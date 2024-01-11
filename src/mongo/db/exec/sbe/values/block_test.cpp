@@ -587,7 +587,7 @@ public:
         return _vals.size();
     }
     value::DeblockedTagVals deblock(
-        boost::optional<value::DeblockedTagValStorage>& storage) const override {
+        boost::optional<value::DeblockedTagValStorage>& storage) override {
         return {_vals.size(), _tags.data(), _vals.data()};
     }
     std::unique_ptr<value::ValueBlock> clone() const override {

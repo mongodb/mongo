@@ -292,6 +292,42 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSum(Ar
 }
 
 namespace {
+template <class Cmp>
+FastTuple<bool, value::TypeTags, value::Value> homogeneousCmpScalar(
+    value::DeblockedHomogeneousVals deblocked, value::Value val, Cmp op = {}) {
+    std::vector<value::Value> res(deblocked.vals.size());
+    switch (deblocked.tag) {
+        case value::TypeTags::NumberInt32: {
+            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
+                res[i] = value::bitcastFrom<bool>(op(value::bitcastTo<int32_t>(deblocked.vals[i]),
+                                                     value::bitcastTo<int32_t>(val)));
+            }
+            break;
+        }
+        case value::TypeTags::NumberInt64:
+        case value::TypeTags::Date: {
+            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
+                res[i] = value::bitcastFrom<bool>(op(value::bitcastTo<int64_t>(deblocked.vals[i]),
+                                                     value::bitcastTo<int64_t>(val)));
+            }
+            break;
+        }
+        case value::TypeTags::NumberDouble:
+            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
+                res[i] = value::bitcastFrom<bool>(
+                    op(value::bitcastTo<double>(deblocked.vals[i]), value::bitcastTo<double>(val)));
+            }
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    // TODO SERVER-83799 Change to BitsetBlock
+    auto out = std::make_unique<value::BoolBlock>(std::move(res), std::move(deblocked.bitset));
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
+}
+
 template <class Cmp, ColumnOpType::Flags AddFlags = ColumnOpType::kNoFlags>
 FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueBlock* blockView,
                                                                    value::TypeTags rhsTag,
@@ -306,12 +342,29 @@ FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueB
         return value::genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
     });
 
+    // Attempt to take advantage of the fact that the comparison could be monotonic. If this doesn't
+    // work, we'll have to extract the contents of the block and compare them one by one.
+    if (auto fastPathRes = blockView->mapMonotonicFastPath(cmpOp); fastPathRes) {
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(fastPathRes.release())};
+    }
+
+    // Second best case, we can get a view of the data in homogeneous form and apply the comparison
+    // in a typed way.
+    auto deblocked = blockView->extractHomogeneous();
+    // Compare fast path for when the input block is strongly typed, and has the same tag as the
+    // value it's being compared to.
+    if (deblocked && deblocked->tag == rhsTag) {
+        return homogeneousCmpScalar<Cmp>(*deblocked, rhsVal);
+    }
+
+    // Generic case: apply the operation one at a time using the generic map() api.
     auto res = blockView->map(cmpOp);
 
     return {
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
 }
-
 }  // namespace
 
 template <class Cmp, ColumnOpType::Flags AddFlags>
@@ -323,6 +376,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmpSca
     auto [valueOwned, valueTag, valueVal] = getFromStack(1);
 
     auto blockView = value::getValueBlock(blockVal);
+
     return blockCompareGeneric<Cmp, AddFlags>(blockView, valueTag, valueVal);
 }
 
@@ -556,6 +610,15 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
               value::bitcastFrom<value::ValueBlock*>(outBlock.release()));
 }
 
+namespace {
+bool allSame(const std::vector<value::Value>& bools) {
+    bool firstBool = bools.size() > 0 ? value::bitcastTo<bool>(bools[0]) : false;
+    return bools.size() > 0
+        ? std::all_of(bools.begin(), bools.end(), [firstBool](bool b) { return b == firstBool; })
+        : false;
+}
+}  // namespace
+
 template <class Op>
 std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
                                                   value::ValueBlock* rightBlock,
@@ -569,22 +632,19 @@ std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
         const auto& right = rightBoolBlock->getVector();
         tassert(8378900, "Mismatch on size", left.size() == right.size());
 
-        std::vector<bool> boolOut(left.size());
+        std::vector<value::Value> boolOut(left.size());
 
         for (size_t i = 0; i < left.size(); ++i) {
-            boolOut[i] = op(left[i], right[i]);
+            const auto leftBool = value::bitcastTo<bool>(left[i]);
+            const auto rightBool = value::bitcastTo<bool>(right[i]);
+            boolOut[i] = value::bitcastFrom<bool>(op(leftBool, rightBool));
         }
 
-        bool allSame = boolOut.size() > 0;
-        bool firstBool = allSame ? boolOut[0] : false;
-        for (size_t i = 1; i < boolOut.size() && allSame; ++i) {
-            allSame = firstBool == boolOut[i];
-        }
-
-        if (allSame) {
+        if (allSame(boolOut)) {
+            invariant(boolOut.size() > 0);
             // All resulting bools were the same so we can return a MonoBlock.
             return std::make_unique<value::MonoBlock>(
-                left.size(), value::TypeTags::Boolean, value::bitcastFrom<bool>(firstBool));
+                left.size(), value::TypeTags::Boolean, value::bitcastFrom<bool>(boolOut[0]));
         } else {
             return std::make_unique<value::BoolBlock>(std::move(boolOut));
         }
@@ -598,25 +658,20 @@ std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
         bool allBool = allBools(left.tags, left.count) && allBools(right.tags, right.count);
         tassert(7953532, "Expected all bool inputs", allBool);
 
-        std::vector<bool> boolOut(left.count);
+        std::vector<value::Value> boolOut(left.count);
         std::vector<value::TypeTags> tagOut(left.count, value::TypeTags::Boolean);
 
         for (size_t i = 0; i < left.count; ++i) {
             const auto leftBool = value::bitcastTo<bool>(left.vals[i]);
             const auto rightBool = value::bitcastTo<bool>(right.vals[i]);
-            boolOut[i] = op(leftBool, rightBool);
+            boolOut[i] = value::bitcastFrom<bool>(op(leftBool, rightBool));
         }
 
-        bool allSame = boolOut.size() > 0;
-        bool firstBool = allSame ? boolOut[0] : false;
-        for (size_t i = 1; i < boolOut.size() && allSame; ++i) {
-            allSame = firstBool == boolOut[i];
-        }
-
-        if (allSame) {
+        if (allSame(boolOut)) {
+            invariant(boolOut.size() > 0);
             // All resulting bools were the same so we can return a MonoBlock.
             return std::make_unique<value::MonoBlock>(
-                left.count, value::TypeTags::Boolean, value::bitcastFrom<bool>(firstBool));
+                left.count, value::TypeTags::Boolean, value::bitcastFrom<bool>(boolOut[0]));
         } else {
             return std::make_unique<value::BoolBlock>(std::move(boolOut));
         }
@@ -830,12 +885,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
     // The last run is implicitly ended.
     ++runsSeen;
 
-    std::vector<bool> folded(runsSeen);
+    // TODO SERVER-83799 Use BitsetBlock instead
+    std::vector<value::Value> folded(runsSeen);
     for (size_t i = 0; i < folded.size(); ++i) {
-        folded[i] = static_cast<bool>(foldCounts[i]);
+        folded[i] = value::bitcastFrom<bool>(static_cast<bool>(foldCounts[i]));
     }
 
-    auto blockOut = std::make_unique<value::BoolBlock>(std::move(folded));
+    auto blockOut = std::make_unique<value::HeterogeneousBlock>(
+        std::vector<value::TypeTags>(folded.size(), value::TypeTags::Boolean), std::move(folded));
 
     return {true,
             value::TypeTags::valueBlock,

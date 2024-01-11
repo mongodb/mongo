@@ -87,9 +87,7 @@ public:
                    std::vector<char> filterPosInfo,
                    std::vector<bool> expectedResult);
 
-    void testCmpScalar(const std::vector<std::pair<value::TypeTags, value::Value>>& testValues,
-                       EPrimBinary::Op,
-                       StringData cmpFunctionName);
+    void testCmpScalar(EPrimBinary::Op, StringData cmpFunctionName, value::ValueBlock* valBlock);
 
     std::pair<std::vector<bool>, std::vector<bool>> naiveLogicalAndOr(
         std::unique_ptr<value::ValueBlock> leftBlock,
@@ -958,10 +956,41 @@ TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
     );
 }
 
-void SBEBlockExpressionTest::testCmpScalar(
-    const std::vector<std::pair<value::TypeTags, value::Value>>& testValues,
-    EPrimBinary::Op scalarOp,
-    StringData cmpFunctionName) {
+template <typename BlockType, typename T>
+std::unique_ptr<BlockType> makeTestHomogeneousBlock() {
+    std::unique_ptr<BlockType> testHomogeneousBlock = std::make_unique<BlockType>();
+    testHomogeneousBlock->push_back(value::bitcastFrom<T>(-1));
+    testHomogeneousBlock->push_back(value::bitcastFrom<T>(0));
+    testHomogeneousBlock->push_back(value::bitcastFrom<T>(1));
+    testHomogeneousBlock->push_back(value::bitcastFrom<T>(std::numeric_limits<T>::min()));
+    testHomogeneousBlock->push_back(value::bitcastFrom<T>(std::numeric_limits<T>::max()));
+    testHomogeneousBlock->pushNothing();
+    return testHomogeneousBlock;
+}
+
+std::unique_ptr<value::ValueBlock> makeTestInt32Block() {
+    return makeTestHomogeneousBlock<value::Int32Block, int32_t>();
+}
+
+std::unique_ptr<value::ValueBlock> makeTestInt64Block() {
+    return makeTestHomogeneousBlock<value::Int64Block, int64_t>();
+}
+
+std::unique_ptr<value::ValueBlock> makeTestDateBlock() {
+    return makeTestHomogeneousBlock<value::DateBlock, int64_t>();
+}
+
+std::unique_ptr<value::ValueBlock> makeTestDoubleBlock() {
+    auto testDoubleBlock = makeTestHomogeneousBlock<value::DoubleBlock, double>();
+    testDoubleBlock->push_back(std::numeric_limits<double>::quiet_NaN());
+    testDoubleBlock->push_back(std::numeric_limits<double>::signaling_NaN());
+    return testDoubleBlock;
+}
+
+void SBEBlockExpressionTest::testCmpScalar(EPrimBinary::Op scalarOp,
+                                           StringData cmpFunctionName,
+                                           value::ValueBlock* valBlock) {
+    invariant(valBlock != nullptr);
 
     value::ViewOfValueAccessor valBlockAccessor;
     value::ViewOfValueAccessor scalarAccessorLhs;
@@ -970,14 +999,10 @@ void SBEBlockExpressionTest::testCmpScalar(
     auto scalarSlotLhs = bindAccessor(&scalarAccessorLhs);
     auto scalarSlotRhs = bindAccessor(&scalarAccessorRhs);
 
-    auto valBlock = std::make_unique<value::HeterogeneousBlock>();
-    for (auto [t, v] : testValues) {
-        auto [cpyT, cpyV] = value::copyValue(t, v);
-        valBlock->push_back(cpyT, cpyV);
-    }
+    auto deblocked = valBlock->extract();
 
     valBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
-                           value::bitcastFrom<value::ValueBlock*>(valBlock.get()));
+                           value::bitcastFrom<value::ValueBlock*>(valBlock));
 
     auto expr = makeE<sbe::EFunction>(
         cmpFunctionName,
@@ -988,8 +1013,8 @@ void SBEBlockExpressionTest::testCmpScalar(
         scalarOp, makeE<EVariable>(scalarSlotLhs), makeE<EVariable>(scalarSlotRhs));
     auto compiledScalarExpr = compileExpression(*scalarExpr);
 
-    for (auto [t, v] : testValues) {
-        scalarAccessorRhs.reset(t, v);
+    for (size_t i = 0; i < deblocked.count; ++i) {
+        scalarAccessorRhs.reset(deblocked.tags[i], deblocked.vals[i]);
 
         // Run the block expression and get the result.
         auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
@@ -999,21 +1024,21 @@ void SBEBlockExpressionTest::testCmpScalar(
         auto* resultValBlock = value::getValueBlock(runVal);
         auto resultExtracted = resultValBlock->extract();
 
-        ASSERT_EQ(resultExtracted.count, testValues.size());
+        ASSERT_EQ(resultExtracted.count, deblocked.count);
 
-        for (size_t i = 0; i < resultExtracted.count; ++i) {
+        for (size_t j = 0; j < resultExtracted.count; ++j) {
             // Determine the expected result.
-            scalarAccessorLhs.reset(testValues[i].first, testValues[i].second);
+            scalarAccessorLhs.reset(deblocked.tags[j], deblocked.vals[j]);
             auto [expectedTag, expectedVal] = runCompiledExpression(compiledScalarExpr.get());
             value::ValueGuard guard(expectedTag, expectedVal);
 
 
-            auto [gotTag, gotVal] = resultExtracted[i];
+            auto [gotTag, gotVal] = resultExtracted[j];
 
             auto [cmpTag, cmpVal] = value::compareValue(gotTag, gotVal, expectedTag, expectedVal);
             ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32) << gotTag << " " << expectedTag;
             ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0)
-                << "Comparing " << std::pair(t, v) << " " << testValues[i] << " and got "
+                << "Comparing " << deblocked[i] << " " << deblocked[j] << " and got "
                 << std::pair(gotTag, gotVal) << " expected " << std::pair(expectedTag, expectedVal);
         }
     }
@@ -1034,18 +1059,35 @@ TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarTest) {
         makeDouble(111.0),
     };
 
-    ON_BLOCK_EXIT([&]() {
-        for (auto [t, v] : testValues) {
-            value::releaseValue(t, v);
-        }
-    });
+    std::unique_ptr<value::HeterogeneousBlock> testBlock =
+        std::make_unique<value::HeterogeneousBlock>();
+    for (auto tv : testValues) {
+        testBlock->push_back(tv);
+    }
 
-    testCmpScalar(testValues, EPrimBinary::greater, "valueBlockGtScalar");
-    testCmpScalar(testValues, EPrimBinary::greaterEq, "valueBlockGteScalar");
-    testCmpScalar(testValues, EPrimBinary::less, "valueBlockLtScalar");
-    testCmpScalar(testValues, EPrimBinary::lessEq, "valueBlockLteScalar");
-    testCmpScalar(testValues, EPrimBinary::eq, "valueBlockEqScalar");
-    testCmpScalar(testValues, EPrimBinary::neq, "valueBlockNeqScalar");
+    testCmpScalar(EPrimBinary::greater, "valueBlockGtScalar", testBlock.get());
+    testCmpScalar(EPrimBinary::greaterEq, "valueBlockGteScalar", testBlock.get());
+    testCmpScalar(EPrimBinary::less, "valueBlockLtScalar", testBlock.get());
+    testCmpScalar(EPrimBinary::lessEq, "valueBlockLteScalar", testBlock.get());
+    testCmpScalar(EPrimBinary::eq, "valueBlockEqScalar", testBlock.get());
+    testCmpScalar(EPrimBinary::neq, "valueBlockNeqScalar", testBlock.get());
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarHomogeneousTest) {
+    std::vector<std::unique_ptr<value::ValueBlock>> testBlocks;
+    testBlocks.push_back(makeTestInt32Block());
+    testBlocks.push_back(makeTestInt64Block());
+    testBlocks.push_back(makeTestDateBlock());
+    testBlocks.push_back(makeTestDoubleBlock());
+
+    for (auto& block : testBlocks) {
+        testCmpScalar(EPrimBinary::greater, "valueBlockGtScalar", block.get());
+        testCmpScalar(EPrimBinary::greaterEq, "valueBlockGteScalar", block.get());
+        testCmpScalar(EPrimBinary::less, "valueBlockLtScalar", block.get());
+        testCmpScalar(EPrimBinary::lessEq, "valueBlockLteScalar", block.get());
+        testCmpScalar(EPrimBinary::eq, "valueBlockEqScalar", block.get());
+        testCmpScalar(EPrimBinary::neq, "valueBlockNeqScalar", block.get());
+    }
 }
 
 TEST_F(SBEBlockExpressionTest, BlockNewTest) {

@@ -110,10 +110,12 @@ public:
 
     ~TsBlock() override;
 
+    boost::optional<DeblockedHomogeneousVals> extractHomogeneous() override;
+
     std::unique_ptr<ValueBlock> clone() const override;
     std::unique_ptr<TsBlock> cloneStrongTyped() const;
 
-    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) const override;
+    DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) override;
 
     // Return whether or not any values of the field are arrays, otherwise return boost::none.
     boost::optional<bool> tryHasNoArrays() {
@@ -153,7 +155,7 @@ public:
     }
 
 private:
-    void ensureDeblocked(boost::optional<DeblockedTagValStorage>& storage) const;
+    void ensureDeblocked();
 
     /**
      * Deblocks the values from a BSON object block.
@@ -188,6 +190,10 @@ private:
     // Store the min and max found in the control field of a bucket
     std::pair<TypeTags, Value> _controlMin;
     std::pair<TypeTags, Value> _controlMax;
+
+    // A HeterogeneousBlock or HomogeneousBlock that stores the decompressed values of the original
+    // TsBlock.
+    std::unique_ptr<ValueBlock> _decompressedBlock;
 };
 
 /**

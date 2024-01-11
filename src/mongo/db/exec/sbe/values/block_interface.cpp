@@ -172,6 +172,7 @@ TokenizedBlock MonoBlock::tokenize() {
             std::vector<size_t>(_count, 0)};
 }
 
+namespace {
 /**
  * Defines equivalence of two Value's. Should only be used for NumberInt32, NumberInt64, and Date.
  */
@@ -188,13 +189,14 @@ struct IntValueEq {
         return bcLHS == bcRHS;
     }
 };
+}  // namespace
 
 // Should not be used for DoubleBlocks since hashValue has special handling of NaN's that differs
 // from naively using absl::Hash<double>.
-template <class T, value::TypeTags TypeTag>
+template <typename T, value::TypeTags TypeTag>
 TokenizedBlock HomogeneousBlock<T, TypeTag>::tokenize() {
     std::vector<Value> tokenVals{};
-    std::vector<size_t> idxs(_missingBitset.size(), 0);
+    std::vector<size_t> idxs(_presentBitset.size(), 0);
 
     auto tokenMap = absl::flat_hash_map<Value, size_t, absl::Hash<T>, IntValueEq<T>>{};
 
@@ -207,15 +209,15 @@ TokenizedBlock HomogeneousBlock<T, TypeTag>::tokenize() {
 
     // We make Nothing the first token and initialize 'idxs' to all zeroes. This means that Nothing
     // is our "default" value, and we only have to set values in idxes for non-Nothings.
-    size_t bitsetIndex = _missingBitset.find_first();
-    for (size_t i = 0; i < _vals.size() && bitsetIndex < _missingBitset.size(); ++i) {
+    size_t bitsetIndex = _presentBitset.find_first();
+    for (size_t i = 0; i < _vals.size() && bitsetIndex < _presentBitset.size(); ++i) {
         auto [it, inserted] = tokenMap.insert({_vals[i], uniqueCount});
         if (inserted) {
             ++uniqueCount;
             tokenVals.push_back(_vals[i]);
         }
         idxs[bitsetIndex] = it->second;
-        bitsetIndex = _missingBitset.find_next(bitsetIndex);
+        bitsetIndex = _presentBitset.find_next(bitsetIndex);
     }
 
     std::vector<TypeTags> tokenTags(uniqueCount, TypeTag);
@@ -259,29 +261,29 @@ std::unique_ptr<ValueBlock> ValueBlock::fillEmpty(TypeTags fillTag, Value fillVa
             vals[i] = val;
         }
     }
+
     return std::make_unique<HeterogeneousBlock>(
         std::move(tags), std::move(vals), true /* isDense */);
 }
 
-template <class T, value::TypeTags TypeTag>
+template <typename T, value::TypeTags TypeTag>
 std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::fillEmpty(TypeTags fillTag,
                                                                     Value fillVal) {
     if (*tryDense()) {
         return nullptr;
     } else if (fillTag == TypeTag) {
-        if (_missingBitset.none()) {
-            std::vector<T> vals(_missingBitset.size(), fillVal);
-            return std::make_unique<HomogeneousBlock<T, TypeTag>>(std::move(vals));
+        if (_presentBitset.none()) {
+            return std::make_unique<MonoBlock>(_presentBitset.size(), fillTag, fillVal);
         }
         // We also know that fillTag must be shallow since HomogeneousBlocks can only store
         // shallow types.
         size_t valsIndex = 0;
-        std::vector<T> vals(_missingBitset.size());
-        for (size_t i = 0; i < _missingBitset.size(); ++i) {
-            if (_missingBitset[i]) {
+        std::vector<Value> vals(_presentBitset.size());
+        for (size_t i = 0; i < _presentBitset.size(); ++i) {
+            if (_presentBitset[i]) {
                 vals[i] = _vals[valsIndex++];
             } else {
-                vals[i] = value::bitcastTo<T>(fillVal);
+                vals[i] = fillVal;
             }
         }
         return std::make_unique<HomogeneousBlock<T, TypeTag>>(std::move(vals));
@@ -301,9 +303,9 @@ std::unique_ptr<ValueBlock> ValueBlock::exists() {
             *tryCount(), TypeTags::Boolean, value::bitcastFrom<bool>(true));
     }
     auto extracted = extract();
-    std::vector<bool> vals(extracted.count);
+    std::vector<Value> vals(extracted.count);
     for (size_t i = 0; i < extracted.count; ++i) {
-        vals[i] = extracted.tags[i] != TypeTags::Nothing;
+        vals[i] = value::bitcastFrom<bool>(extracted.tags[i] != TypeTags::Nothing);
     }
     return std::make_unique<BoolBlock>(std::move(vals));
 }
