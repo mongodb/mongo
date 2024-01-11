@@ -1,5 +1,5 @@
 /**
- * Tests updateOne with id without shard key works with StaleConfigError.
+ * Tests deleteOne with id without shard key works with StaleConfigError.
  *
  * @tags: [featureFlagUpdateOneWithIdWithoutShardKey, requires_fcv_73]
  */
@@ -32,12 +32,13 @@ assert.neq(st.s1.getDB(jsTestName()).coll.findOne({x: -1, _id: -1}))
 assert.commandWorked(
     db.adminCommand({moveChunk: coll.getFullName(), find: {x: -1}, to: st.shard1.shardName}));
 
-// This update via mongos1 should trigger a StaleConfigError as mongos1 is not aware of moved chunk.
-const res = st.s1.getDB(jsTestName()).coll.updateOne({_id: -1}, {$inc: {counter: 1}});
+// This delete via mongos1 should trigger a StaleConfigError as mongos1 is not aware of moved chunk.
+const res = st.s1.getDB(jsTestName()).coll.deleteOne({_id: -1});
 assert.commandWorked(res);
-assert.eq(res.modifiedCount, 1);
+assert.eq(res.deletedCount, 1);
+
 let mongosServerStatus =
     assert.commandWorked(st.s1.getDB(jsTestName()).adminCommand({serverStatus: 1}));
-assert.eq(1, mongosServerStatus.metrics.query.updateOneWithoutShardKeyWithIdRetryCount);
+assert.eq(1, mongosServerStatus.metrics.query.deleteOneWithoutShardKeyWithIdRetryCount);
 
 st.stop();

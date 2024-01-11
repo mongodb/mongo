@@ -56,6 +56,7 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/inline_executor.h"
@@ -699,6 +700,20 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
             dassert(abortBatch == false);
         }
     }
+
+    if (writeOp.getWriteState() == WriteOpState_Ready) {
+        // The writeOp state "Ready" indicates that the current round of braodcasting the write has
+        // failed and must be retried.
+        auto opType = writeOp.getWriteItem().getOpType();
+        if (opType == BatchedCommandRequest::BatchType_Update) {
+            updateOneWithoutShardKeyWithIdRetryCount.increment(1);
+        } else if (opType == BatchedCommandRequest::BatchType_Delete) {
+            deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
+
     batchOp.handleDeferredWriteConcernErrors();
 }
 

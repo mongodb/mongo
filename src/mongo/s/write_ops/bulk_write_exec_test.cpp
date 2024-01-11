@@ -3473,7 +3473,7 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
     auto& updateOp = op.getWriteOp_forTest(0);
     // Since we got an n=1 reply we are done.
     ASSERT(op.shouldStopCurrentRound());
-    op.finishExecutingWriteWithoutShardKeyWithId();
+    op.finishExecutingWriteWithoutShardKeyWithId(targeted);
     ASSERT(op.isFinished());
     ASSERT_EQ(updateOp.getWriteState(), WriteOpState_Completed);
 
@@ -3621,7 +3621,7 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
     ASSERT_EQ(updateOp.getChildWriteOps_forTest().size(), 0);
     ASSERT_FALSE(op.isFinished());
 
-    op.finishExecutingWriteWithoutShardKeyWithId();
+    op.finishExecutingWriteWithoutShardKeyWithId(targeted);
 
     // Clear the map and perform another round of targeting. `targetWrites` will confirm we
     // targeted identically to the first round.
@@ -3640,7 +3640,7 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndRetryableErrorAndWCError)
 
     // Since we got an n=1 reply we are done.
     ASSERT(op.shouldStopCurrentRound());
-    op.finishExecutingWriteWithoutShardKeyWithId();
+    op.finishExecutingWriteWithoutShardKeyWithId(targeted);
     ASSERT(op.isFinished());
     ASSERT_EQ(updateOp.getWriteState(), WriteOpState_Completed);
 
@@ -3862,7 +3862,7 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoMatchAndNonRetryableErrorAndWCErr
             boost::none},
         boost::none);
 
-    op.finishExecutingWriteWithoutShardKeyWithId();
+    op.finishExecutingWriteWithoutShardKeyWithId(targeted);
     // Due to the error, we should have marked the write as errored.
     ASSERT_EQ(updateOp.getWriteState(), WriteOpState_Error);
     ASSERT(op.isFinished());
@@ -3936,7 +3936,7 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, MatchAndNonRetryableError) {
             boost::none},
         boost::none);
 
-    op.finishExecutingWriteWithoutShardKeyWithId();
+    op.finishExecutingWriteWithoutShardKeyWithId(targeted);
     // We should now consider the write complete due to the success reply and should
     // have discarded the error.
     ASSERT_EQ(updateOp.getWriteState(), WriteOpState_Completed);

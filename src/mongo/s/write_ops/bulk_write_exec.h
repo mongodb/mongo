@@ -339,7 +339,7 @@ public:
      * Finalizes/resets state after executing (or attempting to execute) a write without shard key
      * with _id.
      */
-    void finishExecutingWriteWithoutShardKeyWithId();
+    void finishExecutingWriteWithoutShardKeyWithId(TargetedBatchMap& childBatches);
 
     void noteTargetedShard(const TargetedWriteBatch& targetedBatch);
     void noteNumShardsOwningChunks(size_t nsIdx, int nShardsOwningChunks);

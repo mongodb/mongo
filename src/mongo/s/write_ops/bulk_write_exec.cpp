@@ -59,6 +59,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
@@ -683,7 +684,7 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
                         errorsPerNamespace,
                         /*allowShardKeyUpdatesWithoutFullShardKeyInQuery=*/boost::none);
 
-    bulkWriteOp.finishExecutingWriteWithoutShardKeyWithId();
+    bulkWriteOp.finishExecutingWriteWithoutShardKeyWithId(childBatches);
 }
 
 BulkWriteReplyInfo execute(OperationContext* opCtx,
@@ -1591,7 +1592,7 @@ void BulkWriteOp::noteStaleResponses(
     }
 }
 
-void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
+void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId(TargetedBatchMap& childBatches) {
     // See _deferredWCErrors for details.
     if (_deferredWCErrors) {
         auto& [opIdx, wcErrors] = _deferredWCErrors.value();
@@ -1604,6 +1605,21 @@ void BulkWriteOp::finishExecutingWriteWithoutShardKeyWithId() {
     }
     // See _shouldStopCurrentRound for details.
     _shouldStopCurrentRound = false;
+    auto& opIdx = childBatches.begin()->second->getWrites()[0]->writeOpRef.first;
+    auto& writeOp = _writeOps[opIdx];
+    invariant(writeOp.getWriteType() == WriteType::WithoutShardKeyWithId);
+    if (writeOp.getWriteState() == WriteOpState_Ready) {
+        // The writeOp state "Ready" indicates that the current round of braodcasting the write has
+        // failed and must be retried.
+        auto opType = writeOp.getWriteItem().getOpType();
+        if (opType == BatchedCommandRequest::BatchType_Update) {
+            updateOneWithoutShardKeyWithIdRetryCount.increment(1);
+        } else if (opType == BatchedCommandRequest::BatchType_Delete) {
+            deleteOneWithoutShardKeyWithIdRetryCount.increment(1);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
 }
 
 int BulkWriteOp::getBaseChildBatchCommandSizeEstimate() const {
