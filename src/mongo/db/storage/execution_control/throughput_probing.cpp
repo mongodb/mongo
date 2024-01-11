@@ -36,16 +36,21 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/dump_lock_manager.h"
+#include "mongo/db/locker_api.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/stacktrace.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo::execution_control {
+namespace mongo {
+namespace execution_control {
 namespace throughput_probing {
 
 Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
@@ -95,20 +100,32 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                                      TicketHolder* readTicketHolder,
                                      TicketHolder* writeTicketHolder,
                                      Milliseconds interval)
-    : TicketHolderMonitor(svcCtx, readTicketHolder, writeTicketHolder, interval),
+    : _readTicketHolder(readTicketHolder),
+      _writeTicketHolder(writeTicketHolder),
       _stableConcurrency(
           gInitialConcurrency
               ? gInitialConcurrency
               : std::clamp(static_cast<int32_t>(ProcessInfo::getNumLogicalCores() * 2),
                            gMinConcurrency * 2,
                            gMaxConcurrency.load() * 2)),
-      _timer(svcCtx->getTickSource()) {
+      _timer(svcCtx->getTickSource()),
+      _job(svcCtx->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob{
+          "ThroughputProbingTicketHolderMonitor",
+          [this](Client* client) { _run(client); },
+          interval,
+          // TODO(SERVER-74657): Please revisit if this periodic job could be made killable.
+          false /*isKillableByStepdown*/})) {
     _resetConcurrency();
+}
+
+void ThroughputProbing::start() {
+    _job.start();
 }
 
 void ThroughputProbing::appendStats(BSONObjBuilder& builder) const {
     _stats.serialize(builder);
 }
+
 
 void ThroughputProbing::_run(Client* client) {
     auto numFinishedProcessing =
@@ -259,18 +276,54 @@ void ThroughputProbing::_probeDown(double throughput) {
     }
 }
 
+void ThroughputProbing::_resize(TicketHolder* ticketholder, int newTickets) {
+    Timer timer;
+    auto finishedBefore = ticketholder->numFinishedProcessing();
+    auto deadline = Date_t::now() + Milliseconds(gStallDetectionTimeoutMs.load());
+
+    auto success = ticketholder->resize(newTickets, deadline);
+
+    auto elapsed = timer.elapsed();
+    _stats.resizeDurationMicros.fetchAndAdd(durationCount<Microseconds>(elapsed));
+
+    if (!success) {
+        auto throughput = ticketholder->numFinishedProcessing() - finishedBefore;
+        const auto desc = ticketholder == _readTicketHolder ? "reads" : "writes";
+        LOGV2_FATAL_CONTINUE(8373000,
+                             "Unable to acquire a ticket within deadline, which indicates the "
+                             "system is stalled. Dumping diagnostics",
+                             "ticketPool"_attr = desc,
+                             "total"_attr = ticketholder->outof(),
+                             "target"_attr = newTickets,
+                             "throughput"_attr = throughput,
+                             "queued"_attr = ticketholder->queued(),
+                             "stalled"_attr = elapsed);
+
+        dumpLockManager();
+
+#if defined(MONGO_STACKTRACE_CAN_DUMP_ALL_THREADS)
+        // Dump the stack of each thread, non-blocking.
+        printAllThreadStacks();
+#endif
+
+        if (TestingProctor::instance().isEnabled()) {
+            LOGV2_FATAL(8373001, "Aborting the processes in testing due to ticket stall");
+        }
+    }
+}
+
 void ThroughputProbing::_resetConcurrency() {
     auto [newReadConcurrency, newWriteConcurrency] =
         newReadWriteConcurrencies(_stableConcurrency, 1);
 
-    _readTicketHolder->resize(newReadConcurrency);
-    _writeTicketHolder->resize(newWriteConcurrency);
+    _resize(_readTicketHolder, newReadConcurrency);
+    _resize(_writeTicketHolder, newWriteConcurrency);
 
     LOGV2_DEBUG(7796900,
                 3,
                 "Throughput Probing: reset concurrency to stable",
-                "readConcurrency"_attr = newReadConcurrency,
-                "writeConcurrency"_attr = newWriteConcurrency);
+                "readConcurrency"_attr = _readTicketHolder->outof(),
+                "writeConcurrency"_attr = _writeTicketHolder->outof());
 }
 
 void ThroughputProbing::_increaseConcurrency() {
@@ -284,14 +337,14 @@ void ThroughputProbing::_increaseConcurrency() {
         ++newWriteConcurrency;
     }
 
-    _readTicketHolder->resize(newReadConcurrency);
-    _writeTicketHolder->resize(newWriteConcurrency);
+    _resize(_readTicketHolder, newReadConcurrency);
+    _resize(_writeTicketHolder, newWriteConcurrency);
 
     LOGV2_DEBUG(7796901,
                 3,
                 "Throughput Probing: increasing concurrency",
-                "readConcurrency"_attr = newReadConcurrency,
-                "writeConcurrency"_attr = newWriteConcurrency);
+                "readConcurrency"_attr = _readTicketHolder->outof(),
+                "writeConcurrency"_attr = _writeTicketHolder->outof());
 }
 
 void ThroughputProbing::_decreaseConcurrency() {
@@ -305,14 +358,14 @@ void ThroughputProbing::_decreaseConcurrency() {
         --newWriteConcurrency;
     }
 
-    _readTicketHolder->resize(newReadConcurrency);
-    _writeTicketHolder->resize(newWriteConcurrency);
+    _resize(_readTicketHolder, newReadConcurrency);
+    _resize(_writeTicketHolder, newWriteConcurrency);
 
     LOGV2_DEBUG(7796902,
                 3,
                 "Throughput Probing: decreasing concurrency",
-                "readConcurrency"_attr = newReadConcurrency,
-                "writeConcurrency"_attr = newWriteConcurrency);
+                "readConcurrency"_attr = _readTicketHolder->outof(),
+                "writeConcurrency"_attr = _writeTicketHolder->outof());
 }
 
 void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
@@ -320,6 +373,25 @@ void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("timesIncreased", static_cast<long long>(timesIncreased.load()));
     builder.append("totalAmountDecreased", static_cast<long long>(totalAmountDecreased.load()));
     builder.append("totalAmountIncreased", static_cast<long long>(totalAmountIncreased.load()));
+    builder.append("resizeDurationMicros", static_cast<long long>(resizeDurationMicros.load()));
+}
+}  // namespace execution_control
+
+ThroughputProbingTicketHolderManager::ThroughputProbingTicketHolderManager(
+    ServiceContext* svcCtx,
+    std::unique_ptr<TicketHolder> read,
+    std::unique_ptr<TicketHolder> write,
+    Milliseconds interval)
+    : TicketHolderManager(std::move(read), std::move(write)) {
+    _monitor = std::make_unique<execution_control::ThroughputProbing>(
+        svcCtx, _readTicketHolder.get(), _writeTicketHolder.get(), interval);
+    _monitor->start();
 }
 
-}  // namespace mongo::execution_control
+void ThroughputProbingTicketHolderManager::_appendImplStats(BSONObjBuilder& b) const {
+    BSONObjBuilder bbb(b.subobjStart("monitor"));
+    _monitor->appendStats(bbb);
+    bbb.done();
+}
+
+}  // namespace mongo

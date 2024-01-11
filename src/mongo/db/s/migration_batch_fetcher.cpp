@@ -133,7 +133,7 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
       _migrationId{migrationId},
       _writeConcern{writeConcern},
       _isParallelFetchingSupported{parallelFetchingSupported},
-      _secondaryThrottleTicket(1, outerOpCtx->getServiceContext()),
+      _secondaryThrottleTicket(outerOpCtx->getServiceContext(), 1, false /* trackPeakUsed */),
       _bufferSizeTracker(maxBufferedSizeBytesPerThread) {
     _inserterWorkers->startup();
 }

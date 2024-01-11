@@ -37,14 +37,16 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/ticketholder_monitor.h"
+#include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/timer.h"
 
-namespace mongo::execution_control {
+namespace mongo {
+namespace execution_control {
 namespace throughput_probing {
 
 Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
@@ -58,14 +60,16 @@ Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantI
  * attempting to maximize throughput. Assumes both ticket holders have the same starting concurrency
  * level and always keeps the same concurrency level for both.
  */
-class ThroughputProbing : public TicketHolderMonitor {
+class ThroughputProbing {
 public:
     ThroughputProbing(ServiceContext* svcCtx,
                       TicketHolder* readTicketHolder,
                       TicketHolder* writeTicketHolder,
                       Milliseconds interval);
 
-    virtual void appendStats(BSONObjBuilder& builder) const override;
+    void appendStats(BSONObjBuilder& builder) const;
+
+    void start();
 
 private:
     enum class ProbingState {
@@ -74,7 +78,7 @@ private:
         kDown,
     };
 
-    void _run(Client*) override;
+    void _run(Client*);
 
     void _probeStable(double throughput);
     void _probeUp(double throughput);
@@ -83,6 +87,11 @@ private:
     void _resetConcurrency();
     void _increaseConcurrency();
     void _decreaseConcurrency();
+
+    void _resize(TicketHolder* ticketholder, int newTickets);
+
+    TicketHolder* _readTicketHolder;
+    TicketHolder* _writeTicketHolder;
 
     // This value is split between reads and writes based on the read/write ratio.
     double _stableConcurrency;
@@ -99,7 +108,31 @@ private:
         AtomicWord<int64_t> timesIncreased;
         AtomicWord<int64_t> totalAmountDecreased;
         AtomicWord<int64_t> totalAmountIncreased;
+        AtomicWord<int64_t> resizeDurationMicros;
     } _stats;
+
+    PeriodicJobAnchor _job;
 };
 
-}  // namespace mongo::execution_control
+}  // namespace execution_control
+
+class ThroughputProbingTicketHolderManager : public TicketHolderManager {
+public:
+    ThroughputProbingTicketHolderManager(ServiceContext* svcCtx,
+                                         std::unique_ptr<TicketHolder> readTicketHolder,
+                                         std::unique_ptr<TicketHolder> writeTicketHolder,
+                                         Milliseconds interval);
+    virtual bool supportsRuntimeSizeAdjustment() const override {
+        return false;
+    }
+
+protected:
+    virtual void _appendImplStats(BSONObjBuilder& builder) const override;
+
+private:
+    /**
+     * Task which adjusts the number of concurrent read/write transactions.
+     */
+    std::unique_ptr<execution_control::ThroughputProbing> _monitor;
+};
+}  // namespace mongo

@@ -87,8 +87,10 @@ void tsFromDate(const Date_t& deadline, struct timespec& ts) {
 }
 }  // namespace
 
-SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext)
-    : TicketHolder(numTickets, serviceContext) {
+SemaphoreTicketHolder::SemaphoreTicketHolder(ServiceContext* serviceContext,
+                                             int numTickets,
+                                             bool trackPeakUsed)
+    : TicketHolder(serviceContext, numTickets, trackPeakUsed) {
     check(sem_init(&_sem, 0, numTickets));
 }
 
@@ -149,24 +151,12 @@ int32_t SemaphoreTicketHolder::available() const {
     return val;
 }
 
-void SemaphoreTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
-    auto difference = newSize - oldSize;
-
-    if (difference > 0) {
-        for (int32_t i = 0; i < difference; i++) {
-            check(sem_post(&_sem));
-        }
-    } else if (difference < 0) {
-        for (int32_t i = 0; i < -difference; i++) {
-            check(sem_wait(&_sem));
-        }
-    }
-}
-
 #else
 
-SemaphoreTicketHolder::SemaphoreTicketHolder(int32_t numTickets, ServiceContext* svcCtx)
-    : TicketHolder(numTickets, svcCtx), _numTickets(numTickets) {}
+SemaphoreTicketHolder::SemaphoreTicketHolder(ServiceContext* svcCtx,
+                                             int numTickets,
+                                             bool trackPeakUsed)
+    : TicketHolder(svcCtx, numTickets, trackPeakUsed), _numTickets(numTickets) {}
 
 SemaphoreTicketHolder::~SemaphoreTicketHolder() = default;
 
@@ -223,19 +213,5 @@ bool SemaphoreTicketHolder::_tryAcquire() {
     return true;
 }
 
-void SemaphoreTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
-    auto difference = newSize - oldSize;
-
-    stdx::lock_guard<Latch> lk(_mutex);
-    _numTickets += difference;
-
-    if (difference > 0) {
-        for (int32_t i = 0; i < difference; i++) {
-            _newTicket.notify_one();
-        }
-    }
-    // No need to do anything in the other cases as the number of tickets being <= 0 implies they'll
-    // have to wait until the current ticket holders release their tickets.
-}
 #endif
 }  // namespace mongo

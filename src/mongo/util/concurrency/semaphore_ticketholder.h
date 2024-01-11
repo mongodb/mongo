@@ -53,7 +53,9 @@ namespace mongo {
 
 class SemaphoreTicketHolder final : public TicketHolder {
 public:
-    explicit SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext);
+    explicit SemaphoreTicketHolder(ServiceContext* serviceContext,
+                                   int numTickets,
+                                   bool trackPeakUsed);
     ~SemaphoreTicketHolder() override final;
 
     int32_t available() const override final;
@@ -75,8 +77,6 @@ private:
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
-
-    void _resize(int32_t newSize, int32_t oldSize) noexcept override final;
 
     QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final {
         return _semaphoreStats;

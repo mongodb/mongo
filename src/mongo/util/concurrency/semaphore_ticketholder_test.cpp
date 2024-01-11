@@ -47,7 +47,9 @@ class SemaphoreTicketHolderTest : public TicketHolderTestFixture {};
 TEST_F(SemaphoreTicketHolderTest, BasicTimeoutSemaphore) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    basicTimeout(_opCtx.get(), std::make_unique<SemaphoreTicketHolder>(1, &serviceContext));
+    basicTimeout(
+        _opCtx.get(),
+        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */));
 }
 
 TEST_F(SemaphoreTicketHolderTest, ResizeStatsSemaphore) {
@@ -56,14 +58,17 @@ TEST_F(SemaphoreTicketHolderTest, ResizeStatsSemaphore) {
     auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
 
     resizeTest(
-        _opCtx.get(), std::make_unique<SemaphoreTicketHolder>(1, &serviceContext), tickSource);
+        _opCtx.get(),
+        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */),
+        tickSource);
 }
 
 TEST_F(SemaphoreTicketHolderTest, Interruption) {
     ServiceContext serviceContext;
     serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    interruptTest(_opCtx.get(),
-                  std::make_unique<SemaphoreTicketHolder>(1 /* tickets */, getServiceContext()));
+    interruptTest(
+        _opCtx.get(),
+        std::make_unique<SemaphoreTicketHolder>(&serviceContext, 1, false /* trackPeakUsed */));
 }
 
 }  // namespace

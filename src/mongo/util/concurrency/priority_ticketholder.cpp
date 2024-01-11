@@ -44,10 +44,11 @@
 
 namespace mongo {
 
-PriorityTicketHolder::PriorityTicketHolder(int32_t numTickets,
+PriorityTicketHolder::PriorityTicketHolder(ServiceContext* serviceContext,
+                                           int32_t numTickets,
                                            int32_t lowPriorityBypassThreshold,
-                                           ServiceContext* serviceContext)
-    : TicketHolder(numTickets, serviceContext),
+                                           bool trackPeakUsed)
+    : TicketHolder(serviceContext, numTickets, trackPeakUsed),
       _serviceContext(serviceContext),
       _pool(numTickets, lowPriorityBypassThreshold) {}
 
@@ -126,23 +127,6 @@ void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) no
     // 'Immediate' priority operations should bypass the ticketing system completely.
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
     _pool.release();
-}
-
-void PriorityTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
-    auto difference = newSize - oldSize;
-
-    if (difference > 0) {
-        // Hand out tickets one-by-one until we've given them all out.
-        for (auto remaining = difference; remaining > 0; remaining--) {
-            _pool.release();
-        }
-    } else {
-        AdmissionContext admCtx;
-        // Take tickets one-by-one without releasing.
-        for (auto remaining = -difference; remaining > 0; remaining--) {
-            _pool.acquire(&admCtx, Date_t::max());
-        }
-    }
 }
 
 TicketHolder::QueueStats& PriorityTicketHolder::_getQueueStatsToUse(

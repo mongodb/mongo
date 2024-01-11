@@ -98,3 +98,13 @@ server_parameters:
     validator:
       gt: 0
       lte: 1
+
+  throughputProbingStallDetectionTimeoutMs:
+    description: >-
+      How long we wait until we report a stall
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<int32_t>
+    cpp_varname: gStallDetectionTimeoutMs
+    default: 60000
+    validator:
+      gt: 0

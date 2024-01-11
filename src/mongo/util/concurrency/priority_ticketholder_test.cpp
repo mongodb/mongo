@@ -113,22 +113,28 @@ private:
 
 TEST_F(PriorityTicketHolderTest, BasicTimeoutPriority) {
     basicTimeout(_opCtx.get(),
-                 std::make_unique<PriorityTicketHolder>(1 /* tickets */,
+                 std::make_unique<PriorityTicketHolder>(getServiceContext(),
+                                                        1 /* tickets */,
                                                         kDefaultLowPriorityAdmissionBypassThreshold,
-                                                        getServiceContext()));
+                                                        false /* trackPeakUsed */
+                                                        ));
 }
 
 TEST_F(PriorityTicketHolderTest, ResizeStatsPriority) {
     resizeTest(_opCtx.get(),
-               std::make_unique<PriorityTicketHolder>(1 /* tickets */,
+               std::make_unique<PriorityTicketHolder>(getServiceContext(),
+                                                      1 /* tickets */,
                                                       kDefaultLowPriorityAdmissionBypassThreshold,
-                                                      getServiceContext()),
+                                                      false /* trackPeakUsed */
+                                                      ),
                getTickSource());
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityTwoQueuedOperations) {
-    PriorityTicketHolder holder(
-        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
+    PriorityTicketHolder holder(getServiceContext(),
+                                1 /* tickets */,
+                                kDefaultLowPriorityAdmissionBypassThreshold,
+                                false /* trackPeakUsed*/);
 
     Stats stats(&holder);
 
@@ -199,8 +205,10 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoQueuedOperations) {
 
 
 TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
-    PriorityTicketHolder holder(
-        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
+    PriorityTicketHolder holder(getServiceContext(),
+                                1 /* tickets */,
+                                kDefaultLowPriorityAdmissionBypassThreshold,
+                                false /* trackPeakUsed*/);
     Stats stats(&holder);
 
     // This mutex is to avoid data race conditions between checking for the ticket state and setting
@@ -317,8 +325,10 @@ TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
-    PriorityTicketHolder holder(
-        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
+    PriorityTicketHolder holder(getServiceContext(),
+                                1 /* tickets */,
+                                kDefaultLowPriorityAdmissionBypassThreshold,
+                                false /* trackPeakUsed*/);
     Stats stats(&holder);
 
     {
@@ -404,8 +414,10 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
-    PriorityTicketHolder holder(
-        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
+    PriorityTicketHolder holder(getServiceContext(),
+                                1 /* tickets */,
+                                kDefaultLowPriorityAdmissionBypassThreshold,
+                                false /* trackPeakUsed*/);
     Stats stats(&holder);
 
     MockAdmission lowPriorityAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
@@ -498,8 +510,10 @@ TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityCanceled) {
-    PriorityTicketHolder holder(
-        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
+    PriorityTicketHolder holder(getServiceContext(),
+                                1 /* tickets */,
+                                kDefaultLowPriorityAdmissionBypassThreshold,
+                                false /* trackPeakUsed*/);
     Stats stats(&holder);
     {
         MockAdmission lowPriorityAdmission(this->getServiceContext(),
@@ -556,7 +570,8 @@ TEST_F(PriorityTicketHolderTest, PriorityCanceled) {
 
 TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
     auto lowPriorityBypassThreshold = 2;
-    PriorityTicketHolder holder(1 /* tickets */, lowPriorityBypassThreshold, getServiceContext());
+    PriorityTicketHolder holder(
+        getServiceContext(), 1 /* tickets */, lowPriorityBypassThreshold, false /* trackPeakUsed*/);
     Stats stats(&holder);
 
     // Use the GlobalServiceContext to create MockAdmissions.
@@ -641,7 +656,8 @@ TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
 
 TEST_F(PriorityTicketHolderTest, Interruption) {
     interruptTest(_opCtx.get(),
-                  std::make_unique<PriorityTicketHolder>(1 /* tickets */, 0, getServiceContext()));
+                  std::make_unique<PriorityTicketHolder>(
+                      getServiceContext(), 1 /* tickets */, 0, false /* trackPeakUsed */));
 }
 
 }  // namespace

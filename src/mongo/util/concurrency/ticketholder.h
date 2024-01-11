@@ -61,14 +61,17 @@ class TicketHolder {
     friend class Ticket;
 
 public:
-    TicketHolder(int32_t numTickets, ServiceContext* svcCtx);
+    TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trackPeakUsed);
 
     virtual ~TicketHolder(){};
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
+     *
+     * Returns 'true' if the resize completed without reaching the 'deadline', and 'false'
+     * otherwise.
      */
-    virtual void resize(int32_t newSize) noexcept;
+    bool resize(int32_t newSize, Date_t deadline = Date_t::max()) noexcept;
 
     /**
      * Attempts to acquire a ticket without blocking.
@@ -96,21 +99,22 @@ public:
     /**
      * The total number of tickets allotted to the ticket pool.
      */
-    virtual int32_t outof() const {
+    int32_t outof() const {
         return _outof.loadRelaxed();
     }
 
     /**
      * Instantaneous number of tickets that are checked out by an operation.
      */
-    virtual int32_t used() const {
+    int32_t used() const {
         return outof() - available();
     }
 
     /**
      * Peak number of tickets checked out at once since the previous time this function was called.
+     * Invariants that 'trackPeakUsed' has been passed to the TicketHolder,
      */
-    virtual int32_t getAndResetPeakUsed();
+    int32_t getAndResetPeakUsed();
 
     /**
      * 'Immediate' admissions don't need to acquire or wait for a ticket. However, they should
@@ -184,8 +188,6 @@ private:
 
     virtual void _appendImplStats(BSONObjBuilder& b) const {}
 
-    virtual void _resize(int32_t newSize, int32_t oldSize) noexcept {}
-
     /**
      * Fetches the queueing statistics corresponding to the 'admCtx'. All statistics that are queue
      * specific should be updated through the resulting 'QueueStats'.
@@ -194,12 +196,11 @@ private:
 
     void _updatePeakUsed();
 
+    const bool _trackPeakUsed;
+
     Mutex _resizeMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "TicketHolder::_resizeMutex");
-    AtomicWord<int32_t> _outof;
-    AtomicWord<int32_t> _peakUsed;
     AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount;
-    bool _usingDynamicConcurrencyAdjustment;
 
 protected:
     /**
@@ -207,16 +208,15 @@ protected:
      */
     void _appendCommonQueueImplStats(BSONObjBuilder& b, const QueueStats& stats) const;
 
+    AtomicWord<int32_t> _outof;
+    AtomicWord<int32_t> _peakUsed;
+
     ServiceContext* _serviceContext;
 };
 
 class MockTicketHolder : public TicketHolder {
 public:
-    MockTicketHolder() : TicketHolder(0, nullptr) {}
-
-    void resize(int32_t newSize) noexcept override {
-        _outof = newSize;
-    }
+    MockTicketHolder(ServiceContext* svcCtx) : TicketHolder(svcCtx, 0, true) {}
 
     boost::optional<Ticket> tryAcquire(AdmissionContext*) override;
 
@@ -231,23 +231,15 @@ public:
     void reportImmediatePriorityAdmission() override {}
 
     int32_t available() const override {
-        return _outof - _used;
+        return _available;
     }
 
-    int32_t used() const override {
-        return _used;
-    }
-    void setUsed(int32_t used);
-
-    int32_t getAndResetPeakUsed() override {
-        return std::exchange(_peakUsed, 0);
+    void setPeakUsed(int32_t used) {
+        _peakUsed.store(used);
     }
 
-    int32_t outof() const override {
-        return _outof;
-    }
-    void setOutof(int32_t outof) {
-        _outof = outof;
+    void setAvailable(int32_t available) {
+        _available = available;
     }
 
     int64_t queued() const override {
@@ -263,7 +255,7 @@ public:
     }
 
 private:
-    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override {}
+    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override;
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override;
 
@@ -277,9 +269,7 @@ private:
 
     QueueStats _stats;
 
-    int32_t _used = 0;
-    int32_t _peakUsed = 0;
-    int32_t _outof = 0;
+    int32_t _available = 0;
     int32_t _numFinishedProcessing = 0;
 };
 

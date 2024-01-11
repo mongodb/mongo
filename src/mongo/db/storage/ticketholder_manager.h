@@ -38,13 +38,10 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/ticketholder_monitor.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
-
-class TicketHolder;
 
 /**
  * A ticket mechanism is required for global lock acquisition to reduce contention on storage engine
@@ -57,11 +54,10 @@ class TicketHolder;
  */
 class TicketHolderManager {
 public:
-    TicketHolderManager(ServiceContext* svcCtx,
-                        std::unique_ptr<TicketHolder> readTicketHolder,
+    TicketHolderManager(std::unique_ptr<TicketHolder> readTicketHolder,
                         std::unique_ptr<TicketHolder> writeTicketHolder);
 
-    ~TicketHolderManager(){};
+    virtual ~TicketHolderManager(){};
 
     static Status updateConcurrentWriteTransactions(const int32_t& newWriteTransactions);
     static Status updateConcurrentReadTransactions(const int32_t& newReadTransactions);
@@ -95,7 +91,17 @@ public:
 
     void appendStats(BSONObjBuilder& b);
 
-private:
+    /**
+     * Returns true if this TicketHolderManager supports runtime size adjustment.
+     */
+    virtual bool supportsRuntimeSizeAdjustment() const = 0;
+
+protected:
+    /**
+     * Appends any implementation-specific stats.
+     */
+    virtual void _appendImplStats(BSONObjBuilder& builder) const = 0;
+
     /**
      * Holds tickets for MODE_S/MODE_IS global locks requests.
      */
@@ -105,10 +111,19 @@ private:
      * Holds tickets for MODE_X/MODE_IX global lock requests.
      */
     std::unique_ptr<TicketHolder> _writeTicketHolder;
+};
 
-    /**
-     * Task which adjusts the number of concurrent read/write transactions.
-     */
-    std::unique_ptr<TicketHolderMonitor> _monitor;
+class FixedTicketHolderManager : public TicketHolderManager {
+public:
+    FixedTicketHolderManager(std::unique_ptr<TicketHolder> readTicketHolder,
+                             std::unique_ptr<TicketHolder> writeTicketHolder)
+        : TicketHolderManager(std::move(readTicketHolder), std::move(writeTicketHolder)) {}
+
+    virtual bool supportsRuntimeSizeAdjustment() const override {
+        return true;
+    }
+
+protected:
+    virtual void _appendImplStats(BSONObjBuilder& builder) const override {}
 };
 }  // namespace mongo

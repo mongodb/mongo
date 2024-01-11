@@ -74,10 +74,13 @@ public:
 
     TicketHolderFixture(int threads, ServiceContext* serviceContext) {
         if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
-            ticketHolder = std::make_unique<TicketHolderImpl>(
-                kTickets, kLowPriorityAdmissionBypassThreshold, serviceContext);
+            ticketHolder = std::make_unique<TicketHolderImpl>(serviceContext,
+                                                              kTickets,
+                                                              kLowPriorityAdmissionBypassThreshold,
+                                                              true /* track peakUsed */);
         } else {
-            ticketHolder = std::make_unique<TicketHolderImpl>(kTickets, serviceContext);
+            ticketHolder = std::make_unique<TicketHolderImpl>(
+                serviceContext, kTickets, true /* track peakUsed */);
         }
     }
 };

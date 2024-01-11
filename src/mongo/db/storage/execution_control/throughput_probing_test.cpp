@@ -39,11 +39,13 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/mock_periodic_runner.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -73,17 +75,25 @@ TEST(ThroughputProbingParameterTest, MaxConcurrency) {
 class ThroughputProbingTest : public unittest::Test {
 protected:
     explicit ThroughputProbingTest(int32_t size = 64, double readWriteRatio = 0.5)
-        : _runner([svcCtx = _svcCtx.get()] {
+        : _svcCtx([]() {
+              auto ctx = ServiceContext::make();
+              auto ptr = ctx.get();
+              setGlobalServiceContext(std::move(ctx));
+              return ptr;
+          }()),
+          _runner([svcCtx = _svcCtx] {
               auto runner = std::make_unique<MockPeriodicRunner>();
               auto runnerPtr = runner.get();
               svcCtx->setPeriodicRunner(std::move(runner));
               return runnerPtr;
           }()),
-          _tickSource(initTickSourceMock<ServiceContext, Microseconds>(_svcCtx.get())),
+          _tickSource(initTickSourceMock<ServiceContext, Microseconds>(_svcCtx)),
+          _readTicketHolder(_svcCtx),
+          _writeTicketHolder(_svcCtx),
           _throughputProbing([&]() -> ThroughputProbing {
               throughput_probing::gInitialConcurrency = size;
               throughput_probing::gReadWriteRatio.store(readWriteRatio);
-              return {_svcCtx.get(), &_readTicketHolder, &_writeTicketHolder, Milliseconds{1}};
+              return {_svcCtx, &_readTicketHolder, &_writeTicketHolder, Milliseconds{1}};
           }()) {
         // We need to advance the ticks to something other than zero, since that is used to
         // determine the if we're in the first iteration or not.
@@ -102,14 +112,14 @@ protected:
         _tickSource->advance(Microseconds(1000));
     }
 
-    ServiceContext::UniqueServiceContext _svcCtx = ServiceContext::make();
+    ServiceContext* _svcCtx;
     ServiceContext::UniqueClient _client =
         _svcCtx->getService()->makeClient("ThroughputProbingTest");
 
     MockPeriodicRunner* _runner;
+    TickSourceMock<Microseconds>* _tickSource;
     MockTicketHolder _readTicketHolder;
     MockTicketHolder _writeTicketHolder;
-    TickSourceMock<Microseconds>* _tickSource;
     ThroughputProbing _throughputProbing;
 
     class StatsTester {
@@ -180,8 +190,7 @@ TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
     // Tickets are exhausted.
     auto initialSize = _readTicketHolder.outof();
     auto size = initialSize;
-    _readTicketHolder.setUsed(size);
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -208,8 +217,7 @@ TEST_F(ThroughputProbingTest, ProbeUpSucceeds) {
 TEST_F(ThroughputProbingTest, ProbeUpFails) {
     // Tickets are exhausted.
     auto size = _readTicketHolder.outof();
-    _readTicketHolder.setUsed(size);
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -233,7 +241,7 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
     // Tickets are not exhausted.
     auto initialSize = _readTicketHolder.outof();
     auto size = initialSize;
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -260,7 +268,7 @@ TEST_F(ThroughputProbingTest, ProbeDownSucceeds) {
 TEST_F(ThroughputProbingTest, ProbeDownFails) {
     // Tickets are not exhausted.
     auto size = _readTicketHolder.outof();
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -283,8 +291,7 @@ TEST_F(ThroughputProbingTest, ProbeDownFails) {
 TEST_F(ThroughputProbingMaxConcurrencyTest, NoProbeUp) {
     // Tickets are exhausted.
     auto size = _readTicketHolder.outof();
-    _readTicketHolder.setUsed(size);
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -298,7 +305,7 @@ TEST_F(ThroughputProbingMaxConcurrencyTest, NoProbeUp) {
 TEST_F(ThroughputProbingMinConcurrencyTest, NoProbeDown) {
     // Tickets are not exhausted.
     auto size = _readTicketHolder.outof();
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -321,8 +328,7 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
     ASSERT_EQ(std::lround(size * (1 + gStepMultiple.load())), size);
 
     // Tickets are exhausted.
-    _readTicketHolder.setUsed(size);
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -344,8 +350,7 @@ TEST_F(ThroughputProbingMinConcurrencyTest, StepSizeNonZero) {
     // Run another iteration.
 
     // Tickets are exhausted.
-    _readTicketHolder.setUsed(size);
-    _readTicketHolder.setUsed(size - 1);
+    _readTicketHolder.setPeakUsed(size);
     _readTicketHolder.setNumFinishedProcessing(4);
     _tick();
 
@@ -378,8 +383,7 @@ TEST_F(ThroughputProbingTest, ReadWriteRatio) {
     ASSERT_EQ(reads, writes);
 
     // Write tickets are exhausted
-    _writeTicketHolder.setUsed(writes);
-    _writeTicketHolder.setUsed(writes - 1);
+    _writeTicketHolder.setPeakUsed(writes);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -414,6 +418,40 @@ TEST_F(ThroughputProbingTest, ReadWriteRatio) {
     ASSERT_GT(_readTicketHolder.outof(), _writeTicketHolder.outof());
 }
 
+DEATH_TEST_REGEX_F(ThroughputProbingTest, AllTicketsTakenStallIsFatal, "Fatal.*8373001") {
+    auto size = _readTicketHolder.outof();
+    _readTicketHolder.setPeakUsed(size);
+    _readTicketHolder.setAvailable(0);
+
+    // Probe up: increases tickets
+    _tick();
+    _run();
+    ASSERT_GT(_readTicketHolder.outof(), size);
+
+    size = _readTicketHolder.outof();
+
+    // These tickets get taken immediately and not released.
+    _readTicketHolder.setPeakUsed(size);
+    _readTicketHolder.setAvailable(0);
+
+    // Probe up fail: tries to decrease tickets as throughput did not increase, but can't
+    _tick();
+    _run();
+}
+
+TEST_F(ThroughputProbingTest, FixedTicketsStuckIsNotFatal) {
+    // As long as we can add and remove some tickets, we will not detect a stall
+    auto stuckTickets = _readTicketHolder.outof();
+    for (int i = 0; i < 100; i++) {
+        _readTicketHolder.setPeakUsed(stuckTickets);
+        _readTicketHolder.setAvailable(_readTicketHolder.outof() - stuckTickets);
+
+        _tick();
+        _run();
+        ASSERT_GTE(_readTicketHolder.outof(), stuckTickets);
+    }
+}
+
 TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroIncreasing) {
     auto reads = _readTicketHolder.outof();
     auto writes = _writeTicketHolder.outof();
@@ -424,8 +462,7 @@ TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroIncreasing) {
     ASSERT_EQ(std::lround(writes * (1 + gStepMultiple.load())), writes);
 
     // Write tickets are exhausted.
-    _writeTicketHolder.setUsed(writes);
-    _writeTicketHolder.setUsed(writes - 1);
+    _writeTicketHolder.setPeakUsed(writes);
     _writeTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -446,7 +483,7 @@ TEST_F(ThroughputProbingReadHeavyTest, StepSizeNonZeroDecreasing) {
     ASSERT_EQ(std::lround(writes * (1 - gStepMultiple.load())), writes);
 
     // Tickets are not exhausted.
-    _readTicketHolder.setUsed(reads - 1);
+    _readTicketHolder.setPeakUsed(reads - 1);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -467,8 +504,7 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroIncreasing) {
     ASSERT_EQ(std::lround(reads * (1 + gStepMultiple.load())), reads);
 
     // Read tickets are exhausted.
-    _readTicketHolder.setUsed(reads);
-    _readTicketHolder.setUsed(reads - 1);
+    _readTicketHolder.setPeakUsed(reads);
     _readTicketHolder.setNumFinishedProcessing(1);
     _tick();
 
@@ -489,7 +525,7 @@ TEST_F(ThroughputProbingWriteHeavyTest, StepSizeNonZeroDecreasing) {
     ASSERT_EQ(std::lround(reads * (1 + gStepMultiple.load())), reads);
 
     // Tickets are not exhausted.
-    _writeTicketHolder.setUsed(writes - 1);
+    _writeTicketHolder.setPeakUsed(writes - 1);
     _writeTicketHolder.setNumFinishedProcessing(1);
     _tick();
 

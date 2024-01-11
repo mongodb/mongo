@@ -52,21 +52,26 @@ void ThroughputProbing::setup() {
     const auto initialTickets = execution_control::throughput_probing::gInitialConcurrency;
     Milliseconds probingInterval{gStorageEngineConcurrencyAdjustmentIntervalMillis};
 
+    constexpr bool trackPeakUsed = true;
 #ifdef __linux__
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
         _readTicketHolder = std::make_unique<PriorityTicketHolder>(
-            initialTickets, lowPriorityBypassThreshold, svcCtx());
+            svcCtx(), initialTickets, lowPriorityBypassThreshold, trackPeakUsed);
         _writeTicketHolder = std::make_unique<PriorityTicketHolder>(
-            initialTickets, lowPriorityBypassThreshold, svcCtx());
+            svcCtx(), initialTickets, lowPriorityBypassThreshold, trackPeakUsed);
     } else {
-        _readTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
-        _writeTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
+        _readTicketHolder =
+            std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
+        _writeTicketHolder =
+            std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
     }
 #else
-    _readTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
-    _writeTicketHolder = std::make_unique<SemaphoreTicketHolder>(initialTickets, svcCtx());
+    _readTicketHolder =
+        std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
+    _writeTicketHolder =
+        std::make_unique<SemaphoreTicketHolder>(svcCtx(), initialTickets, trackPeakUsed);
 #endif
 
     _runner = [svcCtx = svcCtx()] {

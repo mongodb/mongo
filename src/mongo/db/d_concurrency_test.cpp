@@ -102,7 +102,7 @@ class UseReaderWriterGlobalThrottling {
 public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
-        gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
+        const bool trackPeakUsed = false;
         // TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
 #ifdef __linux__
         if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
@@ -110,27 +110,24 @@ public:
             // For simplicity, no low priority operations will ever be expedited in these tests.
             auto lowPriorityAdmissionsBypassThreshold = 0;
 
-            auto ticketHolderManager = std::make_unique<TicketHolderManager>(
-                _svcCtx,
+            auto ticketHolderManager = std::make_unique<FixedTicketHolderManager>(
                 std::make_unique<PriorityTicketHolder>(
-                    numTickets, lowPriorityAdmissionsBypassThreshold, _svcCtx),
+                    _svcCtx, numTickets, lowPriorityAdmissionsBypassThreshold, trackPeakUsed),
                 std::make_unique<PriorityTicketHolder>(
-                    numTickets, lowPriorityAdmissionsBypassThreshold, _svcCtx));
+                    _svcCtx, numTickets, lowPriorityAdmissionsBypassThreshold, trackPeakUsed));
             TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
         } else {
             LOGV2(7130101, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
-            auto ticketHolderManager = std::make_unique<TicketHolderManager>(
-                _svcCtx,
-                std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx),
-                std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
+            auto ticketHolderManager = std::make_unique<FixedTicketHolderManager>(
+                std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed),
+                std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed));
             TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
         }
 #else
         LOGV2(7207205, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
-        auto ticketHolderManager = std::make_unique<TicketHolderManager>(
-            _svcCtx,
-            std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx),
-            std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
+        auto ticketHolderManager = std::make_unique<FixedTicketHolderManager>(
+            std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed),
+            std::make_unique<SemaphoreTicketHolder>(_svcCtx, numTickets, trackPeakUsed));
         TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
 #endif
     }

@@ -247,6 +247,7 @@ class TicketHolderWaits : public ThreadedTest<10> {
 public:
     TicketHolderWaits() : _hotel(rooms) {
         auto client = Client::getCurrent();
+        constexpr bool trackPeakUsed = false;
         // TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove ifdefs when
         // it's available on other platforms.
 #ifdef __linux__
@@ -254,14 +255,17 @@ public:
             // When run with the PriorityTicketHolder, scale down the default
             // 'lowPriorityAdmissionBypassThreshold' for test purposes.
             int lowPriorityAdmissionBypassThreshold = 100;
-            _tickets = std::make_unique<TicketHolderImpl>(
-                _hotel._nRooms, lowPriorityAdmissionBypassThreshold, client->getServiceContext());
+            _tickets = std::make_unique<TicketHolderImpl>(client->getServiceContext(),
+                                                          _hotel._nRooms,
+                                                          lowPriorityAdmissionBypassThreshold,
+                                                          trackPeakUsed);
         } else {
-            _tickets =
-                std::make_unique<TicketHolderImpl>(_hotel._nRooms, client->getServiceContext());
+            _tickets = std::make_unique<TicketHolderImpl>(
+                client->getServiceContext(), _hotel._nRooms, trackPeakUsed);
         }
 #else
-        _tickets = std::make_unique<TicketHolderImpl>(_hotel._nRooms, client->getServiceContext());
+        _tickets = std::make_unique<TicketHolderImpl>(
+            client->getServiceContext(), _hotel._nRooms, trackPeakUsed);
 #endif
     }
 
@@ -344,8 +348,8 @@ public:
         add<ThreadPoolTest>();
 
         add<TicketHolderWaits<SemaphoreTicketHolder>>();
-// TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove this when it's
-// available on other platforms.
+        // TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove this when it's
+        // available on other platforms.
 #ifdef __linux__
         add<TicketHolderWaits<PriorityTicketHolder>>();
 #endif

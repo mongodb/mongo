@@ -65,9 +65,10 @@ class Ticket;
  */
 class PriorityTicketHolder : public TicketHolder {
 public:
-    explicit PriorityTicketHolder(int32_t numTickets,
+    explicit PriorityTicketHolder(ServiceContext* serviceContext,
+                                  int32_t numTickets,
                                   int32_t lowPriorityBypassThreshold,
-                                  ServiceContext* serviceContext);
+                                  bool trackPeakUsed);
     ~PriorityTicketHolder() override{};
 
     int32_t available() const override final;
@@ -90,8 +91,6 @@ private:
                                                     Date_t until) override final;
 
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
-
-    void _resize(int32_t newSize, int32_t oldSize) noexcept override final;
 
     QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final;
 

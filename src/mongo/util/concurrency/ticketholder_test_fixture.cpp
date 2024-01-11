@@ -138,6 +138,8 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->outof(), 5);
     ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1)));
+
+    ASSERT_FALSE(holder->resize(4, Date_t::now() + Milliseconds(1)));
 }
 
 void TicketHolderTestFixture::interruptTest(OperationContext* opCtx,
