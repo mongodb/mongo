@@ -97,7 +97,9 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
             collation = collator->getSpec().toBSON();
         }
         auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
-            collection->getClusteredInfo().value(), collation);
+            collection->getClusteredInfo().value(),
+            collation,
+            collection->getCollectionOptions().expireAfterSeconds);
         if (additionalInclude == ListIndexesInclude::IndexBuildInfo) {
             indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
         } else {

@@ -528,7 +528,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                     cmd.getCollectionUUID()),
                                                 LockMode::MODE_IX);
 
-            validateTTLOptions(opCtx, collection.getCollectionPtr().get(), cmd);
             checkEncryptedFieldIndexRestrictions(opCtx, collection.getCollectionPtr().get(), cmd);
             addNoteForColumnstoreIndexPreview(cmd, &reply);
 
@@ -547,6 +546,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                 indexesAlreadyExist(opCtx, collection.getCollectionPtr(), specs, &reply)) {
                 return boost::none;
             }
+
+            validateTTLOptions(opCtx, collection.getCollectionPtr().get(), cmd);
 
             if (collection.exists() &&
                 !UncommittedCatalogUpdates::get(opCtx).isCreatedCollection(opCtx, ns)) {

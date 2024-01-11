@@ -253,7 +253,9 @@ void _appendInProgressIndexesStats(OperationContext* opCtx,
             collation = collator->getSpec().toBSON();
         }
         auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
-            collection->getClusteredInfo().value(), collation);
+            collection->getClusteredInfo().value(),
+            collation,
+            collection->getCollectionOptions().expireAfterSeconds);
         auto indexSpec = collection->getClusteredInfo()->getIndexSpec();
         auto nameOptional = indexSpec.getName();
         // An index name is always expected.

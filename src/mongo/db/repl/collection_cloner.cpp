@@ -267,7 +267,9 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
             invariant(_collectionOptions.clusteredIndex);
             invariant(spec.getBoolField("clustered") == true);
             invariant(clustered_util::formatClusterKeyForListIndexes(
-                          _collectionOptions.clusteredIndex.value(), _collectionOptions.collation)
+                          _collectionOptions.clusteredIndex.value(),
+                          _collectionOptions.collation,
+                          _collectionOptions.expireAfterSeconds)
                           .woCompare(spec) == 0);
             // Skip if the spec is for the collection's clusteredIndex.
         } else if (spec.hasField("buildUUID")) {
