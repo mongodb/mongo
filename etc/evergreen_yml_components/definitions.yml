@@ -30,12 +30,11 @@ variables:
 # Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/field_level_encryption/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/replication/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/security/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -50,6 +49,7 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
@@ -83,6 +83,10 @@ variables:
     vars:
       resmoke_args: --help
 
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &benchmark_template
   name: benchmark_template
   depends_on:
@@ -125,6 +129,7 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
@@ -150,6 +155,7 @@ variables:
 # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
 # - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
@@ -190,7 +196,10 @@ variables:
   - func: "f_expansions_write"
   - func: "get engflow creds"
 
-
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &compile_task_group_template
   name: compile_task_group_template
   max_hosts: 1
@@ -919,6 +928,13 @@ functions:
   - *get_buildnumber
   - *f_expansions_write
   - *set_up_credentials
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
+  - *collect_ulimit_info
+
+  "do integration_tests setup":
+  - *f_expansions_write
   - *run_diskstats
   - *monitor_process_threads
   - *collect_system_resource_info
@@ -3575,43 +3591,6 @@ tasks:
       content_type: application/tar
       display_name: "LibFuzzer Tests"
 
-## fetch_and_run_libfuzzertests - get input corpora from s3 and run libfuzzertests ##
-- name: fetch_and_run_libfuzzertests
-  tags: []
-  commands:
-  - func: "fetch corpus"
-  - func: "run tests"
-    vars:
-      suite: libfuzzer
-
-- name: server_discovery_and_monitoring_json_test
-  tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - func: "scons compile"
-    vars:
-      targets: install-sdam-json-test
-      compiling_for_test: true
-      install_dir: build/install/bin
-  - func: "run tests"
-    vars:
-      suite: sdam_json_test
-
-- name: server_selection_json_test
-  tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - func: "scons compile"
-    vars:
-      targets: install-server-selection-json-test
-      compiling_for_test: true
-      install_dir: build/install/bin
-  - func: "run tests"
-
 ## compile_dbtest ##
 - &compile_dbtest
   name: compile_dbtest
@@ -4139,18 +4118,6 @@ tasks:
   - func: "send benchmark results"
     vars:
       suite: benchmarks_second_half
-
-- <<: *benchmark_template
-  name: benchmarks_sharding
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suite: benchmarks_sharding
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
-#  - func: "analyze benchmark results"
 
 # Disabled under SERVER-64949.
 # - <<: *benchmark_template
@@ -4735,62 +4702,6 @@ tasks:
       suite: jstestfuzz_replication_session
       resmoke_args: --numClientsPerFixture=10
 
-## jstestfuzz concurrent sharded cluster ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_gen
-  tags: ["jstestfuzz", "common", "sharding", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded
-      resmoke_args: --numClientsPerFixture=10
-
-## jstestfuzz concurrent sharded cluster causal consistency ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_causal_consistency_gen
-  tags: ["jstestfuzz", "causal", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_causal_consistency
-      resmoke_args: --numClientsPerFixture=10
-
-## jstestfuzz concurrent sharded cluster continuous stepdown ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
-  tags: ["jstestfuzz", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 2
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: --numClientsPerFixture=10
-
-## jstestfuzz concurrent sharded cluster with logical session ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_session_gen
-  tags: ["jstestfuzz", "session", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: ${jstestfuzz_concurrent_num_files|10}
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_session
-      resmoke_args: --numClientsPerFixture=10
-
 # jstestfuzz interrupt #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_gen
@@ -4852,38 +4763,6 @@ tasks:
       jstestfuzz_vars: --jsTestsDir ../jstests
       suite: jstestfuzz_interrupt_replication
       resmoke_args: "--flowControlTicketOverride=1 --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 2
-      num_tasks: 1
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: >-
-        --flowControlTicketOverride=3
-        --mongodSetParameters="{logComponentVerbosity: {command: 2}}"
-
-## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control_gen
-  tags: ["jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 2
-      num_tasks: 1
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: >-
-        --flowControlTicketOverride=30
-        --numClientsPerFixture=10
 
 # jstestfuzz replication continuous stepdown with flow control engaged #
 - <<: *jstestfuzz_template
@@ -4992,182 +4871,6 @@ tasks:
       suite: jstestfuzz_replication_session
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
-## jstestfuzz sharded cluster ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_gen
-  tags: ["jstestfuzz", "common", "sharding", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded multiversion cluster ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_multiversion_gen
-  tags: ["multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      jstestfuzz_sharded_last_continuous_new_old_old_new: last_continuous
-      jstestfuzz_sharded_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-      suite: jstestfuzz_sharded
-      npm_command: jstestfuzz
-      run_no_feature_flag_tests: "true"
-
-## jstestfuzz sharded cluster causal consistency ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_causal_consistency_gen
-  tags: ["jstestfuzz", "causal", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_causal_consistency
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded cluster continuous stepdown ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_continuous_stepdown_gen
-  tags: ["jstestfuzz", "stepdowns", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 5
-      num_tasks: 5
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_continuous_stepdown
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded cluster with logical session ##
-- <<: *jstestfuzz_template
-  name: jstestfuzz_sharded_session_gen
-  tags: ["jstestfuzz", "session", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      jstestfuzz_vars: --jsTestsDir ../jstests
-      suite: jstestfuzz_sharded_session
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## resharding generational fuzzer ##
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_inplace_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 2 --numRecipients 2 --inPlace yes --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_split_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 1 --numRecipients 2 --inPlace no --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_merge_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 2 --numRecipients 1 --inPlace no --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_shuffle_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_idempotency_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --numDonors 3 --numRecipients 3 --inPlace no --useEsModules
-      suite: resharding_fuzzer_idempotency
-
-- <<: *jstestfuzz_template
-  name: resharding_fuzzer_stepup_gen
-  tags: ["resharding_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: >-
-        --numDonors 3 --numRecipients 3 --inPlace yes
-        --electionMech stepup --electionRole donor --electionRole recipient
-        --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: move_collection_fuzzer_gen
-  tags: ["require_npm", "random_name", "feature_flag_guarded"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --opType moveCollection --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
-      suite: resharding_fuzzer
-
-- <<: *jstestfuzz_template
-  name: unshard_collection_fuzzer_gen
-  tags: ["require_npm", "random_name", "feature_flag_guarded"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 10
-      num_tasks: 5
-      npm_command: resharding-fuzzer
-      jstestfuzz_vars: --opType unshardCollection --inPlace yes --numDonors 3 --electionMech stepup --electionRole donor --electionRole recipient --useEsModules
-      suite: resharding_fuzzer
-
 ## Tests that the multiversion test generation logic is not broken.
 - <<: *gen_task_template
   name: multiversion_sanity_check_gen
@@ -5238,19 +4941,6 @@ tasks:
 
 ## integration test suites ##
 
-- <<: *task_template
-  name: audit
-  tags: ["audit", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: auth_gen
-  tags: ["auth"]
-  commands:
-  - func: "generate resmoke tasks"
-
 - name: version_gen
   commands:
   - command: manifest.load
@@ -5305,26 +4995,12 @@ tasks:
   name: version_expansions_future_git_tag_multiversion_gen
 
 - <<: *gen_task_template
-  name: auth_audit_gen
-  tags: ["auth", "audit", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
   name: multiversion_future_git_tag_gen
   tags: ["multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       suite: multiversion_future_git_tag
-
-- <<: *gen_task_template
-  name: multiversion_auth_future_git_tag_gen
-  tags: ["auth", "multiversion", "no_multiversion_generate_tasks", "multiversion_future_git_tag"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: multiversion_auth_future_git_tag
 
 - <<: *task_template
   name: disk_wiredtiger
@@ -5333,102 +5009,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: ese
-  tags: ["encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: failpoints
-  tags: ["misc_js"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: failpoints_auth
-  tags: ["auth"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: integration_tests_standalone
-  tags: ["integration", "standalone"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - *f_expansions_write
-  - *run_diskstats
-  - *monitor_process_threads
-  - *collect_system_resource_info
-  - *collect_ulimit_info
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_standalone_audit
-  tags: ["integration", "audit"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - *f_expansions_write
-  - *run_diskstats
-  - *monitor_process_threads
-  - *collect_system_resource_info
-  - *collect_ulimit_info
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_replset
-  tags: ["integration"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - *f_expansions_write
-  - *run_diskstats
-  - *monitor_process_threads
-  - *collect_system_resource_info
-  - *collect_ulimit_info
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_replset_ssl_auth
-  tags: ["integration"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - *f_expansions_write
-  - *run_diskstats
-  - *monitor_process_threads
-  - *collect_system_resource_info
-  - *collect_ulimit_info
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
-
-- <<: *task_template
-  name: integration_tests_sharded
-  tags: ["integration", "sharded"]
-  depends_on:
-  - name: compile_integration_test
-  commands:
-  - *f_expansions_write
-  - *run_diskstats
-  - *monitor_process_threads
-  - *collect_system_resource_info
-  - *collect_ulimit_info
-  - func: "run tests"
-    vars:
-      install_dir: build/install/bin
 
 - <<: *task_template
   name: jsCore
@@ -5569,33 +5149,6 @@ tasks:
       use_large_distro: "true"
 
 - <<: *task_template
-  name: jsCore_ese
-  tags: ["jscore", "encrypt"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_ese
-
-- <<: *task_template
-  name: jsCore_min_batch_repeat_queries_ese_gsm
-  tags: ["jscore", "encrypt", "gcm"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_min_batch_repeat_queries_ese_gsm
-
-- <<: *task_template
-  name: jsCore_auth
-  tags: ["jscore", "auth", "common"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_auth
-
-- <<: *task_template
   name: jsCore_txns
   tags: ["jscore", "common", "txns"]
   commands:
@@ -5614,30 +5167,6 @@ tasks:
       suite: core_txns_large_txns_format
 
 - <<: *task_template
-  name: sharded_jscore_txns
-  tags: ["sharding", "jscore", "txns"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: sharded_jscore_txns_without_snapshot
-  tags: ["sharding", "wo_snapshot", "jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: sharded_jscore_txns
-      resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
-
-- <<: *task_template
-  name: sharded_jscore_txns_sharded_collections
-  tags: ["sharding", "jscore", "txns"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
   name: cst_jscore_passthrough
   tags: ["jscore"]
   commands:
@@ -5645,45 +5174,8 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
-  name: libunwind_tests
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: libunwind
-
-- <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
   tags: ["causally_consistent"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: sharded_causally_consistent_jscore_txns_passthrough_gen
-  tags: ["sharding", "jscore", "causally_consistent", "txns"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_causally_consistent_jscore_txns_passthrough_without_snapshot_gen
-  tags: ["sharding", "wo_snapshot", "causally_consistent", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharded_causally_consistent_jscore_txns_passthrough
-      resmoke_args: --excludeWithAnyTags=uses_snapshot_read_concern
-
-- <<: *gen_task_template
-  name: causally_consistent_hedged_reads_jscore_passthrough_gen
-  tags: ["causally_consistent", "sharding", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: sharded_collections_causally_consistent_jscore_txns_passthrough
-  tags: ["sharding", "jscore", "causally_consistent", "txns"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5720,12 +5212,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: mongos_test
-
-- <<: *gen_task_template
-  name: multiversion_auth_gen
-  tags: ["auth", "multiversion", "no_multiversion_generate_tasks", "future_git_tag_incompatible"]
-  commands:
-  - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
   name: multiversion_gen
@@ -5799,46 +5285,8 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: sharded_collections_jscore_passthrough_gen
-  tags: ["sharding", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
   name: sharded_collections_uninitialized_fcv_jscore_passthrough_gen
   tags: ["sharding", "jscore", "initsync"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: unsplittable_collections_created_on_any_shard_jscore_passthrough_gen
-  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
-  tags: ["unsplittable_collections"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_collections_jscore_passthrough_with_auto_bootstrap_gen
-  tags: ["sharding", "jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_collections_jscore_multiversion_gen
-  tags: ["multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharded_collections_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
-      sharded_collections_jscore_passthrough_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharded_collections_jscore_passthrough
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharding_jscore_passthrough_gen
-  tags: ["sharding", "jscore", "common"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -5849,155 +5297,12 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
-  name: embedded_router_jscore_passthrough_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: embedded_router_jscore_passthrough_with_config_shard_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharding_jscore_passthrough_with_auto_bootstrap_gen
-  tags: ["sharding", "jscore", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharding_jscore_multiversion_gen
-  tags: ["multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharding_jscore_passthrough_last_lts_new_old_old_new: last_lts
-      sharding_jscore_passthrough_last_continuous_new_old_old_new: last_continuous
-  - func: "generate resmoke tasks"
-    vars:
-      suite: sharding_jscore_passthrough
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
   name: sharding_api_version_jscore_passthrough_gen
   tags: ["sharding", "jscore"]
   commands:
   - func: "generate resmoke tasks"
     vars:
       fallback_num_sub_suites: 5
-
-- <<: *task_template
-  name: sharded_multi_stmt_txn_jscore_passthrough
-  tags: ["sharding", "jscore", "multi_stmt"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["multi_shard", "multi_stmt", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 0  # No cap on number of jobs.
-
-- <<: *gen_task_template
-  name: multi_shard_local_read_write_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["multi_shard", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  tags: ["multi_stmt"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
-  tags: ["multi_shard"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
-  tags: ["multi_shard", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_jscore_passthrough_gen
-  tags: ["shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_causally_consistent_jscore_passthrough_gen
-  tags: ["shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_stepdown_jscore_passthrough_gen
-  tags: ["shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_split_terminate_primary_jscore_passthrough_gen
-  tags: ["shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: shard_split_kill_primary_jscore_passthrough_gen
-  tags: ["shard_split"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: shard_merge_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_merge_causally_consistent_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
 
 - <<: *task_template
   name: index_filters_to_query_settings
@@ -6040,140 +5345,6 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-
-- <<: *gen_task_template
-  name: tenant_migration_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_causally_consistent_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["serverless", "txn"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: shard_merge_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["serverless", "txn"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_stepdown_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: tenant_migration_terminate_primary_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: tenant_migration_kill_primary_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      fallback_num_sub_suites: 10
-
-- <<: *gen_task_template
-  name: talk_directly_to_shardsvrs_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: talk_directly_to_shardsvrs_kill_primary_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_with_mongoq_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_with_mongoq_unsigned_token_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_with_atlas_proxy_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: concurrency_multitenancy_with_atlas_proxy_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      suite: multitenancy_with_atlas_proxy_jscore_passthrough
-      resmoke_args: "--numClientsPerFixture=2 --useTenantClient --excludeWithAnyTags=multi_clients_incompatible"
-
-- <<: *gen_task_template
-  name: concurrency_multitenancy_replication_with_atlas_proxy_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-      resmoke_args: --numClientsPerFixture=2 --useTenantClient
-
-- <<: *gen_task_template
-  name: multitenancy_shard_merge_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: multitenancy_shard_merge_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["serverless"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
 
 - <<: *gen_task_template
   name: clustered_collection_passthrough_gen
@@ -6291,15 +5462,6 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_sharded_with_auto_bootstrap_gen
-  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
   name: concurrency_sharded_replication_multiversion_gen
   tags: ["multiversion_passthrough", "sharded", "multiversion"]
   commands:
@@ -6314,15 +5476,6 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_replication_with_balancer_gen
-  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
@@ -6349,51 +5502,6 @@ tasks:
     vars:
       suite: concurrency_sharded_replication_with_balancer
       resmoke_args: "--excludeWithAnyTags=uses_transactions"
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
-  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_causal_consistency_gen
-  tags: ["concurrency", "non_live_record", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_causal_consistency_and_balancer_gen
-  tags: ["concurrency", "large", "non_live_record", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_with_stepdowns_gen
-  tags: ["concurrency", "stepdowns", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_with_stepdowns_and_balancer_gen
-  tags: ["concurrency", "stepdowns", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
@@ -6425,24 +5533,6 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_sharded_multi_stmt_txn_gen
-  tags: ["concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
-  tags: ["concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
   name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
   tags: ["concurrency", "large", "sharded", "no_debug_mode"]
   commands:
@@ -6454,15 +5544,6 @@ tasks:
 - <<: *gen_task_template
   name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
   tags: ["concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
-  tags: ["concurrency", "stepdowns", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6534,150 +5615,9 @@ tasks:
     vars:
       use_large_distro: "true"
 
-- <<: *task_template
-  name: cwrwc_passthrough
-  tags: ["read_write_concern", "large", "write"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: cwrwc_rc_majority_passthrough_gen
-  tags: ["read_write_concern"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: cwrwc_wc_majority_passthrough_gen
-  tags: ["read_write_concern", "write"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
 - <<: *gen_task_template
   name: secondary_reads_passthrough_gen
   tags: []
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: replica_sets_max_mirroring_large_txns_format_ese_gen
-  tags: ["replica_sets", "encrypt", "san", "no_debug_mode", "multi_oplog"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: replica_sets_max_mirroring_large_txns_format_ese_gcm_gen
-  tags: ["replica_sets", "encrypt", "san", "gcm", "no_debug_mode", "multi_oplog"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *task_template
-  name: sasl
-  tags: ["sasl", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: serverless
-  tags: ["serverless"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: serverless_MTM
-  tags: ["serverless"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: sharding_gen
-  tags: ["sharding", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_auto_bootstrap_gen
-  tags: ["sharding", "common"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_multiversion_gen
-  tags: ["random_multiversion_ds", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharding_last_continuous: last_continuous
-      sharding_last_lts: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      suite: sharding
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharding_csrs_continuous_config_stepdown_gen
-  tags: ["sharding", "common", "csrs", "non_live_record"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-# This is a subset of sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen and
-# sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen and should not be ran
-# in the same varient as them
-- <<: *gen_task_template
-  name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  tags: ["sharding", "common", "encrypt", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
-  tags: ["sharding", "common", "encrypt", "gcm", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_auth_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_auth_audit_gen
-  tags: ["sharding", "auth", "audit", "non_live_record", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6690,90 +5630,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: sharding_hello_failures_gen
-  tags: ["concurrency", "large", "sharded", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: sharding_mongos_and_mixed_shards_gen
-  tags: ["sharding", "common", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharding_last_lts_mongos_and_mixed_shards: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: analyze_shard_key_jscore_passthrough_gen
-  tags: ["sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
-  tags: ["sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: ssl_gen
-  tags: ["encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {network: 2, replication: {heartbeats: 2}}}'"
-
-- <<: *gen_task_template
-  name: sslSpecial_gen
-  tags: ["encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: ssl_special
-
-- <<: *gen_task_template
-  name: ssl_x509_gen
-  tags: ["encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: ssl_x509
-
-- <<: *gen_task_template
-  name: ssl_linear_gen
-  tags: ["encrypt", "ssl", "patch_build"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: ssl_linear
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-  tags: ["jscore"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-  tags: ["sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-  tags: ["sharding"]
-  commands:
-  - func: "generate resmoke tasks"
 
 - <<: *task_template
   name: jsCore_decimal
@@ -6798,25 +5654,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
-- <<: *task_template
-  name: session_jscore_passthrough
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *gen_task_template
-  name: causally_consistent_jscore_passthrough_gen
-  tags: ["causally_consistent"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: causally_consistent_jscore_passthrough_auth_gen
-  tags: ["causally_consistent"]
-  commands:
-  - func: "generate resmoke tasks"
-
 - <<: *gen_task_template
   name: causally_consistent_read_concern_snapshot_passthrough_gen
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
@@ -6828,94 +5665,6 @@ tasks:
   tags: ["causally_consistent", "read_write_concern", "durable_history"]
   commands:
   - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: sharded_causally_consistent_jscore_passthrough_gen
-  tags: ["causally_consistent"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: retryable_writes_jscore_passthrough_gen
-  tags: ["retry"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
-  name: retryable_writes_downgrade_gen
-  tags: ["multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      retryable_writes_downgrade_last_lts: last_lts
-      retryable_writes_downgrade_last_continuous: last_continuous
-  - func: "generate resmoke tasks"
-    vars:
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: sharded_retryable_writes_downgrade_gen
-  tags: ["multiversion_passthrough", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      sharded_retryable_writes_downgrade_last_continuous_new_old_old_new: last_continuous
-      sharded_retryable_writes_downgrade_last_lts_new_old_old_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      run_no_feature_flag_tests: "true"
-
-- <<: *gen_task_template
-  name: retryable_writes_jscore_stepdown_passthrough_gen
-  tags: ["retry"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *task_template
-  name: watchdog_wiredtiger
-  tags: ["watchdog"]
-  commands:
-  - *f_expansions_write
-  - func: "do setup"
-  - func: "do watchdog setup"
-  - func: "run tests"
-    vars:
-      suite: watchdog
-      resmoke_jobs_max: 1
-
-# This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
-- <<: *task_template
-  name: watchdog_inmemory
-  tags: ["watchdog"]
-  commands:
-  - *f_expansions_write
-  - func: "do setup"
-  - func: "do watchdog setup"
-  - func: "run tests"
-    vars:
-      suite: watchdog
-      resmoke_args: --storageEngine=inMemory
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: client_encrypt
-  tags: ["ssl", "encrypt", "patch_build"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: ocsp
-  tags: ["ssl", "encrypt", "ocsp", "patch_build", "no_debug_mode"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
 
 - <<: *task_template
   name: json_schema
@@ -8146,15 +6895,6 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: search_pinned_connections_auth
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
   name: search_ssl
   tags: []
   commands:
@@ -8623,27 +7363,11 @@ task_groups:
   - compile_ninja_compiledb_profile
 
 - <<: *compile_task_group_template
-  name: server_discovery_and_monitoring_json_test_TG
-  tasks:
-  - server_discovery_and_monitoring_json_test
-
-- <<: *compile_task_group_template
-  name: server_selection_json_test_TG
-  tasks:
-  - server_selection_json_test
-
-- <<: *compile_task_group_template
   name: compile_run_and_archive_dbtest_TG
   tasks:
   - compile_dbtest
   - run_dbtest
   - archive_dbtest
-
-- <<: *compile_task_group_template
-  name: compile_archive_and_run_libfuzzertests_TG
-  tasks:
-  - compile_and_archive_libfuzzertests
-  - fetch_and_run_libfuzzertests
 
 - <<: *compile_task_group_template
   name: compile_test_serial_TG
@@ -8730,29 +7454,6 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
-
-# SERVER-76006
-# This is a compile stream meant for non-cached and/or underpowered systems.
-# It joins most of the compile tasks together under a single host spread out
-# across different tasks.
-- <<: *compile_task_group_template
-  name: small_compile_test_and_package_serial_no_unittests_TG
-  tasks:
-  - compile_dist_test_half
-  - compile_dist_test
-  - archive_dist_test
-  - archive_dist_test_debug
-  - compile_integration_test
-  - integration_tests_standalone
-  - integration_tests_standalone_audit
-  - integration_tests_replset
-  - integration_tests_replset_ssl_auth
-  - integration_tests_sharded
-  - compile_dbtest
-  - run_dbtest
-  - archive_dbtest
-  - compile_all_but_not_unittests
-  - package
 
 - <<: *compile_task_group_template
   name: compile_test_benchmark_serial_TG
@@ -8860,25 +7561,6 @@ task_groups:
   name: build_metrics_gen_TG
   tasks:
   - build_metrics_tasks_gen
-
-- <<: *compile_task_group_template
-  name: compile_integration_and_test_parallel_stream_TG
-  tasks:
-  - compile_integration_test
-  - integration_tests_standalone
-  - integration_tests_standalone_audit
-  - integration_tests_replset
-  - integration_tests_replset_ssl_auth
-  - integration_tests_sharded
-
-- <<: *compile_task_group_template
-  name: compile_integration_and_test_no_audit_parallel_stream_TG
-  tasks:
-  - compile_integration_test
-  - integration_tests_standalone
-  - integration_tests_replset
-  - integration_tests_replset_ssl_auth
-  - integration_tests_sharded
 
 - <<: *compile_task_group_template
   name: scons_compile_smoke_test_TG

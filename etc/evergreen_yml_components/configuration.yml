@@ -64,12 +64,6 @@ patch_aliases:
   variant_tags: ["bazel_check"]
   task: '.*'
 
-## Local aliases
-local_aliases:
-- alias: bazel_variants
-  variant_tags: ["bazel_check"]
-  task: '.*'
-
 #######################################
 #               Modules               #
 #######################################

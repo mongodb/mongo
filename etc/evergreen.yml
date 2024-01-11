@@ -56,12 +56,12 @@ include:
 - filename: etc/evergreen_yml_components/configuration.yml
 - filename: etc/evergreen_yml_components/definitions.yml
 
+- filename: etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
+
 - filename: etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
 - filename: etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-- filename: etc/evergreen_yml_components/tasks/components/field_level_encryption/resmoke_tasks.yml
 - filename: etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
 - filename: etc/evergreen_yml_components/tasks/components/replication/resmoke_tasks.yml
-- filename: etc/evergreen_yml_components/tasks/components/security/resmoke_tasks.yml
 
 - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/misc/misc.yml
