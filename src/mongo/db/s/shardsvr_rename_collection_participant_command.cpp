@@ -215,11 +215,14 @@ public:
             const auto [optRenameCollectionParticipant, _] =
                 RenameParticipantInstance::lookup(opCtx, service, id);
             if (optRenameCollectionParticipant) {
+
+                auto optUnblockCrudFuture =
+                    optRenameCollectionParticipant.value()->getUnblockCrudFutureFor(
+                        req.getSourceUUID());
                 uassert(ErrorCodes::CommandFailed,
                         "Provided UUID does not match",
-                        optRenameCollectionParticipant.value()->sourceUUID() ==
-                            req.getSourceUUID());
-                optRenameCollectionParticipant.value()->getUnblockCrudFuture().get(opCtx);
+                        optUnblockCrudFuture.has_value());
+                optUnblockCrudFuture->get(opCtx);
             }
 
             // Since no write that generated a retryable write oplog entry with this sessionId
