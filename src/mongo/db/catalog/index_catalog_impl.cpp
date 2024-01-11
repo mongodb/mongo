@@ -256,12 +256,12 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
             // TTL indexes with an invalid 'expireAfterSeconds' field cause problems in multiversion
             // settings.
-            auto hasInvalidExpireAfterSeconds =
-                !index_key_validate::validateExpireAfterSeconds(
-                     spec[IndexDescriptor::kExpireAfterSecondsFieldName],
-                     index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex)
-                     .isOK();
-            if (hasInvalidExpireAfterSeconds) {
+            auto swType = index_key_validate::validateExpireAfterSeconds(
+                spec[IndexDescriptor::kExpireAfterSecondsFieldName],
+                index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
+            auto expireAfterSecondsType = index_key_validate::extractExpireAfterSecondsType(swType);
+            if (expireAfterSecondsType ==
+                TTLCollectionCache::Info::ExpireAfterSecondsType::kInvalid) {
                 LOGV2_OPTIONS(
                     6852200,
                     {logv2::LogTag::kStartupWarnings},
@@ -279,16 +279,14 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
                     [svcCtx = opCtx->getServiceContext(),
                      uuid = collection->uuid(),
                      indexName,
-                     hasInvalidExpireAfterSeconds](OperationContext*, boost::optional<Timestamp>) {
+                     expireAfterSecondsType](OperationContext*, boost::optional<Timestamp>) {
                         TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                            uuid,
-                            TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
+                            uuid, TTLCollectionCache::Info{indexName, expireAfterSecondsType});
                     });
             } else {
                 TTLCollectionCache::get(opCtx->getServiceContext())
-                    .registerTTLInfo(
-                        collection->uuid(),
-                        TTLCollectionCache::Info{indexName, hasInvalidExpireAfterSeconds});
+                    .registerTTLInfo(collection->uuid(),
+                                     TTLCollectionCache::Info{indexName, expireAfterSecondsType});
             }
         }
 

@@ -46,19 +46,23 @@ TEST(TTLCollectionCacheTest, Basic) {
 
     auto uuidCollA = UUID::gen();
     auto uuidCollB = UUID::gen();
-    auto infoIndexA1 =
-        TTLCollectionCache::Info{"collA_ttl_1", /*isExpireAfterSecondsInvalid=*/false};
+    auto uuidCollC = UUID::gen();
+    auto infoIndexA1 = TTLCollectionCache::Info{
+        "collA_ttl_1", TTLCollectionCache::Info::ExpireAfterSecondsType::kInt};
     auto infoClusteredA = TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}};
-    auto infoIndexB1 =
-        TTLCollectionCache::Info("collB_ttl_1", /*isExpireAfterSecondsInvalid=*/true);
+    auto infoIndexB1 = TTLCollectionCache::Info(
+        "collB_ttl_1", TTLCollectionCache::Info::ExpireAfterSecondsType::kInvalid);
+    auto infoIndexC1 = TTLCollectionCache::Info(
+        "collC_ttl_1", TTLCollectionCache::Info::ExpireAfterSecondsType::kNonInt);
 
     // Confirm registerTTLInfo() behavior using getTTLInfo().
     cache.registerTTLInfo(uuidCollA, infoIndexA1);
     cache.registerTTLInfo(uuidCollA, infoClusteredA);
     cache.registerTTLInfo(uuidCollB, infoIndexB1);
+    cache.registerTTLInfo(uuidCollC, infoIndexC1);
 
     auto infos = cache.getTTLInfos();
-    ASSERT_EQ(infos.size(), 2U);
+    ASSERT_EQ(infos.size(), 3U);
     ASSERT_EQ(infos.count(uuidCollA), 1U);
     ASSERT_EQ(infos[uuidCollA].size(), 2U);
     ASSERT_FALSE(infos[uuidCollA][0].isClustered());
@@ -73,17 +77,46 @@ TEST(TTLCollectionCacheTest, Basic) {
     ASSERT_EQ(infos[uuidCollB][0].getIndexName(), "collB_ttl_1");
     ASSERT(infos[uuidCollB][0].isExpireAfterSecondsInvalid());
 
-    // Check that we can reset '_isExpireAfterSecondsInvalid()' on the TTL index.
-    cache.unsetTTLIndexExpireAfterSecondsInvalid(uuidCollB, infoIndexB1.getIndexName());
+    // Check that we can reset _expireAfterSecondsType on the TTL index.
+    cache.setTTLIndexExpireAfterSecondsType(uuidCollB,
+                                            infoIndexB1.getIndexName(),
+                                            TTLCollectionCache::Info::ExpireAfterSecondsType::kInt);
     infos = cache.getTTLInfos();
-    ASSERT_EQ(infos.size(), 2U);
+    ASSERT_EQ(infos.size(), 3U);
     ASSERT_EQ(infos.count(uuidCollB), 1U);
     ASSERT_EQ(infos[uuidCollB].size(), 1U);
     ASSERT_EQ(infos[uuidCollB][0].getIndexName(), "collB_ttl_1");
     ASSERT_FALSE(infos[uuidCollB][0].isExpireAfterSecondsInvalid());
 
+    ASSERT_EQ(infos.count(uuidCollC), 1U);
+    ASSERT_EQ(infos[uuidCollC].size(), 1U);
+
+    ASSERT_FALSE(infos[uuidCollC][0].isClustered());
+    ASSERT_EQ(infos[uuidCollC][0].getIndexName(), "collC_ttl_1");
+    ASSERT(infos[uuidCollC][0].isExpireAfterSecondsNonInt());
+
+    // Check that we can reset '_isExpireAfterSecondsInvalid()' on the TTL index.
+    cache.setTTLIndexExpireAfterSecondsType(uuidCollC,
+                                            infoIndexC1.getIndexName(),
+                                            TTLCollectionCache::Info::ExpireAfterSecondsType::kInt);
+    infos = cache.getTTLInfos();
+    ASSERT_EQ(infos.size(), 3U);
+    ASSERT_EQ(infos.count(uuidCollC), 1U);
+    ASSERT_EQ(infos[uuidCollC].size(), 1U);
+    ASSERT_EQ(infos[uuidCollC][0].getIndexName(), "collC_ttl_1");
+    ASSERT_FALSE(infos[uuidCollC][0].isExpireAfterSecondsInvalid());
+    ASSERT_FALSE(infos[uuidCollC][0].isExpireAfterSecondsNonInt());
+
     // Check deregisterTTLInfo(). TTLCollectionCache should clean up
     // UUIDs that no longer have any TTL infos registered.
+    cache.deregisterTTLIndexByName(uuidCollC, infoIndexC1.getIndexName());
+    infos = cache.getTTLInfos();
+    ASSERT_EQ(infos.size(), 2U);
+    ASSERT_EQ(infos.count(uuidCollB), 1U);
+    ASSERT_EQ(infos[uuidCollB].size(), 1U);
+    ASSERT_EQ(infos.count(uuidCollA), 1U);
+    ASSERT_EQ(infos[uuidCollA].size(), 2U);
+
     cache.deregisterTTLIndexByName(uuidCollB, infoIndexB1.getIndexName());
     infos = cache.getTTLInfos();
     ASSERT_EQ(infos.size(), 1U);

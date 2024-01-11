@@ -98,7 +98,8 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
                 // validation of this field.
                 ttlCache->registerTTLInfo(
                     uuid,
-                    TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsInvalid=*/false});
+                    TTLCollectionCache::Info{
+                        indexName, TTLCollectionCache::Info::ExpireAfterSecondsType::kInt});
             });
 
         // Change the value of "expireAfterSeconds" on disk.
@@ -130,7 +131,8 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         shard_role_details::getRecoveryUnit(opCtx)->onCommit(
             [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](
                 OperationContext*, boost::optional<Timestamp>) {
-                ttlCache->unsetTTLIndexExpireAfterSecondsInvalid(uuid, indexName);
+                ttlCache->setTTLIndexExpireAfterSecondsType(
+                    uuid, indexName, TTLCollectionCache::Info::ExpireAfterSecondsType::kInt);
             });
         return;
     }

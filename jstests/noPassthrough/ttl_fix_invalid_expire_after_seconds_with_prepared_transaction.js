@@ -21,8 +21,7 @@ const intVal = 2147483647;
 
 assert.commandWorked(shard0TestDB.createCollection(kCollName));
 const fp1 = configureFailPoint(shard0Primary, 'skipTTLIndexValidationOnCreateIndex');
-const fp2 = configureFailPoint(shard0Primary,
-                               'skipTTLIndexInvalidExpireAfterSecondsValidationForCreateIndex');
+const fp2 = configureFailPoint(shard0Primary, 'skipTTLIndexExpireAfterSecondsValidation');
 try {
     assert.commandWorked(
         shard0TestDB[kCollName].createIndex({t: 1}, {expireAfterSeconds: nonIntVal}));

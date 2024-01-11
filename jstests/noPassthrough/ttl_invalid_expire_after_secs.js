@@ -35,8 +35,7 @@ function test(expireAfterSecondsVal) {
     // invalid values of expireAfterSeconds, so we use a failpoint to disable that checking to
     // simulate a value leftover from very old MongoDB versions.
     const fp = configureFailPoint(primary, 'skipTTLIndexValidationOnCreateIndex');
-    const fp2 = configureFailPoint(primary,
-                                   'skipTTLIndexInvalidExpireAfterSecondsValidationForCreateIndex');
+    const fp2 = configureFailPoint(primary, 'skipTTLIndexExpireAfterSecondsValidation');
     try {
         assert.commandWorked(coll.createIndex({t: 1}, {expireAfterSeconds: expireAfterSecondsVal}));
     } finally {
