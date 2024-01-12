@@ -301,8 +301,8 @@ private:
 
         if (_options.tlsCertificateKeyFile) {
             auto certKeyPair = util::parsePEMKeyFile(_options.tlsCertificateKeyFile.get());
-            certKeyPairTls.emplace_back(std::move(certKeyPair.private_key),
-                                        std::move(certKeyPair.cert_chain));
+            certKeyPairTls.push_back(
+                {std::move(certKeyPair.private_key), std::move(certKeyPair.cert_chain)});
             tlsOps.watch_identity_key_cert_pairs();
         }
 
