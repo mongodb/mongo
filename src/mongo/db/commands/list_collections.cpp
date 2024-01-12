@@ -436,7 +436,7 @@ public:
                         }
                     } else {
                         auto perCollectionWork = [&](const Collection* collection) {
-                            if (collection && collection->getTimeseriesOptions() &&
+                            if (collection->getTimeseriesOptions() &&
                                 !collection->ns().isDropPendingNamespace()) {
                                 auto viewNss = collection->ns().getTimeseriesViewNamespace();
                                 auto view =
