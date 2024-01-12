@@ -1142,3 +1142,30 @@ export function isIxscanMultikey(winningPlan) {
     let ixscanStage = getPlanStage(winningPlan, "IXSCAN");
     return ixscanStage.isMultiKey;
 }
+
+/**
+ * Verify that the explain command output 'explain' shows a BATCHED_DELETE stage with an
+ * nWouldDelete value equal to 'nWouldDelete'.
+ */
+export function checkNWouldDelete(explain, nWouldDelete) {
+    assert.commandWorked(explain);
+    assert("executionStats" in explain);
+    var executionStats = explain.executionStats;
+    assert("executionStages" in executionStats);
+
+    // If passed through mongos, then BATCHED_DELETE stage(s) should be below the SHARD_WRITE
+    // mongos stage.  Otherwise the BATCHED_DELETE stage is the root stage.
+    var execStages = executionStats.executionStages;
+    if ("SHARD_WRITE" === execStages.stage) {
+        let totalToBeDeletedAcrossAllShards = 0;
+        execStages.shards.forEach(function(shardExplain) {
+            const rootStageName = shardExplain.executionStages.stage;
+            assert(rootStageName === "BATCHED_DELETE", tojson(execStages));
+            totalToBeDeletedAcrossAllShards += shardExplain.executionStages.nWouldDelete;
+        });
+        assert.eq(totalToBeDeletedAcrossAllShards, nWouldDelete, explain);
+    } else {
+        assert(execStages.stage === "BATCHED_DELETE", explain);
+        assert.eq(execStages.nWouldDelete, nWouldDelete, explain);
+    }
+}
