@@ -290,6 +290,14 @@ size_t SessionCatalog::size() const {
     return _sessions.size();
 }
 
+void SessionCatalog::setDisallowNewTransactions() {
+    _disallowNewTransactions.store(true);
+}
+
+bool SessionCatalog::getDisallowNewTransactions() {
+    return _disallowNewTransactions.load();
+}
+
 SessionCatalog::SessionRuntimeInfo* SessionCatalog::_getSessionRuntimeInfo(
     WithLock wl, const LogicalSessionId& lsid) {
     const auto& parentLsid = isParentSessionId(lsid) ? lsid : *getParentSessionId(lsid);

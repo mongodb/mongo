@@ -176,6 +176,12 @@ public:
         _makeSessionWorkerFnForEagerReap = std::move(makeWorkerFnForEagerReap);
     }
 
+    /**
+     * Called on shutdown to prevent the TransactionRouter from starting a new transaction.
+     */
+    void setDisallowNewTransactions();
+    bool getDisallowNewTransactions();
+
 private:
     /**
      * Tracks the runtime info for transaction sessions that corresponds to the same logical
@@ -276,6 +282,8 @@ private:
 
     // Owns the Session objects for all current Sessions.
     SessionRuntimeInfoMap _sessions;
+
+    AtomicWord<bool> _disallowNewTransactions{false};
 };
 
 /**
