@@ -2183,42 +2183,31 @@ from now on when we invent a new system collection we will place it on "admin".
 # Replication Timestamp Glossary
 
 In this section, when we refer to the word "transaction" without any other qualifier, we are talking
-about a storage transaction. Transactions in the replication layer will be referred to as
-multi-document or prepared transactions.
+about a storage transaction (aka [WriteUnitOfWork](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/storage/write_unit_of_work.h#L48)).
+Transactions in the replication layer will be referred to as multi-document or prepared transactions.
 
 **`all_durable`**: All transactions with timestamps earlier than the `all_durable` timestamp are
 committed. This is the point at which the oplog has no gaps, which are created when we reserve
-timestamps before executing the associated write. Since this timestamp is used to maintain the oplog
-visibility point, it is important that all operations up to and including this timestamp are
-committed and durable on disk. This is so that we can replicate the oplog without any gaps.
-
-**`commit oplog entry timestamp`**: The timestamp of the ‘commitTransaction’ oplog entry for a
-prepared transaction, or the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction.
-In a cross-shard transaction each shard may have a different commit oplog entry timestamp. This is
-guaranteed to be greater than the `prepareTimestamp`.
-
-**`commitTimestamp`**: The timestamp at which we committed a multi-document transaction. This will
-be the `commitTimestamp` field in the `commitTransaction` oplog entry for a prepared transaction, or
-the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a cross-shard
-transaction this timestamp is the same across all shards. The effects of the transaction are visible
-as of this timestamp. Note that `commitTimestamp` and the `commit oplog entry timestamp` are the
-same for non-prepared transactions because we do not write down the oplog entry until we commit the
-transaction. For a prepared transaction, we have the following guarantee: `prepareTimestamp` <=
-`commitTimestamp` <= `commit oplog entry timestamp`
+timestamps before executing the associated write (ex: [insert path](https://github.com/mongodb/mongo/blob/2ff8fff5b01eeda5722884c5fd104716117c9606/src/mongo/db/ops/write_ops_exec.cpp#L379)).
+Since this timestamp is used to maintain the oplog visibility point, it is important that all
+operations up to and including this timestamp are committed. This is so that we can replicate the
+oplog without any gaps.  
+This is calculated at the storage level and can be retrieved through [getAllDurableTimestamp](https://github.com/mongodb/mongo/blob/2ff8fff5b01eeda5722884c5fd104716117c9606/src/mongo/db/repl/storage_interface.h#L471).  
+Contrary to what the name might imply, this timestamp does not indicate that all transactions
+preceding it are durable on disk; rather, it solely signifies they are committed. Therefore,
+replication consistently [maintains that](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4843-L4861) `stable_timestamp` <= `all_durable`.
 
 **`currentCommittedSnapshot`**: An optime maintained in `ReplicationCoordinator` that is used to
 serve majority reads and is always guaranteed to be <= `lastCommittedOpTime`. When `eMRC=true`, this
 is currently [set to the stable optime](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4945).
-Since it is reset every time we recalculate the stable optime, it will also be up to date.
-
+Since it is reset every time we recalculate the stable optime, it will also be up to date.  
 When `eMRC=false`, this [is set](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4952-L4961)
 to the minimum of the stable optime and the `lastCommittedOpTime`, even though it is not used to
 serve majority reads in that case.
 
 **`initialDataTimestamp`**: A timestamp used to indicate the timestamp at which history “begins”.
 When a node comes out of initial sync, we inform the storage engine that the `initialDataTimestamp`
-is the node's `lastApplied`.
-
+is the node's `lastApplied`.  
 By setting this value to 0, it informs the storage engine to take unstable checkpoints. Stable
 checkpoints can be viewed as timestamped reads that persist the data they read into a checkpoint.
 Unstable checkpoints simply open a transaction and read all data that is currently committed at the
@@ -2256,11 +2245,6 @@ at the end of batch application. Startup recovery will use the `oplogTruncateAft
 the oplog back to an oplog point consistent with the rest of the replica set: other nodes may have
 replicated in-memory data that a crashed node no longer has and is unaware that it lacks.
 
-**`prepareTimestamp`**: The timestamp of the ‘prepare’ oplog entry for a prepared transaction. This
-is the earliest timestamp at which it is legal to commit the transaction. This timestamp is provided
-to the storage engine to block reads that are trying to read prepared data until the storage engines
-knows whether the prepared transaction has committed or aborted.
-
 **`readConcernMajorityOpTime`**: Exposed in replSetGetStatus as “readConcernMajorityOpTime” but is
 populated internally from the `currentCommittedSnapshot` timestamp inside `ReplicationCoordinator`.
 
@@ -2269,14 +2253,36 @@ checkpoint, which can be thought of as a consistent snapshot of the data. Replic
 storage engine of where it is safe to take its next checkpoint. This timestamp is guaranteed to be
 majority committed so that RTT rollback can use it. In the case when
 [`eMRC=false`](#enableMajorityReadConcern-flag), the stable timestamp may not be majority committed,
-which is why we must use the Rollback via Refetch rollback algorithm.
-
+which is why we must use the Rollback via Refetch rollback algorithm.  
 This timestamp is also required to increase monotonically except when `eMRC=false`, where in a
-special case during rollback it is possible for the `stableTimestamp` to move backwards.
-
+special case during rollback it is possible for the `stableTimestamp` to move backwards.  
 The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4824-L4881).
-The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921) if it is earlier than the
-`initialDataTimestamp`, since data earlier than that timestamp may be inconsistent.
+The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921)
+if it is earlier than the `initialDataTimestamp`, since data earlier than that timestamp may be
+inconsistent.
+
+#### Timestamps related to both prepared and non-prepared transactions:
+- **`prepareTimestamp`**: The timestamp of the ‘prepare’ oplog entry for a prepared transaction. This
+is the earliest timestamp at which it is legal to commit the transaction. This timestamp is provided
+to the storage engine to block reads that are trying to read prepared data until the storage engines
+knows whether the prepared transaction has committed or aborted.
+
+- **`commit oplog entry timestamp`**: The timestamp of the ‘commitTransaction’ oplog entry for a
+prepared transaction, or the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction.
+In a cross-shard transaction each shard may have a different commit oplog entry timestamp. This is
+guaranteed to be greater than the `prepareTimestamp`. When the `stable_timestamp` advances to this
+point, the transaction can’t be rolled-back; hence, it is referred to as the transaction's
+`durable_timestamp` in [WT](https://source.wiredtiger.com/develop/timestamp_txn_api.html).
+
+- **`commitTimestamp`**: The timestamp at which we committed a multi-document transaction, referred
+to as `commit_timestamp` in [WT](https://source.wiredtiger.com/develop/timestamp_txn_api.html). This will
+be the `commitTimestamp` field in the `commitTransaction` oplog entry for a prepared transaction, or
+the timestamp of the ‘applyOps’ oplog entry for a non-prepared transaction. In a cross-shard
+transaction this timestamp is the same across all shards. The effects of the transaction are visible
+as of this timestamp. Note that `commitTimestamp` and the `commit oplog entry timestamp` are the
+same for non-prepared transactions because we do not write down the oplog entry until we commit the
+transaction. For a prepared transaction, we have the following guarantee: `prepareTimestamp` <=
+`commitTimestamp` <= `commit oplog entry timestamp`
 
 # Non-replication subsystems dependent on replication state transitions.
 
