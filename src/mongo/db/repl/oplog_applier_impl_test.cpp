@@ -93,6 +93,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -5973,12 +5974,41 @@ TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
     }
 }
 
+// For the SinglePreparedTxnMultipleOpsOnOneDoc, we need to make sure we don't fail spuriously
+// due to a hash collision.
+int findDocIdWithSeparateWriterId(
+    OperationContext* opCtx, const NamespaceString& nss, UUID uuid, int docId, int nWriters) {
+
+    invariant(nWriters > 1);
+    const int itersToCheck = std::min(nWriters, 10);
+    CachedCollectionProperties collPropertiesCache;
+    auto oplogEntry1 =
+        makeOplogEntry(OpTypeEnum::kInsert, nss, uuid, BSON("_id" << docId), boost::none);
+    uint32_t id1 =
+        OplogApplierUtils::getOplogEntryHash(opCtx, &oplogEntry1, &collPropertiesCache) % nWriters;
+    for (int newDocId = 1 + docId; newDocId <= docId + itersToCheck; newDocId++) {
+        auto oplogEntry2 =
+            makeOplogEntry(OpTypeEnum::kInsert, nss, uuid, BSON("_id" << newDocId), boost::none);
+        uint32_t id2 =
+            OplogApplierUtils::getOplogEntryHash(opCtx, &oplogEntry2, &collPropertiesCache) %
+            nWriters;
+        if (id1 != id2)
+            return newDocId;
+    }
+    invariant(false,
+              str::stream() << "Unable to find a non-colliding doc ID between " << docId + 1
+                            << " and " << docId + itersToCheck << " inclusive");
+    MONGO_UNREACHABLE;
+}
+
 TEST_F(PreparedTxnSplitTest, SinglePreparedTxnMultipleOpsOnOneDoc) {
     std::vector<OplogEntry> prepareOps;
     const int kNumDocuments = 2;
     const int kNumOpsPerDoc = 3;
     const int kNumApplierThreads = 100;
-    const int kDocID1 = 1001, kDocID2 = 1002;
+    const int kDocID1 = 1001;
+    const int kDocID2 =
+        findDocIdWithSeparateWriterId(_opCtx.get(), _nss, *_uuid, kDocID1, kNumApplierThreads);
 
     // Construct one insert, one update and one delete op for each document.
     std::vector<BSONObj> cruds;
