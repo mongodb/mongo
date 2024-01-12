@@ -813,6 +813,10 @@ public:
         unsupportedExpression("$_internalIndexKey");
     }
 
+    void visit(const ExpressionInternalKeyStringValue* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
 private:
     /**
      * Shared logic for $and, $or. Converts each child into an EExpression that evaluates to Boolean

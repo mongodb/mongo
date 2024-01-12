@@ -1002,6 +1002,10 @@ public:
         unsupportedExpression();
     }
 
+    void visit(const ExpressionInternalKeyStringValue* expr) override final {
+        unsupportedExpression();
+    }
+
 private:
     void unsupportedExpression() {
         _eligible = false;

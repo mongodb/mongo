@@ -205,6 +205,7 @@ public:
         kTsIncrement,
         kInternalOwningShard,
         kInternalIndexKey,
+        kInternalKeyStringValue,
     };
 
     explicit ExpressionHashVisitor(H hashState) : _hashState(std::move(hashState)) {}
@@ -837,6 +838,10 @@ public:
 
     void visit(const ExpressionInternalIndexKey* expr) final {
         _hashState = H::combine(std::move(_hashState), OpType::kInternalIndexKey);
+    }
+
+    void visit(const ExpressionInternalKeyStringValue* expr) final {
+        _hashState = H::combine(std::move(_hashState), OpType::kInternalKeyStringValue);
     }
 
     H moveHashState() {
