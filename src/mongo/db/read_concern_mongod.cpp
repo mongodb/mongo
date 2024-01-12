@@ -513,7 +513,11 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
                 ->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal));
         auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-        Lock::GlobalLock global(opCtx, MODE_IS);
+        Lock::GlobalLock global(opCtx,
+                                MODE_IS,
+                                Date_t::max(),
+                                Lock::InterruptBehavior::kThrow,
+                                Lock::GlobalLockSkipOptions{.skipRSTLLock = true});
         auto lastStableRecoveryTimestamp = storageEngine->getLastStableRecoveryTimestamp();
         if (!lastStableRecoveryTimestamp ||
             *lastStableRecoveryTimestamp < atClusterTime->asTimestamp()) {
