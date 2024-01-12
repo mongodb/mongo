@@ -70,16 +70,16 @@ public:
 
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
 
+private:
     void aboutToDelete(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const BSONObj& doc) override;
+                       const BSONObj& doc) override{};
 
     void onDelete(OperationContext* opCtx,
                   const CollectionPtr& coll,
                   StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) override;
+                  const OplogDeleteEntryArgs& args) override{};
 
-private:
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,
