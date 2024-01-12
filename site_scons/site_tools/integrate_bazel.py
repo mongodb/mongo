@@ -438,6 +438,13 @@ def generate(env: SCons.Environment.Environment) -> None:
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
         ]
 
+        http_client_option = env.GetOption("enable-http-client")
+        if http_client_option is not None:
+            if http_client_option in ["on", "auto"]:
+                bazel_internal_flags.append(f'--//bazel/config:http_client=True')
+            elif http_client_option == "off":
+                bazel_internal_flags.append(f'--//bazel/config:http_client=False')
+
         sanitizer_option = env.GetOption("sanitize")
 
         if sanitizer_option is not None:

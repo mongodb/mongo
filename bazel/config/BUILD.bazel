@@ -21,6 +21,7 @@ load(
     "use_libcxx",
     "build_grpc",
     "separate_debug",
+    "http_client",
     "linkstatic",
 )
 
@@ -713,6 +714,29 @@ config_setting(
     name = "separate_debug_enabled",
     flag_values = {
         "//bazel/config:separate_debug": "True",
+    },
+)
+
+# --------------------------------------
+# http_client options
+# --------------------------------------
+
+http_client(
+    name = "http_client",
+    build_setting_default = True
+)
+
+config_setting(
+    name = "http_client_enabled",
+    flag_values = {
+        "//bazel/config:http_client": "True",
+    }
+)
+
+config_setting(
+    name = "http_client_disabled",
+    flag_values = {
+        "//bazel/config:http_client": "False",
     },
 )
 

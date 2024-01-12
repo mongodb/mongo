@@ -259,6 +259,20 @@ separate_debug = rule(
 )
 
 # =========
+# enable-http-client
+# =========
+
+http_client_provider = provider(
+    doc = "Enable HTTP client",
+    fields = ["enabled"],
+)
+
+http_client = rule(
+    implementation = lambda ctx: linkstatic_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)
+
+# =========
 # linkstatic
 # =========
 

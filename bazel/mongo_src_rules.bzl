@@ -324,7 +324,7 @@ def mongo_cc_library(
 
     if linkstatic == True:
         fail("""Linking specific targets statically is not supported.
-        The mongo build must link entirely statically or entirely dynamically. 
+        The mongo build must link entirely statically or entirely dynamically.
         This can be configured via //config/bazel:linkstatic.""")
 
     # Avoid injecting into unwind/libunwind_asm to avoid a circular dependency.
@@ -407,7 +407,7 @@ def mongo_cc_binary(
 
     if linkstatic == True:
         fail("""Linking specific targets statically is not supported.
-        The mongo build must link entirely statically or entirely dynamically. 
+        The mongo build must link entirely statically or entirely dynamically.
         This can be configured via //config/bazel:linkstatic.""")
 
     fincludes_copt = force_includes_copt(native.package_name(), name)
