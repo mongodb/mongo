@@ -106,10 +106,8 @@ public:
 
     bool isConnected() override;
 
-    bool isFromLoadBalancer() const override;
-
-    bool bindsToOperationState() const override {
-        return isFromLoadBalancer();
+    bool isFromLoadBalancer() const override {
+        return _isFromLoadBalancer;
     }
 
     bool isFromRouterPort() const override {

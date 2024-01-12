@@ -206,13 +206,6 @@ public:
     }
 
     /**
-     * All gRPC sessions are considered bound to the operation state.
-     */
-    bool bindsToOperationState() const final {
-        return true;
-    }
-
-    /**
      * Runs the provided callback when destroying the session.
      * Not synchronized, thus not safe to call once the session is visible to other threads.
      */

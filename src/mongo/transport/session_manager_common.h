@@ -50,9 +50,9 @@ namespace transport {
 class SessionManagerCommon : public SessionManager {
 public:
     explicit SessionManagerCommon(ServiceContext*);
-    SessionManagerCommon(ServiceContext*, std::shared_ptr<ClientTransportObserver> observer);
+    SessionManagerCommon(ServiceContext*, std::unique_ptr<ClientTransportObserver> observer);
     SessionManagerCommon(ServiceContext* svcCtx,
-                         std::vector<std::shared_ptr<ClientTransportObserver>> observers);
+                         std::vector<std::unique_ptr<ClientTransportObserver>> observers);
     ~SessionManagerCommon() override;
 
     void startSession(std::shared_ptr<Session> session) override;
@@ -80,12 +80,6 @@ protected:
     virtual void configureServiceExecutorContext(Client* client,
                                                  bool isPrivilegedSession) const = 0;
 
-    /** Called upon client connection. Default behavior is to do nothing. */
-    virtual void onClientConnect(Client* client) {}
-
-    /** Called upon client disconnection. Default behavior is to do nothing. */
-    virtual void onClientDisconnect(Client* client) {}
-
     /** Total number of sessions created. */
     std::size_t numCreatedSessions() const;
 
@@ -101,7 +95,7 @@ protected:
     std::unique_ptr<Sessions> _sessions;
 
     // External observer which may receive client connect/disconnect events.
-    std::vector<std::shared_ptr<ClientTransportObserver>> _observers;
+    std::vector<std::unique_ptr<ClientTransportObserver>> _observers;
 };
 
 /**

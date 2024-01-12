@@ -44,24 +44,34 @@
 
 namespace mongo {
 
-void killOpenCursors(OperationContext& opCtx) {
-    Client* client = opCtx.getClient();
+void ClientTransportObserverMongos::onClientConnect(Client* client) {
+    if (load_balancer_support::isFromLoadBalancer(client)) {
+        _loadBalancedConnections.increment();
+    }
+}
+
+void ClientTransportObserverMongos::onClientDisconnect(Client* client) {
+    if (!load_balancer_support::isFromLoadBalancer(client)) {
+        return;
+    }
+
+    _loadBalancedConnections.decrement();
+
+    auto killerOperationContext = client->makeOperationContext();
+
+    // Kill any cursors opened by the given Client.
     auto ccm = Grid::get(client->getServiceContext())->getCursorManager();
-    ccm->killCursorsSatisfying(&opCtx,
+    ccm->killCursorsSatisfying(killerOperationContext.get(),
                                [&](CursorId, const ClusterCursorManager::CursorEntry& entry) {
                                    return entry.originatingClientUuid() == client->getUUID();
                                });
-}
-
-void killInProgressTransactions(OperationContext& opCtx) {
-    Client* client = opCtx.getClient();
 
     // Kill any in-progress transactions over this Client connection.
     auto lsid = load_balancer_support::getMruSession(client);
 
     auto killToken = [&]() -> boost::optional<SessionCatalog::KillToken> {
         try {
-            return SessionCatalog::get(&opCtx)->killSession(lsid);
+            return SessionCatalog::get(killerOperationContext.get())->killSession(lsid);
         } catch (const ExceptionFor<ErrorCodes::NoSuchSession>&) {
             return boost::none;
         }
@@ -71,27 +81,22 @@ void killInProgressTransactions(OperationContext& opCtx) {
         // disconnecting client, so we have no transaction state to clean up.
         return;
     }
-    OperationContextSession sessionCtx(&opCtx, std::move(*killToken));
-    invariant(lsid == OperationContextSession::get(&opCtx)->getSessionId());
+    OperationContextSession sessionCtx(killerOperationContext.get(), std::move(*killToken));
+    invariant(lsid == OperationContextSession::get(killerOperationContext.get())->getSessionId());
 
-    auto txnRouter = TransactionRouter::get(&opCtx);
+    auto txnRouter = TransactionRouter::get(killerOperationContext.get());
     if (txnRouter && txnRouter.isInitialized() && !txnRouter.isTrackingOver()) {
         txnRouter.implicitlyAbortTransaction(
-            &opCtx,
+            killerOperationContext.get(),
             {ErrorCodes::Interrupted,
-             "aborting in-progress transaction because client disconnected"});
+             "aborting in-progress transaction because load-balanced client disconnected"});
     }
 }
 
-void ClientTransportObserverMongos::onClientDisconnect(Client* client) {
-    auto session = client->session();
-    if (!session || !session->bindsToOperationState())
-        return;
-
-    auto killerOperationContext = client->makeOperationContext();
-
-    killOpenCursors(*killerOperationContext);
-    killInProgressTransactions(*killerOperationContext);
+void ClientTransportObserverMongos::appendTransportServerStats(BSONObjBuilder* bob) {
+    if (load_balancer_support::isEnabled()) {
+        bob->append("loadBalanced", _loadBalancedConnections);
+    }
 }
 
 }  // namespace mongo

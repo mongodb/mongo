@@ -2,15 +2,6 @@
  * Tests that load-balanced connections are reported correctly in server status metrics.
  */
 
-const kProxyIngressPort = 22064;
-const kProxyEgressPort = 22065;
-const kProxyVersion = 2;
-
-if (_isWindows()) {
-    quit();
-}
-import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
-
 (() => {
     const numConnections = 10;
 
@@ -36,17 +27,13 @@ import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
                     5 * 60000);
     }
 
-    let proxy_server = new ProxyProtocolServer(kProxyIngressPort, kProxyEgressPort, kProxyVersion);
-    proxy_server.start();
-
-    var st = new ShardingTest({
-        shards: 1,
-        mongos: 1,
-        mongosOptions: {setParameter: {"loadBalancerPort": kProxyEgressPort}}
-    });
+    var st = new ShardingTest({shards: 1, mongos: 1});
     let admin = st.s.getDB("admin");
 
-    var uri = `mongodb://127.0.0.1:${kProxyIngressPort}/?loadBalanced=true`;
+    assert.commandWorked(
+        admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'alwaysOn'}));
+
+    var uri = "mongodb://" + admin.getMongo().host + "/?loadBalanced=true";
 
     var testDB = 'connectionsOpenedTest';
     var signalCollection = 'keepRunning';
@@ -66,6 +53,7 @@ import {ProxyProtocolServer} from "jstests/sharding/libs/proxy_protocol.js";
     }
     waitForConnections(admin, 0);
 
+    assert.commandWorked(
+        admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'off'}));
     st.stop();
-    proxy_server.stop();
 })();

@@ -50,6 +50,11 @@ public:
     virtual void onClientConnect(Client* client) {}
 
     /**
+     * Permits an observer to append additional ServerStatus information.
+     */
+    virtual void appendTransportServerStats(BSONObjBuilder* bob) {}
+
+    /**
      * Called on destruction of a client.
      */
     virtual void onClientDisconnect(Client* client) {}

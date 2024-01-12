@@ -203,21 +203,21 @@ public:
 };
 
 SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx)
-    : SessionManagerCommon(svcCtx, std::vector<std::shared_ptr<ClientTransportObserver>>()) {}
+    : SessionManagerCommon(svcCtx, std::vector<std::unique_ptr<ClientTransportObserver>>()) {}
 
 // Helper for single observer constructor.
 // std::initializer_list uses copy semantics, so we can't just call the vector version with:
 // `{std::make_unique<MyObserver>()}`.
 // Instead, construct with an empty array then push our singular one in.
 SessionManagerCommon::SessionManagerCommon(ServiceContext* svcCtx,
-                                           std::shared_ptr<ClientTransportObserver> observer)
+                                           std::unique_ptr<ClientTransportObserver> observer)
     : SessionManagerCommon(svcCtx) {
     invariant(observer);
     _observers.push_back(std::move(observer));
 }
 
 SessionManagerCommon::SessionManagerCommon(
-    ServiceContext* svcCtx, std::vector<std::shared_ptr<ClientTransportObserver>> observers)
+    ServiceContext* svcCtx, std::vector<std::unique_ptr<ClientTransportObserver>> observers)
     : _svcCtx(svcCtx),
       _maxOpenSessions(getSupportedMax()),
       _sessions(std::make_unique<Sessions>()),
@@ -279,7 +279,6 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
         }
     }
 
-    onClientConnect(client);
     for (auto&& observer : _observers) {
         observer->onClientConnect(client);
     }
@@ -358,7 +357,6 @@ std::size_t SessionManagerCommon::numCreatedSessions() const {
 }
 
 void SessionManagerCommon::endSessionByClient(Client* client) {
-    onClientDisconnect(client);
     for (auto&& observer : _observers) {
         observer->onClientDisconnect(client);
     }

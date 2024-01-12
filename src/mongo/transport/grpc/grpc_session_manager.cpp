@@ -127,6 +127,10 @@ void GRPCSessionManager::appendStats(BSONObjBuilder* bob) const {
     }
 
     appendI64(bob, "uniqueClientsSeen"_sd, _clientCache->getUniqueClientsSeen());
+
+    for (auto&& observer : _observers) {
+        observer->appendTransportServerStats(bob);
+    }
 }
 
 void GRPCSessionManager::endSessionByClient(mongo::Client* client) {

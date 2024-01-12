@@ -142,20 +142,20 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
     ServiceContext* svcCtx,
     boost::optional<int> loadBalancerPort,
     boost::optional<int> routerPort,
-    std::shared_ptr<ClientTransportObserver> observer) {
+    std::unique_ptr<ClientTransportObserver> asioObserver) {
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
-    std::vector<std::shared_ptr<ClientTransportObserver>> observers;
-    if (observer) {
-        observers.push_back(std::move(observer));
-    }
 
     {
         AsioTransportLayer::Options opts(config);
         opts.loadBalancerPort = std::move(loadBalancerPort);
         opts.routerPort = std::move(routerPort);
 
-        auto sm = std::make_unique<AsioSessionManager>(svcCtx, observers);
+        std::vector<std::unique_ptr<ClientTransportObserver>> observers;
+        if (asioObserver) {
+            observers.push_back(std::move(asioObserver));
+        }
+        auto sm = std::make_unique<AsioSessionManager>(svcCtx, std::move(observers));
         auto tl = std::make_unique<AsioTransportLayer>(opts, std::move(sm));
         retVector.push_back(std::move(tl));
     }
@@ -164,8 +164,7 @@ std::unique_ptr<TransportLayerManager> TransportLayerManagerImpl::createWithConf
 #ifdef MONGO_CONFIG_SSL
     if (!sslGlobalParams.sslPEMKeyFile.empty()) {
         using GRPCTL = grpc::GRPCTransportLayerImpl;
-        retVector.push_back(
-            GRPCTL::createWithConfig(svcCtx, GRPCTL::Options(*config), std::move(observers)));
+        retVector.push_back(GRPCTL::createWithConfig(svcCtx, GRPCTL::Options(*config)));
     } else {
         LOGV2(8076800, "Unable to start gRPC transport without tlsCertificateKeyFile");
     }

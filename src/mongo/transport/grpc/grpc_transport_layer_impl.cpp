@@ -63,16 +63,12 @@ GRPCTransportLayerImpl::GRPCTransportLayerImpl(ServiceContext* svcCtx,
     : _svcCtx{svcCtx}, _options{std::move(options)}, _sessionManager(std::move(sm)) {}
 
 std::unique_ptr<GRPCTransportLayerImpl> GRPCTransportLayerImpl::createWithConfig(
-    ServiceContext* svcCtx,
-    Options options,
-    std::vector<std::shared_ptr<ClientTransportObserver>> observers) {
+    ServiceContext* svcCtx, Options options) {
 
     auto clientCache = std::make_shared<ClientCache>();
 
     auto tl = std::make_unique<GRPCTransportLayerImpl>(
-        svcCtx,
-        std::move(options),
-        std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers)));
+        svcCtx, std::move(options), std::make_unique<GRPCSessionManager>(svcCtx, clientCache));
     uassertStatusOK(tl->registerService(std::make_unique<CommandService>(
         tl.get(),
         [tlPtr = tl.get()](auto session) {

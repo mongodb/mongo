@@ -31,7 +31,6 @@
 
 #include <memory>
 
-#include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/grpc/client_cache.h"
 #include "mongo/transport/session_manager_common.h"
 
@@ -42,11 +41,8 @@ namespace mongo::transport::grpc {
  */
 class GRPCSessionManager : public SessionManagerCommon {
 public:
-    GRPCSessionManager(ServiceContext* svcCtx,
-                       std::shared_ptr<ClientCache> clientCache,
-                       std::vector<std::shared_ptr<ClientTransportObserver>> observers)
-        : SessionManagerCommon(svcCtx, std::move(observers)),
-          _clientCache(std::move(clientCache)) {}
+    GRPCSessionManager(ServiceContext* svcCtx, std::shared_ptr<ClientCache> clientCache)
+        : SessionManagerCommon(svcCtx), _clientCache(std::move(clientCache)) {}
 
     void appendStats(BSONObjBuilder* bob) const;
     void endSessionByClient(mongo::Client* client) override;

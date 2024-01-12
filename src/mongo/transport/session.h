@@ -168,12 +168,6 @@ public:
     virtual bool isFromLoadBalancer() const = 0;
 
     /**
-     * Returns true if this session binds to the operation state, which implies open cursors and
-     * in-progress transactions should be killed upon client disconnection.
-     */
-    virtual bool bindsToOperationState() const = 0;
-
-    /**
      * Returns true if this session corresponds to a connection accepted from the router port.
      */
     virtual bool isFromRouterPort() const {

@@ -112,20 +112,8 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
         adminExec->appendStats(&section);
     }
 
-    bob->append("loadBalanced", _loadBalancedConnections);
-}
-
-void AsioSessionManager::onClientConnect(Client* client) {
-    auto session = client->session();
-    if (session && session->isFromLoadBalancer()) {
-        _loadBalancedConnections.increment();
-    }
-}
-
-void AsioSessionManager::onClientDisconnect(Client* client) {
-    auto session = client->session();
-    if (session && session->isFromLoadBalancer()) {
-        _loadBalancedConnections.decrement();
+    for (auto&& observer : _observers) {
+        observer->appendTransportServerStats(bob);
     }
 }
 
