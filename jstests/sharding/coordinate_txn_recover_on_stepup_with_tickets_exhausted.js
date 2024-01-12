@@ -69,9 +69,9 @@ const hangBeforeDeletingCoordinatorDocFp =
 // Set the read and write tickets to 0 before executing the code to recover the
 // TransactionCoordinator.
 assert.commandWorked(secondary.getDB("admin").adminCommand(
-    {setParameter: 1, wiredTigerConcurrentReadTransactions: 0}));
+    {setParameter: 1, wiredTigerConcurrentReadTransactions: NumberInt(0)}));
 assert.commandWorked(secondary.getDB("admin").adminCommand(
-    {setParameter: 1, wiredTigerConcurrentWriteTransactions: 0}));
+    {setParameter: 1, wiredTigerConcurrentWriteTransactions: NumberInt(0)}));
 hangBeforeTxnCoordinatorOnStepUpWorkFp.off();
 
 // The TransactionCoordinator has successfully been recovered and the prepared transaction has been
@@ -81,9 +81,9 @@ hangBeforeDeletingCoordinatorDocFp.off();
 
 // Reset the read and write tickets to a non-zero value to allow the test to finish.
 assert.commandWorked(secondary.getDB("admin").adminCommand(
-    {setParameter: 1, wiredTigerConcurrentReadTransactions: 128}));
+    {setParameter: 1, wiredTigerConcurrentReadTransactions: NumberInt(128)}));
 assert.commandWorked(secondary.getDB("admin").adminCommand(
-    {setParameter: 1, wiredTigerConcurrentWriteTransactions: 128}));
+    {setParameter: 1, wiredTigerConcurrentWriteTransactions: NumberInt(128)}));
 
 preparedTxnThread.join();
 st.stop();
