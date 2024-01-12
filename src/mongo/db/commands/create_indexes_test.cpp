@@ -99,5 +99,21 @@ TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) 
     }
 }
 
+TEST_F(CreateIndexesTest, CreateIndexOnPreimagesCollectionFails) {
+    auto opCtx = operationContext();
+    DBDirectClient client(opCtx);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("config.system.preimages");
+    const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+    auto index = BSON("v" << kIndexVersion << "key" << BSON("a" << 1) << "name"
+                          << "a_1");
+    auto cmd = BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index)
+                                    << "commitQuorum" << 0);
+    BSONObj result;
+    // This should fail because it is not permitted to create indexes on config.system.preimages.
+    ASSERT_FALSE(client.runCommand(nss.dbName(), cmd, result)) << result;
+    ASSERT(result.hasField("code"));
+    ASSERT_EQ(result.getIntField("code"), 8293400);
+}
+
 }  // namespace
 }  // namespace mongo
