@@ -175,6 +175,7 @@ AggregateCommandRequest asAggregateCommandRequest(const FindCommandRequest& find
             result.setResumeAfter(findCommand.getResumeAfter().getOwned());
         }
     }
+    result.setIncludeQueryStatsMetrics(findCommand.getIncludeQueryStatsMetrics());
 
     return result;
 }

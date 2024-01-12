@@ -232,14 +232,40 @@ ClientCursorPin registerCursor(OperationContext* opCtx,
 }
 
 /**
+ * Updates query stats in OpDebug using the plan explainer from the pinned cursor (if given)
+ * or the given executor (otherwise) and collects them in the query stats store.
+ */
+void collectQueryStats(OperationContext* opCtx,
+                       mongo::PlanExecutor* maybeExec,
+                       ClientCursorPin* maybePinnedCursor) {
+    invariant(maybeExec || maybePinnedCursor);
+
+    auto curOp = CurOp::get(opCtx);
+    const auto& planExplainer = maybePinnedCursor
+        ? maybePinnedCursor->getCursor()->getExecutor()->getPlanExplainer()
+        : maybeExec->getPlanExplainer();
+    PlanSummaryStats stats;
+    planExplainer.getSummaryStats(&stats);
+    curOp->debug().setPlanSummaryMetrics(stats);
+    curOp->setEndOfOpMetrics(stats.nReturned);
+
+    if (maybePinnedCursor) {
+        collectQueryStatsMongod(opCtx, *maybePinnedCursor);
+    } else {
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
+    }
+}
+
+/**
  * Builds the reply for a pipeline over a sharded collection that contains an exchange stage.
  */
 void handleMultipleCursorsForExchange(OperationContext* opCtx,
                                       const NamespaceString& nsForCursor,
-                                      const std::vector<ClientCursorPin>& pinnedCursors,
+                                      std::vector<ClientCursorPin>& pinnedCursors,
                                       const AggregateCommandRequest& request,
                                       rpc::ReplyBuilderInterface* result) {
     invariant(pinnedCursors.size() > 1);
+    collectQueryStats(opCtx, nullptr, &pinnedCursors[0]);
     long long batchSize =
         request.getCursor().getBatchSize().value_or(aggregation_request_helper::kDefaultBatchSize);
 
@@ -397,6 +423,59 @@ bool getFirstBatch(OperationContext* opCtx,
     return doRegisterCursor;
 }
 
+boost::optional<ClientCursorPin> executeSingleExecUntilFirstBatch(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const AggregateCommandRequest& request,
+    const DeferredCmd& cmdObj,
+    const PrivilegeVector& privileges,
+    const NamespaceString& origNss,
+    std::shared_ptr<ExternalDataSourceScopeGuard> extDataSrcGuard,
+    std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>>& execs,
+    rpc::ReplyBuilderInterface* result) {
+
+    boost::optional<ClientCursorPin> maybePinnedCursor;
+
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    if (!opCtx->inMultiDocumentTransaction()) {
+        options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    }
+    CursorResponseBuilder responseBuilder(result, options);
+
+    auto cursorId = 0LL;
+    const bool doRegisterCursor =
+        getFirstBatch(opCtx, expCtx, request, cmdObj, *execs[0], responseBuilder);
+
+    if (doRegisterCursor) {
+        auto curOp = CurOp::get(opCtx);
+        // Only register a cursor for the pipeline if we have found that we need one for future
+        // calls to 'getMore()'.
+        maybePinnedCursor = registerCursor(
+            opCtx, expCtx, origNss, *cmdObj, privileges, std::move(execs[0]), extDataSrcGuard);
+        auto cursor = maybePinnedCursor->getCursor();
+        cursorId = cursor->cursorid();
+        curOp->debug().cursorid = cursorId;
+
+        // If a time limit was set on the pipeline, remaining time is "rolled over" to the
+        // cursor (for use by future getmore ops).
+        cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+    }
+
+    collectQueryStats(opCtx, execs[0].get(), maybePinnedCursor.get_ptr());
+
+    boost::optional<CursorMetrics> metrics = request.getIncludeQueryStatsMetrics()
+        ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
+        : boost::none;
+    responseBuilder.done(
+        cursorId,
+        origNss,
+        std::move(metrics),
+        SerializationContext::stateCommandReply(request.getSerializationContext()));
+
+    return maybePinnedCursor;
+}
+
 /**
  * Executes the aggregation pipeline, registering any cursors needed for subsequent calls to
  * getMore() if necessary. Returns the first ClientCursorPin, if any cursor was registered.
@@ -411,50 +490,22 @@ boost::optional<ClientCursorPin> executeUntilFirstBatch(
     std::shared_ptr<ExternalDataSourceScopeGuard> extDataSrcGuard,
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>>& execs,
     rpc::ReplyBuilderInterface* result) {
-    auto curOp = CurOp::get(opCtx);
-    std::vector<ClientCursorPin> pinnedCursors;
 
     if (execs.size() == 1) {
-        CursorResponseBuilder::Options options;
-        options.isInitialResponse = true;
-        if (!opCtx->inMultiDocumentTransaction()) {
-            options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
-        }
-        CursorResponseBuilder responseBuilder(result, options);
-
-        auto cursorId = 0LL;
-        const bool doRegisterCursor =
-            getFirstBatch(opCtx, expCtx, request, cmdObj, *execs[0], responseBuilder);
-        if (doRegisterCursor) {
-            // Only register a cursor for the pipeline if we have found that we need one for future
-            // calls to 'getMore()'.
-            auto pinnedCursor = registerCursor(
-                opCtx, expCtx, origNss, *cmdObj, privileges, std::move(execs[0]), extDataSrcGuard);
-            auto cursor = pinnedCursor.getCursor();
-            pinnedCursors.emplace_back(std::move(pinnedCursor));
-            cursorId = cursor->cursorid();
-            curOp->debug().cursorid = cursorId;
-
-            // If a time limit was set on the pipeline, remaining time is "rolled over" to the
-            // cursor (for use by future getmore ops).
-            cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-        }
-
-        responseBuilder.done(
-            cursorId,
-            origNss,
-            SerializationContext::stateCommandReply(request.getSerializationContext()));
-    } else {
-        // If there is more than one executor, that means this query will be running on multiple
-        // shards via exchange and merge. Such queries always require a cursor to be registered for
-        // each PlanExecutor.
-        for (auto&& exec : execs) {
-            auto pinnedCursor = registerCursor(
-                opCtx, expCtx, origNss, *cmdObj, privileges, std::move(exec), extDataSrcGuard);
-            pinnedCursors.emplace_back(std::move(pinnedCursor));
-        }
-        handleMultipleCursorsForExchange(opCtx, origNss, pinnedCursors, request, result);
+        return executeSingleExecUntilFirstBatch(
+            opCtx, expCtx, request, cmdObj, privileges, origNss, extDataSrcGuard, execs, result);
     }
+
+    // If there is more than one executor, that means this query will be running on multiple
+    // shards via exchange and merge. Such queries always require a cursor to be registered for
+    // each PlanExecutor.
+    std::vector<ClientCursorPin> pinnedCursors;
+    for (auto&& exec : execs) {
+        auto pinnedCursor = registerCursor(
+            opCtx, expCtx, origNss, *cmdObj, privileges, std::move(exec), extDataSrcGuard);
+        pinnedCursors.emplace_back(std::move(pinnedCursor));
+    }
+    handleMultipleCursorsForExchange(opCtx, origNss, pinnedCursors, request, result);
 
     if (pinnedCursors.size() > 0) {
         return std::move(pinnedCursors[0]);
@@ -1201,10 +1252,14 @@ Status _runAggregate(OperationContext* opCtx,
             CursorResponseBuilder::Options options;
             options.isInitialResponse = true;
             CursorResponseBuilder responseBuilder(result, options);
+            boost::optional<CursorMetrics> metrics = request.getIncludeQueryStatsMetrics()
+                ? boost::make_optional(CursorMetrics{})
+                : boost::none;
             responseBuilder.setWasStatementExecuted(true);
             responseBuilder.done(
                 0LL,
                 origNss,
+                std::move(metrics),
                 SerializationContext::stateCommandReply(request.getSerializationContext()));
             return Status::OK();
         }
@@ -1662,21 +1717,6 @@ Status _runAggregate(OperationContext* opCtx,
     } else {
         auto maybePinnedCursor = executeUntilFirstBatch(
             opCtx, expCtx, request, cmdObj, privileges, origNss, extDataSrcGuard, execs, result);
-        // The PlanExecutor may have been moved from the 'execs' vector to the cursor if one was
-        // registered, so get it from the right place.
-        auto exec =
-            maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
-        const auto& planExplainer = exec->getPlanExplainer();
-        PlanSummaryStats stats;
-        planExplainer.getSummaryStats(&stats);
-        curOp->debug().setPlanSummaryMetrics(stats);
-        curOp->setEndOfOpMetrics(stats.nReturned);
-
-        if (maybePinnedCursor) {
-            collectQueryStatsMongod(opCtx, *maybePinnedCursor);
-        } else {
-            collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsInfo.key));
-        }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.
@@ -1689,8 +1729,11 @@ Status _runAggregate(OperationContext* opCtx,
                                                      ctx->isAnySecondaryNamespaceAViewOrSharded(),
                                                      secondaryExecNssList);
 
+            auto exec =
+                maybePinnedCursor ? maybePinnedCursor->getCursor()->getExecutor() : execs[0].get();
+            const auto& planExplainer = exec->getPlanExplainer();
             if (const auto& coll = ctx->getCollection()) {
-                CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, stats);
+                CollectionQueryInfo::get(coll).notifyOfQuery(coll, curOp->debug());
             }
             // For SBE pushed down pipelines, we may need to report stats saved for secondary
             // collections separately.

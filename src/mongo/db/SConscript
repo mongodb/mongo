@@ -871,6 +871,7 @@ env.Library(
         'list_indexes.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/cursor_response_idl',
         'api_parameters',
     ],
     LIBDEPS_PRIVATE=[

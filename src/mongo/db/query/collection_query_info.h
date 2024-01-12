@@ -128,9 +128,15 @@ public:
      */
     void clearQueryCacheForSetMultikey(const CollectionPtr& coll) const;
 
+    /**
+     * Notify of a query so as to record statistics. The first overload records the statistics
+     * from the given PlanSummaryStats while the second records stats previously stored in the
+     * OpDebug.
+     */
     void notifyOfQuery(OperationContext* opCtx,
                        const CollectionPtr& coll,
                        const PlanSummaryStats& summaryStats) const;
+    void notifyOfQuery(const CollectionPtr& coll, const OpDebug& debug) const;
 
 private:
     /**

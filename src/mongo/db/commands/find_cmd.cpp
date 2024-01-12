@@ -547,6 +547,8 @@ public:
                 uassertStatusOK(replCoord->updateTerm(opCtx, *term));
             }
 
+            const bool includeMetrics = findCommand->getIncludeQueryStatsMetrics();
+
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
             if (term && isOplogNss) {
@@ -763,9 +765,13 @@ public:
                 const long long numResults = 0;
                 const CursorId cursorId = 0;
                 endQueryOp(opCtx, collectionPtr, *exec, numResults, boost::none, cmdObj);
-                auto bodyBuilder = result->getBodyBuilder();
-                appendCursorResponseObject(
-                    cursorId, nss, BSONArray(), boost::none, &bodyBuilder, respSc);
+                CursorResponseBuilder::Options options;
+                options.isInitialResponse = true;
+                CursorResponseBuilder builder(result, options);
+                boost::optional<CursorMetrics> metrics = includeMetrics
+                    ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
+                    : boost::none;
+                builder.done(cursorId, nss, metrics, respSc);
                 return;
             }
 
@@ -895,7 +901,10 @@ public:
             }
 
             // Generate the response object to send to the client.
-            firstBatch.done(cursorId, nss, respSc);
+            boost::optional<CursorMetrics> metrics = includeMetrics
+                ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
+                : boost::none;
+            firstBatch.done(cursorId, nss, metrics, respSc);
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.

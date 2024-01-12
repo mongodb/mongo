@@ -216,6 +216,19 @@ TEST(ResolvedViewTest, EnsureSerializationContextCopy) {
               SerializationContext::Prefix::IncludePrefix);
 }
 
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesIncludeQueryStatsMetrics) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline, kSimpleCollation};
+    AggregateCommandRequest aggRequest(viewNss, std::vector<mongo::BSONObj>());
+
+    aggRequest.setIncludeQueryStatsMetrics(false);
+    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    ASSERT_FALSE(result.getIncludeQueryStatsMetrics());
+
+    aggRequest.setIncludeQueryStatsMetrics(true);
+    result = resolvedView.asExpandedViewAggregation(aggRequest);
+    ASSERT_TRUE(result.getIncludeQueryStatsMetrics());
+}
+
 TEST(ResolvedViewTest, FromBSONFailsIfMissingResolvedView) {
     BSONObj badCmdResponse = BSON("x" << 1);
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40248);

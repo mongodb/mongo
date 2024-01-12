@@ -1784,6 +1784,9 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     fromPlanCache = planSummaryStats.fromPlanCache;
     replanReason = planSummaryStats.replanReason;
+    collectionScans = planSummaryStats.collectionScans;
+    collectionScansNonTailable = planSummaryStats.collectionScansNonTailable;
+    indexesUsed = planSummaryStats.indexesUsed;
 }
 
 BSONObj OpDebug::makeFlowControlObject(FlowControlTicketholder::CurOp stats) {
@@ -1854,6 +1857,20 @@ static void appendResolvedViewsInfoImpl(
 
         resolvedViewsArr.append(redact(aView.done()));
     }
+}
+
+CursorMetrics OpDebug::getCursorMetrics() const {
+    CursorMetrics metrics;
+
+    metrics.setKeysExamined(additiveMetrics.keysExamined.value_or(0));
+    metrics.setDocsExamined(additiveMetrics.docsExamined.value_or(0));
+
+    metrics.setHasSortStage(hasSortStage);
+    metrics.setUsedDisk(usedDisk);
+    metrics.setFromMultiPlanner(fromMultiPlanner);
+    metrics.setFromPlanCache(fromPlanCache);
+
+    return metrics;
 }
 
 BSONArray OpDebug::getResolvedViewsInfo() const {

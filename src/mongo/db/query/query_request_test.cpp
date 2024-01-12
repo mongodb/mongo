@@ -1590,6 +1590,22 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
     ASSERT_EQ(false, ar.getAllowDiskUse());
 }
 
+TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsTrueSucceeds) {
+    FindCommandRequest findCommand(testns);
+    findCommand.setIncludeQueryStatsMetrics(true);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
+
+    ASSERT_TRUE(ar.getIncludeQueryStatsMetrics());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithIncludeQueryStatsMetricsFalseSucceeds) {
+    FindCommandRequest findCommand(testns);
+    findCommand.setIncludeQueryStatsMetrics(false);
+    auto ar = query_request_conversion::asAggregateCommandRequest(findCommand);
+
+    ASSERT_FALSE(ar.getIncludeQueryStatsMetrics());
+}
+
 TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseTrueSucceeds) {
     FindCommandRequest findCommand(testns);
     findCommand.setAllowDiskUse(true);

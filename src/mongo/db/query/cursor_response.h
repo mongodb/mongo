@@ -134,6 +134,7 @@ public:
      */
     void done(CursorId cursorId,
               const NamespaceString& cursorNamespace,
+              boost::optional<CursorMetrics> metrics = boost::none,
               const SerializationContext& serializationContext =
                   SerializationContext::stateCommandReply());
 
@@ -179,20 +180,6 @@ void appendCursorResponseObject(
     boost::optional<StringData> cursorType,
     BSONObjBuilder* builder,
     const SerializationContext& serializationContext = SerializationContext::stateCommandReply());
-
-/**
- * Builds a getMore response object from the provided cursor identifiers and "nextBatch",
- * and appends the response object to the provided builder under the field name "cursor".
- *
- * The response object has the following format:
- *   { id: <NumberLong>, ns: <String>, nextBatch: <Array> }.
- *
- * This function is deprecated.  Prefer CursorResponseBuilder or CursorResponse::toBSON() instead.
- */
-void appendGetMoreResponseObject(long long cursorId,
-                                 StringData cursorNamespace,
-                                 BSONArray nextBatch,
-                                 BSONObjBuilder* builder);
 
 class CursorResponse {
 public:

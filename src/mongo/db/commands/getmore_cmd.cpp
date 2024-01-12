@@ -82,6 +82,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/optime.h"
@@ -778,8 +779,12 @@ public:
                 curOp->debug().cursorExhausted = true;
             }
 
+            boost::optional<CursorMetrics> metrics = _cmd.getIncludeQueryStatsMetrics()
+                ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
+                : boost::none;
             nextBatch.done(respondWithId,
                            nss,
+                           metrics,
                            SerializationContext::stateCommandReply(_cmd.getSerializationContext()));
 
             // Increment this metric once we have generated a response and we know it will return

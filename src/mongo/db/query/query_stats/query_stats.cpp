@@ -346,7 +346,6 @@ QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
     return snapshot;
 }
 
-
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
                      std::unique_ptr<Key> key,

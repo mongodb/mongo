@@ -66,6 +66,7 @@
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/profile_filter.h"
+#include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_stats/key.h"
@@ -287,6 +288,11 @@ public:
     BSONArray getResolvedViewsInfo() const;
     void appendResolvedViewsInfo(BSONObjBuilder& builder) const;
 
+    /**
+     * Get a snapshot of the cursor metrics suitable for inclusion in a command response.
+     */
+    CursorMetrics getCursorMetrics() const;
+
     // -------------------
 
     // basic options
@@ -314,6 +320,10 @@ public:
     long long sortSpills{0};           // The total number of spills to disk from sort stages
     size_t sortTotalDataSizeBytes{0};  // The amount of data we've sorted in bytes
     long long keysSorted{0};           // The number of keys that we've sorted.
+    long long collectionScans{0};      // The number of collection scans during query execution.
+    long long collectionScansNonTailable{0};  // The number of non-tailable collection scans.
+    std::set<std::string> indexesUsed;        // The indexes used during query execution.
+
 
     // True if the plan came from the multi-planner (not from the plan cache and not a query with a
     // single solution).

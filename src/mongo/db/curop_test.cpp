@@ -392,5 +392,16 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
         ASSERT_EQ(serializedNs, bsonObj.getField("ns").String());
     }
 }
+
+TEST(CurOpTest, getCursorMetricsProducesValidObject) {
+    // This test just checks that the cursor metrics object produced by getCursorMetrics
+    // is a valid, serializable object. In particular, it must have all required fields.
+    QueryTestServiceContext serviceContext;
+    auto opCtx = serviceContext.makeOperationContext();
+    auto curop = CurOp::get(*opCtx);
+    auto metrics = curop->debug().getCursorMetrics();
+    ASSERT_DOES_NOT_THROW(metrics.toBSON());
+}
+
 }  // namespace
 }  // namespace mongo
