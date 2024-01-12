@@ -755,6 +755,9 @@ indicate bugs that will be released in the next version.
 * Before enabling a feature flag by default, check through your open build failures to see if you 
 have any failures on the feature flag buildvariant which should be fixed first.
 
+* If you want to test upgrade/downgrade behavior for an FCV-gated feature flag, please refer to
+  [this test](https://github.com/mongodb/mongo/blob/master/jstests/multiVersion/genericBinVersion/example_fcv_upgrade_downgrade_test.js) as an example.
+
 # Summary of Rules for FCV and Feature Flag Usage:
 * Any project or ticket that wants to introduce different behavior based on which FCV
 the server is running ***must*** add a feature flag. 
