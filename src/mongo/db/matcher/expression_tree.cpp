@@ -311,6 +311,21 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                     }
                 }
 
+                // Equality to parameterized constants should not participate in this rewrite
+                // because parameter information is lost. For example, consider a predicate
+                // {$or: [{a: 10}, {a: 20}]} where both the constants 10 and 20 are parameters; the
+                // resulting expression {a: {$in: [10, 20]}} cannot be correctly rebound to a
+                // predicate with different constants since we treat the $in operand as a single
+                // parameter.
+                if (childExpression->matchType() == MatchExpression::EQ) {
+                    auto eqExpression =
+                        static_cast<EqualityMatchExpression*>(childExpression.get());
+                    if (eqExpression->getInputParamId().has_value()) {
+                        ++countNonEquivExpr;
+                        continue;
+                    }
+                }
+
                 // childExpression is an equality with $in comparison semantics.
                 // The current approach assumes there is one (large) group of $eq disjuncts
                 // that are on the same path.

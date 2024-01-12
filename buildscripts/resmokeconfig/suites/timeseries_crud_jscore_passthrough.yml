@@ -118,6 +118,7 @@ selector:
   - jstests/core/filemd5.js # locking
   - jstests/core/long_index_rename.js # rename
   - jstests/core/query/plan_cache/query_solution_hash.js # locking
+  - jstests/core/query/plan_cache/match_or_duplicate_predicate_plan_cache.js # locking
   # Time-series collections are views which don't support map-reduce
   - jstests/core/commands_namespace_parsing.js
   - jstests/core/constructors.js
