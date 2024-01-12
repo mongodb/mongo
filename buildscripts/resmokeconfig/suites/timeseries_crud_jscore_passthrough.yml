@@ -48,6 +48,7 @@ selector:
   - jstests/core/write/find_and_modify/find_and_modify_empty_update.js
   - jstests/core/write/find_and_modify/find_and_modify_invalid_query_params.js
   - jstests/core/write/find_and_modify/find_and_modify.js
+  - jstests/core/write/find_and_modify/find_and_modify_server7660.js
   # Incompatible find command option.
   - jstests/core/min_max_hashed_index.js # min
   - jstests/core/show_record_id.js # showRecordId
@@ -89,6 +90,7 @@ selector:
   - jstests/core/query/or/orf.js
   - jstests/core/query/bittest.js
   - jstests/core/write/bulk/bulk_write_profile.js
+  - jstests/core/query/distinct/distinct_multikey_dotted_path.js
   # TODO (SERVER-84024): move these tests to other sections.
   # Incompatible with the override.
   - jstests/core/dbhash.js # Buckets _id
@@ -96,13 +98,22 @@ selector:
   - jstests/core/query/invalid_db_name.js
   - jstests/core/fsync.js # Different namespace
   - jstests/core/write/insert/batch_write_command_insert.js # Uniqueness
-  - jstests/core/write/insert/insert1.js # _id constraint
-  - jstests/core/field_name_validation.js # _id constraint
-  - jstests/core/embedded_dollar_prefixed_field_validation.js # _id constraint
-  - jstests/core/query/regex/regex_not_id.js # _id constraint
   - jstests/core/write/insert/insert_id_undefined.js # Undefined _id
   - jstests/core/write/write_result.js # Uniqueness
   - jstests/core/write/write_error_message_truncation.js # Uniqueness
+  # Time-series collections have different _id constraints.
+  - jstests/core/write/insert/insert1.js
+  - jstests/core/field_name_validation.js
+  - jstests/core/embedded_dollar_prefixed_field_validation.js
+  - jstests/core/query/regex/regex_not_id.js
+  - jstests/core/write/update/update_setOnInsert.js
+  - jstests/core/write/update/update3.js
+  - jstests/core/write/update/update_find_and_modify_id.js
+  - jstests/core/query/objid/objid3.js # Field order.
+  - jstests/core/failcommand_failpoint.js
+  - jstests/core/write/update/upsert_fields.js
+  - jstests/core/query/rename/rename_operator.js
+  - jstests/core/write/update/upsert_fields_duplicate_or.js
   # Time-series collections may generate different profiling entries from regular ones.
   - jstests/core/query/plan_cache/cached_plan_trial_does_not_discard_work.js
   - jstests/core/top_drop.js
@@ -134,6 +145,7 @@ selector:
   - jstests/core/exhaust.js # singleBatch
   - jstests/core/kill_cursors.js # noCursorTimeout
   - jstests/core/return_key.js # returnKey
+  - jstests/core/query/find/finda.js # returnKey
   - jstests/core/positional_projection.js # Positional projection
   - jstests/core/query/dbref/dbref3.js # Positional projection
   - jstests/core/query/plan_cache/plan_cache_positional_projection.js # Positional projection
@@ -145,11 +157,22 @@ selector:
   - jstests/core/query/project/project_with_collation.js # Positional projection
   - jstests/core/query/plan_cache/plan_cache_shell_helpers.js # Not first stage in pipeline.
   - jstests/core/query/plan_cache/plan_cache_sbe.js # Not first stage in pipeline.
+  - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js # Not first stage in pipeline.
+  - jstests/core/sbe_plan_cache_duplicate_or_clauses.js # Not first stage in pipeline.
   - jstests/core/single_batch.js # singleBatch
   - jstests/core/query/sort/sortk.js # singleBatch
   - jstests/core/query/sort/sorth.js # singleBatch
   - jstests/core/query/find/find_getmore_cmd.js # singleBatch
+  - jstests/core/query/batch_size.js # singleBatch
   - jstests/core/query/plan_cache/plan_cache_list_shapes.js # Not first stage in pipeline.
+  - jstests/core/query/partial_index_logical.js # Not first stage in pipeline.
+  - jstests/core/query/plan_cache/plan_cache_stats_shard_and_host.js # Not first stage in pipeline.
+  - jstests/core/query/explode_for_sort_plan_cache.js # Not first stage in pipeline.
+  - jstests/core/query/index_key_expression.js # Unclean aggregation result
+  # Different field ordering.
+  - jstests/core/query/or/or1.js
+  # Runs for too long for time-series collections.
+  - jstests/core/write/update/batch_write_command_update.js
   # Multikey indexes and array measurement field.
   - jstests/core/query/explode_for_sort_equality_to_array.js
   - jstests/core/query/find/find_project_sort.js
@@ -229,6 +252,10 @@ selector:
   - jstests/core/query/set/set7.js
   - jstests/core/query/cursor/getmore_invalidated_cursors.js
   - jstests/core/positional_projection_multiple_array_fields.js # $slice
+
+  # TODO (SERVER-85205): Try to enable the test(s).
+  - jstests/core/write/update/upsert_and.js
+
   exclude_with_any_tags:
   - requires_sharding
   - requires_capped

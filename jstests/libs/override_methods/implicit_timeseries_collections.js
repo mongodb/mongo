@@ -32,9 +32,6 @@ const denylistedNamespaces = [
 
 const timeValue = ISODate("2023-11-28T22:14:20.298Z");
 
-/**
- * Creates the collection as time-series if it doesn't exist yet.
- */
 DB.prototype.getCollection = function() {
     const collection = originalGetCollection.apply(this, arguments);
     createCollectionImplicitly(this, collection.getFullName(), collection.getName());
@@ -58,67 +55,76 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
     // Command name is lowercase to account for variations in capitalization (i.e, findandmodify
     // should be handled the same way as findAndModify).
     switch (cmdName.toLowerCase()) {
-        // Add the timestamp property to every document in the insert.
         case "insert": {
             createCollectionImplicitly(
                 conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
-            for (let idx in cmdObj["documents"]) {
-                cmdObj["documents"][idx][timeFieldName] = timeValue;
-            }
+            // Add the timestamp property to every document in the insert.
+            cmdObj["documents"].forEach(doc => {
+                doc[timeFieldName] = timeValue;
+            });
             let insertResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            for (let idx in cmdObj["documents"]) {
-                delete cmdObj["documents"][idx][timeFieldName];
-            }
+            cmdObj["documents"].forEach(doc => {
+                delete doc[timeFieldName];
+            });
             return insertResult;
         }
-        // Create a timeseries collection with the same name as the original createCollection
-        // command.
         case "create": {
             cmdObj["timeseries"] = {timeField: timeFieldName, metaField: metaFieldName};
             break;
         }
-        // Remove all instances of the timestamp field from the result of calling find.
         case "find": {
             let findResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            if ("cursor" in findResult) {
-                cleanUpResultCursor(findResult, "firstBatch");
-            }
+            cleanUpResultCursor(findResult, "firstBatch");
             return findResult;
         }
-        // If the findandmodify involves an update, which could create a new document (with upsert =
-        // true), then add the timestamp field to the update command. Also, remove the timestamp
-        // field name from the result of the find command.
         case "findandmodify": {
-            handleTSFieldForFindAndModify(cmdObj);
+            const upsert = cmdObj["upsert"] == true;
+            if (upsert) {
+                createCollectionImplicitly(
+                    conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
+            }
+            addTimeFieldForUpdate(cmdObj["update"], upsert);
             let findAndModifyResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            handleTSFieldForFindAndModify(cmdObj, true /* remove = true */);
+            removeTimeFieldForUpdate(cmdObj["update"], upsert);
             if (findAndModifyResult["value"] != null) {
                 delete findAndModifyResult["value"][timeFieldName];
             }
             return findAndModifyResult;
         }
-        // Remove instances of the timestamp field name from the result of calling aggregate
-        // functions.
         case "aggregate": {
+            // Project the time field out of the aggregation result.
+            const collAgg = typeof cmdObj["aggregate"] === "string";
+            if (collAgg) {
+                cmdObj["pipeline"].unshift({"$project": {[timeFieldName]: 0}});
+            }
             let aggregateResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            if ("cursor" in aggregateResult) {
-                cleanUpResultCursor(aggregateResult, "firstBatch");
+            if (collAgg) {
+                cmdObj["pipeline"].shift();
             }
             return aggregateResult;
         }
-        // Remove instances of the timestamp field name from the result of calling getmore.
         case "getmore": {
             let getMoreResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            if ("cursor" in getMoreResult) {
-                cleanUpResultCursor(getMoreResult, "nextBatch");
-            }
+            cleanUpResultCursor(getMoreResult, "nextBatch");
             return getMoreResult;
         }
         case "update": {
-            handleTSFieldForUpdates(cmdObj);
-            let updateResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            handleTSFieldForUpdates(cmdObj, true /* remove = true */);
-            return updateResult;
+            if ("updates" in cmdObj) {
+                cmdObj["updates"].forEach(upd => {
+                    const upsert = upd["upsert"];
+                    if (upsert) {
+                        createCollectionImplicitly(
+                            conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
+                    }
+                    addTimeFieldForUpdate(upd["u"], upsert);
+                });
+                let updateResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
+                cmdObj["updates"].forEach(upd => {
+                    removeTimeFieldForUpdate(upd["u"], upd["upsert"]);
+                });
+                return updateResult;
+            }
+            break;
         }
         default: {
             break;
@@ -150,6 +156,9 @@ assert.eq = function(a, b, message) {
 
 // ------------------------------ Helper Methods --------------------------------------
 
+/**
+ * Creates the collection as time-series if it doesn't exist yet.
+ */
 function createCollectionImplicitly(db, collFullName, collName) {
     for (const ns of denylistedNamespaces) {
         if (collFullName.match(ns)) {
@@ -172,122 +181,72 @@ function createCollectionImplicitly(db, collFullName, collName) {
 }
 
 /**
- * Helper method to remove instances of the timestamp field name from the cursor returned
- * in find (and findAndModify) calls.
+ * Helper method to remove the time field from the cursor returned.
  */
 function cleanUpResultCursor(result, batchName) {
-    let batch = result["cursor"][batchName];
-    for (let i = 0; i < batch.length; i++) {
-        delete batch[i][timeFieldName];
-        for (let fieldName in batch[i]) {
-            // Delete timeFieldName value from entries in nested array.
-            if (Array.isArray(batch[i][fieldName])) {
-                let arrCopy = [...batch[i][fieldName]];
-                for (let j = 0; j < batch[i][fieldName].length; j++) {
-                    let entry = batch[i][fieldName][j];
-                    if (entry != null && typeof entry == "object" && timeFieldName in entry) {
-                        arrCopy.splice(j, 1);
-                    }
-                }
-                batch[i][fieldName] = arrCopy;
-            }
-            // Delete timeFieldName value from nested object.
-            let entry = batch[i][fieldName];
-            if (entry != null && typeof entry == "object") {
-                delete entry[timeFieldName];
-            }
-        }
+    if (!("cursor" in result)) {
+        return;
     }
+    result["cursor"][batchName].forEach(doc => {
+        delete doc[timeFieldName];
+    })
 }
 
 /**
- * Helper method for either adding or removing the timeFieldName value from the update command
- * object, determined by whether remove is set to true or false.
+ * Sets the time field for update.
  */
-function handleTSFieldForUpdates(commandObj, remove = false) {
-    for (const i in commandObj["updates"]) {
-        // Aggregation pipeline case - "u" contains an array of operators.
-        if (Array.isArray(commandObj["updates"][i]["u"])) {
-            for (const j in commandObj["updates"][i]["u"]) {
-                for (const field in commandObj["updates"][i]["u"][j]) {
-                    if (dollarOperatorsSet.includes(field)) {
-                        if (remove) {
-                            delete commandObj["updates"][i]["u"][j][field][timeFieldName];
-                        } else {
-                            commandObj["updates"][i]["u"][j][field][timeFieldName] = timeValue;
-                        }
-                    }
-                }
-            }
-        } else {
-            const dollarOperators =
-                Object.keys(commandObj["updates"][i]["u"]).filter(field => field.includes("$"));
-            // Update operator case - each value in object should be an update operator.
-            if (!dollarOperators.length == 0) {
-                for (const field in commandObj["updates"][i]["u"]) {
-                    // Certain operators potentially write a new document.
-                    if (dollarOperatorsSet.includes(field)) {
-                        if (remove) {
-                            delete commandObj["updates"][i]["u"][field][timeFieldName];
-                        } else {
-                            commandObj["updates"][i]["u"][field][timeFieldName] = timeValue;
-                        }
-                    }
-                }
-            } else {  // Replacement document case - we can simply add/remove the timeFieldName
-                      // value.
-                if (remove) {
-                    delete commandObj["updates"][i]["u"][timeFieldName];
-                } else {
-                    commandObj["updates"][i]["u"][timeFieldName] = timeValue;
-                }
-            }
-        }
+function addTimeFieldForUpdate(upd, upsert) {
+    if (upd == null) {
+        return;
     }
-}
-
-/**
- * Helper method for either adding or removing the TS fields from the findAndModify command object,
- * determined by whether remove is set to true or false.
- */
-function handleTSFieldForFindAndModify(commandObj, remove = false) {
-    // Aggregation pipeline case - "u" contains an array of operators.
-    if (Array.isArray(commandObj["update"])) {
-        for (const i in commandObj["update"]) {
-            for (const field in commandObj["update"][i]) {
-                if (dollarOperatorsSet.includes(field)) {
-                    if (remove) {
-                        delete commandObj["update"][i][field][timeFieldName];
-                    } else {
-                        commandObj["update"][i][field][timeFieldName] = timeValue;
-                    }
-                }
+    // Pipeline-style update.
+    if (Array.isArray(upd)) {
+        if (upsert) {
+            upd.unshift({"$set": {[timeFieldName]: timeValue}});
+        }
+        return;
+    }
+    const opStyleUpd = Object.keys(upd).some(field => field.includes("$"));
+    if (opStyleUpd) {
+        // Op-style update.
+        if (upsert) {
+            if ("$set" in upd) {
+                upd["$set"][timeFieldName] = timeValue;
+            } else {
+                upd["$set"] = {[timeFieldName]: timeValue};
             }
         }
     } else {
-        if ("update" in commandObj) {
-            const dollarOperators =
-                Object.keys(commandObj["update"]).filter(field => field.includes("$"));
-            // Update operator case - each value in object should be an update operator.
-            if (!dollarOperators.length == 0) {
-                for (const field in commandObj["update"]) {
-                    // Certain operators potentially write a new document.
-                    if (dollarOperatorsSet.includes(field)) {
-                        if (remove) {
-                            delete commandObj["update"][field][timeFieldName];
-                        } else {
-                            commandObj["update"][field][timeFieldName] = timeValue;
-                        }
-                    }
-                }
-            } else {  // Replacement document case - we can simply add/remove the timeFieldName
-                // value
-                if (remove) {
-                    delete commandObj["update"][timeFieldName];
-                } else {
-                    commandObj["update"][timeFieldName] = timeValue;
-                }
+        // Replacement-style update.
+        upd[timeFieldName] = timeValue;
+    }
+}
+
+/**
+ * Removes the time field for update.
+ */
+function removeTimeFieldForUpdate(upd, upsert) {
+    if (upd == null) {
+        return;
+    }
+    // Pipeline-style update.
+    if (Array.isArray(upd)) {
+        if (upsert) {
+            upd.shift();
+        }
+        return;
+    }
+    const opStyleUpd = Object.keys(upd).some(field => field.includes("$"));
+    if (opStyleUpd) {
+        // Op-style update.
+        if (upsert) {
+            delete upd["$set"][timeFieldName];
+            if (Object.keys(upd["$set"]).length === 0) {
+                delete upd["$set"];
             }
         }
+    } else {
+        // Replacement-style update.
+        delete upd[timeFieldName];
     }
 }
