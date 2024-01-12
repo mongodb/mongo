@@ -872,6 +872,13 @@ server_parameters:
     validator:
       gte: 0
 
+  internalCascadesOptimizerRepeatableSample:
+    description: "Draws a sample once per query and reuses it for estimating multiple predicates. Only takes effect if 'internalCascadesOptimizerSampleChunks > 0'."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerRepeatableSample"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
   internalCascadesOptimizerSampleSizeMin:
     description: "Controls the minimum collection size to use sampling for CE."
     set_at: [ startup, runtime ]

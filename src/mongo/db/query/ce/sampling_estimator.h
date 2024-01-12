@@ -45,18 +45,24 @@ namespace mongo::optimizer::ce {
 class SamplingTransport;
 
 /**
- * Abstract sampling executor. It receives a physical plan defined in the 'planAndProps' argument of
- * its method estimateSelectivity(), and using the provided operation context and metadata, answers
- * the question what selectivity of the predicate which this plan encodes is.
+ * Interface used by 'SamplingEstimator' for executing queries.
  */
 class SamplingExecutor {
 public:
     virtual ~SamplingExecutor() = default;
-    virtual boost::optional<optimizer::SelectivityType> estimateSelectivity(
+
+    /**
+     * Executes the given query, expecting zero or one values in the result.
+     *
+     * The query must bind a single projection, and must return zero or one rows.
+     * This function returns the one value, or Nothing.
+     *
+     * Caller must destroy the returned SBE value.
+     */
+    virtual std::pair<sbe::value::TypeTags, sbe::value::Value> execute(
         const Metadata& metadata,
-        int64_t sampleSize,
         const QueryParameterMap& queryParameters,
-        const PlanAndProps& planAndProps) = 0;
+        const PlanAndProps& planAndProps) const = 0;
 };
 
 /**

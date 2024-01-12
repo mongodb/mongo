@@ -60,11 +60,10 @@ public:
     ABTRecorder(ABTVector& nodes) : _nodes(nodes) {}
     ~ABTRecorder() = default;
 
-    boost::optional<optimizer::SelectivityType> estimateSelectivity(
-        const Metadata& /*metadata*/,
-        int64_t /*sampleSize*/,
-        const QueryParameterMap& /*queryParameters*/,
-        const PlanAndProps& planAndProps) final;
+    std::pair<sbe::value::TypeTags, sbe::value::Value> execute(
+        const Metadata& metadata,
+        const QueryParameterMap& queryParameters,
+        const PlanAndProps& planAndProps) const final;
 
 private:
     // We don't own this.

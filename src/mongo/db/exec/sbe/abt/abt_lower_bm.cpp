@@ -83,7 +83,7 @@ protected:
                     boost::none,
                     CostType::fromDouble(0),
                     CostType::fromDouble(0),
-                    {false}};
+                    CEType{0.0}};
         properties::setPropertyOverwrite(n._physicalProps, properties::ProjectionRequirement({}));
         return n;
     }

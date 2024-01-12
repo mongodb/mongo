@@ -254,68 +254,150 @@ private:
     NodeToGroupPropsMap& _propsMap;
 };
 
+/**
+ * Helper for drawing a repeatable sample of record IDs from a collection: repeated calls to
+ * 'chooseRIDs()' with the same arguments return the same result.
+ */
+class RIDsCache {
+public:
+    RIDsCache(const Metadata& metadata, PrefixId& prefixId, const SamplingExecutor& executor)
+        : _metadata(metadata), _prefixId(prefixId), _executor(executor) {}
+
+    /**
+     * Chooses 'numRids' randomly from the collection named by 'scanDefName',
+     * but repeated calls with the same 'numRids' and 'scanDefName' return the same result.
+     */
+    Constant chooseRIDs(std::string scanDefName, int64_t numRids) {
+
+        std::pair<std::string, int64_t> cacheKey{std::move(scanDefName), numRids};
+        if (auto it = _cache.find(cacheKey); it != _cache.end()) {
+            return it->second;
+        }
+
+
+        ProjectionName ridProj = _prefixId.getNextId("rid");
+        ProjectionName allRidsProj = _prefixId.getNextId("allRids");
+        NodeToGroupPropsMap props;
+        NodeProps nodeProps{._ridProjName = {ridProj}};
+
+        ABT physicalScan =
+            make<PhysicalScanNode>(FieldProjectionMap{._ridProjection = ProjectionName{ridProj}},
+                                   cacheKey.first,
+                                   false /* useParallelScan */,
+                                   ScanOrder::Random);
+        props.emplace(physicalScan.cast<Node>(), nodeProps);
+
+        ABT limitNode = make<LimitSkipNode>(properties::LimitSkipRequirement{numRids, 0},
+                                            std::move(physicalScan));
+        props.emplace(limitNode.cast<Node>(), nodeProps);
+
+        ABT groupNode = make<GroupByNode>(
+            // Empty group key: combine all rows into one group.
+            ProjectionNameVector{},
+            // Output projection holds an array of all the RIDs.
+            ProjectionNameVector{allRidsProj},
+            makeSeq(make<FunctionCall>("$push", makeSeq(make<Variable>(ridProj)))),
+            std::move(limitNode));
+        props.emplace(groupNode.cast<Node>(), nodeProps);
+
+        ABT root = make<RootNode>(properties::ProjectionRequirement{{{allRidsProj}}},
+                                  std::move(groupNode));
+        props.emplace(root.cast<Node>(), nodeProps);
+
+        PlanAndProps planAndProps{std::move(root), std::move(props)};
+
+        auto [tag, val] = _executor.execute(_metadata, {} /*queryParameters*/, planAndProps);
+        Constant c{tag, val};
+        auto [it, inserted] = _cache.emplace(std::move(cacheKey), std::move(c));
+        invariant(inserted);
+        invariant(it != _cache.end());
+
+        return it->second;
+    }
+
+private:
+    const Metadata& _metadata;
+    PrefixId& _prefixId;
+    const SamplingExecutor& _executor;
+    opt::unordered_map<std::pair<std::string, int64_t>, Constant> _cache;
+};
+
 class SamplingChunksTransport {
 public:
+    /**
+     * Transport which replaces the 'Limit PhysicalScan' subplan with a more efficient
+     * 'NLJ ...' plan, which reduces the amount of seeking by taking chunks of adjacent documents.
+     *
+     * If 'ridsCache' is non-null, the transport uses it to draw a sample of RIDs only once;
+     * the RIDs are baked in to the resulting plan.
+     */
     SamplingChunksTransport(NodeToGroupPropsMap& propsMap,
                             const int64_t numChunks,
-                            const RIDProjectionsMap& ridProjections)
-        : _propsMap(propsMap), _numChunks(numChunks), _ridProjections(ridProjections) {}
+                            const RIDProjectionsMap& ridProjections,
+                            PrefixId& prefixId,
+                            RIDsCache* ridsCache)
+        : _propsMap(propsMap),
+          _numChunks(numChunks),
+          _ridProjections(ridProjections),
+          _prefixId(prefixId),
+          _ridsCache(ridsCache) {}
 
     void transport(ABT& n, const LimitSkipNode& limit, ABT& child) {
         if (limit.getProperty().getSkip() != 0 || !child.is<PhysicalScanNode>()) {
             return;
         }
+        // Extract parts of the input.
         const PhysicalScanNode& physicalScan = *child.cast<PhysicalScanNode>();
         const auto& ridProj = _ridProjections.at(physicalScan.getScanDefName());
+        const NodeProps& oldScanProps = _propsMap.at(&physicalScan);
+        const NodeProps& oldLimitProps = _propsMap.at(n.cast<Node>());
+        const int64_t sampleSize = limit.getProperty().getLimit();
 
-        ABT newPhysicalScan =
-            make<PhysicalScanNode>(FieldProjectionMap{._ridProjection = ProjectionName{ridProj}},
-                                   physicalScan.getScanDefName(),
-                                   physicalScan.useParallelScan(),
-                                   physicalScan.getScanOrder());
+        // Decide how to divide the desired sample size up into chunks.
+        const int64_t numChunks = std::min(_numChunks, sampleSize);
+        const int64_t chunkSize = sampleSize / numChunks;
 
-        NodeProps props = _propsMap.at(&physicalScan);
-        properties::getProperty<properties::ProjectionRequirement>(props._physicalProps)
+        // The rewritten plan has the same logical and physical properties as the original.
+        NodeProps resultProps = NodeProps{
+            oldLimitProps._planNodeId,
+            oldLimitProps._groupId,
+            oldLimitProps._logicalProps,
+            oldLimitProps._physicalProps,
+            boost::none /*ridProjName*/,
+            CostType::fromDouble(0),
+            CostType::fromDouble(0),
+            CEType{1.0} /*adjustedCE*/
+        };
+
+        // The outer loop's properties are the same, but with an added RID binding.
+        NodeProps outerLoopProps = resultProps;
+        properties::getProperty<properties::ProjectionRequirement>(outerLoopProps._physicalProps)
             .getProjections() = ProjectionNameVector{ridProj};
-        _propsMap.emplace(newPhysicalScan.cast<Node>(), props);
 
-        ABT seekNode = make<SeekNode>(
-            ridProj, physicalScan.getFieldProjectionMap(), physicalScan.getScanDefName());
-        _propsMap.emplace(seekNode.cast<Node>(), props);
+        ABT outerLoop = makeOuterLoop(numChunks,
+                                      std::move(outerLoopProps),
+                                      ridProj,
+                                      physicalScan.getScanDefName(),
+                                      physicalScan.useParallelScan(),
+                                      physicalScan.getScanOrder());
 
-        const int64_t limitSize = limit.getProperty().getLimit();
-        const int64_t numChunks = std::min(_numChunks, limitSize);
-        const int64_t chunkSize = limitSize / numChunks;
+        // The inner loop produces a chunk of documents for each record ID.
+        // Each chunk has 'chunkSize' documents.
+        ABT innerLoop =
+            ann(resultProps,
+                make<LimitSkipNode>(properties::LimitSkipRequirement(chunkSize, 0),
+                                    ann(oldScanProps,
+                                        make<SeekNode>(ridProj,
+                                                       physicalScan.getFieldProjectionMap(),
+                                                       physicalScan.getScanDefName()))));
 
-        ABT outerNode = make<LimitSkipNode>(properties::LimitSkipRequirement(numChunks, 0),
-                                            std::move(newPhysicalScan));
-        ABT innerNode = make<LimitSkipNode>(properties::LimitSkipRequirement(chunkSize, 0),
-                                            std::move(seekNode));
+        ABT nlj = ann(resultProps,
+                      make<NestedLoopJoinNode>(JoinType::Inner,
+                                               ProjectionNameSet{ridProj},
+                                               Constant::boolean(true),
+                                               std::move(outerLoop),
+                                               std::move(innerLoop)));
 
-        const NodeProps& limitProps = _propsMap.at(n.cast<Node>());
-        NodeProps sharedProps = NodeProps{limitProps._planNodeId,
-                                          limitProps._groupId,
-                                          limitProps._logicalProps,
-                                          limitProps._physicalProps,
-                                          boost::none /*ridProjName*/,
-                                          CostType::fromDouble(0),
-                                          CostType::fromDouble(0),
-                                          true /*adjustedCE*/};
-
-        NodeProps outerLimitProps = sharedProps;
-        properties::getProperty<properties::ProjectionRequirement>(outerLimitProps._physicalProps)
-            .getProjections() = ProjectionNameVector{ridProj};
-        _propsMap.emplace(outerNode.cast<Node>(), outerLimitProps);
-
-        _propsMap.emplace(innerNode.cast<Node>(), sharedProps);
-
-        ABT nlj = make<NestedLoopJoinNode>(JoinType::Inner,
-                                           ProjectionNameSet{ridProj},
-                                           Constant::boolean(true),
-                                           std::move(outerNode),
-                                           std::move(innerNode));
-
-        _propsMap.emplace(nlj.cast<Node>(), sharedProps);
         std::swap(n, nlj);
     }
 
@@ -330,9 +412,60 @@ public:
     }
 
 private:
+    /**
+     * Annotate the node with the given properties, by inserting to _propsMap.
+     */
+    ABT ann(NodeProps props, ABT node) {
+        Node* n = node.cast<Node>();
+        tassert(8375703, "Expected a Node", n);
+        _propsMap.emplace(n, std::move(props));
+        return node;
+    }
+
+    ABT makeOuterLoop(int32_t numChunks,
+                      NodeProps props,
+                      ProjectionName ridProj,
+                      std::string scanDefName,
+                      bool useParallelScan,
+                      ScanOrder scanOrder) {
+        if (_ridsCache) {
+            Constant rids = _ridsCache->chooseRIDs(std::move(scanDefName), numChunks);
+
+            // Properties the Evaluation child, which provides / requires no projections.
+            NodeProps noProj{props};
+            getProperty<properties::ProjectionRequirement>(noProj._physicalProps)
+                .getProjections() = {};
+
+            return ann(props,
+                       make<UnwindNode>(
+                           ridProj,
+                           _prefixId.getNextId("unusedUnwindIndex"),
+                           false /*retainNonArrays*/,
+                           ann(props,
+                               make<EvaluationNode>(
+                                   ridProj,
+                                   make<Constant>(std::move(rids)),
+                                   ann(noProj,
+                                       make<LimitSkipNode>(properties::LimitSkipRequirement(1, 0),
+                                                           ann(noProj, make<CoScanNode>())))))));
+        } else {
+            return ann(props,
+                       make<LimitSkipNode>(
+                           properties::LimitSkipRequirement(numChunks, 0),
+                           ann(props,
+                               make<PhysicalScanNode>(
+                                   FieldProjectionMap{._ridProjection = ProjectionName{ridProj}},
+                                   scanDefName,
+                                   useParallelScan,
+                                   scanOrder))));
+        }
+    }
+
     NodeToGroupPropsMap& _propsMap;
     const int64_t _numChunks;
     const RIDProjectionsMap& _ridProjections;
+    PrefixId& _prefixId;
+    RIDsCache* _ridsCache = nullptr;
 };
 
 class SamplingTransport {
@@ -351,7 +484,8 @@ public:
           _debugInfo(std::move(debugInfo)),
           _prefixId(prefixId),
           _fallbackCE(std::move(fallbackCE)),
-          _executor(std::move(executor)) {}
+          _executor(std::move(executor)),
+          _ridsCache(_phaseManager.getMetadata(), prefixId, *_executor) {}
 
     CERecord transport(const ABT::reference_type n,
                        const FilterNode& node,
@@ -527,21 +661,19 @@ private:
         }
 
         const auto selectivity = estimateSelectivity(memo, logicalProps, abtTree);
-        if (!selectivity) {
-            return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
-        }
 
-        _selectivityCacheMap.emplace(std::move(abtTree), *selectivity);
+        _selectivityCacheMap.emplace(std::move(abtTree), selectivity);
 
         OPTIMIZER_DEBUG_LOG(6264805,
                             5,
                             "CE sampling estimated filter selectivity",
-                            "selectivity"_attr = selectivity->_value);
-        return {*selectivity * childResult, samplingLabel};
+                            "selectivity"_attr = selectivity._value);
+        return {selectivity * childResult, samplingLabel};
     }
 
-    boost::optional<optimizer::SelectivityType> estimateSelectivity(
-        const cascades::Memo& memo, const properties::LogicalProps& logicalProps, ABT abt) {
+    optimizer::SelectivityType estimateSelectivity(const cascades::Memo& memo,
+                                                   const properties::LogicalProps& logicalProps,
+                                                   ABT abt) {
         bool isSargableNode = abt.is<SargableNode>();
 
         // Add a group by to count number of documents.
@@ -567,7 +699,12 @@ private:
         // that value as the number of chunks. Otherwise, perform fully randomized sample.
         if (const int64_t numChunks = _phaseManager.getHints()._numSamplingChunks; numChunks > 0) {
             SamplingChunksTransport instance{
-                planAndProps._map, numChunks, _phaseManager.getRIDProjections()};
+                planAndProps._map,
+                numChunks,
+                _phaseManager.getRIDProjections(),
+                _prefixId,
+                _phaseManager.getHints()._repeatableSample ? &_ridsCache : nullptr,
+            };
             algebra::transport<true>(planAndProps._node, instance);
 
             OPTIMIZER_DEBUG_LOG(6264807,
@@ -576,10 +713,25 @@ private:
                                 "explain"_attr = ExplainGenerator::explainV2(planAndProps._node));
         }
 
-        return _executor->estimateSelectivity(_phaseManager.getMetadata(),
-                                              _sampleSize,
-                                              _phaseManager.getQueryParameters(),
-                                              planAndProps);
+        // (To appease clang, avoid structured bindings here: it apparently doesn't like when
+        // they're captured in a lambda, such as the one tasserted() uses.)
+        const auto execResult = _executor->execute(
+            _phaseManager.getMetadata(), _phaseManager.getQueryParameters(), planAndProps);
+        const auto tag = execResult.first;
+        const auto value = execResult.second;
+        sbe::value::ValueGuard guard{tag, value};
+
+        if (tag == sbe::value::TypeTags::Nothing) {
+            // If Group returned 0 results, then nothing passed the filter, so estimate 0.0
+            // selectivity.
+            return {0.0};
+        } else if (tag == sbe::value::TypeTags::NumberInt64) {
+            return {static_cast<double>(value) / _sampleSize};
+        } else {
+            tasserted(8375702,
+                      str::stream() << "Sampling executor returned an unexpected type: "
+                                    << printTagAndVal(tag, value));
+        }
     }
 
     /**
@@ -704,6 +856,7 @@ private:
     PrefixId& _prefixId;
     std::unique_ptr<cascades::CardinalityEstimator> _fallbackCE;
     std::unique_ptr<SamplingExecutor> _executor;
+    RIDsCache _ridsCache;
 
     // Reassigns projection names in a sargable node in 'normalizeSargableNode()' in order to
     // normalize the ABT for '_selectivityCacheMap'. This is only used with

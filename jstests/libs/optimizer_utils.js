@@ -336,7 +336,9 @@ export function removeUUIDsFromExplain(db, explain) {
 
 export function navigateToPath(doc, path) {
     let result = doc;
-    let components = path.split(".");
+    // Drop empty path components so we can treat '' as a 0-element path,
+    // and also not worry about extra '.' when concatenating paths.
+    let components = path.split(".").filter(s => s.length > 0);
     try {
         for (; components.length > 0; components = components.slice(1)) {
             assert(result.hasOwnProperty(components[0]));

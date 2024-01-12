@@ -122,13 +122,12 @@ bool compareResults(const std::vector<BSONObj>& expected,
     return true;
 }
 
-boost::optional<optimizer::SelectivityType> ABTRecorder::estimateSelectivity(
+std::pair<sbe::value::TypeTags, sbe::value::Value> ABTRecorder::execute(
     const Metadata& /*metadata*/,
-    const int64_t /*sampleSize*/,
     const QueryParameterMap& /*queryParameters*/,
-    const PlanAndProps& planAndProps) {
+    const PlanAndProps& planAndProps) const {
     _nodes.push_back(planAndProps._node);
-    return SelectivityType{0.0};
+    return {sbe::value::TypeTags::Nothing, 0};
 }
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(

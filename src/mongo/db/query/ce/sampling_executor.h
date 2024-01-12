@@ -43,11 +43,10 @@ public:
     SBESamplingExecutor(OperationContext* opCtx) : _opCtx(opCtx) {}
     ~SBESamplingExecutor();
 
-    boost::optional<optimizer::SelectivityType> estimateSelectivity(
+    std::pair<sbe::value::TypeTags, sbe::value::Value> execute(
         const Metadata& metadata,
-        int64_t sampleSize,
         const QueryParameterMap& queryParameters,
-        const PlanAndProps& planAndProps) final;
+        const PlanAndProps& planAndProps) const final;
 
 private:
     OperationContext* _opCtx;

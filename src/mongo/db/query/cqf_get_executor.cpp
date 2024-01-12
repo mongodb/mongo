@@ -358,6 +358,7 @@ QueryHints getHintsFromQueryKnobs() {
     hints._minIndexEqPrefixes = internalCascadesOptimizerMinIndexEqPrefixes.load();
     hints._maxIndexEqPrefixes = internalCascadesOptimizerMaxIndexEqPrefixes.load();
     hints._numSamplingChunks = internalCascadesOptimizerSampleChunks.load();
+    hints._repeatableSample = internalCascadesOptimizerRepeatableSample.load();
     hints._enableNotPushdown = internalCascadesOptimizerEnableNotPushdown.load();
     hints._forceSamplingCEFallBackForFilterNode =
         internalCascadesOptimizerSamplingCEFallBackForFilterNode.load();
@@ -619,6 +620,7 @@ OptPhaseManager createSamplingPhaseManager(const cost_model::CostModelCoefficien
     }
 
     QueryHints samplingHints{._numSamplingChunks = hints._numSamplingChunks,
+                             ._repeatableSample = hints._repeatableSample,
                              ._samplingCollectionSizeMin = hints._samplingCollectionSizeMin,
                              ._samplingCollectionSizeMax = hints._samplingCollectionSizeMax,
                              ._sampleIndexedFields = hints._sampleIndexedFields,

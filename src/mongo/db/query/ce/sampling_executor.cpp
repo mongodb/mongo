@@ -41,11 +41,10 @@ namespace mongo::optimizer::ce {
 
 SBESamplingExecutor::~SBESamplingExecutor() {}
 
-boost::optional<optimizer::SelectivityType> SBESamplingExecutor::estimateSelectivity(
+std::pair<sbe::value::TypeTags, sbe::value::Value> SBESamplingExecutor::execute(
     const Metadata& metadata,
-    const int64_t sampleSize,
     const QueryParameterMap& queryParameters,
-    const PlanAndProps& planAndProps) {
+    const PlanAndProps& planAndProps) const {
     auto env = VariableEnvironment::build(planAndProps._node);
     SlotVarMap slotMap;
     auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO Use factory
@@ -81,17 +80,15 @@ boost::optional<optimizer::SelectivityType> SBESamplingExecutor::estimateSelecti
     sbePlan->open(false);
     ON_BLOCK_EXIT([&] { sbePlan->close(); });
 
-    while (sbePlan->getNext() != sbe::PlanState::IS_EOF) {
-        const auto [tag, value] = accessors.at(0)->getViewOfValue();
-        if (tag == sbe::value::TypeTags::NumberInt64) {
-            // TODO: check if we get exactly one result from the groupby?
-            return {{static_cast<double>(value) / sampleSize}};
-        }
-        return boost::none;
-    };
+    if (sbePlan->getNext() == sbe::PlanState::IS_EOF) {
+        return {sbe::value::TypeTags::Nothing, 0};
+    }
 
-    // If nothing passes the filter, estimate 0.0 selectivity. HashGroup will return 0 results.
-    return {{0.0}};
+    auto result = accessors.at(0)->copyOrMoveValue();
+    tassert(8375701,
+            "Sampling query returned more than one row",
+            sbePlan->getNext() == sbe::PlanState::IS_EOF);
+    return result;
 }
 
 }  // namespace mongo::optimizer::ce

@@ -142,6 +142,11 @@ struct StrongDoubleAlias {
         uassert(7180105, "Invalid value", _value <= TagType::kMaxValue);
     }
 
+    // Prevent implicit conversion from bool to double.
+    template <typename T>
+    StrongDoubleAlias(T) requires std::is_same_v<T, bool>
+    = delete;
+
     constexpr StrongDoubleAlias(const double value) : _value(value) {
         assertValid();
     }

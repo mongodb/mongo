@@ -203,7 +203,7 @@ protected:
         MultikeynessTrie trie;
         IndexPathOccurrences indexPathOccurrences;
         bool exists = true;
-        CEType ce{false};
+        CEType ce{0.0};
         return ScanDefinition(DatabaseNameUtil::deserialize(
                                   boost::none, "test", SerializationContext::stateDefault()),
                               UUID::gen(),
@@ -235,7 +235,7 @@ protected:
                     boost::none,
                     CostType::fromDouble(0),
                     CostType::fromDouble(0),
-                    {false}};
+                    CEType{0.0}};
         return n;
     }
     void runPathLowering(ABT& tree) {
@@ -349,7 +349,7 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                                   boost::none /*_ridProjName*/,
                                   CostType::fromDouble(0) /*_cost*/,
                                   CostType::fromDouble(0) /*_localCost*/,
-                                  {false} /*_adjustedCE*/};
+                                  CEType{0.0} /*_adjustedCE*/};
         // The IndexingAvailability logical property will provide information about where to look in
         // the scanDefs for the Shard Key info.
         properties::setPropertyOverwrite(
@@ -409,7 +409,7 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                                   boost::none /*_ridProjName*/,
                                   CostType::fromDouble(0) /*_cost*/,
                                   CostType::fromDouble(0) /*_localCost*/,
-                                  {false} /*_adjustedCE*/};
+                                  CEType{0.0} /*_adjustedCE*/};
         properties::setPropertyOverwrite(
             filterNodeProps._logicalProps,
             properties::IndexingAvailability(10,
@@ -459,7 +459,7 @@ TEST_F(ABTPlanGeneration, LowerShardFiltering) {
                                   boost::none /*_ridProjName*/,
                                   CostType::fromDouble(0) /*_cost*/,
                                   CostType::fromDouble(0) /*_localCost*/,
-                                  {false} /*_adjustedCE*/};
+                                  CEType{0.0} /*_adjustedCE*/};
         properties::setPropertyOverwrite(
             filterNodeProps._logicalProps,
             properties::IndexingAvailability(10,
@@ -537,7 +537,7 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                                 boost::none,
                                 CostType::fromDouble(0),
                                 CostType::fromDouble(0),
-                                {false}};
+                                CEType{0.0}};
 
     auto node = _node(
         make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
@@ -562,7 +562,7 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                                  boost::none,
                                  CostType::fromDouble(0),
                                  CostType::fromDouble(0),
-                                 {false}};
+                                 CEType{0.0}};
     auto node2 = _node(
         make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending},
                                                               {"sortB", CollationOp::Descending}}),
@@ -614,7 +614,7 @@ TEST_F(ABTPlanGeneration, LowerExchangeNode) {
                                    boost::none,
                                    CostType::fromDouble(0),
                                    CostType::fromDouble(0),
-                                   {false}};
+                                   CEType{0.0}};
 
         properties::PhysProps evalPhysProps;
         properties::DistributionRequirement evalDistReq{properties::DistributionAndProjections(
@@ -628,7 +628,7 @@ TEST_F(ABTPlanGeneration, LowerExchangeNode) {
                                boost::none,
                                CostType::fromDouble(0),
                                CostType::fromDouble(0),
-                               {false}};
+                               CEType{0.0}};
 
 
         ABT evalNode =

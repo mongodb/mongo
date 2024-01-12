@@ -372,6 +372,10 @@ struct QueryHints {
     // randomly and scan sequentially from each of them for the rest.
     size_t _numSamplingChunks = 10;
 
+    // Rather than drawing an independent sample for each predicate, draw one sample and reuse it
+    // for all predicates on that collection. Only takes effect sampling in chunks is enabled.
+    bool _repeatableSample = false;
+
     // If the collection size falls within this range, sampling is a valid estimation method.
     size_t _samplingCollectionSizeMin = 100;
     size_t _samplingCollectionSizeMax = 10000;
