@@ -66,8 +66,7 @@
 
 namespace mongo {
 namespace {
-// Small hack used to be able to retrieve the full removed document in the `onDelete` method
-const auto deletedDocumentDecoration = OplogDeleteEntryArgs::declareDecoration<BSONObj>();
+
 void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
                                                       const RangeDeletionTask& rdt) {
 
@@ -151,42 +150,6 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
                 IDLParserContext("RangeDeleterServiceOpObserver"), args.updateArgs->updatedDoc);
             registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
         }
-    }
-}
-
-void RangeDeleterServiceOpObserver::aboutToDelete(OperationContext* opCtx,
-                                                  const CollectionPtr& coll,
-                                                  BSONObj const& doc,
-                                                  OplogDeleteEntryArgs* args,
-                                                  OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        deletedDocumentDecoration(args) = doc;
-    }
-}
-
-void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
-                                             const CollectionPtr& coll,
-                                             StmtId stmtId,
-                                             const BSONObj& doc,
-                                             const OplogDeleteEntryArgs& args,
-                                             OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-            [deletedDoc = deletedDocumentDecoration(args)](OperationContext* opCtx,
-                                                           boost::optional<Timestamp>) {
-                auto deletionTask = RangeDeletionTask::parse(
-                    IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
-                try {
-                    RangeDeleterService::get(opCtx)->deregisterTask(
-                        deletionTask.getCollectionUuid(), deletionTask.getRange());
-                } catch (const DBException& ex) {
-                    dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                            str::stream()
-                                << "No error different from `NotYetInitialized` is expected "
-                                   "to be propagated to the range deleter observer. Got error: "
-                                << ex.toStatus());
-                }
-            });
     }
 }
 

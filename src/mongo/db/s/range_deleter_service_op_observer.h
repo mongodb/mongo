@@ -68,19 +68,6 @@ public:
     void onUpdate(OperationContext* opCtx,
                   const OplogUpdateEntryArgs& args,
                   OpStateAccumulator* opAccumulator = nullptr) override;
-
-    void aboutToDelete(OperationContext* opCtx,
-                       const CollectionPtr& coll,
-                       const BSONObj& doc,
-                       OplogDeleteEntryArgs* args,
-                       OpStateAccumulator* opAccumulator = nullptr) override;
-
-    void onDelete(OperationContext* opCtx,
-                  const CollectionPtr& coll,
-                  StmtId stmtId,
-                  const BSONObj& doc,
-                  const OplogDeleteEntryArgs& args,
-                  OpStateAccumulator* opAccumulator = nullptr) override;
 };
 
 }  // namespace mongo
