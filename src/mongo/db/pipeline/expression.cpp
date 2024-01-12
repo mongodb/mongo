@@ -77,6 +77,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_parser_gen.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -8194,6 +8195,85 @@ REGISTER_STABLE_EXPRESSION(bitXor, ExpressionBitXor::parse);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())
+
+/* ----------------------- ExpressionInternalKeyStringValue ---------------------------- */
+
+REGISTER_STABLE_EXPRESSION(_internalKeyStringValue, ExpressionInternalKeyStringValue::parse);
+
+boost::intrusive_ptr<Expression> ExpressionInternalKeyStringValue::parse(
+    ExpressionContext* expCtx, BSONElement expr, const VariablesParseState& vps) {
+
+    uassert(
+        8281500,
+        str::stream() << "$_internalKeyStringValue only supports an object as its argument, not "
+                      << typeName(expr.type()),
+        expr.type() == BSONType::Object);
+
+    boost::intrusive_ptr<Expression> inputExpr;
+    boost::intrusive_ptr<Expression> collationExpr;
+
+    for (auto&& element : expr.embeddedObject()) {
+        auto field = element.fieldNameStringData();
+        if ("input"_sd == field) {
+            inputExpr = parseOperand(expCtx, element, vps);
+        } else if ("collation"_sd == field) {
+            collationExpr = parseOperand(expCtx, element, vps);
+        } else {
+            uasserted(8281501,
+                      str::stream() << "Unrecognized argument to $_internalKeyStringValue: "
+                                    << element.fieldName());
+        }
+    }
+    uassert(8281502,
+            str::stream() << "$_internalKeyStringValue requires 'input' to be specified",
+            inputExpr);
+
+    return make_intrusive<ExpressionInternalKeyStringValue>(expCtx, inputExpr, collationExpr);
+}
+
+Value ExpressionInternalKeyStringValue::serialize(const SerializationOptions& options) const {
+    return Value(
+        Document{{getOpName(),
+                  Document{{"input", _children[_kInput]->serialize(options)},
+                           {"collation",
+                            _children[_kCollation] ? _children[_kCollation]->serialize(options)
+                                                   : Value()}}}});
+}
+
+Value ExpressionInternalKeyStringValue::evaluate(const Document& root, Variables* variables) const {
+    const Value input = _children[_kInput]->evaluate(root, variables);
+    auto inputBson = input.wrap("");
+
+    std::unique_ptr<CollatorInterface> collator = nullptr;
+    if (_children[_kCollation]) {
+        const Value collation = _children[_kCollation]->evaluate(root, variables);
+        uassert(8281503,
+                str::stream() << "Collation spec must be an object, not "
+                              << typeName(collation.getType()),
+                collation.isObject());
+        auto collationBson = collation.getDocument().toBson();
+
+        auto collatorFactory =
+            CollatorFactoryInterface::get(getExpressionContext()->opCtx->getServiceContext());
+        collator = uassertStatusOKWithContext(collatorFactory->makeFromBSON(collationBson),
+                                              "Invalid collation spec");
+    }
+
+    key_string::HeapBuilder ksBuilder(key_string::Version::V1);
+    if (collator) {
+        ksBuilder.appendBSONElement(inputBson.firstElement(), [&](StringData str) {
+            return collator->getComparisonString(str);
+        });
+    } else {
+        ksBuilder.appendBSONElement(inputBson.firstElement());
+    }
+    auto ksValue = ksBuilder.release();
+
+    // The result omits the typebits so that the numeric value of different types have the same
+    // binary representation.
+    return Value(
+        BSONBinData{ksValue.getBuffer(), static_cast<int>(ksValue.getSize()), BinDataGeneral});
+}
 
 /* --------------------------------- Parenthesis --------------------------------------------- */
 

@@ -172,6 +172,7 @@ class ExpressionSetField;
 class ExpressionBitAnd;
 class ExpressionBitOr;
 class ExpressionBitXor;
+class ExpressionInternalKeyStringValue;
 
 class AccumulatorAvg;
 class AccumulatorFirstN;
@@ -392,6 +393,8 @@ public:
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionInternalOwningShard>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalIndexKey>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionInternalKeyStringValue>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
@@ -561,5 +564,6 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionTsIncrement*) override {}
     void visit(const ExpressionInternalOwningShard*) override {}
     void visit(const ExpressionInternalIndexKey*) override {}
+    void visit(const ExpressionInternalKeyStringValue*) override {}
 };
 }  // namespace mongo

@@ -997,6 +997,10 @@ public:
         unsupportedExpression();
     }
 
+    void visit(const ExpressionInternalKeyStringValue* expr) override final {
+        unsupportedExpression();
+    }
+
     const BonsaiEligibility& eligibility() const {
         return _eligibility;
     }

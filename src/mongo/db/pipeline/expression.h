@@ -4748,6 +4748,83 @@ public:
     }
 };
 
+/**
+ * The expression '$_internalKeyStringValue' is used to generate the key string binary of any
+ * document value ('input' field) under an optionally different non-default collation ('collation'
+ * field). The generated key string binary purposefully doesn't contain the type bits information,
+ * so that the generated binary has the same ordering as the index.
+ *
+ * The expression specification is a follows:
+ * {
+ *     $_internalKeyStringValue: {
+ *         input: <expression>,
+ *         collation: <collation spec>
+ *     }
+ * }
+ *
+ * Examples:
+ * Case 1: The 'input' field is an integer.
+ * Input1:
+ * {
+ *     $_internalKeyStringValue: {
+ *         input: 1
+ *     }
+ * }
+ * Output1: BinData(0, "KwIE")
+ *
+ * Case 2: The 'input' field is an integer of the same numeric value as above but different type.
+ * Input2:
+ * {
+ *     $_internalKeyStringValue: {
+ *         input: 1.0
+ *     }
+ * }
+ * Output2: BinData(0, "KwIE")
+ *
+ * Case 3: The 'input' field is a string. The 'collation' field is a non-default collation spec.
+ * Input3:
+ * {
+ *     $_internalIndexKey: {
+ *         input: "aAa",
+ *         collation: {locale: "en", strength: 1}
+ *     }
+ * }
+ * Output3: BinData(0, "PCkpKQAE")
+ */
+class ExpressionInternalKeyStringValue final : public Expression {
+public:
+    ExpressionInternalKeyStringValue(ExpressionContext* expCtx,
+                                     boost::intrusive_ptr<Expression> input,
+                                     boost::intrusive_ptr<Expression> collation)
+        : Expression(expCtx, {input, collation}) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+
+    Value serialize(const SerializationOptions& options) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    const char* getOpName() const {
+        return "$_internalKeyStringValue";
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+private:
+    static constexpr size_t _kInput = 0;
+    static constexpr size_t _kCollation = 1;
+};
+
 static boost::intrusive_ptr<Expression> parseParenthesisExprObj(ExpressionContext* expCtx,
                                                                 BSONElement expr,
                                                                 const VariablesParseState& vpsIn);

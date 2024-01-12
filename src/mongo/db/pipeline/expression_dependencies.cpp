@@ -201,6 +201,7 @@ public:
     void visit(const ExpressionInternalFLEBetween*) {}
     void visit(const ExpressionInternalOwningShard*) {}
     void visit(const ExpressionInternalIndexKey*) {}
+    void visit(const ExpressionInternalKeyStringValue*) {}
 };
 
 class DependencyVisitor : public DefaultDependencyVisitor {
