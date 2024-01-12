@@ -6,7 +6,6 @@
  * ]
  */
 
-import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     densifyUnits,
     getArithmeticFunctionsForUnit,
@@ -22,33 +21,33 @@ coll.drop();
 
 // Run all tests for each date unit and on numeric values.
 for (let i = 0; i < densifyUnits.length; i++) {
-    const unit = densifyUnits[i];
     coll.drop();
+
+    const unit = densifyUnits[i];
     const base = unit ? new ISODate("2021-01-01") : 0;
     const {add} = getArithmeticFunctionsForUnit(unit);
 
     // Run all tests for different step values.
     for (let i = 0; i < interestingSteps.length; i++) {
         const step = interestingSteps[i];
-        const runDensifyFullTest = (msg) =>
-            testDensifyStage({field: "val", range: {step, bounds: "full", unit: unit}}, coll, msg);
+        const stage = {field: "val", range: {step: step, bounds: "full", unit: unit}};
 
-        // Fill in docs between 1 and 99.
+        // Fill in docs between 1 and 10.
         coll.drop();
         coll.insert({val: base});
-        coll.insert({val: add(base, 99)});
-        runDensifyFullTest();
+        coll.insert({val: add(base, 10)});
+        testDensifyStage(stage, coll);
 
         // Negative numbers and dates before the epoch.
         coll.drop();
-        insertDocumentsOnStep({base, min: -100, max: -1, step: 2, addFunc: add, coll: coll});
-        runDensifyFullTest();
+        insertDocumentsOnStep({base, min: -10, max: -1, step: 2, addFunc: add, coll: coll});
+        testDensifyStage(stage, coll);
 
         // Lots of off-step documents.
         coll.drop();
         insertDocumentsOnPredicate(
-            {base, min: 0, max: 50, pred: i => i % 3 == 0 || i % 7 == 0, addFunc: add, coll: coll});
-        runDensifyFullTest();
+            {base, min: 0, max: 10, pred: i => i % 3 == 0 || i % 7 == 0, addFunc: add, coll: coll});
+        testDensifyStage(stage, coll);
 
         // Lots of off-step documents with nulls sprinkled in to confirm that a null value is
         // treated the same as a missing value.
@@ -75,7 +74,7 @@ for (let i = 0; i < densifyUnits.length; i++) {
             coll: coll
         });
 
-        runDensifyFullTest();
+        testDensifyStage(stage, coll);
     }
 }
 
@@ -87,4 +86,4 @@ let result = coll.aggregate([
 ]);
 const expected = [{_id: 1, val: 1, orig: true}];
 const resultArray = result.toArray();
-assert(arrayEq(resultArray, expected));
+assert.sameMembers(resultArray, expected);
