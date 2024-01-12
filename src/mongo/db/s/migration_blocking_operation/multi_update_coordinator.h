@@ -40,6 +40,8 @@ class MultiUpdateCoordinatorExternalState {
 public:
     virtual Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
                                                                 const Message& message) const = 0;
+    virtual void startBlockingMigrations() const = 0;
+    virtual void stopBlockingMigrations() const = 0;
     virtual ~MultiUpdateCoordinatorExternalState() {}
 };
 
@@ -47,6 +49,8 @@ class MultiUpdateCoordinatorExternalStateImpl : public MultiUpdateCoordinatorExt
 public:
     Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
                                                         const Message& message) const override;
+    void startBlockingMigrations() const override;
+    void stopBlockingMigrations() const override;
 };
 
 class MultiUpdateCoordinatorExternalStateFactory {
@@ -128,11 +132,11 @@ private:
     void _updateOnDiskState(OperationContext* opCtx,
                             const MultiUpdateCoordinatorDocument& newStateDocument);
 
-    ExecutorFuture<void> _beginOperation();
+    ExecutorFuture<void> _startBlockingMigrations();
     ExecutorFuture<void> _performUpdate();
     ExecutorFuture<void> _checkForPendingUpdates();
     ExecutorFuture<void> _cleanup();
-    void _endOperation();
+    void _stopBlockingMigrations();
 
     const MultiUpdateCoordinatorService* const _service;
 

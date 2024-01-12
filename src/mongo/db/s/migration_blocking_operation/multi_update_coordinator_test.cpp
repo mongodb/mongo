@@ -34,6 +34,7 @@
 #include "mongo/db/s/primary_only_service_helpers/state_transition_progress_gen.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -44,6 +45,7 @@ const Status kRetryableError{ErrorCodes::Interrupted, "Interrupted"};
 constexpr auto kPauseInStateFailpoint = "pauseDuringMultiUpdateCoordinatorStateTransition";
 constexpr auto kPauseInStateFailpointAlternate =
     "pauseDuringMultiUpdateCoordinatorStateTransitionAlternate";
+constexpr auto kRunFailpoint = "hangDuringMultiUpdateCoordinatorRun";
 
 BSONObj updateSuccessResponseBSONObj() {
     BSONObjBuilder bodyBob;
@@ -60,10 +62,16 @@ BSONObj updateFailedResponseBSONObj() {
     return bodyBob.obj();
 }
 
+struct MultiUpdateOpCounters {
+    int startBlockingMigrationsCount = 0;
+    int stopBlockingMigrationsCount = 0;
+};
+
 class MultiUpdateCoordinatorExternalStateForTest : public MultiUpdateCoordinatorExternalState {
 public:
-    explicit MultiUpdateCoordinatorExternalStateForTest(bool shouldFail)
-        : _shouldFail{shouldFail} {}
+    explicit MultiUpdateCoordinatorExternalStateForTest(
+        std::shared_ptr<MultiUpdateOpCounters> counters, bool shouldFail)
+        : _counters{counters}, _shouldFail{shouldFail} {}
 
     Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
                                                         const Message& message) const override {
@@ -85,31 +93,44 @@ public:
         return Future<DbResponse>::makeReady(dbResponse);
     }
 
+    void startBlockingMigrations() const override {
+        _counters->startBlockingMigrationsCount++;
+    }
+
+    void stopBlockingMigrations() const override {
+        _counters->stopBlockingMigrationsCount++;
+    }
+
 private:
+    std::shared_ptr<MultiUpdateOpCounters> _counters;
     bool _shouldFail = false;
 };
 
 class MultiUpdateCoordinatorExternalStateFactoryForTest
     : public MultiUpdateCoordinatorExternalStateFactory {
 public:
-    MultiUpdateCoordinatorExternalStateFactoryForTest(bool shouldFail) : _shouldFail{shouldFail} {}
+    MultiUpdateCoordinatorExternalStateFactoryForTest(
+        std::shared_ptr<MultiUpdateOpCounters> counters, bool shouldFail)
+        : _counters{counters}, _shouldFail{shouldFail} {}
 
     std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const {
-        return std::make_unique<MultiUpdateCoordinatorExternalStateForTest>(_shouldFail);
+        return std::make_unique<MultiUpdateCoordinatorExternalStateForTest>(_counters, _shouldFail);
     }
 
 private:
+    std::shared_ptr<MultiUpdateOpCounters> _counters;
     bool _shouldFail;
 };
 
 class MultiUpdateCoordinatorServiceForTest : public MultiUpdateCoordinatorService {
 public:
     explicit MultiUpdateCoordinatorServiceForTest(ServiceContext* serviceContext,
+                                                  std::shared_ptr<MultiUpdateOpCounters> counters,
                                                   bool shouldFail = false)
         : MultiUpdateCoordinatorService{serviceContext,
                                         std::make_unique<
                                             MultiUpdateCoordinatorExternalStateFactoryForTest>(
-                                            shouldFail)},
+                                            counters, shouldFail)},
           _serviceContext(serviceContext) {}
 
 private:
@@ -125,11 +146,20 @@ protected:
 
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
+    std::shared_ptr<MultiUpdateOpCounters> _counters;
+
+    MultiUpdateCoordinatorTest() {
+        _counters = std::make_shared<MultiUpdateOpCounters>();
+    }
 
     void setUp() override {
         repl::PrimaryOnlyServiceMongoDTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
+    }
+
+    const MultiUpdateOpCounters& getCounters() {
+        return *_counters;
     }
 
     auto failCrudOpsOn(NamespaceString nss, ErrorCodes::Error code) {
@@ -146,7 +176,7 @@ protected:
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<Service>(serviceContext);
+        return std::make_unique<Service>(serviceContext, _counters);
     }
 
     MultiUpdateCoordinatorMetadata createMetadata() {
@@ -202,6 +232,16 @@ protected:
         return Instance::getOrCreate(_opCtx, _service, document.toBSON());
     }
 
+    std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, const UUID& id) {
+        auto instanceId = BSON(MultiUpdateCoordinatorDocument::kIdFieldName << id);
+        auto [maybeInstance, isPausedOrShutdown] = Instance::lookup(opCtx, _service, instanceId);
+        if (!maybeInstance) {
+            return createInstance();
+        }
+
+        return *maybeInstance;
+    }
+
     auto pauseStateTransition(Progress progress, State state, const std::string& failpointName) {
         auto fp = globalFailPointRegistry().find(failpointName);
         auto count =
@@ -248,6 +288,65 @@ protected:
         ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
     }
 
+    void assertStatusAndUpdateResponse(StatusWith<BSONObj> status,
+                                       bool expectFailureResponse = false) {
+        if (expectFailureResponse) {
+            ASSERT_NOT_OK(status);
+            ASSERT_EQ(status.getStatus().code(), 8126701);
+        } else {
+            ASSERT_OK(status);
+            ASSERT_BSONOBJ_EQ(status.getValue(), updateSuccessResponseBSONObj());
+        }
+    }
+
+    auto createInstanceAndStepDown(Progress progress, State state) {
+        auto [instance, fp] = createInstanceInState(progress, state);
+        boost::optional<UUID> instanceId = instance->getMetadata().getId();
+        ASSERT_TRUE(instanceId);
+        stepDown();
+        fp->setMode(FailPoint::off);
+        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+        return instanceId;
+    }
+
+    auto createInstanceAndSimulateFailover(Progress progress, State state) {
+        auto instanceId = createInstanceAndStepDown(progress, state);
+
+        auto fpAlternate = globalFailPointRegistry().find(kRunFailpoint);
+        auto countAlternate = fpAlternate->setMode(FailPoint::alwaysOn);
+        stepUp(_opCtx);
+
+        auto newInstance = getOrCreateInstance(_opCtx, *instanceId);
+        fpAlternate->waitForTimesEntered(countAlternate + 1);
+        return std::tuple{newInstance, fpAlternate};
+    }
+
+    void testFailOverBeforeStateTransition(State state, bool expectFailureResponse = false) {
+        auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kBefore, state);
+        auto initialStartBlockingMigrationsCount = getCounters().startBlockingMigrationsCount;
+        auto initialStopBlockingMigrationsCount = getCounters().stopBlockingMigrationsCount;
+
+        fp->setMode(FailPoint::off);
+        auto status = instance->getCompletionFuture().getNoThrow();
+
+        if (state <= State::kPerformUpdate) {
+            ASSERT_GT(getCounters().startBlockingMigrationsCount,
+                      initialStartBlockingMigrationsCount);
+        } else if (state <= State::kDone) {
+            ASSERT_GT(getCounters().stopBlockingMigrationsCount,
+                      initialStopBlockingMigrationsCount);
+        }
+
+        assertStatusAndUpdateResponse(status, expectFailureResponse);
+    }
+
+    void testFailOverDuringStateTransition(State state, bool expectFailureResponse = false) {
+        auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kAfter, state);
+        fp->setMode(FailPoint::off);
+        assertStatusAndUpdateResponse(instance->getCompletionFuture().getNoThrow(),
+                                      expectFailureResponse);
+    }
+
     void testStateTransitionUpdatesOnDiskStateWithWriteFailure(State state) {
         auto [instance, beforeFp] = createInstanceInState(Progress::kBefore, state);
         auto [afterFp, afterCount] =
@@ -274,7 +373,7 @@ protected:
 class MultiUpdateCoordinatorExternalStateFailTest : public MultiUpdateCoordinatorTest {
 public:
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<Service>(serviceContext, true);
+        return std::make_unique<Service>(serviceContext, _counters, true);
     }
 };
 
@@ -316,6 +415,46 @@ TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureCleanup) {
 
 TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureDone) {
     testStateTransitionUpdatesOnDiskStateWithWriteFailure(State::kDone);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeBlockMigrations) {
+    testFailOverBeforeStateTransition(State::kBlockMigrations);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeCleanup) {
+    testFailOverBeforeStateTransition(State::kCleanup, true /* expectFailureResponse */);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforePerformUpdate) {
+    testFailOverBeforeStateTransition(State::kPerformUpdate);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeDone) {
+    testFailOverBeforeStateTransition(State::kDone);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterBlockMigrations) {
+    testFailOverDuringStateTransition(State::kBlockMigrations);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterPerformUpdate) {
+    testFailOverDuringStateTransition(State::kPerformUpdate, true /* expectFailureResponse */);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterCleanup) {
+    testFailOverDuringStateTransition(State::kCleanup);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterDone) {
+    auto instanceId = createInstanceAndStepDown(Progress::kAfter, State::kDone);
+    stepUp(_opCtx);
+    ASSERT_FALSE(stateDocumentExistsOnDisk(_opCtx, *instanceId));
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepDownBeforeBlockMigrations) {
+    auto instanceId = createInstanceAndStepDown(Progress::kBefore, State::kBlockMigrations);
+    stepUp(_opCtx);
+    ASSERT_FALSE(stateDocumentExistsOnDisk(_opCtx, *instanceId));
 }
 
 TEST_F(MultiUpdateCoordinatorTest, FailsForUnsupportedCmd) {

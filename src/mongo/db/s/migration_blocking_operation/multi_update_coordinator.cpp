@@ -45,6 +45,7 @@ namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(pauseDuringMultiUpdateCoordinatorStateTransition);
 MONGO_FAIL_POINT_DEFINE(pauseDuringMultiUpdateCoordinatorStateTransitionAlternate);
+MONGO_FAIL_POINT_DEFINE(hangDuringMultiUpdateCoordinatorRun);
 using State = MultiUpdateCoordinatorStateEnum;
 
 primary_only_service_helpers::PauseDuringStateTransitionFailPoint<MultiUpdateCoordinatorStateEnum>
@@ -61,6 +62,14 @@ primary_only_service_helpers::PauseDuringStateTransitionFailPoint<MultiUpdateCoo
 Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCommandToShards(
     OperationContext* opCtx, const Message& message) const {
     return ServiceEntryPointMongos::handleRequestImpl(opCtx, message);
+}
+
+void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations() const {
+    // TODO(SERVER-81265): call MigrationBlockingOperationCoordinator::beginOperation().
+}
+
+void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations() const {
+    // TODO(SERVER-81265): call MigrationBlockingOperationCoordinator::endOperation().
 }
 
 MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(
@@ -115,15 +124,18 @@ SemiFuture<void> MultiUpdateCoordinatorInstance::run(
     const CancellationToken& stepdownToken) noexcept {
     _initializeRun(executor, stepdownToken);
 
+    hangDuringMultiUpdateCoordinatorRun.pauseWhileSet();
+
     return _transitionToState(State::kBlockMigrations)
-        .then([this] { return _beginOperation(); })
+        .then([this] { return _startBlockingMigrations(); })
         .then([this] { return _performUpdate(); })
         .then([this] { return _checkForPendingUpdates(); })
         .then([this] { return _cleanup(); })
         .onCompletion([this, self = shared_from_this()](Status operationStatus) {
             return _retry
-                ->untilStepdownOrMajorityCommit("MultiUpdateCoordinator::endOperation",
-                                                [this](const auto& factory) { _endOperation(); })
+                ->untilStepdownOrMajorityCommit(
+                    "MultiUpdateCoordinator::stopBlockingMigration",
+                    [this](const auto& factory) { _stopBlockingMigrations(); })
                 .then([this] { return _transitionToState(State::kDone); })
                 .onCompletion([this, operationStatus](Status cleanupStatus) {
                     // Validating that cleanup status is ok is redundant because
@@ -146,17 +158,18 @@ SemiFuture<void> MultiUpdateCoordinatorInstance::run(
         .semi();
 }
 
-ExecutorFuture<void> MultiUpdateCoordinatorInstance::_beginOperation() {
+ExecutorFuture<void> MultiUpdateCoordinatorInstance::_startBlockingMigrations() {
     if (_getCurrentState() > State::kBlockMigrations) {
         return ExecutorFuture<void>(**_taskExecutor, Status::OK());
     }
 
-    // TODO(SERVER-81265): Chain call to beginOperation();
-    return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+    return ExecutorFuture<void>(**_taskExecutor).then([this] {
+        _externalState->startBlockingMigrations();
+    });
 }
 
 ExecutorFuture<void> MultiUpdateCoordinatorInstance::_performUpdate() {
-    if (_getCurrentState() > State::kPerformUpdate) {
+    if (_getCurrentState() >= State::kPerformUpdate) {
         return ExecutorFuture<void>(**_taskExecutor, Status::OK());
     }
 
@@ -193,20 +206,24 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_checkForPendingUpdates() {
         return ExecutorFuture<void>(**_taskExecutor, Status::OK());
     }
 
-    // TODO(SERVER-81267): $currentOp check for pending updates.
-    return ExecutorFuture<void>(**_taskExecutor, Status::OK());
+    // TODO(SERVER-85142): $currentOp check for pending updates.
+    return ExecutorFuture<void>(**_taskExecutor).then([this] {
+        uassert(8126701,
+                "Encountered a failover while executing multi update/delete operation.",
+                false);
+    });
 }
 
 ExecutorFuture<void> MultiUpdateCoordinatorInstance::_cleanup() {
-    if (_getCurrentState() > State::kCleanup) {
+    if (_getCurrentState() >= State::kCleanup) {
         return ExecutorFuture<void>(**_taskExecutor, Status::OK());
     }
 
     return _transitionToState(State::kCleanup);
 }
 
-void MultiUpdateCoordinatorInstance::_endOperation() {
-    // TODO(SERVER-81265): chain call to endOperation().
+void MultiUpdateCoordinatorInstance::_stopBlockingMigrations() {
+    return _externalState->stopBlockingMigrations();
 }
 
 void MultiUpdateCoordinatorInstance::interrupt(Status status) {}

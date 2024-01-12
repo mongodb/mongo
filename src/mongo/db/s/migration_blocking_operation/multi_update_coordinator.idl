@@ -71,8 +71,7 @@ structs:
             result:
                 type: object_owned
                 description: >-
-                    Stores the result of the underlying update command. If the MultiUpdateCoordinator 
-                    fails, the error reason will be stored here instead.
+                    Stores the result of the underlying update command.
                 optional: true
 
     MultiUpdateCoordinatorDocument:
