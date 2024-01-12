@@ -98,7 +98,6 @@ public:
 
     void tearDown() override {
         getServiceContext()->getTransportLayerManager()->shutdown();
-        sslGlobalParams.sslMode.store(SSLParams::SSLModes::SSLMode_disabled);
         _monitor.reset();
         ServiceContextTest::tearDown();
     }
@@ -185,6 +184,7 @@ private:
     ServerCb _serverCb;
     std::string _sslCAFile = grpc::CommandServiceTestFixtures::kCAFile;
     std::string _sslPEMKeyFile = grpc::CommandServiceTestFixtures::kServerCertificateKeyFile;
+    test::SSLGlobalParamsGuard _sslGlobalParamsGuard;
 
     HostAndPort _asioListenAddress;
 };

@@ -201,6 +201,7 @@ public:
     }
 
     MockServiceEntryPoint* serviceEntryPoint;
+    test::SSLGlobalParamsGuard _sslGlobalParamsGuard;
 };
 
 TEST_F(GRPCTransportLayerTest, RunCommand) {
