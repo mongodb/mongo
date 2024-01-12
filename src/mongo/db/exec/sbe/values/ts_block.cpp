@@ -103,22 +103,10 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
     std::vector<std::unique_ptr<TsBlock>> outBlocks;
     std::vector<std::unique_ptr<CellBlock>> outCells(_pathReqs.size());
 
-    // The time series decoding API gives us the top level fields only, and our CellBlock
-    // extraction code expects full BSON objects. For now we resolve this mismatch by converting
-    // the decoded output into BSON, and then re-extracting. This is really awful in terms of
-    // performance, but the hope is that a new decoding API will be made available, and this
-    // code can be deleted.
-
-    // To avoid repeated allocations, we put all of the BSONObjs into one giant buffer (bsonBuffer).
-    // We keep track of their offsets in 'bsonOffsets'.
-    BufBuilder bsonBuffer;
-    std::vector<BSONObjBuilder> bsonBuilders;
-    std::vector<size_t> bsonOffsets;
-    std::vector<BSONObj> bsons;
-
-    bsonBuilders.reserve(noOfMeasurements);
-    bsonOffsets.reserve(noOfMeasurements);
-    bsons.reserve(noOfMeasurements);
+    // The time series decoding API gives us the top level fields only. To simulate an API
+    // which lets us extract more granular paths, we materialize each top level field as BSON,
+    // and then extract from that. This is awful in terms of performance, but it can be swapped
+    // out with a more efficient implementation when a more granular API becomes available.
 
     auto bucketControlMin = bucketControl.Obj()[timeseries::kBucketControlMinFieldName];
     auto bucketControlMax = bucketControl.Obj()[timeseries::kBucketControlMaxFieldName];
@@ -201,38 +189,25 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
             continue;
         }
 
+        // This is the slow path. We materialize the top level field into BSON and then re-read
+        // that BSON to produce the results for nested paths.
+
         auto extracted = tsBlock->extract();
         invariant(extracted.count == static_cast<size_t>(noOfMeasurements));
-
-        for (size_t i = 0; i < extracted.count; ++i) {
-            bsonOffsets.push_back(bsonBuffer.len());
-            bsonBuilders.push_back(BSONObjBuilder(bsonBuffer));
-            bson::appendValueToBsonObj(bsonBuilders.back(),
-                                       columnElt.fieldNameStringData(),
-                                       extracted[i].first,
-                                       extracted[i].second);
-            bsonBuilders.back().doneFast();
-        }
-
-        for (size_t i = 0; i < extracted.count; ++i) {
-            bsons.push_back(BSONObj(bsonBuffer.buf() + bsonOffsets[i]));
-        }
 
         std::vector<CellBlock::PathRequest> reqs;
         for (auto idx : nonTopLevelIdxesForCurrentField) {
             reqs.push_back(_pathReqs[idx]);
         }
-        auto extractedCellBlocks = value::extractCellBlocksFromBsons(reqs, bsons);
+
+        auto extractor = value::BSONCellExtractor::make(reqs);
+        auto extractedCellBlocks = extractor->extractFromTopLevelField(
+            topLevelField, extracted.tagsSpan(), extracted.valsSpan());
         invariant(reqs.size() == extractedCellBlocks.size());
 
         for (size_t i = 0; i < extractedCellBlocks.size(); ++i) {
             outCells[nonTopLevelIdxesForCurrentField[i]] = std::move(extractedCellBlocks[i]);
         }
-
-        bsonBuilders.clear();
-        bsonOffsets.clear();
-        bsons.clear();
-        bsonBuffer.reset();
     }
 
     // Fill in any empty spots in the output with a block of [Nothing, Nothing...].

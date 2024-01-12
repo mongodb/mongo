@@ -34,6 +34,38 @@
 
 namespace mongo::sbe::value {
 /**
+ * Interface for extracting CellBlocks from raw BSON. Use makeExtractor(), below, to create an
+ * instance. The implementation details are hidden in the associated .cpp file.
+ */
+class BSONCellExtractor {
+public:
+    /*
+     * Creates a BSON extractor which will collect the given path requests.
+     */
+    static std::unique_ptr<BSONCellExtractor> make(
+        const std::vector<CellBlock::PathRequest>& pathReqs);
+
+
+    virtual ~BSONCellExtractor() = default;
+
+    /**
+     * Given a bunch of BSON objects, extract a set of paths from them into CellBlocks.
+     */
+    virtual std::vector<std::unique_ptr<CellBlock>> extractFromBsons(
+        const std::vector<BSONObj>& bsons) = 0;
+
+    /**
+     * Given a bunch of top-level fields (as a tag, val pair), extract the set of sub-paths from
+     * them into CellBlocks. This is useful when, for example, we have the value for field 'a'
+     * sitting in memory, materialized, and we want to avoid wrapping 'a' in a parent BSON object.
+     */
+    virtual std::vector<std::unique_ptr<CellBlock>> extractFromTopLevelField(
+        StringData topLevelField,
+        const std::span<const TypeTags>& tags,
+        const std::span<const Value>& vals) = 0;
+};
+
+/**
  * Given a vector of PathRequests and BSON objects, produces one CellBlock
  * per path request, with data from the BSON Obj.
  *

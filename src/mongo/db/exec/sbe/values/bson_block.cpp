@@ -54,6 +54,12 @@ struct FilterPositionInfoRecorder {
         }
     }
 
+    std::unique_ptr<HeterogeneousBlock> extractValues() {
+        auto out = std::move(outputArr);
+        outputArr = std::make_unique<HeterogeneousBlock>();
+        return out;
+    }
+
     std::vector<char> posInfo;
     bool isNewDoc = false;
     std::unique_ptr<HeterogeneousBlock> outputArr;
@@ -104,6 +110,12 @@ struct ProjectionPositionInfoRecorder {
 
             arrayStack.clear();
         }
+    }
+
+    std::unique_ptr<HeterogeneousBlock> extractValues() {
+        auto out = std::move(outputArr);
+        outputArr = std::make_unique<HeterogeneousBlock>();
+        return out;
     }
 
     std::unique_ptr<HeterogeneousBlock> outputArr;
@@ -168,38 +180,62 @@ struct BsonWalkNode {
     }
 };
 
-void walkField(BsonWalkNode* node, const BSONElement& elem);
+template <class Cb>
+void walkField(
+    BsonWalkNode* node, TypeTags eltTag, Value eltVal, const char* bsonPtr, const Cb& cb);
 
-void walkObj(BsonWalkNode* node, const BSONObj& obj) {
-    for (auto elem : obj) {
-        auto fieldName = elem.fieldNameStringData();
+template <class Cb>
+void walkObj(BsonWalkNode* node, const char* be, const Cb& cb) {
+    const auto end = bson::bsonEnd(be);
+    // Skip document length.
+    be += 4;
+
+    while (be != end - 1) {
+        auto fieldName = bson::fieldNameAndLength(be);
         auto it = node->getChildren.find(fieldName);
-
         if (it != node->getChildren.end()) {
-            walkField(it->second.get(), elem);
+            auto [eltTag, eltVal] = bson::convertFrom<true>(be, end, fieldName.size());
+            walkField(it->second.get(), eltTag, eltVal, be, cb);
         }
+
+        be = bson::advance(be, fieldName.size());
     }
 }
 
-void walkField(BsonWalkNode* node, const BSONElement& elem) {
-    if (elem.type() == BSONType::Object) {
-        walkObj(node, elem.embeddedObject());
+template <class Cb>
+void walkField(
+    BsonWalkNode* node, TypeTags eltTag, Value eltVal, const char* bsonPtr, const Cb& cb) {
+    if (value::isObject(eltTag)) {
+        invariant(eltTag == TypeTags::bsonObject);  // Only BSON is supported for now.
+
+        walkObj(node, value::bitcastTo<const char*>(eltVal), cb);
         if (node->traverseChild) {
-            walkField(node->traverseChild.get(), elem);
+            walkField(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
         }
-    } else if (elem.type() == BSONType::Array) {
+    } else if (value::isArray(eltTag)) {
+        invariant(eltTag == TypeTags::bsonArray);
         if (node->traverseChild) {
             // The projection traversal semantics are "special" in that the leaf must know
             // when there is an array higher up in the tree.
             for (auto& projRecorder : node->childProjRecorders) {
                 projRecorder->startArray();
             }
-            // Follow "traverse" semantics by invoking our children on direct array elements.
-            size_t idx = 0;
-            for (auto arrElem : elem.embeddedObject()) {
-                walkField(node->traverseChild.get(), arrElem);
 
-                ++idx;
+            {
+                auto arrayBson = value::bitcastTo<const char*>(eltVal);
+                const auto arrayEnd = bson::bsonEnd(arrayBson);
+
+                // Follow "traverse" semantics by invoking our children on direct array elements.
+                arrayBson += 4;
+
+                while (arrayBson != arrayEnd - 1) {
+                    auto sv = bson::fieldNameAndLength(arrayBson);
+                    auto [arrEltTag, arrEltVal] =
+                        bson::convertFrom<true>(arrayBson, arrayEnd, sv.size());
+                    walkField(node->traverseChild.get(), arrEltTag, arrEltVal, arrayBson, cb);
+
+                    arrayBson = bson::advance(arrayBson, sv.size());
+                }
             }
 
             for (auto& projRecorder : node->childProjRecorders) {
@@ -208,70 +244,166 @@ void walkField(BsonWalkNode* node, const BSONElement& elem) {
         }
     } else if (node->traverseChild) {
         // We didn't see an array, so we apply the node below the traverse to this scalar.
-        walkField(node->traverseChild.get(), elem);
+        walkField(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
     }
 
-    if (node->filterPosInfoRecorder || node->projRecorder) {
-        auto [tag, val] = bson::convertFrom<true>(elem);
 
-        if (auto rec = node->filterPosInfoRecorder) {
-            rec->recordValue(tag, val);
-        }
+    cb(node, eltTag, eltVal, bsonPtr);
+}
 
-        if (auto rec = node->projRecorder) {
-            rec->recordValue(tag, val);
+class BSONExtractorImpl : public BSONCellExtractor {
+public:
+    BSONExtractorImpl(std::vector<CellBlock::PathRequest> pathReqs);
+
+    std::vector<std::unique_ptr<CellBlock>> extractFromBsons(const std::vector<BSONObj>& bsons);
+
+    std::vector<std::unique_ptr<CellBlock>> extractFromTopLevelField(
+        StringData topLevelField,
+        const std::span<const TypeTags>& tags,
+        const std::span<const Value>& vals);
+
+private:
+    std::vector<std::unique_ptr<CellBlock>> constructOutputFromRecorders();
+
+    std::vector<CellBlock::PathRequest> _pathReqs;
+    std::vector<FilterPositionInfoRecorder> _filterPositionInfoRecorders;
+    std::vector<ProjectionPositionInfoRecorder> _projPositionInfoRecorders;
+    BsonWalkNode _root;
+};
+
+BSONExtractorImpl::BSONExtractorImpl(std::vector<CellBlock::PathRequest> pathReqsIn)
+    : _pathReqs(std::move(pathReqsIn)) {
+    // Ensure we don't reallocate and move the address of these objects, since the path tree
+    // contains pointers to them.
+    _filterPositionInfoRecorders.reserve(_pathReqs.size());
+    _projPositionInfoRecorders.reserve(_pathReqs.size());
+    {
+        for (auto& pathReq : _pathReqs) {
+            if (pathReq.type == CellBlock::PathRequestType::kFilter) {
+                _filterPositionInfoRecorders.emplace_back();
+                _root.add(pathReq.path, &_filterPositionInfoRecorders.back(), nullptr);
+            } else {
+                _projPositionInfoRecorders.emplace_back();
+                _root.add(pathReq.path, nullptr, &_projPositionInfoRecorders.back());
+            }
         }
     }
 }
+
+/*
+ * Callback used in the extractor code when walking the bson. This simply records leave values
+ * depending on which records are present.
+ */
+void visitElementExtractorCallback(BsonWalkNode* node,
+                                   TypeTags eltTag,
+                                   Value eltVal,
+                                   const char* bson) {
+    if (auto rec = node->filterPosInfoRecorder) {
+        rec->recordValue(eltTag, eltVal);
+    }
+
+    if (auto rec = node->projRecorder) {
+        rec->recordValue(eltTag, eltVal);
+    }
+}
+
+std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelField(
+    StringData topLevelField,
+    const std::span<const TypeTags>& tags,
+    const std::span<const Value>& vals) {
+    invariant(tags.size() == vals.size());
+
+    auto node = _root.getChildren.find(topLevelField);
+
+    // Caller should always ask us to extract a top level field that's in the reqs.  We could
+    // relax this if needed, and return a bunch of Nothing CellBlocks, but it's a non-use case
+    // for now.
+    invariant(node != _root.getChildren.end());
+
+    for (size_t i = 0; i < tags.size(); ++i) {
+        for (auto& rec : _filterPositionInfoRecorders) {
+            rec.newDoc();
+        }
+        for (auto& rec : _projPositionInfoRecorders) {
+            rec.newDoc();
+        }
+
+        walkField(node->second.get(), tags[i], vals[i], nullptr, visitElementExtractorCallback);
+
+        for (auto& rec : _filterPositionInfoRecorders) {
+            rec.endDoc();
+        }
+        for (auto& rec : _projPositionInfoRecorders) {
+            rec.endDoc();
+        }
+    }
+
+    return constructOutputFromRecorders();
+}
+
+std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromBsons(
+    const std::vector<BSONObj>& bsons) {
+    for (auto& obj : bsons) {
+        for (auto& rec : _filterPositionInfoRecorders) {
+            rec.newDoc();
+        }
+        for (auto& rec : _projPositionInfoRecorders) {
+            rec.newDoc();
+        }
+
+        walkObj(&_root, obj.objdata(), visitElementExtractorCallback);
+
+        for (auto& rec : _filterPositionInfoRecorders) {
+            rec.endDoc();
+        }
+        for (auto& rec : _projPositionInfoRecorders) {
+            rec.endDoc();
+        }
+    }
+
+    return constructOutputFromRecorders();
+}
+
+std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::constructOutputFromRecorders() {
+    std::vector<std::unique_ptr<CellBlock>> ret;
+    size_t filterRecorderIdx = 0;
+    size_t projRecorderIdx = 0;
+
+    for (auto&& path : _pathReqs) {
+        auto matBlock = std::make_unique<MaterializedCellBlock>();
+        if (path.type == CellBlock::PathRequestType::kFilter) {
+            auto& recorder = _filterPositionInfoRecorders[filterRecorderIdx];
+            matBlock->_deblocked = recorder.extractValues();
+            matBlock->_filterPosInfo = std::move(recorder.posInfo);
+            ++filterRecorderIdx;
+        } else if (path.type == CellBlock::PathRequestType::kProject) {
+            auto& recorder = _projPositionInfoRecorders[projRecorderIdx];
+            matBlock->_deblocked = recorder.extractValues();
+            // No associated position info since we already have one value per document.
+
+            ++projRecorderIdx;
+        } else {
+            MONGO_UNREACHABLE_TASSERT(8463101);
+        }
+        ret.push_back(std::move(matBlock));
+    }
+    tassert(8463102,
+            "Number of filter and projection recorders must sum to number of paths",
+            projRecorderIdx + filterRecorderIdx == _pathReqs.size());
+    return ret;
+}
+
 }  // namespace
+
+std::unique_ptr<BSONCellExtractor> BSONCellExtractor::make(
+    const std::vector<CellBlock::PathRequest>& pathReqs) {
+    return std::make_unique<BSONExtractorImpl>(pathReqs);
+}
 
 std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
     const std::vector<CellBlock::PathRequest>& pathReqs, const std::vector<BSONObj>& bsons) {
 
-    std::vector<FilterPositionInfoRecorder> filterPositionInfoRecorders(pathReqs.size());
-    std::vector<ProjectionPositionInfoRecorder> projPositionInfoRecorders(pathReqs.size());
-    BsonWalkNode root;
-    {
-        size_t idx = 0;
-        for (auto& pathReq : pathReqs) {
-            if (pathReq.type == CellBlock::PathRequestType::kFilter) {
-                root.add(pathReq.path, &filterPositionInfoRecorders[idx], nullptr);
-            } else {
-                root.add(pathReq.path, nullptr, &projPositionInfoRecorders[idx]);
-            }
-            ++idx;
-        }
-    }
-
-    for (auto& obj : bsons) {
-        for (size_t idx = 0; idx < pathReqs.size(); ++idx) {
-            filterPositionInfoRecorders[idx].newDoc();
-            projPositionInfoRecorders[idx].newDoc();
-        }
-
-        walkObj(&root, obj);
-
-        for (size_t idx = 0; idx < pathReqs.size(); ++idx) {
-            filterPositionInfoRecorders[idx].endDoc();
-            projPositionInfoRecorders[idx].endDoc();
-        }
-    }
-
-    std::vector<std::unique_ptr<CellBlock>> ret;
-    for (size_t idx = 0; idx < pathReqs.size(); ++idx) {
-        auto matBlock = std::make_unique<MaterializedCellBlock>();
-        if (pathReqs[idx].type == CellBlock::PathRequestType::kFilter) {
-            matBlock->_deblocked = std::move(filterPositionInfoRecorders[idx].outputArr);
-            matBlock->_filterPosInfo = std::move(filterPositionInfoRecorders[idx].posInfo);
-        } else if (pathReqs[idx].type == CellBlock::PathRequestType::kProject) {
-            auto& block = projPositionInfoRecorders[idx].outputArr;
-            invariant(block->size() == bsons.size());
-            matBlock->_deblocked = std::move(block);
-            // No associated position info since we already have one value per document.
-        }
-        ret.push_back(std::move(matBlock));
-    }
-
-    return ret;
+    auto extractor = BSONCellExtractor::make(pathReqs);
+    return extractor->extractFromBsons(bsons);
 }
 }  // namespace mongo::sbe::value

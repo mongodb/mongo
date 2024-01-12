@@ -95,6 +95,10 @@ inline const char* fieldNameRaw(const char* be) noexcept {
     return be + 1;
 }
 
+inline const char* bsonEnd(const char* bsonStart) noexcept {
+    return bsonStart + ConstDataView(bsonStart).read<LittleEndian<uint32_t>>();
+}
+
 template <class ArrayBuilder>
 void convertToBsonArr(ArrayBuilder& builder, value::Array* arr);
 

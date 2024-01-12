@@ -56,6 +56,14 @@ struct DeblockedTagVals {
         return {tags[idx], vals[idx]};
     }
 
+    std::span<const TypeTags> tagsSpan() const {
+        return std::span(tags, count);
+    }
+
+    std::span<const Value> valsSpan() const {
+        return std::span(vals, count);
+    }
+
     const size_t count;
     const TypeTags* const tags;
     const Value* const vals;
