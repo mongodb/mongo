@@ -442,11 +442,28 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
                                 nss, SerializationContext::stateDefault()));
 
     rangeDeletionsForRenameStore.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
-        try {
-            rangeDeletionsStore.add(opCtx, deletionTask);
-        } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
-            // Task already scheduled in a previous call of this method
-        }
+        // Upsert the range deletion document so that:
+        // - If no document for the same range exists, a task will be registered by the range
+        // deleter insert observer.
+        // - If a document for the same range already exists, no new task will be registered on
+        // the range deleter service because the update observer only registers when the update
+        // action is 'unset the pending field'.
+        auto& uuid = deletionTask.getCollectionUuid();
+        auto& range = deletionTask.getRange();
+        auto upsertQuery =
+            BSON(RangeDeletionTask::kCollectionUuidFieldName
+                 << uuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+                 << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+                 << range.getMax());
+        // Remove _id because it's an immutable field so it can't be part of an update.
+        // But include it as part of the upsert because the _id field is expected to be a uuid
+        // (as opposed to the default OID) in case a new document is inserted.
+        auto upsertDocument = deletionTask.toBSON().removeField(RangeDeletionTask::kIdFieldName);
+        rangeDeletionsStore.upsert(opCtx,
+                                   upsertQuery,
+                                   BSON("$set"
+                                        << upsertDocument << "$setOnInsert"
+                                        << BSON(RangeDeletionTask::kIdFieldName << UUID::gen())));
         return true;
     });
 }

@@ -148,10 +148,21 @@ int insertDocsWithinRange(
     return maxCount;
 }
 
-
 void insertRangeDeletionTaskDocument(OperationContext* opCtx, const RangeDeletionTask& rdt) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.add(opCtx, rdt);
+    // Randomly persist document via insert or upsert. Testing both scenarios because migrations
+    // insert/update range deletion documents while rename participants could potentially insert
+    // via upsert. This is a safeguard test to make sure that the insert observer is properly
+    // invoked in both cases: if at some point inserts via upserts would not be observed anymore
+    // as normal inserts, the range deleter would break.
+    PseudoRandom random(SecureRandom().nextInt64());
+    if (random.nextInt32() % 2) {
+        store.add(opCtx, rdt);
+    } else {
+        store.upsert(opCtx,
+                     BSON(RangeDeletionTask::kIdFieldName << rdt.getId()),
+                     BSON("$set" << rdt.toBSON()));
+    }
 }
 
 void updatePendingField(OperationContext* opCtx, UUID rdtId, bool pending) {

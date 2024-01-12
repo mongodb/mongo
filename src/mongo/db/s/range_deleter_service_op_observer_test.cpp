@@ -142,33 +142,4 @@ TEST_F(RangeDeleterServiceTest, UnsetPendingFieldFromRangeDeletionTask) {
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollB), 1);
 }
 
-TEST_F(RangeDeleterServiceTest, RemoveRangeDeletionTask) {
-    auto rds = RangeDeleterService::get(opCtx);
-    RangeDeletionTask rdt1 = createRangeDeletionTask(
-        uuidCollA, BSON("a" << 5), BSON("a" << 15), CleanWhenEnum::kDelayed);
-    RangeDeletionTask rdt2 = createRangeDeletionTask(
-        uuidCollA, BSON("a" << 15), BSON("a" << 20), CleanWhenEnum::kDelayed);
-
-    insertRangeDeletionTaskDocument(opCtx, rdt1);
-    insertRangeDeletionTaskDocument(opCtx, rdt2);
-    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
-    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
-
-    updatePendingField(opCtx, rdt1.getId(), false);
-    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange()});
-    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
-
-    updatePendingField(opCtx, rdt2.getId(), false);
-    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange(), rdt2.getRange()});
-    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 2);
-
-    deleteRangeDeletionTaskDocument(opCtx, rdt2.getId());
-    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange()});
-    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
-
-    deleteRangeDeletionTaskDocument(opCtx, rdt1.getId());
-    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
-    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
-}
-
 }  // namespace mongo

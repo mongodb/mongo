@@ -758,7 +758,6 @@ TEST_F(RangeDeleterServiceTest, OnlyRemoveDocumentsInRangeToDelete) {
     taskWithOngoingQueries->drainOngoingQueries();
     completionFuture.get(opCtx);
     ASSERT_EQUALS(dbclient.count(nss), numDocsToKeep);
-    ASSERT_EQUALS(dbclient.count(NamespaceString::kRangeDeletionNamespace), 0);
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterAndProcessSingleTaskWithKeyPattern) {

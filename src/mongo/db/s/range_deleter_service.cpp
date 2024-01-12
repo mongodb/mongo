@@ -291,6 +291,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 
                 // Remove persistent range deletion task
                 try {
+                    RangeDeleterService::get(opCtx)->deregisterTask(collectionUuid, range);
                     rangedeletionutil::removePersistentRangeDeletionTask(
                         opCtx, collectionUuid, range);
 
