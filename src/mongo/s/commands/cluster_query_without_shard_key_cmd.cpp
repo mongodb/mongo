@@ -184,7 +184,6 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
     return allShardsContainingChunksForNs;
 }
 
-// TODO: SERVER-75760 Remove this validation since mongos should be doing this upfront.
 void validateFindAndModifyCommand(const write_ops::FindAndModifyCommandRequest& request) {
     uassert(ErrorCodes::FailedToParse,
             "Either an update or remove=true must be specified",
