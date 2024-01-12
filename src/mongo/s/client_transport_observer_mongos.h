@@ -35,16 +35,11 @@
 namespace mongo {
 
 /**
- * Tracks and reports the number of active load balanced connections.
+ * Cleans up open cursors and in-progress transactions upon disconnect for clients that
+ * are considered bound to the operation state.
  */
 class ClientTransportObserverMongos final : public transport::ClientTransportObserver {
-public:
-    void appendTransportServerStats(BSONObjBuilder* bob) final;
-    void onClientConnect(Client* client) final;
     void onClientDisconnect(Client* client) final;
-
-private:
-    Counter64 _loadBalancedConnections;
 };
 
 }  // namespace mongo

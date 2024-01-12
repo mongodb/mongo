@@ -78,6 +78,10 @@ public:
         return false;
     }
 
+    bool bindsToOperationState() const override {
+        return false;
+    }
+
     void appendToBSON(BSONObjBuilder& bb) const override {
         MONGO_UNIMPLEMENTED;
     }
