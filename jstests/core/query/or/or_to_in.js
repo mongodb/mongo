@@ -51,6 +51,10 @@ function assertEquivPlanAndResult(expectedQuery, actualQuery) {
     // Make sure both queries have the same access plan.
     const expectedPlan = getWinningPlanFromExplain(expectedExplain);
     const actualPlan = getWinningPlanFromExplain(actualExplain);
+    // Remove the 'isCached' property of the winning plans as it may differ for both queries
+    // in a replication scenario.
+    delete expectedPlan.isCached;
+    delete actualPlan.isCached;
     assert.docEq(expectedPlan, actualPlan);
 
     // The queries must produce the same result.
