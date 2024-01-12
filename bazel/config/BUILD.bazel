@@ -23,6 +23,7 @@ load(
     "separate_debug",
     "http_client",
     "linkstatic",
+    "use_diagnostic_latches",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -766,4 +767,27 @@ config_setting(
 selects.config_setting_group(
     name = "linkdynamic_required_settings",
     match_all = [":linkstatic_disabled", ":not_windows"],
+)
+
+# --------------------------------------
+# use_diagnostic_latches options
+# --------------------------------------
+
+use_diagnostic_latches(
+    name = "use_diagnostic_latches",
+    build_setting_default = True
+)
+
+config_setting(
+    name = "use_diagnostic_latches_enabled",
+    flag_values = {
+        "//bazel/config:use_diagnostic_latches": "True",
+    }
+)
+
+config_setting(
+    name = "use_diagnostic_latches_disabled",
+    flag_values = {
+        "//bazel/config:use_diagnostic_latches": "False",
+    },
 )

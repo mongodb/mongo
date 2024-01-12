@@ -285,3 +285,17 @@ linkstatic = rule(
     implementation = lambda ctx: linkstatic_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# use-diagnostic-latches
+# =========
+
+use_diagnostic_latches_provider = provider(
+    doc = "Enable annotated Mutex types.",
+    fields = ["enabled"],
+)
+
+use_diagnostic_latches = rule(
+    implementation = lambda ctx: use_diagnostic_latches_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

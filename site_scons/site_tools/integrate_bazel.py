@@ -433,6 +433,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
             f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
             f'--//bazel/config:linkstatic={linkstatic}',
+            f'--//bazel/config:use_diagnostic_latches={True if env.GetOption("use-diagnostic-latches") == "on" else False}',
             f'--platforms=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             f'--host_platform=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g
