@@ -439,6 +439,14 @@ struct IndexBoundsEvaluationInfo {
 };
 
 /**
+ * Holds the slots for the find command limit skip values.
+ */
+struct ParameterizedLimitSkipSlots {
+    boost::optional<sbe::value::SlotId> limit;
+    boost::optional<sbe::value::SlotId> skip;
+};
+
+/**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
  * is needed to execute the PlanStage tree.
  */
@@ -510,6 +518,12 @@ struct PlanStageData {
     // every index used by the plan.
     std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
 
+    /**
+     * Stores slot ids for slots holding limit and skip amounts for a cached auto-parameterized SBE
+     * plan.
+     */
+    ParameterizedLimitSkipSlots limitSkipSlots;
+
     // Stores all namespaces involved in the build side of a hash join plan. Needed to check if the
     // plan should be evicted as the size of the foreign namespace changes.
     stdx::unordered_set<NamespaceString> foreignHashJoinCollections;
@@ -540,6 +554,7 @@ private:
         inputParamToSlotMap = other.inputParamToSlotMap;
         variableIdToSlotMap = other.variableIdToSlotMap;
         indexBoundsEvaluationInfos = other.indexBoundsEvaluationInfos;
+        limitSkipSlots = other.limitSkipSlots;
         foreignHashJoinCollections = other.foreignHashJoinCollections;
         collator = other.collator;
     }
@@ -672,6 +687,10 @@ private:
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLookup(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::unique_ptr<sbe::EExpression> buildLimitSkipAmountExpression(
+        long long amount, boost::optional<sbe::value::SlotId>& slot);
+    std::unique_ptr<sbe::EExpression> buildLimitSkipSumExpression(size_t limitSkipSum);
 
     /**
      * Returns a CollectionPtr corresponding to the collection that we are currently building a

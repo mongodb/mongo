@@ -142,7 +142,7 @@ std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopyForParallelUse()
     return makeCopy();
 }
 
-void RuntimeEnvironment::debugString(StringBuilder* builder) {
+void RuntimeEnvironment::debugString(StringBuilder* builder) const {
     using namespace std::literals;
 
     value::SlotMap<StringData> slotName;
@@ -169,6 +169,12 @@ void RuntimeEnvironment::debugString(StringBuilder* builder) {
         }
     }
     *builder << " }";
+}
+
+std::string RuntimeEnvironment::toDebugString() const {
+    StringBuilder builder;
+    debugString(&builder);
+    return builder.str();
 }
 
 }  // namespace mongo::sbe

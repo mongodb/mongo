@@ -53,7 +53,7 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      value::SlotVector obs,
                      std::vector<value::SortDirection> dirs,
                      value::SlotVector vals,
-                     size_t limit,
+                     std::unique_ptr<EExpression> limit,
                      size_t memoryLimit,
                      bool allowDiskUse,
                      PlanNodeId planNodeId,
@@ -62,12 +62,12 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),
-      _allowDiskUse(allowDiskUse) {
+      _allowDiskUse(allowDiskUse),
+      _limitExpr(std::move(limit)) {
     _children.emplace_back(std::move(input));
 
     invariant(_obs.size() == _dirs.size());
 
-    _specificStats.limit = limit;
     _specificStats.maxMemoryUsageBytes = memoryLimit;
 }
 
@@ -99,7 +99,7 @@ std::unique_ptr<PlanStage> SortStage::clone() const {
                                        _obs,
                                        _dirs,
                                        _vals,
-                                       _specificStats.limit,
+                                       _limitExpr ? _limitExpr->clone() : nullptr,
                                        _specificStats.maxMemoryUsageBytes,
                                        _allowDiskUse,
                                        _commonStats.nodeId,
@@ -221,8 +221,8 @@ std::vector<DebugPrinter::Block> SortStage::debugPrint() const {
     }
     ret.emplace_back("`]");
 
-    if (_specificStats.limit != std::numeric_limits<size_t>::max()) {
-        ret.emplace_back(std::to_string(_specificStats.limit));
+    if (_limitExpr) {
+        DebugPrinter::addBlocks(ret, _limitExpr->debugPrint());
     }
 
     DebugPrinter::addNewLine(ret);
@@ -238,6 +238,7 @@ size_t SortStage::estimateCompileTimeSize() const {
     size += size_estimator::estimate(_dirs);
     size += size_estimator::estimate(_vals);
     size += size_estimator::estimate(_specificStats);
+    size += _limitExpr ? _limitExpr->estimateSize() : 0;
     return size;
 }
 
@@ -274,6 +275,10 @@ void SortStage::SortImpl<KeyRow, ValueRow>::prepare(CompileCtx& ctx) {
         ++counter;
         uassert(4822813, str::stream() << "duplicate field: " << slot, inserted);
     }
+
+    if (_stage._limitExpr) {
+        _limitCode = _stage._limitExpr->compile(ctx);
+    }
 }
 
 template <typename KeyRow, typename ValueRow>
@@ -284,6 +289,14 @@ value::SlotAccessor* SortStage::SortImpl<KeyRow, ValueRow>::getAccessor(CompileC
     }
 
     return ctx.getAccessor(slot);
+}
+
+template <typename KeyRow, typename ValueRow>
+int64_t SortStage::SortImpl<KeyRow, ValueRow>::runLimitCode() {
+    auto [owned, tag, val] = vm::ByteCode{}.run(_limitCode.get());
+    value::ValueGuard guard{owned, tag, val};
+    tassert(8349205, "Limit code returned unexpected value", tag == value::TypeTags::NumberInt64);
+    return value::bitcastTo<size_t>(val);
 }
 
 template <typename KeyRow, typename ValueRow>
@@ -328,6 +341,12 @@ void SortStage::SortImpl<KeyRow, ValueRow>::open(bool reOpen) {
     invariant(_stage._opCtx);
     _stage._commonStats.opens++;
     _stage._children[0]->open(reOpen);
+
+    if (_limitCode) {
+        _stage._specificStats.limit = runLimitCode();
+    } else {
+        _stage._specificStats.limit = std::numeric_limits<size_t>::max();
+    }
 
     makeSorter();
 

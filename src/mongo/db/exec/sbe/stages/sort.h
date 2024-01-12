@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/sorter/sorter_stats.h"
 
@@ -68,7 +69,7 @@ public:
               value::SlotVector obs,
               std::vector<value::SortDirection> dirs,
               value::SlotVector vals,
-              size_t limit,
+              std::unique_ptr<EExpression> limit,
               size_t memoryLimit,
               bool allowDiskUse,
               PlanNodeId planNodeId,
@@ -118,6 +119,7 @@ private:
         void close() final;
 
     private:
+        int64_t runLimitCode();
         void makeSorter();
 
         using SorterIterator = SortIteratorInterface<KeyRow, ValueRow>;
@@ -134,6 +136,8 @@ private:
         SorterData _mergeData;
         SorterData* _mergeDataIt{&_mergeData};
         std::unique_ptr<Sorter<KeyRow, ValueRow>> _sorter;
+
+        std::unique_ptr<vm::CodeFragment> _limitCode;
     };
 
 private:
@@ -154,6 +158,8 @@ private:
     std::unique_ptr<SorterFileStats> _sorterFileStats;
 
     std::unique_ptr<SortIface> _stageImpl;
+
+    std::unique_ptr<EExpression> _limitExpr;
 
     SortStats _specificStats;
     // If provided, used during a trial run to accumulate certain execution stats. Once the

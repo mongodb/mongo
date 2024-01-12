@@ -188,13 +188,6 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
     std::vector<CaseValuePair> caseValuePairs, std::unique_ptr<sbe::EExpression> defaultValue);
 
 /**
- * Insert a limit stage on top of the 'input' stage.
- */
-std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,
-                                              PlanNodeId planNodeId,
-                                              long long limit = 1);
-
-/**
  * Create tree consisting of coscan stage followed by limit stage.
  */
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1);
@@ -221,6 +214,16 @@ inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&...
 template <typename T>
 inline auto makeConstant(sbe::value::TypeTags tag, T value) {
     return sbe::makeE<sbe::EConstant>(tag, sbe::value::bitcastFrom<T>(value));
+}
+
+inline auto makeInt32Constant(int64_t num) {
+    auto val = sbe::value::bitcastFrom<int32_t>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, val);
+}
+
+inline auto makeInt64Constant(int64_t num) {
+    auto val = sbe::value::bitcastFrom<int64_t>(num);
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, val);
 }
 
 inline auto makeConstant(StringData str) {

@@ -43,6 +43,7 @@ void QueryKnobConfiguration::_tryToSetAllValues() {
                                       ->_data.get();
     _sbeDisableGroupPushdownValue = internalQuerySlotBasedExecutionDisableGroupPushdown.load();
     _sbeDisableLookupPushdownValue = internalQuerySlotBasedExecutionDisableLookupPushdown.load();
+    _planEvaluationMaxResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults.load());
     _maxScansToExplodeValue = static_cast<size_t>(internalQueryMaxScansToExplode.load());
     _isSet = true;
 }
@@ -60,6 +61,11 @@ bool QueryKnobConfiguration::getSbeDisableGroupPushdownForOp() {
 bool QueryKnobConfiguration::getSbeDisableLookupPushdownForOp() {
     _tryToSetAllValues();
     return _sbeDisableLookupPushdownValue;
+}
+
+size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() {
+    _tryToSetAllValues();
+    return _planEvaluationMaxResults;
 }
 
 size_t QueryKnobConfiguration::getMaxScansToExplodeForOp() {

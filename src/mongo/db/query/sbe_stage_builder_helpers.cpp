@@ -246,15 +246,9 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditionalFromCaseValuePairs(
         });
 }
 
-std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,
-                                              PlanNodeId planNodeId,
-                                              long long limit) {
-    return sbe::makeS<sbe::LimitSkipStage>(std::move(inputStage), limit, boost::none, planNodeId);
-}
-
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit) {
     return sbe::makeS<sbe::LimitSkipStage>(
-        sbe::makeS<sbe::CoScanStage>(planNodeId), limit, boost::none, planNodeId);
+        sbe::makeS<sbe::CoScanStage>(planNodeId), makeInt64Constant(limit), nullptr, planNodeId);
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
@@ -457,9 +451,11 @@ EvalStage makeLimitSkip(EvalStage input,
                         PlanNodeId planNodeId,
                         boost::optional<long long> limit,
                         boost::optional<long long> skip) {
-    return EvalStage{
-        sbe::makeS<sbe::LimitSkipStage>(input.extractStage(planNodeId), limit, skip, planNodeId),
-        input.extractOutSlots()};
+    return EvalStage{sbe::makeS<sbe::LimitSkipStage>(input.extractStage(planNodeId),
+                                                     limit ? makeInt64Constant(*limit) : nullptr,
+                                                     skip ? makeInt64Constant(*skip) : nullptr,
+                                                     planNodeId),
+                     input.extractOutSlots()};
 }
 
 EvalStage makeUnion(std::vector<EvalStage> inputStages,
@@ -866,7 +862,8 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
     // limiting the result set to 1 row.
     return sbe::makeS<sbe::LoopJoinStage>(
         std::move(inputStage),
-        sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
+        sbe::makeS<sbe::LimitSkipStage>(
+            std::move(scanStage), makeInt64Constant(1), nullptr, planNodeId),
         std::move(slotsToForward),
         sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdentSlot, indexKeySlot, indexKeyPatternSlot),
         nullptr,

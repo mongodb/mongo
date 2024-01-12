@@ -348,7 +348,7 @@ public:
     /**
      * Output a human-readable std::string representing the plan.
      */
-    std::string toString() {
+    std::string toString() const {
         if (!_root) {
             return "empty query solution";
         }
@@ -380,11 +380,6 @@ public:
      * output (e.g. explain).
      */
     void setRoot(std::unique_ptr<QuerySolutionNode> root);
-
-    /**
-     * Extracts the root of the QuerySolutionNode rooted at `_root`.
-     */
-    std::unique_ptr<QuerySolutionNode> extractRoot();
 
     /**
      * Returns a vector containing all of the secondary namespaces referenced by this tree, except
@@ -997,7 +992,11 @@ struct SortKeyGeneratorNode : public QuerySolutionNode {
 };
 
 struct SortNode : public QuerySolutionNodeWithSortSet {
-    SortNode() : limit(0) {}
+    SortNode(std::unique_ptr<QuerySolutionNode> child, BSONObj pattern, size_t limit)
+        : QuerySolutionNodeWithSortSet(std::move(child)),
+          pattern(std::move(pattern)),
+          limit(limit) {}
+    SortNode(const SortNode& other);
 
     virtual ~SortNode() {}
 
@@ -1043,6 +1042,8 @@ private:
  * Represents sort algorithm that can handle any kind of input data.
  */
 struct SortNodeDefault final : public SortNode {
+    using SortNode::SortNode;
+
     virtual StageType getType() const override {
         return STAGE_SORT_DEFAULT;
     }
@@ -1061,6 +1062,8 @@ struct SortNodeDefault final : public SortNode {
  *  - The record id can be discarded.
  */
 struct SortNodeSimple final : public SortNode {
+    using SortNode::SortNode;
+
     virtual StageType getType() const {
         return STAGE_SORT_SIMPLE;
     }
@@ -1073,7 +1076,10 @@ struct SortNodeSimple final : public SortNode {
 };
 
 struct LimitNode : public QuerySolutionNode {
-    LimitNode() {}
+    LimitNode(std::unique_ptr<QuerySolutionNode> child, long long limit)
+        : QuerySolutionNode(std::move(child)), limit(limit) {}
+    LimitNode(const LimitNode& other);
+
     virtual ~LimitNode() {}
 
     virtual StageType getType() const {
@@ -1101,7 +1107,10 @@ struct LimitNode : public QuerySolutionNode {
 };
 
 struct SkipNode : public QuerySolutionNode {
-    SkipNode() {}
+    SkipNode(std::unique_ptr<QuerySolutionNode> child, long long skip)
+        : QuerySolutionNode(std::move(child)), skip(skip) {}
+    SkipNode(const SkipNode& other);
+
     virtual ~SkipNode() {}
 
     virtual StageType getType() const {
@@ -1306,8 +1315,6 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
 };
 
 struct EofNode : public QuerySolutionNodeWithSortSet {
-    EofNode() {}
-
     virtual StageType getType() const {
         return STAGE_EOF;
     }

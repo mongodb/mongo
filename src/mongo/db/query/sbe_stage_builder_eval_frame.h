@@ -214,7 +214,12 @@ public:
     std::unique_ptr<sbe::PlanStage> extractStage(PlanNodeId planNodeId) {
         return _stage ? std::move(_stage)
                       : sbe::makeS<sbe::LimitSkipStage>(
-                            sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId);
+                            sbe::makeS<sbe::CoScanStage>(planNodeId),
+                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                                       sbe::value::bitcastFrom<int64_t>(1)),
+                            nullptr /* skip */,
+                            planNodeId);
+        ;
     }
 
     void setStage(std::unique_ptr<sbe::PlanStage> stage) {

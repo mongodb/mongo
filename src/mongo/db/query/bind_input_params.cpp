@@ -448,4 +448,25 @@ void bindIndexBounds(
             indexBoundsInfo, std::move(intervals), std::move(bounds), runtimeEnvironment);
     }
 }
+
+void bindLimitSkipInputSlots(const CanonicalQuery& cq,
+                             const stage_builder::PlanStageData* data,
+                             sbe::RuntimeEnvironment* runtimeEnvironment) {
+    auto setLimitSkipInputSlot = [&](boost::optional<sbe::value::SlotId> slot,
+                                     boost::optional<int64_t> amount) {
+        if (!slot) {
+            tassert(8349201, "Slot is not present, but amount is present", !amount);
+        } else {
+            tassert(8349202, "Slot is present, but amount is not present", amount);
+            runtimeEnvironment->resetSlot(*slot,
+                                          sbe::value::TypeTags::NumberInt64,
+                                          sbe::value::bitcastFrom<int64_t>(*amount),
+                                          false);
+        }
+    };
+
+    setLimitSkipInputSlot(data->limitSkipSlots.limit, cq.getFindCommandRequest().getLimit());
+    setLimitSkipInputSlot(data->limitSkipSlots.skip, cq.getFindCommandRequest().getSkip());
+}
+
 }  // namespace mongo::input_params
