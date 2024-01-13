@@ -290,7 +290,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
@@ -302,7 +302,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
 
     BatchedCommandRequest targetBatch =
         batchOp.buildBatchRequest(*targeted.begin()->second, targeter, boost::none);
-    ASSERT(targetBatch.getWriteConcern().woCompare(request.getWriteConcern()) == 0);
+    ASSERT(targetBatch.getWriteConcern().woCompare(_opCtx->getWriteConcern().toBSON()) == 0);
 
     BatchedCommandResponse response;
     buildResponse(1, &response);
@@ -1213,7 +1213,7 @@ TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
         insertOp.setDocuments({BSON("x" << 1), BSON("x" << 1)});
         return insertOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
@@ -1260,7 +1260,7 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
         updateOp.setUpdates({buildUpdate(BSON("x" << GTE << -1 << LT << 2), true)});
         return updateOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
@@ -1627,7 +1627,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
         insertOp.setDocuments({BSON("x" << -1), BSON("x" << 2)});
         return insertOp;
     }());
-    request.setWriteConcern(BSON("w" << 3));
+    _opCtx->setWriteConcern(WriteConcernOptions::parse(BSON("w" << 3)).getValue());
 
     BatchWriteOp batchOp(_opCtx, request);
 
