@@ -91,6 +91,12 @@ public:
                                    std::vector<std::vector<ApplierOperation>>* writerVectors,
                                    std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
+    void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
+                                                  StorageInterface* storageInterface,
+                                                  ThreadPool* writerPool,
+                                                  const std::vector<OplogEntry>& ops,
+                                                  bool skipWritesToOplog) override;
+
 private:
     /**
      * Runs oplog application in a loop until shutdown() is called.

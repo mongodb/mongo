@@ -653,11 +653,11 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
 
 // Schedules the writes to the oplog and the change collection for 'ops' into threadPool. The caller
 // must guarantee that 'ops' stays valid until all scheduled work in the thread pool completes.
-void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
-                                              StorageInterface* storageInterface,
-                                              ThreadPool* writerPool,
-                                              const std::vector<OplogEntry>& ops,
-                                              bool skipWritesToOplog) {
+void OplogApplierImpl::scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
+                                                                StorageInterface* storageInterface,
+                                                                ThreadPool* writerPool,
+                                                                const std::vector<OplogEntry>& ops,
+                                                                bool skipWritesToOplog) {
     // Skip performing any writes during the startup recovery when running in the non-serverless
     // environment.
     if (skipWritesToOplog && !change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
