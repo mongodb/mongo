@@ -456,8 +456,9 @@ __verify_tree(
 
     /* Optionally dump address information. */
     if (vs->dump_address)
-        WT_RET(__wt_msg(session, "%s %s", __verify_addr_string(session, ref, vs->tmp1),
-          __wt_page_type_string(page->type)));
+        WT_RET(__wt_msg(session, "%s %s write gen: %" PRIu64,
+          __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type),
+          page->dsk->write_gen));
 
     /* Track the shape of the tree. */
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))

@@ -65,7 +65,7 @@ __wt_time_aggregate_to_string(WT_TIME_AGGREGATE *ta, char *ta_string)
     char ts_string[4][WT_TS_INT_STRING_SIZE];
 
     WT_IGNORE_RET(__wt_snprintf(ta_string, WT_TIME_STRING_SIZE,
-      "newest durable: %s/%s oldest start: %s/%" PRIu64 " newest stop %s/%" PRIu64 "%s",
+      "newest durable: %s/%s oldest start: %s/%" PRIu64 " newest stop: %s/%" PRIu64 "%s",
       __wt_timestamp_to_string(ta->newest_start_durable_ts, ts_string[0]),
       __wt_timestamp_to_string(ta->newest_stop_durable_ts, ts_string[1]),
       __wt_timestamp_to_string(ta->oldest_start_ts, ts_string[2]), ta->newest_txn,
