@@ -1926,7 +1926,7 @@ tasks:
 
   # End of cppsuite test tasks.
   # Start of csuite test tasks
-  - name: csuite-tests-pull-request
+  - name: csuite-tests-fast
     tags: ["pull_request"]
     commands:
       - func: "get project"
@@ -5336,7 +5336,7 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
     - name: compile
-    - name: make-check-test
+    - name: csuite-tests-fast
     - name: fops
     - name: catch2-unittest-test
     - name: examples-c-test
