@@ -251,7 +251,7 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     //For example:
     // Add two indexes: db.collection.createIndex({a:1}) and db.collection.createIndex({a:11})
     // The two indexes are actually the same, One of them is a useless index
-    auto dealIndexKeyPattern = [&](const BSONObj& indexKeyPattern) {
+    auto canonizeIndexKeyPattern = [this](const BSONObj& indexKeyPattern) {
         if (getIndexType() != INDEX_BTREE) {
              return indexKeyPattern;
         }
@@ -276,8 +276,8 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return build.obj();
     };
 
-    BSONObj newIndexKeyPattern = dealIndexKeyPattern(keyPattern());
-    BSONObj existingIndexKeyPattern = dealIndexKeyPattern(existingIndexDesc->keyPattern());
+    BSONObj newIndexKeyPattern = canonizeIndexKeyPattern(keyPattern());
+    BSONObj existingIndexKeyPattern = canonizeIndexKeyPattern(existingIndexDesc->keyPattern());
 
     // We first check whether the key pattern is identical for both indexes.
     if (SimpleBSONObjComparator::kInstance.evaluate(newIndexKeyPattern !=
