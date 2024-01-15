@@ -168,12 +168,6 @@ public:
      */
     StatusWith<OpTime> applyOplogBatch(OperationContext* opCtx, std::vector<OplogEntry> ops);
 
-    virtual void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
-                                                          StorageInterface* storageInterface,
-                                                          ThreadPool* writerPool,
-                                                          const std::vector<OplogEntry>& ops,
-                                                          bool skipWritesToOplog) = 0;
-
     /**
      * Calls the OplogBatcher's getNextApplierBatch.
      */
