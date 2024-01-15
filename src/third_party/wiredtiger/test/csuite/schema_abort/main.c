@@ -562,7 +562,7 @@ thread_ts_run(void *arg)
               "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, oldest_ts, oldest_ts);
             testutil_check(td->conn->set_timestamp(td->conn, tscfg));
             last_ts = oldest_ts;
-            stable_timestamp = oldest_ts;
+            WT_PUBLISH(stable_timestamp, oldest_ts);
             if (!stable_set) {
                 stable_set = true;
                 printf("SET STABLE: %" PRIx64 " %" PRIu64 "\n", oldest_ts, oldest_ts);
@@ -585,6 +585,7 @@ thread_ckpt_run(void *arg)
     WT_SESSION *session;
     uint64_t ts;
     uint64_t sleep_time;
+    uint64_t stable_ts_copy;
     int i;
     char ckpt_flush_config[128], ckpt_config[128];
     bool created_ready, flush_tier, ready_for_kill;
@@ -636,6 +637,14 @@ thread_ckpt_run(void *arg)
         flush_tier = false;
         testutil_tiered_sleep(opts, session, sleep_time, &flush_tier);
 
+        /*
+         * Read the stable timestamp before performing a checkpoint. Before we say we're ready, we
+         * need to perform a checkpoint that's at (or past) the stop timestamp. However, the stable
+         * timestamp could increment during (or after) the checkpoint, so if we read it later, we
+         * could prematurely wrap this thread up.
+         */
+        WT_ORDERED_READ(stable_ts_copy, stable_timestamp);
+
         /* Set the configuration based on whether we're flushing. */
         testutil_check(session->checkpoint(session, flush_tier ? ckpt_flush_config : ckpt_config));
 
@@ -645,7 +654,7 @@ thread_ckpt_run(void *arg)
          * first checkpoint, or if tiered storage, after the first flush_tier has been initiated.
          */
         if (stop_timestamp != 0) {
-            if (stable_timestamp >= stop_timestamp)
+            if (stable_ts_copy >= stop_timestamp)
                 ready_for_kill = true;
         } else if (!opts->tiered_storage)
             ready_for_kill = true;
