@@ -134,6 +134,14 @@ export const $config = (function() {
         };
     })();
 
+    function teardown(db, collName, cluster) {
+        while ((assert.commandWorkedOrFailedWithCode(db.adminCommand({autoCompact: false}),
+                                                     ErrorCodes.ObjectIsBusy))
+                   .code == ErrorCodes.ObjectIsBusy) {
+            sleep(1);
+        }
+    }
+
     var transitions = {
         init: {collectionSetup: 1},
         collectionSetup: {removeDocuments: 1},
@@ -150,5 +158,6 @@ export const $config = (function() {
         states: states,
         transitions: transitions,
         data: data,
+        teardown: teardown
     };
 })();
