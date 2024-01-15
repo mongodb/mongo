@@ -248,19 +248,33 @@ SbVar::SbVar(const optimizer::ProjectionName& name) {
 
 SbExpr::SbExpr(const abt::HolderPtr& a) : _storage(abt::wrap(a->_value)) {}
 
-TypedExpression SbExpr::extractExpr(StageBuilderState& state) {
+TypedExpression SbExpr::extractExpr(StageBuilderState& state, const VariableTypes* slotInfo) {
     if (hasSlot()) {
         auto slotId = get<sbe::value::SlotId>(_storage);
-        return {sbe::makeE<sbe::EVariable>(slotId), TypeSignature::kAnyScalarType};
+        TypeSignature varType = TypeSignature::kAnyScalarType;
+        if (slotInfo) {
+            auto it = slotInfo->find(getABTVariableName(slotId));
+            if (it != slotInfo->end()) {
+                varType = it->second;
+            }
+        }
+        return {sbe::makeE<sbe::EVariable>(slotId), varType};
     }
 
     if (holds_alternative<LocalVarInfo>(_storage)) {
         auto [frameId, slotId] = get<LocalVarInfo>(_storage);
-        return {sbe::makeE<sbe::EVariable>(frameId, slotId), TypeSignature::kAnyScalarType};
+        TypeSignature varType = TypeSignature::kAnyScalarType;
+        if (slotInfo) {
+            auto it = slotInfo->find(getABTLocalVariableName(frameId, slotId));
+            if (it != slotInfo->end()) {
+                varType = it->second;
+            }
+        }
+        return {sbe::makeE<sbe::EVariable>(frameId, slotId), varType};
     }
 
     if (holds_alternative<abt::HolderPtr>(_storage)) {
-        return abtToExpr(get<abt::HolderPtr>(_storage)->_value, state);
+        return abtToExpr(get<abt::HolderPtr>(_storage)->_value, state, slotInfo);
     }
 
     if (holds_alternative<bool>(_storage)) {

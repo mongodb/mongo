@@ -481,6 +481,15 @@ PlanStageSlots PlanStageSlots::makeMergedPlanStageSlots(StageBuilderState& state
     return outputs;
 }
 
+TypeSignature PlanStageSlots::getSignatureForSlot(sbe::value::SlotId slotId) {
+    for (auto& entry : _data->slotNameToIdMap) {
+        if (entry.second.slotId == slotId) {
+            return entry.second.typeSignature;
+        }
+    }
+    return TypeSignature::kAnyScalarType;
+}
+
 std::vector<PlanStageSlots::OwnedSlotName> PlanStageSlots::getRequiredNamesInOrder(
     const PlanStageReqs& reqs) const {
     // Get the required names from 'reqs' and store them into 'names'.
@@ -3501,6 +3510,9 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
 
     childReqs.setFields(std::move(fields));
 
+    // Indicate we can work on block values, if we are not requested to produce a result object.
+    childReqs.setCanProcessBlockValues(!childReqs.hasResult());
+
     bool produceResultObj = reqResultObj;
 
     return std::make_unique<BuildProjectionPlan>(
@@ -3641,20 +3653,109 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         nodes = std::move(newNodes);
     }
 
-    StringMap<sbe::value::SlotId> updatedPathsSlotMap;
+    StringMap<TypedSlot> updatedPathsSlotMap;
     sbe::SlotExprPairVector projects;
 
+    if (hasBlockOutput(outputs)) {
+        // Process the expressions that can work on top of the block values.
+        auto projectExpressionToSlot = [&](const Expression* expr) -> boost::optional<TypedSlot> {
+            auto result =
+                generateExpression(_state, expr, outputs.getResultObjIfExists(), &outputs);
+
+            // The projection is just forwarding an existing slot.
+            if (result.hasSlot()) {
+                return TypedSlot{*result.getSlot(), outputs.getSignatureForSlot(*result.getSlot())};
+            }
+            auto blockResult = buildVectorizedExpr(std::move(result), outputs, false);
+
+            if (blockResult.has_value()) {
+                // The projection can work on top of block values because it's either made of
+                // supported block processing primitives, or it's the manipulation of a scalar slot.
+                auto newSlot = _state.slotId();
+                projects.emplace_back(newSlot, std::move(blockResult->expr));
+                return TypedSlot{newSlot, blockResult->typeSignature};
+            } else {
+                // Expression cannot be processed as a block.
+                return {};
+            }
+        };
+
+        // We evaluate all the MQL Expressions in advance here, and update the corresponding
+        // ProjectNodes in 'nodes' accordingly.
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            auto& node = nodes[i];
+            auto& path = paths[i];
+
+            if (!node.isExpr()) {
+                continue;
+            }
+
+            auto slot = projectExpressionToSlot(node.getExpr());
+            if (slot.has_value()) {
+                node = ProjectNode(SbExpr{slot->slotId});
+
+                auto it = plan->updatedPathsExprMap.find(path);
+
+                if (it != plan->updatedPathsExprMap.end()) {
+                    updatedPathsSlotMap.emplace(path, *slot);
+                    plan->updatedPathsExprMap.erase(it);
+                }
+            }
+        }
+
+        if (!plan->updatedPathsExprMap.empty()) {
+            for (auto&& path : plan->updatedPaths) {
+                auto it = plan->updatedPathsExprMap.find(path);
+
+                if (it != plan->updatedPathsExprMap.end()) {
+                    auto slot = projectExpressionToSlot(it->second);
+                    if (slot.has_value()) {
+                        updatedPathsSlotMap.emplace(path, *slot);
+                        plan->updatedPathsExprMap.erase(it);
+                    }
+                }
+            }
+        }
+
+        if (!projects.empty()) {
+            stage = sbe::makeS<sbe::ProjectStage>(
+                std::move(stage), std::move(projects), root->nodeId());
+        }
+
+        projects.clear();
+
+        // Terminate the block processing section of the pipeline if there are expressions that are
+        // not compatible with block processing, the parent stage doesn't support block values or if
+        // we need to build a scalar result document.
+        if (!plan->updatedPathsExprMap.empty() || !reqs.getCanProcessBlockValues() ||
+            planType != BuildProjectionPlan::kDoNotMakeResult) {
+            stage = buildBlockToRow(std::move(stage), outputs);
+
+            // Update the info stored in local maps to avoid restoring an out-of-date information
+            // later.
+            for (auto&& entry : updatedPathsSlotMap) {
+                if (TypeSignature::kBlockType.isSubset(entry.second.typeSignature) ||
+                    TypeSignature::kCellType.isSubset(entry.second.typeSignature)) {
+                    entry.second =
+                        outputs.get(std::make_pair(PlanStageSlots::kField, std::move(entry.first)));
+                }
+            }
+        }
+    }
+
     if (!plan->updatedPathsExprMap.empty()) {
+        VariableTypes varTypes = buildVariableTypes(outputs);
         auto projectExpressionToSlot = [&](const Expression* expr) {
             auto result =
                 generateExpression(_state, expr, outputs.getResultObjIfExists(), &outputs);
 
             if (result.hasSlot()) {
-                return *result.getSlot();
+                return TypedSlot{*result.getSlot(), outputs.getSignatureForSlot(*result.getSlot())};
             } else {
                 auto newSlot = _state.slotId();
-                projects.emplace_back(newSlot, result.extractExpr(_state).expr);
-                return newSlot;
+                auto typedExpr = result.extractExpr(_state, &varTypes);
+                projects.emplace_back(newSlot, std::move(typedExpr.expr));
+                return TypedSlot{newSlot, typedExpr.typeSignature};
             }
         };
 
@@ -3667,7 +3768,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             }
 
             auto slot = projectExpressionToSlot(node.getExpr());
-            node = ProjectNode(SbExpr{slot});
+            node = ProjectNode(SbExpr{slot.slotId});
 
             auto it = plan->updatedPathsExprMap.find(path);
 

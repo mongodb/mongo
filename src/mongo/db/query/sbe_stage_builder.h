@@ -500,6 +500,9 @@ public:
         changes = ProjectionEffects(FieldSet::makeOpenSet(drops), modifys, {}).compose(changes);
     }
 
+    // Return the type information associated with the requested slot.
+    TypeSignature getSignatureForSlot(sbe::value::SlotId slotId);
+
     // Returns a sorted list of all the names in this PlanStageSlots has that are required by
     // 'reqs', plus any additional names needed by 'reqs' that this PlanStageSlots does not satisfy.
     std::vector<OwnedSlotName> getRequiredNamesInOrder(const PlanStageReqs& reqs) const;

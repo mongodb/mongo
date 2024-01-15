@@ -284,9 +284,8 @@ std::tuple<sbe::value::SlotVector, SbStage, SbExpr> generateGroupBySingleKey(
     SbExprBuilder b(state);
     auto groupBySbExpr =
         b.makeFillEmptyNull(generateExpression(state, idExpr.get(), rootSlot, &outputs));
-    auto abtGroupBy = abt::unwrap(groupBySbExpr.extractABT());
     VariableTypes varTypes = buildVariableTypes(outputs);
-    auto groupByExpr = abtToExpr(abtGroupBy, state, &varTypes);
+    auto groupByExpr = groupBySbExpr.extractExpr(state, &varTypes);
 
     if (auto groupByExprConstant = groupByExpr.expr->as<sbe::EConstant>(); groupByExprConstant) {
         return {sbe::value::SlotVector{}, std::move(stage), std::move(groupByExpr.expr)};

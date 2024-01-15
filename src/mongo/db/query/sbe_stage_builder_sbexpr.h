@@ -309,9 +309,10 @@ public:
 
     /**
      * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
-     * stored as an ABT node, it is lowered into an SBE expression.
+     * stored as an ABT node, it is lowered into an SBE expression, using the provided type
+     * information for the referenced variables.
      */
-    TypedExpression extractExpr(StageBuilderState& state);
+    TypedExpression extractExpr(StageBuilderState& state, const VariableTypes* slotInfo = nullptr);
 
     /**
      * Extract the expression on top of the stack as an ABT node. Throws an exception if the
