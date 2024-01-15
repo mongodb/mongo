@@ -171,6 +171,8 @@ all:
   ticket: SERVER-82883
 - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
   ticket: SERVER-77506
+- test_file: jstests/change_streams/dbcheck_oplog_entry.js
+  ticket: SERVER-85156
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null

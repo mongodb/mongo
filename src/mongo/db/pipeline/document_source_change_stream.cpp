@@ -295,7 +295,9 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
     BSONObj opNsMatch = BSON("ns" << BSONRegEx(getNsRegexForChangeStream(nss)));
 
     // 2.1) Normal CRUD ops.
-    auto normalOpTypeMatch = BSON("op" << NE << "n");
+    auto normalOpTypeMatch = BSON("op" << BSON("$in" << BSON_ARRAY("i"
+                                                                   << "u"
+                                                                   << "d")));
 
     // TODO SERVER-44039: we continue to generate 'kNewShardDetected' events for compatibility
     // with 4.2, even though we no longer rely on them to detect new shards. We may wish to remove
