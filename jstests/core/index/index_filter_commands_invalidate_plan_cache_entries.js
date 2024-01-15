@@ -57,7 +57,9 @@ assert(existsInPlanCache({a: 1, b: 1}, {}, {}, coll));
 assert.eq(1, coll.find({a: 1, b: 1}).sort({a: 1}).itcount());
 assert(existsInPlanCache({a: 1, b: 1}, {a: 1}, {}, coll));
 
-assert.eq(coll.aggregate([{$planCacheStats: {}}]).toArray().length, 3);
+// We check that the plan cache contains at least 3 entries because we can't control how many extra
+// plans are created to perform the queries being run in parallel by other concurrent tasks.
+assert.gte(coll.aggregate([{$planCacheStats: {}}]).toArray().length, 3);
 
 // This query has same index filter key as the first query "{a: 1}" w/o skip. So when an index
 // filter is set/cleared on query {a: 1}, the plan cache entry created for this query should also be
@@ -66,18 +68,18 @@ assert.eq(0, coll.find({a: 1}).skip(1).itcount());
 
 // SBE plan cache key encodes "skip", so there's one more plan cache entry in SBE plan cache. While
 // in classic plan cache, queries with only difference in "skip" share the same plan cache entry.
-assert.eq(coll.aggregate([{$planCacheStats: {}}]).itcount(), 3 + isSbeEnabled);
+assert.gte(coll.aggregate([{$planCacheStats: {}}]).itcount(), 3 + isSbeEnabled);
 
 assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}));
-assert.eq(coll.aggregate([{$planCacheStats: {}}]).toArray().length, 2 + isSbeEnabled);
+assert(!existsInPlanCache({a: 1, b: 1}, {}, {}, coll));
 
 // This planCacheSetFilter command will invalidate plan cache entries with filter {a: 1}. There are
 // two entries in the SBE plan cache that got invalidated, or one entry in the classic plan cache
 // that got invalidated.
 assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {a: 1}, indexes: [{a: 1}]}));
-assert.eq(coll.aggregate([{$planCacheStats: {}}]).toArray().length, 1);
+assert(!existsInPlanCache({a: 1}, {}, {}, coll));
 
 // Test that plan cache entries with same query shape but in a different collection won't be cleared
 // when an index filter with the same query shape is set/cleared.
