@@ -21,16 +21,22 @@ Random.setRandomSeed();
 const pass = "a" + Random.rand();
 
 // Create one root user and one regular user on the given connection.
-function createUsers(conn) {
+function createUsers(conn, grantDirectShardOperationsRole) {
     const adminDB = conn.getDB("admin");
+
     adminDB.createUser({user: "ted", pwd: pass, roles: ["root"]});
     assert(adminDB.auth("ted", pass), "Authentication 1 Failed");
-    adminDB.createUser({user: "yuta", pwd: pass, roles: ["readWriteAnyDatabase"]});
+
+    let yutaRoles = ["readWriteAnyDatabase"];
+    if (grantDirectShardOperationsRole)
+        yutaRoles.push("directShardOperations");
+
+    adminDB.createUser({user: "yuta", pwd: pass, roles: yutaRoles});
 }
 
 // Create the necessary users at both cluster and shard-local level.
-createUsers(shardConn);
-createUsers(mongosConn);
+createUsers(shardConn, /* grantDirectShardOperationsRole */ true);
+createUsers(mongosConn, /* grantDirectShardOperationsRole */ false);
 
 // Run the various auth tests on the given shard or mongoS connection.
 function runCursorTests(conn) {
