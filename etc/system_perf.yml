@@ -3161,8 +3161,8 @@ buildvariants:
       infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: initialsync-logkeeper
       workload_setup: 2022-11
-      # EBS logkeeper snapshot with FCV set to 7.2
-      snapshotId: snap-042ca2a003313ebc2
+      # EBS logkeeper snapshot with FCV set to 7.3
+      snapshotId: snap-0651d6a7d0adfe68b
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -3189,7 +3189,7 @@ buildvariants:
   #     infrastructure_provisioning_release: 2022-11
   #     infrastructure_provisioning: initialsync-logkeeper-snapshot-update
   #     # Update this to latest snapshot after each LTS release.
-  #     snapshotId: snap-042ca2a003313ebc2
+  #     snapshotId: snap-0651d6a7d0adfe68b
   #     platform: linux
   #     authentication: disabled
   #     storageEngine: wiredTiger
