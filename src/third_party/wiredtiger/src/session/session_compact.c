@@ -311,8 +311,6 @@ __compact_worker(WT_SESSION_IMPL *session)
      * clearly more than we need); quit if we make no progress.
      */
     for (loop = 0; loop < 100; ++loop) {
-        WT_STAT_CONN_SET(session, session_table_compact_passes, loop);
-
         /* Step through the list of files being compacted. */
         for (another_pass = false, i = 0; i < session->op_handle_next; ++i) {
             /* Skip objects where there's no more work. */
@@ -377,7 +375,6 @@ __compact_worker(WT_SESSION_IMPL *session)
 
 err:
     session->compact_state = WT_COMPACT_NONE;
-    WT_STAT_CONN_SET(session, session_table_compact_passes, 0);
 
     return (ret);
 }

@@ -173,26 +173,23 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_REF_LOCK(session, ref, &previous_state);
 
     /*
-     * Don't bother rewriting deleted pages but also don't skip. The on-disk block is discarded by
-     * the next checkpoint.
+     * Skip deleted pages but consider them progress (the on-disk block is discarded by the next
+     * checkpoint).
      */
-    if (previous_state == WT_REF_DELETED && ref->page_del == NULL)
+    if (previous_state == WT_REF_DELETED)
         *skipp = false;
 
     /*
-     * If it's on disk, get a copy of the address and ask the block manager to rewrite the block if
+     * If it's on-disk, get a copy of the address and ask the block manager to rewrite the block if
      * it's useful. This is safe because we're holding the WT_REF locked, so nobody can read the
-     * page giving eviction a chance to modify the address. Note that a deleted ref that is not
-     * globally visible is still on disk.
+     * page giving eviction a chance to modify the address.
      *
      * In this path, we are holding the WT_REF lock across two OS buffer cache I/Os (the read of the
      * original block and the write of the new block), plus whatever overhead that entails. It's not
      * ideal, we could release the lock, but then we'd have to deal with the block having been read
      * into memory while we were moving it.
      */
-    if ((previous_state == WT_REF_DISK ||
-          (previous_state == WT_REF_DELETED && ref->page_del != NULL)) &&
-      __wt_ref_addr_copy(session, ref, &copy)) {
+    if (previous_state == WT_REF_DISK && __wt_ref_addr_copy(session, ref, &copy)) {
         bm = S2BT(session)->bm;
         addr_size = copy.size;
         WT_ERR(bm->compact_page_rewrite(bm, session, copy.addr, &addr_size, skipp));
