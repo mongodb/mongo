@@ -481,8 +481,7 @@ void broadcastDropCollection(OperationContext* opCtx,
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     // Remove primary shard from participants
-    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
-                       participants.end());
+    std::erase(participants, primaryShardId);
 
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
         opCtx,
@@ -1518,8 +1517,7 @@ void CreateCollectionCoordinator::_exitCriticalSectionsOnParticipants(
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     auto participants = *_doc.getShardIds();
-    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
-                       participants.end());
+    std::erase(participants, primaryShardId);
 
     async_rpc::GenericArgs args;
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
@@ -1732,8 +1730,7 @@ void CreateCollectionCoordinator::_enterCriticalSection(
 
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
     auto participants = *_doc.getShardIds();
-    participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
-                       participants.end());
+    std::erase(participants, primaryShardId);
 
     async_rpc::GenericArgs args;
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
@@ -1755,8 +1752,6 @@ void CreateCollectionCoordinator::_createCollectionOnParticipants(
 
     if (!_firstExecution) {
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
-
-        broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
 
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
     }
@@ -1856,6 +1851,40 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
         _performNoopRetryableWriteOnAllShardsAndConfigsvr(opCtx, getNewSession(opCtx), **executor);
 
         _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
+
+        // Get the shards committed to the sharding catalog.
+        auto cri = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss()));
+        const auto& cm = cri.cm;
+        std::set<ShardId> involvedShardIds;
+        cm.getAllShardIds(&involvedShardIds);
+
+        // If there are less shards involved in the operation than the ones persisted in the
+        // document, implies that the collection has been created in some shards that are not owning
+        // chunks.
+        auto allShardIds = *_doc.getShardIds();
+        std::vector<ShardId> nonInvolvedShardIds;
+        std::set_difference(allShardIds.cbegin(),
+                            allShardIds.cend(),
+                            involvedShardIds.cbegin(),
+                            involvedShardIds.cend(),
+                            std::back_inserter(nonInvolvedShardIds));
+
+        // Remove the primary shard from the list. It must always have the collection regardless if
+        // it owns chunks.
+        const auto primaryShardId = ShardingState::get(opCtx)->shardId();
+        std::erase(nonInvolvedShardIds, primaryShardId);
+
+        if (!nonInvolvedShardIds.empty()) {
+            sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
+                opCtx,
+                nss(),
+                nonInvolvedShardIds,
+                **executor,
+                getNewSession(opCtx),
+                true /* fromMigrate */,
+                false /* dropSystemCollections */);
+        }
     }
 
     // Ensure that the change stream event gets emitted at least once.
@@ -1917,6 +1946,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
                                                     _request,
                                                     *_doc.getTranslatedRequestParams(),
                                                     CommitPhase::kAborted);
+            }
+
+            if (_doc.getPhase() >= Phase::kCreateCollectionOnParticipants) {
+                broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
             }
 
             if (_doc.getPhase() >= Phase::kEnterCriticalSection) {
