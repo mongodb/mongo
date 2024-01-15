@@ -769,7 +769,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     }
     /*
      * If reconciliation is disabled for this thread (e.g., during an eviction that writes to the
-     * history store), give up.
+     * history store or reading a checkpoint), give up.
      */
     if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
         return (__wt_set_return(session, EBUSY));
