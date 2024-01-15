@@ -1994,6 +1994,9 @@ static const char *const __stats_connection_desc[] = {
   "transaction: set timestamp calls",
   "transaction: set timestamp durable calls",
   "transaction: set timestamp durable updates",
+  "transaction: set timestamp force calls",
+  "transaction: set timestamp global oldest timestamp set to be more recent than the global stable "
+  "timestamp",
   "transaction: set timestamp oldest calls",
   "transaction: set timestamp oldest updates",
   "transaction: set timestamp stable calls",
@@ -2699,6 +2702,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_set_ts = 0;
     stats->txn_set_ts_durable = 0;
     stats->txn_set_ts_durable_upd = 0;
+    stats->txn_set_ts_force = 0;
+    stats->txn_set_ts_out_of_order = 0;
     stats->txn_set_ts_oldest = 0;
     stats->txn_set_ts_oldest_upd = 0;
     stats->txn_set_ts_stable = 0;
@@ -3461,6 +3466,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_set_ts += WT_STAT_READ(from, txn_set_ts);
     to->txn_set_ts_durable += WT_STAT_READ(from, txn_set_ts_durable);
     to->txn_set_ts_durable_upd += WT_STAT_READ(from, txn_set_ts_durable_upd);
+    to->txn_set_ts_force += WT_STAT_READ(from, txn_set_ts_force);
+    to->txn_set_ts_out_of_order += WT_STAT_READ(from, txn_set_ts_out_of_order);
     to->txn_set_ts_oldest += WT_STAT_READ(from, txn_set_ts_oldest);
     to->txn_set_ts_oldest_upd += WT_STAT_READ(from, txn_set_ts_oldest_upd);
     to->txn_set_ts_stable += WT_STAT_READ(from, txn_set_ts_stable);

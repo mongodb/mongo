@@ -359,8 +359,10 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
     force = cval.val != 0;
 
-    if (force)
+    if (force) {
+        WT_STAT_CONN_INCR(session, txn_set_ts_force);
         goto set;
+    }
 
     __wt_readlock(session, &txn_global->rwlock);
 
@@ -384,9 +386,7 @@ __wt_txn_global_set_timestamp(WT_SESSION_IMPL *session, const char *cfg[])
     if (!has_stable && txn_global->has_stable_timestamp)
         stable_ts = last_stable_ts;
 
-    /*
-     * The oldest and stable timestamps must always satisfy the condition that oldest <= stable.
-     */
+    /* The oldest and stable timestamps must always satisfy the condition that oldest <= stable. */
     if ((has_oldest || has_stable) && (has_oldest || txn_global->has_oldest_timestamp) &&
       (has_stable || txn_global->has_stable_timestamp) && oldest_ts > stable_ts) {
         __wt_readunlock(session, &txn_global->rwlock);
@@ -436,6 +436,20 @@ set:
         txn_global->stable_is_pinned = false;
         __wt_verbose_timestamp(session, stable_ts, "Updated global stable timestamp");
     }
+
+    /*
+     * Even if the timestamps have been forcibly set, they must always satisfy the condition that
+     * oldest <= stable. Don't fail as MongoDB violates this rule in very specific scenarios.
+     */
+    if (txn_global->has_stable_timestamp && txn_global->has_oldest_timestamp &&
+      txn_global->oldest_timestamp > txn_global->stable_timestamp) {
+        WT_STAT_CONN_INCR(session, txn_set_ts_out_of_order);
+        __wt_verbose_debug1(session, WT_VERB_TIMESTAMP,
+          "set_timestamp: oldest timestamp %s must not be later than stable timestamp %s",
+          __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
+          __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string[1]));
+    }
+
     __wt_writeunlock(session, &txn_global->rwlock);
 
     if (has_oldest || has_stable)

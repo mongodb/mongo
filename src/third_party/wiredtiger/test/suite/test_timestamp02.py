@@ -33,6 +33,7 @@
 import random
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
+from wiredtiger import stat
 from wtscenario import make_scenarios
 
 class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
@@ -45,6 +46,12 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         ('lsm', dict(extra_config=',type=lsm')),
         ('row', dict(extra_config='')),
     ])
+
+    def get_stat(self, stat_name):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        value = stat_cursor[stat_name][2]
+        stat_cursor.close()
+        return value
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -89,6 +96,8 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Bump the oldest timestamp, we're not going back...
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(100))
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_oldest), 1)
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_oldest_upd), 1)
 
         # Update them and retry.
         random.shuffle(keys)
@@ -104,9 +113,13 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.set_timestamp('durable_timestamp=' + self.timestamp_str(150))
         self.assertTimestampsEqual(self.conn.query_timestamp(), self.timestamp_str(150))
         self.conn.set_timestamp('durable_timestamp=' + self.timestamp_str(200))
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_durable), 2)
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_durable_upd), 2)
 
         # Now the stable timestamp before we read.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(200))
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_stable), 1)
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_stable_upd), 1)
 
         for i, t in enumerate(orig_keys):
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 100),
@@ -114,6 +127,8 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Bump the oldest timestamp, we're not going back...
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(200))
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_oldest), 2)
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_oldest_upd), 2)
 
         # Remove them and retry
         random.shuffle(keys)
@@ -124,6 +139,8 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
 
         # We have to continue to advance the stable timestamp before reading.
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(300))
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_stable), 2)
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_stable_upd), 2)
         for i, t in enumerate(orig_keys):
             self.check(self.session, 'read_timestamp=' + self.timestamp_str(t + 200),
                 dict((k, 2) for k in orig_keys[i+1:]))
@@ -131,7 +148,7 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         # Perform validation on setting the oldest and the stable timestamps:
         # - It is a success, but a no-op, to set them behind their existing values.
         # - Oldest timestamp can't be more than the stable. It is reported as an error if an attempt
-        #   is made to set that way.
+        #   is made to set that way. If forcibly set in the wrong order, a stat should indicate it.
         # - If both the oldest and the stable are provided in the same call, the test to check if
         #   they are being moved backwards is done first. The value that is being set backwards is
         #   silently dropped, as if not provided at all. This is followed by the test on the oldest
@@ -197,6 +214,12 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
             self.conn.query_timestamp("get=oldest_timestamp"), self.timestamp_str(302))
         self.assertTimestampsEqual(\
             self.conn.query_timestamp("get=stable_timestamp"), self.timestamp_str(302))
+
+        # Forcibly set the oldest timestamp greater than the stable timestamp.
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_force), 0)
+        self.conn.set_timestamp('force,oldest_timestamp=' + self.timestamp_str(303))
+        # Verify the ooo ts has been detected.
+        self.assertEqual(self.get_stat(stat.conn.txn_set_ts_force), 1)
 
     def test_read_your_writes(self):
         self.session.create(self.uri,
