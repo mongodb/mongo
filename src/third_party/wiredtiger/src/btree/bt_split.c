@@ -424,10 +424,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
      * deepen-per-child configuration might get it wrong.
      */
     children = pindex->entries / btree->split_deepen_per_child;
-    if (children < 10) {
-        if (pindex->entries < 100)
+    if (children < WT_SPLIT_DEEPEN_MIN_CREATE_CHILD_PAGES) {
+        if (pindex->entries < WT_INTERNAL_SPLIT_MIN_KEYS)
             return (__wt_set_return(session, EBUSY));
-        children = 10;
+        children = WT_SPLIT_DEEPEN_MIN_CREATE_CHILD_PAGES;
     }
     chunk = pindex->entries / children;
     remain = pindex->entries - chunk * (children - 1);
@@ -931,10 +931,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
      * deepen-per-child configuration might get it wrong.
      */
     children = pindex->entries / btree->split_deepen_per_child;
-    if (children < 10) {
-        if (pindex->entries < 100)
+    if (children < WT_SPLIT_DEEPEN_MIN_CREATE_CHILD_PAGES) {
+        if (pindex->entries < WT_INTERNAL_SPLIT_MIN_KEYS)
             return (__wt_set_return(session, EBUSY));
-        children = 10;
+        children = WT_SPLIT_DEEPEN_MIN_CREATE_CHILD_PAGES;
     }
     chunk = pindex->entries / children;
     remain = pindex->entries - chunk * (children - 1);
@@ -1248,7 +1248,7 @@ __split_internal_should_split(WT_SESSION_IMPL *session, WT_REF *ref)
     pindex = WT_INTL_INDEX_GET_SAFE(page);
 
     /* Sanity check for a reasonable number of on-page keys. */
-    if (pindex->entries < 100)
+    if (pindex->entries < WT_INTERNAL_SPLIT_MIN_KEYS)
         return (false);
 
     /*

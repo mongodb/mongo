@@ -498,6 +498,8 @@ WT_PACKED_STRUCT_END
  *	The page index held by each internal page.
  */
 struct __wt_page_index {
+#define WT_SPLIT_DEEPEN_MIN_CREATE_CHILD_PAGES 10
+#define WT_INTERNAL_SPLIT_MIN_KEYS 100
     uint32_t entries;
     wt_shared uint32_t deleted_entries;
     WT_REF **index;
