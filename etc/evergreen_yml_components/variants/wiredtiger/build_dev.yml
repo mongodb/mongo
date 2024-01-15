@@ -3,7 +3,7 @@
 variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/build_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
@@ -18,7 +18,7 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/build_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_expansions  # The most commonly used compile expansions.

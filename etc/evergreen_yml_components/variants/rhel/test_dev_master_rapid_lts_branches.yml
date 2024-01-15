@@ -1,11 +1,37 @@
-# RHEL build variants for testing the classic engine.
+# RHEL build variants for testing development environments that should run on master, rapid release (7.1, 7.2 etc.) and LTS release (7.0, 6.0 etc.) branch projects
 
 variables:
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &linux-x86-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
+  run_on:
+  - rhel80-xlarge
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
+  modules:
+    - enterprise
+  stepback: false
+
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &linux-x86-dynamic-compile-expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  compile_flags: >-
+    --ssl
+    MONGO_DISTMOD=rhel80
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    --link-model=dynamic
+
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
@@ -20,10 +46,9 @@ variables:
     variant: linux-x86-dynamic-compile
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -35,10 +60,9 @@ variables:
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
@@ -55,7 +79,7 @@ variables:
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_debug_aubsan_compile_variant_dependency
   depends_on:
@@ -75,7 +99,7 @@ variables:
 # - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - aubsan_options: &aubsan_options >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -84,7 +108,7 @@ variables:
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &aubsan-lite-required-expansions
   compile_variant: *linux_debug_aubsan_compile_variant_name
@@ -101,6 +125,193 @@ variables:
 
 
 buildvariants:
+- <<: *linux-x86-dynamic-compile-params
+  name: &linux-x86-dynamic-compile linux-x86-dynamic-compile
+  display_name: "* Linux x86 Shared Library"
+  expansions:
+    <<: *linux-x86-dynamic-compile-expansions
+    compile_variant: *linux-x86-dynamic-compile
+  tasks:
+    - name: compile_ninja_quick_TG
+    - name: compile_test_parallel_unittest_stream_TG
+    - name: compile_test_parallel_core_stream_TG
+    - name: compile_test_parallel_dbtest_stream_TG
+    - name: compile_integration_and_test_parallel_stream_TG
+    - name: generate_buildid_to_debug_symbols_mapping
+    - name: run_pretty_printer_tests
+    - name: server_discovery_and_monitoring_json_test_TG
+      distros:
+      - rhel80-large
+    - name: server_selection_json_test_TG
+      distros:
+      - rhel80-large
+
+- &enterprise-rhel-80-64-bit-dynamic-template
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
+  display_name: "* Shared Library Enterprise RHEL 8.0"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions:
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: *linux_x86_dynamic_compile_variant_name
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  tasks:
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
+  - name: aggregation_repeat_queries
+  - name: analyze_shard_key_jscore_passthrough_gen
+  - name: audit
+  - name: .auth
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .change_stream_fuzzer
+  - name: .misc_js
+  - name: .concurrency !.large !.no_txns
+  - name: .concurrency .large !.no_txns
+    distros:
+    - rhel80-medium
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
+    distros:
+    - rhel80-medium
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+  - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
+  - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: .jscore .common !jsCore
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: libunwind_tests
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: .query_fuzzer !.feature_flag_guarded
+  - name: .random_multiversion_ds
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-medium
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_pinned_connections_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: sharding_api_strict_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: .updatefuzzer
+  - name: secondary_reads_passthrough_gen
+  - name: .serverless
+    distros:
+    - rhel80-xlarge
+  - name: vector_search
+  - name: vector_search_auth
+  - name: vector_search_ssl
+
+# TODO (SERVER-75884): Remove this variant once we switch to config shard as the default.
+# This build variant is used to test suites that use sharded cluster fixture with config shard mode.
+- &enterprise-rhel-80-64-bit-dynamic-config-shard
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: enterprise-rhel-80-64-bit-dynamic-config-shard
+  display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  stepback: false
+  expansions: &enterprise-rhel-80-64-bit-dynamic-config-shard-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+    test_flags: >-
+      --configShard=any
+      --excludeWithAnyTags=config_shard_incompatible
+  tasks:
+  - name: aggregation_mongos_passthrough
+  - name: aggregation_one_shard_sharded_collections
+  - name: aggregation_sharded_collections_causally_consistent_passthrough
+  - name: aggregation_sharded_collections_passthrough
+  - name: causally_consistent_hedged_reads_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: causally_consistent_jscore_passthrough_gen
+  - name: change_streams
+  - name: change_streams_mongos_sessions_passthrough
+  - name: change_streams_multi_stmt_txn_mongos_passthrough
+  - name: change_streams_multi_stmt_txn_sharded_collections_passthrough
+  - name: change_streams_per_shard_cursor_passthrough
+  - name: fle2_sharding_high_cardinality
+  - name: fle2_sharding
+  - name: jstestfuzz_sharded_causal_consistency_gen
+  - name: jstestfuzz_sharded_continuous_stepdown_gen
+  - name: jstestfuzz_sharded_gen
+  - name: jstestfuzz_sharded_session_gen
+  - name: sharded_causally_consistent_jscore_passthrough_gen
+  - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
+  - name: sharding_auth_gen
+  # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
+  # variant will be removed when config shards become the default, so this is only temporary.
+  - name: sharding_multiversion_gen
+  - name: .sharding .txns
+  # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
+  - name: .sharding .common !.csrs
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .concurrency .sharded !.large
+  - name: .concurrency .sharded .large
+    distros:
+    - rhel80-medium
+  - name: .multi_shard
+
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine

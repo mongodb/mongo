@@ -3,7 +3,7 @@
 variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/build_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
@@ -18,7 +18,7 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/build_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
 # - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_expansions  # The most commonly used compile expansions.
@@ -47,7 +47,7 @@ variables:
 # - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - aubsan_options: &aubsan_options >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"

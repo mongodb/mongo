@@ -2,10 +2,9 @@
 
 variables:
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
@@ -33,7 +32,7 @@ variables:
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_debug_aubsan_compile_variant_dependency
   depends_on:
@@ -48,10 +47,9 @@ variables:
     variant: linux-debug-aubsan-compile-required
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -63,10 +61,9 @@ variables:
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
@@ -87,7 +84,7 @@ variables:
 # - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - aubsan_options: &aubsan_options >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -104,7 +101,7 @@ variables:
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &aubsan-lite-required-expansions
   compile_variant: *linux_debug_aubsan_compile_variant_name

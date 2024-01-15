@@ -1,4 +1,4 @@
-# RHEL InMemory build variants that need to be run on LTS but not Rapid releases
+# RHEL build variants for testing development environments that should run only on master and LTS release (7.0, 6.0 etc.) branch projects
 
 buildvariants:
 - name: enterprise-rhel-80-64-bit-inmem

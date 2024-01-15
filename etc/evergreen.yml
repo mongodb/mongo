@@ -79,11 +79,9 @@ include:
 - filename: etc/evergreen_yml_components/variants/macos/build_dev.yml
 - filename: etc/evergreen_yml_components/variants/macos/test_dev.yml
 
-- filename: etc/evergreen_yml_components/variants/rhel/build_dev.yml
-- filename: etc/evergreen_yml_components/variants/rhel/test_dev.yml
-- filename: etc/evergreen_yml_components/variants/rhel/test_in_memory.yml
-- filename: etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
-- filename: etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
+- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_lts_branches.yml
+- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 
 - filename: etc/evergreen_yml_components/variants/ubuntu/build_dev.yml
 - filename: etc/evergreen_yml_components/variants/ubuntu/test_dev.yml

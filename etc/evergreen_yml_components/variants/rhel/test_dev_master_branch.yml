@@ -1,11 +1,62 @@
-# RHEL build variants for testing development environments
+# RHEL build variants for testing development environments that should run only on master branch projects
 
 variables:
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &linux-x86-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
+  run_on:
+  - rhel80-xlarge
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
+  modules:
+    - enterprise
+  stepback: false
+
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &linux-x86-dynamic-compile-expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  compile_flags: >-
+    --ssl
+    MONGO_DISTMOD=rhel80
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    --link-model=dynamic
+
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
+  run_on:
+  - rhel80-xlarge
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
+  tasks:
+  - name: compile_test_parallel_core_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
+  - name: generate_buildid_to_debug_symbols_mapping
+
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &generic_linux_compile_expansions  # The most commonly used compile expansions.
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
@@ -20,10 +71,9 @@ variables:
     variant: linux-x86-dynamic-compile
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -35,10 +85,9 @@ variables:
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_config_shard.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_classic_engine.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
@@ -130,6 +179,87 @@ variables:
 
 
 buildvariants:
+- <<: *generic_linux_compile_params
+  name: &linux-x86-dynamic-compile-future-tag-multiversion linux-x86-dynamic-compile-future-tag-multiversion
+  display_name: "Linux x86 Shared Library Compile (future git tag multiversion)"
+  modules:
+  - enterprise
+  expansions:
+    <<: *linux-x86-dynamic-compile-expansions
+    bv_future_git_tag: r100.0.0-9999
+    compile_variant: *linux-x86-dynamic-compile-future-tag-multiversion
+  tasks:
+  - name: version_expansions_future_git_tag_multiversion_gen
+  - name: compile_test_serial_future_git_tag_multiversion_TG
+
+- <<: *linux-x86-dynamic-compile-params
+  name: &linux-stitch-compile-suggested linux-stitch-compile-suggested
+  display_name: "* Linux x86 Stitch Enterprise Compile"
+  expansions:
+    <<: *linux-x86-dynamic-compile-expansions
+    compile_variant: *linux-stitch-compile-suggested
+  tasks:
+    - name: .stitch
+
+- <<: *linux-x86-dynamic-compile-params
+  name: &linux-crypt-compile linux-crypt-compile
+  display_name: "* Linux x86 Crypt Enterprise Compile"
+  expansions:
+    <<: *linux-x86-dynamic-compile-expansions
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    compile_variant: *linux-crypt-compile
+  tasks:
+    - name: .crypt
+    - name: crypt_build_debug_and_test
+
+- <<: *generic_linux_compile_params
+  name: &linux-x86-dynamic-grpc-suggested linux-x86-dynamic-grpc-suggested
+  display_name: "* Linux x86 Shared Library with GRPC"
+  modules:
+    - enterprise
+  stepback: false
+  expansions:
+    <<: *generic_linux_compile_expansions
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --link-model=dynamic
+      ENABLE_GRPC_BUILD=1
+    compile_variant: *linux-x86-dynamic-grpc-suggested
+    clang_tidy_toolchain: v4
+    large_distro_name: rhel80-xlarge
+    test_flags: >-
+      --additionalFeatureFlags "featureFlagGRPC"
+      --excludeWithAnyTags=requires_external_data_source,requires_mongobridge
+      --tlsMode preferTLS
+      --tlsCAFile jstests/libs/ca.pem
+      --shellTls
+      --shellTlsCertificateKeyFile jstests/libs/client.pem
+      --mongosTlsCertificateKeyFile jstests/libs/server.pem
+      --mongodTlsCertificateKeyFile jstests/libs/server.pem
+  tasks:
+    - name: compile_ninja_quick_TG
+    - name: compile_test_parallel_unittest_stream_TG
+    - name: compile_test_parallel_core_stream_TG
+    - name: compile_test_parallel_dbtest_stream_TG
+    - name: generate_buildid_to_debug_symbols_mapping
+    # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
+    # and processes to be used with TLS on a single host.
+    - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen
+    - name: noPassthrough_gen
+    - name: .lint
+    - name: libdeps_graph_linting_TG
+      distros:
+      - rhel80-large
+    - name: clang_tidy_TG
+      distros:
+      - rhel80-xxlarge
+
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   <<: *linux_x86_dynamic_compile_variant_dependency
   name: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags enterprise-rhel-80-64-bit-dynamic-all-feature-flags
@@ -286,120 +416,6 @@ buildvariants:
   - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
   - name: query_stats_passthrough
-
-- &enterprise-rhel-80-64-bit-dynamic-template
-  <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel-80-64-bit-dynamic enterprise-rhel-80-64-bit-dynamic
-  display_name: "* Shared Library Enterprise RHEL 8.0"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-small
-  expansions:
-    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
-  depends_on:
-  - name: archive_dist_test_debug
-    variant: *linux_x86_dynamic_compile_variant_name
-  - name: version_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  tasks:
-  - name: .aggfuzzer !.feature_flag_guarded
-  - name: .aggregation !.feature_flag_guarded
-  - name: aggregation_repeat_queries
-  - name: analyze_shard_key_jscore_passthrough_gen
-  - name: audit
-  - name: .auth
-  - name: unittest_shell_hang_analyzer_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams
-  - name: .change_stream_fuzzer
-  - name: .misc_js
-  - name: .concurrency !.large !.no_txns
-  - name: .concurrency .large !.no_txns
-    distros:
-    - rhel80-medium
-  - name: .config_fuzzer !.large
-  - name: .config_fuzzer .large
-    distros:
-    - rhel80-medium
-  - name: disk_wiredtiger
-  - name: .encrypt
-  - name: idl_tests
-  - name: initial_sync_fuzzer_gen
-  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
-  - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
-  - name: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough_gen
-  - name: jsCore
-    distros:
-    - rhel80-xlarge
-  - name: .jscore .common !jsCore
-  - name: jsCore_min_batch_repeat_queries_ese_gsm
-  - name: jsCore_txns_large_txns_format
-  - name: json_schema
-  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
-  - name: libunwind_tests
-  - name: .multi_shard
-  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: multiversion_gen
-  - name: .query_fuzzer !.feature_flag_guarded
-  - name: .random_multiversion_ds
-  - name: .read_write_concern .large
-    distros:
-    - rhel80-medium
-  - name: .read_write_concern !.large
-  - name: .replica_sets !.encrypt !.auth
-    distros:
-    - rhel80-xlarge
-  - name: replica_sets_api_version_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_pinned_connections_auth
-  - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: sharding_api_version_jscore_passthrough_gen
-  - name: sharding_api_strict_passthrough_gen
-  - name: .sharding .txns
-  - name: .sharding .common
-  - name: .updatefuzzer
-  - name: secondary_reads_passthrough_gen
-  - name: .serverless
-    distros:
-    - rhel80-xlarge
-  - name: vector_search
-  - name: vector_search_auth
-  - name: vector_search_ssl
 
 - name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
