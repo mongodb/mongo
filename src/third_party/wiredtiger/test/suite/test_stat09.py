@@ -63,7 +63,7 @@ class test_stat09(wttest.WiredTigerTestCase):
             if desc == lookfor:
                 found = True
                 foundval = val
-                self.printVerbose(2, '  stat: \'' + desc + '\', \'' +
+                self.printVerbose(3, '  stat: \'' + desc + '\', \'' +
                     valstr + '\', ' + str(val))
                 break
 

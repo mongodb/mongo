@@ -213,7 +213,7 @@ class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertTrue(gotval, wantval)
             correct += 1
         self.assertTrue(correct > 0)
-        self.printVerbose(2, 'after salvaging, file has ' + str(correct) + '/' +
+        self.printVerbose(3, 'after salvaging, file has ' + str(correct) + '/' +
                           str(self.nentries) + ' entries')
         cursor.close()
 
