@@ -230,6 +230,7 @@ env.Library(
         'namespace_string_util.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/security_token',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
     ],

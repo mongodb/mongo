@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/auth/validated_tenancy_scope_factory.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/client.h"
 #include "mongo/db/write_block_bypass.h"
@@ -101,7 +102,8 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope = boost::none;
     const auto originalToken = getValidatedTenancyScopeToken();
     if (originalToken != boost::none && !originalToken->empty()) {
-        validatedTenancyScope = auth::ValidatedTenancyScope(client, *originalToken);
+        validatedTenancyScope =
+            auth::ValidatedTenancyScopeFactory::parse(client, {}, *originalToken);
     }
     auth::ValidatedTenancyScope::set(opCtx, validatedTenancyScope);
 }

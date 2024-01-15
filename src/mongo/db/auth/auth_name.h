@@ -49,7 +49,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/tenant_id.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -122,8 +121,7 @@ public:
     }
 
     DatabaseName getDatabaseName() const {
-        return DatabaseNameUtil::deserialize(
-            _tenant, _db, SerializationContext::stateAuthPrevalidated());
+        return DatabaseName(std::move(_tenant), _db);
     }
 
     /**

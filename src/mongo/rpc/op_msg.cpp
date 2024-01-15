@@ -256,7 +256,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 #endif
     if (gMultitenancySupport) {
         msg.validatedTenancyScope =
-            auth::ValidatedTenancyScope::create(client, msg.body, securityToken);
+            auth::ValidatedTenancyScopeFactory::parse(client, msg.body, securityToken);
     }
 
     return msg;

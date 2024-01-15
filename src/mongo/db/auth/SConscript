@@ -5,11 +5,35 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target='auth_name',
+    source=[
+        'auth_name.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
     target='security_token',
     source=[
-        'security_token_authentication_guard.cpp',
         'validated_tenancy_scope.idl',
         'validated_tenancy_scope.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/jwt_types',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        'auth_name',
+    ],
+)
+
+env.Library(
+    target='security_token_auth',
+    source=[
+        'security_token_authentication_guard.cpp',
+        'validated_tenancy_scope_factory.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/jwt_types',
@@ -20,6 +44,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
         'authprivilege',
+        'security_token',
     ],
 )
 
@@ -30,11 +55,13 @@ env.Library(
     target='auth',
     source=[
         'auth_decorations.cpp',
-        'auth_name.cpp',
         'authorization_manager.cpp',
         'authorization_manager_factory.cpp',
         'authorization_session.cpp',
         'role_name_or_string.cpp',
+    ],
+    LIBDEPS=[
+        'auth_name',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -575,6 +602,7 @@ env.CppUnitTest(
         'saslauth',
         'security_file',
         'security_key',
+        'security_token_auth',
         'user',
     ],
 )

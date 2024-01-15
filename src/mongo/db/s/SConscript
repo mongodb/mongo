@@ -308,6 +308,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/security_token',
+        '$BUILD_DIR/mongo/db/auth/security_token_auth',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_block_bypass',
         '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',

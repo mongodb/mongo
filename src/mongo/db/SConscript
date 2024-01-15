@@ -1233,6 +1233,7 @@ env.Library(
         'auth/auth',
         'auth/auth_umc',
         'auth/authprivilege',
+        'auth/security_token_auth',
         'auth/user_acquisition_stats',
         'command_can_run_here',
         'commands/server_status_core',

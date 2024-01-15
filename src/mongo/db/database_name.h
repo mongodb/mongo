@@ -311,6 +311,9 @@ private:
     friend class DatabaseNameUtil;
     friend class NamespaceStringUtil;
 
+    template <typename T>
+    friend class AuthName;
+
     /**
      * Constructs a DatabaseName from the given tenantId and database name.
      * "dbString" is expected only consist of a db name. It is the caller's responsibility to ensure

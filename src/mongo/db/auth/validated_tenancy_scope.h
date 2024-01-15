@@ -54,28 +54,6 @@ public:
     ValidatedTenancyScope() = delete;
     ValidatedTenancyScope(const ValidatedTenancyScope&) = default;
 
-    /**
-     * Constructs a ValidatedTenancyScope by parsing a SecurityToken from a JWS String
-     * and verifying its cryptographic signature.
-     */
-    ValidatedTenancyScope(Client* client, StringData securityToken);
-
-    /**
-     * Constructs a ValidatedTenancyScope for tenant only by validating that the
-     * current client is permitted to specify a tenant via the $tenant field.
-     */
-    ValidatedTenancyScope(Client* client, TenantId tenant);
-
-    /**
-     * Parses the client provided command body and securityToken for tenantId,
-     * and for securityToken respectively, the authenticatedUser as well.
-     *
-     * Returns boost::none when multitenancy support is not enabled.
-     */
-    static boost::optional<ValidatedTenancyScope> create(Client* client,
-                                                         BSONObj body,
-                                                         StringData securityToken);
-
     bool hasAuthenticatedUser() const;
 
     const UserName& authenticatedUser() const;
@@ -159,6 +137,30 @@ public:
         : _tenantOrUser(std::move(tenant)) {}
 
 private:
+    friend class ValidatedTenancyScopeFactory;
+
+    /**
+     * Private constructor to be called only by the ValidatedTenancyScopeFactory in order to
+     * enforce authorization and validation of a parsed security token prior to constructing a
+     * ValidatedTenancyScope.
+     */
+    ValidatedTenancyScope(Client* client,
+                          StringData securityToken,
+                          const std::variant<std::monostate, UserName, TenantId>& tenantOrUser,
+                          Date_t expiration,
+                          TenantProtocol tenantProtocol)
+        : _originalToken(securityToken.toString()),
+          _expiration(expiration),
+          _tenantOrUser(tenantOrUser),
+          _tenantProtocol(tenantProtocol) {}
+
+    /**
+     * Private constructor to be called only by the ValidatedTenancyScopeFactory in order to
+     * enforce authorization of a authenticated user's tenantId prior to constructing a
+     * ValidatedTenancyScope.
+     */
+    explicit ValidatedTenancyScope(TenantId tenant) : _tenantOrUser(std::move(tenant)) {}
+
     // Preserve original token for serializing from MongoQ.
     std::string _originalToken;
 
