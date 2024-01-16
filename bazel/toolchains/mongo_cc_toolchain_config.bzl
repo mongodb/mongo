@@ -374,12 +374,12 @@ def _impl(ctx):
 
     supports_pic_feature = feature(
         name = "supports_pic",
-        enabled = True,
+        enabled = False,
     )
 
     pic_feature = feature(
         name = "pic",
-        enabled = True,
+        enabled = False,
         flag_sets = [
             flag_set(
                 actions = [
@@ -394,6 +394,25 @@ def _impl(ctx):
                 flag_groups = [
                     flag_group(flags = ["-fPIC"], expand_if_available = "pic"),
                 ],
+            ),
+        ],
+    )
+
+    pie_feature = feature(
+        name = "pie",
+        enabled = False,
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.assemble,
+                    ACTION_NAMES.preprocess_assemble,
+                    ACTION_NAMES.linkstamp_compile,
+                    ACTION_NAMES.c_compile,
+                    ACTION_NAMES.cpp_compile,
+                    ACTION_NAMES.cpp_module_codegen,
+                    ACTION_NAMES.cpp_module_compile,
+                ],
+                flag_groups = [flag_group(flags = ["-fPIE"])],
             ),
         ],
     )
@@ -452,6 +471,7 @@ def _impl(ctx):
         supports_dynamic_linker_feature,
         supports_pic_feature,
         pic_feature,
+        pie_feature,
         per_object_debug_info_feature,
         preprocessor_defines_feature,
         objcopy_embed_flags_feature,

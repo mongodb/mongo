@@ -299,3 +299,17 @@ use_diagnostic_latches = rule(
     implementation = lambda ctx: use_diagnostic_latches_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# shared_archive
+# =========
+
+shared_archive_provider = provider(
+    doc = "Enable generating a shared archive file for each shared library (e.g. '.so.a')",
+    fields = ["enabled"],
+)
+
+shared_archive = rule(
+    implementation = lambda ctx: shared_archive_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

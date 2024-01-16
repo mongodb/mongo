@@ -351,6 +351,33 @@ def mongo_cc_library(
         "//bazel/config:macos_aarch64": macos_rpath_flags,
     })
 
+    # Create a cc_library entry to generate a shared archive of the target.
+    native.cc_library(
+        name = name + ".so",
+        srcs = srcs,
+        hdrs = hdrs + fincludes_hdr,
+        deps = all_deps,
+        visibility = visibility,
+        testonly = testonly,
+        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
+        data = data,
+        tags = tags,
+        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
+        linkstatic = True,
+        local_defines = MONGO_GLOBAL_DEFINES + local_defines,
+        includes = [],
+        features = ["supports_pic", "pic"],
+        target_compatible_with = select({
+            "//bazel/config:shared_archive_enabled": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+    )
+
+    all_deps += select({
+        "//bazel/config:shared_archive_enabled": [":" + name + ".so"],
+        "//conditions:default": [],
+    })
+
     native.cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs,
@@ -365,6 +392,11 @@ def mongo_cc_library(
         linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         includes = [],
+        features = select({
+            "//bazel/config:linkstatic_disabled": ["supports_pic", "pic"],
+            "//bazel/config:shared_archive_enabled": ["supports_pic", "pic"],
+            "//conditions:default": ["pie"],
+        }),
     )
 
     extract_debuginfo(
@@ -428,6 +460,7 @@ def mongo_cc_binary(
         linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
         includes = [],
+        features = ["pie"],
     )
 
     extract_debuginfo(

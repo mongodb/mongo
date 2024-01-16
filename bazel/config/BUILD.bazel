@@ -24,6 +24,7 @@ load(
     "http_client",
     "linkstatic",
     "use_diagnostic_latches",
+    "shared_archive",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -789,5 +790,21 @@ config_setting(
     name = "use_diagnostic_latches_disabled",
     flag_values = {
         "//bazel/config:use_diagnostic_latches": "False",
+    },
+)
+
+# --------------------------------------
+# shared_archive options
+# --------------------------------------
+
+shared_archive(
+    name = "shared_archive",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "shared_archive_enabled",
+    flag_values = {
+        "//bazel/config:shared_archive": "True",
     },
 )
