@@ -2,9 +2,11 @@
  * Tests that time-series collections can be sharded with different configurations.
  *
  * @tags: [
- *   requires_fcv_51
+ *   requires_fcv_51,
  * ]
  */
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 Random.setRandomSeed();
 
@@ -42,6 +44,22 @@ function validateViewCreated(viewName) {
     assert.eq(tsOpts.metaField, timeseries.metaField, tsOpts);
 }
 
+function validateIndexBackingShardKey({coll, expectedKey, usingTimeseriesDefaultKey}) {
+    // The feature flag updates the index backing the shard key. If there is no feature flag we
+    // expect "control.max.time" to not be in the index.
+    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+    if (!FeatureFlagUtil.isPresentAndEnabled(sDB, "AuthoritativeShardCollection") &&
+        expectedKey.hasOwnProperty("control.max.time") && !usingTimeseriesDefaultKey) {
+        delete expectedKey["control.max.time"];
+    }
+    const indexList = coll.getIndexKeys();
+    const index = indexList.filter(i => bsonWoCompare(i, expectedKey) === 0);
+    assert.eq(1,
+              index.length,
+              "Expected one index with the key: " + tojson(expectedKey) +
+                  " but found the following indexes: " + tojson(indexList));
+}
+
 // Simple shard key on the metadata field.
 function metaShardKey(implicit) {
     // Command should fail since the 'timeseries' specification does not match that existing
@@ -64,6 +82,16 @@ function metaShardKey(implicit) {
     validateBucketsCollectionSharded({collName: 'ts', shardKey: {meta: 1}, timeseries});
 
     validateViewCreated("ts");
+
+    // shardCollection on a new time-series collection will use the default time-series index as the
+    // index backing the shardKey.
+    const expectedKey =
+        implicit ? {"meta": 1, "control.min.time": 1, "control.max.time": 1} : {'meta': 1};
+    validateIndexBackingShardKey({
+        coll: sDB['system.buckets.ts'],
+        expectedKey: expectedKey,
+        usingTimeseriesDefaultKey: implicit
+    })
 
     assert.commandWorked(st.s.adminCommand({split: 'test.system.buckets.ts', middle: {meta: 10}}));
 
@@ -88,6 +116,55 @@ metaShardKey(false);
 // Sharding a new timeseries collection.
 metaShardKey(true);
 
+// Simple shard key on a subfield of the metadata field.
+function metaSubFieldShardKey(implicit) {
+    // Command should fail since the 'timeseries' specification does not match that existing
+    // collection.
+    if (!implicit) {
+        assert.commandWorked(sDB.createCollection('ts', {timeseries}));
+        // This index gets created as {meta.a: 1} on the buckets collection.
+        assert.commandWorked(sDB.ts.createIndex({'hostId.a': 1}));
+        assert.commandFailedWithCode(st.s.adminCommand({
+            shardCollection: 'test.ts',
+            key: {'hostId.a': 1},
+            timeseries: {timeField: 'time'},
+        }),
+                                     [5731500]);
+    }
+
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: 'test.ts', key: {'hostId.a': 1}, timeseries}));
+
+    validateBucketsCollectionSharded({collName: 'ts', shardKey: {'meta.a': 1}, timeseries});
+
+    validateViewCreated("ts");
+
+    validateIndexBackingShardKey({coll: sDB['system.buckets.ts'], expectedKey: {'meta.a': 1}})
+
+    assert.commandWorked(
+        st.s.adminCommand({split: 'test.system.buckets.ts', middle: {'meta.a': 10}}));
+
+    const primaryShard = st.getPrimaryShard(dbName);
+    assert.commandWorked(st.s.adminCommand({
+        movechunk: 'test.system.buckets.ts',
+        find: {'meta.a': 10},
+        to: st.getOther(primaryShard).shardName,
+        _waitForDelete: true,
+    }));
+
+    let counts = st.chunkCounts('system.buckets.ts', 'test');
+    assert.eq(1, counts[st.shard0.shardName]);
+    assert.eq(1, counts[st.shard1.shardName]);
+
+    assert(sDB.ts.drop());
+}
+
+// Sharding an existing timeseries collection.
+metaSubFieldShardKey(false);
+
+// Sharding a new timeseries collection.
+metaSubFieldShardKey(true);
+
 // Shard key on the metadata field and time fields.
 function metaAndTimeShardKey(implicit) {
     assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
@@ -103,6 +180,12 @@ function metaAndTimeShardKey(implicit) {
     }));
 
     validateViewCreated("ts");
+
+    validateIndexBackingShardKey({
+        coll: sDB['system.buckets.ts'],
+        expectedKey: {"meta": 1, "control.min.time": 1, "control.max.time": 1},
+        usingTimeseriesDefaultKey: true
+    })
 
     validateBucketsCollectionSharded({
         collName: 'ts',
@@ -195,6 +278,9 @@ function runShardKeyPatternValidation(collectionExists) {
             timeSeriesParams: {timeField: 'time', metaField: 'hostId'}
         });
 
+        validateIndexBackingShardKey(
+            {coll: sDB['system.buckets.ts'], expectedKey: {'meta': 'hashed'}});
+
         assert.eq(coll.find().itcount(), 2);  // Validate count after sharding.
         let insertCount = timeseriesInsert(coll);
         assert.eq(coll.find().itcount(), insertCount + 2);
@@ -212,6 +298,11 @@ function runShardKeyPatternValidation(collectionExists) {
             key: {hostId: 'hashed', time: 1},
             timeseries: {timeField: 'time', metaField: 'hostId'}
         }));
+
+        validateIndexBackingShardKey({
+            coll: sDB['system.buckets.ts'],
+            expectedKey: {'meta': 'hashed', 'control.min.time': 1, 'control.max.time': 1}
+        });
 
         coll = sDB.getCollection('ts');
         assert.eq(coll.find().itcount(), 0);
@@ -287,6 +378,11 @@ function runShardKeyPatternValidation(collectionExists) {
 
         assert.commandWorked(st.s.adminCommand(
             {shardCollection: 'test.ts', key: {time: 1}, timeseries: {timeField: 'time'}}));
+
+        validateIndexBackingShardKey({
+            coll: sDB['system.buckets.ts'],
+            expectedKey: {'control.min.time': 1, 'control.max.time': 1}
+        });
 
         assert(sDB.getCollection("ts").drop());
     })();

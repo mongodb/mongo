@@ -948,7 +948,8 @@ boost::optional<UUID> createCollectionAndIndexes(
     const ShardsvrCreateCollectionRequest& request,
     const boost::optional<bool> collectionEmpty,
     const NamespaceString& nss,
-    const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams) {
+    const boost::optional<mongo::TranslatedRequestParams>& translatedRequestParams,
+    bool isUpdatedCoordinatorDoc) {
     LOGV2_DEBUG(5277903, 2, "Create collection createCollectionAndIndexes", logAttrs(nss));
 
     const auto& collationBSON = translatedRequestParams->getCollation();
@@ -995,7 +996,9 @@ boost::optional<UUID> createCollectionAndIndexes(
             collationBSON,
             request.getUnique().value_or(false),
             request.getEnforceUniquenessCheck().value_or(true),
-            shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
+            shardkeyutil::ValidationBehaviorsShardCollection(opCtx),
+            request.getTimeseries(),
+            isUpdatedCoordinatorDoc);
     } else {
         uassert(6373200,
                 "Must have an index compatible with the proposed shard key",
@@ -1278,7 +1281,8 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                                              _request,
                                                              _collectionEmpty,
                                                              nss(),
-                                                             _doc.getTranslatedRequestParams());
+                                                             _doc.getTranslatedRequestParams(),
+                                                             false /* isUpdatedCoordinatorDoc */);
 
                 audit::logShardCollection(opCtx->getClient(),
                                           nss(),
@@ -1697,7 +1701,8 @@ void CreateCollectionCoordinator::_createCollectionOnCoordinator() {
                                        _request,
                                        _collectionEmpty,
                                        nss(),
-                                       _doc.getTranslatedRequestParams());
+                                       _doc.getTranslatedRequestParams(),
+                                       true /* isUpdatedCoordinatorDoc */);
 
     audit::logShardCollection(
         opCtx->getClient(), nss(), *_request.getShardKey(), _request.getUnique().value_or(false));

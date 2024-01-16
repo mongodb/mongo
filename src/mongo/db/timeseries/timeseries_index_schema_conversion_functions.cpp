@@ -356,6 +356,97 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
     return builder.obj();
 }
 
+/**
+ * Maps a buckets shard key spec to a spec for the index backing the shard key on the buckets
+ * collection using the information provided in 'timeseriesOptions'. The shard key on the buckets
+ * collection should already be rewritten to use bucket collection field names and should be valid.
+ *
+ * If 'bucketShardKeySpecBSON' does not match a valid time-series shard key format, then boost::none
+ * is returned.
+ *
+ * Conversion Example:
+ * On a time-series collection with 'tm' time field and 'mm' metadata field,
+ * we may see a compound shard key on the underlying bucket collection mapped from:
+ * {
+ *     'meta.tag1': 1,
+ *     'control.min.tm': 1,
+ * }
+ * to an index on the buckets collection:
+ * {
+ *     'meta.tag1': 1,
+ *     'control.min.tm': 1,
+ *     'control.max.tm': 1
+ * }
+ */
+boost::optional<BSONObj> createBucketsIndexSpecFromBucketsShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketShardKeySpecBSON) {
+
+    // The shard key has already been validated. Therefore, the index backing the shard key must be
+    // valid. If not, this means  we have passed shard key validation, but have created an
+    // invalid index backing the shard key. We will return boost::none if the index is invalid and
+    // the caller of the function will verify an index was returned.
+    if (bucketShardKeySpecBSON.isEmpty()) {
+        return {};
+    }
+
+    if (bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$hint"_sd ||
+        bucketShardKeySpecBSON.firstElement().fieldNameStringData() == "$natural"_sd) {
+        return {};
+    }
+
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+    const std::string controlMinTimeField = str::stream()
+        << timeseries::kControlMinFieldNamePrefix << timeField;
+
+    BSONObjBuilder builder;
+    for (const auto& elem : bucketShardKeySpecBSON) {
+        // Unsharded collections can appear with the key '{_id:1}'. We will return the key as is in
+        // that case.
+        if (elem.fieldNameStringData() == timeseries::kBucketIdFieldName) {
+            if (!elem.isNumber() || elem.number() != 1 || bucketShardKeySpecBSON.nFields() != 1) {
+                return {};
+            }
+            return builder.append(elem).obj();
+        }
+
+        // We expect the index backing the shard key to already be "buckets-encoded". This means
+        // that indexSpecBSON should be "{control.min.time:1}".
+        if (elem.fieldNameStringData() == controlMinTimeField) {
+            if (!elem.isNumber() || elem.number() < 0) {
+                // Shard keys on the time field must be ascending.
+                return {};
+            }
+
+            // Append the 'control.min.time' element and add the 'control.max.time' element.
+            builder.append(elem);
+            builder.appendAs(elem,
+                             str::stream() << timeseries::kControlMaxFieldNamePrefix << timeField);
+            continue;
+        }
+
+        // If the index is on the meta field, the index should already be buckets-encoded and thus
+        // be rewritten as "meta".
+        if (metaField) {
+            if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName) {
+                builder.append(elem);
+                continue;
+            }
+
+            // Time-series indexes on sub-documents of the 'metaField' are allowed.
+            if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
+                builder.append(elem);
+                continue;
+            }
+        }
+
+        // Shard keys are only allowed on the meta field or time field.
+        return {};
+    }
+
+    return builder.obj();
+}
+
 }  // namespace
 
 StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
@@ -366,6 +457,17 @@ StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
 StatusWith<BSONObj> createBucketsShardKeySpecFromTimeseriesShardKeySpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesShardKeySpecBSON) {
     return createBucketsSpecFromTimeseriesSpec(timeseriesOptions, timeseriesShardKeySpecBSON, true);
+}
+
+boost::optional<BSONObj> createBucketsShardKeyIndexFromBucketsShardKeySpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesShardKeySpecBSON) {
+    return createBucketsIndexSpecFromBucketsShardKeySpec(timeseriesOptions,
+                                                         timeseriesShardKeySpecBSON);
+}
+
+boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndexSpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON) {
+    return createTimeseriesIndexSpecFromBucketsIndexSpec(timeseriesOptions, bucketsIndexSpecBSON);
 }
 
 boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(

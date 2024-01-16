@@ -7,6 +7,7 @@
  * ]
  */
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 Random.setRandomSeed();
 
@@ -89,7 +90,11 @@ assert.eq(bucketsColl.count(), 4);
 
 // The {meta: 1, time: 1} index gets built by default on the time-series bucket collection.
 assert.eq(coll.getIndexes().length, 2);
-assert.eq(coll.getIndexes()[1].name, "control.min.t_1");
+// TODO SERVER-79304 the test shouldn't rely on the feature flag.
+const indexName = FeatureFlagUtil.isPresentAndEnabled(sDB, "AuthoritativeShardCollection")
+    ? "t_1"
+    : "control.min.t_1";
+assert.eq(coll.getIndexes()[1].name, indexName);
 
 const forwardSort = {
     $sort: {t: 1}

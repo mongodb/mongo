@@ -8,9 +8,13 @@
  *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # During fcv upgrade/downgrade the index created might not be what we expect.
+ *   # TODO SERVER-79304 remove this tag.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run((insert) => {
@@ -49,7 +53,7 @@ TimeseriesTest.run((insert) => {
      * The second key pattern is what we can expect to use as a hint when querying the bucket
      * collection.
      */
-    const runTest = function(spec, bucketSpec) {
+    const runTest = function(spec, bucketSpec, isBackingShardKey = false) {
         const coll = db.getCollection(collNamePrefix + collCountPostfix++);
         const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
         coll.drop();  // implicitly drops bucketsColl.
@@ -91,25 +95,38 @@ TimeseriesTest.run((insert) => {
         // inspect the result's namespace in addition to the result's index key pattern.
         let cursorDoc = assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor;
         assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
-        assert.eq(1 + numExtraIndexes, cursorDoc.firstBatch.length, tojson(cursorDoc));
+        // If our index backs the shard key and the collection is sharded, only 'numExtraIndexes'
+        // will appear.
+        // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+        const updateForNewBehavior = FixtureHelpers.isSharded(bucketsColl) && isBackingShardKey &&
+            FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection");
+        const numIndexesToCheck = updateForNewBehavior ? numExtraIndexes : 1 + numExtraIndexes;
+        assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(spec, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 
         // Check that listIndexes against the buckets collection returns the index as hinted
         cursorDoc =
             assert.commandWorked(db.runCommand({listIndexes: bucketsColl.getName()})).cursor;
         assert.eq(bucketsColl.getFullName(), cursorDoc.ns, tojson(cursorDoc));
-        assert.eq(1 + numExtraIndexes, cursorDoc.firstBatch.length, tojson(cursorDoc));
+        assert.eq(numIndexesToCheck, cursorDoc.firstBatch.length, tojson(cursorDoc));
         assert.contains(bucketSpec, cursorDoc.firstBatch.map(ix => ix.key), tojson(cursorDoc));
 
-        // Drop the index on the time-series collection and then check that the underlying buckets
-        // collection index was dropped properly.
+        // If the buckets collection is sharded, the passthrough suites uses the
+        // shardKey {timeField: 1}. This will create an index with key {timeField: 1} that backs the
+        // shard key. We cannot drop or hide this index, so if the collection is sharded and the
+        // index we are testing backs the shard key we have to exit the test here.
+        if (updateForNewBehavior) {
+            return;
+        }
+
+        // Drop the index on the time-series collection and then check that the underlying
+        // buckets collection index was dropped properly.
         assert.commandWorked(coll.dropIndex(spec), 'failed to drop index: ' + tojson(spec));
         assert.commandFailedWithCode(
             assert.throws(() => bucketsColl.find().hint(bucketSpec).toArray()),
                          ErrorCodes.BadValue);
         assert.commandFailedWithCode(assert.throws(() => coll.find().hint(spec).toArray()),
                                                   ErrorCodes.BadValue);
-
         // Check that we are able to drop the index by name (single name and array of names).
         assert.commandWorked(coll.createIndex(spec, {name: 'myindex1'}),
                              'failed to create index: ' + tojson(spec));
@@ -192,7 +209,9 @@ TimeseriesTest.run((insert) => {
             {'meta.tag1': 1, 'meta.tag2': -1});
 
     // timeField ascending and descending indexes.
-    runTest({[timeFieldName]: 1}, {[controlMinTimeFieldName]: 1, [controlMaxTimeFieldName]: 1});
+    runTest({[timeFieldName]: 1},
+            {[controlMinTimeFieldName]: 1, [controlMaxTimeFieldName]: 1},
+            true /* isBackingShardKey */);
     runTest({[timeFieldName]: -1}, {[controlMaxTimeFieldName]: -1, [controlMinTimeFieldName]: -1});
 
     // Compound metaField and timeField.

@@ -105,7 +105,9 @@ public:
                     coll.getShardingDescription().isUniqueShardKey(),
                     request().getEnforceUniquenessCheck().value_or(true),
                     shardkeyutil::ValidationBehaviorsLocalRefineShardKey(opCtx,
-                                                                         coll.getCollectionPtr()));
+                                                                         coll.getCollectionPtr()),
+                    coll.getCollectionPtr()->getTimeseriesOptions(),
+                    false /* updatedToHandleTimeseriesIndex */);
             }
             shardkeyutil::validateShardKeyIsNotEncrypted(opCtx, ns(), keyPattern);
         }

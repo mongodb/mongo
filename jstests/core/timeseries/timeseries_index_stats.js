@@ -12,9 +12,13 @@
  *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # During fcv upgrade/downgrade the index created might not be what we expect.
+ *   # TODO SERVER-79304 remove this tag.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run((insert) => {
@@ -51,7 +55,11 @@ TimeseriesTest.run((insert) => {
     if (FixtureHelpers.isSharded(bucketsColl)) {
         // Expect one additional index, created implicitly when the collection was implicitly
         // sharded.
-        indexKeys['control.min.tm_1'] = {[timeFieldName]: 1};
+        // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+        let shardIndexName = FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection")
+            ? 'tm_1'
+            : 'control.min.tm_1';
+        indexKeys[shardIndexName] = {[timeFieldName]: 1};
     }
 
     // Create an index directly on the buckets collection that would not be visible in the

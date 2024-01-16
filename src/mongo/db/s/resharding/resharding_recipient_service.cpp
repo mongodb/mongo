@@ -716,6 +716,11 @@ void ReshardingRecipientService::RecipientStateMachine::
                     // to make sure we have the indexSpecs even after restart.
                     shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
                     behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
+
+                    // Do not need to pass in time-series options because we cannot reshard a
+                    // time-series collection.
+                    // TODO SERVER-84741 pass in time-series options and ensure the shard key is
+                    // partially rewritten.
                     shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                         opCtx.get(),
                         _metadata.getSourceNss(),
@@ -723,7 +728,9 @@ void ReshardingRecipientService::RecipientStateMachine::
                         CollationSpec::kSimpleSpec,
                         false /* unique */,
                         true /* enforceUniquenessCheck */,
-                        behaviors);
+                        behaviors,
+                        boost::none /* tsOpts */,
+                        false /* updatedToHandleTimeseriesIndex */);
                 });
         } else {
             _externalState->withShardVersionRetry(
@@ -736,6 +743,10 @@ void ReshardingRecipientService::RecipientStateMachine::
                         _metadata.getTempReshardingNss(),
                         ShardKeyPattern(_metadata.getReshardingKey()));
 
+                    // Do not need to pass in time-series options because we cannot reshard a
+                    // time-series collection.
+                    // TODO SERVER-84741 pass in time-series options and ensure the shard key is
+                    // partially rewritten.
                     shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                         opCtx.get(),
                         _metadata.getTempReshardingNss(),
@@ -743,7 +754,9 @@ void ReshardingRecipientService::RecipientStateMachine::
                         CollationSpec::kSimpleSpec,
                         false /* unique */,
                         true /* enforceUniquenessCheck */,
-                        shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
+                        shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()),
+                        boost::none /* tsOpts */,
+                        false /* updatedToHandleTimeseriesIndex */);
                 });
         }
 
@@ -892,6 +905,11 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                    // We call validateShardKeyIndexExistsOrCreateIfPossible again here in case if we
                    // restarted after creatingCollection phase, whatever indexSpec we get in that
                    // phase will go away.
+                   //
+                   // Do not need to pass in time-series options because we cannot reshard a
+                   // time-series collection.
+                   // TODO SERVER-84741 pass in time-series options and ensure the shard key is
+                   // partially rewritten.
                    shardkeyutil::ValidationBehaviorsReshardingBulkIndex behaviors;
                    behaviors.setOpCtxAndCloneTimestamp(opCtx.get(), *_cloneTimestamp);
                    shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
@@ -901,7 +919,9 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                        CollationSpec::kSimpleSpec,
                        false /* unique */,
                        true /* enforceUniquenessCheck */,
-                       behaviors);
+                       behaviors,
+                       boost::none /* tsOpts */,
+                       false /* updatedToHandleTimeseriesIndex */);
 
                    // Get all indexSpecs need to build.
                    auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());

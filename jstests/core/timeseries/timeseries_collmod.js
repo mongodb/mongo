@@ -8,8 +8,13 @@
  *   requires_non_retryable_commands,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # During fcv upgrade/downgrade the index created might not be what we expect.
+ *   # TODO SERVER-79304 remove this tag.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const collName = "timeseries_collmod";
 const coll = db.getCollection(collName);
@@ -21,17 +26,25 @@ const idlInvalidValueError = 51024;
 coll.drop();
 assert.commandWorked(
     db.createCollection(collName, {timeseries: {timeField: "time", granularity: 'seconds'}}));
-assert.commandWorked(coll.createIndex({"time": 1}));
+
+// This test cannot use the index with the key {'time': 1}, since that is the same as the implicitly
+// created shard key and thus we cannot hide the index. We will use a different index here to avoid
+// conflicts.
+// TODO SERVER-79304 the test shouldn't rely on the feature flag.
+let indexField =
+    FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection") ? "a" : "time";
+assert.commandWorked(coll.createIndex({[indexField]: 1}));
 
 // Tries to convert a time-series secondary index to TTL index.
-assert.commandFailedWithCode(
-    db.runCommand(
-        {"collMod": collName, "index": {"keyPattern": {"time": 1}, "expireAfterSeconds": 100}}),
-    ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "index": {"keyPattern": {[indexField]: 1}, "expireAfterSeconds": 100}
+}),
+                             ErrorCodes.InvalidOptions);
 
 // Successfully hides a time-series secondary index.
-assert.commandWorked(
-    db.runCommand({"collMod": collName, "index": {"keyPattern": {"time": 1}, "hidden": true}}));
+assert.commandWorked(db.runCommand(
+    {"collMod": collName, "index": {"keyPattern": {[indexField]: 1}, "hidden": true}}));
 
 // Tries to set the validator for a time-series collection.
 assert.commandFailedWithCode(

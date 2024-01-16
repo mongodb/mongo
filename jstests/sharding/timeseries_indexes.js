@@ -9,6 +9,7 @@
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 Random.setRandomSeed();
 
@@ -124,12 +125,16 @@ function generateDoc(time, metaValue) {
 
     assert.commandWorked(bucketsColl.dropIndex({'meta.subField1': 1}));
     indexKeys = bucketsColl.getIndexes().map(x => x.key);
-    assert.sameMembers([{'control.min.time': 1}].concat(extraBucketIndexes), indexKeys);
+    let indexesToAdd = {'control.min.time': 1};
+    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+    if (FeatureFlagUtil.isPresentAndEnabled(mongosDB, "AuthoritativeShardCollection")) {
+        indexesToAdd = {'control.min.time': 1, "control.max.time": 1};
+    }
+    assert.sameMembers([indexesToAdd].concat(extraBucketIndexes), indexKeys);
 
     assert.commandWorked(bucketsColl.createIndex({'meta.subField2': 1}));
     indexKeys = bucketsColl.getIndexes().map(x => x.key);
-    assert.sameMembers([{'control.min.time': 1}, {'meta.subField2': 1}].concat(extraBucketIndexes),
-                       indexKeys);
+    assert.sameMembers([indexesToAdd, {'meta.subField2': 1}].concat(extraBucketIndexes), indexKeys);
 
     assert(coll.drop());
 })();

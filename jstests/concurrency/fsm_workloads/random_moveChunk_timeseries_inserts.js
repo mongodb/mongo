@@ -17,6 +17,7 @@ import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js';
 import {getPlanStages} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
@@ -142,7 +143,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 assert.eq(bucketIndex, ixScan.keyPattern, ixScan);
             }
         };
-        verifyBucketIndex({"control.min.t": 1});
+        // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+        if (FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection")) {
+            verifyBucketIndex({"control.min.t": 1, "control.max.t": 1});
+        } else {
+            verifyBucketIndex({"control.min.t": 1});
+        }
         verifyBucketIndex({meta: 1, "control.min._id": 1, "control.max._id": 1});
         verifyBucketIndex({meta: 1, "control.min.t": 1, "control.max.t": 1});
     };

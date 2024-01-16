@@ -200,7 +200,9 @@ public:
                             boost::none,
                             collType.getUnique(),
                             request().getEnforceUniquenessCheck().value_or(true),
-                            shardkeyutil::ValidationBehaviorsRefineShardKey(opCtx, nss));
+                            shardkeyutil::ValidationBehaviorsRefineShardKey(opCtx, nss),
+                            collType.getTimeseriesFields()->getTimeseriesOptions(),
+                            false /* updatedToHandleTimeseriesIndex */);
                     });
             }
             LOGV2(21922, "CMD: refineCollectionShardKey", "request"_attr = request().toBSON({}));

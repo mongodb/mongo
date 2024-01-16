@@ -9,6 +9,9 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # During fcv upgrade/downgrade the index created might not be what we expect.
+ *   # TODO SERVER-79304 remove this tag.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {
@@ -17,6 +20,7 @@ import {
     getRejectedPlan,
     getRejectedPlans
 } from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 const coll = db.timeseries_index_partial;
@@ -44,17 +48,20 @@ function resetCollection(collation) {
     // If the collection is sharded, expect an implicitly-created index on time. It will appear
     // differently in listIndexes depending on whether you look at the time-series collection or
     // the buckets collection.
-    // TODO SERVER-77112 fix this logic once this issue is fixed.
+    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+    const newShardKeyIndex =
+        FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection");
     if (FixtureHelpers.isSharded(buckets)) {
         extraIndexes.push({
             "v": 2,
             "key": {"time": 1},
-            "name": "control.min.time_1",
+            "name": newShardKeyIndex ? "time_1" : "control.min.time_1",
         });
         extraBucketIndexes.push({
             "v": 2,
-            "key": {"control.min.time": 1},
-            "name": "control.min.time_1",
+            "key": newShardKeyIndex ? {"control.min.time": 1, "control.max.time": 1}
+                                    : {"control.min.time": 1},
+            "name": newShardKeyIndex ? "time_1" : "control.min.time_1",
         });
     }
     // When enabled, the {meta: 1, time: 1} index gets built by default on the time-series
@@ -177,12 +184,15 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
 
     // Test some predicates on the time field.
     {
-        //  TODO SERVER-77112 we can change this to assert.commandWorkedOrFailed, since the indexes
-        //  made by 'createIndex' should be identical to the implicit index made by
-        //  'shardCollection'.
-        if (!FixtureHelpers.isSharded(buckets)) {
+        // Note on implicitly sharded collections this index is already made and this operation is a
+        // no-op.
+        // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+        if (FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection")) {
+            assert.commandWorked(coll.createIndex({[timeField]: 1}));
+        } else if (!FixtureHelpers.isSharded(buckets)) {
             assert.commandWorked(coll.createIndex({[timeField]: 1}));
         }
+
         const t0 = ISODate('2000-01-01T00:00:00Z');
         const t1 = ISODate('2000-01-01T00:00:01Z');
         const t2 = ISODate('2000-01-01T00:00:02Z');

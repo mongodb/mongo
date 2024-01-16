@@ -19,6 +19,9 @@
  *   requires_pipeline_optimization,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # During fcv upgrade/downgrade the index created might not be what we expect.
+ *   # TODO SERVER-79304 remove this tag.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 
@@ -640,9 +643,14 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
     // Make sure the 2dsphere index exists. (If the collection is implicitly sharded then we will
     // also see an implicitly created index.)
     const buckets = db.getCollection('system.buckets.' + coll.getName());
+    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+    let extraIndexesForSharding =
+        FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection")
+        ? {'control.min.time': 1, 'control.max.time': 1}
+        : {'control.min.time': 1};
     assert.sameMembers(buckets.getIndexKeys(),
                        FixtureHelpers.isSharded(buckets)
-                           ? [{'data.loc': '2dsphere_bucket'}, {'control.min.time': 1}]
+                           ? [{'data.loc': '2dsphere_bucket'}, extraIndexesForSharding]
                            : [{'data.loc': '2dsphere_bucket'}]);
 
     insertTestData(coll);

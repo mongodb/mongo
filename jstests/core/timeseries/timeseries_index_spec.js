@@ -7,9 +7,14 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # During fcv upgrade/downgrade the index created might not be what we expect.
+ *   # TODO SERVER-79304 remove this tag.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 TimeseriesTest.run(() => {
     const collName = "timeseries_index_spec";
@@ -69,8 +74,16 @@ TimeseriesTest.run(() => {
         assert.commandWorked(coll.dropIndexes(indexName));
     };
 
-    assert.commandWorked(coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
-    verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
+    // If the collection is sharded, we expect an implicitly-created index on time. This index will
+    // be the same index as the result of createIndex({timeField: 1}). Therefore we cannot create
+    // nor drop an identical index with a different name.
+    // TODO SERVER-79304 the test shouldn't rely on the feature flag.
+    if (!(FixtureHelpers.isSharded(bucketsColl) &&
+          FeatureFlagUtil.isPresentAndEnabled(db, "AuthoritativeShardCollection"))) {
+        assert.commandWorked(
+            coll.createIndex({[timeFieldName]: 1}, {name: "timefield_downgradable"}));
+        verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "timefield_downgradable");
+    }
 
     assert.commandWorked(coll.createIndex({[metaFieldName]: 1}, {name: "metafield_downgradable"}));
     verifyAndDropIndex(/*shouldHaveOriginalSpec=*/ false, "metafield_downgradable");

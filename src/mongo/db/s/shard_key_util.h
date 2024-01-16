@@ -70,7 +70,8 @@ public:
     virtual void createShardKeyIndex(const NamespaceString& nss,
                                      const BSONObj& proposedKey,
                                      const boost::optional<BSONObj>& defaultCollation,
-                                     bool unique) const = 0;
+                                     bool unique,
+                                     boost::optional<TimeseriesOptions> tsOpts) const = 0;
 };
 
 /**
@@ -92,7 +93,8 @@ public:
     void createShardKeyIndex(const NamespaceString& nss,
                              const BSONObj& proposedKey,
                              const boost::optional<BSONObj>& defaultCollation,
-                             bool unique) const override;
+                             bool unique,
+                             boost::optional<TimeseriesOptions> tsOpts) const override;
 
 private:
     std::unique_ptr<DBDirectClient> _localClient;
@@ -116,7 +118,8 @@ public:
     void createShardKeyIndex(const NamespaceString& nss,
                              const BSONObj& proposedKey,
                              const boost::optional<BSONObj>& defaultCollation,
-                             bool unique) const override;
+                             bool unique,
+                             boost::optional<TimeseriesOptions> tsOpts) const override;
 
 private:
     OperationContext* _opCtx;
@@ -144,7 +147,8 @@ public:
     void createShardKeyIndex(const NamespaceString& nss,
                              const BSONObj& proposedKey,
                              const boost::optional<BSONObj>& defaultCollation,
-                             bool unique) const override;
+                             bool unique,
+                             boost::optional<TimeseriesOptions> tsOpts) const override;
 
 private:
     OperationContext* _opCtx;
@@ -171,7 +175,8 @@ public:
     void createShardKeyIndex(const NamespaceString& nss,
                              const BSONObj& proposedKey,
                              const boost::optional<BSONObj>& defaultCollation,
-                             bool unique) const override;
+                             bool unique,
+                             boost::optional<TimeseriesOptions> tsOpts) const override;
 
     void setOpCtxAndCloneTimestamp(OperationContext* opCtx, Timestamp cloneTimestamp);
 
@@ -208,12 +213,17 @@ private:
  * 3. If the proposed shard key is specified as unique, there must exist a useful,
  *    unique index exactly equal to the proposedKey (not just a prefix).
  *
+ * 4. If the request concerns a timeseries collection, 'nss' must refer to the buckets namespace,
+ *    'tsOpts' must have a value, and 'shardKeyPattern' must already be buckets-encoded.
+ *    TODO (SERVER-79304): Remove 'updatedToHandleTimeseriesIndex' once 8.0 becomes last LTS. We
+ *    will only rewrite the index if 'updatedToHandleTimeseriesIndex' is true.
+ *
  * After validating these constraints:
  *
- * 4. If there is no useful index, and the collection is non-empty or we are refining the
+ * 5. If there is no useful index, and the collection is non-empty or we are refining the
  *    collection's shard key, we must fail.
  *
- * 5. If the collection is empty and we are not refining the collection's shard key, and it's
+ * 6. If the collection is empty and we are not refining the collection's shard key, and it's
  *    still possible to create an index on the proposed key, we go ahead and do so.
  *
  * Returns true if the index has been created, false otherwise.
@@ -224,7 +234,9 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const boost::optional<BSONObj>& defaultCollation,
                                                    bool unique,
                                                    bool enforceUniquenessCheck,
-                                                   const ShardKeyValidationBehaviors& behaviors);
+                                                   const ShardKeyValidationBehaviors& behaviors,
+                                                   boost::optional<TimeseriesOptions> tsOpts,
+                                                   bool updatedToHandleTimeseriesIndex);
 /**
  * Compares the proposed shard key with the collection's existing indexes to ensure they are a legal
  * combination.
