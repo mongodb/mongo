@@ -3566,7 +3566,10 @@ def doConfigure(myenv):
                 f"Use the '--linker' option instead of modifying the LINKFLAGS directly.")
 
         linker_ld = get_option('linker')
-        if linker_ld == 'auto':
+
+        if linker_ld == "bfd" and env.get("BAZEL_BUILD_ENABLED"):
+            myenv.FatalError(f"The linker 'bfd' is not supported with BAZEL_BUILD_ENABLED.")
+        elif linker_ld == 'auto':
             if not env.TargetOSIs('darwin', 'macOS'):
                 if not myenv.AddToLINKFLAGSIfSupported('-fuse-ld=lld'):
                     myenv.FatalError(

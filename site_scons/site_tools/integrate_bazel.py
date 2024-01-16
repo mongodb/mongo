@@ -451,6 +451,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:linkstatic={linkstatic}',
             f'--//bazel/config:use_diagnostic_latches={True if env.GetOption("use-diagnostic-latches") == "on" else False}',
             f'--//bazel/config:shared_archive={env.GetOption("link-model") == "dynamic-sdk"}',
+            f'--//bazel/config:linker={"lld" if env.GetOption("linker") == "auto" else env.GetOption("linker")}',
             f'--platforms=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             f'--host_platform=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g

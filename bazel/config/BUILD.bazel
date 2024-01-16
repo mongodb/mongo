@@ -25,6 +25,7 @@ load(
     "linkstatic",
     "use_diagnostic_latches",
     "shared_archive",
+    "linker",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -263,6 +264,29 @@ config_setting(
         "@platforms//os:windows",
     ],
     flag_values = {"//bazel/config:build_mode": "release"},
+)
+
+# --------------------------------------
+# linker options
+# --------------------------------------
+
+linker(
+    name = "linker",
+    build_setting_default = "lld",
+)
+
+config_setting(
+    name = "linker_gold",
+    flag_values = {
+        "//bazel/config:linker": "gold",
+    },
+)
+
+config_setting(
+    name = "linker_lld",
+    flag_values = {
+        "//bazel/config:linker": "lld",
+    },
 )
 
 # --------------------------------------

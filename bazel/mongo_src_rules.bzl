@@ -94,6 +94,11 @@ DEBUG_DEFINES = select({
     "//conditions:default": ["NDEBUG"],
 })
 
+LINKER_LINKFLAGS = select({
+    "//bazel/config:linker_gold": ["-fuse-ld=gold"],
+    "//bazel/config:linker_lld": ["-fuse-ld=lld"],
+})
+
 LIBUNWIND_DEPS = select({
     "//bazel/config:use_libunwind_enabled": ["//src/third_party/unwind:unwind"],
     "//conditions:default": [],
@@ -223,7 +228,8 @@ MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINE
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS \
                     + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
 
-MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + LIBCXX_LINKFLAGS
+MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS \
+                         + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS
 
 def force_includes_copt(package_name, name):
 

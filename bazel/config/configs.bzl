@@ -36,6 +36,28 @@ build_mode = rule(
     build_setting = config.string(flag = True),
 )
 
+# ==========
+# linker
+# ==========
+
+linker_values = ["gold", "lld"]
+
+linker_provider = provider(
+    doc = "Specify the type of linker to use.",
+    fields = {"linker": "choose one of " + ".".join(linker_values)},
+)
+
+def linker_impl(ctx):
+    linker_value = ctx.build_setting_value
+    if linker_value not in linker_values:
+        fail(str(ctx.label) + " build_mode allowed to take values {" + ", ".join(linker_values) + "} but was set to unallowed value " + linker_value)
+    return linker_provider(linker = linker_value)
+
+linker = rule(
+    implementation = linker_impl,
+    build_setting = config.string(flag = True),
+)
+
 # =========
 # gdbserver
 # =========

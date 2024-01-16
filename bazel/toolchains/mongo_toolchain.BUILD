@@ -27,6 +27,7 @@ COMMON_LINK_FLAGS = [
     "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
     "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
     "-Bexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
+    "-Bexternal/mongo_toolchain/stow/llvm-v4/bin",
     # Use the host system's glibc dynamic libraries
     "-B/lib/aarch64-linux-gnu",
 ]
