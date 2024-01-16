@@ -2810,7 +2810,7 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_gen
   - name: .rollbackfuzzer
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !sharded_collections_jscore_passthrough_with_config_shard_gen
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
@@ -2863,7 +2863,7 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_gen
   - name: .rollbackfuzzer
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !sharded_collections_jscore_passthrough_with_config_shard_gen
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
