@@ -59,26 +59,65 @@ assert.commandWorked(mongosDB.adminCommand({
     to: st.rs1.getURL()
 }));
 
-const changeStream = mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
+assert.soon(() => {
+    let lastInserted = -1;
+    let lastUpdated = -1;
+    let lastInsertSeen = -1;
+    let lastUpdateSeen = -1;
+    let resumeToken = "";
+    let finished = false;
 
-// Write enough documents that we likely have some on each shard.
-const nDocs = 1000;
-for (let id = 0; id < nDocs; ++id) {
-    assert.commandWorked(mongosColl.insert({_id: id, shardKey: id}));
-    assert.commandWorked(mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}));
-}
+    while (!finished) {
+        try {
+            const changeStream = resumeToken
+                ? mongosColl.aggregate(
+                      [{$changeStream: {fullDocument: "updateLookup", resumeAfter: resumeToken}}])
+                : mongosColl.aggregate([{$changeStream: {fullDocument: "updateLookup"}}]);
+            resumeToken = changeStream._resumeToken;
 
-for (let id = 0; id < nDocs; ++id) {
-    assert.soon(() => changeStream.hasNext());
-    let next = changeStream.next();
-    assert.eq(next.operationType, "insert");
-    assert.eq(next.documentKey, {shardKey: id, _id: id});
+            // Write enough documents that we likely have some on each shard.
+            const nDocs = 1000;
+            for (let id = Math.min(lastInserted, lastUpdated) + 1; id < nDocs; ++id) {
+                if (id > lastInserted) {
+                    assert.commandWorked(mongosColl.insert({_id: id, shardKey: id}));
+                    lastInserted = id;
+                }
+                if (id > lastUpdated) {
+                    assert.commandWorked(
+                        mongosColl.update({shardKey: id}, {$set: {updatedCount: 1}}));
+                    lastUpdated = id;
+                }
+            }
 
-    assert.soon(() => changeStream.hasNext());
-    next = changeStream.next();
-    assert.eq(next.operationType, "update");
-    assert.eq(next.documentKey, {shardKey: id, _id: id});
-    assert.docEq({_id: id, shardKey: id, updatedCount: 1}, next.fullDocument);
-}
+            for (let id = Math.min(lastInsertSeen, lastUpdateSeen) + 1; id < nDocs; ++id) {
+                if (id > lastInsertSeen) {
+                    assert.soon(() => changeStream.hasNext());
+                    let next = changeStream.next();
+                    assert.eq(next.operationType, "insert");
+                    assert.eq(next.documentKey, {shardKey: id, _id: id});
+                    resumeToken = next._id;
+                    lastInsertSeen = id;
+                }
+
+                if (id > lastUpdateSeen) {
+                    assert.soon(() => changeStream.hasNext());
+                    let next = changeStream.next();
+                    assert.eq(next.operationType, "update");
+                    assert.eq(next.documentKey, {shardKey: id, _id: id});
+                    assert.docEq({_id: id, shardKey: id, updatedCount: 1}, next.fullDocument);
+                    resumeToken = next._id;
+                    lastUpdateSeen = id;
+                }
+            }
+            finished = true;
+        } catch (e) {
+            // In a step down the changeStream may return QueryPlanKilled, which can be recovered
+            if (!(ErrorCodes.isCursorInvalidatedError(e) || isRetryableError(e))) {
+                throw (e);
+            }
+        }
+        return true;
+    }
+});
 
 st.stop();
