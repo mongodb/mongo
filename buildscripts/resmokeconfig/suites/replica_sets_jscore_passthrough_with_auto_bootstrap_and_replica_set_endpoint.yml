@@ -123,9 +123,7 @@ executor:
       # that is fsync locked and has replica set endpoint enabled.
       # - CheckReplDBHash
       - CheckReplOplogs
-      # TODO (SERVER-84362): Investigate ObjectIsBusy error in the replica set endpoint suite when
-      # the ValidateCollections hook is enabled.
-      # - ValidateCollections
+      - ValidateCollections
   config:
     shell_options:
       eval: "globalThis.testingReplication = true;"
@@ -143,9 +141,7 @@ executor:
     # TODO (SERVER-83433): Add back the test coverage for running db hash check on replica set that
     # is fsync locked and has replica set endpoint enabled.
     # - class: CheckReplDBHash
-    # TODO (SERVER-84362): Investigate ObjectIsBusy error in the replica set endpoint suite when
-    # the ValidateCollections hook is enabled.
-    # - class: ValidateCollections
+    - class: ValidateCollections
     - class: CleanEveryN
       n: 20
   fixture:
