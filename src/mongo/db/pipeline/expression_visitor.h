@@ -179,6 +179,7 @@ class AccumulatorMergeObjects;
 
 class ExpressionTsSecond;
 class ExpressionTsIncrement;
+class ExpressionInternalKeyStringValue;
 
 template <typename AccumulatorState>
 class ExpressionFromAccumulator;
@@ -365,6 +366,8 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetField>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTsSecond>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTsIncrement>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionInternalKeyStringValue>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
@@ -525,5 +528,6 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionSetField*) override {}
     void visit(const ExpressionTsSecond*) override {}
     void visit(const ExpressionTsIncrement*) override {}
+    void visit(const ExpressionInternalKeyStringValue*) override {}
 };
 }  // namespace mongo

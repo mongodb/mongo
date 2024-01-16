@@ -477,6 +477,7 @@ public:
     void visit(const ExpressionSetField* expr) final {}
     void visit(const ExpressionTsSecond* expr) final {}
     void visit(const ExpressionTsIncrement* expr) final {}
+    void visit(const ExpressionInternalKeyStringValue* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -710,6 +711,7 @@ public:
     void visit(const ExpressionSetField* expr) final {}
     void visit(const ExpressionTsSecond* expr) final {}
     void visit(const ExpressionTsIncrement* expr) final {}
+    void visit(const ExpressionInternalKeyStringValue* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -3028,6 +3030,10 @@ public:
             },
             _context->popExpr());
         _context->pushExpr(std::move(tsIncrementExpr));
+    }
+
+    void visit(const ExpressionInternalKeyStringValue* expr) final {
+        unsupportedExpression(expr->getOpName());
     }
 
 private:
