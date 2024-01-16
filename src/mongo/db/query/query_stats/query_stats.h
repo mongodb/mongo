@@ -123,7 +123,7 @@ public:
     }
 
     size_t getMaxSize() {
-        return _maxSize;
+        return _maxSize.load();
     }
 
     /**
@@ -131,7 +131,7 @@ public:
      * entries.
      */
     size_t resetSize(size_t cacheSize) {
-        _maxSize = cacheSize;
+        _maxSize.store(cacheSize);
         return _queryStatsStore->reset(cacheSize);
     }
 
@@ -142,7 +142,7 @@ private:
      * Max size of the queryStats store. Tracked here to avoid having to recompute after it's
      * divided up into partitions.
      */
-    size_t _maxSize;
+    AtomicWord<size_t> _maxSize;
 };
 
 const auto queryStatsStoreDecoration =
