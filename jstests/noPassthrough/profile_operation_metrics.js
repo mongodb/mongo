@@ -1482,7 +1482,7 @@ const operations = [
         profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.cursorSeeks, 1);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
             if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {

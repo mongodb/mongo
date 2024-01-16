@@ -438,6 +438,222 @@ TEST(RecordStoreTestHarness, Cursor1) {
     }
 }
 
+TEST(RecordStoreTestHarness, CursorRestoreForward) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    const std::string ns = "test.a";
+
+    auto rs = harnessHelper->newRecordStore(ns, {});
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        std::string s = "test";
+        for (int i = 1; i <= 3; i++) {
+            ASSERT_OK(
+                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
+                    .getStatus());
+        }
+        uow.commit();
+    }
+
+    auto cursor = rs->getCursor(opCtx.get());
+    auto r1 = cursor->next();
+    ASSERT(r1);
+    ASSERT_EQ(RecordId(1), r1->id);
+
+    cursor->save();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    cursor->restore();
+
+    auto r2 = cursor->next();
+    ASSERT(r2);
+    ASSERT_EQ(RecordId(2), r2->id);
+
+    cursor->save();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    cursor->restore();
+
+    auto r3 = cursor->next();
+    ASSERT(r3);
+    ASSERT_EQ(RecordId(3), r3->id);
+
+    auto end = cursor->next();
+    ASSERT_EQ(boost::none, end);
+}
+
+TEST(RecordStoreTestHarness, CursorRestoreReverse) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    const std::string ns = "test.a";
+
+    auto rs = harnessHelper->newRecordStore(ns, {});
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        std::string s = "test";
+        for (int i = 1; i <= 3; i++) {
+            ASSERT_OK(
+                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
+                    .getStatus());
+        }
+        uow.commit();
+    }
+
+    auto cursor = rs->getCursor(opCtx.get(), false);
+    auto r1 = cursor->next();
+    ASSERT(r1);
+    ASSERT_EQ(RecordId(3), r1->id);
+
+    cursor->save();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    cursor->restore();
+
+    auto r2 = cursor->next();
+    ASSERT(r2);
+    ASSERT_EQ(RecordId(2), r2->id);
+
+    cursor->save();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+    cursor->restore();
+
+    auto r3 = cursor->next();
+    ASSERT(r3);
+    ASSERT_EQ(RecordId(1), r3->id);
+
+    auto end = cursor->next();
+    ASSERT_EQ(boost::none, end);
+}
+
+TEST(RecordStoreTestHarness, CursorRestoreDeletedDoc) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    const std::string ns = "test.a";
+
+    auto rs = harnessHelper->newRecordStore(ns, {});
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        std::string s = "test";
+        for (int i = 1; i <= 3; i++) {
+            ASSERT_OK(
+                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
+                    .getStatus());
+        }
+        uow.commit();
+    }
+
+    auto cursor = rs->getCursor(opCtx.get());
+    auto r1 = cursor->next();
+    ASSERT(r1);
+    ASSERT_EQ(RecordId(1), r1->id);
+
+    cursor->save();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        rs->deleteRecord(opCtx.get(), RecordId(1));
+        uow.commit();
+    }
+    cursor->restore();
+
+    auto r2 = cursor->next();
+    ASSERT(r2);
+    ASSERT_EQ(RecordId(2), r2->id);
+
+    cursor->save();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        rs->deleteRecord(opCtx.get(), RecordId(2));
+        uow.commit();
+    }
+    cursor->restore();
+
+    auto r3 = cursor->next();
+    ASSERT(r3);
+    ASSERT_EQ(RecordId(3), r3->id);
+
+    cursor->save();
+    shard_role_details::getRecoveryUnit(opCtx.get())->abandonSnapshot();
+
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        rs->deleteRecord(opCtx.get(), RecordId(3));
+        uow.commit();
+    }
+    cursor->restore();
+
+    auto end = cursor->next();
+    ASSERT_EQ(boost::none, end);
+}
+
+TEST(RecordStoreTestHarness, CursorSaveRestoreSeek) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    const std::string ns = "test.a";
+
+    auto rs = harnessHelper->newRecordStore(ns, {});
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        std::string s = "test";
+        for (int i = 1; i <= 2; i++) {
+            ASSERT_OK(
+                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
+                    .getStatus());
+        }
+        uow.commit();
+    }
+
+    auto cursor = rs->getCursor(opCtx.get());
+    auto r1 = cursor->next();
+    ASSERT(r1);
+    ASSERT_EQ(RecordId(1), r1->id);
+
+    auto r2 = cursor->next();
+    ASSERT(r2);
+    ASSERT_EQ(RecordId(2), r2->id);
+
+    cursor->save();
+    cursor->restore();
+
+    r1 = cursor->seekExact(RecordId(1));
+    ASSERT(r1);
+    ASSERT_EQ(RecordId(1), r1->id);
+}
+
+TEST(RecordStoreTestHarness, CursorSaveUnpositionedRestoreSeek) {
+    const auto harnessHelper = newRecordStoreHarnessHelper();
+    const std::string ns = "test.a";
+
+    auto rs = harnessHelper->newRecordStore(ns, {});
+    ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    {
+        WriteUnitOfWork uow(opCtx.get());
+        std::string s = "test";
+        for (int i = 1; i <= 2; i++) {
+            ASSERT_OK(
+                rs->insertRecord(opCtx.get(), RecordId(i), s.c_str(), s.size() + 1, Timestamp())
+                    .getStatus());
+        }
+        uow.commit();
+    }
+
+    auto cursor = rs->getCursor(opCtx.get());
+    auto r1 = cursor->next();
+    ASSERT(r1);
+    ASSERT_EQ(RecordId(1), r1->id);
+
+    auto r2 = cursor->next();
+    ASSERT(r2);
+    ASSERT_EQ(RecordId(2), r2->id);
+
+    cursor->saveUnpositioned();
+    cursor->restore();
+
+    r1 = cursor->seekExact(RecordId(1));
+    ASSERT(r1);
+    ASSERT_EQ(RecordId(1), r1->id);
+}
+
 TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     const auto harnessHelper = newRecordStoreHarnessHelper();
     const std::string ns = "test.system.buckets.a";

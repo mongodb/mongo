@@ -235,33 +235,30 @@ protected:
                           bool dupsAllowed) = 0;
 
     void setKey(WT_CURSOR* cursor, const WT_ITEM* item);
-    void getKey(OperationContext* opCtx, WT_CURSOR* cursor, WT_ITEM* key);
 
     /**
-     * Checks whether the prefix key defined by 'buffer' and 'size' is in the index. If it is,
-     * returns the RecordId of the first matching key and positions the cursor 'c' on that key.
+     * Load the key positioned by this cursor into 'key'. When metrics is provided, count the
+     * size towards resource consumption metrics.
      */
-    boost::optional<RecordId> _keyExists(OperationContext* opCtx,
-                                         WT_CURSOR* c,
-                                         const char* buffer,
-                                         size_t size);
+    void getKey(WT_CURSOR* cursor, WT_ITEM* key, ResourceConsumption::MetricsCollector* metrics);
 
     /**
      * Checks whether the prefix key defined by 'keyString' and 'sizeWithoutRecordId' is in the
      * index. If it is, returns the RecordId of the first matching key and positions the cursor 'c'
      * on that key.
      */
-    boost::optional<RecordId> _keyExistsBounded(OperationContext* opCtx,
-                                                WT_CURSOR* c,
-                                                const key_string::Value& keyString,
-                                                size_t sizeWithoutRecordId);
+    boost::optional<RecordId> _keyExists(OperationContext* opCtx,
+                                         WT_CURSOR* c,
+                                         const key_string::Value& keyString,
+                                         size_t sizeWithoutRecordId);
 
     /**
      * Sets the upper bound on the passed in cursor to be the maximum value of the KeyString prefix.
+     * Used when checking if a specific key prefix exists.
      */
-    void _setUpperBound(WT_CURSOR* c,
-                        const key_string::Value& keyString,
-                        size_t sizeWithoutRecordId);
+    void _setUpperBoundForKeyExists(WT_CURSOR* c,
+                                    const key_string::Value& keyString,
+                                    size_t sizeWithoutRecordId);
 
     /**
      * Returns a DuplicateKey error if the prefix key exists in the index with a different RecordId.

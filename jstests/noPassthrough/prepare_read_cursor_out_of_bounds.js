@@ -37,17 +37,7 @@ session.startTransaction();
 sessionColl.insert({x: 'b'});
 const prepareTimestamp = PrepareHelpers.prepareTransaction(session);
 
-const failpoint = configureFailPoint(primary, "WTIndexPauseAfterSearchNear", {indexName: 'x_1'});
-
-// After the query on 'c' starts, we commit the transaction and advance the cursor. Expect that this
-// finds nothing.
-const awaitShell = startParallelShell(function() {
-    assert.eq(null, db.coll.findOne({x: 'c'}));
-}, primary.port);
-
-failpoint.wait();
+assert.eq(null, db.coll.findOne({x: 'c'}));
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp));
-failpoint.off();
-awaitShell();
 
 replTest.stopSet();

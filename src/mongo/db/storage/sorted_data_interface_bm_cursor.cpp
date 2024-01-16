@@ -121,6 +121,32 @@ void BM_Advance(benchmark::State& state,
     state.SetItemsProcessed(fix.itemsProcessed);
 };
 
+void BM_Seek(benchmark::State& state,
+             Direction direction,
+             Cursor::KeyInclusion keyInclusion,
+             Uniqueness uniqueness) {
+
+    Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
+    for (auto _ : state) {
+        fix.cursor->seek(fix.firstKey, keyInclusion);
+        fix.itemsProcessed += 1;
+    }
+    state.SetItemsProcessed(fix.itemsProcessed);
+};
+
+void BM_SaveRestore(benchmark::State& state, Direction direction, Uniqueness uniqueness) {
+
+    Fixture fix(uniqueness, direction, 100'000, KeyFormat::Long);
+
+    for (auto _ : state) {
+        fix.cursor->seek(fix.firstKey);
+        fix.cursor->save();
+        fix.cursor->restore();
+        fix.itemsProcessed += 1;
+    }
+    state.SetItemsProcessed(fix.itemsProcessed);
+};
+
 void BM_AdvanceWithEnd(benchmark::State& state,
                        Direction direction,
                        Uniqueness uniqueness,
@@ -129,9 +155,9 @@ void BM_AdvanceWithEnd(benchmark::State& state,
     Fixture fix(uniqueness, direction, 100'000, keyFormat);
 
     for (auto _ : state) {
-        fix.cursor->seek(fix.firstKey);
         BSONObj lastKey = BSON("" << (direction == kForward ? fix.nToInsert : 1));
         fix.cursor->setEndPosition(lastKey, /*inclusive*/ true);
+        fix.cursor->seek(fix.firstKey);
         for (int i = 1; i < fix.nToInsert; i++)
             fix.cursor->next(kRecordId);
         fix.itemsProcessed += fix.nToInsert;
@@ -154,6 +180,14 @@ BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardLocUnique, kBackward, kRecordId, kU
 BENCHMARK_CAPTURE(BM_Advance, AdvanceBackwardKeyAndLocUnique, kBackward, kRecordIdAndKey, kUnique);
 BENCHMARK_CAPTURE(
     BM_Advance, AdvanceBackwardStringLoc, kForward, kRecordId, kNonUnique, KeyFormat::String);
+
+BENCHMARK_CAPTURE(BM_Seek, SeekForwardKey, kForward, kRecordId, kNonUnique);
+BENCHMARK_CAPTURE(BM_Seek, SeekForwardKeyAndLoc, kForward, kRecordIdAndKey, kNonUnique);
+BENCHMARK_CAPTURE(BM_Seek, SeekForwardKeyUnique, kForward, kRecordId, kUnique);
+BENCHMARK_CAPTURE(BM_Seek, SeekForwardKeyAndLocUnique, kForward, kRecordIdAndKey, kUnique);
+
+BENCHMARK_CAPTURE(BM_SaveRestore, SaveRestore, kForward, kNonUnique);
+BENCHMARK_CAPTURE(BM_SaveRestore, SaveRestoreUnique, kForward, kUnique);
 
 BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceForward, kForward, kNonUnique);
 BENCHMARK_CAPTURE(BM_AdvanceWithEnd, AdvanceForwardUnique, kForward, kUnique);

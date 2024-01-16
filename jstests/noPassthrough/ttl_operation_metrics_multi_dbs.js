@@ -117,10 +117,8 @@ assertMetrics(primary, (metrics) => {
     assert.eq(metrics[dbName2].docUnitsWritten, 0);
     assert.eq(metrics[dbName2].totalUnitsWritten, 0);
 
-    // We need to read in a few keys to determine whether there is data to delete. Since we haven't
-    // stopped the TTL monitor, the value can be larger than expected.
-    assert.gte(metrics[dbName2].primaryMetrics.idxEntryBytesRead, 24);
-    assert.gte(metrics[dbName2].primaryMetrics.idxEntryUnitsRead, 2);
+    assert.eq(metrics[dbName2].primaryMetrics.idxEntryBytesRead, 0);
+    assert.eq(metrics[dbName2].primaryMetrics.idxEntryUnitsRead, 0);
     assert.eq(metrics[dbName2].idxEntryUnitsWritten, 0);
     assert.eq(metrics[dbName2].idxEntryBytesWritten, 0);
 });

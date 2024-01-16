@@ -109,7 +109,7 @@ export function runFindAndModifyCmdSuccess(st,
             updatedVal = pipelineUpdateResult[i];
         let newDoc = sessionDB.foo.find(updatedVal).toArray();
         assert.eq(0, sessionDB.foo.find(queries[i]).itcount());
-        assert.eq(1, newDoc.length);
+        assert.eq(1, newDoc.length, updatedVal);
         if (bsonWoCompare(updatedVal, collectionSplitPoint) > 0) {
             assert.eq(0, st.rs0.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());
             assert.eq(1, st.rs1.getPrimary().getDB(kDbName).foo.find(updatedVal).itcount());

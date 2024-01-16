@@ -293,7 +293,7 @@ public:
             return {};
         }
         if (!_lastMoveSkippedKey) {
-            _eof = advanceWTCursor();
+            _eof = !advanceWTCursor();
         }
 
         return curr();
@@ -426,7 +426,7 @@ private:
             PrepareConflictBehavior::kEnforce;
         WT_ITEM curKey;
         while (cmp < 0) {
-            _eof = advanceWTCursor();
+            _eof = !advanceWTCursor();
 
             if (_eof) {
                 break;
@@ -436,7 +436,7 @@ private:
                 break;
             }
 
-            getKey(c, &curKey);
+            getKey(c, &curKey, &metricsCollector);
             cmp = std::memcmp(
                 curKey.data, searchKeyItem.data, std::min(searchKeyItem.size, curKey.size));
 

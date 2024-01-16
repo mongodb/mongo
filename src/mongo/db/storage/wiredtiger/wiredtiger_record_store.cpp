@@ -2385,10 +2385,9 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
         invariantWTOK(c->bound(c, "bound=upper"), c->session);
     }
 
-    int cmp;
-    int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
+    int ret =
+        wiredTigerPrepareConflictRetry(_opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
     invariantWTOK(c->bound(c, "action=clear"), c->session);
-
     if (ret == WT_NOTFOUND) {
         _eof = true;
 
@@ -2402,8 +2401,14 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
     }
     invariantWTOK(ret, c->session);
 
-    if (cmp == 0)
+    // Our cursor can only move in one direction, so there's no need to clear the bound after
+    // seeking.
+
+    RecordId foundKey = getKey(c);
+    int cmp = foundKey.compare(_lastReturnedId);
+    if (cmp == 0) {
         return true;  // Landed right where we left off.
+    }
 
     if (_isCapped && !tolerateCappedRepositioning) {
         // The cursor has been repositioned as it was sitting on a document that has been
@@ -2415,16 +2420,11 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
         return false;
     }
 
-    if (_forward && cmp > 0) {
-        // We landed after where we were. Return our new location on the next call to next().
-        _skipNextAdvance = true;
-    } else if (!_forward && cmp < 0) {
-        _skipNextAdvance = true;
-    } else {
-        // Check that the cursor hasn't landed before _lastReturnedId
-        dassert(_forward ? cmp >= 0 : cmp <= 0);
-    }
+    // With bounded cursors, we should always find a key greater than the one we searched for.
+    dassert(_forward ? cmp > 0 : cmp < 0);
 
+    // We landed after where we were. Return our new location on the next call to next().
+    _skipNextAdvance = true;
     return true;
 }
 

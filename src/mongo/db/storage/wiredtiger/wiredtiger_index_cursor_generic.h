@@ -40,9 +40,7 @@ namespace mongo {
 class WiredTigerIndexCursorGeneric {
 public:
     WiredTigerIndexCursorGeneric(OperationContext* opCtx, bool forward)
-        : _opCtx(opCtx),
-          _forward(forward),
-          _metrics(&ResourceConsumption::MetricsCollector::get(opCtx)) {}
+        : _opCtx(opCtx), _forward(forward) {}
     virtual ~WiredTigerIndexCursorGeneric() = default;
 
     void resetCursor() {
@@ -54,7 +52,6 @@ public:
 
     void detachFromOperationContext() {
         _opCtx = nullptr;
-        _metrics = nullptr;
 
         if (!_saveStorageCursorOnDetachFromOperationContext) {
             _cursor = boost::none;
@@ -63,7 +60,6 @@ public:
 
     void reattachToOperationContext(OperationContext* opCtx) {
         _opCtx = opCtx;
-        _metrics = &ResourceConsumption::MetricsCollector::get(opCtx);
         // _cursor recreated in restore() to avoid risk of WT_ROLLBACK issues.
     }
 
@@ -73,39 +69,44 @@ public:
 
 protected:
     /**
-     * Returns true if and only if the cursor advanced to EOF.
+     * Returns false if and only if the cursor advanced to EOF.
      */
     [[nodiscard]] bool advanceWTCursor() {
         WT_CURSOR* c = _cursor->get();
         int ret = wiredTigerPrepareConflictRetry(
             _opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
         if (ret == WT_NOTFOUND) {
-            return true;
+            return false;
         }
         invariantWTOK(ret, c->session);
-        return false;
+        return true;
     }
 
     void setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
         cursor->set_key(cursor, item);
     }
 
-    void getKey(WT_CURSOR* cursor, WT_ITEM* key) {
+    void getKey(WT_CURSOR* cursor, WT_ITEM* key, ResourceConsumption::MetricsCollector* metrics) {
         invariantWTOK(cursor->get_key(cursor, key), cursor->session);
 
-        _metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
+        if (metrics) {
+            metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
+        }
     }
 
-    void getKeyValue(WT_CURSOR* cursor, WT_ITEM* key, WT_ITEM* value) {
+    void getKeyValue(WT_CURSOR* cursor,
+                     WT_ITEM* key,
+                     WT_ITEM* value,
+                     ResourceConsumption::MetricsCollector* metrics) {
         invariantWTOK(cursor->get_raw_key_value(cursor, key, value), cursor->session);
 
-        _metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
+        if (metrics) {
+            metrics->incrementOneIdxEntryRead(cursor->internal_uri, key->size);
+        }
     }
 
     OperationContext* _opCtx;
     const bool _forward;
-    ResourceConsumption::MetricsCollector* _metrics;
-
     boost::optional<WiredTigerCursor> _cursor;
 
     bool _saveStorageCursorOnDetachFromOperationContext = false;
