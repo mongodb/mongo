@@ -640,8 +640,7 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     const auto [cm, _] = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithPlacementRefresh(opCtx,
-                                                                                              nss));
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss));
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
 

@@ -24,12 +24,6 @@ selector:
   # TODO: SERVER-83349 Enable once dataShard is randomized through a fail point
   - jstests/core/timeseries/timeseries_create.js
   - jstests/core/timeseries/timeseries_create_collection.js
-  # TODO: SERVER-83784 Enable once collmod timeseries options is fixed
-  - jstests/core/timeseries/bucket_granularity.js
-  - jstests/core/timeseries/bucket_timestamp_rounding.js
-  - jstests/core/timeseries/bucket_unpacking_group_reorder_fixed_buckets.js
-  - jstests/core/timeseries/bucket_unpacking_with_match_fixed_buckets.js
-  - jstests/core/timeseries/timeseries_collmod.js
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/**/apitest_db.js  # serverStatus output doesn't have storageEngine.
