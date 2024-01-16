@@ -32,9 +32,8 @@ export const logEveryBatch =
     }
 
 export const dbCheckCompleted = (db) => {
-    return db.getSiblingDB("admin").currentOp().inprog == undefined ||
-        db.getSiblingDB("admin").currentOp().inprog.filter(x => x["desc"] == "dbCheck")[0] ===
-        undefined;
+    const inprog = db.getSiblingDB("admin").currentOp().inprog;
+    return inprog == undefined || inprog.filter(x => x["desc"] == "dbCheck")[0] === undefined;
 };
 
 // Wait for dbCheck to complete (on both primaries and secondaries).
