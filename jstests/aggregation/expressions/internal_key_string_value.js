@@ -1,5 +1,8 @@
 // Tests the behavior of $_internalKeyStringValue when used in agg expressions.
 
+(function() {
+"use strict";
+
 const coll = db[jsTestName()];
 
 // Testing behavior for basic data types.
@@ -193,3 +196,4 @@ results = coll.aggregate([
               .toArray();
 assert.eq(docs.length, results.length, results);
 assert(results.every(result => bsonWoCompare(result.b, results[0].b) === 0), results);
+})();
