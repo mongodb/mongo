@@ -69,6 +69,8 @@ class SamplingEstimator : public cascades::CardinalityEstimator {
 public:
     SamplingEstimator(OptPhaseManager phaseManager,
                       int64_t numRecords,
+                      DebugInfo debugInfo,
+                      PrefixId& prefixId,
                       std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
                       std::unique_ptr<SamplingExecutor> executor);
     ~SamplingEstimator();

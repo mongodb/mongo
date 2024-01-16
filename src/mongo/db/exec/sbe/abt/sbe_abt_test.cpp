@@ -883,6 +883,8 @@ TEST_F(NodeSBE, SamplingTest) {
         metadata,
         std::make_unique<ce::SamplingEstimator>(std::move(phaseManagerForSampling),
                                                 1000 /*collectionSize*/,
+                                                DebugInfo::kDefaultForTests,
+                                                prefixId,
                                                 makeHeuristicCE(),
                                                 std::make_unique<ABTRecorder>(nodes)),
         makeHeuristicCE(),
@@ -908,15 +910,14 @@ TEST_F(NodeSBE, SamplingTest) {
         "|           Const [1]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [scan_0]\n"
-        "|   PathGet [a]\n"
+        "|   |   Variable [evalTemp_1]\n"
         "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [2]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip [limit: 100, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, test]\n"
+        "|   Seek [ridProjection: rid_0, {'a': evalTemp_1}, test]\n"
         "LimitSkip [limit: 10, skip: 0]\n"
         "PhysicalScan [{'<rid>': rid_0}, test]\n",
         nodes.front());

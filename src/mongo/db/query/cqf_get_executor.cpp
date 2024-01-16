@@ -660,6 +660,8 @@ std::unique_ptr<CardinalityEstimator> createCardinalityEstimator(
                 createSamplingPhaseManager(
                     costModel, prefixId, metadata, constFold, hints, queryParameters),
                 collectionSize,
+                DebugInfo::kDefaultForProd,
+                prefixId,
                 std::make_unique<HeuristicEstimator>(),
                 std::make_unique<ce::SBESamplingExecutor>(opCtx));
         } else {

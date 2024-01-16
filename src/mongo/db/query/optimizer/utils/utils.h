@@ -406,6 +406,12 @@ ResidualRequirementsWithOptionalCE::Node createResidualReqsWithCE(
 ResidualRequirementsWithOptionalCE::Node createResidualReqsWithEmptyCE(const PSRExpr::Node& reqs);
 
 /**
+ * Build ResidualRequirementsWithOptionalCE where each entry in 'residReqs' has boost::none CE.
+ */
+ResidualRequirementsWithOptionalCE::Node createResidualReqsWithEmptyCE(
+    const ResidualRequirements::Node& residReqs);
+
+/**
  * Sort requirements under a Conjunction by estimated cost.
  */
 void sortResidualRequirements(ResidualRequirementsWithOptionalCE::Node& residualReq);

@@ -1930,6 +1930,34 @@ ResidualRequirementsWithOptionalCE::Node createResidualReqsWithEmptyCE(const PSR
     return std::move(*b.finish());
 }
 
+ResidualRequirementsWithOptionalCE::Node createResidualReqsWithEmptyCE(
+    const ResidualRequirements::Node& residReqs) {
+    BoolExprBuilder<ResidualRequirementWithOptionalCE> b;
+    b.pushDisj();
+
+    ResidualRequirements::visitDisjuncts(
+        residReqs,
+        [&](const ResidualRequirements::Node& child, const ResidualRequirements::VisitorContext&) {
+            b.pushConj();
+
+            ResidualRequirements::visitConjuncts(
+                child,
+                [&](const ResidualRequirements::Node& atom,
+                    const ResidualRequirements::VisitorContext&) {
+                    ResidualRequirements::visitAtom(
+                        atom,
+                        [&](const ResidualRequirement& req,
+                            const ResidualRequirements::VisitorContext&) {
+                            b.atom(req._key, req._req, boost::none);
+                        });
+                });
+
+            b.pop();
+        });
+
+    return std::move(*b.finish());
+}
+
 
 void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node) {
     // "move" data out of map to avoid potential copies.

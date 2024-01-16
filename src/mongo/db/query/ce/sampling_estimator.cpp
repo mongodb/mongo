@@ -52,8 +52,11 @@
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/optimizer/rewrites/sampling_const_eval.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
+#include "mongo/db/query/optimizer/utils/path_utils.h"
 #include "mongo/db/query/optimizer/utils/physical_plan_builder.h"
 #include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
@@ -143,6 +146,113 @@ private:
     const OptPhaseManager& _phaseManager;
 };
 
+/**
+ * Transport to build empty props for each node since the plan is constructed without the memo
+ * implementation phase, while the later SBE lowering phase still assumes the props map to be
+ * populated (e.g. the FilterNodes lowered from '_residualRequirements' of a SargableNode).
+ */
+class BuildingPropsTransport {
+public:
+    BuildingPropsTransport(NodeToGroupPropsMap& propsMap) : _propsMap(propsMap) {}
+
+    template <typename T, typename... Args>
+    void transport(ABT& n, const T& node, Args&&... args) {
+        _propsMap.emplace(n.cast<Node>(), NodeProps{});
+    }
+
+    void buildProps(ABT& n) {
+        algebra::transport<true>(n, *this);
+    }
+
+private:
+    NodeToGroupPropsMap& _propsMap;
+};
+
+/**
+ * Transport to implement SargableNode into FilterNode, LimitSkipNode and PhysicalScanNode
+ * with field projections. Particularly, this transport is interested in the '_residualRequirements'
+ * and '_fieldProjectionMap' in the 'ScanParams' of the SargableNode. '_residualRequirements' is
+ * lowered into FilterNode(s) and '_fieldProjectionMap' is turned into the field projection map of a
+ * PhysicalScanNode.
+ */
+class ImplementationTransport {
+public:
+    ImplementationTransport(const Memo& memo,
+                            const int64_t sampleSize,
+                            const Metadata& metadata,
+                            const properties::IndexingAvailability& indexingAvailability,
+                            const PathToIntervalFn& pathToIntervalFn,
+                            NodeToGroupPropsMap& propsMap)
+        : _memo(memo),
+          _sampleSize(sampleSize),
+          _metadata(metadata),
+          _indexingAvailability(indexingAvailability),
+          _pathToIntervalFn(pathToIntervalFn),
+          _propsMap(propsMap) {}
+    void transport(ABT& n,
+                   SargableNode& node,
+                   ABT& /*childResult*/,
+                   ABT& /*bindResult*/,
+                   ABT& /*refsResult*/) {
+        const auto& scanDefName = _indexingAvailability.getScanDefName();
+
+        // Prepares node properties for the scan node.
+        NodeProps props;
+        ProjectionNameVector projectionNames;
+        for (const auto& entry : node.getScanParams()->_fieldProjectionMap._fieldProjections) {
+            projectionNames.push_back(entry.second);
+        }
+        properties::setPropertyOverwrite<properties::ProjectionRequirement>(
+            props._physicalProps, properties::ProjectionRequirement{std::move(projectionNames)});
+
+        // Creates a physical scan node with the field projeciton map from 'node'.
+        auto physicalScanNode =
+            make<PhysicalScanNode>(std::move(node.getScanParams()->_fieldProjectionMap),
+                                   scanDefName,
+                                   false /*canUseParallelScan*/,
+                                   _metadata._scanDefs.at(scanDefName).getScanOrder());
+        _propsMap.emplace(physicalScanNode.cast<Node>(), std::move(props));
+
+        // Creates a LimitSkipNode on top of the PhysicalScanNode.
+        auto limitSkipNode = make<LimitSkipNode>(properties::LimitSkipRequirement(_sampleSize, 0),
+                                                 std::move(physicalScanNode));
+
+
+        auto residualReqs = *node.getScanParams()->_residualRequirements;
+        PhysPlanBuilder builder;
+        std::swap(builder._node, limitSkipNode);
+
+        // Lowers 'residualReqs' and creates FilterNode(s) on top of the ABT 'normalized'.
+        lowerPartialSchemaRequirements(boost::none /*scanGroupCE*/,
+                                       boost::none /*baseCE*/,
+                                       {} /*indexPredSels*/,
+                                       createResidualReqsWithEmptyCE(residualReqs),
+                                       _pathToIntervalFn,
+                                       builder);
+        std::swap(n, builder._node);
+    }
+
+    /**
+     * Template to handle all other cases.
+     */
+    template <typename T, typename... Args>
+    void transport(ABT& n, const T& node, Args&&... args) {
+        static_assert(!std::is_same_v<T, SargableNode>, "Missing SargableNode handler");
+    }
+
+    void lower(ABT& n) {
+        algebra::transport<true>(n, *this);
+    }
+
+private:
+    const Memo& _memo;
+    const int64_t _sampleSize;
+    const Metadata& _metadata;
+    const properties::IndexingAvailability& _indexingAvailability;
+    const PathToIntervalFn& _pathToIntervalFn;
+    NodeToGroupPropsMap& _propsMap;
+};
+
 class SamplingChunksTransport {
 public:
     SamplingChunksTransport(NodeToGroupPropsMap& propsMap,
@@ -181,7 +291,7 @@ public:
         ABT innerNode = make<LimitSkipNode>(properties::LimitSkipRequirement(chunkSize, 0),
                                             std::move(seekNode));
 
-        const NodeProps& limitProps = _propsMap.at(n.cast<Node>());
+        const NodeProps& limitProps = _propsMap.at(limit.getChild().cast<Node>());
         NodeProps sharedProps = NodeProps{limitProps._planNodeId,
                                           limitProps._groupId,
                                           limitProps._logicalProps,
@@ -229,12 +339,16 @@ class SamplingTransport {
 public:
     SamplingTransport(OptPhaseManager phaseManager,
                       const int64_t numRecords,
+                      DebugInfo debugInfo,
+                      PrefixId& prefixId,
                       std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
                       std::unique_ptr<SamplingExecutor> executor)
         : _phaseManager(std::move(phaseManager)),
           _sampleSize(std::min<int64_t>(
               _phaseManager.getHints()._sqrtSampleSizeEnabled ? std::sqrt(numRecords) : numRecords,
               _phaseManager.getHints()._samplingCollectionSizeMax)),
+          _debugInfo(std::move(debugInfo)),
+          _prefixId(prefixId),
           _fallbackCE(std::move(fallbackCE)),
           _executor(std::move(executor)) {}
 
@@ -271,12 +385,18 @@ public:
         if (!properties::hasProperty<properties::IndexingAvailability>(logicalProps)) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
         }
+        const auto& indexingAvailability =
+            getPropertyConst<properties::IndexingAvailability>(logicalProps);
+        // TODO(SERVER-84713): Remove once a SargableNode always has a ScanNode child after the
+        // substitution phase.
+        if (node.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId() !=
+            indexingAvailability.getScanGroupId()) {
+            // To implement a sargable node, we must have the scan group as a child.
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
+        }
 
-        const ScanDefinition& scanDef = getScanDefFromIndexingAvailability(
-            metadata, properties::getPropertyConst<properties::IndexingAvailability>(logicalProps));
-
-        SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
-        ABT extracted = planExtractor.extract(n.copy());
+        const ScanDefinition& scanDef =
+            getScanDefFromIndexingAvailability(metadata, indexingAvailability);
 
         // If there are at least two indexed fields, this ABT pair will hold the paths of the
         // two indexed fields that appear most frequently across all indexes. If such a pair exists,
@@ -305,46 +425,41 @@ public:
             }
         }
         // If there exist two suitable fields to estimate together, one will be held in
-        // conjKeyPair.first until its match is found by the lambda below. conjKeyPair.second is
-        // used to identify the PartialSchemaKey path of each conjunct.
-        boost::optional<std::pair<ABT, ABT>> conjKeyPair;
+        // conjKeyPair.second until its match is found by the lambda below. conjKeyPair.first is
+        // used to denote its index within the conjunction.
+        boost::optional<std::pair<size_t, PartialSchemaEntry>> conjKeyPair;
         std::string estimationMode;
+
+        size_t entryIndex = 0;
         // Estimate individual requirements separately by potentially re-using cached results.
         // TODO: consider estimating together the entire set of requirements (but caching!)
         EstimatePartialSchemaEntrySelFn estimateFn = [&](SelectivityTreeBuilder& selTreeBuilder,
                                                          const PartialSchemaEntry& e) {
             const auto& [key, req] = e;
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
-                PhysPlanBuilder lowered{extracted};
-                // Lower requirement without an output binding.
-                lowerPartialSchemaRequirement(
-                    key,
-                    PartialSchemaRequirement{boost::none /*boundProjectionName*/,
-                                             req.getIntervals(),
-                                             req.getIsPerfOnly()},
-                    _phaseManager.getPathToInterval(),
-                    boost::none /*residualCE*/,
-                    lowered);
-                uassert(6624243, "Expected a filter node", lowered._node.is<FilterNode>());
-                ABT entry = lowered._node;
+                // Collects the partial schema entries to rebuild a sargable node. If there exist
+                // two suitable fields to sample together, 'conjEntries' will contains 2 entries.
+                // Otherwise, it contains only one entry 'e'.
+                std::vector<std::pair<size_t, PartialSchemaEntry>> conjEntries;
+                conjEntries.push_back({entryIndex, e});
                 if (canCombine) {
                     if (conjKeyPair.has_value()) {
-                        if ((conjKeyPair->second == paths->first && key._path == paths->second) ||
-                            (conjKeyPair->second == paths->second && key._path == paths->first)) {
-                            entry = make<FilterNode>(
-                                make<BinaryOp>(
-                                    Operations::And,
-                                    std::move(
-                                        conjKeyPair.get().first.cast<FilterNode>()->getFilter()),
-                                    std::move(entry.cast<FilterNode>()->getFilter())),
-                                std::move(entry.cast<FilterNode>()->getChild()));
+                        if ((conjKeyPair->second.first._path == paths->first &&
+                             key._path == paths->second) ||
+                            (conjKeyPair->second.first._path == paths->second &&
+                             key._path == paths->first)) {
+                            conjEntries.push_back(*conjKeyPair);
                             conjKeyPair = boost::none;
                         }
                     } else if (key._path == paths->first || key._path == paths->second) {
-                        conjKeyPair = std::make_pair(entry, key._path);
+                        conjKeyPair = std::make_pair(entryIndex, e);
                         return;
                     }
                 }
+                // Rebuilds a normalized sargable node whose 'reqMap' is reconstructed from
+                // 'conjEntries'.
+                auto normalized = normalizeSargableNode(node, conjEntries);
+
                 // Continue the sampling estimation only if the field from the partial schema is
                 // indexed.
                 const bool shouldSample = isFieldPathIndexed(key, scanDef) ||
@@ -355,7 +470,7 @@ public:
                                        logicalProps,
                                        queryParameters,
                                        n,
-                                       std::move(entry),
+                                       std::move(normalized),
                                        childResult._ce)
                     : _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
                 const SelectivityType sel =
@@ -363,6 +478,8 @@ public:
                 selTreeBuilder.atom(sel);
                 estimationMode = filterCE._mode;
             }
+
+            entryIndex++;
         };
         PartialSchemaRequirementsCardinalityEstimator estimator(estimateFn, childResult._ce);
         return {estimator.estimateCE(node.getReqMap()), estimationMode};
@@ -408,7 +525,7 @@ private:
             return {it->second * childResult, samplingLabel};
         }
 
-        const auto selectivity = estimateSelectivity(abtTree);
+        const auto selectivity = estimateSelectivity(memo, logicalProps, abtTree);
         if (!selectivity) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, queryParameters, n);
         }
@@ -422,7 +539,10 @@ private:
         return {*selectivity * childResult, samplingLabel};
     }
 
-    boost::optional<optimizer::SelectivityType> estimateSelectivity(ABT abt) {
+    boost::optional<optimizer::SelectivityType> estimateSelectivity(
+        const cascades::Memo& memo, const properties::LogicalProps& logicalProps, ABT abt) {
+        bool isSargableNode = abt.is<SargableNode>();
+
         // Add a group by to count number of documents.
         const ProjectionName sampleSumProjection = "sum";
         abt = make<GroupByNode>(ProjectionNameVector{},
@@ -433,13 +553,14 @@ private:
             properties::ProjectionRequirement{ProjectionNameVector{sampleSumProjection}},
             std::move(abt));
 
-
         OPTIMIZER_DEBUG_LOG(6264806,
                             5,
                             "Estimate selectivity ABT",
                             "explain"_attr = ExplainGenerator::explainV2(abt));
 
-        PlanAndProps planAndProps = _phaseManager.optimizeAndReturnProps(std::move(abt));
+        PlanAndProps planAndProps = isSargableNode
+            ? implementSargableNode(memo, logicalProps, std::move(abt))
+            : _phaseManager.optimizeAndReturnProps(std::move(abt));
 
         // If internalCascadesOptimizerSampleChunks is a positive integer, sample by chunks using
         // that value as the number of chunks. Otherwise, perform fully randomized sample.
@@ -458,6 +579,88 @@ private:
                                               _sampleSize,
                                               _phaseManager.getQueryParameters(),
                                               planAndProps);
+    }
+
+    /**
+     * Rebuilds a SargableNode by reconstructing 'reqMap' from 'conjEntries'. 'conjEntries' may
+     * contain more than one predicates, for instance, when we are sampling 2 predicates at a time.
+     *
+     * Also, normalizes the SargableNode with 'getExistingOrTempProjForFieldName()' to ensure the
+     * same field names always resolved with the same projection name. This is essential to make two
+     * equivalent sampling queries hit the cache '_selectivityCacheMap' even though they are
+     * generated from different SargableNode trees in different memo groups.
+     *
+     * Lastly, omits anything irrelevant for sampling queries such as candidate indexes or output
+     * bindings.
+     */
+    ABT normalizeSargableNode(
+        const SargableNode& node,
+        const std::vector<std::pair<size_t, PartialSchemaEntry>>& conjEntries) {
+        FieldProjectionMap fpm;
+        BoolExprBuilder<PartialSchemaEntry> reqs;
+        BoolExprBuilder<ResidualRequirement> residualReqs;
+        reqs.pushDisj().pushConj();
+        residualReqs.pushDisj().pushConj();
+        for (const auto& e : conjEntries) {
+            auto& [key, req] = e.second;
+            auto fieldPath = *key._path.cast<PathGet>();
+            auto projectionName =
+                getExistingOrTempProjForFieldName(_prefixId, fieldPath.name(), _fieldProjMap);
+            fpm._fieldProjections.emplace(fieldPath.name(), projectionName);
+
+            // Strips the output binding from the requirement.
+            PartialSchemaRequirement reqWithoutProjection{
+                boost::none, req.getIntervals(), req.getIsPerfOnly()};
+            reqs.atom(key, reqWithoutProjection);
+            residualReqs.atom(
+                {{projectionName, fieldPath.getPath()}, reqWithoutProjection, e.first});
+        }
+
+        // Notes that we pass empty candidate indexes. This is for better caching in
+        // '_selectivityCacheMap' as long as two sargable nodes have the same 'reqMap'.
+        return make<SargableNode>(*reqs.finish(),
+                                  CandidateIndexes{},
+                                  ScanParams{fpm, *residualReqs.finish()},
+                                  IndexReqTarget::Complete,
+                                  node.getChild());
+    }
+
+    /**
+     * Implements sargable node without full round-trip.
+     */
+    PlanAndProps implementSargableNode(const cascades::Memo& memo,
+                                       const properties::LogicalProps& logicalProps,
+                                       ABT abt) {
+        PlanAndProps planAndProps{std::move(abt), NodeToGroupPropsMap{}};
+        ImplementationTransport{
+            memo,
+            _sampleSize,
+            _phaseManager.getMetadata(),
+            properties::getPropertyConst<properties::IndexingAvailability>(logicalProps),
+            _phaseManager.getPathToInterval(),
+            planAndProps._map}
+            .lower(planAndProps._node);
+        BuildingPropsTransport{planAndProps._map}.buildProps(planAndProps._node);
+
+        // TODO: Remove ref tracker by refactoring path lowering constructor.
+        VariableEnvironment env = VariableEnvironment::build(
+            planAndProps._node, &memo /*memoInterface*/, false /*computeLastRefs*/);
+
+        if (_phaseManager.hasPhase(OptPhase::PathLower)) {
+            PathLowering instance{_prefixId, env};
+            int optimizeIterations = 0;
+            for (; instance.optimize(planAndProps._node); optimizeIterations++) {
+                tassert(
+                    8158902,
+                    str::stream()
+                        << "Iteration limit exceeded while running the following phase: PathLower.",
+                    !_debugInfo.exceedsIterationLimit(optimizeIterations));
+            }
+        }
+        if (_phaseManager.hasPhase(OptPhase::ConstEvalPost_ForSampling)) {
+            SamplingConstEval{}.optimize(planAndProps._node);
+        }
+        return planAndProps;
     }
 
     const ScanDefinition& getScanDefFromIndexingAvailability(
@@ -496,18 +699,31 @@ private:
     OptPhaseManager _phaseManager;
 
     const int64_t _sampleSize;
+    DebugInfo _debugInfo;
+    PrefixId& _prefixId;
     std::unique_ptr<cascades::CardinalityEstimator> _fallbackCE;
     std::unique_ptr<SamplingExecutor> _executor;
+
+    // Reassigns projection names in a sargable node in 'normalizeSargableNode()' in order to
+    // normalize the ABT for '_selectivityCacheMap'. This is only used with
+    // 'getExistingOrTempProjForFieldName()'.
+    FieldProjectionMap _fieldProjMap;
 
     static constexpr char samplingLabel[] = "sampling";
 };
 
 SamplingEstimator::SamplingEstimator(OptPhaseManager phaseManager,
                                      const int64_t numRecords,
+                                     DebugInfo debugInfo,
+                                     PrefixId& prefixId,
                                      std::unique_ptr<cascades::CardinalityEstimator> fallbackCE,
                                      std::unique_ptr<SamplingExecutor> executor)
-    : _transport(std::make_unique<SamplingTransport>(
-          std::move(phaseManager), numRecords, std::move(fallbackCE), std::move(executor))) {}
+    : _transport(std::make_unique<SamplingTransport>(std::move(phaseManager),
+                                                     numRecords,
+                                                     std::move(debugInfo),
+                                                     prefixId,
+                                                     std::move(fallbackCE),
+                                                     std::move(executor))) {}
 
 SamplingEstimator::~SamplingEstimator() {}
 

@@ -179,9 +179,9 @@ public:
 
     const QueryParameterMap& getQueryParameters() const;
 
-private:
     bool hasPhase(OptPhase phase) const;
 
+private:
     template <OptPhase phase, class C>
     void runStructuralPhase(C instance, VariableEnvironment& env, ABT& input);
 
