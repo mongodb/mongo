@@ -11,9 +11,9 @@ if (!checkCascadesOptimizerEnabled(db)) {
     quit();
 }
 
-// TODO SERVER-82185: Remove this once M2-eligibility checker + E2E parameterization implemented
+// TODO SERVER-84203: Remove this once temporary parameterization suites are deleted.
 if (!checkPlanCacheParameterization(db)) {
-    jsTestLog("Skipping test because E2E plan cache parameterization not yet implemented");
+    jsTestLog("Skipping test because parameterization is not yet enabled by default.");
     quit();
 }
 
@@ -42,7 +42,14 @@ const cmds = [
     [{$or: [{'a.b': 2}, {'a.b': 2}]}, 1]
 ];
 
-function verifyCommandCorrectness(cmd, nReturnedExpected, find = true) {
+/**
+ * Verify that the command returns the correct number of documents and produces a correct plan.
+ * 'nReturnedExpected' is the expected number of documents returned from the command. 'find` is true
+ * if it is a find command, and false if it is an aggregate command. 'assertPhysicalScan` is true if
+ * the command is M2-eligible and produces a collection scan plan, false if the command is
+ * M2-ineligible.
+ */
+function verifyCommandCorrectness(cmd, nReturnedExpected, find, assertPhysicalScan) {
     let res;
     if (find) {
         res = coll.explain("executionStats").find(cmd).finish();
@@ -51,11 +58,19 @@ function verifyCommandCorrectness(cmd, nReturnedExpected, find = true) {
     }
     // Correct number of documents returned.
     assert.eq(nReturnedExpected, res.executionStats.nReturned);
-    // Plan uses a collection scan.
-    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+
+    if (assertPhysicalScan) {
+        // Plan uses a collection scan.
+        assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+    }
 }
 
-function verifyCommandParameterization(cmd, find = true) {
+/**
+ * Verify that the command is parameterized if it is M2-eligible. 'find` is true if it is a find
+ * command, false if it is an aggregate command. 'assertParameterized` is true if the command is
+ * M2-eligible and contains FunctionCall [getParam] nodes, false if the command is M2-ineligible.
+ */
+function verifyCommandParameterization(cmd, find, assertParameterized) {
     let res;
     if (find) {
         res = runWithParams(
@@ -72,9 +87,14 @@ function verifyCommandParameterization(cmd, find = true) {
             ],
             () => coll.explain("executionStats").aggregate({$match: cmd}));
     }
-    // Plan is parameterized and contains FunctionCall [getParam].
+
     let explainStr = removeUUIDsFromExplain(db, res);
-    assert(explainStr.includes("FunctionCall [getParam]"));
+    if (assertParameterized) {
+        // Plan is parameterized and contains FunctionCall [getParam].
+        assert(explainStr.includes("FunctionCall [getParam]"));
+    } else {
+        assert(!explainStr.includes("FunctionCall [getParam]"));
+    }
 }
 
 runWithParams(
@@ -83,14 +103,31 @@ runWithParams(
         {key: "internalCascadesOptimizerDisableFastPath", value: true},
     ],
     () => {
+        const find = true;
+        const agg = false;
+        const assertPhysicalScan = true;
+        const assertParamerized = true;
+
         // Collection has no indexes except default _id index
         // Verify that queries are parameterized correctly for M2 Bonsai-eligible FIND queries
-        cmds.forEach(cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1])});
-        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0])});
+        cmds.forEach(
+            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], find, assertPhysicalScan)});
+        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], find, assertParamerized)});
 
         // Verify that queries are parameterized correctly for M2 Bonsai-eligible AGG queries
-        cmds.forEach(cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], false)});
-        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], false)});
-    });
+        cmds.forEach(
+            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], agg, assertPhysicalScan)});
+        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], agg, assertParamerized)});
 
-// TODO SERVER-82185 Verify that M2-ineligible queries on indexed collections are not parameterized
+        assert.commandWorked(coll.createIndex({'a.b': 1}));
+        // Collection has indexes
+        // Verify that queries are not parameterized for M2 Bonsai-ineligible FIND queries
+        cmds.forEach(
+            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], find, !assertPhysicalScan)});
+        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], find, !assertParamerized)});
+
+        // Verify that queries are not parameterized for M2 Bonsai-ineligible AGG queries
+        cmds.forEach(
+            cmdEl => {verifyCommandCorrectness(cmdEl[0], cmdEl[1], agg, !assertPhysicalScan)});
+        cmds.forEach(cmdEl => {verifyCommandParameterization(cmdEl[0], agg, !assertParamerized)});
+    });

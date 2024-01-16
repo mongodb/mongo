@@ -10,9 +10,9 @@ if (!checkCascadesOptimizerEnabled(db)) {
     quit();
 }
 
-// TODO SERVER-82185: Remove this once M2-eligibility checker + E2E parameterization implemented
+// TODO SERVER-84203: Remove this once temporary parameterization suites are deleted.
 if (!checkPlanCacheParameterization(db)) {
-    jsTestLog("Skipping test because E2E plan cache parameterization not yet implemented");
+    jsTestLog("Skipping test because parameterization is not yet enabled by default.");
     quit();
 }
 

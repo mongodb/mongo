@@ -1618,7 +1618,8 @@ Status _runAggregate(OperationContext* opCtx,
                 };
 
                 if (internalCascadesOptimizerEnableParameterization.load() &&
-                    pipeline->canParameterize() && fullyEligible(pipeline->getSources())) {
+                    bonsaiEligibility.isFullyEligible() && pipeline->canParameterize() &&
+                    fullyEligible(pipeline->getSources())) {
                     pipeline->parameterize();
                 }
 

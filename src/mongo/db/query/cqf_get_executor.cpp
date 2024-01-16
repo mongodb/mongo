@@ -959,12 +959,16 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
         involvedCollections = pipeline->getInvolvedCollections();
     }
 
-    // TODO SERVER-82185: Update value of parameterizationOn based on M2-eligibility
     // TODO SERVER-83414: Enable histogram CE with parameterization.
     const auto parameterizationOn = (internalQueryCardinalityEstimatorMode != "histogram"_sd) &&
-        internalCascadesOptimizerEnableParameterization.load();
+        internalCascadesOptimizerEnableParameterization.load() && eligibility.isFullyEligible();
 
     const auto planCacheKey = [&]() -> boost::optional<sbe::PlanCacheKey> {
+        // For now, only M2-eligible queries will be cached.
+        if (!eligibility.isFullyEligible()) {
+            return boost::none;
+        }
+
         if (canonicalQuery) {
             return createPlanCacheKey(*canonicalQuery, collections);
         } else if (pipeline->isParameterized()) {

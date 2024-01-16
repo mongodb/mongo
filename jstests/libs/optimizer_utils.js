@@ -12,7 +12,7 @@ export function checkCascadesOptimizerEnabled(theDB) {
     return val == "tryBonsai" || val == "tryBonsaiExperimental" || val == "forceBonsai";
 }
 
-// TODO SERVER-82185: Remove this once M2-eligibility checker + E2E parameterization implemented
+// TODO SERVER-84203: Remove this once temporary parameterization suites are deleted.
 export function checkPlanCacheParameterization(theDB) {
     return theDB.adminCommand({getParameter: 1, internalCascadesOptimizerEnableParameterization: 1})
         .internalCascadesOptimizerEnableParameterization;

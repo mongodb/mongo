@@ -9,9 +9,6 @@ selector:
   exclude_files:
   - jstests/query_golden/libs/**/*.js
   - jstests/query_golden/ce_accuracy.js
-  - jstests/query_golden/ce_mixed.js
-  - jstests/query_golden/ce_sampled_histogram.js
-  - jstests/query_golden/non_multikey_paths.js
 executor:
   archive:
     hooks:
