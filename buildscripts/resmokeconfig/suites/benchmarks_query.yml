@@ -10,6 +10,7 @@ selector:
   - build/install/bin/rate_limiting_bm*
   - build/install/bin/shapifying_bm*
   - build/install/bin/profile_filter_bm*
+  - build/install/bin/query_settings_lookup_bm*
 
 executor:
   config: {}
