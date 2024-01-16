@@ -159,6 +159,7 @@ class ExpressionDateSubtract;
 class ExpressionDateTrunc;
 class ExpressionGetField;
 class ExpressionSetField;
+class ExpressionInternalKeyStringValue;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -167,6 +168,7 @@ class AccumulatorStdDevPop;
 class AccumulatorStdDevSamp;
 class AccumulatorSum;
 class AccumulatorMergeObjects;
+
 template <typename AccumulatorState>
 class ExpressionFromAccumulator;
 
@@ -315,6 +317,7 @@ public:
     virtual void visit(ExpressionDateSubtract*) = 0;
     virtual void visit(ExpressionGetField*) = 0;
     virtual void visit(ExpressionSetField*) = 0;
+    virtual void visit(ExpressionInternalKeyStringValue*) = 0;
 };
 
 }  // namespace mongo
