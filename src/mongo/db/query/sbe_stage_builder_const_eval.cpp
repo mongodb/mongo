@@ -335,54 +335,70 @@ void ExpressionConstEval::transport(optimizer::ABT& n,
 void ExpressionConstEval::transport(optimizer::ABT& n,
                                     const optimizer::FunctionCall& op,
                                     std::vector<optimizer::ABT>& args) {
-    // We can simplify exists(constant) to true if the said constant is not Nothing.
-    if (op.name() == "exists" && args.size() == 1 && args[0].is<optimizer::Constant>()) {
-        auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
-        swapAndUpdate(n, optimizer::Constant::boolean(tag != sbe::value::TypeTags::Nothing));
-    }
+    if (args.size() == 1 && args[0].is<optimizer::Constant>()) {
+        // We can simplify exists(constant) to true if the said constant is not Nothing.
+        if (op.name() == "exists"s) {
+            auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+            swapAndUpdate(n, optimizer::Constant::boolean(tag != sbe::value::TypeTags::Nothing));
+        }
 
-    // We can simplify coerceToBool(constant).
-    if (op.name() == "coerceToBool" && args.size() == 1 && args[0].is<optimizer::Constant>()) {
-        auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
-        auto [resultTag, resultVal] = sbe::value::coerceToBool(tag, val);
-        swapAndUpdate(n, optimizer::make<optimizer::Constant>(resultTag, resultVal));
+        // We can simplify coerceToBool(constant).
+        if (op.name() == "coerceToBool"s) {
+            auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+            auto [resultTag, resultVal] = sbe::value::coerceToBool(tag, val);
+            swapAndUpdate(n, optimizer::make<optimizer::Constant>(resultTag, resultVal));
+        }
+
+        // We can simplify isTimeUnit(constant).
+        if (op.name() == "isTimeUnit"s) {
+            auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+            if (sbe::value::isString(tag)) {
+                swapAndUpdate(n,
+                              optimizer::Constant::boolean(
+                                  isValidTimeUnit(sbe::value::getStringView(tag, val))));
+            } else {
+                swapAndUpdate(n, optimizer::Constant::nothing());
+            }
+        }
     }
 
     // We can simplify typeMatch(constant, constantMask).
-    if (op.name() == "typeMatch" && args.size() == 2 && args[0].is<optimizer::Constant>() &&
+    if (args.size() == 2 && args[0].is<optimizer::Constant>() &&
         args[1].is<optimizer::Constant>()) {
-        auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
-        if (tag == sbe::value::TypeTags::Nothing) {
-            swapAndUpdate(n, optimizer::Constant::nothing());
-        } else {
-            auto [tagMask, valMask] = args[1].cast<optimizer::Constant>()->get();
-            if (tagMask == sbe::value::TypeTags::NumberInt32) {
-                auto bsonMask = static_cast<uint32_t>(sbe::value::bitcastTo<int32_t>(valMask));
-                swapAndUpdate(n,
-                              optimizer::Constant::boolean((getBSONTypeMask(tag) & bsonMask) != 0));
+        if (op.name() == "typeMatch"s) {
+            auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+            if (tag == sbe::value::TypeTags::Nothing) {
+                swapAndUpdate(n, optimizer::Constant::nothing());
+            } else {
+                auto [tagMask, valMask] = args[1].cast<optimizer::Constant>()->get();
+                if (tagMask == sbe::value::TypeTags::NumberInt32) {
+                    auto bsonMask = static_cast<uint32_t>(sbe::value::bitcastTo<int32_t>(valMask));
+                    swapAndUpdate(
+                        n, optimizer::Constant::boolean((getBSONTypeMask(tag) & bsonMask) != 0));
+                }
+            }
+        }
+
+        // We can simplify convert(constant).
+        if (op.name() == "convert"s) {
+            auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
+            if (tag == sbe::value::TypeTags::Nothing) {
+                swapAndUpdate(n, optimizer::Constant::nothing());
+            } else {
+                auto [tagRhs, valRhs] = args[1].cast<optimizer::Constant>()->get();
+                if (tagRhs == sbe::value::TypeTags::NumberInt32) {
+                    sbe::value::TypeTags targetTypeTag =
+                        (sbe::value::TypeTags)sbe::value::bitcastTo<int32_t>(valRhs);
+                    auto [_, convertedTag, convertedVal] =
+                        sbe::value::genericNumConvert(tag, val, targetTypeTag);
+                    swapAndUpdate(n,
+                                  optimizer::make<optimizer::Constant>(convertedTag, convertedVal));
+                }
             }
         }
     }
 
-    // We can simplify convert(constant).
-    if (op.name() == "convert" && args.size() == 2 && args[0].is<optimizer::Constant>() &&
-        args[1].is<optimizer::Constant>()) {
-        auto [tag, val] = args[0].cast<optimizer::Constant>()->get();
-        if (tag == sbe::value::TypeTags::Nothing) {
-            swapAndUpdate(n, optimizer::Constant::nothing());
-        } else {
-            auto [tagRhs, valRhs] = args[1].cast<optimizer::Constant>()->get();
-            if (tagRhs == sbe::value::TypeTags::NumberInt32) {
-                sbe::value::TypeTags targetTypeTag =
-                    (sbe::value::TypeTags)sbe::value::bitcastTo<int32_t>(valRhs);
-                auto [_, convertedTag, convertedVal] =
-                    sbe::value::genericNumConvert(tag, val, targetTypeTag);
-                swapAndUpdate(n, optimizer::make<optimizer::Constant>(convertedTag, convertedVal));
-            }
-        }
-    }
-
-    if (op.name() == "newArray") {
+    if (op.name() == "newArray"s) {
         bool allConstants = true;
         for (const optimizer::ABT& arg : op.nodes()) {
             if (!arg.is<optimizer::Constant>()) {

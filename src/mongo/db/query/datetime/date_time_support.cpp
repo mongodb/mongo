@@ -856,13 +856,6 @@ inline long long dateDiffSecond(timelib_time* startInstant, timelib_time* endIns
         dateDiffMinuteWithoutUTCOffsetCorrection(startInstant, endInstant) * kSecondsPerMinute +
         utcOffsetCorrectionForSeconds(startInstant, endInstant);
 }
-inline long long dateDiffMillisecond(Date_t startDate, Date_t endDate) {
-    long long result;
-    uassert(5166308,
-            "dateDiff overflowed",
-            !overflow::sub(endDate.toMillisSinceEpoch(), startDate.toMillisSinceEpoch(), &result));
-    return result;
-}
 
 // A mapping from a string expression of TimeUnit to TimeUnit.
 static const StringMap<TimeUnit> timeUnitNameToTimeUnitMap{
@@ -909,6 +902,13 @@ long long dateDiff(Date_t startDate,
     // Translate the time instants to the given timezone.
     auto startDateInTimeZone = timezone.getTimelibTime(startDate);
     auto endDateInTimeZone = timezone.getTimelibTime(endDate);
+    return dateDiff(startDateInTimeZone.get(), endDateInTimeZone.get(), unit, startOfWeek);
+}
+
+long long dateDiff(_timelib_time* startDateInTimeZone,
+                   _timelib_time* endDateInTimeZone,
+                   TimeUnit unit,
+                   DayOfWeek startOfWeek) {
     switch (unit) {
         case TimeUnit::year:
             return dateDiffYear(*startDateInTimeZone, *endDateInTimeZone);
@@ -921,14 +921,22 @@ long long dateDiff(Date_t startDate,
         case TimeUnit::day:
             return dateDiffDay(*startDateInTimeZone, *endDateInTimeZone);
         case TimeUnit::hour:
-            return dateDiffHour(startDateInTimeZone.get(), endDateInTimeZone.get());
+            return dateDiffHour(startDateInTimeZone, endDateInTimeZone);
         case TimeUnit::minute:
-            return dateDiffMinute(startDateInTimeZone.get(), endDateInTimeZone.get());
+            return dateDiffMinute(startDateInTimeZone, endDateInTimeZone);
         case TimeUnit::second:
-            return dateDiffSecond(startDateInTimeZone.get(), endDateInTimeZone.get());
+            return dateDiffSecond(startDateInTimeZone, endDateInTimeZone);
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+long long dateDiffMillisecond(Date_t startDate, Date_t endDate) {
+    long long result;
+    uassert(5166308,
+            "dateDiff overflowed",
+            !overflow::sub(endDate.toMillisSinceEpoch(), startDate.toMillisSinceEpoch(), &result));
+    return result;
 }
 
 TimeUnit parseTimeUnit(StringData unitName) {

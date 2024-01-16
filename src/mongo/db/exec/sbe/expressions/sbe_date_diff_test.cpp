@@ -120,6 +120,11 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
     value::OwnedValueAccessor startOfWeekAccessor;
     auto startOfWeekSlot = bindAccessor(&startOfWeekAccessor);
 
+    value::ViewOfValueAccessor blockAccessor;
+    auto blockSlot = bindAccessor(&blockAccessor);
+    value::ViewOfValueAccessor bitsetAccessor;
+    auto bitsetSlot = bindAccessor(&bitsetAccessor);
+
     // Construct an invocation of "dateDiff" function without 'startOfWeek' parameter.
     auto dateDiffExpression =
         sbe::makeE<sbe::EFunction>("dateDiff",
@@ -139,6 +144,30 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
                                                                 makeE<EVariable>(timezoneSlot),
                                                                 makeE<EVariable>(startOfWeekSlot)));
     auto compiledDateDiffWithStartOfWeek = compileExpression(*dateDiffExpression);
+
+    // Construct an invocation of "valueBlockDateDiff" function.
+    auto valueBlockDateDiffExpression =
+        sbe::makeE<sbe::EFunction>("valueBlockDateDiff",
+                                   sbe::makeEs(makeE<EVariable>(bitsetSlot),
+                                               makeE<EVariable>(blockSlot),
+                                               makeE<EVariable>(timezoneDBSlot),
+                                               makeE<EVariable>(endDateSlot),
+                                               makeE<EVariable>(unitSlot),
+                                               makeE<EVariable>(timezoneSlot)));
+    auto compiledValueBlockDateDiff = compileExpression(*valueBlockDateDiffExpression);
+
+    // Construct an invocation of "valueBlockDateDiff" function with 'startOfWeek' parameter.
+    valueBlockDateDiffExpression =
+        sbe::makeE<sbe::EFunction>("valueBlockDateDiff",
+                                   sbe::makeEs(makeE<EVariable>(bitsetSlot),
+                                               makeE<EVariable>(blockSlot),
+                                               makeE<EVariable>(timezoneDBSlot),
+                                               makeE<EVariable>(endDateSlot),
+                                               makeE<EVariable>(unitSlot),
+                                               makeE<EVariable>(timezoneSlot),
+                                               makeE<EVariable>(startOfWeekSlot)));
+    auto compiledValueBlockDateDiffWithStartOfWeek =
+        compileExpression(*valueBlockDateDiffExpression);
 
     // Setup timezone database.
     auto timezoneDatabase = std::make_unique<TimeZoneDatabase>();
@@ -300,30 +329,71 @@ TEST_F(SBEDateDiffTest, BasicDateDiff) {
             makeLongValue(1)  // result
         }};
 
-    int testNumber{0};
-    for (auto&& testCase : testCases) {
-        startDateAccessor.reset(testCase.startDate.first, testCase.startDate.second);
-        endDateAccessor.reset(testCase.endDate.first, testCase.endDate.second);
-        unitAccessor.reset(testCase.unit.first, testCase.unit.second);
-        timezoneAccessor.reset(testCase.timezone.first, testCase.timezone.second);
-        if (testCase.startOfWeek) {
-            startOfWeekAccessor.reset(testCase.startOfWeek->first, testCase.startOfWeek->second);
+    {
+        int testNumber{0};
+        for (auto&& testCase : testCases) {
+            // Values will be freed after running block tests.
+            startDateAccessor.reset(false, testCase.startDate.first, testCase.startDate.second);
+            endDateAccessor.reset(false, testCase.endDate.first, testCase.endDate.second);
+            unitAccessor.reset(false, testCase.unit.first, testCase.unit.second);
+            timezoneAccessor.reset(false, testCase.timezone.first, testCase.timezone.second);
+            if (testCase.startOfWeek) {
+                startOfWeekAccessor.reset(
+                    false, testCase.startOfWeek->first, testCase.startOfWeek->second);
+            }
+
+            // Execute the "dateDiff" function.
+            auto result = runCompiledExpression(
+                (testCase.startOfWeek ? compiledDateDiffWithStartOfWeek : compiledDateDiff).get());
+            auto [resultTag, resultValue] = result;
+            value::ValueGuard resultGuard(resultTag, resultValue);
+
+            auto [compResultTag, compResultValue] = compareValue(resultTag,
+                                                                 resultValue,
+                                                                 testCase.expectedValue.first,
+                                                                 testCase.expectedValue.second);
+            value::ValueGuard compResultGuard(compResultTag, compResultValue);
+
+            ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32);
+            ASSERT_EQUALS(compResultValue, 0)
+                << "Failed test #" << testNumber << ", result: " << result
+                << ", expected: " << testCase.expectedValue;
+            ++testNumber;
         }
+    }
 
-        // Execute the "dateDiff" function.
-        auto result = runCompiledExpression(
-            (testCase.startOfWeek ? compiledDateDiffWithStartOfWeek : compiledDateDiff).get());
-        auto [resultTag, resultValue] = result;
-        value::ValueGuard resultGuard(resultTag, resultValue);
+    {
+        for (auto&& testCase : testCases) {
+            endDateAccessor.reset(testCase.endDate.first, testCase.endDate.second);
+            unitAccessor.reset(testCase.unit.first, testCase.unit.second);
+            timezoneAccessor.reset(testCase.timezone.first, testCase.timezone.second);
+            if (testCase.startOfWeek) {
+                startOfWeekAccessor.reset(testCase.startOfWeek->first,
+                                          testCase.startOfWeek->second);
+            }
+            value::HeterogeneousBlock block;
+            block.push_back(testCase.startDate.first, testCase.startDate.second);
+            blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(&block));
 
-        auto [compResultTag, compResultValue] = compareValue(
-            resultTag, resultValue, testCase.expectedValue.first, testCase.expectedValue.second);
-        value::ValueGuard compResultGuard(compResultTag, compResultValue);
+            value::HeterogeneousBlock bitset;
+            bitset.push_back(makeBool(true));
+            bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                 value::bitcastFrom<value::ValueBlock*>(&bitset));
 
-        ASSERT_EQUALS(compResultTag, value::TypeTags::NumberInt32);
-        ASSERT_EQUALS(compResultValue, 0) << "Failed test #" << testNumber << ", result: " << result
-                                          << ", expected: " << testCase.expectedValue;
-        ++testNumber;
+            // Execute the "valueBlockDateDiff" function.
+            auto result = runCompiledExpression((testCase.startOfWeek
+                                                     ? compiledValueBlockDateDiffWithStartOfWeek
+                                                     : compiledValueBlockDateDiff)
+                                                    .get());
+            auto [resultTag, resultValue] = result;
+            value::ValueGuard resultGuard(resultTag, resultValue);
+
+            assertBlockEq(resultTag,
+                          resultValue,
+                          std::vector{std::pair(testCase.expectedValue.first,
+                                                testCase.expectedValue.second)});
+        }
     }
 }
 

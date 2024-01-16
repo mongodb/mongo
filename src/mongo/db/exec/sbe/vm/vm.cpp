@@ -3180,66 +3180,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(ArityType a
         timezoneTuple);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityType arity) {
-    invariant(arity == 5 || arity == 6);  // 6th parameter is 'startOfWeek'.
-
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
-    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
-
-    // Get startDate.
-    auto [startDateOwn, startDateTag, startDateValue] = getFromStack(1);
-    if (!coercibleToDate(startDateTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto startDate = getDate(startDateTag, startDateValue);
-
-    // Get endDate.
-    auto [endDateOwn, endDateTag, endDateValue] = getFromStack(2);
-    if (!coercibleToDate(endDateTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto endDate = getDate(endDateTag, endDateValue);
-
-    // Get unit.
-    auto [unitOwn, unitTag, unitValue] = getFromStack(3);
-    if (!value::isString(unitTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto unitString = value::getStringView(unitTag, unitValue);
-    if (!isValidTimeUnit(unitString)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto unit = parseTimeUnit(unitString);
-
-    // Get timezone.
-    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(4);
-    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
-
-    // Get startOfWeek, if 'startOfWeek' parameter was passed and time unit is the week.
-    DayOfWeek startOfWeek{kStartOfWeekDefault};
-    if (6 == arity) {
-        auto [startOfWeekOwn, startOfWeekTag, startOfWeekValue] = getFromStack(5);
-        if (!value::isString(startOfWeekTag)) {
-            return {false, value::TypeTags::Nothing, 0};
-        }
-        if (TimeUnit::week == unit) {
-            auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
-            if (!isValidDayOfWeek(startOfWeekString)) {
-                return {false, value::TypeTags::Nothing, 0};
-            }
-            startOfWeek = parseDayOfWeek(startOfWeekString);
-        }
-    }
-    auto result = dateDiff(startDate, endDate, unit, timezone, startOfWeek);
-    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToString(ArityType arity) {
     invariant(arity == 4);
 
@@ -9500,6 +9440,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockMax(arity);
         case Builtin::valueBlockCount:
             return builtinValueBlockCount(arity);
+        case Builtin::valueBlockDateDiff:
+            return builtinValueBlockDateDiff(arity);
         case Builtin::valueBlockDateTrunc:
             return builtinValueBlockDateTrunc(arity);
         case Builtin::valueBlockSum:

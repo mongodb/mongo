@@ -47,6 +47,176 @@ namespace {
 
 using namespace optimizer;
 
+TEST(VectorizerTest, ConvertDateTrunc) {
+    auto tree = make<FunctionCall>("dateTrunc",
+                                   makeSeq(make<Variable>("timezoneDB"),
+                                           make<Variable>("inputVar"),
+                                           Constant::str("hour"),
+                                           Constant::int32(1),
+                                           Constant::str("UTC"),
+                                           Constant::str("sunday")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kDateTimeType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"valueBlockDateTrunc\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"Nothing\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"timezoneDB\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"StringSmall\", \n"
+        "            value: \"hour\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"NumberInt32\", \n"
+        "            value: 1\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"StringSmall\", \n"
+        "            value: \"UTC\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"StringSmall\", \n"
+        "            value: \"sunday\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertDateDiff) {
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kDateTimeType),
+                                    boost::none));
+    {
+        auto tree = make<FunctionCall>("dateDiff",
+                                       makeSeq(make<Variable>("timezoneDB"),
+                                               make<Variable>("inputVar"),
+                                               Constant::str("2024-01-01T01:00:00"),
+                                               Constant::str("hour"),
+                                               Constant::str("UTC")));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockDateDiff\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"timezoneDB\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"StringBig\", \n"
+            "            value: \"2024-01-01T01:00:00\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"StringSmall\", \n"
+            "            value: \"hour\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"StringSmall\", \n"
+            "            value: \"UTC\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+    {
+        auto tree = make<FunctionCall>("dateDiff",
+                                       makeSeq(make<Variable>("timezoneDB"),
+                                               Constant::str("2024-01-01T01:00:00"),
+                                               make<Variable>("inputVar"),
+                                               Constant::str("hour"),
+                                               Constant::str("UTC")));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"UnaryOp\", \n"
+            "    op: \"Neg\", \n"
+            "    input: {\n"
+            "        nodeType: \"FunctionCall\", \n"
+            "        name: \"valueBlockDateDiff\", \n"
+            "        arguments: [\n"
+            "            {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"Nothing\"\n"
+            "            }, \n"
+            "            {\n"
+            "                nodeType: \"Variable\", \n"
+            "                name: \"inputVar\"\n"
+            "            }, \n"
+            "            {\n"
+            "                nodeType: \"Variable\", \n"
+            "                name: \"timezoneDB\"\n"
+            "            }, \n"
+            "            {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"StringBig\", \n"
+            "                value: \"2024-01-01T01:00:00\"\n"
+            "            }, \n"
+            "            {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"StringSmall\", \n"
+            "                value: \"hour\"\n"
+            "            }, \n"
+            "            {\n"
+            "                nodeType: \"Const\", \n"
+            "                tag: \"StringSmall\", \n"
+            "                value: \"UTC\"\n"
+            "            }\n"
+            "        ]\n"
+            "    }\n"
+            "}\n",
+            *processed.expr);
+    }
+}
+
 TEST(VectorizerTest, ConvertGt) {
     auto tree1 = make<BinaryOp>(Operations::Gt, make<Variable>("inputVar"), Constant::int32(9));
 

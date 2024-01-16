@@ -147,6 +147,106 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateTrunc(ArityT
     return dateTrunc(dateTag, dateValue, unit, binSize, timezone, startOfWeek);
 }
 
+
+/**
+ * The stack for builtinDateDiff is ordered as follows:
+ * (0) timezoneDB
+ * (1) start date
+ * (2) end date
+ * (3) timeUnit
+ * (4) timezone
+ * (5) optional start of week
+ *
+ * The stack for builtinValueBlockDateDiff is ordered as follows:
+ * (0) bitset
+ * (1) start dateBlock
+ * (2) timezoneDB
+ * (3) end date
+ * (4) timeUnit
+ * (5) timezone
+ * (6) optional start of week
+ *
+ * This difference in stack positions is handled by the isBlockBuiltin parameter.
+ */
+template <bool IsBlockBuiltin>
+bool ByteCode::validateDateDiffParameters(Date_t* endDate,
+                                          TimeUnit* unit,
+                                          TimeZone* timezone,
+                                          DayOfWeek* startOfWeek) {
+    size_t timezoneDBStackPos =
+        IsBlockBuiltin ? kTimezoneDBStackPosBlock : kTimezoneDBStackPosDefault;
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(timezoneDBStackPos);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return false;
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+
+    size_t stackPosOffset = IsBlockBuiltin ? kStackPosOffsetBlock : 0u;
+
+    auto [endDateOwn, endDateTag, endDateValue] = getFromStack(2 + stackPosOffset);
+    if (!coercibleToDate(endDateTag)) {
+        return false;
+    }
+    *endDate = getDate(endDateTag, endDateValue);
+
+    auto [unitOwn, unitTag, unitValue] = getFromStack(3 + stackPosOffset);
+    if (!value::isString(unitTag)) {
+        return false;
+    }
+    auto unitString = value::getStringView(unitTag, unitValue);
+    if (!isValidTimeUnit(unitString)) {
+        return false;
+    }
+    *unit = parseTimeUnit(unitString);
+
+    // Get timezone.
+    auto [timezoneOwned, timezoneTag, timezoneValue] = getFromStack(4 + stackPosOffset);
+    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
+        return false;
+    }
+    *timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+
+    // Get startOfWeek, if 'startOfWeek' parameter was requested and time unit is the week.
+    if (startOfWeek) {
+        auto [startOfWeekOwn, startOfWeekTag, startOfWeekValue] = getFromStack(5 + stackPosOffset);
+        if (!value::isString(startOfWeekTag)) {
+            return false;
+        }
+        if (TimeUnit::week == *unit) {
+            auto startOfWeekString = value::getStringView(startOfWeekTag, startOfWeekValue);
+            if (!isValidDayOfWeek(startOfWeekString)) {
+                return false;
+            }
+            *startOfWeek = parseDayOfWeek(startOfWeekString);
+        }
+    }
+    return true;
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityType arity) {
+    invariant(arity == 5 || arity == 6);  // 6th parameter is 'startOfWeek'.
+
+    Date_t endDate;
+    TimeUnit unit{TimeUnit::year};
+    TimeZone timezone{};
+    DayOfWeek startOfWeek{kStartOfWeekDefault};
+
+    if (!validateDateDiffParameters<>(
+            &endDate, &unit, &timezone, arity == 6 ? &startOfWeek : nullptr)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    // Get startDate.
+    auto [startDateOwn, startDateTag, startDateValue] = getFromStack(1);
+    if (!coercibleToDate(startDateTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto startDate = getDate(startDateTag, startDateValue);
+
+    auto result = dateDiff(startDate, endDate, unit, timezone, startOfWeek);
+    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
+}
+
 namespace {
 
 /**
@@ -194,6 +294,60 @@ static constexpr auto dateTruncOpType =
                  ColumnOpType::ReturnNothingOnMissing{}};
 
 static const auto dateTruncOp = value::makeColumnOpWithParams<dateTruncOpType, DateTruncFunctor>();
+
+struct DateDiffFunctor {
+    DateDiffFunctor(Date_t endDate, TimeUnit unit, TimeZone timeZone, DayOfWeek startOfWeek)
+        : _endDate(timeZone.getTimelibTime(endDate)),
+          _unit(unit),
+          _timeZone(timeZone),
+          _startOfWeek(startOfWeek) {}
+
+    std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
+                                                        value::Value val) const {
+        if (!coercibleToDate(tag)) {
+            return std::pair(value::TypeTags::Nothing, value::Value{0u});
+        }
+        auto date = _timeZone.getTimelibTime(getDate(tag, val));
+
+        auto result = dateDiff(date.get(), _endDate.get(), _unit, _startOfWeek);
+
+        return std::pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result));
+    }
+
+    std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter> _endDate;
+    TimeUnit _unit;
+    TimeZone _timeZone;
+    DayOfWeek _startOfWeek;
+};
+
+static constexpr auto dateDiffOpType =
+    ColumnOpType{ColumnOpType::kMonotonic | ColumnOpType::kOutputNonNothingOnExpectedInput,
+                 value::TypeTags::Date,
+                 value::TypeTags::Nothing,
+                 ColumnOpType::ReturnNothingOnMissing{}};
+
+static const auto dateDiffOp = value::makeColumnOpWithParams<dateDiffOpType, DateDiffFunctor>();
+
+struct DateDiffMillisecondFunctor {
+    DateDiffMillisecondFunctor(Date_t endDate) : _endDate(endDate) {}
+
+    std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
+                                                        value::Value val) const {
+        if (!coercibleToDate(tag)) {
+            return std::pair(value::TypeTags::Nothing, value::Value{0u});
+        }
+        auto date = getDate(tag, val);
+
+        auto result = dateDiffMillisecond(date, _endDate);
+
+        return std::pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result));
+    }
+
+    Date_t _endDate;
+};
+
+static const auto dateDiffMillisecondOp =
+    value::makeColumnOpWithParams<dateDiffOpType, DateDiffMillisecondFunctor>();
 }  // namespace
 
 /**
@@ -226,6 +380,45 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateTr
 
     return {
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
+}
+
+/**
+ * Given a ValueBlock and bitset as input, returns a ValueBlock with the difference between each
+ * date in the input block with corresponding bit set to true and the argument provided. Values that
+ * are not coercible to dates are turned into Nothings instead.
+ */
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateDiff(
+    ArityType arity) {
+    invariant(arity == 6 || arity == 7);
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    invariant(inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    invariant(bitsetTag == value::TypeTags::valueBlock);
+
+    Date_t endDate;
+    TimeUnit unit{TimeUnit::year};
+    TimeZone timezone{};
+    DayOfWeek startOfWeek{kStartOfWeekDefault};
+
+    if (!validateDateDiffParameters<true /* isBlockBuiltin */>(
+            &endDate, &unit, &timezone, arity == 7 ? &startOfWeek : nullptr)) {
+        return makeNothingBlock(valueBlockIn);
+    }
+
+    if (unit == TimeUnit::millisecond) {
+        auto out = valueBlockIn->map(dateDiffMillisecondOp.bindParams(endDate));
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(out.release())};
+    } else {
+        auto out = valueBlockIn->map(dateDiffOp.bindParams(endDate, unit, timezone, startOfWeek));
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(out.release())};
+    }
 }
 
 }  // namespace mongo::sbe::vm
