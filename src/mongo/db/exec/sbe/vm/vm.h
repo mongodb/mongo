@@ -712,6 +712,8 @@ enum class Builtin : uint16_t {
 
     // Start of 2 byte builtins.
     valueBlockExists = 256,
+    valueBlockTypeMatch,
+    valueBlockIsTimezone,
     valueBlockFillEmpty,
     valueBlockFillEmptyBlock,
     valueBlockMin,
@@ -1938,6 +1940,8 @@ private:
 
     // Block builtins
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockExists(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockTypeMatch(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockIsTimezone(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmptyBlock(ArityType arity);
     template <bool less>
