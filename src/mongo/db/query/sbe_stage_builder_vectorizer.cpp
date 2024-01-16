@@ -275,13 +275,14 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             }
             break;
         }
-        case optimizer::Operations::And: {
+        case optimizer::Operations::And:
+        case optimizer::Operations::Or: {
             Tree lhs = op.getLeftChild().visit(*this);
             if (!lhs.expr.has_value()) {
                 return lhs;
             }
-            // An And operation between two blocks has to work at the level of measures, not on the
-            // expanded arrays.
+            // An And/Or operation between two blocks has to work at the level of measures, not on
+            // the expanded arrays.
             foldIfNecessary(lhs);
 
             if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
@@ -289,7 +290,12 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                 // This way, the right side can decide whether to skip the processing of the indexes
                 // where the left side produced a false result.
                 auto lhsVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
-                _activeMasks.push_back(lhsVar);
+
+                auto mask = op.op() == optimizer::Operations::And
+                    ? lhsVar
+                    : getABTLocalVariableName(_frameGenerator->generate(), 0);
+
+                _activeMasks.push_back(mask);
                 Tree rhs = op.getRightChild().visit(*this);
                 _activeMasks.pop_back();
                 if (!rhs.expr.has_value()) {
@@ -298,11 +304,24 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                 foldIfNecessary(rhs);
 
                 if (TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
-                    return {makeLet(lhsVar,
-                                    std::move(*lhs.expr),
-                                    makeABTFunction("valueBlockLogicalAnd"_sd,
-                                                    makeVariable(lhsVar),
-                                                    std::move(*rhs.expr))),
+                    return {op.op() == optimizer::Operations::And
+                                ? makeLet(lhsVar,
+                                          std::move(*lhs.expr),
+                                          makeABTFunction("valueBlockLogicalAnd"_sd,
+                                                          makeVariable(lhsVar),
+                                                          std::move(*rhs.expr)))
+                                : makeLet(lhsVar,
+                                          std::move(*lhs.expr),
+                                          makeLet(mask,
+                                                  makeABTFunction(
+                                                      "valueBlockLogicalNot",
+                                                      makeABTFunction(
+                                                          "valueBlockFillEmpty"_sd,
+                                                          makeVariable(lhsVar),
+                                                          optimizer::Constant::boolean(false))),
+                                                  makeABTFunction("valueBlockLogicalOr"_sd,
+                                                                  makeVariable(lhsVar),
+                                                                  std::move(*rhs.expr)))),
                             TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
                                 .include(lhs.typeSignature.include(rhs.typeSignature)
                                              .intersect(TypeSignature::kNothingType)),
