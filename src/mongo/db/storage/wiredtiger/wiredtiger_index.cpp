@@ -1012,7 +1012,7 @@ public:
             ? key_string::Discriminator::kExclusiveAfter
             : key_string::Discriminator::kExclusiveBefore;
         _endPosition = std::make_unique<key_string::Builder>(_version);
-        _endPosition->resetToKey(BSONObj::stripFieldNames(key), _ordering, discriminator);
+        _endPosition->resetToKey(key, _ordering, discriminator);
     }
 
     boost::optional<IndexKeyEntry> seek(

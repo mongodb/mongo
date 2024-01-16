@@ -165,8 +165,7 @@ key_string::Value IndexEntryComparison::makeKeyStringFromBSONKey(
     key_string::Version version,
     Ordering ord,
     key_string::Discriminator discrim) {
-    BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
-    key_string::Builder builder(version, finalKey, ord, discrim);
+    key_string::Builder builder(version, bsonKey, ord, discrim);
     return builder.getValueCopy();
 }
 
