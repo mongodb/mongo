@@ -248,7 +248,7 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
             case SerializationContext::Prefix::IncludePrefix: {
                 auto dbName = parseFromStringExpectTenantIdInMultitenancyMode(db);
                 if (!dbName.tenantId() && dbName.isInternalDb()) {
-                    return dbName;
+                    return DatabaseName(std::move(tenantId), dbName.db());
                 }
 
                 uassert(

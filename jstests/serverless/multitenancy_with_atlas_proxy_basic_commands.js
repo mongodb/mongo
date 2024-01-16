@@ -102,51 +102,54 @@ const otherSecurityToken = _createTenantToken({tenant: kOtherTenant, expectPrefi
 }
 
 // Test listDatabases command.
-// TODO: SERVER-82279 uncomment listDatabases test case
-// {
-//     // Set token for first tenant
-//     primary._setSecurityToken(securityToken);
+{
+    // Set token for first tenant
+    primary._setSecurityToken(securityToken);
 
-//     // Create databases for kTenant. A new database is implicitly created when a collection is
-//     // created.
-//     const kOtherDbName = kTenant + '_otherDb';
-//     assert.commandWorked(primary.getDB(kOtherDbName).createCollection(kCollName));
+    // Create databases for kTenant. A new database is implicitly created when a collection is
+    // created.
+    const kOtherDbName = kTenant + '_otherDb';
 
-//     const dbs = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
-//     assert.eq(2, dbs.databases.length, tojson(dbs));
-//     // The 'admin' database is not expected because we do not create a tenant user in this test.
-//     const expectedTenantDbs = [kPrefixedDbName, kOtherDbName];
-//     assert(arrayEq(expectedTenantDbs, dbs.databases.map(db => db.name)), tojson(dbs));
+    assert.commandWorked(primary.getDB(kOtherDbName).createCollection(kCollName));
 
-//     // These databases should not be accessed with a different tenant.
-//     primary._setSecurityToken(otherSecurityToken);
-//     const dbsWithDiffTenant =
-//         assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
-//     assert.eq(0, dbsWithDiffTenant.databases.length, tojson(dbsWithDiffTenant));
+    const dbs = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
 
-//     // List all databases without filter. The tenant prefix is expected in response.
-//     primary._setSecurityToken(undefined);
-//     const allDbs = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
-//     const expectedAllDbs =
-//         [kTenant + "_" + kPrefixedDbName, kTenant + "_" + kOtherDbName, "admin", "config",
-//         "local"];
+    assert.eq(2, dbs.databases.length, tojson(dbs));
+    // The 'admin' database is not expected because we do not create a tenant user in this test.
+    const expectedTenantDbs = [kPrefixedDbName, kOtherDbName];
+    assert(arrayEq(expectedTenantDbs, dbs.databases.map(db => db.name)), tojson(dbs));
 
-//     assert.eq(expectedAllDbs.length, allDbs.databases.length);
-//     assert(arrayEq(expectedAllDbs, allDbs.databases.map(db => db.name)), tojson(allDbs));
+    // These databases should not be accessed with a different tenant.
+    primary._setSecurityToken(otherSecurityToken);
+    const dbsWithDiffTenant =
+        assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
+    assert.eq(0, dbsWithDiffTenant.databases.length, tojson(dbsWithDiffTenant));
 
-//     // List all databases with tenant prefix filter. The tenant prefix is expected in response.
-//     const dbsWithTenantFilter = assert.commandWorked(adminDb.runCommand(
-//         {listDatabases: 1, nameOnly: true, filter: {"name": new RegExp("(^" + kTenant + ")")}}));
-//     const expectedDbsWithTenantFilter = [kTenant + "_" + kPrefixedDbName, kTenant + "_" +
-//     kOtherDbName];
+    // List all databases without filter. The tenant prefix is expected in response.
+    primary._setSecurityToken(undefined);
+    const allDbs = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
+    const expectedAllDbs = [
+        "admin",
+        "config",
+        "local",
+        kPrefixedDbName,
+        kOtherDbName,
+    ];
 
-//     assert.eq(expectedDbsWithTenantFilter.length,
-//               dbsWithTenantFilter.databases.length,
-//               tojson(dbsWithTenantFilter));
-//     assert(arrayEq(expectedDbsWithTenantFilter, dbsWithTenantFilter.databases.map(db =>
-//     db.name)),
-//            tojson(dbsWithTenantFilter));
-// }
+    assert.eq(expectedAllDbs.length, allDbs.databases.length);
+    assert(arrayEq(expectedAllDbs, allDbs.databases.map(db => db.name)), tojson(allDbs));
+
+    // List all databases with tenant prefix filter. The tenant prefix is expected in response.
+    const dbsWithTenantFilter = assert.commandWorked(adminDb.runCommand(
+        {listDatabases: 1, nameOnly: true, filter: {"name": new RegExp("(^" + kTenant + ")")}}));
+    const expectedDbsWithTenantFilter = [kPrefixedDbName, kOtherDbName];
+
+    assert.eq(expectedDbsWithTenantFilter.length,
+              dbsWithTenantFilter.databases.length,
+              tojson(dbsWithTenantFilter));
+    assert(arrayEq(expectedDbsWithTenantFilter, dbsWithTenantFilter.databases.map(db => db.name)),
+           tojson(dbsWithTenantFilter));
+}
 
 // Test insert, agg, find, getMore, and explain commands.
 {
