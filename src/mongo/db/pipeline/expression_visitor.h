@@ -152,6 +152,7 @@ class ExpressionInternalJsEmit;
 class ExpressionFunction;
 class ExpressionDegreesToRadians;
 class ExpressionRadiansToDegrees;
+class ExpressionInternalKeyStringValue;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -160,6 +161,7 @@ class AccumulatorStdDevPop;
 class AccumulatorStdDevSamp;
 class AccumulatorSum;
 class AccumulatorMergeObjects;
+
 template <typename AccumulatorState>
 class ExpressionFromAccumulator;
 
@@ -301,6 +303,7 @@ public:
     virtual void visit(ExpressionInternalFindPositional*) = 0;
     virtual void visit(ExpressionInternalFindElemMatch*) = 0;
     virtual void visit(ExpressionToHashedIndexKey*) = 0;
+    virtual void visit(ExpressionInternalKeyStringValue*) = 0;
 };
 
 }  // namespace mongo
