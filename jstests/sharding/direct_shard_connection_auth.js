@@ -1,7 +1,8 @@
 /**
  * Tests that direct shard connections are correctly allowed and disallowed using authentication.
  *
- * @tags: [featureFlagCheckForDirectShardOperations, featureFlagClusterCardinalityParameter]
+ * @tags: [featureFlagCheckForDirectShardOperations, featureFlagClusterCardinalityParameter,
+ * requires_fcv_70]
  */
 (function() {
 'use strict';
