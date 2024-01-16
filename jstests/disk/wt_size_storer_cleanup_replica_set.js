@@ -3,13 +3,14 @@
  * dropped.
  *
  * @tags: [
- *   incompatible_with_macos,  # TODO (SERVER-83337): Re-enable on macOS.
  *   requires_replication,
  *   requires_wiredtiger,
  * ]
  */
 
 import {
+    getUriForColl,
+    getUriForIndex,
     runWiredTigerTool,
 } from "jstests/disk/libs/wt_file_helper.js";
 
@@ -54,10 +55,16 @@ replTest.start(
     primary, {setParameter: {minSnapshotHistoryWindowInSeconds: 0}}, true /* forRestart */);
 primary = replTest.getPrimary();
 
+const collIdent = getUriForColl(coll());
+const indexIdent = getUriForIndex(coll(), "_id_");
+
 assert.eq(coll().count(), 1);
 assert(coll().drop());
 assert.commandWorked(primary.adminCommand({appendOplogNote: 1, data: {msg: "advance timestamp"}}));
 assert.commandWorked(primary.adminCommand({fsync: 1}));
+
+checkLog.containsJson(primary, 22237, {ident: collIdent});
+checkLog.containsJson(primary, 22237, {ident: indexIdent});
 
 replTest.stop(primary, undefined, {}, {forRestart: true});
 
