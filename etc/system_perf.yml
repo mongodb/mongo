@@ -2421,6 +2421,41 @@ buildvariants:
       - name: industry_benchmarks
       - name: industry_benchmarks_w1
 
+  - <<: *shard-baseline
+    name: linux-3-shard-query-settings
+    display_name: Linux 3-Shard Cluster (QuerySettings)
+    cron: *linux-3-shard-cron
+    modules: *modules
+    expansions:
+      <<: *shard-baseline-expansions
+      mongodb_setup: shard-query-settings
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+        cron: *high-value-workload-cron
+      - name: tpcc_majority
+        cron: *high-value-workload-cron
+      - name: mixed_workloads_genny_rate_limited_high_value
+        cron: *high-value-workload-cron
+      - name: bestbuy_agg
+        cron: *high-value-workload-cron
+      - name: large_indexed_ins_high_value
+        cron: *high-value-workload-cron
+      - name: expressive_queries_high_value
+        cron: *high-value-workload-cron
+      - name: time_series_sort_high_value
+        cron: *high-value-workload-cron
+      - name: tsbs_query
+        cron: *high-value-workload-cron
+      - name: array_traversal_high_value
+        cron: *high-value-workload-cron
+      - name: filter_with_complex_logical_expression_high_value
+      - name: tsbs_query
+        cron: *high-value-workload-cron
+      - name: mongos_workloads
+        cron: *high-value-workload-cron
+
   - name: linux-shard-lite-audit.2022-11
     display_name: Linux Shard Lite Cluster Audit 2022-11
     cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
@@ -3046,6 +3081,56 @@ buildvariants:
       - name: tsbs-query-optimizations
       - name: dbcheck
       - name: tsbs-expression-query
+
+  - name: linux-3-node-replSet-query-settings
+    display_name: Linux 3-Node ReplSet 2022-11 (QuerySettings)
+    cron: *linux-3-node-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-query-settings
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+        cron: *high-value-workload-cron
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+        cron: *high-value-workload-cron
+      - name: tpcc_majority
+        cron: *high-value-workload-cron
+      - name: linkbench2
+        cron: *high-value-workload-cron
+      - name: mixed_workloads_genny_rate_limited_high_value
+        cron: *high-value-workload-cron
+      - name: majority_reads10_k_threads_high_value
+        cron: *high-value-workload-cron
+      - name: bestbuy_agg
+        cron: *high-value-workload-cron
+      - name: large_indexed_ins_high_value
+        cron: *high-value-workload-cron
+      - name: expressive_queries_high_value
+        cron: *high-value-workload-cron
+      - name: time_series_sort_high_value
+        cron: *high-value-workload-cron
+      - name: tsbs_query
+        cron: *high-value-workload-cron
+      - name: array_traversal_high_value
+        cron: *high-value-workload-cron
+      - name: filter_with_complex_logical_expression_high_value
+      - name: tsbs_query
+        cron: *high-value-workload-cron
 
   - name: linux-3-node-replSet-notls.2022-11
     display_name: Linux 3-Node ReplSet (No TLS) 2022-11
