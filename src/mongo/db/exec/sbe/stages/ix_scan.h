@@ -196,6 +196,7 @@ protected:
     BufBuilder _valuesBuffer;
 
     bool _open{false};
+    bool _uniqueIndex{false};
     ScanState _scanState = ScanState::kNeedSeek;
     IndexScanStats _specificStats;
 
@@ -268,6 +269,8 @@ private:
 
     value::OwnedValueAccessor _seekKeyLowHolder;
     value::OwnedValueAccessor _seekKeyHighHolder;
+
+    bool _pointBound{false};
 };
 
 /**
