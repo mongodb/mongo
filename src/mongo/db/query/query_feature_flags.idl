@@ -111,3 +111,11 @@ feature_flags:
       cpp_varname: gFeatureFlagTimeSeriesInSbe
       default: true
       shouldBeFCVGated: false
+
+    featureFlagClassicRuntimePlanningForSbe:
+      description: "Enables use of the classic engine's MultiPlanStage and SubplanStage to perform
+                    plan selection for queries that use SBE. When disabled, the SBE multi-planner
+                    and subplanner are used instead."
+      cpp_varname: gFeatureFlagClassicRuntimePlanningForSbe
+      default: false
+      shouldBeFCVGated: true
