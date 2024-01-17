@@ -111,10 +111,8 @@ explain = coll.find({x: 3}).collation(caseInsensitive).explain();
 checkIndexFilterSet(explain, true);
 assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
 
+// TODO: SERVER-79230 Apply QuerySettings for distinct commands.
 if (isIndexFiltersToQuerySettings) {
-    // Query settings can't be used to substitute index filters for distinct commands. Configuring
-    // query settings requires providing full query shape. For 'find' one could build it from
-    // parameters passed into planCacheSetFilter. For 'distinct' query 'key' field is missing.
     quit();
 }
 

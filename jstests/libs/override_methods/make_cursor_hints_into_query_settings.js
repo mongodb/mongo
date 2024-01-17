@@ -9,8 +9,9 @@ function hasSupportedHint(cmdObj) {
 }
 
 function getCommandType(cmdObj) {
+    // TODO SERVER-79230 Add 'distinct' to the supported commands.
     // TODO SERVER-79231 Add 'aggregate' to the supported commands.
-    const supportedCommands = ["find", "distinct"];
+    const supportedCommands = ["find"];
     return supportedCommands.find((key) => (key in cmdObj));
 }
 

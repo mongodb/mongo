@@ -264,6 +264,38 @@ StatusWith<BSONObj> CanonicalDistinct::asAggregationCommand() const {
     return aggregationBuilder.obj();
 }
 
+CanonicalDistinct CanonicalDistinct::parseFromBSON(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& cmdObj,
+    const ExtensionsCallback& extensionsCallback,
+    const CollatorInterface* defaultCollator,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
+    const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+    const auto serializationContext = vts != boost::none
+        ? SerializationContext::stateCommandRequest(vts->hasTenantId(), vts->isFromAtlasProxy())
+        : SerializationContext::stateCommandRequest();
+    auto distinctCommand = std::make_unique<DistinctCommandRequest>(
+        DistinctCommandRequest::parse(IDLParserContext("distinctCommandRequest",
+                                                       false /* apiStrict */,
+                                                       vts,
+                                                       nss.tenantId(),
+                                                       serializationContext),
+                                      cmdObj));
+
+    auto expCtx = CanonicalDistinct::makeExpressionContext(
+        opCtx, nss, *distinctCommand, defaultCollator, verbosity);
+
+    auto parsedDistinct =
+        parsed_distinct_command::parse(expCtx,
+                                       cmdObj,
+                                       std::move(distinctCommand),
+                                       extensionsCallback,
+                                       MatchExpressionParser::kAllowAllSpecialFeatures);
+
+    return CanonicalDistinct::parse(std::move(expCtx), std::move(parsedDistinct));
+}
+
 CanonicalDistinct CanonicalDistinct::parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
                                            const CollatorInterface* defaultCollator) {

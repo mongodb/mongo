@@ -105,6 +105,13 @@ public:
      */
     StatusWith<BSONObj> asAggregationCommand() const;
 
+    static CanonicalDistinct parseFromBSON(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& cmdObj,
+        const ExtensionsCallback& extensionsCallback,
+        const CollatorInterface* defaultCollator,
+        boost::optional<ExplainOptions::Verbosity> verbosity = boost::none);
 
     static CanonicalDistinct parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    std::unique_ptr<ParsedDistinctCommand> parsedDistinct,
