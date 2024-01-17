@@ -853,6 +853,12 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
     invariant(false, "not implemented");
 }
 
+template <class Buffer>
+requires Appendable<Buffer>
+void BSONColumnBlockBased::decompressIterative(Buffer& buffer) const {
+    invariant(false, "not implemented");
+}
+
 BSONElement BSONColumnBlockBased::first() const {
     invariant(false, "not implemented");
     return BSONElement();

@@ -666,6 +666,29 @@ public:
     }
 
     /**
+     * Decompress entire BSONColumn using the iteration-based implementation. This is used for
+     * testing and production uses should eventually be replaced.
+     *
+     */
+    template <class Buffer>
+    requires Appendable<Buffer>
+    void decompressIterative(Buffer& buffer) const;
+
+    /**
+     * Wrapper that expects the caller to define a Materializer and a Container to receive a
+     * collection of elements from block decoding. This calls the iteration-based implementation.
+     * This is used for testing and production uses should eventually be replaced.
+     */
+    template <class CMaterializer, class Container>
+    requires Materializer<CMaterializer>
+    void decompressIterative(Container& collection,
+                             typename CMaterializer::Allocator& allocator) const {
+        Collector<CMaterializer, Container> collector(collection, allocator);
+        decompressIterative(collector);
+    }
+
+
+    /**
      * Return first non-missing element stored in this BSONColumn
      */
     BSONElement first() const;
