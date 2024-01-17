@@ -14,8 +14,10 @@ var mongosB = s.s1;
 let ns = "test.coll";
 
 let adminSA = mongosA.getDB("admin");
-adminSA.runCommand({enableSharding: "test", primaryShard: s.shard0.shardName});
-adminSA.runCommand({enableSharding: "test2", primaryShard: s.shard1.shardName});
+adminSA.runCommand({enableSharding: "test"});
+
+adminSA.runCommand({moveprimary: "test", to: "s.shard0.shardName"});
+adminSA.runCommand({moveprimary: "test2", to: "s.shard1.shardName"});
 
 adminSA.runCommand({shardCollection: ns, key: {_id: 1}});
 

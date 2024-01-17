@@ -42,10 +42,6 @@ function assertNoQueryAnalyzerConfigDoc(conn, ns) {
 
 function setUpCollection(conn, {isShardedColl, st}) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
-    if (st) {
-        assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
-    }
     const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
@@ -53,6 +49,7 @@ function setUpCollection(conn, {isShardedColl, st}) {
     assert.commandWorked(db.createCollection(collName));
     if (isShardedColl) {
         assert(st);
+        assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.name}));
         assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
         assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
         assert.commandWorked(

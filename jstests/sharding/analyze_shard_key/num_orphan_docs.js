@@ -20,7 +20,7 @@ const writeConcern = {
 };
 
 function testAnalyzeShardKeyUnshardedCollection(conn) {
-    const dbName = "testDbUnsharded";
+    const dbName = "testDb";
     const collName = "testCollUnsharded";
     const ns = dbName + "." + collName;
     const coll = conn.getCollection(ns);
@@ -65,12 +65,11 @@ function testAnalyzeShardKeyShardedCollection(st) {
         {currentKey: 10, candidateKey: 100}
     ];
 
-    assert.commandWorked(
-        st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     assert.commandWorked(coll.createIndex(currentKey));
     assert.commandWorked(coll.createIndex(candidateKey));
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
+    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: currentKey}));
 
     // Analyze a shard key while no shards have orphan documents. Chunk distribution:

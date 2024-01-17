@@ -35,10 +35,8 @@ assert.eq(2, destColl.find().count(), result);
 
 // Test that it works when the dbs are on different shards.
 destColl.drop();
-destDB.dropDatabase();
 
-assert.commandWorked(
-    st.s.adminCommand({enableSharding: destDB.getName(), primaryShard: st.shard1.name}));
+assert.commandWorked(st.s.adminCommand({movePrimary: destDB.getName(), to: st.shard1.name}));
 
 result = assert.commandWorked(sourceDB.runCommand({
     mapReduce: sourceColl.getName(),
