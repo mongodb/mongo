@@ -170,6 +170,12 @@ void generatePlannerInfo(PlanExecutor* exec,
         plannerBob.append("planCacheKey", zeroPaddedHex(*planCacheKeyHash));
     }
 
+    if (exec->getOpCtx() != nullptr) {
+        plannerBob.appendNumber(
+            "optimizationTimeMillis",
+            durationCount<Milliseconds>(CurOp::get(exec->getOpCtx())->debug().planningTime));
+    }
+
     if (!extraInfo.isEmpty()) {
         plannerBob.appendElements(extraInfo);
     }

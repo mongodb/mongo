@@ -1,6 +1,7 @@
 // When running explain commands with "executionStats" verbosity, checks that the explain output
 // includes "executionTimeMicros"/"executionTimeNanos" only if requested.
 // "executionTimeMillisEstimate" will always be present in the explain output.
+// Check that "queryPlanner" has "optimizationTimeMillis".
 import {getAllPlanStages, getOptimizer} from "jstests/libs/analyze_plan.js";
 
 let conn = MongoRunner.runMongod({});
@@ -30,6 +31,10 @@ function verifyStages(execStages, microAndNanosExpected) {
 
 // Test explain on find command.
 let explainResult = coll.find({x: {$gt: 500}}).explain("executionStats");
+// Verify that "queryPlanner" has "optimizationTimeMillis".
+assert(explainResult.hasOwnProperty("queryPlanner"), explainResult);
+assert(explainResult.queryPlanner.hasOwnProperty("optimizationTimeMillis"),
+       explainResult.queryPlanner);
 let executionStages = explainResult.executionStats.executionStages;
 assert(executionStages.hasOwnProperty("executionTimeMillisEstimate"), executionStages);
 verifyStages(executionStages, false);
@@ -49,6 +54,10 @@ for (let executionStage of executionStages) {
     assert(!executionStage.hasOwnProperty("executionTimeMicros"), executionStage);
     assert(!executionStage.hasOwnProperty("executionTimeNanos"), executionStage);
     if (executionStage.hasOwnProperty("$cursor")) {
+        // Verify that "queryPlanner" has "optimizationTimeMillis".
+        assert(executionStage["$cursor"].hasOwnProperty("queryPlanner"), executionStage);
+        assert(executionStage["$cursor"]["queryPlanner"].hasOwnProperty("optimizationTimeMillis"),
+               executionStage);
         const stages = executionStage["$cursor"]["executionStats"]["executionStages"];
         verifyStages(stages, false);
     }
