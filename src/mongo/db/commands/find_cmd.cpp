@@ -193,29 +193,35 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
     curOp->setNS_inlock(nss);
 }
 
+/**
+ * Check if the operation comes from the internal client. Returns 'true' if the client is
+ * internal ('mongos'), and false otherwise.
+ */
+bool isInternalClient(const OperationContext* opCtx) {
+    return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
+}
+
 // TODO: SERVER-73632 Remove feature flag for PM-635.
 // Remove query settings lookup as it is only done on mongos.
 query_settings::QuerySettings lookupQuerySettingsForFind(
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const ParsedFindCommand& parsedFind,
     const NamespaceString& nss) {
-    auto opCtx = expCtx->opCtx;
-    auto serializationContext = parsedFind.findCommandRequest->getSerializationContext();
-
-    // If part of the sharded cluster, use the query settings passed as part of the command
-    // arguments.
-    if (ShardingState::get(opCtx)->enabled()) {
-        return parsedFind.findCommandRequest->getQuerySettings().get_value_or({});
-    }
-
     // No query settings lookup for IDHACK queries.
     if (isIdHackEligibleQueryWithoutCollator(*parsedFind.findCommandRequest)) {
         return query_settings::QuerySettings();
     }
 
+    // If part of the sharded cluster, use the query settings passed as part of the command
+    // arguments.
+    if (isInternalClient(expCtx->opCtx)) {
+        return parsedFind.findCommandRequest->getQuerySettings().get_value_or({});
+    }
+
+    const auto& serializationContext = parsedFind.findCommandRequest->getSerializationContext();
     return query_settings::lookupQuerySettings(expCtx, nss, serializationContext, [&]() {
         query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
-        return findCmdShape.sha256Hash(opCtx, serializationContext);
+        return findCmdShape.sha256Hash(expCtx->opCtx, serializationContext);
     });
 }
 
@@ -963,11 +969,9 @@ public:
 
             // TODO: SERVER-73632 Remove Feature Flag for PM-635.
             // Forbid users from passing 'querySettings' explicitly.
-            if (!ShardingState::get(opCtx)->enabled()) {
-                uassert(7746901,
-                        "BSON field 'querySettings' is an unknown field",
-                        !findCommand->getQuerySettings().has_value());
-            }
+            uassert(7746901,
+                    "BSON field 'querySettings' is an unknown field",
+                    isInternalClient(opCtx) || !findCommand->getQuerySettings().has_value());
 
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {
