@@ -54,7 +54,6 @@ variables:
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
-    - enterprise
     - mongo-tools
     # - mongo
     - dsi
