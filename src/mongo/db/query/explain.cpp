@@ -96,6 +96,8 @@ void generatePlannerInfo(PlanExecutor* exec,
     plannerBob.append("namespace",
                       NamespaceStringUtil::serialize(exec->nss(), serializationContext));
 
+    auto framework = exec->getQueryFramework();
+
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet' field
     // will always be false in the case of EOF or idhack plans.
     boost::optional<uint32_t> queryHash;
@@ -115,10 +117,12 @@ void generatePlannerInfo(PlanExecutor* exec,
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
             !QueryKnobConfiguration::decoration(exec->getCanonicalQuery()->getOpCtx())
                  .isForceClassicEngineEnabled()) {
-            const auto planCacheKeyInfo =
-                plan_cache_key_factory::make(*exec->getCanonicalQuery(),
-                                             collections,
-                                             canonical_query_encoder::Optimizer::kSbeStageBuilders);
+            const auto planCacheKeyInfo = plan_cache_key_factory::make(
+                *exec->getCanonicalQuery(),
+                collections,
+                framework == PlanExecutor::QueryFramework::kCQF
+                    ? canonical_query_encoder::Optimizer::kBonsai
+                    : canonical_query_encoder::Optimizer::kSbeStageBuilders);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
         } else {
@@ -134,8 +138,6 @@ void generatePlannerInfo(PlanExecutor* exec,
     // query as an optimization (specifically, the update system does not canonicalize for idhack
     // updates). In these cases, 'query' is NULL.
     auto query = exec->getCanonicalQuery();
-
-    auto framework = exec->getQueryFramework();
 
     // For CQF explains, we serialize the entire input MQL (via CanonicalQuery or Pipeline) under
     // "parsedQuery". For classic explains, we serialize just the match expression.

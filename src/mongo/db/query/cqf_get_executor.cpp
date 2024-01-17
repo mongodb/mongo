@@ -475,6 +475,7 @@ static ExecParams createExecutor(
     // Get the plan either from cache or by lowering + optimization.
     auto [fromCache, sbePlan, data] =
         plan(phaseManager, planAndProps, opCtx, collections, requireRID, sbeYieldPolicy, env);
+    CurOp::get(opCtx)->debug().fromPlanCache = fromCache;
 
     sbePlan->attachToOperationContext(opCtx);
     if (expCtx->explain || expCtx->mayDbProfile) {
@@ -984,6 +985,12 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
         return boost::none;
     }();
+
+    if (planCacheKey) {
+        OpDebug& opDebug = CurOp::get(opCtx)->debug();
+        opDebug.queryHash = planCacheKey.get().queryHash();
+        opDebug.planCacheKey = planCacheKey.get().planCacheKeyHash();
+    }
 
     const auto& collection = collections.getMainCollection();
 
