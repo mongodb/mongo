@@ -104,21 +104,23 @@ let newPrimaryColl = primary.getDB(db.getName()).getCollection(coll.getName());
 const newPrimaryCatalogContents = newPrimaryColl.aggregate([{$listCatalog: {}}]).toArray();
 jsTestLog("Catalog contents on new primary: " + tojson(newPrimaryCatalogContents));
 
-const collModOplogEntries =
-    rst.findOplog(primary,
-                  {
-                      op: 'c',
-                      ns: newPrimaryColl.getDB().getCollection('$cmd').getFullName(),
-                      'o.collMod': coll.getName(),
-                      'o.index.name': 't_1',
-                      'o.index.expireAfterSeconds': newNodeSpec.expireAfterSeconds
-                  },
-                  /*limit=*/ 1)
-        .toArray();
-assert.eq(collModOplogEntries.length,
-          1,
-          'TTL index with ' + nonIntVal +
-              ' expireAfterSeconds was not fixed using collMod during step-up: ' +
-              tojson(rst.findOplog(primary, {op: {$ne: 'n'}}, /*limit=*/ 10).toArray()));
+assert.soon(
+    () => {
+        return 1 ===
+            rst.findOplog(primary,
+                          {
+                              op: 'c',
+                              ns: newPrimaryColl.getDB().getCollection('$cmd').getFullName(),
+                              'o.collMod': coll.getName(),
+                              'o.index.name': 't_1',
+                              'o.index.expireAfterSeconds': newNodeSpec.expireAfterSeconds
+                          },
+                          /*limit=*/ 1)
+                .toArray()
+                .length;
+    },
+    'TTL index with ' + nonIntVal +
+        ' expireAfterSeconds was not fixed using collMod during step-up: ' +
+        tojson(rst.findOplog(primary, {op: {$ne: 'n'}}, /*limit=*/ 10).toArray()));
 
 rst.stopSet();
