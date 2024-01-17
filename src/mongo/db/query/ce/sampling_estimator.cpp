@@ -211,11 +211,12 @@ public:
                                    scanDefName,
                                    false /*canUseParallelScan*/,
                                    _metadata._scanDefs.at(scanDefName).getScanOrder());
-        _propsMap.emplace(physicalScanNode.cast<Node>(), std::move(props));
+        _propsMap.emplace(physicalScanNode.cast<Node>(), props);
 
         // Creates a LimitSkipNode on top of the PhysicalScanNode.
         auto limitSkipNode = make<LimitSkipNode>(properties::LimitSkipRequirement(_sampleSize, 0),
                                                  std::move(physicalScanNode));
+        _propsMap.emplace(limitSkipNode.cast<Node>(), std::move(props));
 
 
         auto residualReqs = *node.getScanParams()->_residualRequirements;
@@ -291,7 +292,7 @@ public:
         ABT innerNode = make<LimitSkipNode>(properties::LimitSkipRequirement(chunkSize, 0),
                                             std::move(seekNode));
 
-        const NodeProps& limitProps = _propsMap.at(limit.getChild().cast<Node>());
+        const NodeProps& limitProps = _propsMap.at(n.cast<Node>());
         NodeProps sharedProps = NodeProps{limitProps._planNodeId,
                                           limitProps._groupId,
                                           limitProps._logicalProps,
