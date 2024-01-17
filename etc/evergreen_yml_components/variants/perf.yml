@@ -44,6 +44,13 @@ variables:
     - name: schedule_global_auto_tasks
       variant: task_generation
 
+- &schedule_patch_auto_tasks_task
+  name: schedule_patch_auto_tasks
+  activate: false
+  depends_on:
+    - name: schedule_global_auto_tasks
+      variant: task_generation
+
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/perf.yml
@@ -96,7 +103,7 @@ buildvariants:
   run_on:
     - rhel70-small
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
@@ -153,7 +160,7 @@ buildvariants:
   run_on:
     - amazon2
   tasks: &classic_engine_tasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
@@ -213,7 +220,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks: &classic_engine_1nodereplset_tasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: linkbench
     - name: linkbench2
@@ -259,7 +266,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: bestbuy_4_analytics
     - name: bestbuy_4_analytics_columnstore
@@ -289,7 +296,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-M60-like"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: industry_benchmarks
     - name: ycsb_60GB
@@ -325,7 +332,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-atlas-large"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: tpcc
@@ -351,7 +358,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-atlas-large"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
       cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
@@ -403,7 +410,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-atlas-large"
   tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
@@ -431,7 +438,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks: &standalonetasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: dsi_integ_test_run_command_simple
     - name: smoke_test
@@ -481,7 +488,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
@@ -528,7 +535,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: stream_workloads
 
@@ -591,7 +598,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks: &bonsai_standalone_tasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
 
 - <<: *amazon2_x86_compile_variant_dependency
@@ -673,7 +680,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks: &bonsai_1nodereplset_tasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: linkbench2
     - name: snapshot_reads
@@ -797,7 +804,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: linkbench
     - name: linkbench2
@@ -844,7 +851,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks: &audit-tasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: crud_workloads_majority
@@ -910,7 +917,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: medical_workload_diagnosis_50_50_high_value
     - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
@@ -956,7 +963,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: linkbench
@@ -980,7 +987,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: smoke_test
@@ -1006,7 +1013,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: smoke_test
@@ -1032,7 +1039,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-single"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: smoke_test
@@ -1058,7 +1065,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: crud_workloads_majority
     - name: crud_workloads_w1
@@ -1086,7 +1093,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard"
   tasks: &linux_3_shard_tasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_w1.2023-09
@@ -1134,7 +1141,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_w1.2023-09
@@ -1180,7 +1187,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: bestbuy_agg
     - name: bestbuy_agg_merge_different_db
@@ -1224,7 +1231,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: mongos_workloads
@@ -1251,7 +1258,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: linkbench
@@ -1275,7 +1282,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: change_streams_preimage_throughput
     - name: change_streams_preimage_latency
@@ -1303,7 +1310,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard-lite"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
@@ -1325,7 +1332,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
       cron: *high-value-workload-cron
@@ -1408,7 +1415,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks: &3node-intel-tasks
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
       cron: *high-value-workload-cron
@@ -1464,7 +1471,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
@@ -1524,7 +1531,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
@@ -1584,7 +1591,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
@@ -1647,7 +1654,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: crud_workloads_majority
     - name: ycsb.2023-09
@@ -1671,7 +1678,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb_stepdowns.2023-09
     - name: ycsb_rolling_restarts.2023-09
@@ -1705,7 +1712,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: initialsync-large
     - name: initialsync-large-fcbis
@@ -1729,7 +1736,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
@@ -1753,7 +1760,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-initialsync-logkeeper"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: initialsync-logkeeper
     - name: initialsync-logkeeper-fcbis
@@ -1780,7 +1787,7 @@ buildvariants:
 #     - "rhel70-perf-initialsync-logkeeper"
 #   depends_on: *_compile_amazon_linux2_arm64
 #   tasks:
-#     - name: schedule_patch_auto_tasks
+#     - *schedule_patch_auto_tasks_task
 #     - *schedule_variant_auto_tasks_task
 #     - name: initialsync-logkeeper-snapshot-update
 
@@ -1803,7 +1810,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
 
@@ -1826,7 +1833,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
@@ -1848,7 +1855,7 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
 
 # Template below used to create an anchor for linux mongo-perf standalone arm without the high-value-workload cron override that would transfer to any variant that uses this
@@ -2353,6 +2360,6 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard"
   tasks:
-    - name: schedule_patch_auto_tasks
+    - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: genny_resharding_withIndexes
