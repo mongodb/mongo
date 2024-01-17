@@ -426,13 +426,17 @@ private:
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
+    using ViewsMap = immutable::unordered_map<std::string,
+                                              absl::flat_hash_set<NamespaceString>,
+                                              StringMapHasher,
+                                              StringMapEq>;
 
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
 
     // Map of database names to a set of their views. Only databases with views are present.
-    StringMap<absl::flat_hash_set<NamespaceString>> _views;
+    ViewsMap _views;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).

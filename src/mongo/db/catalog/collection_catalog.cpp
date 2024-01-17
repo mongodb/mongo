@@ -955,7 +955,7 @@ CollectionCatalog::Stats CollectionCatalog::getStats() const {
 
 CollectionCatalog::ViewCatalogSet CollectionCatalog::getViewCatalogDbNames() const {
     ViewCatalogSet results;
-    for (const auto& dbNameViewSetPair : _views) {
+    for (auto&& dbNameViewSetPair : _views) {
         results.insert(dbNameViewSetPair.first);
     }
     return results;
@@ -965,10 +965,10 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
                                            CollectionUUID uuid,
                                            std::shared_ptr<Collection> coll) {
     auto ns = coll->ns();
-    if (auto it = _views.find(ns.db()); it != _views.end()) {
+    if (auto* set = _views.find(ns.db())) {
         uassert(ErrorCodes::NamespaceExists,
                 str::stream() << "View already exists. NS: " << ns,
-                !it->second.contains(ns));
+                !set->contains(ns));
     }
     if (_collections.find(ns) != nullptr) {
         auto& uncommittedCatalogUpdates = getUncommittedCatalogUpdates(opCtx);
@@ -1075,7 +1075,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
     _collections = {};
     _orderedCollections.clear();
     _catalog = {};
-    _views.clear();
+    _views = {};
     _stats = {};
 
     _resourceInformation.clear();
@@ -1087,27 +1087,34 @@ void CollectionCatalog::registerView(const NamespaceString& ns) {
         throw WriteConflictException();
     }
 
-    _views[ns.db()].insert(ns);
+    absl::flat_hash_set<NamespaceString> viewsForDb;
+    if (auto* existingSet = _views.find(ns.db())) {
+        viewsForDb = *existingSet;
+    }
+    viewsForDb.insert(ns);
+    _views = _views.set(ns.db().toString(), std::move(viewsForDb));
 }
 void CollectionCatalog::deregisterView(const NamespaceString& ns) {
-    auto it = _views.find(ns.db());
-    if (it == _views.end()) {
+    auto* set = _views.find(ns.db());
+    if (!set) {
         return;
     }
 
-    auto& viewsForDb = it->second;
+    absl::flat_hash_set<NamespaceString> viewsForDb = *set;
     viewsForDb.erase(ns);
     if (viewsForDb.empty()) {
-        _views.erase(it);
+        _views = _views.erase(ns.db().toString());
+    } else {
+        _views = _views.set(ns.db().toString(), std::move(viewsForDb));
     }
 }
 
 void CollectionCatalog::replaceViewsForDatabase(StringData dbName,
                                                 absl::flat_hash_set<NamespaceString> views) {
     if (views.empty())
-        _views.erase(dbName);
+        _views = _views.erase(dbName.toString());
     else {
-        _views[dbName] = std::move(views);
+        _views = _views.set(dbName.toString(), std::move(views));
     }
 }
 
