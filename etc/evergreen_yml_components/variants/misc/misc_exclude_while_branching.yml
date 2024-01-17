@@ -52,6 +52,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     large_distro_name: rhel80-large
+    core_analyzer_distro_name: rhel80-xlarge
     num_scons_link_jobs_available: 0.1
   tasks:
   - name: build_metrics_gen_TG

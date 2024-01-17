@@ -8,6 +8,7 @@ buildvariants:
   - rhel80-medium
   expansions:
     large_distro_name: rhel80-large
+    core_analyzer_distro_name: rhel80-xlarge
     burn_in_tag_include_all_required_and_suggested: true
     burn_in_tag_exclude_build_variants: >-
       macos-debug-suggested

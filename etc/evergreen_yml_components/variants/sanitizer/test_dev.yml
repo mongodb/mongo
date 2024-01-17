@@ -56,7 +56,7 @@ variables:
   multiversion_edition: enterprise
   repo_edition: enterprise
   large_distro_name: rhel80-medium
-  core_analyzer_distro_name: rhel80-large
+  core_analyzer_distro_name: rhel80-xlarge
   num_scons_link_jobs_available: 0.99
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
@@ -136,7 +136,7 @@ buildvariants:
     target_resmoke_time: 15
     max_sub_suites: 5
     large_distro_name: rhel80-medium
-    core_analyzer_distro_name: rhel80-large
+    core_analyzer_distro_name: rhel80-xlarge
     compile_variant: *linux_x86_dynamic_debug_compile_variant_name
   tasks:
   - name: .aggregation !.encrypt !.feature_flag_guarded
@@ -701,7 +701,7 @@ buildvariants:
     scons_cache_scope: shared
     separate_debug: off
     large_distro_name: rhel80-medium
-    core_analyzer_distro_name: rhel80-large
+    core_analyzer_distro_name: rhel80-xlarge
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -829,6 +829,7 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel80-debug-tsan-expansions-template
     large_distro_name: rhel80-large
+    core_analyzer_distro_name: rhel80-xlarge
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_serial_TG
