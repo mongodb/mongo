@@ -428,6 +428,7 @@ public:
 
     /* returns the pre-grow write position */
     char* grow(int by) {
+        invariant(by >= 0);
         if (MONGO_likely(by <= _end - _nextByte)) {
             char* oldNextByte = _nextByte;
             _nextByte += by;
