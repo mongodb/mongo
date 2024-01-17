@@ -694,6 +694,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     uint64_t original_snap_min;
     const char *txn_cfg[] = {
       WT_CONFIG_BASE(session, WT_SESSION_begin_transaction), "isolation=snapshot", NULL};
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool flush, flush_force, use_timestamp;
 
     conn = S2C(session);
@@ -790,6 +791,16 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
          * because recovery doesn't set the recovery timestamp until its checkpoint is complete.
          */
         if (txn_global->has_stable_timestamp) {
+            /* A checkpoint should never proceed when timestamps are out of order. */
+            if (txn_global->has_oldest_timestamp &&
+              txn_global->oldest_timestamp > txn_global->stable_timestamp) {
+                __wt_readunlock(session, &txn_global->rwlock);
+                WT_ASSERT_ALWAYS(session, false,
+                  "oldest timestamp %s must not be later than stable timestamp %s when taking a "
+                  "checkpoint",
+                  __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[0]),
+                  __wt_timestamp_to_string(txn_global->stable_timestamp, ts_string[1]));
+            }
             txn_global->checkpoint_timestamp = txn_global->stable_timestamp;
             if (!F_ISSET(conn, WT_CONN_RECOVERING))
                 txn_global->meta_ckpt_timestamp = txn_global->checkpoint_timestamp;

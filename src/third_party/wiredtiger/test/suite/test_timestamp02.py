@@ -221,6 +221,9 @@ class test_timestamp02(wttest.WiredTigerTestCase, suite_subprocess):
         # Verify the ooo ts has been detected.
         self.assertEqual(self.get_stat(stat.conn.txn_set_ts_force), 1)
 
+        # Restore the system in a correct state.
+        self.conn.set_timestamp('force,oldest_timestamp=' + self.timestamp_str(302))
+
     def test_read_your_writes(self):
         self.session.create(self.uri,
             'key_format=i,value_format=i' + self.extra_config)
