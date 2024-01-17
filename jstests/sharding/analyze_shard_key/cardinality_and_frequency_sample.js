@@ -81,6 +81,10 @@ const sampleSizeTestCasesNotUnique = makeSampleRateTestCases(false /* isUnique *
 function runTest(conn, {isUnique, isShardedColl, st, rst}) {
     const dbName = "testDb";
     const collName = "testColl";
+    if (st) {
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+    }
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
     const coll = db.getCollection(collName);
@@ -94,7 +98,6 @@ function runTest(conn, {isUnique, isShardedColl, st, rst}) {
 
     if (isShardedColl) {
         assert(st);
-        assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.name}));
         assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {a: "hashed"}}));
         assert.commandWorked(
             st.s.adminCommand({moveChunk: ns, find: {a: 1}, to: st.shard1.shardName}));

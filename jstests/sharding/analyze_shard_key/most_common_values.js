@@ -54,6 +54,10 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
     jsTest.log("Testing the test cases for " + tojson({isHashed, isUnique, isShardedColl}));
 
     const dbName = "testDb";
+    if (st) {
+        assert.commandWorked(
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
+    }
     const collName = "testColl";
     const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
@@ -76,7 +80,6 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
                    "are unique since uniqueness can't be maintained unless the shard key is " +
                    "prefix of the candidate shard keys");
         assert(st);
-        assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: st.shard0.shardName}));
 
         // Make the collection have two chunks:
         // shard0: [MinKey, 1]

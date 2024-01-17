@@ -18,6 +18,14 @@
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
+if (FixtureHelpers.isMongos(db)) {
+    const shards = db.getSiblingDB('config').shards.find().toArray();
+    const shardName0 = shards.map(doc => doc._id)[0];
+    const dbName = db.getName();
+    db.getSiblingDB(dbName).dropDatabase();
+    assert.commandWorked(db.adminCommand({enableSharding: dbName, primaryShard: shardName0}));
+}
+
 // Create unindexed collection
 const coll = db.timeseries_internal_bounded_sort_extended_range;
 const buckets = db['system.buckets.' + coll.getName()];
@@ -46,7 +54,6 @@ for (const collection of [buckets, bucketsIndexed]) {
         const shards = db.getSiblingDB('config').shards.find().toArray();
         const [shardName0, shardName1] = shards.map(doc => doc._id);
 
-        assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: shardName0}));
         const collName = collection.getFullName();
         // Our example data has documents between 2000-2003, and these dates are non-wrapping.
         // So this goes on the primary shard, and everything else goes on the non-primary.

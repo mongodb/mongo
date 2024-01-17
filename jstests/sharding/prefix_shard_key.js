@@ -24,7 +24,7 @@ var db = s.getDB("test");
 var admin = s.getDB("admin");
 var config = s.getDB("config");
 
-assert.commandWorked(s.s0.adminCommand({enablesharding: "test", primaryShard: s.shard1.shardName}));
+assert.commandWorked(s.s0.adminCommand({enableSharding: "test", primaryShard: s.shard0.shardName}));
 
 //******************Part 1********************
 
@@ -144,10 +144,7 @@ for (i = 0; i < 3; i++) {
     // setup new collection on shard0
     var coll2 = db.foo2;
     coll2.drop();
-    if (s.getPrimaryShardIdForDatabase(coll2.getDB()) != s.shard0.shardName) {
-        var moveRes = admin.runCommand({movePrimary: coll2.getDB() + "", to: s.shard0.shardName});
-        assert.eq(moveRes.ok, 1, "primary not moved correctly");
-    }
+    assert(s.getPrimaryShardIdForDatabase(coll2.getDB()) === s.shard0.shardName);
 
     // declare a longer index
     if (i == 0) {
@@ -177,7 +174,7 @@ for (i = 0; i < 3; i++) {
     assert.eq(findChunksUtil.findChunksByNs(config, coll2.getFullName()).count(), 2);
 
     // movechunk should move ALL docs since they have same value for skey
-    moveRes = admin.runCommand(
+    var moveRes = admin.runCommand(
         {moveChunk: coll2 + "", find: {skey: 0}, to: s.shard1.shardName, _waitForDelete: true});
     assert.eq(moveRes.ok, 1, "movechunk didn't work");
 

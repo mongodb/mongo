@@ -8,6 +8,9 @@ const testName = "lookup_sharded";
 const mongosDB = st.s0.getDB(testName);
 assert.commandWorked(mongosDB.dropDatabase());
 
+// Ensure the primary shard for the test db is shard0.
+assert.commandWorked(st.s.adminCommand({enableSharding: testName, primaryShard: st.shard0.name}));
+
 // Used by testPipeline to sort result documents. All _ids must be primitives.
 function compareId(a, b) {
     if (a._id < b._id) {
@@ -531,9 +534,6 @@ const explain = assert.commandWorked(mongosDB.lookup.explain().aggregate([
 if (explain.hasOwnProperty("shards")) {
     assert.eq(Object.keys(explain.shards).length, 1, explain);
 }
-
-// Ensure the primary shard for the test db is shard0.
-assert.commandWorked(st.s.adminCommand({movePrimary: mongosDB.getName(), to: st.shard0.name}));
 
 //
 // Test sharded local collection and unsharded foreign collection.
