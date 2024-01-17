@@ -88,11 +88,13 @@ void appendGeoJSONCoordinatesLiteral(BSONObjBuilder* bob,
 
     // When a $geoNear expression is parsed (see GeoNearExpression::parseNewQuery()), a $geometry
     // object defaults to being parsed as a point, without checking the type of the geometry object.
-    // This means we can query for a $geoNear expression that does not specify a type at all. In
-    // order to accomodate this case, we also default to type: 'Point' to ensure our representative
-    // shape is re-parseable.
-    const auto geoType = typeElem ? GeoParser::geoJSONTypeStringToEnum(typeElem.valueStringData())
-                                  : GeoParser::GEOJSON_POINT;
+    // This means we can query for a $geoNear expression that specifies an invalid type, or no type
+    // at all. In order to accomodate this case, we default to type: 'Point' to ensure our
+    // representative shape is re-parseable.
+    auto geoType = GeoParser::geoJSONTypeStringToEnum(typeElem.valueStringData());
+    if (geoType == GeoParser::GEOJSON_UNKNOWN) {
+        geoType = GeoParser::GEOJSON_POINT;
+    }
     switch (geoType) {
         case GeoParser::GEOJSON_POLYGON: {
             // Polygon requires four pairs of coordinates in a closed loop wrapped in an array to be
