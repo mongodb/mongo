@@ -127,10 +127,19 @@ void throwOnBadARSResponse(const AsyncRequestsSender::Response& arsResponse) {
 }  // namespace
 
 // static
-BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity) {
-    auto filtered = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
+                                      ExplainOptions::Verbosity verbosity,
+                                      const BSONObj& querySettings) {
     BSONObjBuilder out;
-    out.append("explain", filtered);
+    BSONObjIterator cmdIter(cmdObj);
+    BSONObjBuilder filteredBuilder(out.subobjStart("explain"));
+    CommandHelpers::filterCommandRequestForPassthrough(&cmdIter, &filteredBuilder);
+
+    // Propagate query settings if there are any.
+    if (!querySettings.isEmpty()) {
+        filteredBuilder.append("querySettings", querySettings);
+    }
+    const auto filtered = filteredBuilder.done();
     out.append("verbosity", ExplainOptions::verbosityString(verbosity));
 
     // Propagate all generic arguments out of the inner command since the shards will only process
