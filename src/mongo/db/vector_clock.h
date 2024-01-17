@@ -316,7 +316,7 @@ protected:
     // VectorClock mutex is held.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("VectorClock::_mutex");
 
-    bool _isEnabled{true};
+    AtomicWord<bool> _isEnabled{true};
 
     LogicalTimeArray _vectorTime = {
         kInitialComponentTime, kInitialComponentTime, kInitialComponentTime};

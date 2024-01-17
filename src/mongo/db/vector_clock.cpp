@@ -394,13 +394,11 @@ std::string VectorClock::_componentName(Component component) {
 }
 
 bool VectorClock::isEnabled() const {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _isEnabled;
+    return _isEnabled.load();
 }
 
 void VectorClock::_disable() {
-    stdx::lock_guard<Latch> lock(_mutex);
-    _isEnabled = false;
+    _isEnabled.store(false);
 }
 
 void VectorClock::resetVectorClock_forTest() {
@@ -409,7 +407,7 @@ void VectorClock::resetVectorClock_forTest() {
     for (; it != _vectorTime.end(); ++it) {
         *it = VectorClock::kInitialComponentTime;
     }
-    _isEnabled = true;
+    _isEnabled.store(true);
 }
 
 void VectorClock::_advanceTime_forTest(Component component, LogicalTime newTime) {
