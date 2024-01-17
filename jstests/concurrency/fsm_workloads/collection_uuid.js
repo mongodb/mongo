@@ -240,6 +240,32 @@ export const $config = (function() {
     })();
 
     const setup = function(db, collName, cluster) {
+        if (isMongos(db)) {
+            db.getSiblingDB(otherDbName).dropDatabase();
+            db[sameDbCollName].drop();
+            const shardNames = Object.keys(cluster.getSerializedCluster().shards);
+            const numShards = shardNames.length;
+            let otherDbShard;
+
+            if (numShards > 1) {
+                const currDb = db.getSiblingDB('config')['databases'].findOne({_id: db.getName()});
+                shardNames.some((shard) => {
+                    if (shard != currDb.primary) {
+                        otherDbShard = shard;
+                        return false;
+                    }
+                    return true;
+                });
+            } else {
+                otherDbShard = shardNames[0];
+            }
+            assert.commandWorked(
+                db.adminCommand({enableSharding: otherDbName, primaryShard: otherDbShard}));
+        } else {
+            db[sameDbCollName].drop();
+            db.getSiblingDB(otherDbName)[otherDbCollName].drop();
+        }
+
         // Add documents with wide range '_id' to end up with the data distributed across multiple
         // shards in the sharded scenario.
         for (let i = 0; i < this.threadCount; ++i) {
@@ -249,24 +275,8 @@ export const $config = (function() {
                     {_id: uniqueNum, x: i, ["y_" + i]: uniqueNum, a: uniqueNum, b: uniqueNum}));
             }
         }
-
-        db[sameDbCollName].drop();
-        db.getSiblingDB(otherDbName)[otherDbCollName].drop();
         assert.commandWorked(db[sameDbCollName].insert({_id: 0}));
         assert.commandWorked(db.getSiblingDB(otherDbName)[otherDbCollName].insert({_id: 0}));
-
-        if (isMongos(db)) {
-            const shardNames = Object.keys(cluster.getSerializedCluster().shards);
-            const numShards = shardNames.length;
-            if (numShards > 1) {
-                assert.commandWorked(
-                    db.adminCommand({movePrimary: db.getName(), to: shardNames[0]}));
-                assert.commandWorked(db.getSiblingDB(otherDbName).adminCommand({
-                    movePrimary: otherDbName,
-                    to: shardNames[1]
-                }));
-            }
-        }
     };
 
     const teardown = function(db, collName, cluster) {

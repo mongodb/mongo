@@ -33,12 +33,12 @@ const db = mongosConn.getDB(dbName);
 const donor = st.shard0;
 const recipient = st.shard1;
 
+assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: donor.shardName}));
+
 // Creates a sharded collection and enables recording of pre-images for it. Returns the sharded
 // collection.
 const coll = (() => {
     assertDropAndRecreateCollection(db, collName);
-
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: donor.shardName}));
 
     const coll = db.getCollection(collName);
 
