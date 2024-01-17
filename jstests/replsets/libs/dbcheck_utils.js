@@ -180,7 +180,10 @@ export const runDbCheckForDatabase =
             40619 /* collection is not replicated error. */,
             // Some tests adds an invalid view, resulting in a failure of the 'dbcheck'
             // operation with an 'InvalidViewDefinition' error.
-            ErrorCodes.InvalidViewDefinition
+            ErrorCodes.InvalidViewDefinition,
+            // Might hit stale shardVersion response from shard config while racing with
+            // 'dropCollection' command.
+            ErrorCodes.StaleConfig
         ];
 
         listCollectionsWithoutViews(db).map(c => c.name).forEach(collName => {
