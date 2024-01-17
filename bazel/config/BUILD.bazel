@@ -26,6 +26,7 @@ load(
     "use_diagnostic_latches",
     "shared_archive",
     "linker",
+    "detect_odr_violations",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -831,4 +832,32 @@ config_setting(
     flag_values = {
         "//bazel/config:shared_archive": "True",
     },
+)
+
+# --------------------------------------
+# detect-odr-violations options
+# --------------------------------------
+
+detect_odr_violations(
+    name = "detect_odr_violations",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "detect_odr_violations_enabled",
+    flag_values = {
+        "//bazel/config:detect_odr_violations": "True",
+    },
+)
+
+config_setting(
+    name = "detect_odr_violations_disabled",
+    flag_values = {
+        "//bazel/config:detect_odr_violations": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "detect_odr_violations_required_settings",
+    match_all = [":opt_off", ":detect_odr_violations_enabled", ":linker_gold"],
 )

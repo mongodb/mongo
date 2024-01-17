@@ -222,6 +222,19 @@ GLIBCXX_DEBUG_DEFINES = select({
     ("//bazel/config:use_glibcxx_debug_disabled"): [],
 }, no_match_error = GLIBCXX_DEBUG_ERROR_MESSAGE)
 
+DETECT_ODR_VIOLATIONS_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    detect_odr_violations requires these configurations:\n"+
+    "    --//bazel/config:build_mode=opt_off\n"+
+    "    --//bazel/config:linker=gold\n"
+)
+
+
+DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
+    ("//bazel/config:detect_odr_violations_required_settings"): ["-Wl,--detect-odr-violations"],
+    ("//bazel/config:detect_odr_violations_disabled"): [],
+}, no_match_error = DETECT_ODR_VIOLATIONS_ERROR_MESSAGE)
+
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES \
                        + GLIBCXX_DEBUG_DEFINES
 
@@ -229,7 +242,7 @@ MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZE
                     + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS \
-                         + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS
+                         + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS
 
 def force_includes_copt(package_name, name):
 

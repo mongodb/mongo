@@ -448,6 +448,7 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:use_glibcxx_debug={env.GetOption("use-glibcxx-debug") is not None}',
             f'--//bazel/config:build_grpc={True if env["ENABLE_GRPC_BUILD"] else False}',
             f'--//bazel/config:use_libcxx={env.GetOption("libc++") is not None}',
+            f'--//bazel/config:detect_odr_violations={env.GetOption("detect-odr-violations") is not None}',
             f'--//bazel/config:linkstatic={linkstatic}',
             f'--//bazel/config:use_diagnostic_latches={True if env.GetOption("use-diagnostic-latches") == "on" else False}',
             f'--//bazel/config:shared_archive={env.GetOption("link-model") == "dynamic-sdk"}',
