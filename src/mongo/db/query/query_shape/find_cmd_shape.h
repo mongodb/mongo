@@ -57,9 +57,9 @@ struct FindCmdShapeComponents : public CmdSpecificShapeComponents {
      */
     void appendTo(BSONObjBuilder&) const;
 
-    int64_t size() const final {
-        return sizeof(this) + filter.objsize() + projection.objsize() + sort.objsize() +
-            min.objsize() + max.objsize();
+    size_t size() const final {
+        return sizeof(FindCmdShapeComponents) + filter.objsize() + projection.objsize() +
+            sort.objsize() + min.objsize() + max.objsize();
     }
 
     BSONObj filter;
@@ -128,5 +128,8 @@ H AbslHashValue(H h, const FindCmdShapeComponents::HasField& hasField) {
     return H::combine(
         std::move(h), hasField.projection, hasField.sort, hasField.limit, hasField.skip);
 }
+static_assert(sizeof(FindCmdShape) == sizeof(CmdWithLetShape) + sizeof(FindCmdShapeComponents),
+              "If the class' members have changed, this assert and the extraSize() calculation may "
+              "need to be updated with a new value.");
 
 }  // namespace mongo::query_shape

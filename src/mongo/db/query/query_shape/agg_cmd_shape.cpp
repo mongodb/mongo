@@ -103,8 +103,8 @@ int64_t _size(const std::vector<BSONObj>& objects) {
 }
 }  // namespace
 
-int64_t AggCmdShapeComponents::size() const {
-    return sizeof(*this) + _size(representativePipeline);
+size_t AggCmdShapeComponents::size() const {
+    return sizeof(AggCmdShapeComponents) + _size(representativePipeline);
 }
 
 AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,
@@ -122,5 +122,11 @@ AggCmdShape::AggCmdShape(const AggregateCommandRequest& aggregateCommand,
                   pipeline.serializeToBson(
                       SerializationOptions::kRepresentativeQueryShapeSerializeOptions)),
       _inMongos(expCtx->inMongos) {}
+
+size_t AggCmdShape::extraSize() const {
+    // To account for possible padding, we calculate the extra space with the difference instead of
+    // using sizeof(bool);
+    return sizeof(AggCmdShape) - sizeof(CmdWithLetShape) - sizeof(AggCmdShapeComponents);
+}
 
 }  // namespace mongo::query_shape

@@ -82,7 +82,7 @@ struct CmdSpecificShapeComponents {
      * We cannot just use sizeof() because there are some variable size data members (like BSON
      * objects) which depend on the particular instance.
      */
-    virtual int64_t size() const = 0;
+    virtual size_t size() const = 0;
 
     // Some template boilerplate to allow sub-classes to overload the hash implementation.
     template <typename H>
@@ -137,8 +137,15 @@ public:
      * The size of a query shape is important, since we store these in space-constrained
      * environments like the query stats store.
      */
-    int64_t size() const;
+    size_t size() const;
 
+    /**
+     * This should be overriden by a child class if it has members whose sizes are not included in
+     * specificComponents().size().
+     */
+    virtual size_t extraSize() const {
+        return 0;
+    }
     template <typename H>
     friend H AbslHashValue(H h, const Shape& shape) {
         h = H::combine(std::move(h), shape.nssOrUUID, shape.specificComponents());

@@ -68,6 +68,9 @@ env.Library(
 env.CppUnitTest(
     target="db_query_query_stats_test",
     source=[
+        "agg_key_test.cpp",
+        "find_key_test.cpp",
+        "key_test.cpp",
         "query_stats_test.cpp",
         "supplemental_metrics_test.cpp",
         "query_stats_store_test.cpp",

@@ -54,18 +54,18 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
                                                std::unique_ptr<APIParameters> apiParams,
                                                query_shape::CollectionType collectionType,
                                                bool maxTimeMS)
-    : _queryShape(std::move(queryShape)),
-      _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
+    : _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
       _readPreference(readPreference.value_or(BSONObj()).getOwned()),
       _writeConcern(writeConcern.value_or(BSONObj()).getOwned()),
       _shapifiedReadConcern(shapifyReadConcern(readConcern.value_or(BSONObj()))),
-      _apiParams(std::move(apiParams)),
       _comment(commentObj ? _commentObj.firstElement() : BSONElement()),
-      _collectionType(collectionType),
+      _queryShape(std::move(queryShape)),
+      _apiParams(std::move(apiParams)),
       _clientMetaDataHash(clientMetadata ? clientMetadata->hashWithoutMongosInfo()
                                          : simpleHash(BSONObj())),
+      _collectionType(collectionType),
       _hasField{.clientMetaData = bool(clientMetadata),
                 .comment = bool(commentObj),
                 .hint = bool(hint),
@@ -94,7 +94,7 @@ BSONObj UniversalKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
     }
 }
 
-int64_t UniversalKeyComponents::size() const {
+size_t UniversalKeyComponents::size() const {
     return sizeof(*this) + _queryShape->size() +
         (_apiParams ? sizeof(*_apiParams) + shape_helpers::optionalSize(_apiParams->getAPIVersion())
                     : 0) +

@@ -70,8 +70,8 @@ void LetShapeComponent::HashValue(absl::HashState state) const {
         std::move(state), hasLet, simpleHash(shapifiedLet), unownedInnerComponents);
 }
 
-int64_t LetShapeComponent::size() const {
-    return shapifiedLet.objsize() + unownedInnerComponents.size();
+size_t LetShapeComponent::size() const {
+    return sizeof(LetShapeComponent) + shapifiedLet.objsize() + unownedInnerComponents.size();
 }
 
 void LetShapeComponent::addLetBson(BSONObjBuilder& bob,

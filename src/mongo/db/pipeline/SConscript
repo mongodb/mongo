@@ -656,7 +656,6 @@ env.CppUnitTest(
         'abt/abt_translation_test.cpp',
         'accumulator_js_test.cpp' if get_option('js-engine') != 'none' else [],
         'accumulator_test.cpp',
-        'agg_cmd_shape_test.cpp',
         'aggregation_request_test.cpp',
         'change_stream_document_diff_parser_test.cpp',
         'change_stream_event_transform_test.cpp',

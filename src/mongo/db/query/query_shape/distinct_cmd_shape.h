@@ -51,7 +51,7 @@ struct DistinctCmdShapeComponents : public CmdSpecificShapeComponents {
 
     void HashValue(absl::HashState state) const final;
 
-    int64_t size() const final;
+    size_t size() const final;
 
     std::string key;
     BSONObj representativeQuery;
@@ -74,5 +74,9 @@ public:
 
     DistinctCmdShapeComponents components;
 };
+
+static_assert(sizeof(DistinctCmdShape) == sizeof(Shape) + sizeof(DistinctCmdShapeComponents),
+              "If the class' members have changed, this assert and the extraSize() calculation may "
+              "need to be updated with a new value.");
 
 }  // namespace mongo::query_shape

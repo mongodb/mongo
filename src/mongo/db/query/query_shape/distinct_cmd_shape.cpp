@@ -44,8 +44,8 @@ void DistinctCmdShapeComponents::HashValue(absl::HashState state) const {
     absl::HashState::combine(std::move(state), key, simpleHash(representativeQuery));
 }
 
-int64_t DistinctCmdShapeComponents::size() const {
-    return sizeof(this) + key.size() + representativeQuery.objsize();
+size_t DistinctCmdShapeComponents::size() const {
+    return sizeof(DistinctCmdShapeComponents) + key.size() + representativeQuery.objsize();
 }
 
 const CmdSpecificShapeComponents& DistinctCmdShape::specificComponents() const {

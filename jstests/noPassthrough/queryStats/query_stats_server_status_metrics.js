@@ -43,10 +43,15 @@ function addApprox2MBOfStatsData(testDB, coll) {
 
         const kCmdNsObj = {cmdNs: {db: testDB.getName(), coll: coll.getName()}};
 
+        // Rough estimate of space needed for just the query stats 'Key' class members assuming
+        // everything is 8 bytes.
+        const kCxxOverhead = 96;
+
         // This is likely not to be exact - we are probably forgetting something. But we don't need
         // to be exact, just "good enough."
         return align(kNumCountersAndDates * 4 + Object.bsonsize(cmdObjTemplate) +
-                     Object.bsonsize(kClientMetadataEst) + Object.bsonsize(kCmdNsObj));
+                     Object.bsonsize(kClientMetadataEst) + Object.bsonsize(kCmdNsObj) +
+                     kCxxOverhead);
     })();
     const nIterations = k2MB / kEstimatedEntrySizeBytes;
     for (let i = 0; i <= nIterations; i++) {

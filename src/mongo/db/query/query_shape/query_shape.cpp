@@ -92,8 +92,9 @@ BSONObj Shape::toBson(OperationContext* opCtx,
     return bob.obj();
 }
 
-int64_t Shape::size() const {
-    return sizeof(this) + shape_helpers::optionalObjSize(collation) + specificComponents().size();
+size_t Shape::size() const {
+    return sizeof(Shape) + shape_helpers::optionalObjSize(collation) + specificComponents().size() +
+        extraSize();
 }
 
 QueryShapeHash Shape::sha256Hash(OperationContext* opCtx,

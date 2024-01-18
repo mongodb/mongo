@@ -48,6 +48,17 @@ std::string applyHmacForTest(StringData sd) {
 static const NamespaceStringOrUUID kDefaultTestNss =
     NamespaceStringOrUUID{NamespaceString::createNamespaceString_forTest("testDB.testColl")};
 
+struct RequestOptions {
+    OptionalBool singleBatch = {};
+    OptionalBool allowDiskUse = {};
+    OptionalBool returnKey = {};
+    OptionalBool showRecordId = {};
+    OptionalBool tailable = {};
+    OptionalBool awaitData = {};
+    OptionalBool mirrored = {};
+    OptionalBool limit = {};
+    OptionalBool skip = {};
+};
 class FindCmdShapeTest : public ServiceContextTest {
 public:
     void setUp() final {
@@ -88,6 +99,28 @@ public:
     }
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
+
+    std::unique_ptr<FindCmdShapeComponents> makeShapeComponentsFromFilter(
+        BSONObj filter, const RequestOptions& requestOptions = {}) {
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(filter.getOwned());
+        fcr->setSingleBatch(requestOptions.singleBatch);
+        fcr->setAllowDiskUse(requestOptions.allowDiskUse);
+        fcr->setReturnKey(requestOptions.returnKey);
+        fcr->setAllowDiskUse(requestOptions.showRecordId);
+        fcr->setTailable(requestOptions.tailable);
+        fcr->setAwaitData(requestOptions.awaitData);
+        fcr->setMirrored(requestOptions.mirrored);
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+        return std::make_unique<FindCmdShapeComponents>(*parsedFind, _expCtx);
+    }
+
+    std::unique_ptr<FindCmdShape> makeShapeFromFilter(const BSONObj& filter) {
+        auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        fcr->setFilter(filter.getOwned());
+        auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+        return std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+    }
 };
 
 TEST_F(FindCmdShapeTest, NormalSortPattern) {
@@ -171,6 +204,83 @@ TEST_F(FindCmdShapeTest, AllOptionalArgumentsSetToFalse) {
         uassertStatusOK(::mongo::parsed_find_command::parse(_expCtx, {std::move(fcr)}));
     auto cmdShape = std::make_unique<FindCmdShape>(*parsedRequest, _expCtx);
     ASSERT_EQUALS(0x2AAA8, cmdShape->components.optionalArgumentsEncoding());
+}
+
+
+TEST_F(FindCmdShapeTest, SizeOfShapeComponents) {
+    auto query = BSON("query" << 1 << "xEquals" << 42);
+    auto findCmdComponent = makeShapeComponentsFromFilter(query.getOwned());
+    const auto querySize = findCmdComponent->filter.objsize();
+
+    const auto minimumSize = sizeof(FindCmdShapeComponents) + querySize;
+    ASSERT_GT(findCmdComponent->size(), minimumSize);
+    ASSERT_LTE(findCmdComponent->size(),
+               minimumSize + static_cast<size_t>(4 * BSONObj().objsize()));
+}
+
+TEST_F(FindCmdShapeTest, EquivalentShapeComponentsSizes) {
+    auto query = BSON("query" << 1 << "xEquals" << 42);
+    // Tailable can not be set together with 'singleBatch' option.
+    auto mostlyTrueComponent = makeShapeComponentsFromFilter(query.getOwned(),
+                                                             {.singleBatch = false,
+                                                              .allowDiskUse = true,
+                                                              .returnKey = true,
+                                                              .showRecordId = true,
+                                                              .tailable = true,
+                                                              .awaitData = true,
+                                                              .mirrored = true,
+                                                              .limit = true,
+                                                              .skip = true});
+
+    auto mostlyFalseComponent = makeShapeComponentsFromFilter(query.getOwned(),
+                                                              {.singleBatch = false,
+                                                               .allowDiskUse = false,
+                                                               .returnKey = false,
+                                                               .showRecordId = false,
+                                                               .tailable = true,
+                                                               .awaitData = false,
+                                                               .mirrored = false,
+                                                               .limit = false,
+                                                               .skip = false});
+
+    ASSERT_EQ(mostlyTrueComponent->size(), mostlyFalseComponent->size());
+}
+
+TEST_F(FindCmdShapeTest, DifferentShapeComponentsSizes) {
+    auto smallQuery = BSON("query" << BSONObj());
+    auto smallFindCmdComponent = makeShapeComponentsFromFilter(smallQuery.getOwned());
+
+    auto largeQuery = BSON("query" << 1 << "xEquals" << 42);
+    auto largeFindCmdComponent = makeShapeComponentsFromFilter(largeQuery.getOwned());
+
+    ASSERT_LT(smallQuery.objsize(), largeQuery.objsize());
+    ASSERT_LT(smallFindCmdComponent->size(), largeFindCmdComponent->size());
+}
+
+TEST_F(FindCmdShapeTest, SizeOfShapeWithAndWithoutLet) {
+    auto filter = BSON("query" << 1 << "xEquals" << 42);
+    auto shapeWithoutLet = makeShapeFromFilter(filter.getOwned());
+
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setFilter(filter.getOwned());
+    fcr->setLet(fromjson(R"({x: 4})"));
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto shapeWithLet = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+
+    ASSERT_LT(shapeWithoutLet->size(), shapeWithLet->size());
+}
+
+TEST_F(FindCmdShapeTest, SizeOfShapeWithAndWithoutCollation) {
+    auto filter = BSON("query" << 1 << "xEquals" << 42);
+    auto shapeWithoutCollation = makeShapeFromFilter(filter.getOwned());
+
+    auto fcr = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+    fcr->setFilter(filter.getOwned());
+    fcr->setCollation(fromjson(R"({locale: "en_US"})"));
+    auto parsedFind = uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(fcr)}));
+    auto shapeWithCollation = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+
+    ASSERT_LT(shapeWithoutCollation->size(), shapeWithCollation->size());
 }
 
 }  // namespace

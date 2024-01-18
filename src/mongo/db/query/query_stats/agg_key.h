@@ -67,7 +67,7 @@ struct AggCmdComponents : public SpecificKeyComponents {
 
     void appendTo(BSONObjBuilder& bob, const SerializationOptions& opts) const;
 
-    int64_t size() const;
+    size_t size() const;
 
     stdx::unordered_set<NamespaceString> involvedNamespaces;
     bool _bypassDocumentValidation;
@@ -118,4 +118,7 @@ protected:
 private:
     const AggCmdComponents _components;
 };
+static_assert(
+    sizeof(AggKey) == sizeof(Key) + sizeof(AggCmdComponents),
+    "If the class' members have changed, this assert may need to be updated with a new value.");
 }  // namespace mongo::query_stats

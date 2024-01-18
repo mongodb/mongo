@@ -87,6 +87,8 @@ protected:
     }
 };
 
+class DistinctShapeSizeTest : public ServiceContextTest {};
+
 TEST_F(ExtractQueryShapeDistinctTest, ExtractFromDistinct) {
     auto expectedShape = fromjson(
         R"({ cmdNs: { db: "testdb", coll: "testcoll" }, command: "distinct", key: "name" })");
@@ -194,5 +196,27 @@ TEST_F(ExtractQueryShapeDistinctTest, CompareShapeHashes) {
     ASSERT_EQ(hash1, hash2);
     ASSERT_NOT_EQUALS(hash1, hash3);
 }
+
+TEST_F(DistinctShapeSizeTest, SizeOfShapeComponents) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto distinct = fromjson(R"({ distinct: "testcoll", $db: "testdb", key: "name" })");
+
+    auto distinctCommand = std::make_unique<DistinctCommandRequest>(DistinctCommandRequest::parse(
+        IDLParserContext("distinctCommandRequest",
+                         false /* apiStrict */,
+                         auth::ValidatedTenancyScope::get(expCtx->opCtx),
+                         boost::none),
+        distinct));
+    auto pd = parsed_distinct_command::parse(
+        expCtx, std::move(distinct), std::move(distinctCommand), ExtensionsCallbackNoop(), {});
+    auto components = std::make_unique<DistinctCmdShapeComponents>(*pd, expCtx);
+    const auto minimumSize = sizeof(CmdSpecificShapeComponents) + sizeof(BSONObj) +
+        sizeof(std::string) + components->key.size() +
+        static_cast<size_t>(components->representativeQuery.objsize());
+
+    ASSERT_GTE(components->size(), minimumSize);
+    ASSERT_LTE(components->size(), minimumSize + 8 /*padding*/);
+}
+
 }  // namespace
 }  // namespace mongo::query_shape

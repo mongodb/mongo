@@ -58,7 +58,7 @@ struct LetShapeComponent : public CmdSpecificShapeComponents {
     /**
      * Includes the size of the let parameters and the size of 'unownedInnerComponents.'
      */
-    int64_t size() const final;
+    size_t size() const final;
 
     /**
      * Adds _only_ the let params.
@@ -102,6 +102,8 @@ protected:
 
     LetShapeComponent _let;
 };
-
+static_assert(sizeof(CmdWithLetShape) == sizeof(Shape) + sizeof(LetShapeComponent),
+              "If the class' members have changed, this assert and the extraSize() calculation may "
+              "need to be updated with a new value.");
 
 }  // namespace mongo::query_shape

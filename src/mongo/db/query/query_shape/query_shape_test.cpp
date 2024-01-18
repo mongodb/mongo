@@ -45,20 +45,20 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/parsed_match_expression_for_test.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/query_shape_test_gen.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
-
 namespace mongo::query_shape {
 
 namespace {
-
 BSONObj predicateShape(const MatchExpression* expr) {
     return expr->serialize(SerializationOptions::kDebugQueryShapeSerializeOptions);
 }
@@ -691,6 +691,98 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
         })",
         parent.toBSON(options));
 }
+
 }  // namespace
 
+namespace {
+
+static const NamespaceString kDefaultTestNss =
+    NamespaceString::createNamespaceString_forTest("testDB.testColl");
+
+struct DummyShapeSpecificComponents : public query_shape::CmdSpecificShapeComponents {
+    DummyShapeSpecificComponents(){};
+    void HashValue(absl::HashState state) const {}
+    size_t size() const final {
+        return sizeof(DummyShapeSpecificComponents);
+    }
+};
+
+class DummyShape : public Shape {
+public:
+    DummyShape(NamespaceStringOrUUID nssOrUUID,
+               BSONObj collation,
+               DummyShapeSpecificComponents dummyComponents)
+        : Shape(nssOrUUID, collation) {
+        components = dummyComponents;
+    }
+
+    const CmdSpecificShapeComponents& specificComponents() const final {
+        return components;
+    }
+
+    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
+                                          OperationContext*,
+                                          const SerializationOptions& opts) const final {}
+    DummyShapeSpecificComponents components;
+};
+
+class DummyShapeWithExtraSize : public Shape {
+public:
+    DummyShapeWithExtraSize(NamespaceStringOrUUID nssOrUUID,
+                            BSONObj collation,
+                            DummyShapeSpecificComponents dummyComponents)
+        : Shape(nssOrUUID, collation) {
+        components = dummyComponents;
+    }
+
+    const CmdSpecificShapeComponents& specificComponents() const final {
+        return components;
+    }
+
+    // Random number for testing purposes.
+    size_t extraSize() const final override {
+        return 125;
+    }
+    void appendCmdSpecificShapeComponents(BSONObjBuilder&,
+                                          OperationContext*,
+                                          const SerializationOptions& opts) const final {}
+
+    DummyShapeSpecificComponents components;
+};
+
+class UniversalShapeTest : public ServiceContextTest {};
+
+TEST_F(UniversalShapeTest, SizeOfSpecificComponents) {
+    auto innerComponents = std::make_unique<DummyShapeSpecificComponents>();
+    ASSERT_EQ(innerComponents->size(), sizeof(CmdSpecificShapeComponents));
+    ASSERT_EQ(innerComponents->size(), sizeof(void*) /*vtable ptr*/);
+}
+
+TEST_F(UniversalShapeTest, SizeOfShape) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    // Make shape for testing.
+    auto collation = BSONObj{};
+    auto innerComponents = std::make_unique<DummyShapeSpecificComponents>();
+    auto shape = std::make_unique<DummyShape>(kDefaultTestNss, collation, *innerComponents);
+
+    ASSERT_EQ(innerComponents->size(), shape->specificComponents().size());
+    ASSERT_EQ(shape->size(),
+              sizeof(NamespaceStringOrUUID) + sizeof(BSONObj) + sizeof(void*) /*vtable ptr*/ +
+                  shape->specificComponents().size() + static_cast<size_t>(collation.objsize()));
+}
+
+TEST_F(UniversalShapeTest, SizeOfShapeWithExtraSize) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    // Make shape for testing.
+    auto collation = BSONObj{};
+    auto innerComponents = std::make_unique<DummyShapeSpecificComponents>();
+    auto shape = std::make_unique<DummyShape>(kDefaultTestNss, collation, *innerComponents);
+    auto shapeWithExtraSize =
+        std::make_unique<DummyShapeWithExtraSize>(kDefaultTestNss, collation, *innerComponents);
+
+    ASSERT_EQ(shapeWithExtraSize->size(), shape->size() + shapeWithExtraSize->extraSize());
+}
+}  // namespace
 }  // namespace mongo::query_shape

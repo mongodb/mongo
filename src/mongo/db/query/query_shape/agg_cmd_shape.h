@@ -57,7 +57,7 @@ struct AggCmdShapeComponents : public query_shape::CmdSpecificShapeComponents {
                           stdx::unordered_set<NamespaceString> involvedNamespaces,
                           std::vector<BSONObj> shapifiedPipeline);
 
-    int64_t size() const final;
+    size_t size() const final;
 
     void appendTo(BSONObjBuilder&) const;
 
@@ -88,6 +88,7 @@ public:
     void appendLetCmdSpecificShapeComponents(BSONObjBuilder& bob,
                                              const boost::intrusive_ptr<ExpressionContext>&,
                                              const SerializationOptions&) const final;
+    size_t extraSize() const final override;
 
 private:
     AggCmdShapeComponents _components;
@@ -95,4 +96,8 @@ private:
     // context for re-parsing.
     bool _inMongos;
 };
+static_assert(sizeof(AggCmdShape) <=
+                  sizeof(CmdWithLetShape) + sizeof(AggCmdShapeComponents) + 8 /* bool and padding*/,
+              "If the class' members have changed, this assert and the extraSize() calculation may "
+              "need to be updated with a new value.");
 }  // namespace mongo::query_shape
