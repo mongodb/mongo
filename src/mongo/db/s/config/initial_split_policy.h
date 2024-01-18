@@ -114,8 +114,7 @@ public:
         const ShardKeyPattern& shardKeyPattern,
         const Timestamp& validAfter,
         const std::vector<BSONObj>& splitPoints,
-        const std::vector<ShardId>& allShardIds,
-        int numContiguousChunksPerShard);
+        const std::vector<ShardId>& allShardIds);
 };
 
 /**
@@ -155,10 +154,7 @@ public:
     SplitPointsBasedSplitPolicy(
         const ShardKeyPattern& shardKeyPattern,
         size_t numShards,
-        boost::optional<std::vector<ShardId>> availableShardIds = boost::none,
-        // TODO SERVER-82611: get rid of the `numInitialChunks` argument.
-        // The `numInitialChunks` parameter was deprecated in SERVER-74747 and should not be used.
-        boost::optional<size_t> numInitialChunks = boost::none);
+        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -168,13 +164,9 @@ public:
     const std::vector<BSONObj>& getSplitPoints() const {
         return _splitPoints;
     }
-    size_t getNumContiguousChunksPerShard() const {
-        return _numContiguousChunksPerShard;
-    }
 
 private:
     std::vector<BSONObj> _splitPoints;
-    size_t _numContiguousChunksPerShard;
     boost::optional<std::vector<ShardId>> _availableShardIds;
 };
 
@@ -250,10 +242,7 @@ public:
         const ShardKeyPattern& shardKeyPattern,
         std::vector<TagsType> tags,
         bool isCollectionEmpty,
-        boost::optional<std::vector<ShardId>> availableShardIds = boost::none,
-        // TODO SERVER-82611: get rid of the `numInitialChunks` argument.
-        // The `numInitialChunks` parameter was deprecated in SERVER-74747 and should not be used.
-        boost::optional<size_t> numInitialChunks = boost::none);
+        boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
 
     SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 
@@ -262,7 +251,6 @@ private:
      * Validates that each of tags are set up correctly so that the tags can be split further.
      */
     void _validate(const ShardKeyPattern& shardKeyPattern, bool isCollectionEmpty);
-    size_t _numInitialChunks;
     StringMap<size_t> _numTagsPerShard;
 };
 
