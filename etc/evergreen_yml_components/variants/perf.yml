@@ -1382,6 +1382,7 @@ buildvariants:
     - name: tsbs_query_fixed_bucketing
     - name: tsbs-query-genny
     - name: tsbs-query-optimizations
+    - name: tsbs-expression-query
     - name: big_update_10k
     - name: mixed_workloads_genny_rate_limited_high_value
       cron: *high-value-workload-cron
@@ -1451,6 +1452,7 @@ buildvariants:
       cron: *high-value-workload-cron
     - name: time_series_sort_high_value
       cron: *high-value-workload-cron
+    - name: tsbs-expression-query
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-last-continuous-fcv.arm.aws.2023-11
@@ -1633,6 +1635,7 @@ buildvariants:
     - name: tsbs_query_fixed_bucketing
     - name: tsbs-query-genny
     - name: tsbs-query-optimizations
+    - name: tsbs-expression-query
     - name: dbcheck
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency

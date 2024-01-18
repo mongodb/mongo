@@ -2698,6 +2698,7 @@ buildvariants:
       - name: tsbs_query_fixed_bucketing
       - name: tsbs-query-genny
       - name: tsbs-query-optimizations
+      - name: tsbs-expression-query
       - name: big_update_10k
       - name: mixed_workloads_genny_rate_limited_high_value
         cron: *high-value-workload-cron
@@ -2711,7 +2712,6 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: time_series_sort_high_value
         cron: *high-value-workload-cron
-      - name: tsbs-expression-query
 
   # Variant which runs a single shard cluster with a config
   # shard and mongos processes processes co-located on the
@@ -2843,6 +2843,7 @@ buildvariants:
         cron: *high-value-workload-cron
       - name: time_series_sort_high_value
         cron: *high-value-workload-cron
+      - name: tsbs-expression-query
 
   - &3node-query-stats-rate-limit
     name: linux-3-node-replSet-intel-limited-1-query-stats.2022-11
@@ -3086,8 +3087,8 @@ buildvariants:
       - name: tsbs_query_fixed_bucketing
       - name: tsbs-query-genny
       - name: tsbs-query-optimizations
-      - name: dbcheck
       - name: tsbs-expression-query
+      - name: dbcheck
 
   - name: linux-3-node-replSet-query-settings
     display_name: Linux 3-Node ReplSet 2022-11 (QuerySettings)
