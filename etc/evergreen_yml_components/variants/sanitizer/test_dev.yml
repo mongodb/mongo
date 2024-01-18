@@ -716,7 +716,7 @@ buildvariants:
   - name: audit
   # - name: .auth  # Not passing
   - name: buildscripts_test
-  # - name: unittest_shell_hang_analyzer_gen # Not passing
+  - name: unittest_shell_hang_analyzer_gen
   # - name: .config_fuzzer # Not passing
   - name: config_fuzzer_jsCore
   - name: cqf
@@ -796,7 +796,7 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   # - name: .sharding .common # Not passing
-  # - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen # Not passing
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: .stitch
   # - name: .crypt # Doesn't pass on v4
   #   distros:
@@ -834,7 +834,6 @@ buildvariants:
   tasks:
   - name: compile_test_serial_TG
   - name: .auth
-  - name: unittest_shell_hang_analyzer_gen
   - name: .concurrency !.no_txns !.compute_mode
   - name: .config_fuzzer
   - name: .encrypt
@@ -844,7 +843,6 @@ buildvariants:
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
   # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: .sharding .common
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   # - name: .crypt # Doesn't pass on v4
   #   distros:
   #   - rhel80-xlarge
