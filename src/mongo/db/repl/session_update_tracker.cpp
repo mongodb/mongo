@@ -99,7 +99,7 @@ OplogEntry createOplogEntryForTransactionTableUpdate(repl::OpTime opTime,
 }
 
 /**
- * Constructs a new oplog entry if the given entry has transaction state embedded within in. The new
+ * Constructs a new oplog entry if the given entry has transaction state embedded within it. The new
  * oplog entry will contain the operation needed to replicate the transaction table.
  *
  * Returns boost::none if the given oplog doesn't have any transaction state or does not support

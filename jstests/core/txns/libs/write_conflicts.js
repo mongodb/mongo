@@ -138,7 +138,7 @@ export var WriteConflictHelpers = (function() {
         assert.commandWorked(session2Coll.runCommand(txn2Op));
         assert.commandWorked(session2.commitTransaction_forTesting());
 
-        const writeConflictsBefore = getWriteConflictsFromAllShards(coll, 0);
+        const writeConflictsBefore = getWriteConflictsFromAllShards(coll);
         const res = session1Coll.runCommand(txn1Op);
         // Not a writeError but a total command failure
         assert.eq(res.ok, 0);
@@ -147,7 +147,7 @@ export var WriteConflictHelpers = (function() {
         assert.commandFailedWithCode(session1.commitTransaction_forTesting(),
                                      ErrorCodes.NoSuchTransaction);
 
-        const writeConflictsAfter = getWriteConflictsFromAllShards(coll, 1);
+        const writeConflictsAfter = getWriteConflictsFromAllShards(coll);
         validateWriteConflictsBeforeAndAfter(coll, writeConflictsBefore, writeConflictsAfter);
 
         session1.startTransaction();
