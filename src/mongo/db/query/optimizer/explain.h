@@ -80,28 +80,6 @@ private:
     ExplainVersion _explainVersion;
 };
 
-/**
- * Stringifies paths and expressions in an ABT for queryPlanner explain purposes. For example, the
- * following ABT:
- * EvalFilter []
- * |   Variable [p3]
- * PathTraverse [1] PathComposeM []
- * |   PathCompare [Gt] Const [nan]
- * PathCompare [Lt] Const [5]
- *
- * results in the following string:
- * "EvalFilter (Traverse [1] ComposeM (< Const [5]) (> Const [nan])) (Var [p3])"
- */
-class StringifyPathsAndExprs {
-public:
-    static std::string stringify(ABT::reference_type node);
-};
-
-/**
- * This transport is used to generate the user-facing representation of the ABT which is shown in
- * the queryPlanner section of explain output. It assumes that the input is a physical ABT. This
- * currently only works for M2 plans under tryBonsai.
- */
 class UserFacingExplain {
 public:
     UserFacingExplain(const NodeToGroupPropsMap& nodeMap = {}) : _nodeMap(nodeMap) {}
@@ -142,25 +120,23 @@ public:
 
     void walk(const RootNode& node, BSONObjBuilder* bob, const ABT& child, const ABT& /* refs */) {
         bob->append(kStage, kRootName);
-
-        BSONArrayBuilder projs(bob->subarrayStart(kProj));
-        for (const auto& projName : node.getProperty().getProjections().getVector()) {
-            projs.append(projName.value());
-        }
-        projs.doneFast();
+        bob->append(kProj, "<todo>");
 
         BSONObjBuilder inputBob(bob->subobjStart(kInput));
         generateExplain(child, &inputBob);
     }
 
-    void walk(const FilterNode& node, BSONObjBuilder* bob, const ABT& child, const ABT& expr) {
+    void walk(const FilterNode& node,
+              BSONObjBuilder* bob,
+              const ABT& child,
+              const ABT& /* expr */) {
         auto it = _nodeMap.find(&node);
         tassert(8075601, "Failed to find node properties", it != _nodeMap.end());
         const NodeProps& props = it->second;
 
         bob->append(kStage, kFilterName);
         bob->append(kNodeId, props._planNodeId);
-        bob->append(kFilter, StringifyPathsAndExprs::stringify(expr));
+        bob->append(kFilter, "<todo>");
 
         BSONObjBuilder inputBob(bob->subobjStart(kInput));
         generateExplain(child, &inputBob);
@@ -176,11 +152,7 @@ public:
 
         bob->append(kStage, kEvalName);
         bob->append(kNodeId, props._planNodeId);
-
-        BSONObjBuilder projectionsBob(bob->subobjStart(kProj));
-        projectionsBob.append(node.getProjectionName().value(),
-                              StringifyPathsAndExprs::stringify(node.getProjection()));
-        projectionsBob.doneFast();
+        bob->append(kProj, "<todo>");
 
         BSONObjBuilder inputBob(bob->subobjStart(kInput));
         generateExplain(child, &inputBob);
@@ -206,22 +178,7 @@ public:
                 break;
         }
 
-        auto map = node.getFieldProjectionMap();
-        std::map<FieldNameType, ProjectionName> ordered;
-        if (const auto& projName = map._ridProjection) {
-            ordered.emplace("<rid>", *projName);
-        }
-        if (const auto& projName = map._rootProjection) {
-            ordered.emplace("<root>", *projName);
-        }
-        for (const auto& entry : map._fieldProjections) {
-            ordered.insert(entry);
-        }
-        BSONObjBuilder fieldProjs(bob->subobjStart(kProj));
-        for (const auto& [fieldName, projectionName] : ordered) {
-            fieldProjs.append(projectionName.value(), fieldName.value());
-        }
-        fieldProjs.doneFast();
+        bob->append(kProj, "<todo>");
     }
 
     void generateExplain(const ABT::reference_type n, BSONObjBuilder* bob) {
