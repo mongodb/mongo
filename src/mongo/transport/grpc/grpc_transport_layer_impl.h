@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <memory>
 
+#include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/grpc/grpc_transport_layer.h"
 #include "mongo/transport/session_manager.h"
 #include "mongo/util/duration.h"
@@ -56,8 +57,10 @@ public:
      * Note that this TransportLayer will throw during `setup()`
      * if no tlsCertificateKeyFile is available.
      */
-    static std::unique_ptr<GRPCTransportLayerImpl> createWithConfig(ServiceContext*,
-                                                                    Options options);
+    static std::unique_ptr<GRPCTransportLayerImpl> createWithConfig(
+        ServiceContext*,
+        Options options,
+        std::vector<std::shared_ptr<ClientTransportObserver>> observers);
 
     Status registerService(std::unique_ptr<Service> svc) override;
 

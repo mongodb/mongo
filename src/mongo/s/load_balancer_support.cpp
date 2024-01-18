@@ -53,7 +53,7 @@
 namespace mongo::load_balancer_support {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(clientIsFromLoadBalancer);
+MONGO_FAIL_POINT_DEFINE(loadBalancerSupportClientIsFromLoadBalancer);
 
 struct PerService {
     /**
@@ -67,10 +67,6 @@ struct PerService {
 class PerClient {
 public:
     bool isFromLoadBalancer() const;
-
-    void setIsFromLoadBalancer() {
-        _isFromLoadBalancer = true;
-    }
 
     bool didHello() const {
         return _didHello;
@@ -89,9 +85,6 @@ public:
     }
 
 private:
-    /** True if the connection was established through a load balancer. */
-    bool _isFromLoadBalancer = false;
-
     /** True after we send this client a hello reply. */
     bool _didHello = false;
 
@@ -103,7 +96,7 @@ const auto getPerServiceState = ServiceContext::declareDecoration<PerService>();
 const auto getPerClientState = Client::declareDecoration<PerClient>();
 
 bool PerClient::isFromLoadBalancer() const {
-    if (MONGO_unlikely(clientIsFromLoadBalancer.shouldFail())) {
+    if (MONGO_unlikely(loadBalancerSupportClientIsFromLoadBalancer.shouldFail())) {
         return true;
     }
     const auto& session = getPerClientState.owner(this)->session();
@@ -115,7 +108,7 @@ bool PerClient::isFromLoadBalancer() const {
 
 bool isEnabled() {
     const auto val = loadBalancerPort.load();
-    return val != 0 || MONGO_unlikely(clientIsFromLoadBalancer.shouldFail());
+    return val != 0 || MONGO_unlikely(loadBalancerSupportClientIsFromLoadBalancer.shouldFail());
 }
 
 boost::optional<int> getLoadBalancerPort() {

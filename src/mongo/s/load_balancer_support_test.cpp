@@ -79,7 +79,7 @@ public:
     };
 
     FailPointEnableBlock simulateLoadBalancerConnection() const {
-        return FailPointEnableBlock("clientIsFromLoadBalancer");
+        return FailPointEnableBlock("loadBalancerSupportClientIsFromLoadBalancer");
     }
 };
 

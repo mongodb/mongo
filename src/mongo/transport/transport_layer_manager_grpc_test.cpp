@@ -167,7 +167,9 @@ private:
         grpcOpts.clientMetadata = grpc::makeClientMetadataDocument();
         auto* svcCtx = getServiceContext();
         auto clientCache = std::make_shared<grpc::ClientCache>();
-        auto sm = std::make_unique<grpc::GRPCSessionManager>(svcCtx, clientCache);
+        std::vector<std::shared_ptr<ClientTransportObserver>> observers;
+        auto sm =
+            std::make_unique<grpc::GRPCSessionManager>(svcCtx, clientCache, std::move(observers));
         auto grpcLayer = std::make_unique<grpc::GRPCTransportLayerImpl>(
             svcCtx, std::move(grpcOpts), std::move(sm));
         uassertStatusOK(grpcLayer->registerService(std::make_unique<grpc::CommandService>(

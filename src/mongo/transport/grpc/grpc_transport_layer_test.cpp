@@ -100,7 +100,8 @@ public:
         GRPCTransportLayer::Options options = CommandServiceTestFixtures::makeTLOptions()) {
         auto* svcCtx = getServiceContext();
         auto clientCache = std::make_shared<ClientCache>();
-        auto sm = std::make_unique<GRPCSessionManager>(svcCtx, clientCache);
+        std::vector<std::shared_ptr<ClientTransportObserver>> observers;
+        auto sm = std::make_unique<GRPCSessionManager>(svcCtx, clientCache, std::move(observers));
         auto tl =
             std::make_unique<GRPCTransportLayerImpl>(svcCtx, std::move(options), std::move(sm));
         uassertStatusOK(tl->registerService(
@@ -289,7 +290,9 @@ public:
     void setUp() override {
         GRPCTransportLayerTest::setUp();
         auto* svcCtx = getServiceContext();
-        auto sm = std::make_unique<GRPCSessionManager>(svcCtx, std::make_shared<ClientCache>());
+        std::vector<std::shared_ptr<ClientTransportObserver>> observers;
+        auto sm = std::make_unique<GRPCSessionManager>(
+            svcCtx, std::make_shared<ClientCache>(), std::move(observers));
         _tl = std::make_unique<GRPCTransportLayerImpl>(
             getServiceContext(), CommandServiceTestFixtures::makeTLOptions(), std::move(sm));
         uassertStatusOK(_tl->setup());

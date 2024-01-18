@@ -51,6 +51,7 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerShortOpportunisticReadWrite);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
 MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
+MONGO_FAIL_POINT_DEFINE(clientIsFromLoadBalancer);
 
 namespace {
 
@@ -152,6 +153,10 @@ CommonAsioSession::CommonAsioSession(
         LOGV2(5271001, "Initializing the AsioSession with transient SSL context", attrs);
     }
 #endif
+}
+
+bool CommonAsioSession::isFromLoadBalancer() const {
+    return MONGO_unlikely(clientIsFromLoadBalancer.shouldFail()) || _isFromLoadBalancer;
 }
 
 void CommonAsioSession::end() {
