@@ -948,6 +948,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
     if (nShardsOwningChunks)
         stats->noteNumShardsOwningChunks(*nShardsOwningChunks);
 
+    stats->noteTargetedCollectionIsSharded(targeter.isTargetedCollectionSharded());
+
     batchOp.buildClientResponse(clientResponse);
 
     LOGV2_DEBUG(22910,
@@ -974,6 +976,10 @@ void BatchWriteExecStats::noteNumShardsOwningChunks(const int nShardsOwningChunk
     _numShardsOwningChunks.emplace(nShardsOwningChunks);
 }
 
+void BatchWriteExecStats::noteTargetedCollectionIsSharded(bool isSharded) {
+    _hasTargetedShardedCollection = isSharded;
+}
+
 const std::set<ShardId>& BatchWriteExecStats::getTargetedShards() const {
     return _targetedShards;
 }
@@ -986,10 +992,15 @@ boost::optional<int> BatchWriteExecStats::getNumShardsOwningChunks() const {
     return _numShardsOwningChunks;
 }
 
+bool BatchWriteExecStats::hasTargetedShardedCollection() const {
+    return _hasTargetedShardedCollection;
+}
+
 void updateHostsTargetedMetrics(OperationContext* opCtx,
                                 BatchedCommandRequest::BatchType batchType,
                                 int nShardsOwningChunks,
-                                int nShardsTargeted) {
+                                int nShardsTargeted,
+                                bool isSharded) {
     NumHostsTargetedMetrics::QueryType writeType;
     switch (batchType) {
         case BatchedCommandRequest::BatchType_Insert:
@@ -1006,7 +1017,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
     }
 
     auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
-        opCtx, nShardsTargeted, nShardsOwningChunks);
+        opCtx, nShardsTargeted, nShardsOwningChunks, isSharded);
     NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(writeType, targetType);
 }
 

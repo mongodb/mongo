@@ -403,6 +403,7 @@ void BulkWriteExecStats::updateMetrics(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().nShards = _targetedShards.size();
 
     for (size_t nsIdx = 0; nsIdx < targeters.size(); ++nsIdx) {
+        const auto& targeter = targeters[nsIdx];
         auto it = _targetedShardsPerNsAndBatchType.find(nsIdx);
         if (it == _targetedShardsPerNsAndBatchType.end()) {
             continue;
@@ -418,7 +419,11 @@ void BulkWriteExecStats::updateMetrics(OperationContext* opCtx,
             }
 
             if (nShardsOwningChunks.has_value()) {
-                updateHostsTargetedMetrics(opCtx, batchType, nShardsOwningChunks.value(), nShards);
+                updateHostsTargetedMetrics(opCtx,
+                                           batchType,
+                                           nShardsOwningChunks.value(),
+                                           nShards,
+                                           targeter->isTargetedCollectionSharded());
             }
         }
     }

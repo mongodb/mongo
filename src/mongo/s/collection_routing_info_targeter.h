@@ -171,6 +171,8 @@ public:
      */
     int getNShardsOwningChunks() const override;
 
+    bool isTargetedCollectionSharded() const override;
+
     bool isTrackedTimeSeriesBucketsNamespace() const override;
 
     bool timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const;

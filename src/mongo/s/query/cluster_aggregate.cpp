@@ -193,6 +193,11 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
     // Create a set of ShardIds that own a chunk belonging to any of the collections involved in
     // this pipeline. This will be used to determine whether the pipeline targeted all of the shards
     // that own chunks for any collection involved or not.
+    //
+    // Note that this will only take into account collections that are sharded. If the namespace is
+    // an unsharded collection we will not track which shard owns it here. This is to preserve
+    // semantics of the tracked host metrics since unsharded collections are tracked separately on
+    // its own value.
     std::set<ShardId> shardsOwningChunks = [&]() {
         std::set<ShardId> shardsIds;
 
@@ -224,8 +229,11 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
 
     auto nShardsTargeted = CurOp::get(opCtx)->debug().nShards;
     if (nShardsTargeted > 0) {
+        // shardsOwningChunks will only contain something if we targeted a sharded collection in the
+        // pipeline.
+        bool hasTargetedShardedCollection = !shardsOwningChunks.empty();
         auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
-            opCtx, nShardsTargeted, shardsOwningChunks.size());
+            opCtx, nShardsTargeted, shardsOwningChunks.size(), hasTargetedShardedCollection);
         NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(
             NumHostsTargetedMetrics::QueryType::kAggregateCmd, targetType);
     }

@@ -185,6 +185,11 @@ public:
      * Returns the number of shards that own one or more chunks for the targeted collection.
      */
     virtual int getNShardsOwningChunks() const = 0;
+
+    /**
+     * Returns whether the targeted collection is sharded or not
+     */
+    virtual bool isTargetedCollectionSharded() const = 0;
 };
 
 }  // namespace mongo

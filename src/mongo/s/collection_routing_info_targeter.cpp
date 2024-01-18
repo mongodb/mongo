@@ -954,6 +954,10 @@ int CollectionRoutingInfoTargeter::getNShardsOwningChunks() const {
     return 0;
 }
 
+bool CollectionRoutingInfoTargeter::isTargetedCollectionSharded() const {
+    return _cri.cm.isSharded();
+}
+
 bool CollectionRoutingInfoTargeter::isTrackedTimeSeriesBucketsNamespace() const {
     // Used for testing purposes to force that we always have a tracked timeseries bucket namespace.
     if (MONGO_unlikely(isTrackedTimeSeriesBucketsNamespaceAlwaysTrue.shouldFail())) {

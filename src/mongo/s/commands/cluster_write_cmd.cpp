@@ -682,11 +682,13 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     // Record the number of shards targeted by this write.
     CurOp::get(opCtx)->debug().nShards = nShards;
 
-    if (stats.getNumShardsOwningChunks().has_value())
+    if (stats.getNumShardsOwningChunks().has_value()) {
         updateHostsTargetedMetrics(opCtx,
                                    _batchedRequest.getBatchType(),
                                    stats.getNumShardsOwningChunks().value(),
-                                   nShards);
+                                   nShards,
+                                   stats.hasTargetedShardedCollection());
+    }
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {
         auto writeCmdStatus = response.toStatus();

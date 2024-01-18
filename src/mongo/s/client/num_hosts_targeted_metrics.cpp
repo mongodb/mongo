@@ -95,10 +95,10 @@ void NumHostsTargetedMetrics::appendSection(BSONObjBuilder* builder) {
 }
 
 NumHostsTargetedMetrics::TargetType NumHostsTargetedMetrics::parseTargetType(
-    OperationContext* opCtx, int nShardsTargeted, int nShardsOwningChunks) {
+    OperationContext* opCtx, int nShardsTargeted, int nShardsOwningChunks, bool isSharded) {
     // If nShardsOwningChunks == 0, this means the routing info did not contain a chunk manager so
-    // the collection is unsharded
-    if (nShardsOwningChunks == 0)
+    // the collection is unsharded.
+    if (!isSharded || nShardsOwningChunks == 0)
         return TargetType::kUnsharded;
 
     if (nShardsTargeted == 1)

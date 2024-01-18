@@ -100,10 +100,12 @@ public:
     void noteWriteAt(const HostAndPort& host, repl::OpTime opTime, const OID& electionId);
     void noteTargetedShard(const ShardId& shardId);
     void noteNumShardsOwningChunks(int nShardsOwningChunks);
+    void noteTargetedCollectionIsSharded(bool isSharded);
 
     const std::set<ShardId>& getTargetedShards() const;
     const HostOpTimeMap& getWriteOpTimes() const;
     boost::optional<int> getNumShardsOwningChunks() const;
+    bool hasTargetedShardedCollection() const;
 
     // Expose via helpers if this gets more complex
 
@@ -120,11 +122,13 @@ private:
     std::set<ShardId> _targetedShards;
     HostOpTimeMap _writeOpTimes;
     boost::optional<int> _numShardsOwningChunks;
+    bool _hasTargetedShardedCollection = false;
 };
 
 void updateHostsTargetedMetrics(OperationContext* opCtx,
                                 BatchedCommandRequest::BatchType batchType,
                                 int nShardsOwningChunks,
-                                int nShardsTargeted);
+                                int nShardsTargeted,
+                                bool isSharded);
 
 }  // namespace mongo

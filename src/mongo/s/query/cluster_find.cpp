@@ -313,13 +313,9 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 void updateNumHostsTargetedMetrics(OperationContext* opCtx,
                                    const ChunkManager& cm,
                                    int nTargetedShards) {
-    int nShardsOwningChunks = 0;
-    if (cm.isSharded()) {
-        nShardsOwningChunks = cm.getNShardsOwningChunks();
-    }
-
+    int nShardsOwningChunks = cm.hasRoutingTable() ? cm.getNShardsOwningChunks() : 0;
     auto targetType = NumHostsTargetedMetrics::get(opCtx).parseTargetType(
-        opCtx, nTargetedShards, nShardsOwningChunks);
+        opCtx, nTargetedShards, nShardsOwningChunks, cm.isSharded());
     NumHostsTargetedMetrics::get(opCtx).addNumHostsTargeted(
         NumHostsTargetedMetrics::QueryType::kFindCmd, targetType);
 }

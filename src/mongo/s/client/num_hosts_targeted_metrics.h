@@ -60,7 +60,8 @@ public:
 
     TargetType parseTargetType(OperationContext* opCtx,
                                int nShardsTargeted,
-                               int nShardsOwningChunks);
+                               int nShardsOwningChunks,
+                               bool isSharded);
 
     static NumHostsTargetedMetrics& get(ServiceContext* serviceContext);
     static NumHostsTargetedMetrics& get(OperationContext* opCtx);

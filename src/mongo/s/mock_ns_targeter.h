@@ -157,6 +157,11 @@ public:
         return 0;
     }
 
+    bool isTargetedCollectionSharded() const override {
+        // No-op
+        return false;
+    }
+
     bool isTrackedTimeSeriesBucketsNamespace() const override {
         return _isTrackedTimeSeriesBucketsNamespace;
     }
