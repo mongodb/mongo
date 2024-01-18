@@ -423,11 +423,13 @@ def test_install_compass(test_args: TestArgs):
 
     exec_result = run_and_log(" ".join(cmd), end_on_error=False)
 
-    if exec_result.returncode != 0:
-        if test_args['arch'] == 'x86_64' and test_args['package_manager'] != 'zypper':
-            # install-compass does not work on platforms other than x86_64 and
-            # currently cannot use zypper to install packages.
-            raise RuntimeError("Failed to install compass")
+    # install-compass currently cannot use zypper to install packages. Ignore error code.
+    if test_args['package_manager'] == 'zypper' or exec_result.returncode not in [
+            0,  # success
+            3,  # unsupported arch (compass only supports x86_64)
+            6,  # unsupported linux version
+    ]:
+        raise RuntimeError("Failed to install compass")
 
 
 def test_uninstall(test_args: TestArgs):
