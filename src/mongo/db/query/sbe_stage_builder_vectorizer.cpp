@@ -449,8 +449,12 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
         for (size_t i = 0; i < arity; i++) {
             functionArgs.emplace_back(std::move(*args[i].expr));
         }
-        return {
-            makeABTFunction(op.name(), std::move(functionArgs)), TypeSignature::kAnyScalarType, {}};
+        TypeSignature typeSignature = TypeSignature::kAnyScalarType;
+        // The fail() function aborts the query and never returns a valid value.
+        if (arity == 2 && op.name() == "fail"s) {
+            typeSignature = TypeSignature();
+        }
+        return {makeABTFunction(op.name(), std::move(functionArgs)), typeSignature, {}};
     }
     if (numOfBlockArgs == 1) {
         if (arity == 1 && op.name() == "exists"s) {
@@ -542,43 +546,43 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
     }
     foldIfNecessary(test);
 
-    if (TypeSignature::kBlockType.isSubset(test.typeSignature)) {
-        auto blockify = [](Tree& tree, optimizer::ProjectionName var) {
-            if (!TypeSignature::kBlockType.isSubset(tree.typeSignature)) {
-                tree.expr =
-                    makeABTFunction("valueBlockNewFill"_sd,
-                                    makeIf(makeABTFunction("valueBlockNone"_sd,
-                                                           makeVariable(var),
-                                                           optimizer::Constant::boolean(true)),
-                                           optimizer::Constant::nothing(),
-                                           std::move(*tree.expr)),
-                                    makeABTFunction("valueBlockSize"_sd, makeVariable(var)));
-                tree.typeSignature = TypeSignature::kBlockType.include(tree.typeSignature);
-                tree.sourceCell = boost::none;
-            }
-        };
+    auto blockify = [](Tree& tree, optimizer::ProjectionName bitmapVar) {
+        if (!TypeSignature::kBlockType.isSubset(tree.typeSignature)) {
+            tree.expr =
+                makeABTFunction("valueBlockNewFill"_sd,
+                                makeIf(makeABTFunction("valueBlockNone"_sd,
+                                                       makeVariable(bitmapVar),
+                                                       optimizer::Constant::boolean(true)),
+                                       optimizer::Constant::nothing(),
+                                       std::move(*tree.expr)),
+                                makeABTFunction("valueBlockSize"_sd, makeVariable(bitmapVar)));
+            tree.typeSignature = TypeSignature::kBlockType.include(tree.typeSignature);
+            tree.sourceCell = boost::none;
+        }
+    };
 
+    if (TypeSignature::kBlockType.isSubset(test.typeSignature)) {
         // Treat the result of the condition as the mask to be applied on the 'then' side, and its
         // flipped representation as the mask for the 'else' branch.
-        auto lhsVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
-        _activeMasks.push_back(lhsVar);
+        auto thenBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+        _activeMasks.push_back(thenBranchBitmapVar);
         auto thenBranch = op.getThenChild().visit(*this);
         _activeMasks.pop_back();
         if (!thenBranch.expr.has_value()) {
             return thenBranch;
         }
         // If the branch produces a scalar value, blockify it.
-        blockify(thenBranch, lhsVar);
+        blockify(thenBranch, thenBranchBitmapVar);
 
-        auto rhsVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
-        _activeMasks.push_back(rhsVar);
+        auto elseBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+        _activeMasks.push_back(elseBranchBitmapVar);
         auto elseBranch = op.getElseChild().visit(*this);
         _activeMasks.pop_back();
         if (!elseBranch.expr.has_value()) {
             return elseBranch;
         }
         // If the branch produces a scalar value, blockify it.
-        blockify(elseBranch, rhsVar);
+        blockify(elseBranch, elseBranchBitmapVar);
 
         boost::optional<optimizer::ProjectionName> sameCell = thenBranch.sourceCell.has_value() &&
                 elseBranch.sourceCell.has_value() &&
@@ -590,15 +594,15 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             foldIfNecessary(thenBranch);
             foldIfNecessary(elseBranch);
         }
-        return {makeLet(lhsVar,
+        return {makeLet(thenBranchBitmapVar,
                         std::move(*test.expr),
                         makeABTFunction("valueBlockCombine"_sd,
                                         std::move(*thenBranch.expr),
-                                        makeLet(rhsVar,
+                                        makeLet(elseBranchBitmapVar,
                                                 makeABTFunction("valueBlockLogicalNot"_sd,
-                                                                makeVariable(lhsVar)),
+                                                                makeVariable(thenBranchBitmapVar)),
                                                 std::move(*elseBranch.expr)),
-                                        makeVariable(lhsVar))),
+                                        makeVariable(thenBranchBitmapVar))),
                 thenBranch.typeSignature.include(elseBranch.typeSignature),
                 sameCell};
 
@@ -614,7 +618,69 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
         }
         if (TypeSignature::kBlockType.isSubset(thenBranch.typeSignature) !=
             TypeSignature::kBlockType.isSubset(elseBranch.typeSignature)) {
-            // TODO: blockify the scalar branch.
+            auto& blockBranch = TypeSignature::kBlockType.isSubset(thenBranch.typeSignature)
+                ? thenBranch
+                : elseBranch;
+            auto& scalarBranch = TypeSignature::kBlockType.isSubset(thenBranch.typeSignature)
+                ? elseBranch
+                : thenBranch;
+
+            // When an "if" statement is using a scalar test expression, but can return either a
+            // block or a scalar value, we can't decide at compile time whether the runtime value
+            // will be a block or a scalar value; this makes it impossible for the parent expression
+            // to continue with the vectorization.
+            //
+            // E.g. (if ($$NOW > "2024-01-01") then dateDiff(...) else 0) < 365)
+            //      The vectorizer cannot decide whether the "<" operator should be translated into
+            //      a valueBlockLtScalar, because if the "else" branch is selected, the function
+            //      will be invoked with two scalar arguments, leading to a runtime failure.
+
+            // We can vectorize this operation if the scalarBranch is a call to fail(), because it
+            // would never return a value and the type information is the one coming from the block
+            // branch.
+            if (scalarBranch.typeSignature.isEmpty()) {
+                return {makeIf(std::move(*test.expr),
+                               std::move(*thenBranch.expr),
+                               std::move(*elseBranch.expr)),
+                        blockBranch.typeSignature,
+                        blockBranch.sourceCell};
+            }
+            // The other approach is to convert the scalar value into a block containing N copies of
+            // the scalar value, but we need to know the exact number of items that would be
+            // returned at runtime by the block branch. We can't however execute the block branch to
+            // extract its length via valueBlockSize, because we would be executing a branch that
+            // the test expression was guarding against execution. We can instead use the active
+            // mask, or the source cell.
+            if (!_activeMasks.empty()) {
+                // The scalarBranch variable is a reference, so we are actually modifying either
+                // thenBranch.expr or elseBranch.expr in place.
+                blockify(scalarBranch, _activeMasks.back());
+                return {makeIf(std::move(*test.expr),
+                               std::move(*thenBranch.expr),
+                               std::move(*elseBranch.expr)),
+                        blockBranch.typeSignature.include(scalarBranch.typeSignature),
+                        blockBranch.sourceCell};
+            }
+            if (blockBranch.sourceCell.has_value()) {
+                // The scalarBranch variable is a reference, so we are actually modifying either
+                // thenBranch.expr or elseBranch.expr in place.
+                scalarBranch.expr = makeABTFunction(
+                    "valueBlockNewFill"_sd,
+                    std::move(*scalarBranch.expr),
+                    makeABTFunction("valueBlockSize"_sd,
+                                    makeABTFunction("cellBlockGetFlatValuesBlock"_sd,
+                                                    makeVariable(*blockBranch.sourceCell))));
+                scalarBranch.typeSignature =
+                    TypeSignature::kBlockType.include(scalarBranch.typeSignature);
+                scalarBranch.sourceCell = blockBranch.sourceCell;
+                return {makeIf(std::move(*test.expr),
+                               std::move(*thenBranch.expr),
+                               std::move(*elseBranch.expr)),
+                        blockBranch.typeSignature.include(scalarBranch.typeSignature),
+                        blockBranch.sourceCell};
+            }
+            // Missing those information, we abort vectorization and evaluate the expression in the
+            // scalar pipeline.
             return {{}, TypeSignature::kAnyScalarType, {}};
         }
         boost::optional<optimizer::ProjectionName> sameCell;

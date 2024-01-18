@@ -728,6 +728,497 @@ TEST(VectorizerTest, ConvertBlockIf) {
         *processed.expr);
 }
 
+TEST(VectorizerTest, ConvertMixedScalarIf) {
+    // Test conversion of "if" operators on a scalar test expression with only one branch yielding a
+    // block value.
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    // Convert an "if" where either one of the branches is a failure function
+    {
+        auto tree =
+            make<If>(make<FunctionCall>("exists", makeSeq(make<Variable>("scalarVar"))),
+                     make<Variable>("inputVar"),
+                     make<FunctionCall>("fail",
+                                        makeSeq(Constant::int64(9999),
+                                                Constant::str("scalarVar must not be Nothing"))));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"If\", \n"
+            "            condition: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"exists\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"scalarVar\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            then: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"inputVar\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            else: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"fail\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Const\", \n"
+            "                        tag: \"NumberInt64\", \n"
+            "                        value: 9999\n"
+            "                    }, \n"
+            "                    {\n"
+            "                        nodeType: \"Const\", \n"
+            "                        tag: \"StringBig\", \n"
+            "                        value: \"scalarVar must not be Nothing\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+    {
+        auto tree = make<If>(
+            make<UnaryOp>(Operations::Not,
+                          make<FunctionCall>("exists", makeSeq(make<Variable>("scalarVar")))),
+            make<FunctionCall>(
+                "fail",
+                makeSeq(Constant::int64(9999), Constant::str("scalarVar must not be Nothing"))),
+            make<Variable>("inputVar"));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"If\", \n"
+            "            condition: {\n"
+            "                nodeType: \"UnaryOp\", \n"
+            "                op: \"Not\", \n"
+            "                input: {\n"
+            "                    nodeType: \"FunctionCall\", \n"
+            "                    name: \"exists\", \n"
+            "                    arguments: [\n"
+            "                        {\n"
+            "                            nodeType: \"Variable\", \n"
+            "                            name: \"scalarVar\"\n"
+            "                        }\n"
+            "                    ]\n"
+            "                }\n"
+            "            }, \n"
+            "            then: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"fail\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Const\", \n"
+            "                        tag: \"NumberInt64\", \n"
+            "                        value: 9999\n"
+            "                    }, \n"
+            "                    {\n"
+            "                        nodeType: \"Const\", \n"
+            "                        tag: \"StringBig\", \n"
+            "                        value: \"scalarVar must not be Nothing\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            else: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"inputVar\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+
+    // Convert an "if" where either one of the branches is a scalar value
+    {
+        auto tree = make<If>(
+            make<BinaryOp>(Operations::Gt, make<Variable>("scalarVar"), Constant::int32(0)),
+            make<Variable>("inputVar"),
+            make<Variable>("scalarVar"));
+
+        sbe::value::FrameIdGenerator generator;
+
+        // Test the case when we don't have a bitmap available
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"If\", \n"
+            "            condition: {\n"
+            "                nodeType: \"BinaryOp\", \n"
+            "                op: \"Gt\", \n"
+            "                left: {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"scalarVar\"\n"
+            "                }, \n"
+            "                right: {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 0\n"
+            "                }\n"
+            "            }, \n"
+            "            then: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"inputVar\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            else: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"valueBlockNewFill\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"scalarVar\"\n"
+            "                    }, \n"
+            "                    {\n"
+            "                        nodeType: \"FunctionCall\", \n"
+            "                        name: \"valueBlockSize\", \n"
+            "                        arguments: [\n"
+            "                            {\n"
+            "                                nodeType: \"FunctionCall\", \n"
+            "                                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                                arguments: [\n"
+            "                                    {\n"
+            "                                        nodeType: \"Variable\", \n"
+            "                                        name: \"inputVar\"\n"
+            "                                    }\n"
+            "                                ]\n"
+            "                            }\n"
+            "                        ]\n"
+            "                    }\n"
+            "                ]\n"
+            "            }\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+
+        // Test the case when we have a bitmap available
+        auto processed2 =
+            Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree, bindings, 10);
+
+        ASSERT_TRUE(processed2.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"If\", \n"
+            "            condition: {\n"
+            "                nodeType: \"BinaryOp\", \n"
+            "                op: \"Gt\", \n"
+            "                left: {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"scalarVar\"\n"
+            "                }, \n"
+            "                right: {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 0\n"
+            "                }\n"
+            "            }, \n"
+            "            then: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"inputVar\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            else: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"valueBlockNewFill\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"If\", \n"
+            "                        condition: {\n"
+            "                            nodeType: \"FunctionCall\", \n"
+            "                            name: \"valueBlockNone\", \n"
+            "                            arguments: [\n"
+            "                                {\n"
+            "                                    nodeType: \"Variable\", \n"
+            "                                    name: \"__s10\"\n"
+            "                                }, \n"
+            "                                {\n"
+            "                                    nodeType: \"Const\", \n"
+            "                                    tag: \"Boolean\", \n"
+            "                                    value: true\n"
+            "                                }\n"
+            "                            ]\n"
+            "                        }, \n"
+            "                        then: {\n"
+            "                            nodeType: \"Const\", \n"
+            "                            tag: \"Nothing\"\n"
+            "                        }, \n"
+            "                        else: {\n"
+            "                            nodeType: \"Variable\", \n"
+            "                            name: \"scalarVar\"\n"
+            "                        }\n"
+            "                    }, \n"
+            "                    {\n"
+            "                        nodeType: \"FunctionCall\", \n"
+            "                        name: \"valueBlockSize\", \n"
+            "                        arguments: [\n"
+            "                            {\n"
+            "                                nodeType: \"Variable\", \n"
+            "                                name: \"__s10\"\n"
+            "                            }\n"
+            "                        ]\n"
+            "                    }\n"
+            "                ]\n"
+            "            }\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed2.expr);
+    }
+    {
+        auto tree = make<If>(
+            make<BinaryOp>(Operations::Lt, make<Variable>("scalarVar"), Constant::int32(0)),
+            make<Variable>("scalarVar"),
+            make<Variable>("inputVar"));
+
+        sbe::value::FrameIdGenerator generator;
+
+        // Test the case when we don't have a bitmap available
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"If\", \n"
+            "            condition: {\n"
+            "                nodeType: \"BinaryOp\", \n"
+            "                op: \"Lt\", \n"
+            "                left: {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"scalarVar\"\n"
+            "                }, \n"
+            "                right: {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 0\n"
+            "                }\n"
+            "            }, \n"
+            "            then: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"valueBlockNewFill\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"scalarVar\"\n"
+            "                    }, \n"
+            "                    {\n"
+            "                        nodeType: \"FunctionCall\", \n"
+            "                        name: \"valueBlockSize\", \n"
+            "                        arguments: [\n"
+            "                            {\n"
+            "                                nodeType: \"FunctionCall\", \n"
+            "                                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                                arguments: [\n"
+            "                                    {\n"
+            "                                        nodeType: \"Variable\", \n"
+            "                                        name: \"inputVar\"\n"
+            "                                    }\n"
+            "                                ]\n"
+            "                            }\n"
+            "                        ]\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            else: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"inputVar\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+
+        // Test the case when we have a bitmap available
+        auto processed2 =
+            Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree, bindings, 10);
+
+        ASSERT_TRUE(processed2.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"If\", \n"
+            "            condition: {\n"
+            "                nodeType: \"BinaryOp\", \n"
+            "                op: \"Lt\", \n"
+            "                left: {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"scalarVar\"\n"
+            "                }, \n"
+            "                right: {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 0\n"
+            "                }\n"
+            "            }, \n"
+            "            then: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"valueBlockNewFill\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"If\", \n"
+            "                        condition: {\n"
+            "                            nodeType: \"FunctionCall\", \n"
+            "                            name: \"valueBlockNone\", \n"
+            "                            arguments: [\n"
+            "                                {\n"
+            "                                    nodeType: \"Variable\", \n"
+            "                                    name: \"__s10\"\n"
+            "                                }, \n"
+            "                                {\n"
+            "                                    nodeType: \"Const\", \n"
+            "                                    tag: \"Boolean\", \n"
+            "                                    value: true\n"
+            "                                }\n"
+            "                            ]\n"
+            "                        }, \n"
+            "                        then: {\n"
+            "                            nodeType: \"Const\", \n"
+            "                            tag: \"Nothing\"\n"
+            "                        }, \n"
+            "                        else: {\n"
+            "                            nodeType: \"Variable\", \n"
+            "                            name: \"scalarVar\"\n"
+            "                        }\n"
+            "                    }, \n"
+            "                    {\n"
+            "                        nodeType: \"FunctionCall\", \n"
+            "                        name: \"valueBlockSize\", \n"
+            "                        arguments: [\n"
+            "                            {\n"
+            "                                nodeType: \"Variable\", \n"
+            "                                name: \"__s10\"\n"
+            "                            }\n"
+            "                        ]\n"
+            "                    }\n"
+            "                ]\n"
+            "            }, \n"
+            "            else: {\n"
+            "                nodeType: \"FunctionCall\", \n"
+            "                name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                arguments: [\n"
+            "                    {\n"
+            "                        nodeType: \"Variable\", \n"
+            "                        name: \"inputVar\"\n"
+            "                    }\n"
+            "                ]\n"
+            "            }\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed2.expr);
+    }
+
+    // Attempting to convert an "if" where there is no bitmap or information on the underlying cell.
+    {
+        auto tree = make<If>(
+            make<BinaryOp>(Operations::Lt, make<Variable>("scalarVar"), Constant::int32(0)),
+            make<Variable>("scalarVar"),
+            make<BinaryOp>(
+                Operations::And, make<Variable>("inputVar"), make<Variable>("inputVar")));
+
+        sbe::value::FrameIdGenerator generator;
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_FALSE(processed.expr.has_value());
+    }
+}
+
 TEST(VectorizerTest, ConvertProjection) {
     auto tree1 = make<BinaryOp>(
         Operations::FillEmpty, make<Variable>("inputVar"), optimizer::Constant::emptyObject());

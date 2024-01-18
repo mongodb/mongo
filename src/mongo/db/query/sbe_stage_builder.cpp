@@ -3729,15 +3729,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // we need to build a scalar result document.
         if (!plan->updatedPathsExprMap.empty() || !reqs.getCanProcessBlockValues() ||
             planType != BuildProjectionPlan::kDoNotMakeResult) {
+            // Include the output of the ProjectStage so that it gets converted to scalar values.
+            for (auto& entry : updatedPathsSlotMap) {
+                outputs.set(std::make_pair(PlanStageSlots::kField, entry.first), entry.second);
+            }
+
             stage = buildBlockToRow(std::move(stage), outputs);
 
             // Update the info stored in local maps to avoid restoring an out-of-date information
             // later.
-            for (auto&& entry : updatedPathsSlotMap) {
+            for (auto& entry : updatedPathsSlotMap) {
                 if (TypeSignature::kBlockType.isSubset(entry.second.typeSignature) ||
                     TypeSignature::kCellType.isSubset(entry.second.typeSignature)) {
-                    entry.second =
-                        outputs.get(std::make_pair(PlanStageSlots::kField, std::move(entry.first)));
+                    entry.second = outputs.get(std::make_pair(PlanStageSlots::kField, entry.first));
                 }
             }
         }

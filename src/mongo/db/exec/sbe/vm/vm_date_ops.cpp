@@ -364,7 +364,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateTr
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    invariant(bitsetTag == value::TypeTags::valueBlock);
+    // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
+    invariant(bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
 
     TimeUnit unit{TimeUnit::year};
     int64_t binSize{0u};
@@ -396,7 +397,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateDi
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    invariant(bitsetTag == value::TypeTags::valueBlock);
+    // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
+    invariant(bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
 
     Date_t endDate;
     TimeUnit unit{TimeUnit::year};
