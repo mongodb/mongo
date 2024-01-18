@@ -1219,6 +1219,16 @@ void BulkWriteOp::noteChildBatchResponse(
             replyIndex--;
         }
 
+        // If we are out of replyItems but have more write ops then we must be in an ordered:false
+        // errorsOnly:true bulkWrite where we have successful results after the last error.
+        if (replyIndex >= (int)replyItems.size()) {
+            tassert(8516601,
+                    "bulkWrite received more replies than writes",
+                    _clientRequest.getErrorsOnly());
+            noteWriteOpResponse(write, writeOp, commandReply, boost::none);
+            continue;
+        }
+
         auto& reply = replyItems[replyIndex];
 
         // This can only happen when running an errorsOnly:true bulkWrite. We will only receive a

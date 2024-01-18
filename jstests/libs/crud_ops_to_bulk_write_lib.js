@@ -115,6 +115,10 @@ export const BulkWriteUtils = (function() {
                         bufferedOps.shift();
                         i++;
                     }
+                    // If there were no ops we need to progress forward to avoid infinite looping.
+                    if (numOpsToShift == 0) {
+                        i++;
+                    }
                 }
 
                 // Can't execute a bulkWrite with no ops remaining.

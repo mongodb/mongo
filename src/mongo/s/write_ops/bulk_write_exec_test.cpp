@@ -2302,6 +2302,33 @@ TEST_F(BulkWriteOpChildBatchErrorTest, LocalNonTransientTransactionErrorInTxnUno
     }
 }
 
+// Unordered bulkWrite: test handling of errorsOnly:true with ordered:false.
+TEST_F(BulkWriteOpChildBatchErrorTest, ErrorsOnlyErrorThenSuccess) {
+    request.setOrdered(false);
+    request.setErrorsOnly(true);
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+    auto targeted = targetOp(bulkWriteOp, request.getOrdered());
+
+    // Simulate successful response with 1 error and 1 success.
+    auto status = Status(ErrorCodes::Interrupted, "interrupted");
+    auto reply = makeBWCommandReply({BulkWriteReplyItem(0, status)}, {});
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId1], reply, boost::none);
+
+    reply = makeBWCommandReply({BulkWriteReplyItem(1, status)}, {});
+    bulkWriteOp.noteChildBatchResponse(*targeted[kShardId2], reply, boost::none);
+
+    // We should now be finished.
+    ASSERT(bulkWriteOp.isFinished());
+
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(0).getOpError().getStatus(), status);
+    ASSERT_FALSE(bulkWriteOp.getWriteOp_forTest(1).hasBulkWriteReplyItem());
+    ASSERT_FALSE(bulkWriteOp.getWriteOp_forTest(2).hasBulkWriteReplyItem());
+    ASSERT_EQ(bulkWriteOp.getWriteOp_forTest(3).getOpError().getStatus(), status);
+
+    auto replyInfo = bulkWriteOp.generateReplyInfo();
+    ASSERT_EQ(replyInfo.replyItems.size(), 2);
+}
+
 // Ordered bulkWrite: Test handling of a remote top-level error.
 TEST_F(BulkWriteOpChildBatchErrorTest, RemoteErrorOrdered) {
     BulkWriteOp bulkWriteOp(_opCtx, request);
