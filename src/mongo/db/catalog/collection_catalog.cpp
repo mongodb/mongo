@@ -1297,7 +1297,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
     _viewsForDatabase = {};
     _stats = {};
 
-    _resourceInformation.clear();
+    _resourceInformation = {};
 }
 
 void CollectionCatalog::clearViews(OperationContext* opCtx, StringData dbName) const {
@@ -1325,7 +1325,6 @@ boost::optional<std::string> CollectionCatalog::lookupResourceName(const Resourc
     if (search == _resourceInformation.end()) {
         return boost::none;
     }
-
     const std::set<std::string>& namespaces = search->second;
 
     // When there are multiple namespaces mapped to the same ResourceId, return boost::none as the
@@ -1345,12 +1344,14 @@ void CollectionCatalog::removeResource(const ResourceId& rid, const std::string&
         return;
     }
 
-    std::set<std::string>& namespaces = search->second;
+    std::set<std::string> namespaces = search->second;
     namespaces.erase(entry);
 
     // Remove the map entry if this is the last namespace in the set for the ResourceId.
     if (namespaces.size() == 0) {
-        _resourceInformation.erase(search);
+        _resourceInformation = _resourceInformation.erase(search, rid);
+    } else {
+        _resourceInformation = _resourceInformation.set(rid, std::move(namespaces));
     }
 }
 
@@ -1360,16 +1361,17 @@ void CollectionCatalog::addResource(const ResourceId& rid, const std::string& en
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
         std::set<std::string> newSet = {entry};
-        _resourceInformation.insert(std::make_pair(rid, newSet));
+        _resourceInformation = _resourceInformation.set(rid, std::move(newSet));
         return;
     }
 
-    std::set<std::string>& namespaces = search->second;
-    if (namespaces.count(entry) > 0) {
+    if (const auto& namespaces = search->second; namespaces.count(entry) > 0) {
         return;
     }
 
+    std::set<std::string> namespaces = search->second;
     namespaces.insert(entry);
+    _resourceInformation = _resourceInformation.set(rid, std::move(namespaces));
 }
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
