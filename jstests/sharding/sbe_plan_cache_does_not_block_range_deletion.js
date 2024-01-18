@@ -4,6 +4,8 @@
  * @tags: [
  *   # This test requires the fix from SERVER-73032.
  *   requires_fcv_63,
+ *   # TODO SERVER-85380: Remove tag once indexed queries are M4-eligible for the plan cache
+ *   cqf_incompatible
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
