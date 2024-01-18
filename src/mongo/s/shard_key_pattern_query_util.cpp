@@ -92,10 +92,17 @@ constexpr size_t kMaxFlattenedInCombinations = 4000000;
 
 IndexBounds collapseQuerySolution(const QuerySolutionNode* node) {
     if (node->children.empty()) {
-        tassert(7670304, "Invalid node type", node->getType() == STAGE_IXSCAN);
-
-        const IndexScanNode* ixNode = static_cast<const IndexScanNode*>(node);
-        return ixNode->bounds;
+        tassert(7670304,
+                "Invalid node type",
+                node->getType() == STAGE_IXSCAN || node->getType() == STAGE_EOF);
+        // An EOF plan is produced when the predicate in the query is trivially false.
+        if (node->getType() == STAGE_IXSCAN)
+            return static_cast<const IndexScanNode*>(node)->bounds;
+        // TODO: SERVER-84547 Instead of returning empty index bounds we should propagete the EOF
+        // plan to the shard targeting and avoid sending the query to any shard at all as it is most
+        // likely trivallyFalse.
+        if (node->getType() == STAGE_EOF)
+            return IndexBounds();
     }
 
     if (node->children.size() == 1) {
@@ -127,7 +134,7 @@ IndexBounds collapseQuerySolution(const QuerySolutionNode* node) {
             continue;
         }
 
-        IndexBounds childBounds = collapseQuerySolution(it->get());
+        auto childBounds = collapseQuerySolution(it->get());
         if (childBounds.size() == 0) {
             // Got unexpected node in query solution tree
             return IndexBounds();
@@ -152,8 +159,8 @@ IndexBounds collapseQuerySolution(const QuerySolutionNode* node) {
 }
 
 BSONElement extractKeyElementFromDoc(const BSONObj& obj, StringData pathStr) {
-    // Any arrays found get immediately returned. We are equipped up the call stack to specifically
-    // deal with array values.
+    // Any arrays found get immediately returned. We are equipped up the call stack to
+    // specifically deal with array values.
     size_t idxPath;
     return getFieldDottedOrArray(obj, FieldRef(pathStr), &idxPath);
 }
@@ -394,15 +401,16 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
             canonicalQuery.getPrimaryMatchExpression()->getChildVector()->begin() + geoIdx.value());
     }
 
-    // Consider shard key as an index
-    std::string accessMethod = IndexNames::findPluginName(key);
+    // Consider shard key as an index.
+    auto accessMethod = IndexNames::findPluginName(key);
     dassert(accessMethod == IndexNames::BTREE || accessMethod == IndexNames::HASHED);
     const auto indexType = IndexNames::nameToType(accessMethod);
 
-    // Use query framework to generate index bounds
+    // Use query framework to generate index bounds.
     QueryPlannerParams plannerParams;
-    // Must use "shard key" index
-    plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
+    // Must use "shard key" index.
+    plannerParams.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::STRICT_NO_TABLE_SCAN;
     IndexEntry indexEntry(key,
                           indexType,
                           IndexDescriptor::kLatestIndexVersion,
@@ -428,7 +436,7 @@ IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& can
         // Pick any solution that has non-trivial IndexBounds. bounds.size() == 0 represents a
         // trivial IndexBounds where none of the fields' values are bounded.
         for (auto&& soln : solutions) {
-            IndexBounds bounds = collapseQuerySolution(soln->root());
+            auto bounds = collapseQuerySolution(soln->root());
             if (bounds.size() > 0) {
                 return bounds;
             }
@@ -511,14 +519,14 @@ void getShardIdsForCanonicalQuery(const CanonicalQuery& query,
     //   Query { a : { $gte : 1, $lt : 2 },
     //            b : { $gte : 3, $lt : 4 } }
     //   => Bounds { a : [1, 2), b : [3, 4) }
-    IndexBounds bounds = getIndexBoundsForQuery(cm.getShardKeyPattern().toBSON(), query);
+    auto bounds = getIndexBoundsForQuery(cm.getShardKeyPattern().toBSON(), query);
 
     // Transforms bounds for each shard key field into full shard key ranges
     // for example :
     //   Key { a : 1, b : 1 }
     //   Bounds { a : [1, 2), b : [3, 4) }
     //   => Ranges { a : 1, b : 3 } => { a : 2, b : 4 }
-    BoundList ranges = flattenBounds(cm.getShardKeyPattern(), bounds);
+    auto ranges = flattenBounds(cm.getShardKeyPattern(), bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
         const auto& min = it->first;

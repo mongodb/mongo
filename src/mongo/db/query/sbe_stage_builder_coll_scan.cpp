@@ -273,7 +273,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
     sbe::RuntimeEnvironment* env = state.env.runtimeEnv;
 
-    invariant(csn->doSbeClusteredCollectionScan());
+    invariant(csn->doClusteredCollectionScanSbe());
     invariant(!csn->resumeAfterRecordId || forward);
     invariant(!csn->resumeAfterRecordId || !csn->tailable);
     // The minRecord and maxRecord optimizations are not compatible with resumeAfterRecordId.
@@ -503,7 +503,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     PlanYieldPolicy* yieldPolicy,
     bool isResumingTailableScan) {
 
-    if (csn->doSbeClusteredCollectionScan()) {
+    if (csn->doClusteredCollectionScanSbe()) {
         return generateClusteredCollScan(
             state, collection, csn, std::move(fields), yieldPolicy, isResumingTailableScan);
     } else {

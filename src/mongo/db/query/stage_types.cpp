@@ -95,7 +95,7 @@ StringData stageTypeToString(StageType stageType) {
     return kStageTypesMap.at(STAGE_UNKNOWN);
 }
 
-StringData sbeClusteredCollectionScanToString() {
+StringData clusteredCollectionScanSbeToString() {
     static const StringData kClusteredIxscan = "CLUSTERED_IXSCAN"_sd;
     return kClusteredIxscan;
 }
