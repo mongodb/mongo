@@ -296,8 +296,8 @@ variables:
   - name: sharding_auth_audit_gen
   - name: snmp
 
-- &stitch_support_task_group_template
-  name: stitch_support_task_group_template
+- &stitch_support_task_group_template_community_only
+  name: stitch_support_task_group_template_community_only
   setup_task:
     - func: "apply compile expansions"
     - func: "set task expansion macros"
@@ -2500,7 +2500,7 @@ tasks:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
 
-- name: stitch_support_create_lib
+- name: stitch_support_create_lib_community_only
   commands:
     - *f_expansions_write
     - func: "scons compile"
@@ -2531,9 +2531,9 @@ tasks:
         content_type: application/tar
         display_name: "Stitch Support Library"
 
-- name: stitch_support_install_tests
+- name: stitch_support_install_tests_community_only
   depends_on:
-    - name: stitch_support_create_lib
+    - name: stitch_support_create_lib_community_only
   commands:
     - func: "scons compile"
       vars:
@@ -2547,9 +2547,9 @@ tasks:
           --separate-debug
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
 
-- name: stitch_support_run_tests
+- name: stitch_support_run_tests_community_only
   depends_on:
-    - name: stitch_support_install_tests
+    - name: stitch_support_install_tests_community_only
   commands:
     - *f_expansions_write
     - command: subprocess.exec
@@ -7246,18 +7246,18 @@ task_groups:
   - "embedded_sdk_s3_put_latest"
   - "embedded_sdk_tests_s3_put_latest"
 
-- <<: *stitch_support_task_group_template
-  name: stitch_support_lib_build_and_archive
+- <<: *stitch_support_task_group_template_community_only
+  name: stitch_support_lib_build_and_archive_community_only
   tags: ["stitch"]
   tasks:
-    - "stitch_support_create_lib"
-- <<: *stitch_support_task_group_template
-  name: stitch_support_lib_build_and_test
+    - "stitch_support_create_lib_community_only"
+- <<: *stitch_support_task_group_template_community_only
+  name: stitch_support_lib_build_and_test_community_only
   tags: ["stitch"]
   max_hosts: 1
   tasks:
-    - "stitch_support_install_tests"
-    - "stitch_support_run_tests"
+    - "stitch_support_install_tests_community_only"
+    - "stitch_support_run_tests_community_only"
 
 #######################################
 #               Modules               #
@@ -7674,7 +7674,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .ssl
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -7716,7 +7715,6 @@ buildvariants:
   - name: .sharding .txns
   - name: sharding_gen
   - name: sharding_jscore_passthrough
-  - name: .stitch
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804-arm64
@@ -7909,7 +7907,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .ssl
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -7990,7 +7987,6 @@ buildvariants:
   - name: .sharding .txns
   - name: slow1_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -8089,7 +8085,6 @@ buildvariants:
   - name: .sharding .txns !.csrs
   - name: slow1_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -8188,7 +8183,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -8608,7 +8602,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
-  - name: .stitch
   - name: .updatefuzzer
   - name: push
 
@@ -8910,7 +8903,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: snmp
-  - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -9038,7 +9030,6 @@ buildvariants:
   - name: .sharding .common
   - name: sharding_opportunistic_secondary_targeting_gen
   - name: snmp
-  - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -9127,7 +9118,6 @@ buildvariants:
     - name: .sharding .txns
     - name: .sharding .common
     - name: snmp
-    - name: .stitch
     - name: .updatefuzzer
     - name: secondary_reads_passthrough_gen
 
@@ -9313,7 +9303,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: snmp
-  - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -9514,7 +9503,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -9591,7 +9579,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64
@@ -9639,7 +9626,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -9713,7 +9699,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
 
 - name: ubuntu1804-debug-suggested
   display_name: "* Shared Library Ubuntu 18.04 DEBUG"
@@ -9999,7 +9984,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10048,7 +10032,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10127,7 +10110,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10176,7 +10158,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10244,7 +10225,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10331,7 +10311,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10423,7 +10402,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10512,7 +10490,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10600,7 +10577,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -10879,7 +10855,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: snmp
   - name: .watchdog
-  - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
@@ -10965,7 +10940,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: snmp
-  - name: .stitch
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
