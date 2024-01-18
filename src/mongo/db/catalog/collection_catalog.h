@@ -463,7 +463,7 @@ private:
     uint64_t _epoch = 0;
 
     // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
-    std::map<ResourceId, std::set<std::string>> _resourceInformation;
+    immutable::map<ResourceId, std::set<std::string>> _resourceInformation;
 
     /**
      * Contains non-default database profile settings. New collections, current collections and
