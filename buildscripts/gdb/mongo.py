@@ -541,7 +541,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             val = get_boost_optional(txn_part_observable_state['txnResourceStash'])
             if val:
                 locker_addr = get_unique_ptr(val["_locker"])
-                locker_obj = locker_addr.dereference().cast(lookup_type("mongo::LockerImpl"))
+                locker_obj = locker_addr.dereference().cast(lookup_type("mongo::Locker"))
                 print('txnResourceStash._locker', "@", locker_addr)
                 print("txnResourceStash._locker._id", "=", locker_obj["_id"])
             else:

@@ -54,7 +54,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -70,7 +70,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -80,10 +79,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-
-using std::endl;
-using std::string;
-using std::unique_ptr;
 
 void profile(OperationContext* opCtx, NetworkOp op) {
     // Initialize with 1kb at start in order to avoid realloc later
@@ -144,7 +139,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         // We swap the lockers as that way we preserve locks held in transactions and any other
         // options set for the locker like maxLockTimeout.
         auto oldLocker = shard_role_details::swapLocker(
-            opCtx, std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+            opCtx, std::make_unique<Locker>(opCtx->getServiceContext()));
         auto emptyLocker = shard_role_details::swapLocker(newCtx.get(), std::move(oldLocker));
         ON_BLOCK_EXIT([&] {
             auto oldCtxLocker =

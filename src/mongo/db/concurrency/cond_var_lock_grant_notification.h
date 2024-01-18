@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,33 +29,54 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/lock_manager.h"
-#include "mongo/db/transaction_resources.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 
-class TrackingLockGrantNotification : public LockGrantNotification {
-public:
-    TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {}
+class OperationContext;
 
-    void notify(ResourceId resId, LockResult result) override {
-        numNotifies++;
-        lastResId = resId;
-        lastResult = result;
+/**
+ * Notfication callback, which stores the last notification result and signals a condition
+ * variable, which can be waited on.
+ */
+class CondVarLockGrantNotification final : public LockGrantNotification {
+public:
+    CondVarLockGrantNotification() = default;
+
+    /**
+     * Uninterruptible blocking method, which waits for the notification to fire.
+     *
+     * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
+     */
+    LockResult wait(Milliseconds timeout);
+
+    /**
+     * Interruptible blocking method, which waits for the notification to fire or an interrupt from
+     * the operation context.
+     *
+     * @param opCtx OperationContext to wait on for an interrupt.
+     * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
+     */
+    LockResult wait(OperationContext* opCtx, Milliseconds timeout);
+
+    /**
+     * Clears the object so it can be reused.
+     */
+    void clear() {
+        _result = LOCK_INVALID;
     }
 
-public:
-    int numNotifies;
+    void notify(ResourceId resId, LockResult result) override;
 
-    ResourceId lastResId;
-    LockResult lastResult;
-};
+private:
+    // These two go together to implement the conditional variable pattern.
+    Mutex _mutex = MONGO_MAKE_LATCH("CondVarLockGrantNotification::_mutex");
+    stdx::condition_variable _cond;
 
-struct LockRequestCombo : public LockRequest, TrackingLockGrantNotification {
-public:
-    explicit LockRequestCombo(Locker* locker) {
-        initNew(locker, this);
-    }
+    // Result from the last call to notify
+    LockResult _result{LOCK_INVALID};
 };
 
 }  // namespace mongo

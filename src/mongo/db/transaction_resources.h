@@ -39,7 +39,6 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -218,6 +217,21 @@ inline const Locker* getLocker(const OperationContext* opCtx) {
 }
 
 /**
+ * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
+ * only.
+ */
+void makeLockerOnOperationContext(OperationContext* opCtx);
+
+/**
+ * Swaps the locker, releasing the old locker to the caller.
+ * The Client lock is going to be acquired by this function.
+ */
+std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
+std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
+                                   std::unique_ptr<Locker> newLocker,
+                                   WithLock lk);
+
+/**
  * Get the RecoveryUnit for the given opCtx. Caller DOES NOT own pointer.
  */
 // TODO (SERVER-77213): Move implementation to .cpp file
@@ -262,12 +276,6 @@ std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* op
 WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
                                                    std::unique_ptr<RecoveryUnit> unit,
                                                    WriteUnitOfWork::RecoveryUnitState state);
-
-/**
- * Sets the locker for use by this OperationContext. Call during OperationContext initialization,
- * only.
- */
-void setLocker(OperationContext* opCtx, std::unique_ptr<Locker> locker);
 
 /**
  * This class is a container for all the collection resources which are currently acquired by a

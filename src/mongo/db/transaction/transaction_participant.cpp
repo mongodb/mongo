@@ -72,7 +72,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/fill_locker_info.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
@@ -1273,7 +1273,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     opCtx->setWriteUnitOfWork(nullptr);
 
     _locker = shard_role_details::swapLocker(
-        opCtx, std::make_unique<LockerImpl>(opCtx->getServiceContext()), wl);
+        opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), wl);
     _locker->releaseTicket();
     _locker->unsetThreadId();
     if (opCtx->getLogicalSessionId()) {

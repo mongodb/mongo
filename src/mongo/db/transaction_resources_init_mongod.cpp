@@ -31,7 +31,6 @@
 #include <string>
 
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -56,7 +55,7 @@ public:
 
         shard_role_details::TransactionResources::attachToOpCtx(
             opCtx, std::make_unique<shard_role_details::TransactionResources>());
-        shard_role_details::setLocker(opCtx, std::make_unique<LockerImpl>(service));
+        shard_role_details::makeLockerOnOperationContext(opCtx);
 
         // There are a few cases where we don't have a storage engine available yet when creating an
         // operation context.

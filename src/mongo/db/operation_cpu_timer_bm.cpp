@@ -30,36 +30,17 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_resources.h"
-#include "mongo/platform/basic.h"
-
 
 namespace mongo {
 namespace {
-
-class LockerClientObserver : public ServiceContext::ClientObserver {
-public:
-    LockerClientObserver() = default;
-    ~LockerClientObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-    void onDestroyClient(Client* client) final {}
-    void onCreateOperationContext(OperationContext* opCtx) final {
-        auto service = opCtx->getServiceContext();
-        shard_role_details::setLocker(opCtx, std::make_unique<LockerImpl>(service));
-    }
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
 
 class Fixture {
 public:
     Fixture() {
         setGlobalServiceContext(ServiceContext::make());
-        getGlobalServiceContext()->registerClientObserver(std::make_unique<LockerClientObserver>());
         _client = getGlobalServiceContext()->getService()->makeClient("test");
     }
 

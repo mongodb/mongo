@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -90,8 +90,6 @@ public:
     ClientAndCtx makeClientWithLocker(const std::string& clientName) {
         auto client = getServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        shard_role_details::swapLocker(opCtx.get(),
-                                       std::make_unique<LockerImpl>(opCtx->getServiceContext()));
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 

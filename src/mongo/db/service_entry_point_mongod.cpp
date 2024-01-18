@@ -44,7 +44,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -293,7 +292,7 @@ public:
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         invariant(!shard_role_details::getLocker(opCtx)->isLocked());
         shard_role_details::swapLocker(
-            opCtx, std::make_unique<LockerImpl>(opCtx->getServiceContext()), lk);
+            opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), lk);
     }
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(

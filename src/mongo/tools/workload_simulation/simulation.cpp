@@ -29,12 +29,10 @@
 
 #include "mongo/tools/workload_simulation/simulation.h"
 
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_severity.h"
 #include "mongo/tools/workload_simulation/simulator_options.h"
 #include "mongo/util/pcre.h"
 
@@ -71,19 +69,6 @@ bool shouldRun(const Simulation& simulation) {
     return true;
 }
 
-class LockerClientObserver : public ServiceContext::ClientObserver {
-public:
-    LockerClientObserver() = default;
-    ~LockerClientObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-    void onDestroyClient(Client* client) final {}
-    void onCreateOperationContext(OperationContext* opCtx) final {
-        auto service = opCtx->getServiceContext();
-        shard_role_details::setLocker(opCtx, std::make_unique<LockerImpl>(service));
-    }
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
 }  // namespace
 
 Simulation::Simulation(StringData suiteName, StringData workloadName)
@@ -102,8 +87,6 @@ void Simulation::setup() {
         // events.
         return actorCount();
     });
-
-    _svcCtx->registerClientObserver(std::make_unique<LockerClientObserver>());
 
     // We need to advance the ticks to something other than zero for most things to behave well.
     _tickSource->advance(Milliseconds{1});

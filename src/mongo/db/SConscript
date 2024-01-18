@@ -797,9 +797,9 @@ env.CppUnitTest(
         'client_out_of_line_executor_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'client_out_of_line_executor',
+        'concurrency/lock_manager',
     ],
 )
 
@@ -809,8 +809,8 @@ env.CppUnitTest(
         'mongod_options_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'concurrency/lock_manager',
         'mongod_options',
         'server_base',
     ],
@@ -947,7 +947,6 @@ env.Library(
         'catalog/collection_operation_source.cpp',
         'direct_shard_client_tracker.cpp',
         'dump_lock_manager_impl.cpp',
-        'locker_api.cpp',
         'replica_set_endpoint_sharding_state.cpp',
         'replica_set_endpoint_util.cpp',
         's/collection_metadata.cpp',
@@ -972,7 +971,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/grid',
         'concurrency/lock_manager',
         'index/index_access_method',
-        'rw_concern_d',
         'shard_role_api_stor_ex',
         'views/views',
     ],
@@ -2113,8 +2111,9 @@ env.Library(
         'rs_local_client.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        'concurrency/lock_manager',
         'dbdirectclient',
+        'repl/repl_coordinator_interface',
         'rw_concern_d',
     ],
 )
@@ -2222,6 +2221,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/s/grid',
+        'concurrency/lock_manager',
         'dbdirectclient',
         'repl/replica_set_aware_service',
         'rw_concern_d',
@@ -2417,9 +2417,9 @@ env.Program(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/signal_handlers',
+        'concurrency/lock_manager',
         'traffic_reader',
     ],
 )
@@ -2991,7 +2991,7 @@ env.Benchmark(
         'operation_cpu_timer_bm.cpp',
     ],
     LIBDEPS=[
-        'service_context',
+        'service_context_non_d',
         'shard_role_api',
     ],
 )
@@ -3013,7 +3013,6 @@ env.Benchmark(
         'service_entry_point_common_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'auth/authserver',
         'catalog/catalog_impl',

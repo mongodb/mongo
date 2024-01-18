@@ -37,7 +37,7 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"

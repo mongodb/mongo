@@ -37,7 +37,6 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/dump_lock_manager.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"

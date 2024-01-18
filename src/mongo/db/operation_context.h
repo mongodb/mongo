@@ -73,7 +73,6 @@
 
 namespace mongo {
 
-class CurOp;
 class ServiceContext;
 
 namespace repl {

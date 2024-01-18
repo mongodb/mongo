@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,24 +27,40 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/concurrency/cond_var_lock_grant_notification.h"
 
-#include <memory>
-
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-namespace shard_role_details {
 
-/**
- * Swaps the locker, releasing the old locker to the caller.
- * The Client lock is going to be acquired by this function.
- */
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx, std::unique_ptr<Locker> newLocker);
-std::unique_ptr<Locker> swapLocker(OperationContext* opCtx,
-                                   std::unique_ptr<Locker> newLocker,
-                                   WithLock lk);
+LockResult CondVarLockGrantNotification::wait(Milliseconds timeout) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    return _cond.wait_for(
+               lock, timeout.toSystemDuration(), [this] { return _result != LOCK_INVALID; })
+        ? _result
+        : LOCK_TIMEOUT;
+}
 
-}  // namespace shard_role_details
+LockResult CondVarLockGrantNotification::wait(OperationContext* opCtx, Milliseconds timeout) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    if (opCtx->waitForConditionOrInterruptFor(
+            _cond, lock, timeout, [this] { return _result != LOCK_INVALID; })) {
+        // Because waitForConditionOrInterruptFor evaluates the predicate before checking for
+        // interrupt, it is possible that a killed operation can acquire a lock if the request is
+        // granted quickly. For that reason, it is necessary to check if the operation has been
+        // killed at least once before accepting the lock grant.
+        opCtx->checkForInterrupt();
+        return _result;
+    }
+    return LOCK_TIMEOUT;
+}
+
+void CondVarLockGrantNotification::notify(ResourceId resId, LockResult result) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    invariant(_result == LOCK_INVALID);
+    _result = result;
+
+    _cond.notify_all();
+}
+
 }  // namespace mongo

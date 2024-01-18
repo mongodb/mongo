@@ -37,7 +37,6 @@
 #include <functional>
 #include <future>
 #include <memory>
-#include <mutex>
 #include <ostream>
 #include <string>
 #include <type_traits>
@@ -50,7 +49,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/fast_map_noalloc.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/curop.h"
@@ -145,15 +144,9 @@ class DConcurrencyTestFixture : public ServiceContextTest {
 public:
     ServiceContext::UniqueOperationContext makeOperationContextWithLocker() {
         auto opCtx = makeOperationContext();
-        shard_role_details::swapLocker(opCtx.get(),
-                                       std::make_unique<LockerImpl>(opCtx->getServiceContext()));
         return opCtx;
     }
 
-    /**
-     * Returns a vector of Clients of length 'k', each of which has an OperationContext with its
-     * lockState set to a LockerImpl.
-     */
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
     makeKClientsWithLockers(int k) {
         std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
@@ -163,8 +156,6 @@ public:
             auto client = getServiceContext()->getService()->makeClient(
                 str::stream() << "test client for thread " << i);
             auto opCtx = client->makeOperationContext();
-            shard_role_details::swapLocker(
-                opCtx.get(), std::make_unique<LockerImpl>(opCtx->getServiceContext()));
             clients.emplace_back(std::move(client), std::move(opCtx));
         }
         return clients;
@@ -1188,7 +1179,7 @@ TEST_F(DConcurrencyTestFixture, FailedGlobalLockShouldUnlockRSTLOnlyOnce) {
         Lock::GlobalLock(opCtx2, MODE_IX, Date_t::max(), Lock::InterruptBehavior::kThrow),
         DBException,
         ErrorCodes::LockTimeout);
-    auto opCtx2Locker = static_cast<LockerImpl*>(shard_role_details::getLocker(opCtx2));
+    auto opCtx2Locker = shard_role_details::getLocker(opCtx2);
     // GlobalLock failed, but the RSTL should be successfully acquired and pending unlocked.
     ASSERT(opCtx2Locker->getRequestsForTest().find(resourceIdGlobal).finished());
     ASSERT_EQ(opCtx2Locker->getRequestsForTest().find(resourceRSTL).objAddr()->unlockPending, 1U);
@@ -2651,9 +2642,9 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalN
 
     FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
 
-    LockerImpl locker1(opCtx->getServiceContext());
-    LockerImpl locker2(opCtx->getServiceContext());
-    LockerImpl locker3(opCtx->getServiceContext());
+    Locker locker1(opCtx->getServiceContext());
+    Locker locker2(opCtx->getServiceContext());
+    Locker locker3(opCtx->getServiceContext());
 
     {
         locker1.lockGlobal(opCtx.get(), MODE_IX);
@@ -2695,9 +2686,9 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
 
     FailPointEnableBlock failWaitingNonPartitionedLocks("failNonIntentLocksIfWaitNeeded");
 
-    LockerImpl locker1(opCtx->getServiceContext());
-    LockerImpl locker2(opCtx->getServiceContext());
-    LockerImpl locker3(opCtx->getServiceContext());
+    Locker locker1(opCtx->getServiceContext());
+    Locker locker2(opCtx->getServiceContext());
+    Locker locker3(opCtx->getServiceContext());
 
     // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
     const ResourceId resId(

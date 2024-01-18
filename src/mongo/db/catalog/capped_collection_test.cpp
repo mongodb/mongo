@@ -39,7 +39,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/capped_visibility.h"
 #include "mongo/db/catalog/catalog_control.h"
 #include "mongo/db/catalog/collection.h"
@@ -48,7 +47,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -67,7 +66,6 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo {
@@ -119,8 +117,6 @@ protected:
     ClientAndCtx makeClientAndCtx(const std::string& clientName) {
         auto client = getServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        shard_role_details::swapLocker(opCtx.get(),
-                                       std::make_unique<LockerImpl>(getServiceContext()));
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 

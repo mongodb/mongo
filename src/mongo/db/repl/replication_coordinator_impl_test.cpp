@@ -34,13 +34,9 @@
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 #include <future>
-#include <list>
 #include <memory>
-#include <ratio>
 #include <set>
 #include <sys/types.h>
-#include <system_error>
-#include <type_traits>
 #include <vector>
 
 #include "mongo/bson/bsonelement.h"
@@ -50,7 +46,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/bson_extract_optime.h"
@@ -105,6 +100,7 @@
 
 namespace mongo {
 namespace repl {
+
 extern Atomic64Metric& replicationWaiterListMetric;
 extern Atomic64Metric& opTimeWaiterListMetric;
 
@@ -2222,19 +2218,21 @@ TEST_F(StepDownTest,
     // locker to test this, or otherwise stepDown will be granted the lock automatically.
     ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
     ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->isRSTLExclusive());
-    auto locker = shard_role_details::swapLocker(
-        opCtx.get(), std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+    {
+        auto client =
+            getServiceContext()->getService()->makeClient("populateCollectionUUIDMismatch");
+        AlternativeClientRegion acr(client);
+        auto alternativeOpCtx = acr->makeOperationContext();
 
-    ASSERT_THROWS_CODE(
-        getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
-        AssertionException,
-        ErrorCodes::LockTimeout);
-    ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+        ASSERT_THROWS_CODE(getReplCoord()->stepDown(
+                               alternativeOpCtx.get(), false, Milliseconds(0), Milliseconds(1000)),
+                           AssertionException,
+                           ErrorCodes::LockTimeout);
+        ASSERT_TRUE(getReplCoord()->getMemberState().primary());
+        ASSERT_FALSE(shard_role_details::getLocker(alternativeOpCtx.get())->isRSTLLocked());
+    }
 
-    ASSERT_TRUE(locker->isRSTLExclusive());
-    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->isRSTLLocked());
-
-    shard_role_details::swapLocker(opCtx.get(), std::move(locker));
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->isRSTLExclusive());
 }
 
 /* Step Down Test for a 5-node replica set */

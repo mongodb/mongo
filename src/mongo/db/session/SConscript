@@ -14,6 +14,7 @@ env.Library(
         'logical_session_id_helpers',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',

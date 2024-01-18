@@ -314,7 +314,7 @@ def find_mutex_holder(graph, thread_dict, show):
 
 def find_lock_manager_holders(graph, thread_dict, show):
     """Find lock manager holders."""
-    frame = find_frame(r'mongo::LockerImpl::')
+    frame = find_frame(r'mongo::Locker::')
     if not frame:
         return
 
@@ -323,7 +323,7 @@ def find_lock_manager_holders(graph, thread_dict, show):
     (_, lock_waiter_lwpid, _) = gdb.selected_thread().ptid
     lock_waiter = thread_dict[lock_waiter_lwpid]
 
-    locker_ptr_type = lookup_type("mongo::LockerImpl").pointer()
+    locker_ptr_type = lookup_type("mongo::Locker").pointer()
 
     lock_head = gdb.parse_and_eval(
         "mongo::LockManager::get((mongo::ServiceContext*) mongo::getGlobalServiceContext())->_getBucket(resId)->findOrInsert(resId)"

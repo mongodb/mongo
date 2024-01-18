@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/sharding_ddl_coordinator.h"
-
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_external_state_for_test.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
 namespace mongo {
@@ -125,7 +123,7 @@ TEST_F(ShardingDDLCoordinatorTest, AcquiresDDLLocks) {
         coordinator->fulfillPromises();
         CancellationSource cancellationSource;
 
-        coordinator->_locker = std::make_unique<LockerImpl>(getServiceContext());
+        coordinator->_locker = std::make_unique<Locker>(getServiceContext());
 
         // Just run the '_acquireAllLocksAsync()' bit of ShardingDDLCoordinator::run().
         ExecutorFuture<void>(**_scopedExecutor)

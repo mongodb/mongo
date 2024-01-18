@@ -47,7 +47,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_request_list.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"

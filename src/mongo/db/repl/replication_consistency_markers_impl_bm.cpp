@@ -30,15 +30,14 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/db/catalog/database_holder_mock.h"
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log_domain_global.h"
 
-
 namespace mongo {
+namespace {
+
 MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())
 (InitializerContext* context) {
     // Dummy initializer to fill in the initializer graph
@@ -86,7 +85,6 @@ void BM_refreshOplogTruncateAFterPointIfPrimary(benchmark::State& state) {
     auto client =
         serviceContext->getService()->makeClient("BM_refresOplogTruncateAfterPoint_Client");
     auto opCtx = client->makeOperationContext();
-    shard_role_details::setLocker(opCtx.get(), std::make_unique<LockerImpl>(serviceContext));
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderMock>());
     for (auto _ : state) {
         consistencyMarkers.refreshOplogTruncateAfterPointIfPrimary(opCtx.get());
@@ -95,4 +93,6 @@ void BM_refreshOplogTruncateAFterPointIfPrimary(benchmark::State& state) {
 }
 
 BENCHMARK(BM_refreshOplogTruncateAFterPointIfPrimary)->MinTime(10.0);
+
+}  // namespace
 }  // namespace mongo

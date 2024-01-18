@@ -34,7 +34,6 @@
 #include <utility>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -49,6 +48,7 @@
 namespace mongo {
 
 class Ticket;
+class OperationContext;
 class PriorityTicketHolder;
 class SemaphoreTicketHolder;
 
@@ -63,7 +63,7 @@ class TicketHolder {
 public:
     TicketHolder(ServiceContext* svcCtx, int32_t numTickets, bool trackPeakUsed);
 
-    virtual ~TicketHolder(){};
+    virtual ~TicketHolder() {}
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.

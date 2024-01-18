@@ -62,11 +62,12 @@
 
 namespace mongo {
 
+class CanonicalQuery;
+class CurOp;
 class DeleteRequest;
 class OpDebug;
 class PlanExecutor;
 class UpdateRequest;
-class CanonicalQuery;
 
 namespace write_ops_exec {
 

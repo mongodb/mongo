@@ -42,7 +42,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -331,7 +331,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             getForwardableOpMetadata().setOn(opCtx);
 
             invariant(!_locker);
-            _locker = std::make_unique<LockerImpl>(opCtx->getServiceContext());
+            _locker = std::make_unique<Locker>(opCtx->getServiceContext());
             _locker->unsetThreadId();
             _locker->setDebugInfo(str::stream() << _coordId.toBSON());
 

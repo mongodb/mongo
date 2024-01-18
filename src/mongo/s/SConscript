@@ -356,6 +356,7 @@ env.Library(
         'query/cluster_cursor_manager',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],

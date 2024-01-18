@@ -45,7 +45,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/cursor_server_params.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"

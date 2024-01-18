@@ -40,13 +40,13 @@ env.Library(
 env.Library(
     target='lock_manager',
     source=[
+        'cond_var_lock_grant_notification.cpp',
         'd_concurrency.cpp',
         'fill_locker_info.cpp',
         'lock_manager.cpp',
         'lock_manager_defs.cpp',
         'lock_stats.cpp',
         'locker.cpp',
-        'locker_impl.cpp',
         'replication_state_transition_lock_guard.cpp',
         'resource_catalog.cpp',
     ],
@@ -82,7 +82,7 @@ env.CppUnitTest(
         'fill_locker_info_test.cpp',
         'lock_manager_test.cpp',
         'lock_stats_test.cpp',
-        'locker_impl_test.cpp',
+        'locker_test.cpp',
         'resource_catalog_test.cpp',
     ],
     LIBDEPS=[

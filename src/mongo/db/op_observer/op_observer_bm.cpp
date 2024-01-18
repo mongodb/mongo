@@ -32,8 +32,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/concurrency/locker_impl.h"
-#include "mongo/db/locker_api.h"
 #include "mongo/db/op_observer/change_stream_pre_images_op_observer.h"
 #include "mongo/db/op_observer/fallback_op_observer.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"
@@ -61,6 +59,8 @@
 #include "mongo/logv2/log_domain_global.h"
 
 namespace mongo {
+namespace {
+
 MONGO_INITIALIZER_GENERAL(CoreOptions_Store, (), ())
 (InitializerContext* context) {
     // Dummy initializer to fill in the initializer graph
@@ -73,31 +73,6 @@ MONGO_INITIALIZER_GENERAL(DisableLogging, (), ())
     lv2Config.makeDisabled();
     uassertStatusOK(lv2Manager.getGlobalDomainInternal().configure(lv2Config));
 }
-
-class LockerImplClientObserver : public ServiceContext::ClientObserver {
-public:
-    LockerImplClientObserver() = default;
-    ~LockerImplClientObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-
-    void onDestroyClient(Client* client) final {}
-
-    void onCreateOperationContext(OperationContext* opCtx) override {
-        shard_role_details::setLocker(opCtx,
-                                      std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
-
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
-
-const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
-    "CollectionCatalogBenchmarkClientObserver",
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-    },
-    [](ServiceContext* serviceContext) {
-    }};
 
 ServiceContext* setupServiceContext() {
     auto serviceContext = ServiceContext::make();
@@ -307,4 +282,6 @@ void BM_aboutAndOnDelete_System(benchmark::State& state) {
 BENCHMARK(BM_aboutAndOnDelete_ConfigTransactions)->MinTime(10.0);
 BENCHMARK(BM_aboutAndOnDelete_User)->MinTime(10.0);
 BENCHMARK(BM_aboutAndOnDelete_System)->MinTime(10.0);
+
+}  // namespace
 }  // namespace mongo

@@ -323,6 +323,7 @@ env.Library(
         'catalog_control.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/rebuild_indexes',

@@ -41,7 +41,7 @@
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -63,14 +63,12 @@ namespace {
 
 class CatalogRAIITestFixture : public ServiceContextTest {
 public:
-    typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
-        ClientAndCtx;
+    using ClientAndCtx =
+        std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>;
 
     ClientAndCtx makeClientWithLocker(const std::string& clientName) {
         auto client = getServiceContext()->getService()->makeClient(clientName);
         auto opCtx = client->makeOperationContext();
-        shard_role_details::swapLocker(opCtx.get(),
-                                       std::make_unique<LockerImpl>(opCtx->getServiceContext()));
         return std::make_pair(std::move(client), std::move(opCtx));
     }
 

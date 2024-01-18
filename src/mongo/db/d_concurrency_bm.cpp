@@ -31,7 +31,6 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -67,10 +66,6 @@ public:
         }
     }
 
-    /**
-     * Returns a vector of Clients of length 'k', each of which has an OperationContext with its
-     * lockState set to a LockerImpl.
-     */
     void makeKClientsWithLockers(int k) {
         clients.reserve(k);
 

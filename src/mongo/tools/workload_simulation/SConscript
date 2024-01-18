@@ -25,6 +25,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/server_options_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/storage/concurrency_adjustment_parameters',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
@@ -38,7 +39,7 @@ env.Library(
         'simulator_main.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/tools/workload_simulation/simulation',
+        'simulation',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

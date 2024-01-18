@@ -124,8 +124,9 @@ env.Library(
     source=[
         'capped_snapshots.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         'recovery_unit_base',
     ],
 )
@@ -648,6 +649,7 @@ env.Library(
         'bson_collection_catalog_entry',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
