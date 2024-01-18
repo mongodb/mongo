@@ -454,6 +454,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authserver',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/server_status_servers',
+        '$BUILD_DIR/mongo/db/cursor_stats',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',

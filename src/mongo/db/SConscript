@@ -1540,6 +1540,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='cursor_stats',
+    source=[
+        'cursor_stats.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'commands/server_status_core',
+        'server_base',
+    ],
+)
+
 execEnv = env.Clone()
 execEnv.InjectThirdParty(libraries=['snappy'])
 execEnv.Library(
@@ -1704,6 +1715,7 @@ execEnv.Library(
         'commands/server_status_core',
         'concurrency/exception_util',
         'curop_failpoint_helpers',
+        'cursor_stats',
         'exec/sbe/query_sbe_abt',
         'internal_transactions_feature_flag',
         'not_primary_error_tracker',

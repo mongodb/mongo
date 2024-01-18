@@ -123,6 +123,8 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     invariant(_exec);
     invariant(_operationUsingCursor);
 
+    auto& cursorStats = CursorStats::getInstance();
+
     cursorStats.cursorStatsOpen.increment();
     cursorStats.cursorStatsTotalOpened.increment();
 
@@ -162,6 +164,7 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         incrementCursorLifespanMetric(_createdDate, *now);
     }
 
+    auto& cursorStats = CursorStats::getInstance();
     cursorStats.cursorStatsOpen.decrement();
     if (isNoTimeout()) {
         cursorStats.cursorStatsOpenNoTimeout.decrement();

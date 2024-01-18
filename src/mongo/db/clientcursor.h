@@ -477,8 +477,6 @@ private:
     // 2) You know you have the cursor pinned.
     OperationContext* _operationUsingCursor;
 
-    CursorStats& cursorStats = CursorStats::getInstance();
-
     Date_t _lastUseDate;
     Date_t _createdDate;
 
