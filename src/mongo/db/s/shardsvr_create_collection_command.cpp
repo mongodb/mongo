@@ -53,6 +53,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -183,9 +184,17 @@ public:
             }
 
             const auto createCollectionCoordinator = [&] {
+                // TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
+                FixedFCVRegion fixedFcvRegion{opCtx};
+                const auto fcvSnapshot = (*fixedFcvRegion).acquireFCVSnapshot();
+
                 auto requestToForward = request().getShardsvrCreateCollectionRequest();
-                // Validates and sets missing time-series options fields automatically.
-                if (requestToForward.getTimeseries()) {
+                // Validates and sets missing time-series options fields automatically. This may
+                // modify the options by setting default values. Due to modifying the durable
+                // format it is feature flagged to 7.1+
+                if (requestToForward.getTimeseries() &&
+                    gFeatureFlagValidateAndDefaultValuesForShardedTimeseries.isEnabled(
+                        fcvSnapshot)) {
                     auto timeseriesOptions = *requestToForward.getTimeseries();
                     uassertStatusOK(
                         timeseries::validateAndSetBucketingParameters(timeseriesOptions));
@@ -197,11 +206,8 @@ public:
                         sharding_ddl_util::unsplittableCollectionShardKey().toBSON());
                 }
 
-                // TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
-                FixedFCVRegion fixedFcvRegion{opCtx};
                 auto coordinatorDoc = [&] {
-                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(
-                            (*fixedFcvRegion).acquireFCVSnapshot())) {
+                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(fcvSnapshot)) {
                         const DDLCoordinatorTypeEnum coordType =
                             DDLCoordinatorTypeEnum::kCreateCollection;
                         auto doc = CreateCollectionCoordinatorDocument();

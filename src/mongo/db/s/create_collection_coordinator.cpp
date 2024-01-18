@@ -85,6 +85,7 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
@@ -1094,7 +1095,15 @@ void commit(OperationContext* opCtx,
 
     if (request.getTimeseries()) {
         TypeCollectionTimeseriesFields timeseriesFields;
-        timeseriesFields.setTimeseriesOptions(*request.getTimeseries());
+        auto tsOptions = [&] {
+            // TODO SERVER-85251: We can replace all of this with:
+            //    return *request.getTimeseries();
+            // Once the next LTS is made.
+            TimeseriesOptions timeseriesOptions = *request.getTimeseries();
+            (void)timeseries::validateAndSetBucketingParameters(timeseriesOptions);
+            return timeseriesOptions;
+        }();
+        timeseriesFields.setTimeseriesOptions(std::move(tsOptions));
         coll.setTimeseriesFields(std::move(timeseriesFields));
     }
 
