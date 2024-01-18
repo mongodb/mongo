@@ -122,8 +122,9 @@ protected:
      * Build a plan cache key from a CanonicalQuery.
      */
     sbe::PlanCacheKey makePlanCacheKey(const CanonicalQuery& query) {
-        return plan_cache_key_factory::make(
-            query, MultipleCollectionAccessor{_collectionPtr}, false);
+        return plan_cache_key_factory::make(query,
+                                            MultipleCollectionAccessor{_collectionPtr},
+                                            canonical_query_encoder::Optimizer::kBonsai);
     }
 
     /**

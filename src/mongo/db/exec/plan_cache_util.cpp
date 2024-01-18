@@ -98,7 +98,8 @@ void updatePlanCache(OperationContext* opCtx,
     const CollectionPtr& collection = collections.getMainCollection();
     if (collection && !query.isUncacheableSbe() && shouldCacheQuery(query) &&
         solution.isEligibleForPlanCache()) {
-        sbe::PlanCacheKey key = plan_cache_key_factory::make(query, collections);
+        sbe::PlanCacheKey key = plan_cache_key_factory::make(
+            query, collections, canonical_query_encoder::Optimizer::kSbeStageBuilders);
         // Store a copy of the root and corresponding data, as well as the hash of the QuerySolution
         // that led to this cache entry.
         auto plan = std::make_unique<sbe::CachedSbePlan>(

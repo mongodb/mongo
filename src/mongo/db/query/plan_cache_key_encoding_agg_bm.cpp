@@ -82,8 +82,8 @@ public:
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(
-                canonical_query_encoder::encodePipeline(expCtx.get(), pipelineStages));
+            benchmark::DoNotOptimize(canonical_query_encoder::encodePipeline(
+                expCtx.get(), pipelineStages, canonical_query_encoder::Optimizer::kBonsai));
             benchmark::ClobberMemory();
         }
     }

@@ -1390,7 +1390,8 @@ protected:
         return nullptr;
     }
     sbe::PlanCacheKey buildPlanCacheKey() const {
-        return plan_cache_key_factory::make(*_cq, _collections);
+        return plan_cache_key_factory::make(
+            *_cq, _collections, canonical_query_encoder::Optimizer::kSbeStageBuilders);
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(

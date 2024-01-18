@@ -222,7 +222,8 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     if (shouldCache) {
         // Deactivate the current cache entry.
         auto&& sbePlanCache = sbe::getPlanCache(_opCtx);
-        sbePlanCache.deactivate(plan_cache_key_factory::make(_cq, _collections));
+        sbePlanCache.deactivate(plan_cache_key_factory::make(
+            _cq, _collections, canonical_query_encoder::Optimizer::kSbeStageBuilders));
     }
 
     auto buildExecutableTree = [&](const QuerySolution& sol) {

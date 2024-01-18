@@ -59,7 +59,7 @@ public:
                                  .parsedFind = ParsedFindCommandParams{std::move(findCommand)}});
         cq->setSbeCompatible(true);
 
-        return canonical_query_encoder::encodeSBE(*cq);
+        return canonical_query_encoder::encodeSBE(*cq, canonical_query_encoder::Optimizer::kBonsai);
     }
 
     void benchmarkPipeline(benchmark::State& state,

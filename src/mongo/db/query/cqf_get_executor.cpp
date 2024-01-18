@@ -695,7 +695,8 @@ boost::optional<sbe::PlanCacheKey> createPlanCacheKey(
     }
 
     if constexpr (std::is_same_v<QueryType, CanonicalQuery>) {
-        return boost::make_optional(plan_cache_key_factory::make(query, collections, false));
+        return boost::make_optional(plan_cache_key_factory::make(
+            query, collections, canonical_query_encoder::Optimizer::kBonsai));
     } else {
         return boost::make_optional(plan_cache_key_factory::make(query, collections));
     }

@@ -229,7 +229,8 @@ void updatePlanCacheFromCandidates(
 
                 auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
                 uassertStatusOK(sbe::getPlanCache(opCtx).set(
-                    plan_cache_key_factory::make(query, collections),
+                    plan_cache_key_factory::make(
+                        query, collections, canonical_query_encoder::Optimizer::kSbeStageBuilders),
                     std::move(cachedPlan),
                     *rankingDecision,
                     opCtx->getServiceContext()->getPreciseClockSource()->now(),

@@ -114,7 +114,9 @@ void generatePlannerInfo(PlanExecutor* exec,
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
             !exec->getCanonicalQuery()->getForceClassicEngine()) {
             const auto planCacheKeyInfo =
-                plan_cache_key_factory::make(*exec->getCanonicalQuery(), collections);
+                plan_cache_key_factory::make(*exec->getCanonicalQuery(),
+                                             collections,
+                                             canonical_query_encoder::Optimizer::kSbeStageBuilders);
             planCacheKeyHash = planCacheKeyInfo.planCacheKeyHash();
             queryHash = planCacheKeyInfo.queryHash();
         } else {

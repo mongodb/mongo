@@ -209,7 +209,8 @@ protected:
                                                    isCountLike,
                                                    needsMerge));
         cq->setSbeCompatible(true);
-        const auto key = canonical_query_encoder::encodeSBE(*cq);
+        const auto key = canonical_query_encoder::encodeSBE(
+            *cq, canonical_query_encoder::Optimizer::kSbeStageBuilders);
         gctx.outStream() << key << std::endl;
     }
 
@@ -233,7 +234,8 @@ protected:
         const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx(), nss);
         auto pipeline = parsePipeline(expCtx, pipelineObj(matchStr, projStr), true);
 
-        const auto key = canonical_query_encoder::encodePipeline(expCtx.get(), pipeline);
+        const auto key = canonical_query_encoder::encodePipeline(
+            expCtx.get(), pipeline, canonical_query_encoder::Optimizer::kBonsai);
         gctx.outStream() << key << std::endl;
     }
 };
@@ -687,5 +689,16 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyForPipeline) {
     testComputeKeyForPipeline(
         gctx, "{$match: {$or: [{a: 1}, {b: 1}]}}", "{$project: {a: 1, b: 1}}");
 }
+
+TEST_F(CanonicalQueryEncoderTest, EncodeOptimizerType) {
+    auto query = canonicalize(opCtx(), "{a: 1}");
+    query->setSbeCompatible(true);
+    auto classicEncoding = canonical_query_encoder::encodeSBE(
+        *query, canonical_query_encoder::Optimizer::kSbeStageBuilders);
+    auto cqfEncoding =
+        canonical_query_encoder::encodeSBE(*query, canonical_query_encoder::Optimizer::kBonsai);
+    ASSERT_NE(classicEncoding, cqfEncoding);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -1160,7 +1160,8 @@ namespace canonical_query_encoder {
  */
 void encodePipeline(const ExpressionContext* expCtx,
                     const std::vector<boost::intrusive_ptr<DocumentSource>>& cqPipeline,
-                    BufBuilder* bufBuilder) {
+                    BufBuilder* bufBuilder,
+                    const Optimizer optimizer) {
     bufBuilder->appendChar(kEncodeSectionDelimiter);
     std::vector<Value> serializedArray;
     for (auto& stage : cqPipeline) {
@@ -1173,15 +1174,16 @@ void encodePipeline(const ExpressionContext* expCtx,
             encodeKeyForPipelineStage(documentSource, serializedArray, bufBuilder);
         }
     }  // for each stage in 'cqPipeline'
+    bufBuilder->appendChar(encodeEnum(optimizer));
 }
 
 CanonicalQuery::QueryShapeString encodePipeline(
     const ExpressionContext* expCtx,
-    const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages) {
+    const std::vector<boost::intrusive_ptr<DocumentSource>>& pipelineStages,
+    const Optimizer optimizer) {
     static constexpr size_t bufferSize = 200;
     BufBuilder bufBuilder(bufferSize);
-
-    canonical_query_encoder::encodePipeline(expCtx, pipelineStages, &bufBuilder);
+    canonical_query_encoder::encodePipeline(expCtx, pipelineStages, &bufBuilder, optimizer);
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
@@ -1201,8 +1203,8 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     return keyBuilder.str();
 }
 
-std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibility) {
-    if (requiresSbeCompatibility) {
+std::string encodeSBE(const CanonicalQuery& cq, const Optimizer optimizer) {
+    if (optimizer == Optimizer::kSbeStageBuilders) {
         tassert(6142104,
                 "attempting to encode SBE plan cache key for SBE-incompatible query",
                 cq.isSbeCompatible());
@@ -1254,11 +1256,10 @@ std::string encodeSBE(const CanonicalQuery& cq, const bool requiresSbeCompatibil
 
     encodeFindCommandRequest(cq, &bufBuilder);
 
-    encodePipeline(cq.getExpCtxRaw(), cq.cqPipeline(), &bufBuilder);
+    encodePipeline(cq.getExpCtxRaw(), cq.cqPipeline(), &bufBuilder, optimizer);
     if (const auto& bitset = cq.searchMetadata(); bitset.any()) {
         bufBuilder.appendStr(bitset.to_string(), false /* includeEndingNull */);
     }
-
     return base64::encode(StringData(bufBuilder.buf(), bufBuilder.len()));
 }
 
