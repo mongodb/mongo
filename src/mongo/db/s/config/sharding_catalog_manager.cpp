@@ -1332,8 +1332,11 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
 
     // Delete any existing document that has been already majority committed.
     {
-        repl::ReadConcernArgs::get(opCtx) =
-            repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+        auto originalReadConcern =
+            std::exchange(repl::ReadConcernArgs::get(opCtx),
+                          repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern));
+        ScopeGuard resetReadConcerGuard(
+            [&] { repl::ReadConcernArgs::get(opCtx) = std::move(originalReadConcern); });
 
         write_ops::DeleteCommandRequest deleteOp(
             NamespaceString::kConfigsvrPlacementHistoryNamespace);
