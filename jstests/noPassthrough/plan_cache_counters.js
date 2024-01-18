@@ -1,6 +1,6 @@
 /**
- * Test that the plan cache hits and misses serverStatus counters are updated correctly when a plan
- * is recovered from the plan cache.
+ * Test that the plan cache hits, misses and skipped serverStatus' counters are updated correctly
+ * when serving queries.
  *
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
@@ -24,27 +24,30 @@ assert.commandWorked(collCapped.insert({a: 1}));
 const isSbeEnabled = checkSbeFullyEnabled(db);
 
 /**
- * Retrieves the "hits" and "misses" serverStatus metrics for the given 'planCacheType' (sbe or
- * classic) and returns them as an object: {hits: <number>, misses: <number>}.
+ * Retrieves the "hits", "misses" and "skipped" serverStatus metrics for the given 'planCacheType'
+ * (sbe or classic) and returns them as an object: {hits: <number>, misses: <number>, skipped:
+ * <number>}.
  */
 function getPlanCacheMetrics(planCacheType) {
     const serverStatus = assert.commandWorked(db.serverStatus());
     const hits = serverStatus.metrics.query.planCache[planCacheType].hits;
     const misses = serverStatus.metrics.query.planCache[planCacheType].misses;
-    return {hits, misses};
+    const skipped = serverStatus.metrics.query.planCache[planCacheType].skipped;
+    return {hits, misses, skipped};
 }
 
+// Enum for the expected cache behavior when running a particular command.
+const cacheBehavior = Object.freeze({skip: 0, miss: 1, hit: 2});
+
 /**
- * Runs the given command (either find or aggregate) and validates that the "hits" and "misses"
- * serverStatus metrics for the given 'planCacheType' (sbe or classic) have been updated according
- * to our expectations described in the 'hitsShouldChange' argument. This argument is an array of
- * boolean values which provide this function with the following two details:
- *    - how many times to run the given command
- *    - how the "hits" and "misses" values are expected to change after each run (true - we expect
- *      it to increase, false - remain unchanged)
- *    - only the expectations for the "hits" metric is provided, since the "misses" value changes
- *      inversely to the "hits" metric (if "hits" is expected to be changed, than "misses" should
- *      remain unchanged, and vice versa)
+ * Runs the given command (either find or aggregate) and validates that the "hits", "misses" and
+ * "skipped" serverStatus metrics for the given 'planCacheType' (sbe or classic) have been updated
+ * according to our expectations described in the 'expectedCacheBehaviors' argument.
+ *
+ * 'expectedCacheBehaviors' argument is an array of
+ * 'cacheBehavior' values which provide this function with the following two details:
+ *    1. how many times to run the given command
+ *    2. which of the three counters is expected to change after each run
  *
  * The 'planCacheType' is derived from the current mongod instance settings (either sbe or classic),
  * if not specified, and can be overwritten by providing a specific value.
@@ -54,8 +57,12 @@ function getPlanCacheMetrics(planCacheType) {
  * defined on the collection will be dropped. An array can be empty, in which case indexes will be
  * dropped and no new indexes will be created.
  */
-function runCommandAndCheckPlanCacheMetric(
-    {command, indexes, hitsShouldChange, planCacheType = (isSbeEnabled ? "sbe" : "classic")}) {
+function runCommandAndCheckPlanCacheMetric({
+    command,
+    indexes,
+    expectedCacheBehaviors,
+    planCacheType = (isSbeEnabled ? "sbe" : "classic")
+}) {
     if (indexes) {
         assert.commandWorked(coll.dropIndexes());
 
@@ -64,18 +71,32 @@ function runCommandAndCheckPlanCacheMetric(
         }
     }
 
-    hitsShouldChange.forEach(function(shouldChange) {
+    expectedCacheBehaviors.forEach((expectedCacheBehavior) => {
         const oldMetrics = getPlanCacheMetrics(planCacheType);
         assert.commandWorked(db.runCommand(command));
         const newMetrics = getPlanCacheMetrics(planCacheType);
 
-        const checkMetrics = function(metricShouldChange, metric) {
-            const increment = metricShouldChange ? 1 : 0;
-            assert.eq(newMetrics[metric], oldMetrics[metric] + increment, command);
-        };
-
-        checkMetrics(shouldChange, "hits");
-        checkMetrics(!shouldChange, "misses");
+        switch (expectedCacheBehavior) {
+            case cacheBehavior.skip:
+                assert.eq(oldMetrics.hits, newMetrics.hits, command);
+                assert.eq(oldMetrics.misses, newMetrics.misses, command);
+                assert.eq(oldMetrics.skipped + 1, newMetrics.skipped, command);
+                break;
+            case cacheBehavior.miss:
+                assert.eq(oldMetrics.hits, newMetrics.hits, command);
+                assert.eq(oldMetrics.misses + 1, newMetrics.misses, command);
+                assert.eq(oldMetrics.skipped, newMetrics.skipped, command);
+                break;
+            case cacheBehavior.hit:
+                assert.eq(oldMetrics.hits + 1, newMetrics.hits, command);
+                assert.eq(oldMetrics.misses, newMetrics.misses, command);
+                assert.eq(oldMetrics.skipped, newMetrics.skipped, command);
+                break;
+            default:
+                assert(false,
+                       "Unknown cache behavior: " + expectedCacheBehavior +
+                           " Command: " + JSON.stringify(command));
+        }
     });
 }
 
@@ -84,7 +105,8 @@ function runCommandAndCheckPlanCacheMetric(
     // A simple collection scan. We should only recover from plan cache when SBE is on.
     {
         command: {find: coll.getName(), filter: {a: 1}, comment: "query coll scan"},
-        hitsShouldChange: [false, isSbeEnabled]
+        expectedCacheBehaviors:
+            [cacheBehavior.miss, isSbeEnabled ? cacheBehavior.hit : cacheBehavior.miss]
     },
     // Same as above but with an aggregate command.
     {
@@ -94,20 +116,20 @@ function runCommandAndCheckPlanCacheMetric(
             cursor: {},
             comment: "query coll scan aggregate"
         },
-        hitsShouldChange: [isSbeEnabled]
+        expectedCacheBehaviors: [isSbeEnabled ? cacheBehavior.hit : cacheBehavior.miss]
     },
     // Same query but with two indexes on the collection. We should recover from plan cache on
     // third run when a plan cache entry gets activated.
     {
         command: {find: coll.getName(), filter: {a: 1}, comment: "query two indexes"},
         indexes: [{a: 1}, {a: 1, b: 1}],
-        hitsShouldChange: [false, false, true]
+        expectedCacheBehaviors: [cacheBehavior.miss, cacheBehavior.miss, cacheBehavior.hit]
     },
     // Same query shape as above, should always recover from plan cache.
     {
         command:
             {find: coll.getName(), filter: {a: 5}, comment: "query two indexes different eq cost"},
-        hitsShouldChange: [true],
+        expectedCacheBehaviors: [cacheBehavior.hit],
     },
     // Same query as above, but with an aggregate command. Should always recover from plan cache.
     {
@@ -117,19 +139,22 @@ function runCommandAndCheckPlanCacheMetric(
             cursor: {},
             comment: "query two indexes aggregate"
         },
-        hitsShouldChange: [true],
+        expectedCacheBehaviors: [cacheBehavior.hit],
     },
     // IdHack queries is always is executed with the classic engine and never get cached.
     {
         command: {find: coll.getName(), filter: {_id: 1}, comment: "query idhack"},
-        hitsShouldChange: [false, false, false],
+        expectedCacheBehaviors: [cacheBehavior.skip, cacheBehavior.skip, cacheBehavior.skip],
         planCacheType: "classic"
     },
     // Hinted queries are cached and can be recovered only in SBE. Note that 'hint' changes the
     // query shape, so we expect to recover only on a second run.
     {
         command: {find: coll.getName(), filter: {a: 1}, comment: "query hint", hint: {a: 1}},
-        hitsShouldChange: [false, isSbeEnabled],
+        expectedCacheBehaviors: [
+            isSbeEnabled ? cacheBehavior.miss : cacheBehavior.skip,
+            isSbeEnabled ? cacheBehavior.hit : cacheBehavior.skip
+        ],
     },
     // Min queries never get cached.
     {
@@ -140,7 +165,7 @@ function runCommandAndCheckPlanCacheMetric(
             min: {a: 10},
             hint: {a: 1}
         },
-        hitsShouldChange: [false, false, false],
+        expectedCacheBehaviors: [cacheBehavior.skip, cacheBehavior.skip, cacheBehavior.skip],
     },
     // Max queries never get cached.
     {
@@ -151,18 +176,29 @@ function runCommandAndCheckPlanCacheMetric(
             max: {a: 10},
             hint: {a: 1}
         },
-        hitsShouldChange: [false, false, false],
+        expectedCacheBehaviors: [cacheBehavior.skip, cacheBehavior.skip, cacheBehavior.skip],
     },
     // We don't cache plans for explain.
     {
         command: {explain: {find: coll.getName(), filter: {a: 1}, comment: "query explain"}},
-        hitsShouldChange: [false, false, false],
+        expectedCacheBehaviors: [cacheBehavior.skip, cacheBehavior.skip, cacheBehavior.skip],
     },
     // Tailable cursor queries never get cached.
     {
         command:
             {find: collCapped.getName(), filter: {a: 1}, comment: "query tailable", tailable: true},
-        hitsShouldChange: [false, false, false],
+        expectedCacheBehaviors: [cacheBehavior.skip, cacheBehavior.skip, cacheBehavior.skip],
+    },
+    // Trivially false queries never get cached.
+    {
+        command:
+            {find: coll.getName(), filter: {"$alwaysFalse": 1}, comment: "trivially false query"},
+        expectedCacheBehaviors: [cacheBehavior.skip],
+    },
+    // Queries on non existing collections never get cached.
+    {
+        command: {find: "non_existing_collection", filter: {a: 1}, comment: "non existing coll"},
+        expectedCacheBehaviors: [cacheBehavior.skip],
     },
 ].forEach(testCase => runCommandAndCheckPlanCacheMetric(testCase));
 

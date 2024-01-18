@@ -143,6 +143,10 @@ bool shouldCacheQuery(const CanonicalQuery& query) {
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
     const MatchExpression* expr = query.getPrimaryMatchExpression();
 
+    if (expr->isTriviallyFalse()) {
+        return false;
+    }
+
     if (!query.getSortPattern() && expr->matchType() == MatchExpression::AND &&
         expr->numChildren() == 0 && !query.isSbeCompatible()) {
         return false;

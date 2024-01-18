@@ -480,6 +480,10 @@ public:
         classicMisses.increment();
     }
 
+    void incrementClassicSkippedCounter() {
+        classicSkipped.increment();
+    }
+
     void incrementSbeHitsCounter() {
         sbeHits.increment();
     }
@@ -488,11 +492,22 @@ public:
         sbeMisses.increment();
     }
 
+    void incrementSbeSkippedCounter() {
+        sbeSkipped.increment();
+    }
+
 private:
+    // Counters that track the number of times a query plan is:
+    // a) found in the cache (hits),
+    // b) not found in cache (misses), or
+    // c) not considered for caching hence we don't even look for it in the cache (skipped).
+    // Split into classic and SBE, depending on which execution engine is used.
     CounterMetric classicHits{"query.planCache.classic.hits"};
     CounterMetric classicMisses{"query.planCache.classic.misses"};
+    CounterMetric classicSkipped{"query.planCache.classic.skipped"};
     CounterMetric sbeHits{"query.planCache.sbe.hits"};
     CounterMetric sbeMisses{"query.planCache.sbe.misses"};
+    CounterMetric sbeSkipped{"query.planCache.sbe.skipped"};
 };
 extern PlanCacheCounters planCacheCounters;
 

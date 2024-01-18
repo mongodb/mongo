@@ -340,6 +340,15 @@ TEST_F(PlanCacheTest, ShouldNotCacheQueryExplain) {
     assertShouldNotCacheQuery(*cq);
 }
 
+/**
+ * Trivially false queries are not cacheable.
+ */
+TEST_F(PlanCacheTest, ShouldNotCacheQueryTriviallyFalse) {
+    std::unique_ptr<CanonicalQuery> cq(canonicalize("{$alwaysFalse: 1}"));
+    ASSERT_TRUE(cq->getPrimaryMatchExpression()->isTriviallyFalse());
+    assertShouldNotCacheQuery(*cq);
+}
+
 PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
 createCallback(const CanonicalQuery& cq, const plan_ranker::PlanRankingDecision& decision) {
     auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {

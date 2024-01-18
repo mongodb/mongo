@@ -942,6 +942,11 @@ public:
             solution->setRoot(std::make_unique<EofNode>());
             auto result = releaseResult();
             addSolutionToResult(result.get(), std::move(solution));
+            if (std::is_same_v<KeyType, sbe::PlanCacheKey>) {
+                planCacheCounters.incrementSbeSkippedCounter();
+            } else {
+                planCacheCounters.incrementClassicSkippedCounter();
+            }
             return std::move(result);
         }
 
@@ -1190,8 +1195,7 @@ protected:
                     2,
                     "Using classic engine idhack",
                     "canonicalQuery"_attr = redact(_cq->toStringShort()));
-        planCacheCounters.incrementClassicMissesCounter();
-
+        planCacheCounters.incrementClassicSkippedCounter();
         auto result = releaseResult();
         std::unique_ptr<PlanStage> stage =
             std::make_unique<IDHackStage>(_cq->getExpCtxRaw(), _cq, _ws, _collection, descriptor);
@@ -1299,9 +1303,11 @@ protected:
                     return result;
                 }
             }
+            planCacheCounters.incrementClassicMissesCounter();
+        } else {
+            planCacheCounters.incrementClassicSkippedCounter();
         }
 
-        planCacheCounters.incrementClassicMissesCounter();
         return nullptr;
     }
 
@@ -1416,9 +1422,10 @@ protected:
             result->emplace(std::make_pair(std::move(root), std::move(stageData)));
             result->setRecoveredFromPlanCache(true);
             return result;
+        } else {
+            planCacheCounters.incrementSbeSkippedCounter();
         }
 
-        planCacheCounters.incrementSbeMissesCounter();
         return nullptr;
     }
 
