@@ -578,7 +578,7 @@ void CollectionCatalog::onCloseCatalog() {
 
     _shadowCatalog.emplace();
     for (auto& entry : _catalog)
-        _shadowCatalog->insert({entry.first, entry.second->ns()});
+        _shadowCatalog = _shadowCatalog->insert({entry.first, entry.second->ns()});
 }
 
 void CollectionCatalog::onOpenCatalog() {
@@ -785,9 +785,9 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
     // using the pre-close state. This ensures that any tasks reloading the catalog can see their
     // own updates.
     if (_shadowCatalog) {
-        auto shadowIt = _shadowCatalog->find(uuid);
-        if (shadowIt != _shadowCatalog->end())
-            return shadowIt->second;
+        auto* shadowIt = _shadowCatalog->find(uuid);
+        if (shadowIt)
+            return *shadowIt;
     }
     return boost::none;
 }

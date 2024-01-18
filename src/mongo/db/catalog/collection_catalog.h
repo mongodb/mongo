@@ -428,8 +428,7 @@ private:
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
      * to pre-close NSS. See also onCloseCatalog.
      */
-    boost::optional<
-        mongo::stdx::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
+    boost::optional<immutable::unordered_map<CollectionUUID, NamespaceString, CollectionUUID::Hash>>
         _shadowCatalog;
 
     using CollectionCatalogMap =
