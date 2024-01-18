@@ -1,0 +1,8 @@
+# Golden test output of StringifyPathsExprs/PathConstant
+
+==== VARIATION: PathConstant ====
+-- INPUT:
+PathConstant [] Const [0]
+
+-- OUTPUT:
+Constant Const [0]

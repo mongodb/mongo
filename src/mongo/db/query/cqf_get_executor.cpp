@@ -505,6 +505,7 @@ static ExecParams createExecutor(
     } else if (explainVersionStr == "bson"_sd &&
                frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
         explainVersion = ExplainVersion::UserFacingExplain;
+        toExplain = *phaseManager.getPostMemoPlan();
     } else if (explainVersionStr == "bson"_sd) {
         explainVersion = ExplainVersion::V3;
     } else {
