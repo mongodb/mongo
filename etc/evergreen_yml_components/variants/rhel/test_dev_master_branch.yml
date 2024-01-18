@@ -235,13 +235,14 @@ buildvariants:
     large_distro_name: rhel80-xlarge
     test_flags: >-
       --additionalFeatureFlags "featureFlagGRPC"
-      --excludeWithAnyTags=requires_external_data_source,requires_mongobridge
+      --excludeWithAnyTags=requires_external_data_source,requires_mongobridge,requires_auth,grpc_incompatible,creates_and_authenticates_user
       --tlsMode preferTLS
       --tlsCAFile jstests/libs/ca.pem
       --shellTls
       --shellTlsCertificateKeyFile jstests/libs/client.pem
       --mongosTlsCertificateKeyFile jstests/libs/server.pem
       --mongodTlsCertificateKeyFile jstests/libs/server.pem
+      --shellGRPC
   tasks:
     - name: compile_ninja_quick_TG
     - name: compile_test_parallel_unittest_stream_TG
@@ -250,8 +251,7 @@ buildvariants:
     - name: generate_buildid_to_debug_symbols_mapping
     # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
     # and processes to be used with TLS on a single host.
-    - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen
-    - name: noPassthrough_gen
+    - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.sharding !.txns
     - name: .lint
     - name: libdeps_graph_linting_TG
       distros:

@@ -122,6 +122,7 @@ DEFAULTS = {
     "export_mongod_config": "off",
     "tls_mode": None,
     "tls_ca_file": None,
+    "shell_grpc": False,
     "shell_tls_enabled": False,
     "shell_tls_certificate_key_file": None,
     "mongos_tls_certificate_key_file": None,
@@ -526,6 +527,9 @@ MIXED_BIN_VERSIONS = None
 
 # Specifies the binary version of last-lts or last-continous when multiversion enabled
 MULTIVERSION_BIN_VERSION = None
+
+# Specifies whether to use gRPC when connecting via the shell by default.
+SHELL_GRPC = None
 
 # Specifies what tlsMode the server(s) should be started with.
 TLS_MODE = None

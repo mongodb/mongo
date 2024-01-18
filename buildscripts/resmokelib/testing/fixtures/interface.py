@@ -183,6 +183,15 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         raise NotImplementedError(
             "get_internal_connection_string must be implemented by Fixture subclasses")
 
+    def get_shell_connection_url(self):
+        """Return the connection string to be used by the mongo shell process executing a jstest.
+
+        Defaults to returning the driver connection url, but can be overriden to provide 
+        shell-specific options (such as using a gRPC port).
+        https://docs.mongodb.com/manual/reference/connection-string/
+        """
+        return self.get_driver_connection_url()
+
     def get_driver_connection_url(self):
         """Return the mongodb connection string as defined below.
 

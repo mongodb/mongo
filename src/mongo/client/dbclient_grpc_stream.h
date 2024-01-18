@@ -102,6 +102,10 @@ public:
     }
 #endif
 
+    bool isGRPC() override {
+        return true;
+    }
+
 private:
     StatusWith<std::shared_ptr<transport::Session>> _makeSession(
         const HostAndPort& host,

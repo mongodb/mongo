@@ -146,6 +146,7 @@ class _FixtureConfig(object):
         self.LINEAR_CHAIN = config.LINEAR_CHAIN
         self.TLS_MODE = config.TLS_MODE
         self.TLS_CA_FILE = config.TLS_CA_FILE
+        self.SHELL_GRPC = config.SHELL_GRPC
         self.SHELL_TLS_CERTIFICATE_KEY_FILE = config.SHELL_TLS_CERTIFICATE_KEY_FILE
         self.NUM_REPLSET_NODES = config.NUM_REPLSET_NODES
         self.NUM_SHARDS = config.NUM_SHARDS

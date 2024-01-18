@@ -965,6 +965,9 @@ class RunPlugin(PluginInterface):
             " existing MongoDB cluster with the URL mongodb://localhost:[PORT]."
             " This is useful for connecting to a server running in a debugger.")
 
+        parser.add_argument("--shellGRPC", dest="shell_grpc", action="store_true",
+                            help="Whether to use gRPC by default when connecting via the shell.")
+
         parser.add_argument("--shellTls", dest="shell_tls_enabled", action="store_true",
                             help="Whether to use TLS when connecting.")
 

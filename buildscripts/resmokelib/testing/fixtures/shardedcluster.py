@@ -507,6 +507,10 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
         """Use ExternalFixture method."""
         return external.ExternalFixture.get_driver_connection_url(self)
 
+    def get_shell_connection_url(self):
+        """Use ExternalFixture method."""
+        return external.ExternalFixture.get_shell_connection_url(self)
+
     def get_node_info(self):
         """Use ExternalFixture method."""
         return external.ExternalFixture.get_node_info(self)
@@ -706,9 +710,16 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         """Return true if the cluster is still operating."""
         return self.mongos is not None and self.mongos.poll() is None
 
+    def _get_hostname(self):
+        return self.logger.external_sut_hostname if self.config.NOOP_MONGO_D_S_PROCESSES else 'localhost'
+
     def get_internal_connection_string(self):
         """Return the internal connection string."""
-        return f"{self.logger.external_sut_hostname if self.config.NOOP_MONGO_D_S_PROCESSES else 'localhost'}:{self.port}"
+        return f"{self._get_hostname()}:{self.port}"
+
+    def get_shell_connection_url(self):
+        port = self.port if not self.config.SHELL_GRPC else self.grpcPort
+        return f"{self._get_hostname()}:{port}"
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

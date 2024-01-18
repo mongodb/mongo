@@ -47,5 +47,5 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
     def _make_process(self):
         return core.programs.mongo_shell_program(
             self.logger, executable=self.shell_executable,
-            connection_string=self.fixture.get_driver_connection_url(),
+            connection_string=self.fixture.get_shell_connection_url(),
             filename=self.test_runner_file, test_filename=self.test_name, **self.shell_options)

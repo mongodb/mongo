@@ -6,6 +6,8 @@
  *   assumes_superuser_permissions,
  *   does_not_support_stepdowns,
  *   no_selinux,
+ *   # This test searches for a MongoRPC-specific log string (*conn).
+ *   grpc_incompatible,
  * ]
  */
 

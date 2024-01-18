@@ -423,6 +423,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.TLS_CA_FILE = config.pop("tls_ca_file")
     _config.SHELL_TLS_ENABLED = config.pop("shell_tls_enabled")
     _config.SHELL_TLS_CERTIFICATE_KEY_FILE = config.pop("shell_tls_certificate_key_file")
+    _config.SHELL_GRPC = config.pop("shell_grpc")
     _config.MONGOD_TLS_CERTIFICATE_KEY_FILE = config.pop("mongod_tls_certificate_key_file")
     _config.MONGOS_TLS_CERTIFICATE_KEY_FILE = config.pop("mongos_tls_certificate_key_file")
     _config.NUM_SHARDS = config.pop("num_shards")

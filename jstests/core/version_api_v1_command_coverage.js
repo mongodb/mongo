@@ -7,6 +7,7 @@
  *   not_allowed_with_signed_security_token,
  *   requires_non_retryable_commands,
  *   uses_api_parameters,
+ *   creates_and_authenticates_user,
  * ]
  */
 

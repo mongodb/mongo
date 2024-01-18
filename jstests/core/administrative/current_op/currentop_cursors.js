@@ -10,6 +10,7 @@
  *   # This test contains assertions for the hostname that operations run on.
  *   tenant_migration_incompatible,
  *   docker_incompatible,
+ *   grpc_incompatible,
  * ]
  */
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";

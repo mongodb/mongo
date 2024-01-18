@@ -17,7 +17,8 @@
 //   directly_against_shardsvrs_incompatible,
 //   # This test has statements that do not support non-local read concern.
 //   does_not_support_causal_consistency,
-//   uses_compact
+//   uses_compact,
+//   creates_and_authenticates_user,
 // ]
 
 /*
