@@ -4218,6 +4218,17 @@ tasks:
       resmoke_jobs_max: 1
   - func: "send benchmark results"
 
+- <<: *benchmark_template
+  name: benchmarks_namespace
+  tags: ["benchmarks"]
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      suite: benchmarks_namespace_string
+      resmoke_jobs_max: 1
+  - func: "send benchmark results"
+
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
   tags: ["jepsen"]
