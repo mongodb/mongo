@@ -119,6 +119,12 @@ def bazel_target_emitter(
             'bazel_output': bazel_out_target.replace('\\', '/')
         }
 
+        # scons isn't aware of bazel build definition files, so cache won't be invalidated when they change
+        # force scons to always request bazel to build any converted targets
+        # since bazel maintains its own cache, this won't result in redundant build executions
+        env.AlwaysBuild(t)
+        env.NoCache(t)
+
     return (target, source)
 
 
