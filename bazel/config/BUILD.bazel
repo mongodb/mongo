@@ -306,6 +306,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "use_libunwind_disabled",
+    flag_values = {
+        "//bazel/config:use_libunwind": "False",
+    },
+)
+
 # --------------------------------------
 # gdbserver options
 # --------------------------------------
@@ -556,6 +563,34 @@ config_setting(
 )
 
 # --------------------------------------
+# linkstatic options
+# --------------------------------------
+
+linkstatic(
+    name = "linkstatic",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "linkstatic_enabled",
+    flag_values = {
+        "//bazel/config:linkstatic": "True",
+    },
+)
+
+config_setting(
+    name = "linkstatic_disabled",
+    flag_values = {
+        "//bazel/config:linkstatic": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "linkdynamic_required_settings",
+    match_all = [":linkstatic_disabled", ":not_windows"],
+)
+
+# --------------------------------------
 # sanitizer options
 # --------------------------------------
 
@@ -728,6 +763,11 @@ selects.config_setting_group(
     match_all = [":fsan_enabled"],
 )
 
+selects.config_setting_group(
+    name = "sanitize_thread_required_settings",
+    match_all = [":tsan_enabled", ":use_libunwind_disabled", ":linkdynamic_required_settings"],
+)
+
 # --------------------------------------
 # separate_debug options
 # --------------------------------------
@@ -765,34 +805,6 @@ config_setting(
     flag_values = {
         "//bazel/config:http_client": "False",
     },
-)
-
-# --------------------------------------
-# linkstatic options
-# --------------------------------------
-
-linkstatic(
-    name = "linkstatic",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "linkstatic_enabled",
-    flag_values = {
-        "//bazel/config:linkstatic": "True",
-    },
-)
-
-config_setting(
-    name = "linkstatic_disabled",
-    flag_values = {
-        "//bazel/config:linkstatic": "False",
-    },
-)
-
-selects.config_setting_group(
-    name = "linkdynamic_required_settings",
-    match_all = [":linkstatic_disabled", ":not_windows"],
 )
 
 # --------------------------------------

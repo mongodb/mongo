@@ -187,6 +187,44 @@ FUZZER_SANITIZER_LINKFLAGS = select({
 }
 , no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "fuzzer")
 
+# Combines following two conditions -
+# 1.
+# TODO: SERVER-48622
+#
+# See https://github.com/google/sanitizers/issues/943
+# for why we disallow combining TSAN with
+# libunwind. We could, atlernatively, have added logic
+# to automate the decision about whether to enable
+# libunwind based on whether TSAN is enabled, but that
+# logic is already complex, and it feels better to
+# make it explicit that using TSAN means you won't get
+# the benefits of libunwind.
+# 2.
+# We add supressions based on the library file in etc/tsan.suppressions
+# so the link-model needs to be dynamic.
+
+THREAD_SANITIZER_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    Build failed due to either -\n" +
+    "    Cannot use libunwind with TSAN, please add --//bazel/config:use_libunwind=False to your compile flags or\n" +
+    "    TSAN is only supported with dynamic link models, please add --//bazel/config:linkstatic=False to your compile flags.\n"
+)
+
+THREAD_SANITIZER_COPTS = select({
+    ("//bazel/config:sanitize_thread_required_settings"): ["-fsanitize=thread"],
+    ("//bazel/config:tsan_disabled"): [],
+}, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
+
+THREAD_SANITIZER_LINKFLAGS = select({
+    ("//bazel/config:sanitize_thread_required_settings"): ["-fsanitize=thread"],
+    ("//bazel/config:tsan_disabled"): [],
+}, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
+
+THREAD_SANITIZER_DEFINES = select({
+    ("//bazel/config:sanitize_thread_required_settings"): ["THREAD_SANITIZER"],
+    ("//bazel/config:tsan_disabled"): [],
+}, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
+
 REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE = (
     "\nError:\n" +
     "    linking mongo dynamically is not currently supported on Windows"
@@ -236,12 +274,13 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
 }, no_match_error = DETECT_ODR_VIOLATIONS_ERROR_MESSAGE)
 
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES \
-                       + GLIBCXX_DEBUG_DEFINES
+                       + THREAD_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS \
-                    + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
+                    + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS \
+                         + THREAD_SANITIZER_LINKFLAGS + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS
                          + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS
 
 def force_includes_copt(package_name, name):
