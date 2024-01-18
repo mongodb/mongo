@@ -9,9 +9,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -28,9 +26,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &gen_task_template
   name: gen_task_template
@@ -50,6 +46,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &benchmark_template
   name: benchmark_template
@@ -70,8 +67,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_config_vars
   is_jstestfuzz: true
@@ -97,8 +93,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_template
   name: jstestfuzz_template
@@ -1275,6 +1270,16 @@ tasks:
 ################################################
 
 - <<: *gen_task_template
+  name: aggregation_unsplittable_collections_on_random_shard_passthrough
+  # TODO SERVER-83445 Enable on non-all-feature-flag variants.
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "unsplittable_collections"]
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *gen_task_template
   name: causally_consistent_jscore_passthrough_auth_gen
   tags: ["assigned_to_jira_team_server_catalog_and_routing", "causally_consistent"]
   commands:
@@ -1283,6 +1288,30 @@ tasks:
 - <<: *gen_task_template
   name: causally_consistent_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_catalog_and_routing", "causally_consistent"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: change_streams_change_collection_replica_sets_kill_secondary_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_catalog_and_routing"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: change_streams_change_collection_replica_sets_stepdown_primary_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_catalog_and_routing"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_catalog_and_routing"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_catalog_and_routing"]
   commands:
   - func: "generate resmoke tasks"
 

@@ -9,9 +9,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -28,9 +26,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &gen_task_template
   name: gen_task_template
@@ -50,6 +46,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &benchmark_template
   name: benchmark_template
@@ -70,8 +67,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_config_vars
   is_jstestfuzz: true
@@ -97,8 +93,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_template
   name: jstestfuzz_template

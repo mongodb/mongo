@@ -32,9 +32,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -51,9 +49,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/querying/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &gen_task_template
   name: gen_task_template
@@ -87,6 +83,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &benchmark_template
   name: benchmark_template
@@ -132,8 +129,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_config_vars
   is_jstestfuzz: true
@@ -159,8 +155,7 @@ variables:
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/components/aggregation_framework/resmoke_tasks.yml
-# - etc/evergreen_yml_components/tasks/components/change_streams/resmoke_tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_template
   name: jstestfuzz_template
@@ -4122,90 +4117,6 @@ tasks:
     vars:
       suite: benchmarks_second_half
 
-# Disabled under SERVER-64949.
-# - <<: *benchmark_template
-#   name: benchmarks_cst
-#   tags: ["benchmarks"]
-#   commands:
-#   - func: "do benchmark setup"
-#   - func: "run tests"
-#     vars:
-#       suite: benchmarks_cst
-#       resmoke_jobs_max: 1
-#   - func: "send benchmark results"
-#   - func: "analyze benchmark results"
-
-- <<: *benchmark_template
-  name: benchmarks_query
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suite: benchmarks_query
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
-
-- <<: *benchmark_template
-  name: benchmarks_expression
-  tags: ["benchmarks"]
-  commands:
-    - func: "do benchmark setup"
-    - func: "run tests"
-      vars:
-        suite: benchmarks_expression
-        exec_timeout_secs: 18000  # 5 hour timeout.
-        resmoke_jobs_max: 1
-    - func: "send benchmark results"
-
-- <<: *benchmark_template
-  name: benchmarks_expression_sbe
-  tags: ["benchmarks"]
-  commands:
-    - func: "do benchmark setup"
-    - func: "run tests"
-      vars:
-        suite: benchmarks_expression_sbe
-        exec_timeout_secs: 18000  # 5 hour timeout.
-        resmoke_jobs_max: 1
-    - func: "send benchmark results"
-
-- <<: *benchmark_template
-  name: benchmarks_abt
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suites: benchmarks_abt
-      exec_timeout_secs: 18000  # 5 hour timeout.
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
-
-- <<: *benchmark_template
-  name: benchmarks_abt_lowering
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suites: benchmarks_abt_lowering
-      exec_timeout_secs: 18000  # 5 hour timeout.
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
-
-- <<: *benchmark_template
-  name: benchmarks_abt_path_lowering
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suites: benchmarks_abt_path_lowering
-      exec_timeout_secs: 18000  # 5 hour timeout.
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
-
 - <<: *benchmark_template
   name: benchmarks_streams
   tags: ["benchmarks"]
@@ -4414,134 +4325,6 @@ tasks:
   - func: "setup jepsen docker config fuzzer"
   - func: "run jepsen docker test"
 
-## Standalone fuzzer comparing find query results of Bonsai optimizations vs SBE stage-builders ##
-- <<: *jstestfuzz_template
-  name: query_fuzzer_bonsai_m2_vs_sbe_stagebuilders_gen
-  tags: ["query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_sbe_stagebuilders
-      npm_command: query-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## Standalone fuzzer comparing find query results of Bonsai optimizations vs Classic ##
-- <<: *jstestfuzz_template
-  name: query_fuzzer_bonsai_m2_vs_classic_gen
-  tags: ["query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode bonsai_m2_vs_classic
-      npm_command: query-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
-- <<: *jstestfuzz_template
-  name: query_fuzzer_standalone_gen
-  tags: ["query_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode standalone
-      npm_command: query-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz standalone fuzzer for checking find equivalence with and without plan cache ##
-- <<: *jstestfuzz_template
-  name: query_fuzzer_plan_cache_gen
-  tags: ["query_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode plan_cache
-      npm_command: query-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz sharded fuzzer for checking find and aggregate equivalence ##
-- <<: *jstestfuzz_template
-  name: query_fuzzer_sharded_gen
-  tags: ["query_fuzzer", "require_npm", "random_name"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode sharded
-      npm_command: query-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz standalone update generational fuzzer ##
-- <<: *jstestfuzz_template
-  name: update_fuzzer_gen
-  tags: ["updatefuzzer", "require_npm", "random_name", "multiversion"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      update_fuzzer_last_lts: last_lts
-      update_fuzzer_last_continuous: last_continuous
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --useEsModules
-      npm_command: update-fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-      run_no_feature_flag_tests: "true"
-
-## jstestfuzz standalone update time-series generational fuzzer ##
-- <<: *jstestfuzz_template
-  name: update_timeseries_fuzzer_gen
-  tags: ["updatefuzzer", "require_npm", "random_name", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --diffTestingMode timeseries --useEsModules
-      npm_command: update-fuzzer
-      suite: generational_fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-
-## jstestfuzz replication update generational fuzzer ##
-- <<: *jstestfuzz_template
-  name: update_fuzzer_replication_gen
-  tags: ["updatefuzzer", "require_npm", "random_name", "multiversion", "no_debug_mode"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      update_fuzzer_replication_last_lts: last_lts
-      update_fuzzer_replication_last_continuous: last_continuous
-  - func: "generate resmoke tasks"
-    vars:
-      <<: *jstestfuzz_config_vars
-      num_files: 20
-      num_tasks: 20
-      jstestfuzz_vars: --useEsModules
-      npm_command: update-fuzzer
-      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
-      run_no_feature_flag_tests: "true"
-
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_gen
@@ -4710,37 +4493,6 @@ tasks:
       suite: core
 
 - <<: *task_template
-  name: cst_jscore_passthrough
-  tags: ["jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: jsCore_column_store_indexes
-  # TODO SERVER-75026 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
-  # variants.
-  depends_on:
-  - name: jsCore
-  tags: ["jscore", "sbe_only", "feature_flag_guarded"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_column_store_indexes
-
-- <<: *task_template
-  name: jsCore_wildcard_indexes
-  depends_on:
-  - name: jsCore
-  tags: ["jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_wildcard_indexes
-
-- <<: *task_template
   name: mongosTest
   tags: ["misc_js", "non_read_maj", "non_live_record"]
   commands:
@@ -4802,48 +4554,6 @@ tasks:
       resmoke_jobs_max: 1
       use_large_distro: "true"
 
-- <<: *task_template
-  name: index_filters_to_query_settings
-  tags: ["sbe_only"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: cursor_hints_to_query_settings
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: query_stats_passthrough
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: query_stats_aggregation_passthrough
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: query_stats_mongos_passthrough
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: query_stats_mongos_aggregation_passthrough
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
 - <<: *gen_task_template
   name: parallel_gen
   tags: ["misc_js", "parallel"]
@@ -4861,35 +4571,10 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
-  name: concurrency_compute_mode_gen
-  tags: ["concurrency", "no_passthrough", "compute_mode", "no_debug_mode"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
   name: concurrency_simultaneous_gen
   tags: ["concurrency", "common", "random_name"]
   commands:
   - func: "generate resmoke tasks"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *gen_task_template
-  name: sharding_api_strict_passthrough_gen
-  tags: ["sharding"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *task_template
-  name: json_schema
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
     vars:
       resmoke_jobs_max: 1
 
@@ -6080,60 +5765,6 @@ tasks:
          'destination': {'path': '${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
 - <<: *task_template
-  name: search
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: search_auth
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: search_ssl
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: vector_search
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: vector_search_auth
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: vector_search_ssl
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
   name: streams
   tags: []
   commands:
@@ -6351,24 +5982,6 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: core
-
-- <<: *task_template
-  name: query_golden_classic
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: query_golden_classic
-
-- <<: *task_template
-  name: query_golden_cqf
-  tags: [cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: query_golden_cqf
 
 - name: tooling_metrics_test
   tags: []
