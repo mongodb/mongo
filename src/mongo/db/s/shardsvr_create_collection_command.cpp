@@ -216,7 +216,7 @@ public:
                         return doc.toBSON();
                     } else {
                         const DDLCoordinatorTypeEnum coordType =
-                            DDLCoordinatorTypeEnum::kCreateCollectionPre73Compatible;
+                            DDLCoordinatorTypeEnum::kCreateCollectionPre80Compatible;
                         auto doc = CreateCollectionCoordinatorDocumentLegacy();
                         doc.setShardingDDLCoordinatorMetadata({{ns(), coordType}});
                         doc.setShardsvrCreateCollectionRequest(requestToForward);

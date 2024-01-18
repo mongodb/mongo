@@ -50,7 +50,7 @@ enums:
             kRenameCollection: "renameCollection_V2"
             kCreateCollection: "createCollection_V4"
             # TODO SERVER-79304: Remove once 8.0 becomes last LTS
-            kCreateCollectionPre73Compatible: "createCollection_V3"
+            kCreateCollectionPre80Compatible: "createCollection_V3"
             # TODO SERVER-79064: Remove once 8.0 becomes last LTS
             kRefineCollectionShardKeyPre71Compatible: "refineCollectionShardKey"
             kRefineCollectionShardKey: "refineCollectionShardKey_V2"

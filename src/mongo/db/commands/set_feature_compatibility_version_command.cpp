@@ -1657,7 +1657,7 @@ private:
             feature_flags::gAuthoritativeShardCollection.isEnabledOnVersion(requestedVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
-                    opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre73Compatible);
+                    opCtx, DDLCoordinatorTypeEnum::kCreateCollectionPre80Compatible);
         }
 
         // We perform a drain of create coordinators so that we don't end up with a confusing
