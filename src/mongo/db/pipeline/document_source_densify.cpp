@@ -40,6 +40,7 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <iterator>
 #include <memory>
+#include <tuple>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/basic_types.h"
@@ -242,11 +243,21 @@ list<intrusive_ptr<DocumentSource>> create(const intrusive_ptr<ExpressionContext
 }
 }  // namespace document_source_densify
 
+// Create an object to be passed to a generator containing fields that must be propagated to
+// generated documents.
+boost::optional<Document> DocumentSourceInternalDensify::createIncludeFieldsObj(
+    Value partitionKey) {
+    if (_partitionExpr->selfAndChildrenAreConstant()) {
+        return boost::none;
+    }
+    return boost::make_optional<Document>(partitionKey.getDocument());
+}
 DocumentSourceInternalDensify::DocGenerator::DocGenerator(DensifyValue min,
                                                           RangeStatement range,
                                                           FieldPath fieldName,
                                                           boost::optional<Document> includeFields,
                                                           boost::optional<Document> finalDoc,
+                                                          boost::optional<Value> partitionKey,
                                                           ValueComparator comp,
                                                           size_t* counter,
                                                           bool maxInclusive)
@@ -254,6 +265,7 @@ DocumentSourceInternalDensify::DocGenerator::DocGenerator(DensifyValue min,
       _range(std::move(range)),
       _path(std::move(fieldName)),
       _finalDoc(std::move(finalDoc)),
+      _partitionKey(std::move(partitionKey)),
       _min(std::move(min)),
       _maxInclusive(maxInclusive),
       _counter(counter) {
@@ -338,6 +350,11 @@ bool DocumentSourceInternalDensify::DocGenerator::done() const {
     return _state == GeneratorState::kDone;
 }
 
+bool DocumentSourceInternalDensify::DocGenerator::lastGeneratedDoc() const {
+    return _state == GeneratorState::kReturningFinalDocument ||
+        (_state == GeneratorState::kDone && _finalDoc == boost::none);
+}
+
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDensify::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto results = document_source_densify::createFromBsonInternal(elem, expCtx, kStageName, true);
@@ -363,50 +380,36 @@ Value DocumentSourceInternalDensify::serialize(const SerializationOptions& opts)
     return Value(out.freezeToValue());
 }
 
-// Create an object to be passed to a generator containing fields that must be propagated to
-// generated documents.
-boost::optional<Document> DocumentSourceInternalDensify::createIncludeFieldsObj(Document doc) {
-    if (_partitionExpr->selfAndChildrenAreConstant()) {
-        return boost::none;
-    }
-    return boost::make_optional<Document>(getDensifyPartition(doc).getDocument());
-}
-boost::optional<Document> DocumentSourceInternalDensify::createIncludeFieldsObj(
-    Value partitionVal) {
-    if (_partitionExpr->selfAndChildrenAreConstant()) {
-        return boost::none;
-    }
-    tassert(8246100,
-            "Expected partition value to be a document",
-            partitionVal.getType() == BSONType::Object);
-    return partitionVal.getDocument();
-}
-
-// Return true if this GetNextResult should be returned without processing.
-std::pair<bool, DocumentSource::GetNextResult>
+// Return true if the second return value should be returned without processing.
+std::tuple<bool, DocumentSource::GetNextResult, DensifyValue, Value>
 DocumentSourceInternalDensify::getAndCheckInvalidDoc() {
     auto nextDoc = pSource->getNext();
     if (!nextDoc.isAdvanced()) {
         if (nextDoc.isEOF()) {
-            return {true, handleSourceExhausted()};
+            auto docToReturn = handleSourceExhausted();
+            return std::make_tuple(true, docToReturn, DensifyValue(), Value());
         }
-        return {true, nextDoc};
+        return std::make_tuple(true, nextDoc, DensifyValue(), Value());
     }
 
     auto doc = nextDoc.getDocument();
-    if (doc.getNestedField(_field).nullish()) {
+    auto densifyField = doc.getNestedField(_field);
+    if (densifyField.nullish()) {
         // The densify field is not present or null, let document pass unmodified.
-        return {true, nextDoc};
+        return std::make_tuple(true, doc, DensifyValue(), Value());
     }
+    // We will be densifying. Set up state for all future functions.
+    auto densifyVal = getDensifyValue(densifyField);
+    auto partitionKey = getDensifyPartition(doc);
     // Track the global max for later. The latest from the source is always the global max.
     if (_isFullDensify) {
-        _fullDensifyGlobalMax = getDensifyValue(doc);
+        _fullDensifyGlobalMax = densifyVal;
         if (!_fullDensifyGlobalMin) {
             // First value seen is the global min.
             _fullDensifyGlobalMin = _fullDensifyGlobalMax;
         }
     }
-    return std::make_pair<bool, DocumentSource::GetNextResult>(false, std::move(doc));
+    return std::make_tuple(false, doc, densifyVal, partitionKey);
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPartitionedInputHelper(
@@ -435,20 +438,20 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::finishDensifyingPar
             valToGenerate,
             RangeStatement(_range.getStep(), ExplicitBounds(valToGenerate, max), _range.getUnit()),
             createIncludeFieldsObj(firstPartition),
-            boost::none,
-            maxInclusive  // final doc.
-        );
+            boost::none,     // finalDoc
+            firstPartition,  // partitionKey
+            maxInclusive);
         // Remove this partition from the table, we're done with it. Note that we may still have
         // documents to generate, but we won't ever need to process it again.
         _partitionTable.erase(firstPartitionKeyVal);
-        auto nextDoc = _docGenerator->getNextDocument();
+        auto returnDoc = _docGenerator->getNextDocument();
         if (_docGenerator->done()) {
             _docGenerator = boost::none;
             _densifyState = DensifyState::kFinishingDensifyNoGenerator;
         } else {
             _densifyState = DensifyState::kFinishingDensifyWithGenerator;
         }
-        return nextDoc;
+        return returnDoc;
     }
     _densifyState = DensifyState::kDensifyDone;
     return DocumentSource::GetNextResult::makeEOF();
@@ -463,10 +466,13 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleSourceExhaust
     // 1. _fullDensifyGlobalMax if we are densifying with option 'full'
     // 2. _rangeDensifyEnd if we are densifying with option 'range'
     if (_isFullDensify) {
-        // 'Full case'
-        tassert(8246101,
-                "Expected global min/max to be set for 'full' case",
-                _fullDensifyGlobalMax && _fullDensifyGlobalMin);
+        // 'Full case'. If we haven't seen any documents yet, we can't generate more.
+        if (!_fullDensifyGlobalMax && !_fullDensifyGlobalMin) {
+            if (_partitionTable.size() == 0) {
+                return DocumentSource::GetNextResult::makeEOF();
+            }
+            tasserted(8246101, "Expected global min/max to be set for 'full' case");
+        }
         // If we are in the partitioned case, and we saw a value in a partition, we need to create
         // that value in every other partition. This is the "fullDensifyGlobalMax" and unfortunately
         // needs to be considered inclusive, in contrast to every other case.
@@ -526,33 +532,38 @@ void DocumentSourceInternalDensify::initializeState() {
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGen(Document currentDoc,
-                                                                           DensifyValue lastSeen) {
-    auto val = getDensifyValue(currentDoc);
+                                                                           DensifyValue lastSeen,
+                                                                           DensifyValue& densifyVal,
+                                                                           Value& partitionKey) {
     auto nextValToGenerate = lastSeen.increment(_range);
-
-    // If the current value is the next value to be generated, save it as the current (last seen)
-    // value.
-    if (val == nextValToGenerate) {
-        setPartitionValue(currentDoc);
-    }
 
     // If we don't need to create a generator (no intervening documents to generate before
     // outputting currentDoc), then don't create a generator. Altenatively if this document is above
     // where we need to generated documents, also don't create a generator.
-    if (val <= nextValToGenerate || (_rangeDensifyEnd && nextValToGenerate >= _rangeDensifyEnd)) {
+    if (densifyVal <= nextValToGenerate ||
+        (_rangeDensifyEnd && nextValToGenerate >= _rangeDensifyEnd)) {
+        // If the current value is the next value to be generated, save it as the last seen
+        // value.
+        if (densifyVal == nextValToGenerate) {
+            setPartitionValue(densifyVal, partitionKey);
+        }
         return currentDoc;
     }
 
     // Falling through the above conditions means the currentDoc is strictly greater than the last
     // seen document plus the step value.
+    // Save the next value to be generated in the partition to note that we've seen a value in it.
+    setPartitionValue(nextValToGenerate, partitionKey);
     // Don't generate past explicit bounds if present.
-    auto maxRange = _rangeDensifyEnd && _rangeDensifyEnd <= val ? _rangeDensifyEnd : val;
+    auto maxRange =
+        _rangeDensifyEnd && _rangeDensifyEnd <= densifyVal ? _rangeDensifyEnd : densifyVal;
     createDocGenerator(nextValToGenerate,
                        RangeStatement(_range.getStep(),
                                       ExplicitBounds(nextValToGenerate, *maxRange),
                                       _range.getUnit()),
-                       createIncludeFieldsObj(currentDoc),
-                       currentDoc);
+                       createIncludeFieldsObj(partitionKey),
+                       currentDoc,
+                       partitionKey);
 
     _densifyState = DensifyState::kHaveGenerator;
     auto nextDoc = _docGenerator->getNextDocument();
@@ -561,37 +572,36 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::handleNeedGen(Docum
         _densifyState = DensifyState::kNeedGen;
     }
 
-    setPartitionValue(nextDoc);
     return nextDoc;
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalDensify::checkFirstDocAgainstRangeStart(
-    Document doc) {
+    Document doc, DensifyValue& densifyVal, Value& partitionKey) {
     // If this document is in the range already, create a generator to densify. Otherwise return the
     // doc.
-    auto densifyVal = getDensifyValue(doc);
     if (_rangeDensifyStart && densifyVal > _rangeDensifyStart) {
-        setPartitionValue(doc, _rangeDensifyStart);
+        setPartitionValue(*_rangeDensifyStart, partitionKey);
         // Note that we don't use the doc here as the 'lastSeen' value. We always want to start at
         // the beginning of the range.
-        return handleNeedGen(doc, _rangeDensifyStart->decrement(_range));
+        return handleNeedGen(doc, _rangeDensifyStart->decrement(_range), densifyVal, partitionKey);
     } else if (_isFullDensify) {
         // This is the first value in the partition. We may have to create documents based on other
         // partitions in the full case.
         if (densifyVal > *_fullDensifyGlobalMin &&
             densifyVal > _fullDensifyGlobalMin->increment(_range)) {
             // This value is above where the next document would need to be generated.
-            return handleNeedGen(doc, _fullDensifyGlobalMin->decrement(_range));
+            return handleNeedGen(
+                doc, _fullDensifyGlobalMin->decrement(_range), densifyVal, partitionKey);
         } else if (densifyVal > *_fullDensifyGlobalMin) {
             // This value is between the minimum and the next step. Store that we've seen this
             // partition and we'll use the minimum value for it.
-            setPartitionValue(doc, _fullDensifyGlobalMin->decrement(_range));
+            setPartitionValue(_fullDensifyGlobalMin->decrement(_range), partitionKey);
             return doc;
         }
         // Else this document is equal to the next value. We don't need to generate a document, so
         // just save this value and return it.
     }
-    setPartitionValue(doc);
+    setPartitionValue(densifyVal, partitionKey);
     return doc;
 }
 
@@ -607,29 +617,28 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             // Initialize global vars (densifying min, densifying max).
             // Initialize partition state (even without partition, assume one partition).
             initializeState();
-            auto [shouldReturnWithoutProcessing, nextDoc] = getAndCheckInvalidDoc();
+            auto [shouldReturnWithoutProcessing, origDoc, densifyVal, densifyPartition] =
+                getAndCheckInvalidDoc();
             if (shouldReturnWithoutProcessing) {
-                return nextDoc;
+                return origDoc;
             }
-            auto doc = nextDoc.getDocument();
-            // This is the first document. If its already in the range, we must densify it.
-            return checkFirstDocAgainstRangeStart(doc);
+            auto doc = origDoc.getDocument();
+            return checkFirstDocAgainstRangeStart(doc, densifyVal, densifyPartition);
         }
         case DensifyState::kNeedGen: {
             // Pull document
-            auto [shouldReturnWithoutProcessing, nextDoc] = getAndCheckInvalidDoc();
+            auto [shouldReturnWithoutProcessing, origDoc, densifyVal, densifyPartition] =
+                getAndCheckInvalidDoc();
             if (shouldReturnWithoutProcessing) {
-                return nextDoc;
+                return origDoc;
             }
-            auto doc = nextDoc.getDocument();
-            auto thisVal = getDensifyValue(doc);
+            auto doc = origDoc.getDocument();
 
-            auto partitionVal = getDensifyPartition(doc);
-            auto foundPartitionVal = _partitionTable.find(partitionVal);
+            auto foundPartitionVal = _partitionTable.find(densifyPartition);
             // If we haven't seen this partition yet, no need for any action. We'll densify when we
             // see another document later, unless this is in the range.
             if (foundPartitionVal == _partitionTable.end()) {
-                return checkFirstDocAgainstRangeStart(doc);
+                return checkFirstDocAgainstRangeStart(doc, densifyVal, densifyPartition);
             }
             auto lastPartitionVal = foundPartitionVal->second.value();
             if (_rangeDensifyEnd && lastPartitionVal >= _rangeDensifyEnd) {
@@ -638,15 +647,14 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
             }
             // Set the new place to start densifying to either the bottom of the explicit range or
             // the last thing seen in the partition.
-            auto lastSeen = lastPartitionVal;
             if (_rangeDensifyStart && _rangeDensifyStart > lastPartitionVal) {
-                lastSeen = _rangeDensifyStart->decrement(_range);
+                lastPartitionVal = _rangeDensifyStart->decrement(_range);
             }
-            if (lastSeen > thisVal) {
+            if (lastPartitionVal > densifyVal) {
                 // This document is not yet in the densification range.
                 return DocumentSource::GetNextResult(std::move(doc));
             }
-            return handleNeedGen(doc, lastSeen);
+            return handleNeedGen(doc, lastPartitionVal, densifyVal, densifyPartition);
         }
         case DensifyState::kHaveGenerator: {
             // Pull document from generator.
@@ -655,23 +663,30 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::doGetNext() {
                     _docGenerator && !_docGenerator->done());
 
             auto generatedDoc = _docGenerator->getNextDocument();
-            // Update partition table if its on step.
+            // Only set the partition value if this document is the last on-step document that this
+            // generator will produce. The last on-step document is the last generated document OR
+            // the 'finalDoc' that was placed in the generator when it was built.
+            if (_docGenerator->done() || _docGenerator->lastGeneratedDoc()) {
+                auto genDensifyVal = getDensifyValue(generatedDoc);
+                auto partition = getDensifyPartition(generatedDoc);
+                // If we're densifying we must have seen a value in this partition already.
+                auto foundPartitionVal = _partitionTable.find(partition);
+                tassert(8246104,
+                        "Expected value in the partition",
+                        foundPartitionVal != _partitionTable.end());
+                // Verify this is on the step. If the document was generated it automatically is,
+                // otherwise it is the final doc and may happen to be on the step.
+                if (_docGenerator->lastGeneratedDoc() ||
+                    genDensifyVal == foundPartitionVal->second.value().increment(_range)) {
+                    setPartitionValue(genDensifyVal, partition);
+                }
+            }
+            // Update state.
             if (_docGenerator->done()) {
                 _docGenerator = boost::none;
                 _densifyState = DensifyState::kNeedGen;
                 // We haven't seen EOF yet -- if we have, we would be in
                 // kFinishingDensifyWithGenerator. Assume we're not done.
-            }
-            // The generator's final document may not be on the step.
-            auto genDensifyVal = getDensifyValue(generatedDoc);
-            auto partition = getDensifyPartition(generatedDoc);
-            // If we're densifying we must have seen a value in this partition already.
-            auto foundPartitionVal = _partitionTable.find(partition);
-            tassert(8246104,
-                    "Expected value in the partition",
-                    foundPartitionVal != _partitionTable.end());
-            if (genDensifyVal == foundPartitionVal->second.value().increment(_range)) {
-                setPartitionValue(generatedDoc);
             }
             return generatedDoc;
         }

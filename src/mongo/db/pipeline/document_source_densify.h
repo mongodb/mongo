@@ -122,8 +122,7 @@ public:
      * the document has either a numeric value or a date in the proper field, and throws an error
      * otherwise.
      */
-    static DensifyValue getFromDocument(const Document& doc, const FieldPath& path) {
-        Value val = doc.getNestedField(path);
+    static DensifyValue getFromValue(const Value& val) {
         uassert(5733201,
                 "Densify field type must be numeric or a date",
                 val.numeric() || val.getType() == BSONType::Date);
@@ -131,6 +130,10 @@ public:
             return val.getDate();
         }
         return val;
+    }
+    static DensifyValue getFromDocument(const Document& doc, const FieldPath& path) {
+        Value val = doc.getNestedField(path);
+        return getFromValue(val);
     }
 
     std::string toString() const {
@@ -346,11 +349,16 @@ public:
                      FieldPath fieldName,
                      boost::optional<Document> includeFields,
                      boost::optional<Document> finalDoc,
+                     boost::optional<Value> partitionKey,
                      ValueComparator comp,
                      size_t* counter,
                      bool maxInclusive);
         Document getNextDocument();
         bool done() const;
+        // Helper to return whether this is the last generated document. This is useful because
+        // the last generated document is always on the step. Expected to be called after generating
+        // a document to describe the document that was just generated as 'last' or 'not last'.
+        bool lastGeneratedDoc() const;
 
 
     private:
@@ -363,6 +371,8 @@ public:
         // creation of this generator. Will be returned after the final generated document. Can
         // be boost::none if we are generating the values at the end of the range.
         boost::optional<Document> _finalDoc;
+        // The partition key for all documents created by this generator.
+        boost::optional<Value> _partitionKey;
         // The minimum value that this generator will create, therefore the next generated
         // document will have this value.
         DensifyValue _min;
@@ -447,20 +457,30 @@ private:
 
     /**
      * Helper to pull a document from the previous stage and verify that it is eligible for
-     * densification. Returns a pair where the boolean is true if this doc should be passed through
-     * and false if it can be densified. The second result is the document from the previous stage.
+     * densification. Returns a tuple of <Return immediately, pulled document, value to be
+     * densified, partition key>.
      */
-    std::pair<bool, DocumentSource::GetNextResult> getAndCheckInvalidDoc();
+    std::tuple<bool, DocumentSource::GetNextResult, DensifyValue, Value> getAndCheckInvalidDoc();
 
-    DensifyValue getDensifyValue(const Document& doc) {
-        auto val = DensifyValue::getFromDocument(doc, _field);
+    void assertDensifyType(DensifyValue val) {
         uassert(6053600,
                 val.isNumber()
                     ? "Encountered numeric densify value in collection when step has a date unit."
                     : "Encountered date densify value in collection when step does not have a date "
                       "unit.",
                 (!_range.getUnit() && val.isNumber()) || (_range.getUnit() && val.isDate()));
+    }
+
+    DensifyValue getDensifyValue(const Document& doc) {
+        auto val = DensifyValue::getFromDocument(doc, _field);
+        assertDensifyType(val);
         return val;
+    }
+
+    DensifyValue getDensifyValue(const Value& val) {
+        auto densifyVal = DensifyValue::getFromValue(val);
+        assertDensifyType(densifyVal);
+        return densifyVal;
     }
 
     Value getDensifyPartition(const Document& doc) {
@@ -471,19 +491,21 @@ private:
     /**
      * Decides whether or not to build a DocGen and return the first document generated or return
      * the current doc if the rangeMin + step is greater than rangeMax.
+     * Optionally include the densify and partition values for the generator if they've already
+     * been calculated.
      */
-    DocumentSource::GetNextResult handleNeedGen(Document currentDoc, DensifyValue lastSeen);
+    DocumentSource::GetNextResult handleNeedGen(Document currentDoc,
+                                                DensifyValue lastSeen,
+                                                DensifyValue& densifyVal,
+                                                Value& partitinKey);
 
     /**
      * Check whether or not the first document in the partition needs to be densified. Returns the
      * document this iteration should return.
      */
-    DocumentSource::GetNextResult checkFirstDocAgainstRangeStart(Document doc);
-    /**
-     * Checks where the current doc's value lies compared to the range and creates the correct
-     * DocGen if needed and returns the next doc.
-     */
-    DocumentSource::GetNextResult handleNeedGenExplicit(Document currentDoc);
+    DocumentSource::GetNextResult checkFirstDocAgainstRangeStart(Document doc,
+                                                                 DensifyValue& densifyVal,
+                                                                 Value& partitionKey);
 
     /**
      * Handles when the pSource has been exhausted. Has different behavior depending on the densify
@@ -504,20 +526,16 @@ private:
      * be the last seen value in the partition unless it is less than the optional 'minOverride'.
      * Helper is to share code between visit functions.
      */
-    DocumentSource::GetNextResult finishDensifyingPartitionedInput();
     DocumentSource::GetNextResult finishDensifyingPartitionedInputHelper(
         DensifyValue max,
         boost::optional<DensifyValue> minOverride = boost::none,
         bool maxInclusive = false);
 
+    boost::optional<Document> createIncludeFieldsObj(Value partitionKey);
     /**
      * Helper to set the value in the partition table.
      */
-    void setPartitionValue(Document doc,
-                           boost::optional<DensifyValue> valueOverride = boost::none) {
-        tassert(8246103, "partitionExpr", _partitionExpr);
-        auto partitionKey = getDensifyPartition(doc);
-        auto partitionVal = valueOverride ? *valueOverride : getDensifyValue(doc);
+    void setPartitionValue(DensifyValue partitionVal, Value partitionKey) {
         SimpleMemoryUsageToken memoryToken{
             partitionKey.getApproximateSize() + partitionVal.getApproximateSize(), &_memTracker};
         _partitionTable[partitionKey] = {std::move(memoryToken), std::move(partitionVal)};
@@ -527,34 +545,41 @@ private:
                 _memTracker.withinMemoryLimit());
     }
 
-    /**
-     * Helpers to create doc generators. Sets _docGenerator to the created generator.
-     */
-    boost::optional<Document> createIncludeFieldsObj(Document doc);
-    boost::optional<Document> createIncludeFieldsObj(Value val);
+    void setPartitionValue(Document doc,
+                           boost::optional<DensifyValue> valueOverride = boost::none) {
+        tassert(8246103, "partitionExpr", _partitionExpr);
+        auto partitionKey = getDensifyPartition(doc);
+        auto partitionVal = valueOverride ? *valueOverride : getDensifyValue(doc);
+        setPartitionValue(partitionVal, partitionKey);
+    }
+
     /**
      * Create a document generator for the given range statement. The generation will start at 'min'
      * (inclusive) and will go to the end of the given 'range'. Whether or not a document at the
      * range maximum depends on 'maxInclusive' -- if true, the range will be inclusive on both ends.
      * Will output documents that include any given 'includeFields' (with their values) and, if
      * given, will output 'finalDoc' unchanged at the end of the generated documents.
+     * Pass the partition key to the generator to avoid having to compute it for each document
+     * the generator creates.
      */
     void createDocGenerator(DensifyValue min,
                             RangeStatement range,
                             boost::optional<Document> includeFields,
                             boost::optional<Document> finalDoc,
+                            boost::optional<Value> partitionKey,
                             bool maxInclusive = false) {
         _docGenerator = DocGenerator(min,
                                      range,
                                      _field,
                                      includeFields,
                                      finalDoc,
+                                     partitionKey,
                                      pExpCtx->getValueComparator(),
                                      &_docsGenerated,
                                      maxInclusive);
     }
     void createDocGenerator(DensifyValue min, RangeStatement range) {
-        createDocGenerator(min, range, boost::none, boost::none);
+        createDocGenerator(min, range, boost::none, boost::none, boost::none);
     }
 
 

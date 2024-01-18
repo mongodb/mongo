@@ -6,6 +6,7 @@
  * ]
  */
 
+import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {
     densifyUnits,
     getArithmeticFunctionsForUnit,
@@ -77,3 +78,13 @@ for (let i = 0; i < densifyUnits.length; i++) {
         runDensifyFullTest();
     }
 }
+
+// Test that full range does not fail if there's only one document in the collection.
+coll.drop();
+coll.insert({_id: 1, val: 1, orig: true});
+let result = coll.aggregate([
+    {"$densify": {"field": "val", "range": {"step": 2, "bounds": "full"}}},
+]);
+const expected = [{_id: 1, val: 1, orig: true}];
+const resultArray = result.toArray();
+assert(arrayEq(resultArray, expected));
