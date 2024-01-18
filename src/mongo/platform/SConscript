@@ -48,7 +48,7 @@ env.BazelLibrary(
     MONGO_API_NAME="visibility_test_libcommon",
 )
 
-env.Library(
+env.BazelLibrary(
     target="visibility_test_lib1",
     source=[
         "visibility_test_lib1.cpp",
@@ -63,7 +63,7 @@ env.Library(
     MONGO_API_NAME="visibility_test_lib1",
 )
 
-env.Library(
+env.BazelLibrary(
     target="visibility_test_lib2",
     source=[
         "visibility_test_lib2.cpp",
