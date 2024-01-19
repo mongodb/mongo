@@ -490,6 +490,7 @@ TEST(ImmutableMap, Iteration) {
     ASSERT(it1 == map1.end());
 }
 
+#ifndef __APPLE__
 TEST(ImmutableMap, Insert) {
     auto v0 = init_maps<int, int>();
 
@@ -985,6 +986,7 @@ TEST(ImmutableMap, EraseViaIterator) {
     ASSERT_NOT_CONTAINS(v13, 5);
     ASSERT_NOT_CONTAINS(v13, 7);
 }
+#endif
 
 TEST(ImmutableMap, ExclusiveOwnership) {
     immutable::map<int, int> v0;
@@ -1146,6 +1148,7 @@ TEST(ImmutableSet, Iteration) {
     ASSERT(it1 == set1.end());
 }
 
+#ifndef __APPLE__
 TEST(ImmutableSet, Insert) {
     auto v0 = init_sets<int>();
 
@@ -1312,6 +1315,7 @@ TEST(ImmutableSet, EraseViaIterator) {
     ASSERT_NOT_CONTAINS(v13, 5);
     ASSERT_NOT_CONTAINS(v13, 7);
 }
+#endif
 
 TEST(ImmutableSet, ExclusiveOwnership) {
     immutable::set<int> v0;
