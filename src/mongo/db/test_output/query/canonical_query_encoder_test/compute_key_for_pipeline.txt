@@ -1,18 +1,18 @@
 ==== VARIATION: bonsai + sbe, {$match: {a: 1}}, {}
-fGVxAGE/AAAAADE=
+fGVxAGE/AAAAAAoAAAAx
 ==== VARIATION: bonsai + sbe, {$match: {a: 2}}, {}
-fGVxAGE/AAAAADE=
+fGVxAGE/AAAAAAoAAAAx
 ==== VARIATION: bonsai + sbe, {$match: {b: 1}}, {}
-fGVxAGI/AAAAADE=
+fGVxAGI/AAAAAAoAAAAx
 ==== VARIATION: bonsai + sbe, {$match: {$and: [{a: 1}, {b: 1}]}}, {}
-fGFuAFtlcQBhPwAAAAAsZXEAYj8BAAAAXTE=
+fGFuAFtlcQBhPwAAAAAKAAAALGVxAGI/AQAAAAoAAABdMQ==
 ==== VARIATION: bonsai + sbe, {$match: {$or: [{a: 1}, {b: 1}]}}, {}
-fG9yAFtlcQBhPwAAAAAsZXEAYj8BAAAAXTE=
+fG9yAFtlcQBhPwAAAAAKAAAALGVxAGI/AQAAAAoAAABdMQ==
 ==== VARIATION: bonsai + sbe, {$match: {a: 1}}, {$project: {a: 1}}
-fGVxAGE/AAAAAHweAAAAAyRwcm9qZWN0AA8AAAAIX2lkAAEIYQABAAAx
+fGVxAGE/AAAAAAoAAAB8HgAAAAMkcHJvamVjdAAPAAAACF9pZAABCGEAAQAAMQ==
 ==== VARIATION: bonsai + sbe, {$match: {b: 1}}, {$project: {b: 1}}
-fGVxAGI/AAAAAHweAAAAAyRwcm9qZWN0AA8AAAAIX2lkAAEIYgABAAAx
+fGVxAGI/AAAAAAoAAAB8HgAAAAMkcHJvamVjdAAPAAAACF9pZAABCGIAAQAAMQ==
 ==== VARIATION: bonsai + sbe, {$match: {$and: [{a: 1}, {b: 1}]}}, {$project: {a: 1, b: 1}}
-fGFuAFtlcQBhPwAAAAAsZXEAYj8BAAAAXXwiAAAAAyRwcm9qZWN0ABMAAAAIX2lkAAEIYQABCGIAAQAAMQ==
+fGFuAFtlcQBhPwAAAAAKAAAALGVxAGI/AQAAAAoAAABdfCIAAAADJHByb2plY3QAEwAAAAhfaWQAAQhhAAEIYgABAAAx
 ==== VARIATION: bonsai + sbe, {$match: {$or: [{a: 1}, {b: 1}]}}, {$project: {a: 1, b: 1}}
-fG9yAFtlcQBhPwAAAAAsZXEAYj8BAAAAXXwiAAAAAyRwcm9qZWN0ABMAAAAIX2lkAAEIYQABCGIAAQAAMQ==
+fG9yAFtlcQBhPwAAAAAKAAAALGVxAGI/AQAAAAoAAABdfCIAAAADJHByb2plY3QAEwAAAAhfaWQAAQhhAAEIYgABAAAx
