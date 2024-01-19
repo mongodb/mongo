@@ -53,6 +53,7 @@
 #include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/namespace_string.h"
@@ -731,7 +732,13 @@ BulkWriteReplyInfo execute(OperationContext* opCtx,
     int numRoundsWithoutProgress = 0;
 
     while (!bulkWriteOp.isFinished()) {
-        // 1: Target remaining ops with the appropriate targeter based on the namespace index and
+        // Make sure we are not over our maximum memory allocation, if we are then mark the next
+        // write op with an error and abort the operation.
+        if (bulkWriteOp.aboveBulkWriteRepliesMaxSize()) {
+            bulkWriteOp.abortDueToMaxSizeError();
+        }
+
+        // Target remaining ops with the appropriate targeter based on the namespace index and
         // re-batch ops based on their targeted shard id.
         TargetedBatchMap childBatches;
 
@@ -1009,6 +1016,25 @@ bool BulkWriteOp::isFinished() const {
     return true;
 }
 
+bool BulkWriteOp::aboveBulkWriteRepliesMaxSize() const {
+    return _approximateSize >= gBulkWriteMaxRepliesSize.loadRelaxed();
+}
+
+void BulkWriteOp::abortDueToMaxSizeError() {
+    // Need to find the next writeOp so we can store an error in it.
+    for (auto& writeOp : _writeOps) {
+        if (writeOp.getWriteState() < WriteOpState_Completed) {
+            writeOp.setOpError(write_ops::WriteError(
+                0,
+                Status{ErrorCodes::ExceededMemoryLimit,
+                       fmt::format("BulkWrite response size exceeded limit ({} bytes)",
+                                   _approximateSize)}));
+            break;
+        }
+    }
+    _aborted = true;
+}
+
 const WriteOp& BulkWriteOp::getWriteOp_forTest(int i) const {
     return _writeOps[i];
 }
@@ -1249,6 +1275,8 @@ void BulkWriteOp::noteChildBatchResponse(
             continue;
         }
 
+        _approximateSize += reply.getApproximateSize();
+
         if (reply.getStatus().isOK()) {
             noteWriteOpResponse(write, writeOp, commandReply, reply);
         } else {
@@ -1414,6 +1442,10 @@ void BulkWriteOp::noteWriteOpFinalResponse(
 
     if (!shardWCError.error.toStatus().isOK()) {
         saveWriteConcernError(shardWCError);
+    }
+
+    if (reply) {
+        _approximateSize += reply->getApproximateSize();
     }
 
     if (response.getNErrors() == 0) {

@@ -204,6 +204,18 @@ public:
      */
     bool isFinished() const;
 
+    /**
+     * Returns true if the current approximate size of the bulkWrite is above the maximum allowed
+     * size.
+     */
+    bool aboveBulkWriteRepliesMaxSize() const;
+
+    /**
+     * Store a memory exceeded error in the first non-completed write op and abort the bulkWrite to
+     * avoid any other writes being executed.
+     */
+    void abortDueToMaxSizeError();
+
     const WriteOp& getWriteOp_forTest(int i) const;
 
     int numWriteOpsIn(WriteOpState opState) const;
@@ -410,6 +422,10 @@ private:
     int _nModified = 0;
     int _nUpserted = 0;
     int _nDeleted = 0;
+
+    // The approximate size of replyItems we are tracking. Used to keep mongos from
+    // using too much memory on this command.
+    int32_t _approximateSize = 0;
 
     BulkWriteExecStats _stats;
 };
