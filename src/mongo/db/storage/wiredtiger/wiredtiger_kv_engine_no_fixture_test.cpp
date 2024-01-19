@@ -65,6 +65,7 @@
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
@@ -93,10 +94,10 @@ namespace {
  */
 class KVTestClientObserver final : public ServiceContext::ClientObserver {
 public:
-    KVTestClientObserver(KVEngine* kvEngine) : _kvEngine(kvEngine) {}
     void onCreateClient(Client* client) override {}
     void onDestroyClient(Client* client) override {}
     void onCreateOperationContext(OperationContext* opCtx) {
+        stdx::unique_lock<Latch> lock(_mutex);
         shard_role_details::setRecoveryUnit(
             opCtx,
             std::unique_ptr<RecoveryUnit>(_kvEngine->newRecoveryUnit()),
@@ -104,7 +105,13 @@ public:
     }
     void onDestroyOperationContext(OperationContext* opCtx) override {}
 
+    void setKVEngine(KVEngine* kvEngine) {
+        stdx::unique_lock<Latch> lock(_mutex);
+        _kvEngine = kvEngine;
+    }
+
 private:
+    Mutex _mutex = MONGO_MAKE_LATCH("KVTestClientObserver::_mutex");  // protects _kvEngine
     KVEngine* _kvEngine;
 };
 
@@ -168,9 +175,13 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
     setGlobalServiceContext(ServiceContext::make());
     ON_BLOCK_EXIT([] { setGlobalServiceContext({}); });
     auto serviceContext = getGlobalServiceContext();
+    auto clientObserver = std::make_unique<KVTestClientObserver>();
+    auto clientObserverPtr = clientObserver.get();
+    serviceContext->registerClientObserver(std::move(clientObserver));
     unittest::TempDir home("WiredTigerKVEngineNoFixtureTest_Basic_home");
     ClockSourceMock cs;
     auto kvEngine = makeKVEngine(serviceContext, home.path(), &cs);
+    clientObserverPtr->setKVEngine(kvEngine.get());
     auto conn = kvEngine->getConnection();
     ASSERT(conn) << fmt::format("failed to open connection to source folder {}", home.path());
 
@@ -186,7 +197,6 @@ TEST(WiredTigerKVEngineNoFixtureTest, Basic) {
     });
 
     // Create an OperationContext with the WiredTigetRecoveryUnit.
-    serviceContext->registerClientObserver(std::make_unique<KVTestClientObserver>(kvEngine.get()));
     auto client = serviceContext->getService()->makeClient("myclient");
     auto opCtx = serviceContext->makeOperationContext(client.get());
 
