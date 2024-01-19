@@ -281,10 +281,8 @@ public:
             }
 
             auto viewAggCmd =
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(nss.dbName(),
-                                                                     request.validatedTenancyScope,
-                                                                     viewAggregation.getValue(),
-                                                                     serializationCtx)
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), request.validatedTenancyScope, viewAggregation.getValue())
                     .body;
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
                 opCtx,
@@ -398,11 +396,7 @@ public:
             auto viewAggregation = canonicalDistinct.asAggregationCommand();
             uassertStatusOK(viewAggregation.getStatus());
 
-            using VTS = auth::ValidatedTenancyScope;
-            boost::optional<VTS> vts = boost::none;
-            if (dbName.tenantId()) {
-                vts = VTS(dbName.tenantId().value(), VTS::TrustedForInnerOpMsgRequestTag{});
-            }
+            auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto aggRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
                 dbName, vts, std::move(viewAggregation.getValue()));
 

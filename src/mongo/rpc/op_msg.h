@@ -449,6 +449,10 @@ public:
      * Do not use if creating an OpMsgRequest in order to run a command directly (i.e.
      * CommandHelpers::runCommandDirectly). This function does not set a ValidatedTenancyScope on
      * the request itself, which will lead to the request being parsed incorrectly.
+     *
+     * TODO SERVER-81825: remove this function once all existing call sites switch to use
+     * createWithValidatedTenancyScope.
+     * @deprecated
      */
     static OpMsgRequest create(
         const DatabaseName& dbName,
@@ -463,7 +467,7 @@ public:
         const DatabaseName& dbName,
         boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
         BSONObj body,
-        const SerializationContext& sc = SerializationContext::stateDefault());
+        const BSONObj& extraFields = {});
 };
 
 }  // namespace mongo

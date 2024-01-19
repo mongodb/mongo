@@ -350,7 +350,7 @@ BSONObj appendDollarDbAndTenant(const DatabaseName& dbName,
             appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant);
         }
         builder.append("$db", DatabaseNameUtil::serialize(dbName, sc));
-        if (sc.getPrefix() != SerializationContext::Prefix::Default) {
+        if (sc.getPrefix() == SerializationContext::Prefix::IncludePrefix) {
             builder.append("expectPrefix",
                            sc.getPrefix() == SerializationContext::Prefix::IncludePrefix);
         }
@@ -376,19 +376,6 @@ void OpMsgRequest::setDollarTenant(const TenantId& tenant) {
     body = bodyBuilder.obj();
 }
 
-OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
-    const DatabaseName& dbName,
-    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
-    BSONObj body,
-    const SerializationContext& sc) {
-    OpMsgRequest request;
-
-    request.body =
-        appendDollarDbAndTenant(dbName, std::move(body), sc, validatedTenancyScope != boost::none);
-    request.validatedTenancyScope = validatedTenancyScope;
-
-    return request;
-}
 namespace {
 std::string compactStr(const std::string& input) {
     if (input.length() > 2024) {
@@ -397,11 +384,9 @@ std::string compactStr(const std::string& input) {
     return input;
 }
 }  // namespace
-
-OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
-                                         BSONObj body,
-                                         const BSONObj& extraFields,
-                                         const SerializationContext& sc) {
+void validateExtraFields(const DatabaseName& dbName,
+                         const BSONObj& body,
+                         const BSONObj& extraFields) {
     int bodySize = body.objsize();
     int extraFieldsSize = extraFields.objsize();
 
@@ -419,9 +404,35 @@ OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
             "db"_attr = dbName.toStringForErrorMsg(),
             "extraFields"_attr = compactStr(extraFields.toString()));
     };
+}
+
+OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
+    const DatabaseName& dbName,
+    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
+    BSONObj body,
+    const BSONObj& extraFields) {
+    validateExtraFields(dbName, body, extraFields);
+
+    const SerializationContext sc = validatedTenancyScope != boost::none
+        ? SerializationContext::stateCommandRequest(validatedTenancyScope->hasTenantId(),
+                                                    validatedTenancyScope->isFromAtlasProxy())
+        : SerializationContext::stateCommandRequest();
 
     OpMsgRequest request;
+    request.body = appendDollarDbAndTenant(
+        dbName, std::move(body), sc, validatedTenancyScope != boost::none, extraFields);
+    request.validatedTenancyScope = validatedTenancyScope;
 
+    return request;
+}
+
+OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
+                                         BSONObj body,
+                                         const BSONObj& extraFields,
+                                         const SerializationContext& sc) {
+    validateExtraFields(dbName, body, extraFields);
+
+    OpMsgRequest request;
     request.body = appendDollarDbAndTenant(dbName, std::move(body), sc, false, extraFields);
 
     return request;

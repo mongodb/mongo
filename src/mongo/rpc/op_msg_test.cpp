@@ -1004,11 +1004,8 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixDefault) {
                   VTS::TenantProtocol::kDefault,
                   VTS::TokenForTestingTag{});
 
-    auto sc = SerializationContext::stateCommandRequest();
-    sc.setTenantIdSource(true);
-
     OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, sc);
+        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
 
@@ -1134,19 +1131,10 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixFalse) {
                   VTS::TenantProtocol::kDefault,
                   VTS::TokenForTestingTag{});
 
-    auto sc = SerializationContext::stateCommandRequest();
-    sc.setPrefixState(false);
-    sc.setTenantIdSource(true);
-
     OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, sc);
+        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
-
-    // Received an expectPrefix=false in the request body.
-    ASSERT_EQ(msg.body.getField("expectPrefix").eoo(), false);
-    ASSERT_TRUE(msg.body.getField("expectPrefix").isBoolean());
-    ASSERT_EQ(msg.body.getField("expectPrefix").boolean(), false);
     ASSERT_EQ(msg.getDatabase(), dbString);
 }
 
@@ -1169,12 +1157,8 @@ TEST(OpMsgRequestBuilder, WithVTSAndSerializationContextExpPrefixTrue) {
                   VTS::TenantProtocol::kAtlasProxy,
                   VTS::TokenForTestingTag{});
 
-    auto sc = SerializationContext::stateCommandRequest();
-    sc.setPrefixState(true);
-    sc.setTenantIdSource(true);
-
     OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body, sc);
+        DatabaseName::createDatabaseName_forTest(tenantId, dbString), vts, body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
 

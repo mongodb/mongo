@@ -227,12 +227,10 @@ public:
                 return viewAggregation.getStatus();
             }
 
-            auto viewAggCmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                                  nss.dbName(),
-                                  opMsgRequest.validatedTenancyScope,
-                                  viewAggregation.getValue(),
-                                  serializationCtx)
-                                  .body;
+            auto viewAggCmd =
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), opMsgRequest.validatedTenancyScope, viewAggregation.getValue())
+                    .body;
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
@@ -335,27 +333,13 @@ public:
 
         if (ctx->getView()) {
             auto viewAggregation = countCommandAsAggregationCommand(request, nss);
-            const auto& requestSC = request.getSerializationContext();
-            SerializationContext aggRequestSC(
-                requestSC.getSource(), requestSC.getCallerType(), requestSC.getPrefix());
-
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.reset();
 
             uassertStatusOK(viewAggregation.getStatus());
-            using VTS = auth::ValidatedTenancyScope;
-            boost::optional<VTS> innerCmdVts = boost::none;
-            if (dbName.tenantId()) {
-                innerCmdVts = VTS(dbName.tenantId().value(), VTS::TrustedForInnerOpMsgRequestTag{});
-                aggRequestSC.setTenantIdSource(true);
-                // Use the original VTS to check the client connection tenant protocol.
-                if (vts != boost::none && vts->isFromAtlasProxy()) {
-                    aggRequestSC.setPrefixState(true);
-                }
-            }
 
             auto aggRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                dbName, innerCmdVts, std::move(viewAggregation.getValue()), aggRequestSC);
+                dbName, vts, std::move(viewAggregation.getValue()));
             BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
 
             uassertStatusOK(ViewResponseFormatter(aggResult).appendAsCountResponse(
