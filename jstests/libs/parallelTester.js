@@ -32,6 +32,9 @@ if (typeof _threadInject != "undefined") {
         for (var i = 1, l = arguments.length; i < l; i++) {
             newArgs.push(evalCodeArgs(arguments[i]));
         }
+        if (TestData && TestData["shellGRPC"]) {
+            eval('import("jstests/libs/override_methods/enable_grpc_on_connect.js")');
+        }
         realStartFn = newArgs.shift();
         return realStartFn.apply(this, newArgs);
     }

@@ -5,6 +5,8 @@
  *     uses_multiple_connections,
  *     # benchRun does not use runCommand which is required by the `simulate_atlas_proxy` override.
  *     simulate_atlas_proxy_incompatible,
+ *     # TODO SERVER-84638: remove this incompatibility once benchrun passes on shell options.
+ *     grpc_incompatible,
  * ]
  */
 const coll = db.benchrun_pipeline_updates;

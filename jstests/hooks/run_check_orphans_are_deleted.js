@@ -24,11 +24,13 @@ if (topology.type == Topology.kShardedCluster) {
             throw new Error('Unrecognized topology format: ' + tojson(topology));
         }
 
-        CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), new Mongo(shardPrimary), shardName);
+        CheckOrphansAreDeletedHelpers.runCheck(
+            db.getMongo(), new Mongo(shardPrimary, undefined, {gRPC: false}), shardName);
     }
 } else if (topology.type == Topology.kReplicaSet && topology.configsvr &&
            TestData.testingReplicaSetEndpoint) {
-    CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), new Mongo(topology.primary), "config");
+    CheckOrphansAreDeletedHelpers.runCheck(
+        db.getMongo(), new Mongo(topology.primary, undefined, {gRPC: false}), "config");
 } else {
     throw new Error('Orphan documents check must be run against a sharded cluster, but got: ' +
                     tojson(topology));

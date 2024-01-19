@@ -252,7 +252,7 @@ buildvariants:
     - name: generate_buildid_to_debug_symbols_mapping
     # sharding_uninitialized_fcv_jscore_passthrough_gen spawns too many connections
     # and processes to be used with TLS on a single host.
-    - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.sharding !.txns
+    - name: .jscore .common !sharding_uninitialized_fcv_jscore_passthrough_gen !.auth !.txns
     - name: .lint
     - name: libdeps_graph_linting_TG
       distros:

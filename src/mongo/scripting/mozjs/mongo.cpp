@@ -731,6 +731,12 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
                         apiParameters.getVersion());
             }
         }
+
+#ifdef MONGO_CONFIG_GRPC
+        if (options.hasField("gRPC")) {
+            cs.setIsGRPC(options.getBoolField("gRPC"));
+        }
+#endif
     }
 #ifdef MONGO_CONFIG_GRPC
     if (cs.isGRPC()) {

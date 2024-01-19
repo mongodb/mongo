@@ -56,13 +56,15 @@ StatusWith<std::shared_ptr<transport::Session>> DBClientGRPCStream::_makeSession
     transport::ConnectSSLMode sslMode,
     Milliseconds timeout,
     boost::optional<TransientSSLParams> transientSSLParams) {
-    auto tl = dynamic_cast<transport::grpc::GRPCTransportLayer*>(
-        getGlobalServiceContext()->getTransportLayerManager()->getEgressLayer());
-    invariant(tl,
-              "DBClientGRPCStream can only be used with a gRPC transport layer configured as the "
-              "egress transport layer.");
-
-    return tl->connectWithAuthToken(host, std::move(timeout), _authToken);
+    transport::grpc::GRPCTransportLayer* grpcLayer = nullptr;
+    for (auto& tl : getGlobalServiceContext()->getTransportLayerManager()->getTransportLayers()) {
+        if (auto g = dynamic_cast<transport::grpc::GRPCTransportLayer*>(tl.get())) {
+            grpcLayer = g;
+            break;
+        }
+    }
+    invariant(grpcLayer);
+    return grpcLayer->connectWithAuthToken(host, std::move(timeout), _authToken);
 }
 
 void DBClientGRPCStream::_reconnectSession() {

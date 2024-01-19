@@ -294,6 +294,15 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         return ",".join([mongos.get_internal_connection_string() for mongos in self.mongos])
 
+    def get_shell_connection_string(self):
+        if self.mongos is None:
+            raise ValueError("Must call setup() before calling get_shell_connection_string()")
+
+        return ",".join([mongos.get_shell_connection_string() for mongos in self.mongos])
+
+    def get_shell_connection_url(self):
+        return "mongodb://" + self.get_shell_connection_string()
+
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
         if self.is_ready and self.replica_endpoint_mode:
@@ -617,7 +626,8 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         self.port = fixturelib.get_next_port(job_num)
         self.mongos_options["port"] = self.port
         if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
-            self.mongos_options["grpcPort"] = fixturelib.get_next_port(job_num)
+            self.grpcPort = fixturelib.get_next_port(job_num)
+            self.mongos_options["grpcPort"] = self.grpcPort
 
         self._dbpath_prefix = dbpath_prefix
 
@@ -737,9 +747,12 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
         """Return the internal connection string."""
         return f"{self._get_hostname()}:{self.port}"
 
-    def get_shell_connection_url(self):
+    def get_shell_connection_string(self):
         port = self.port if not self.config.SHELL_GRPC else self.grpcPort
         return f"{self._get_hostname()}:{port}"
+
+    def get_shell_connection_url(self):
+        return "mongodb://" + self.get_shell_connection_string()
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

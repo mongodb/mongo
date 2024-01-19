@@ -7,9 +7,11 @@ assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a
 const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 
 const hostList = [];
+let useGRPC = false;
 
 if (topology.type === Topology.kStandalone) {
-    hostList.push(topology.mongod);
+    useGRPC = db.getMongo().isGRPC();
+    hostList.push(db.getMongo().host);
 } else if (topology.type === Topology.kReplicaSet) {
     hostList.push(...topology.nodes);
     new ReplSetTest(topology.nodes[0]).awaitSecondaryNodes();
@@ -49,7 +51,7 @@ if (requiredFCV) {
     // multi-statement transaction. We temporarily raise the transactionLifetimeLimitSeconds to be
     // 24 hours to avoid spurious failures from it having been set to a lower value.
     originalTransactionLifetimeLimitSeconds = hostList.map(hostStr => {
-        const conn = new Mongo(hostStr);
+        const conn = new Mongo(hostStr, undefined, {gRPC: useGRPC});
         const res = assert.commandWorked(
             conn.adminCommand({setParameter: 1, transactionLifetimeLimitSeconds: 24 * 60 * 60}));
         return {conn, originalValue: res.was};
@@ -77,7 +79,7 @@ if (requiredFCV) {
         adminDB.runCommand({setFeatureCompatibilityVersion: requiredFCV, confirm: true}));
 }
 
-new CollectionValidator().validateNodes(hostList);
+new CollectionValidator().validateNodes(hostList, {gRPC: useGRPC});
 
 if (originalFCV && originalFCV.version !== requiredFCV) {
     assert.commandWorked(

@@ -8,7 +8,7 @@ export var Topology = {
 };
 
 export var DiscoverTopology = (function() {
-    const kDefaultConnectFn = (host) => new Mongo(host);
+    const kDefaultConnectFn = (host) => new Mongo(host, undefined, {gRPC: false});
 
     function getDataMemberConnectionStrings(conn) {
         const res = assert.commandWorked(conn.adminCommand({isMaster: 1}));
