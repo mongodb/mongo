@@ -2684,8 +2684,16 @@ var ReplSetTest = function ReplSetTest(opts) {
             // to time out since it may take a while to process each batch and a test may have
             // changed "cursorTimeoutMillis" to a short time period.
             this._cursorExhausted = false;
-            this.cursor =
-                coll.find(query).sort({$natural: -1}).noCursorTimeout().readConcern("local");
+            // TODO SERVER-75496 remove the batchSize once the the following issue is fixed: The
+            // find{...} will always run with apiStrict:false, however getMore may run with
+            // apiStrict: true on specific suites. Use a bigger batch size to prevent getMore from
+            // running.
+            this._cursorExhausted = false;
+            this.cursor = coll.find(query)
+                              .sort({$natural: -1})
+                              .noCursorTimeout()
+                              .readConcern("local")
+                              .batchSize(200);
         };
 
         this.getFirstDoc = function() {
