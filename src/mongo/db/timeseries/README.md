@@ -107,6 +107,28 @@ Compressed bucket (version 2):
 }
 ```
 
+### Metadata Normalization
+
+If the value of a document's `metaField` field contains any object data, that data will be
+_normalized_. The fields in each nested subobject will be sorted in lexicographic order.
+
+This is done because many application languages offer support (and even default to) using unordered
+dictionaries to store the fields in an object, resulting in randomized field order for inserts that
+logically belong to the same time series. Normalizing this data allows us to bucket these documents
+together efficiently.
+
+As an example, consider a time series collection with a configured `{metaField: 'm'}`. Given a
+document `{m: {c: 1, b: {f: true, d: 0}}}`, we will normalize this to
+`{m: {b: {d: 0, f: true}, c: 1}}`.
+
+This normalization occurs prior to routing documents when inserting in a sharded collection.
+
+This normalization is not performed on `$match` expressions or in other places in the query system.
+This may cause queries using object equality filters not to find all documents that one might
+expect, as object equality is field-order sensitive. Due to this field-order sensitivity, object
+equality filters are generally not recommended, and doubly-so for time series `metaField` data.
+Queries should instead match on specific nested fields.
+
 ## Indexes
 
 In order to support queries on the time-series collection that could benefit from indexed access
