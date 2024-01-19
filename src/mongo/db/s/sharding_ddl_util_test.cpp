@@ -248,14 +248,13 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
 
     // No exception is thrown if the TO collection does not exist and has no associated tags
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kFromNss, fromColl, kToNss, boost::none /*toColl*/, false /* dropTarget */);
+        opCtx, kToNss, boost::none /*toColl*/, false /* dropTarget */);
 
     // Initialize the sharded TO collection
     const auto toColl = setupShardedCollection(kToNss);
 
     // No exception is thrown if the TO collection exists and dropTarget is `true`
-    sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kFromNss, fromColl, kToNss, toColl, true /* dropTarget */);
+    sharding_ddl_util::checkRenamePreconditions(opCtx, kToNss, toColl, true /* dropTarget */);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
@@ -271,16 +270,15 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetNamespaceIsTooLong) {
         dbName + "." +
         std::string(NamespaceString::MaxNsShardedCollectionLen - dbName.length() - 1, 'x'));
     sharding_ddl_util::checkRenamePreconditions(
-        opCtx, kFromNss, fromColl, longEnoughNss, boost::none, false /* dropTarget */);
+        opCtx, longEnoughNss, boost::none, false /* dropTarget */);
 
     // Check that an exception is thrown if the namespace of the target collection is too long
     const NamespaceString tooLongNss =
         NamespaceString::createNamespaceString_forTest(longEnoughNss.toString_forTest() + 'x');
-    ASSERT_THROWS_CODE(
-        sharding_ddl_util::checkRenamePreconditions(
-            opCtx, kFromNss, fromColl, tooLongNss, boost::none, false /* dropTarget */),
-        AssertionException,
-        ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
+                           opCtx, tooLongNss, boost::none, false /* dropTarget */),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
@@ -293,10 +291,10 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
     const auto toColl = setupShardedCollection(kToNss);
 
     // Check that an exception is thrown if the target collection exists and dropTarget is not set
-    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
-                           opCtx, kFromNss, fromColl, kToNss, toColl, false /* dropTarget */),
-                       AssertionException,
-                       ErrorCodes::NamespaceExists);
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::checkRenamePreconditions(opCtx, kToNss, toColl, false /* dropTarget */),
+        AssertionException,
+        ErrorCodes::NamespaceExists);
 }
 
 TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
@@ -317,10 +315,10 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionTargetCollectionHasTags) {
     ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));
 
     // Check that an exception is thrown if some tag is associated to the target collection
-    ASSERT_THROWS_CODE(sharding_ddl_util::checkRenamePreconditions(
-                           opCtx, kFromNss, fromColl, kToNss, toColl, true /* dropTarget */),
-                       AssertionException,
-                       ErrorCodes::CommandFailed);
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util::checkRenamePreconditions(opCtx, kToNss, toColl, true /* dropTarget */),
+        AssertionException,
+        ErrorCodes::CommandFailed);
 }
 
 }  // namespace
