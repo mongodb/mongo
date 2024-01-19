@@ -99,6 +99,10 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
+    bool hasOptimizedPos() const {
+        return _hasOptimizedPos;
+    }
+
 protected:
     GetNextResult doGetNext() final;
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
