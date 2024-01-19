@@ -37,6 +37,7 @@
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <iterator>
 #include <system_error>
 #include <type_traits>
 
@@ -1760,8 +1761,10 @@ TEST_F(TxnParticipantTest, PrepareReturnsAListOfAffectedNamespaces) {
     auto [timestamp, namespaces] = txnParticipant.prepareTransaction(opCtx(), {});
     ASSERT_EQ(namespaces, txnParticipant.affectedNamespaces());
 
-    std::sort(namespaces.begin(), namespaces.end());
-    ASSERT_EQ(namespaces, kNamespaces);
+    std::vector<NamespaceString> namespacesVec;
+    std::move(namespaces.begin(), namespaces.end(), std::back_inserter(namespacesVec));
+    std::sort(namespacesVec.begin(), namespacesVec.end());
+    ASSERT_EQ(namespacesVec, kNamespaces);
 }
 
 /**

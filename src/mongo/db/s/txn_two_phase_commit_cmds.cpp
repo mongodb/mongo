@@ -32,6 +32,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <iterator>
 #include <memory>
 #include <set>
 #include <string>
@@ -241,12 +242,17 @@ public:
         }
 
         Response createResponse(Timestamp prepareTimestamp,
-                                std::vector<NamespaceString> affectedNamespaces) {
+                                absl::flat_hash_set<NamespaceString> affectedNamespaces) {
             Response response;
             response.setPrepareTimestamp(std::move(prepareTimestamp));
             if (feature_flags::gFeatureFlagEndOfTransactionChangeEvent.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                response.setAffectedNamespaces(std::move(affectedNamespaces));
+                std::vector<NamespaceString> namespaces;
+                namespaces.reserve(affectedNamespaces.size());
+                std::move(affectedNamespaces.begin(),
+                          affectedNamespaces.end(),
+                          std::back_inserter(namespaces));
+                response.setAffectedNamespaces(std::move(namespaces));
             }
             return response;
         }

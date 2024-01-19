@@ -2,7 +2,7 @@
  * Tests that serverStatus includes a migration status when called on the source shard of an active
  * migration.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [requires_fcv_73]
  */
 
 import {
@@ -74,10 +74,8 @@ var assertSessionMigrationStatusSource = function(
     if (expectedEntriesSkippedLowerBound == null) {
         assert(migrationResult.sessionOplogEntriesSkippedSoFarLowerBound);
     } else {
-        // Running DDL operations increases this number by 1, and addShard runs setClusterParameter
-        let actualEntriesSkippedLowerBound = expectedEntriesSkippedLowerBound + 1;
         assert.eq(migrationResult.sessionOplogEntriesSkippedSoFarLowerBound,
-                  actualEntriesSkippedLowerBound);
+                  expectedEntriesSkippedLowerBound);
     }
 };
 

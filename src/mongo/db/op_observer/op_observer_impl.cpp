@@ -179,7 +179,8 @@ repl::OpTime logMutableOplogEntry(OperationContext* opCtx,
  */
 void onWriteOpCompleted(OperationContext* opCtx,
                         std::vector<StmtId> stmtIdsWritten,
-                        SessionTxnRecord sessionTxnRecord) {
+                        SessionTxnRecord sessionTxnRecord,
+                        const NamespaceString& nss) {
     if (sessionTxnRecord.getLastWriteOpTime().isNull())
         return;
 
@@ -198,6 +199,10 @@ void onWriteOpCompleted(OperationContext* opCtx,
     }
     sessionTxnRecord.setTxnNum(*opCtx->getTxnNumber());
     txnParticipant.onWriteOpCompletedOnPrimary(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
+
+    if (!nss.isEmpty()) {
+        txnParticipant.addToAffectedNamespaces(opCtx, nss);
+    }
 }
 
 /**
@@ -361,7 +366,7 @@ void logGlobalIndexDDLOperation(OperationContext* opCtx,
     SessionTxnRecord sessionTxnRecord;
     sessionTxnRecord.setLastWriteOpTime(writeOpTime);
     sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
-    onWriteOpCompleted(opCtx, {stmtId}, sessionTxnRecord);
+    onWriteOpCompleted(opCtx, {stmtId}, sessionTxnRecord, NamespaceString());
 }
 
 }  // namespace
@@ -812,7 +817,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(lastOpTime);
         sessionTxnRecord.setLastWriteDate(lastWriteDate);
-        onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord);
+        onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord, nss);
     }
 
     if (opAccumulator) {
@@ -1016,7 +1021,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
-        onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord);
+        onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord, nss);
     }
 
     if (opAccumulator) {
@@ -1147,7 +1152,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
-        onWriteOpCompleted(opCtx, std::vector<StmtId>{stmtId}, sessionTxnRecord);
+        onWriteOpCompleted(opCtx, std::vector<StmtId>{stmtId}, sessionTxnRecord, nss);
     }
 }
 
@@ -1567,7 +1572,8 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
             if (txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
                 sessionTxnRecord.setTxnRetryCounter(*txnRetryCounter);
             }
-            onWriteOpCompleted(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
+            onWriteOpCompleted(
+                opCtx, std::move(stmtIdsWritten), sessionTxnRecord, NamespaceString());
         }
         return writeOpTime;
     } catch (const AssertionException& e) {
@@ -1622,7 +1628,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
             if (!isDefaultTxnRetryCounter(txnRetryCounter)) {
                 sessionTxnRecord.setTxnRetryCounter(txnRetryCounter);
             }
-            onWriteOpCompleted(opCtx, {}, sessionTxnRecord);
+            onWriteOpCompleted(opCtx, {}, sessionTxnRecord, NamespaceString());
             wuow.commit();
         });
 }

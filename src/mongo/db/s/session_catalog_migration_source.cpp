@@ -67,6 +67,7 @@
 #include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_id.h"
@@ -252,6 +253,32 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
                                          const LogicalSessionId& migrationLsid) {
     const auto migrationLsidWithoutTxnNumber = castToParentSessionId(migrationLsid);
 
+    // Create a list of all sessions that we should not consider for migration.
+    // These will be sessions that do not have _ns in their affectedNamespaces and that are safe to
+    // ignore.
+    absl::flat_hash_set<LogicalSessionId, LogicalSessionIdHash> sessionsToIgnore;
+
+    const auto sessionCatalog = SessionCatalog::get(opCtx);
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
+    sessionCatalog->scanSessions(matcherAllSessions, [&](const ObservableSession& session) {
+        auto txnParticipant = TransactionParticipant::get(session);
+
+        // We only want to potentially ignore sessions that we know are safe to ignore.
+        // We can only be confident if the state is valid and we have a complete history to check
+        // against.
+        if (txnParticipant.isValid() && !txnParticipant.hasIncompleteHistory()) {
+            const auto& namespaces = txnParticipant.affectedNamespaces();
+            // If a session only contains the dead sentinel for incomplete oplog history
+            // then it will have affectedNamespaces size of 0, not allowing this op to go through
+            // the rest of session migration code to be properly handled will result in a different
+            // error than IncompleteTransactionHistory when the command is retried.
+            if (!namespaces.contains(_ns)) {
+                sessionsToIgnore.emplace(session.getSessionId());
+            }
+        }
+    });
+
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     // Skip internal sessions for retryable writes with aborted or in progress transactions since
@@ -279,6 +306,12 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
             SessionTxnRecord::parse(IDLParserContext("Session migration cloning"), cursor->next());
 
         const auto sessionId = txnRecord.getSessionId();
+
+        if (sessionsToIgnore.contains(sessionId)) {
+            // Skip sessions we know do not have _ns in their oplog chains.
+            continue;
+        }
+
         const auto parentSessionId = castToParentSessionId(sessionId);
         const auto parentTxnNumber =
             sessionId.getTxnNumber() ? *sessionId.getTxnNumber() : txnRecord.getTxnNum();
@@ -585,12 +618,12 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
 
             ScopeGuard skippedEntryTracker(
                 [this] { _sessionOplogEntriesSkippedSoFarLowerBound.addAndFetch(1); });
-            // Skip the rest of the chain for this session since the ns is unrelated with the
-            // current one being migrated. It is ok to not check the rest of the chain because
-            // retryable writes doesn't allow touching different namespaces.
+
+            // We only want to oplog entries for our target namespace. BulkWrite can cause multiple
+            // namespaces to be affected by the same retryable write chain so we must continue to
+            // iterate this chain to check for entries.
             if (nextStmtIds.front() != kIncompleteHistoryStmtId && nextOplog->getNss() != _ns) {
-                _currentOplogIterator.reset();
-                return false;
+                continue;
             }
 
             // Skipping an entry here will also result in the pre/post images to also not be
