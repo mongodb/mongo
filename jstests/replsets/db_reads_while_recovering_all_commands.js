@@ -419,7 +419,6 @@ const allCommands = {
     startRecordingTraffic: {skip: isNotAUserDataRead},
     startSession: {skip: isNotAUserDataRead},
     stopRecordingTraffic: {skip: isNotAUserDataRead},
-    sysprofile: {skip: isAnInternalCommand},
     testDeprecation: {skip: isNotAUserDataRead},
     testDeprecationInVersion2: {skip: isNotAUserDataRead},
     testInternalTransactions: {skip: isNotAUserDataRead},
