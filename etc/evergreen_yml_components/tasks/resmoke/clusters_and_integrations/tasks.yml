@@ -121,6 +121,7 @@ variables:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
+  - func: "get engflow creds"
   teardown_task:
   - func: "f_expansions_write"
   - func: "attach scons logs"

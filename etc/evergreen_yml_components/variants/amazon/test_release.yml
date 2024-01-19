@@ -901,6 +901,9 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=off
+      BAZEL_BUILD_ENABLED=1
+      BAZEL_INTEGRATION_DEBUG=1
+      BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
