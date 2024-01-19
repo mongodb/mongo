@@ -41,6 +41,16 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='timeseries_tracking_allocator_test',
+    source=[
+        'timeseries_tracking_allocator_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+    ],
+)
+
 env.Library(
     target='catalog_helper',
     source=[
