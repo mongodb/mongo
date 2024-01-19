@@ -90,7 +90,8 @@ namespace mongo {
 void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       bool fromMigrate,
-                                                      bool dropSystemCollections) {
+                                                      bool dropSystemCollections,
+                                                      const boost::optional<UUID>& expectedUUID) {
 
     boost::optional<UUID> collectionUUID;
     {
@@ -106,6 +107,18 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
             }
             return boost::none;
         }();
+
+        if (collectionUUID && expectedUUID && *collectionUUID != *expectedUUID) {
+            // Ignore the drop collection if the collections exists locally and there is a mismatch
+            // between the current uuid and the expected one.
+            LOGV2_DEBUG(8363400,
+                        1,
+                        "Skipping dropping the collection due to mismatched collection uuid",
+                        "nss"_attr = nss,
+                        "uuid"_attr = *collectionUUID,
+                        "expectedUUID"_attr = *expectedUUID);
+            return;
+        }
 
         // Clear CollectionShardingRuntime entry.
         CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)

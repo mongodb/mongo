@@ -224,4 +224,25 @@ function testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(cre
 testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(true /* createAsUnsharded */);
 testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(false /* createAsUnsharded */);
 
+(function testShardCollectionDroppingByUUIDAtRollback() {
+    const collName = "collD";
+    const ns = dbName + "." + collName;
+
+    // By a direct connection, create a misplaced collection.
+    assert.commandWorked(st.shard1.getCollection(ns).insert({x: "foo"}));
+
+    // Validate that shardCollection will fail when trying to create the participant collection.
+    assert.commandFailedWithCode(st.s.adminCommand({shardCollection: ns, key: {x: "hashed"}}),
+                                 ErrorCodes.InvalidUUID);
+
+    // Validate that the collection still exists on shard1 because the shardCollection rollback has
+    // not drop it.
+    const rs1Collections = assert.commandWorked(st.rs1.getPrimary().getDB(dbName).runCommand(
+        {listCollections: 1, filter: {name: collName}}));
+    assert.eq(1, rs1Collections.cursor.firstBatch.length);
+
+    // Manually drop the collection to pass the metadata inconsistency hook.
+    assert(st.shard1.getCollection(ns).drop());
+})();
+
 st.stop();

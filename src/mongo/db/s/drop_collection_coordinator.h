@@ -82,11 +82,15 @@ public:
      *
      * When dropSystemCollections is set, system collections are allowed to be dropped. Therefore,
      * if nss is a system collection but dropSystemCollections is false, the drop will fail.
+     *
+     * If expectedUUID is set and doesn't match the value persisted on the CollectionCatalog, then
+     * this is a no-op. If expectedUUID is not set, no UUID check will be performed.
      */
     static void dropCollectionLocally(OperationContext* opCtx,
                                       const NamespaceString& nss,
                                       bool fromMigrate,
-                                      bool dropSystemCollections);
+                                      bool dropSystemCollections,
+                                      const boost::optional<UUID>& expectedUUID = boost::none);
 
 private:
     const BSONObj _critSecReason;

@@ -477,7 +477,8 @@ void updateCollectionMetadataInTransaction(OperationContext* opCtx,
 void broadcastDropCollection(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const std::shared_ptr<executor::TaskExecutor>& executor,
-                             const OperationSessionInfo& osi) {
+                             const OperationSessionInfo& osi,
+                             const boost::optional<UUID>& expectedUUID = boost::none) {
     const auto primaryShardId = ShardingState::get(opCtx)->shardId();
 
     auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
@@ -491,7 +492,8 @@ void broadcastDropCollection(OperationContext* opCtx,
         executor,
         osi,
         true /* fromMigrate */,
-        false /* dropSystemCollections */);
+        false /* dropSystemCollections */,
+        expectedUUID);
 }
 
 boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithSameOptions(
@@ -1897,7 +1899,8 @@ void CreateCollectionCoordinator::_setPostCommitMetadata(
                 **executor,
                 getNewSession(opCtx),
                 true /* fromMigrate */,
-                false /* dropSystemCollections */);
+                false /* dropSystemCollections */,
+                _uuid);
         }
     }
 
@@ -1963,7 +1966,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             }
 
             if (_doc.getPhase() >= Phase::kCreateCollectionOnParticipants) {
-                broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx));
+                // TODO SERVER-83774: Remove the following invariant and skip the broadcast if the
+                // _uuid does not exist.
+                invariant(_uuid);
+                broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx), _uuid);
             }
 
             if (_doc.getPhase() >= Phase::kEnterCriticalSection) {

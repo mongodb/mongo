@@ -275,13 +275,15 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx);
 /**
  * Sends the _shardsvrDropCollectionParticipant command to the specified shards.
  */
-void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  const std::vector<ShardId>& shardIds,
-                                                  std::shared_ptr<executor::TaskExecutor> executor,
-                                                  const OperationSessionInfo& osi,
-                                                  bool fromMigrate,
-                                                  bool dropSystemCollections);
+void sendDropCollectionParticipantCommandToShards(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<ShardId>& shardIds,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const OperationSessionInfo& osi,
+    bool fromMigrate,
+    bool dropSystemCollections,
+    const boost::optional<UUID>& collectionUUID = boost::none);
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to);
 

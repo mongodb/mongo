@@ -513,6 +513,10 @@ commands:
                 type: bool
                 description: "Allow dropping a system collection. False if no value is present."
                 optional: true
+            collectionUUID:
+                type: uuid
+                description: "The expected UUID of the collection."
+                optional: true
 
         reply_type: OkReply
 

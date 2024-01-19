@@ -564,10 +564,12 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
                                                   const OperationSessionInfo& osi,
                                                   bool fromMigrate,
-                                                  bool dropSystemCollections) {
+                                                  bool dropSystemCollections,
+                                                  const boost::optional<UUID>& collectionUUID) {
     ShardsvrDropCollectionParticipant dropCollectionParticipant(nss);
     dropCollectionParticipant.setFromMigrate(fromMigrate);
     dropCollectionParticipant.setDropSystemCollections(dropSystemCollections);
+    dropCollectionParticipant.setCollectionUUID(collectionUUID);
     async_rpc::GenericArgs args;
     async_rpc::AsyncRPCCommandHelpers::appendOSI(args, osi);
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
