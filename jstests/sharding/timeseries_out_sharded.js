@@ -100,13 +100,13 @@ runTest({observer: [{$out: "observer_out"}], timeseries: timeseriesPipeline});
 
 // Test that $out can replace an existing time-series collection without the 'timeseries' option.
 // Change an option in the existing time-series collections.
-assert.commandWorked(testDB.runCommand({collMod: targetCollName, expireAfterSeconds: 360}));
+assert.commandWorked(testDB.runCommand({collMod: targetCollName, expireAfterSeconds: 3600}));
 // Run the $out stage.
 timeseriesPipeline = [{$out: targetCollName}];
 runTest({observer: [{$out: "observer_out"}], timeseries: timeseriesPipeline, drop: false});
 
 // Test that $out can replace an existing time-series collection with the 'timeseries' option.
-let newDate = new Date('1999-09-30T03:24:00');
+let newDate = new Date();
 let observerPipeline = [{$set: {"time": newDate}}, {$out: "observer_out"}];
 timeseriesPipeline = TimeseriesAggTests.generateOutPipeline(
     targetCollName, dbName, {timeField: "time", metaField: "tags"}, {$set: {"time": newDate}});
