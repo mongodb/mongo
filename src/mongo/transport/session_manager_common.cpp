@@ -264,6 +264,7 @@ void SessionManagerCommon::startSession(std::shared_ptr<Session> session) {
                       "remote"_attr = session->remote(),
                       "connectionCount"_attr = sync.size());
             }
+            session->end();
             return;
         }
 
