@@ -11,7 +11,8 @@ var testOnlyCommands = [
     'sleep',
     'cpuload',
     'captrunc',
-    'emptycapped'
+    'emptycapped',
+    'sysprofile'
 ];
 
 var assertCmdNotFound = function(db, cmdName) {

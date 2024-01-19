@@ -1320,6 +1320,7 @@ export let MongosAPIParametersUtil = (function() {
             commandName: "stopRecordingTraffic",
             skip: "executes locally on mongos (not sent to any remote node)"
         },
+        {commandName: "sysprofile", skip: "internal command"},
         {
             commandName: "testDeprecation",
             skip: "executes locally on mongos (not sent to any remote node)"
