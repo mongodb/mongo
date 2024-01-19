@@ -377,8 +377,9 @@ class TestRunner(Subcommand):
             with open('resmoke_env_options.txt') as fin:
                 resmoke_env_options = fin.read().strip()
 
-        self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
-                                  resmoke_env_options, local_resmoke_invocation)
+        local_resmoke_invocation = f"{resmoke_env_options} {local_resmoke_invocation}"
+        self._resmoke_logger.info("resmoke.py invocation for local usage: %s",
+                                  local_resmoke_invocation)
 
         lines = []
 
