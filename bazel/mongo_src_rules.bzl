@@ -60,8 +60,12 @@ WINDOWS_RELEASE_COPTS = [
     "/Od",
 ]
 
+# TODO SERVER-85340 fix this error message when libc++ is readded to the toolchain
 LIBCXX_ERROR_MESSAGE = (
     "\nError:\n" +
+    "    libc++ is not currently supported in the mongo toolchain.\n"+
+    "    Follow this ticket to see when support is being added SERVER-85340\n"+
+    "    We currently only support passing the libcxx config on macos for compatibility reasons.\n"+
     "    libc++ requires these configuration:\n"+
     "    --//bazel/config:compiler_type=clang\n"
 )

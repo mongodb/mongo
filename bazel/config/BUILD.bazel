@@ -522,11 +522,15 @@ use_libcxx(
     build_setting_default = False,
 )
 
+# TODO SERVER-85340 when libc++ is readded remove the macos constraint
 config_setting(
     name = "use_libcxx_enabled",
     flag_values = {
         "//bazel/config:use_libcxx": "True",
     },
+    constraint_values = [
+        "@platforms//os:macos",
+    ],
 )
 
 config_setting(
