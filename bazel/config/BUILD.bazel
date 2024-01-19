@@ -768,6 +768,16 @@ selects.config_setting_group(
     match_all = [":tsan_enabled", ":use_libunwind_disabled", ":linkdynamic_required_settings"],
 )
 
+selects.config_setting_group(
+    name = "sanitize_undefined_without_fuzzer_settings",
+    match_all = [":ubsan_enabled", ":fsan_disabled"],
+)
+
+selects.config_setting_group(
+    name = "sanitize_undefined_dynamic_link_settings",
+    match_all = [":ubsan_enabled", ":linkdynamic_required_settings"],
+)
+
 # --------------------------------------
 # separate_debug options
 # --------------------------------------

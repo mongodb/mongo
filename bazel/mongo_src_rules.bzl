@@ -225,6 +225,36 @@ THREAD_SANITIZER_DEFINES = select({
     ("//bazel/config:tsan_disabled"): [],
 }, no_match_error = THREAD_SANITIZER_ERROR_MESSAGE)
 
+
+UNDEFINED_SANITIZER_DEFINES = select({
+    ("//bazel/config:ubsan_enabled"): ["UNDEFINED_BEHAVIOR_SANITIZER"],
+    ("//bazel/config:ubsan_disabled"): [],
+})
+
+# By default, undefined behavior sanitizer doesn't stop on
+# the first error. Make it so. Newer versions of clang
+# have renamed the flag.
+# However, this flag cannot be included when using the fuzzer sanitizer
+# if we want to suppress errors to uncover new ones.
+UNDEFINED_SANITIZER_COPTS = select({
+    ("//bazel/config:sanitize_undefined_without_fuzzer_settings"): ["-fno-sanitize-recover"],
+    ("//conditions:default"): [],
+}) + select({
+    ("//bazel/config:sanitize_undefined_dynamic_link_settings"): ["-fno-sanitize=vptr"],
+    ("//conditions:default"): [],
+}) + select({
+    ("//bazel/config:ubsan_enabled"): ["-fsanitize=undefined"],
+    ("//bazel/config:ubsan_disabled"): [],
+}, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "undefined")
+
+UNDEFINED_SANITIZER_LINKFLAGS = select({
+    ("//bazel/config:sanitize_undefined_dynamic_link_settings"): ["-fno-sanitize=vptr"],
+    ("//conditions:default"): [],
+}) + select({
+    ("//bazel/config:ubsan_enabled"): ["-fsanitize=undefined"],
+    ("//bazel/config:ubsan_disabled"): [],
+}, no_match_error = GENERIC_SANITIZER_ERROR_MESSAGE + "undefined")
+
 REQUIRED_SETTINGS_DYNAMIC_LINK_ERROR_MESSAGE = (
     "\nError:\n" +
     "    linking mongo dynamically is not currently supported on Windows"
@@ -274,14 +304,15 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
 }, no_match_error = DETECT_ODR_VIOLATIONS_ERROR_MESSAGE)
 
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES \
-                       + THREAD_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES
+                       + THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS \
-                    + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
+                    + MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS \
+                    + THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS \
-                         + THREAD_SANITIZER_LINKFLAGS + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS
-                         + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS
+                        + UNDEFINED_SANITIZER_LINKFLAGS + THREAD_SANITIZER_LINKFLAGS \
+                        + LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS
 
 def force_includes_copt(package_name, name):
 
