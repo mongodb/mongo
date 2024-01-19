@@ -1,19 +1,12 @@
 import {
     assertValueOnPlanPath,
     checkCascadesOptimizerEnabled,
-    checkPlanCacheParameterization,
     removeUUIDsFromExplain,
     runWithParams
 } from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    quit();
-}
-
-// TODO SERVER-84203: Remove this once temporary parameterization suites are deleted.
-if (!checkPlanCacheParameterization(db)) {
-    jsTestLog("Skipping test because parameterization is not yet enabled by default.");
     quit();
 }
 

@@ -1002,8 +1002,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_varname: "internalCascadesOptimizerEnableParameterization"
     cpp_vartype: AtomicWord<bool>
-    default: false
-    test_only: true
+    default: true
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryFrameworkControl:

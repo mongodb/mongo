@@ -820,38 +820,6 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
-# TODO SERVER-84203: Delete this temporary suite
-- <<: *task_template
-  name: cqf_parameterization_aggregation_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-# TODO SERVER-84203: Delete this temporary suite
-- <<: *task_template
-  name: cqf_parameterization_jscore_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-# TODO SERVER-84203: Delete this temporary suite
-- <<: *task_template
-  name: cqf_parameterization_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-# TODO SERVER-84203: Delete this temporary suite
-- <<: *task_template
-  name: cqf_parameterization_query_golden_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
 - <<: *task_template
   name: jsCore_wildcard_indexes
   depends_on:

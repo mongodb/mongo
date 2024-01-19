@@ -133,7 +133,9 @@ Filter []
 |   |   Variable [evalTemp_0]
 |   PathTraverse [1]
 |   PathCompare [Eq]
-|   Const [2]
+|   FunctionCall [getParam]
+|   |   Const [3]
+|   Const [0]
 PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0}, cqf_index_hints_, Reverse]
 `;
 
@@ -157,7 +159,9 @@ Filter []
 |   EvalFilter []
 |   |   Variable [evalTemp_0]
 |   PathCompare [Eq]
-|   Const [2]
+|   FunctionCall [getParam]
+|   |   Const [3]
+|   Const [0]
 PhysicalScan [{'<root>': scan_0, 'b': evalTemp_0}, cqf_index_hints_, Reverse]
 `;
 
@@ -215,7 +219,9 @@ Filter []
 |   |   Variable [evalTemp_0]
 |   PathTraverse [1]
 |   PathCompare [Eq]
-|   Const [2]
+|   FunctionCall [getParam]
+|   |   Const [3]
+|   Const [0]
 PhysicalScan [{'<root>': scan_0, 'b': evalTemp_0}, cqf_index_hints_, Reverse]
 `;
 

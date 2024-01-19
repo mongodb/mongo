@@ -14,7 +14,8 @@ await runHistogramsTest(function() {
     runWithParams(
         [
             // Sargable nodes & Filter nodes get different CEs.
-            {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false}
+            {key: "internalCascadesOptimizerDisableSargableWhenNoIndexes", value: false},
+            {key: "internalCascadesOptimizerEnableParameterization", value: false}
         ],
         () => {
             const coll = db.ce_data_20;

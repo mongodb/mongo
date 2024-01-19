@@ -36,7 +36,9 @@ Filter []
 |   |   Variable [evalTemp_0]
 |   PathTraverse [1]
 |   PathCompare [Eq]
-|   Const [1]
+|   FunctionCall [getParam]
+|   |   Const [3]
+|   Const [0]
 PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0}, cqf_redundant_condition_]
 `;
     const actualStr = removeUUIDsFromExplain(db, res);

@@ -12,12 +12,6 @@ export function checkCascadesOptimizerEnabled(theDB) {
     return val == "tryBonsai" || val == "tryBonsaiExperimental" || val == "forceBonsai";
 }
 
-// TODO SERVER-84203: Remove this once temporary parameterization suites are deleted.
-export function checkPlanCacheParameterization(theDB) {
-    return theDB.adminCommand({getParameter: 1, internalCascadesOptimizerEnableParameterization: 1})
-        .internalCascadesOptimizerEnableParameterization;
-}
-
 /**
  * Utility for checking if the experimental Cascades optimizer code path is enabled (checks
  * framework control for M4+).
