@@ -13,6 +13,7 @@ import bson.errors
 import pymongo.errors
 
 import buildscripts.resmokelib.utils.filesystem as fs
+from buildscripts.resmokelib import core
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
@@ -469,3 +470,27 @@ class _InitialSyncThread(threading.Thread):
 
         self.logger.info("Old primary on port {} in set {} successfully stepped down".format(
             old_primary.port, fixture.replset_name))
+
+        # It is possible for the initial sync node to have been behind every other node when it
+        # stepped up causing them all to enter rollback. To make sure this doesn't happen we
+        # perform a write and wait for it to replicate to all nodes. If any nodes were in rollback
+        # they would need to finish in order to apply the new write.
+        client_conn = fixture.get_driver_connection_url()
+        js_cmds = """
+            const conn = '{}';
+            try {{
+                const rst = new ReplSetTest(conn);
+                assert.commandWorked(rst.getPrimary().getDB("admin").runCommand({{appendOplogNote: 1, data: {{a: 2}}}}));
+                rst.awaitReplication();
+            }} catch (e) {{
+                jsTestLog("WaitForReplication got error: " + tojson(e));
+                throw e;
+            }}"""
+        shell_options = {"nodb": "", "eval": js_cmds.format(client_conn)}
+        shell_proc = core.programs.mongo_shell_program(self.logger, **shell_options)
+        shell_proc.start()
+        return_code = shell_proc.wait()
+        if return_code:
+            raise errors.ServerFailure("Awaiting replication failed for {}".format(client_conn))
+
+        self.logger.info("Finished WaitForReplication, no nodes should be in ROLLBACK state.")
