@@ -1,4 +1,4 @@
-# Copyright (C) 2023-present MongoDB, Inc.
+# Copyright (C) 2024-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -26,28 +26,17 @@
 # it in the license file.
 #
 
-global:
-    cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/db/server_options.h"
-    configs:
-        section: GRPC Options
-        source: [ cli, ini, yaml ]
+# Feature flag for gRPC.
 
-configs:
-    "net.grpc.port":
-        description: gRPC listener port
-        short_name: grpcPort
-        arg_vartype: Int
-        cpp_varname: serverGlobalParams.grpcPort
-        validator: { gte: 1 }
-        # Default is defined in mongo/db/server_options.h
-        # default: 27021
-    "net.grpc.serverMaxThreads":
-        description: Limit of maximum number of gRPC session threads
-        short_name: grpcServerMaxThreads
-        arg_vartype: Int
-        cpp_varname: serverGlobalParams.grpcServerMaxThreads
-        validator: { gte: 1 }
-        # Default is defined in mongo/db/server_options.h
-        # default: 1000
+global:
+    cpp_namespace: "mongo::feature_flags"
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+feature_flags:
+    featureFlagGRPC:
+        description: "Feature flag to enable listening for ingress gRPC connections"
+        cpp_varname: gFeatureFlagGRPC
+        default: false
+        shouldBeFCVGated: false

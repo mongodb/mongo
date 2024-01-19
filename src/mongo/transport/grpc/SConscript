@@ -10,7 +10,7 @@ env.Library(
     source=[
         'client.cpp',
         'client_cache.cpp',
-        'grpc_parameters.idl',
+        'grpc_feature_flag.idl',
         'grpc_session_manager.cpp',
         'grpc_transport_layer_impl.cpp',
         'server.cpp',
@@ -34,6 +34,18 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/third_party/shim_grpc',
+    ],
+)
+
+env.Library(
+    target='grpc_transport_server_options',
+    source=[
+        'grpc_parameters.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
 

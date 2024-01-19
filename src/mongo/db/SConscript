@@ -17,6 +17,11 @@ env.InjectThirdParty(libraries=[
     's2',
 ])
 
+
+def shouldBuildGRPC(myEnv):
+    return myEnv.TargetOSIs('linux') and myEnv['ENABLE_GRPC_BUILD']
+
+
 env.SConscript(
     dirs=[
         'auth',
@@ -2456,6 +2461,8 @@ env.Library(
         '$BUILD_DIR/mongo/s/commands/sharded_cluster_commands',
         '$BUILD_DIR/mongo/s/commands/sharded_cluster_sharding_commands',
         '$BUILD_DIR/mongo/scripting/scripting_server',
+        '$BUILD_DIR/mongo/transport/grpc/grpc_transport_server_options'
+        if shouldBuildGRPC(env) else [],
         '$BUILD_DIR/mongo/transport/message_compressor_options_server',
         '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',

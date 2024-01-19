@@ -22,6 +22,11 @@ env.SConscript(
     ],
 )
 
+
+def shouldBuildGRPC(myEnv):
+    return myEnv.TargetOSIs('linux') and myEnv['ENABLE_GRPC_BUILD']
+
+
 # This is the main library to use for consumers of sharding. It will pull the routing and targeting
 # functionality.
 #
@@ -468,6 +473,8 @@ env.Library(
         '$BUILD_DIR/mongo/executor/async_rpc_error_info',
         '$BUILD_DIR/mongo/executor/hedging_metrics',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_server_status',
+        '$BUILD_DIR/mongo/transport/grpc/grpc_transport_server_options'
+        if shouldBuildGRPC(env) else [],
         '$BUILD_DIR/mongo/transport/message_compressor_options_server',
         '$BUILD_DIR/mongo/transport/session_manager',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',
