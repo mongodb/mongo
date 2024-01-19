@@ -48,9 +48,9 @@ feature_flags:
         cpp_varname: gFeatureFlagGlobalIndexes
         default: false
         shouldBeFCVGated: true
-    featureFlagAdditionalParticipants:
-        description: "Adding additional participants to existing transactions"
-        cpp_varname: gFeatureFlagAdditionalParticipants
+    featureFlagAllowAdditionalParticipants:
+        description: "Enable adding additional participants to active transaction"
+        cpp_varname: gFeatureFlagAllowAdditionalParticipants
         default: false
         shouldBeFCVGated: true
     featureFlagBulkWriteCommand:
