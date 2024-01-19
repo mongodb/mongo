@@ -71,22 +71,12 @@ namespace timeseries {
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(simulateBsonColumnCompressionDataLoss);
-}
 
-CompressionResult compressBucket(const BSONObj& bucketDoc,
-                                 StringData timeFieldName,
-                                 const NamespaceString& nss,
-                                 bool validateDecompression) try {
+CompressionResult _compressBucket(const BSONObj& bucketDoc,
+                                  StringData timeFieldName,
+                                  const NamespaceString& nss,
+                                  bool validateDecompression) try {
     CompressionResult result;
-
-    ON_BLOCK_EXIT([&] {
-        tassert(8000400,
-                fmt::format("Couldn't compress time-series bucket {} for collection {}",
-                            bucketDoc.toString(),
-                            nss.toStringForErrorMsg()),
-                result.compressedBucket ||
-                    MONGO_unlikely(simulateBsonColumnCompressionDataLoss.shouldFail()));
-    });
 
     // Helper for uncompressed measurements
     struct Measurement {
@@ -359,6 +349,23 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
     }
 
     result.compressedBucket = builder.obj();
+    return result;
+} catch (...) {
+    return {};
+}
+}  // namespace
+
+CompressionResult compressBucket(const BSONObj& bucketDoc,
+                                 StringData timeFieldName,
+                                 const NamespaceString& ns,
+                                 bool validateDecompression) try {
+    auto result = _compressBucket(bucketDoc, timeFieldName, ns, validateDecompression);
+    tassert(8000400,
+            fmt::format("Couldn't compress time-series bucket {} for collection {}",
+                        bucketDoc.toString(),
+                        ns.toStringForErrorMsg()),
+            result.compressedBucket ||
+                MONGO_unlikely(simulateBsonColumnCompressionDataLoss.shouldFail()));
     return result;
 } catch (...) {
     // Skip compression if we encounter any exception

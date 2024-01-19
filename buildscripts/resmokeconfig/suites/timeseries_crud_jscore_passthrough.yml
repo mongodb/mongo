@@ -199,7 +199,7 @@ selector:
   - jstests/core/mod_with_where.js
   - jstests/core/query/and/and.js
   - jstests/core/query/or/ora.js
-  # TODO(SERVER-84170): Try to include this test.
+  # TODO(SERVER-85404): Try to include this test.
   - jstests/core/query/array/array_index_and_nonIndex_consistent.js
   - jstests/core/query/array/array_comparison_correctness.js
   - jstests/core/query/min_max_key.js
