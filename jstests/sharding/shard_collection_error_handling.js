@@ -52,6 +52,8 @@ function testNonRetriableErrorInsideCommitPhase(createAsUnsharded) {
     st.rs0.freeze(primaryNode);
 
     awaitShardCollection();
+    fp.off();
+    st.rs0.unfreeze(primaryNode);
 
     // Validate that previous run of the shardCollection command has not left the cluster in an
     // inconsistent state and we are able to create the collection successfully.
@@ -60,34 +62,27 @@ function testNonRetriableErrorInsideCommitPhase(createAsUnsharded) {
 
     // Validate that there is no local collection on the db primary shard in case of implicit
     // shardCollection create, otherwise it must exist.
-    if (createAsUnsharded) {
-        let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
-            {listCollections: 1, filter: {name: collName}}));
-        assert.eq(1, rs0Collections.cursor.firstBatch.length);
-    } else {
-        // TODO SERVER-83774: Create collection coordinator should clean up the collection on the db
-        // primary shard in case of rollback.
-        let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
-            {listCollections: 1, filter: {name: collName}}));
-        assert.eq(1, rs0Collections.cursor.firstBatch.length);
-    }
+    // TODO SERVER-83774: Create collection coordinator should clean up the collection on the db
+    // primary shard in case of rollback.
+    let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
+        {listCollections: 1, filter: {name: collName}}));
+    assert.eq(1, rs0Collections.cursor.firstBatch.length);
 
     // Validate that there is no local collection on the participant shard.
     let rs1Collections = assert.commandWorked(st.rs1.getPrimary().getDB(dbName).runCommand(
         {listCollections: 1, filter: {name: collName}}));
     assert.eq(0, rs1Collections.cursor.firstBatch.length);
 
-    // Use retryWrites when writing to the configsvr because mongos does not automatically retry
-    // those.
-    const mongosSession = st.s.startSession({retryWrites: true});
-    const configDB = mongosSession.getDatabase("config");
-    const collEntry = configDB.collections.findOne({_id: ns});
-    assert.eq(undefined, collEntry);
+    if (!createAsUnsharded) {
+        // Use retryWrites when writing to the configsvr because mongos does not automatically retry
+        // those.
+        const mongosSession = st.s.startSession({retryWrites: true});
+        const configDB = mongosSession.getDatabase("config");
+        const collEntry = configDB.collections.findOne({_id: ns});
+        assert.eq(undefined, collEntry);
+    }
 
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {y: 1}}));
-
-    fp.off();
-    st.rs0.unfreeze(primaryNode);
 }
 
 testNonRetriableErrorInsideCommitPhase(true /* createAsUnsharded */);
@@ -135,6 +130,8 @@ function testRetriableErrorWithoutInvolvingDBPrimaryShardAtSecondExecution(creat
     st.rs0.freeze(primaryNode);
 
     awaitShardCollection();
+    fp.off();
+    st.rs0.unfreeze(primaryNode);
 
     // Validate that the collection exists on the db primary shard.
     let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
@@ -154,9 +151,6 @@ function testRetriableErrorWithoutInvolvingDBPrimaryShardAtSecondExecution(creat
     assert.eq(2, chunks.length);
     assert.eq(st.shard1.shardName, chunks[0].shard);
     assert.eq(st.shard1.shardName, chunks[1].shard);
-
-    fp.off();
-    st.rs0.unfreeze(primaryNode);
 }
 
 testRetriableErrorWithoutInvolvingDBPrimaryShardAtSecondExecution(true /* createAsUnsharded */);
@@ -204,6 +198,8 @@ function testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(cre
     st.rs0.freeze(primaryNode);
 
     awaitShardCollection();
+    fp.off();
+    st.rs0.unfreeze(primaryNode);
 
     // Validate that the collection exists on the db primary shard.
     let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
@@ -223,9 +219,6 @@ function testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(cre
     assert.eq(2, chunks.length);
     assert.eq(st.shard0.shardName, chunks[0].shard);
     assert.eq(st.shard0.shardName, chunks[1].shard);
-
-    fp.off();
-    st.rs0.unfreeze(primaryNode);
 }
 
 testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(true /* createAsUnsharded */);
