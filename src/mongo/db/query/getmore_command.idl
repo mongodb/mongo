@@ -82,5 +82,5 @@ commands:
       includeQueryStatsMetrics:
         description: Determines whether or not to include query stats metrics in the response.
         type: optionalBool
-        stability: unstable
+        stability: internal
     reply_type: CursorGetMoreReply

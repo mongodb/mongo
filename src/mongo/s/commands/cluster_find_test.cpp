@@ -112,5 +112,10 @@ TEST_F(ClusterFindTest, SnapshotReadConcernWithAfterClusterTime) {
     testSnapshotReadConcernWithAfterClusterTime(kFindCmdTargeted, kFindCmdScatterGather);
 }
 
+TEST_F(ClusterFindTest, IncludeQueryStatsMetrics) {
+    testIncludeQueryStatsMetrics(kFindCmdTargeted, true /* isTargeted */);
+    testIncludeQueryStatsMetrics(kFindCmdScatterGather, false /* isTargeted */);
+}
+
 }  // namespace
 }  // namespace mongo

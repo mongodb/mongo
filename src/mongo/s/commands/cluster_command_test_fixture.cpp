@@ -54,6 +54,7 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
@@ -338,6 +339,67 @@ void ClusterCommandTestFixture::testSnapshotReadConcernWithAfterClusterTime(
     if (!scatterGatherCmd.isEmpty()) {
         runCommandInspectRequests(
             _makeCmd(scatterGatherCmd, true), containsAtClusterTimeNoAfterClusterTime, false);
+    }
+}
+
+void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool isTargeted) {
+    const std::string fieldName = "includeQueryStatsMetrics";
+
+    // The given command should not set includeQueryStatsMetrics.
+    ASSERT(cmd[fieldName].eoo());
+
+    BSONObj cmdIncludeTrue = cmd.addField(BSON(fieldName << true).firstElement());
+    BSONObj cmdIncludeFalse = cmd.addField(BSON(fieldName << false).firstElement());
+
+    auto expectFieldIs = [&](bool value) {
+        return [value, &fieldName](const executor::RemoteCommandRequest& request) {
+            auto elt = request.cmdObj[fieldName];
+            ASSERT(!elt.eoo());
+            ASSERT_EQ(elt.boolean(), value);
+        };
+    };
+
+    auto expectNoField = [&](const executor::RemoteCommandRequest& request) {
+        ASSERT(request.cmdObj[fieldName].eoo());
+    };
+
+    {
+        RAIIServerParameterControllerForTest flag("featureFlagQueryStatsDataBearingNodes", true);
+
+        {
+            // No rate limit i.e., no requests are rate limited and each one is allowed to gather
+            // stats.
+            RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", -1);
+
+            runCommandInspectRequests(cmd, expectFieldIs(true), isTargeted);
+
+            // Putting includeQueryStatsMetrics into the original command overrides rate limits.
+            runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
+            runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
+        }
+
+        {
+            // Rate limit is 0 i.e., every request is rate-limited.
+            RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", 0);
+
+            runCommandInspectRequests(cmd, expectNoField, isTargeted);
+
+            // Putting includeQueryStatsMetrics into the original command overrides rate limits.
+            runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
+            runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
+        }
+    }
+
+    {
+        RAIIServerParameterControllerForTest flag("featureFlagQueryStatsDataBearingNodes", false);
+        RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", -1);
+
+        // Having the feature flag disabled means we won't set the field unrequested.
+        runCommandInspectRequests(cmd, expectNoField, isTargeted);
+
+        // We will still pass through the field when the feature flag is false.
+        runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
+        runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
     }
 }
 

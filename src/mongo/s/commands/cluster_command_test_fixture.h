@@ -110,6 +110,11 @@ protected:
                                                      BSONObj scatterGatherCmd = BSONObj());
 
     /**
+     * Verifies that includeQueryStatsMetrics is added or not added as needed.
+     */
+    void testIncludeQueryStatsMetrics(BSONObj cmd, bool isTargeted);
+
+    /**
      * Appends the metadata shards return on responses to transaction statements, such as the
      * readOnly field.
      */

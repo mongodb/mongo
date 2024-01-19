@@ -70,6 +70,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
@@ -80,6 +81,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sort_pattern.h"
@@ -241,6 +243,20 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
     // Propagate it to the shards.
     if (!query.getExpCtx()->getQuerySettings().toBSON().isEmpty()) {
         findCommand->setQuerySettings(query.getExpCtx()->getQuerySettings());
+    }
+
+    // Set includeQueryStatsMetrics if necessary.
+    if (feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        auto origValue = query.getFindCommandRequest().getIncludeQueryStatsMetrics();
+        if (origValue.has_value()) {
+            // If the original command specified includeQueryStatsMetrics, just pass it through.
+            findCommand->setIncludeQueryStatsMetrics(origValue);
+        } else if (!opDebug.queryStatsInfo.wasRateLimited) {
+            // If the query wasn't rate limited, we can add the field.
+            findCommand->setIncludeQueryStatsMetrics(true);
+        }
     }
 
     return findCommand;
