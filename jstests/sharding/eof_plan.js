@@ -1,6 +1,11 @@
 /*
  * In the case of an always false predicate the shards will return an EOF plan. Additionally this
  * tests that mongos can deal with EOF plans coming from the shard.
+ *
+ * @tags: [
+ *   # EOF plans are only with
+ *   requires_fcv_73,
+ * ]
  */
 
 import {getWinningPlanFromExplain} from 'jstests/libs/analyze_plan.js'
