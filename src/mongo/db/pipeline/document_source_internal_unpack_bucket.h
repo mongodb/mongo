@@ -143,7 +143,7 @@ public:
         return DepsTracker::State::EXHAUSTIVE_ALL;
     }
 
-    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+    void addVariableRefs(std::set<Variables::Id>* refs) const final;
 
     int getBucketMaxSpanSeconds() const {
         return _bucketMaxSpanSeconds;
@@ -315,6 +315,17 @@ private:
     // Parses given 'eventFilterBson' to set '_eventFilter' and determines its dependencies
     // and SBE compatibility.
     void setEventFilter(BSONObj eventFilterBson, bool shouldOptimize);
+
+    /**
+     * Applies optimizeAt() to all stages in the given pipeline after the stage that 'itr' points
+     * to, which is the bucket unpack stage.
+     *
+     * Due to the manipulation of 'itr' through the optimizations, it may be possible that
+     * preceeding stages will be optimized. However, optimization of the bucket unpack stage will be
+     * skipped.
+     */
+    Pipeline::SourceContainer::iterator optimizeAtRestOfPipeline(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
 
     // If buckets contained a mixed type schema along some path, we have to push down special
     // predicates in order to ensure correctness.

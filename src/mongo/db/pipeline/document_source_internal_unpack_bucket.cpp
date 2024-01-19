@@ -289,6 +289,7 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
 void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     auto prefix = Pipeline::SourceContainer(container->begin(), itr);
     Pipeline::optimizeContainer(&prefix);
+    Pipeline::optimizeEachStage(&prefix);
     container->erase(container->begin(), itr);
     container->splice(itr, prefix);
 }
@@ -1599,6 +1600,34 @@ bool findSequentialDocumentCache(Pipeline::SourceContainer::iterator start,
     return start != end;
 }
 
+Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::optimizeAtRestOfPipeline(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    if (itr == container->end()) {
+        return itr;
+    }
+
+    invariant(*itr == this);
+    Pipeline::SourceContainer::iterator unpackBucket = itr;
+
+    itr = std::next(itr);
+
+    try {
+        while (itr != container->end()) {
+            if (itr == unpackBucket) {
+                itr = std::next(itr);
+                if (itr == container->end())
+                    break;
+            }
+            itr = (*itr).get()->optimizeAt(itr, container);
+        }
+    } catch (DBException& ex) {
+        ex.addContext("Failed to optimize pipeline");
+        throw;
+    }
+
+    return itr;
+}
+
 DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
     Pipeline::SourceContainer::iterator itr,
     Pipeline::SourceContainer* container,
@@ -1609,6 +1638,15 @@ DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
         match_expression::addDependencies(_eventFilter.get(), &deps);
     }
     return deps;
+}
+
+void DocumentSourceInternalUnpackBucket::addVariableRefs(std::set<Variables::Id>* refs) const {
+    if (_eventFilter) {
+        match_expression::addVariableRefs(eventFilter(), refs);
+    }
+    if (_wholeBucketFilter) {
+        match_expression::addVariableRefs(wholeBucketFilter(), refs);
+    }
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
@@ -1694,31 +1732,33 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
     }
 
-    // Optimize the pipeline after this stage to merge $match stages and push them forward, and to
-    // take advantage of $expr rewrite optimizations.
+    // OptimizeAt the pipeline after this stage to merge $match stages and push them forward.
     if (!_optimizedEndOfPipeline) {
         _optimizedEndOfPipeline = true;
 
         if (std::next(itr) == container->end()) {
             return container->end();
         }
-        if (auto nextStage = dynamic_cast<DocumentSourceGeoNear*>(std::next(itr)->get())) {
-            // If the end of the pipeline starts with a $geoNear stage, make sure it gets optimized
-            // in a context where it knows there are other stages before it. It will split itself
-            // up into separate $match and $sort stages. But it doesn't split itself up when it's
-            // the first stage, because it expects to use a special DocumentSouceGeoNearCursor plan.
-            nextStage->optimizeAt(std::next(itr), container);
-        }
+
+        // TODO SERVER-84113: Remove specific caching logic and calls that result in optimize()
+        // being called.
         auto cacheFound = findSequentialDocumentCache(itr, container->end());
         if (cacheFound) {
-            // optimizeAt() is responsible for reordering stages, and optimize() is responsible for
-            // simplifying individual stages. $sequentialCache's optimizeAt() places the stage where
-            // it can cache as big a prefix of the pipeline as possible. To do so correctly, it
-            // needs to look at dependencies: a stage that depends on a let-variable cannot be
-            // cached. But optimize() can inline variables. Therefore, we want to avoid calling
-            // optimize() before $sequentialCache has a chance to run optimizeAt().
-            return Pipeline::optimizeAtEndOfPipeline(itr, container);
+            // We want to call optimizeAt() on the rest of the pipeline first, and exit this
+            // function since any calls to optimize() will interfere with the
+            // sequentialDocumentCache's ability to properly place itself or abandon.
+            return DocumentSourceInternalUnpackBucket::optimizeAtRestOfPipeline(itr, container);
         } else {
+            if (auto nextStage = dynamic_cast<DocumentSourceGeoNear*>(std::next(itr)->get())) {
+                // If the end of the pipeline starts with a $geoNear stage, make sure it gets
+                // optimized in a context where it knows there are other stages before it. It will
+                // split itself up into separate $match and $sort stages. But it doesn't split
+                // itself up when it's the first stage, because it expects to use a special
+                // DocumentSouceGeoNearCursor plan.
+                nextStage->optimizeAt(std::next(itr), container);
+            }
+            // We want to optimize the rest of the pipeline to ensure the stages are in their
+            // optimal position and expressions have been optimized to allow for certain rewrites.
             Pipeline::optimizeEndOfPipeline(itr, container);
         }
 
@@ -1803,6 +1843,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                                                              pExpCtx,
                                                              ExtensionsCallbackNoop(),
                                                              Pipeline::kAllowedMatcherFeatures));
+            // NAAMATODO comment to move this into optimize once that ticket is done
             _wholeBucketFilter = MatchExpression::optimize(std::move(_wholeBucketFilter),
                                                            /* enableSimplification */ false);
         }

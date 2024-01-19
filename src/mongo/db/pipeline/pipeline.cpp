@@ -360,21 +360,29 @@ void Pipeline::optimizePipeline() {
     if (MONGO_unlikely(disablePipelineOptimization.shouldFail())) {
         return;
     }
-
     optimizeContainer(&_sources);
+    optimizeEachStage(&_sources);
 }
 
 void Pipeline::optimizeContainer(SourceContainer* container) {
-    SourceContainer optimizedSources;
-
     SourceContainer::iterator itr = container->begin();
     try {
         while (itr != container->end()) {
             invariant((*itr).get());
             itr = (*itr).get()->optimizeAt(itr, container);
         }
+    } catch (DBException& ex) {
+        ex.addContext("Failed to optimize pipeline");
+        throw;
+    }
 
-        // Once we have reached our final number of stages, optimize each individually.
+    stitch(container);
+}
+
+void Pipeline::optimizeEachStage(SourceContainer* container) {
+    SourceContainer optimizedSources;
+    try {
+        // We should have our final number of stages. Optimize each individually.
         for (auto&& source : *container) {
             if (auto out = source->optimize()) {
                 optimizedSources.push_back(out);
@@ -933,28 +941,11 @@ Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
     // optimize, since otherwise calls to optimizeAt() will overrun these limits.
     auto endOfPipeline = Pipeline::SourceContainer(std::next(itr), container->end());
     Pipeline::optimizeContainer(&endOfPipeline);
+    Pipeline::optimizeEachStage(&endOfPipeline);
     container->erase(std::next(itr), container->end());
     container->splice(std::next(itr), endOfPipeline);
 
     return std::next(itr);
-}
-
-Pipeline::SourceContainer::iterator Pipeline::optimizeAtEndOfPipeline(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    if (itr == container->end()) {
-        return itr;
-    }
-    itr = std::next(itr);
-    try {
-        while (itr != container->end()) {
-            invariant((*itr).get());
-            itr = (*itr).get()->optimizeAt(itr, container);
-        }
-    } catch (DBException& ex) {
-        ex.addContext("Failed to optimize pipeline");
-        throw;
-    }
-    return itr;
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(

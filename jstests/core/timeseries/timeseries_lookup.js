@@ -11,6 +11,7 @@
  *   references_foreign_collection,
  * ]
  */
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
@@ -245,3 +246,94 @@ TimeseriesTest.run((insert) => {
         });
     });
 });
+
+{
+    // Test that we get the right results for $lookup on a timeseries collection with an internal
+    // pipeline containing both correlated and uncorrelated $match stages. Ensures we do not cache
+    // the results of this internal pipeline incorrectly
+    // (src/mongo/db/pipeline/document_source_sequential_document_cache.h) regardless of the order
+    // of the $match stages.
+
+    // TODO SERVER-84279: these tests may be duplicating some the above, but it is unclear due to
+    // the complexity which should be cleared up with this ticket.
+    const testDB = db.getSiblingDB(jsTestName());
+    testDB.local.insertMany([{_id: 0, key: 1}, {_id: 1, key: 2}]);
+    testDB.createCollection("foreign", {timeseries: {timeField: "time", metaField: "meta"}});
+    testDB.foreign.insertMany([
+        {time: new Date(), _id: 0, meta: 1, val1: 42, val2: 100},
+        {time: new Date(), _id: 2, meta: 2, val1: 17, val2: 100}
+    ]);
+
+    // The $sequentialCache (document_source_sequential_document_cache.h) decides whether or not it
+    // can cache the results of the internal lookup pipeline based on if the pipeline is correlated
+    // or uncorrelated. With timeseries, many rewrites occur which can merge $match stages together,
+    // have them pushed into the $_internalUnpackBucket stage as an eventFilter, or push them in
+    // front of the
+    // $_internalUnpackBucket stage. We need to make sure that the ability of the cache to recognize
+    // when there is a correlated $match in the pipeline to remain regardless of these rewrites.
+    (function testUncorrelatedFollowedByCorrelatedMatch() {
+        const lookupStage = {$lookup: {
+            from: "foreign",
+            let: {lkey: "$key"},
+            pipeline: [
+              {$match: {$expr: {$lt: ["$val1","$val2"]}}},
+              {$match: {$expr: {$eq: ["$meta","$$lkey"]}}},
+              {$project: {lkey: "$$lkey",fkey: "$meta",val: "$val1",_id: 0,}},
+            ],
+            as: "joined"
+          }};
+        const result = testDB.local.aggregate(lookupStage)
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {"_id": 1, "key": 2, "joined": [{"lkey": 2, "fkey": 2, "val": 17}]},
+                {"_id": 0, "key": 1, "joined": [{"lkey": 1, "fkey": 1, "val": 42}]}
+            ],
+            extraErrorMsg: `Unexpected result of running pipeline ${tojson(lookupStage)}`
+        });
+    })();
+
+    (function testCorrelatedFollowedByUncorrelatedMatch() {
+        const lookupStage = {$lookup: {
+            from: "foreign",
+            let: {lkey: "$key"},
+            pipeline: [
+              {$match: {$expr: {$eq: ["$meta","$$lkey"]}}},
+              {$match: {$expr: {$lt: ["$val1","$val2"]}}},
+              {$project: {lkey: "$$lkey",fkey: "$meta",val: "$val1",_id: 0,}},
+            ],
+            as: "joined"
+          }};
+        const result = testDB.local.aggregate(lookupStage);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {"_id": 1, "key": 2, "joined": [{"lkey": 2, "fkey": 2, "val": 17}]},
+                {"_id": 0, "key": 1, "joined": [{"lkey": 1, "fkey": 1, "val": 42}]}
+            ],
+            extraErrorMsg: `Unexpected result of running pipeline ${tojson(lookupStage)}`
+        });
+    })();
+
+    (function testUncorrelatedFollowedByUncorrelatedMatch() {
+        const lookupStage = {$lookup: {
+            from: "foreign",
+            let: {lkey: "$key"},
+            pipeline: [
+              {$match: {$expr: {$lt: ["$meta","$val1"]}}},
+              {$match: {$expr: {$lt: ["$val1","$val2"]}}},
+              {$project: {meta: "$meta",val: "$val1",_id: 0,}},
+            ],
+            as: "joined"
+          }};
+        const result = testDB.local.aggregate(lookupStage);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {"_id": 0, "key": 1, "joined": [{"meta": 1, "val": 42}, {"meta": 2, "val": 17}]},
+                {"_id": 1, "key": 2, "joined": [{"meta": 1, "val": 42}, {"meta": 2, "val": 17}]}
+            ],
+            extraErrorMsg: `Unexpected result of running pipeline ${tojson(lookupStage)}`
+        });
+    })();
+}

@@ -215,16 +215,6 @@ public:
     static Pipeline::SourceContainer::iterator optimizeEndOfPipeline(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
 
-    /**
-     * Applies optimizeAt() to all stages in the given pipeline after the stage that 'itr' points
-     * to.
-     *
-     * Returns a valid iterator that points to the new "end of the pipeline": i.e., the stage that
-     * comes after 'itr' in the newly optimized pipeline.
-     */
-    static Pipeline::SourceContainer::iterator optimizeAtEndOfPipeline(
-        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
-
     static std::unique_ptr<Pipeline, PipelineDeleter> makePipelineFromViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
         ExpressionContext::ResolvedNamespace resolvedNs,
@@ -365,7 +355,13 @@ public:
     void optimizePipeline();
 
     /**
-     * Modifies the container, optimizing it by combining and swapping stages.
+     * Modifies the container, optimizes each stage individually.
+     */
+    static void optimizeEachStage(SourceContainer* container);
+
+    /**
+     * Modifies the container, optimizing it by combining, swapping, dropping and/or inserting
+     * stages.
      */
     static void optimizeContainer(SourceContainer* container);
 

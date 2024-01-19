@@ -769,21 +769,58 @@ template PipelinePtr DocumentSourceLookUp::buildPipeline<false /*isStreamsEngine
 template PipelinePtr DocumentSourceLookUp::buildPipeline<true /*isStreamsEngine*/>(
     const boost::intrusive_ptr<ExpressionContext>& fromExpCtx, const Document& inputDoc);
 
+/**
+ * Method that looks for a DocumentSourceSequentialDocumentCache stage and calls optimizeAt() on
+ * it if it has yet to be optimized.
+ */
+void findAndOptimizeSequentialDocumentCache(Pipeline& pipeline) {
+    auto& container = pipeline.getSources();
+    auto itr = (&container)->begin();
+    while (itr != (&container)->end()) {
+        if (dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get())) {
+            auto sequentialCache = dynamic_cast<DocumentSourceSequentialDocumentCache*>(itr->get());
+            if (!sequentialCache->hasOptimizedPos()) {
+                sequentialCache->optimizeAt(itr, &container);
+            }
+        }
+        itr = std::next(itr);
+    }
+}
+
 void DocumentSourceLookUp::addCacheStageAndOptimize(Pipeline& pipeline) {
-    // Add the cache stage at the end and optimize. During the optimization process, the cache will
-    // either move itself to the correct position in the pipeline, or will abandon itself if no
-    // suitable cache position exists. Do it only if pipeline optimization is enabled, otherwise
-    // Pipeline::optimizePipeline() will exit early and correct placement of the cache will not
-    // occur.
+    // Adds the cache to the end of the pipeline and calls optimizeContainer which will ensure the
+    // stages of the pipeline are in the correct and optimal order, before the cache runs
+    // doOptimizeAt. During the optimization process, the cache will either move itself to the
+    // correct position in the pipeline, or abandon itself if no suitable cache position exists.
+    // Once the cache is finished optimizing, the entire pipeline is optimized.
+    //
+    // When pipeline optimization is disabled, 'Pipeline::optimizePipeline()' exits early and so the
+    // cache would not be placed correctly. So we only add the cache when pipeline optimization is
+    // enabled.
     if (auto fp = globalFailPointRegistry().find("disablePipelineOptimization");
         fp && fp->shouldFail()) {
         _cache->abandon();
     } else {
+        // The cache needs to see the full pipeline in its correct order in order to properly place
+        // itself, therefore we are adding it to the end of the pipeline, and calling
+        // optimizeContainer on the pipeline to ensure the rest of the pipeline is in its correct
+        // order before optimizing the cache.
+        // TODO SERVER-84113: We will no longer have separate logic based on if a cache is present
+        // in doOptimizeAt(), so we can instead only add and optimize the cache after
+        // optimizeContainer is called.
         pipeline.addFinalSource(
             DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache.get_ptr()));
-    }
 
-    pipeline.optimizePipeline();
+        auto& container = pipeline.getSources();
+
+        Pipeline::optimizeContainer(&container);
+
+        // We want to ensure the cache has been optimized prior to any calls to optimize().
+        findAndOptimizeSequentialDocumentCache(pipeline);
+
+        // Optimize the pipeline, with the cache in its correct position if it exists.
+        Pipeline::optimizeEachStage(&container);
+    }
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const {
