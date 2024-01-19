@@ -59,7 +59,7 @@ void ResourceCatalog::add(ResourceId id, const NamespaceString& ns) {
 
 void ResourceCatalog::add(ResourceId id, const DatabaseName& dbName) {
     invariant(id.getType() == RESOURCE_DATABASE);
-    _add(id, DatabaseNameUtil::serializeForCatalog(dbName));
+    _add(id, DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog()));
 }
 
 void ResourceCatalog::add(ResourceId id, DDLResourceName resourceName) {
@@ -79,7 +79,7 @@ void ResourceCatalog::remove(ResourceId id, const NamespaceString& ns) {
 
 void ResourceCatalog::remove(ResourceId id, const DatabaseName& dbName) {
     invariant(id.getType() == RESOURCE_DATABASE);
-    _remove(id, DatabaseNameUtil::serializeForCatalog(dbName));
+    _remove(id, DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog()));
 }
 
 void ResourceCatalog::remove(ResourceId id, DDLResourceName resourceName) {

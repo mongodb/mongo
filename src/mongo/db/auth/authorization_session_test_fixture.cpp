@@ -80,8 +80,7 @@ void AuthorizationSessionTestFixture::setUp() {
     _sc = SerializationContext(SerializationContext::Source::Command,
                                SerializationContext::CallerType::Request,
                                SerializationContext::Prefix::Default,
-                               true /* nonPrefixedTenantId */,
-                               false /* authExpectTenantPrefix */);
+                               true /* nonPrefixedTenantId */);
 }
 
 Status AuthorizationSessionTestFixture::createUser(const UserName& username,

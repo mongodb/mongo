@@ -311,7 +311,6 @@ TEST(CurOpTest, ShouldReportIsFromUserConnection) {
         auto sc = SerializationContext(SerializationContext::Source::Command,
                                        SerializationContext::CallerType::Reply,
                                        SerializationContext::Prefix::Default,
-                                       false,
                                        true);
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss, sc);
 

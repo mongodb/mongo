@@ -167,7 +167,7 @@ bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj&
         auto context = SerializationContext::stateAuthPrevalidated();
         // Mark the context as should expect tenant prefix for auth to signify that the NS string we
         // are passing in may be prefixed with a tenantId.
-        context.setExpectTenantPrefixForAuth(true);
+        context.setPrefixState(true);
 
         const NamespaceString fromNamespace = NamespaceStringUtil::deserialize(
             boost::none, cmdObj.firstElement().valueStringDataSafe(), context);

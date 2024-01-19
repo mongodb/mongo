@@ -289,16 +289,20 @@ TEST(DatabaseNameUtilTest, Serialize_StorageCatalog) {
         RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
         {  // No prefix, no tenantId.
             // request --> { ns: database.coll }
-            auto dbName = DatabaseNameUtil::deserializeForCatalog(dbnString);
+            auto dbName = DatabaseNameUtil::deserialize(
+                boost::none, dbnString, SerializationContext::stateCatalog());
             ASSERT_EQ(dbName.tenantId(), boost::none);
-            ASSERT_EQ(DatabaseNameUtil::serializeForCatalog(dbName), dbnString);
+            ASSERT_EQ(DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog()),
+                      dbnString);
         }
 
         {  // Has prefix, no tenantId. Storage catalog always returns prefixed dbname.
             // request --> { ns: tenantId_database.coll }
-            auto dbName = DatabaseNameUtil::deserializeForCatalog(dbnPrefixString);
+            auto dbName = DatabaseNameUtil::deserialize(
+                boost::none, dbnPrefixString, SerializationContext::stateCatalog());
             ASSERT_EQ(dbName.tenantId(), boost::none);
-            ASSERT_EQ(DatabaseNameUtil::serializeForCatalog(dbName), dbnPrefixString);
+            ASSERT_EQ(DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog()),
+                      dbnPrefixString);
         }
     }
 
@@ -306,16 +310,20 @@ TEST(DatabaseNameUtilTest, Serialize_StorageCatalog) {
         RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
         {  // No prefix, no tenantId.
             // request --> { ns: database.coll }
-            auto dbName = DatabaseNameUtil::deserializeForCatalog(dbnString);
+            auto dbName = DatabaseNameUtil::deserialize(
+                boost::none, dbnString, SerializationContext::stateCatalog());
             ASSERT_EQ(dbName.tenantId(), boost::none);
-            ASSERT_EQ(DatabaseNameUtil::serializeForCatalog(dbName), dbnString);
+            ASSERT_EQ(DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog()),
+                      dbnString);
         }
 
         {  // Has prefix, no tenantId. Storage catalog always returns prefixed dbname.
             // request --> { ns: tenantId_database.coll }
-            auto dbName = DatabaseNameUtil::deserializeForCatalog(dbnPrefixString);
+            auto dbName = DatabaseNameUtil::deserialize(
+                boost::none, dbnPrefixString, SerializationContext::stateCatalog());
             ASSERT_EQ(dbName.tenantId(), tenantId);
-            ASSERT_EQ(DatabaseNameUtil::serializeForCatalog(dbName), dbnPrefixString);
+            ASSERT_EQ(DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog()),
+                      dbnPrefixString);
         }
     }
 }

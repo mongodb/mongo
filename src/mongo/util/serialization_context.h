@@ -81,12 +81,10 @@ struct SerializationContext {
     SerializationContext(Source source = Source::Default,
                          CallerType callerType = CallerType::None,
                          Prefix prefixState = Prefix::Default,
-                         bool nonPrefixedTenantId = false,
-                         bool authExpectTenantPrefix = false)
+                         bool nonPrefixedTenantId = false)
         : _source(source),
           _callerType(callerType),
           _prefixState(prefixState),
-          _authExpectTenantPrefix(authExpectTenantPrefix),
           _nonPrefixedTenantId(nonPrefixedTenantId) {}
 
     /**
@@ -157,10 +155,6 @@ struct SerializationContext {
         _nonPrefixedTenantId = nonPrefixedTenantId;
     }
 
-    void setExpectTenantPrefixForAuth(bool authExpectTenantPrefix) {
-        _authExpectTenantPrefix = authExpectTenantPrefix;
-    }
-
     void setPrefixState(bool prefixState) {
         _prefixState = prefixState ? Prefix::IncludePrefix : Prefix::ExcludePrefix;
     }
@@ -179,9 +173,6 @@ struct SerializationContext {
     }
     bool receivedNonPrefixedTenantId() const {
         return _nonPrefixedTenantId;
-    }
-    bool shouldExpectTenantPrefixForAuth() const {
-        return _authExpectTenantPrefix;
     }
 
     std::string toString() const {
@@ -215,9 +206,6 @@ private:
     Source _source;
     CallerType _callerType;
     Prefix _prefixState;
-    // This flag is for the AuthPrevalidated source. If true, when deserializing, we should expect
-    // that the database name portion may have the correct tenant ID prefixed.
-    bool _authExpectTenantPrefix;
     bool _nonPrefixedTenantId;
 };
 

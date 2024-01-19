@@ -65,14 +65,6 @@ public:
     static std::string serialize(const DatabaseName& dbName, const SerializationContext& context);
 
     /**
-     * To be used only for durable catalog. We always include the tenantId as prefixed in a
-     * databasename for the catalog.
-     */
-    static std::string serializeForCatalog(
-        const DatabaseName& dbName,
-        const SerializationContext& context = SerializationContext::stateDefault());
-
-    /**
      * Deserializes StringData dbName to a DatabaseName object.
      *
      * If multitenancySupport is enabled and featureFlagRequireTenantID is enabled, then a
@@ -100,16 +92,6 @@ public:
                                     StringData db,
                                     const SerializationContext& context);
 
-    static DatabaseName deserialize(boost::optional<TenantId> tenantId,
-                                    StringData db,
-                                    const auth::ValidatedTenancyScope& vts);
-
-    /**
-     * To be used only by the storage catalog.
-     */
-    static DatabaseName deserializeForCatalog(
-        StringData db, const SerializationContext& context = SerializationContext::stateDefault());
-
     /**
      * To be used with Failpoints since they can be database specific. Parses the `data` BSONObj to
      * find an existing `dbFieldName` and returns a DatabaseName object from it.
@@ -124,18 +106,12 @@ public:
 private:
     static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 
-    static std::string serializeForStorage(const DatabaseName& dbName,
-                                           const SerializationContext& context);
+    static std::string serializeForStorage(const DatabaseName& dbName);
 
     static std::string serializeForCommands(const DatabaseName& dbName,
                                             const SerializationContext& context);
 
-    static std::string serializeForAuthPrevalidated(const DatabaseName& dbName,
-                                                    const SerializationContext& context);
-
-    static DatabaseName deserializeForStorage(boost::optional<TenantId> tenantId,
-                                              StringData db,
-                                              const SerializationContext& context);
+    static DatabaseName deserializeForStorage(boost::optional<TenantId> tenantId, StringData db);
 
     static DatabaseName deserializeForCommands(boost::optional<TenantId> tenantId,
                                                StringData db,

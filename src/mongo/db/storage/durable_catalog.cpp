@@ -118,7 +118,7 @@ constexpr std::array<StringData, 256> escapeTable = {
 
 std::string escapeDbName(const DatabaseName& dbName) {
     std::string escaped;
-    const auto db = DatabaseNameUtil::serializeForCatalog(dbName);
+    const auto db = DatabaseNameUtil::serialize(dbName, SerializationContext::stateCatalog());
     escaped.reserve(db.size());
     for (unsigned char c : db) {
         StringData ce = escapeTable[c];
