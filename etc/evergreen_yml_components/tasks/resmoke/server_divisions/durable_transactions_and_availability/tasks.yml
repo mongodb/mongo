@@ -7,9 +7,10 @@ variables:
 # Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -24,9 +25,10 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &gen_task_template
   name: gen_task_template
@@ -44,9 +46,10 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &benchmark_template
   name: benchmark_template
@@ -65,9 +68,9 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_config_vars
   is_jstestfuzz: true
@@ -91,9 +94,9 @@ variables:
 # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_template
   name: jstestfuzz_template

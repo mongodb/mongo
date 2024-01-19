@@ -30,9 +30,10 @@ variables:
 # Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &task_template
   name: template
@@ -47,9 +48,10 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &gen_task_template
   name: gen_task_template
@@ -65,25 +67,12 @@ variables:
     vars:
       resmoke_args: --help
 
-- &gen_burn_in_task_template
-  name: gen_burn_in_task_template
-  depends_on:
-  - name: version_burn_in_gen
-    variant: generate-tasks-for-version
-    # This is added because of EVG-18211.
-    # Without this we are adding extra dependencies on evergreen and it is causing strain
-    omit_generated_tasks: true
-  - name: archive_dist_test_debug
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      resmoke_args: --help
-
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/non_server_teams/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &benchmark_template
   name: benchmark_template
@@ -127,9 +116,9 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_config_vars
   is_jstestfuzz: true
@@ -153,9 +142,9 @@ variables:
 # Used for tests that invoke 'resmoke.py --suites=jstestfuzz*'.
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/durable_transactions_and_availability/tasks.yml
-# - etc/evergreen_yml_components/tasks/resmoke/query/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &jstestfuzz_template
   name: jstestfuzz_template
@@ -196,7 +185,7 @@ variables:
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
-# - etc/evergreen_yml_components/tasks/resmoke/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &compile_task_group_template
   name: compile_task_group_template
@@ -4070,27 +4059,6 @@ tasks:
       args:
       - "src/evergreen/check_idl_compat.sh"
 
-- <<: *gen_burn_in_task_template
-  name: burn_in_tests_gen
-  tags: []
-  patch_only: true
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_burn_in_task_template
-  name: burn_in_tags_gen
-  tags: []
-  patch_only: true
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_burn_in_task_template
-  name: burn_in_tasks_gen
-  tags: []
-  patch_only: true
-  commands:
-  - func: "generate resmoke tasks"
-
 - <<: *benchmark_template
   name: benchmarks_orphaned_first_half
   tags: ["benchmarks"]
@@ -4118,29 +4086,6 @@ tasks:
   - func: "send benchmark results"
     vars:
       suite: benchmarks_second_half
-
-- <<: *benchmark_template
-  name: benchmarks_streams
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suites: benchmarks_streams
-      exec_timeout_secs: 18000  # 5 hour timeout.
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
-
-- <<: *benchmark_template
-  name: benchmarks_namespace
-  tags: ["benchmarks"]
-  commands:
-  - func: "do benchmark setup"
-  - func: "run tests"
-    vars:
-      suite: benchmarks_namespace_string
-      resmoke_jobs_max: 1
-  - func: "send benchmark results"
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
@@ -4354,23 +4299,6 @@ tasks:
       suite: jstestfuzz
       resmoke_args: --numClientsPerFixture=10
 
-## Tests that the multiversion test generation logic is not broken.
-- <<: *gen_task_template
-  name: multiversion_sanity_check_gen
-  tags: ["multiversion", "multiversion_sanity_check"]
-  commands:
-  - func: "initialize multiversion tasks"
-    vars:
-      multiversion_sanity_check_last_continuous_new_new_old: last_continuous
-      multiversion_sanity_check_last_continuous_new_old_new: last_continuous
-      multiversion_sanity_check_last_continuous_old_new_new: last_continuous
-      multiversion_sanity_check_last_lts_new_new_old: last_lts
-      multiversion_sanity_check_last_lts_new_old_new: last_lts
-      multiversion_sanity_check_last_lts_old_new_new: last_lts
-  - func: "generate resmoke tasks"
-    vars:
-      run_no_feature_flag_tests: "true"
-
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
@@ -4508,15 +4436,6 @@ tasks:
   tags: ["multiversion", "no_multiversion_generate_tasks", "future_git_tag_incompatible"]
   commands:
   - func: "generate resmoke tasks"
-
-- <<: *gen_task_template
-  name: unittest_shell_hang_analyzer_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      exec_timeout_secs: 3600
-      use_large_distro: "true"
 
 - <<: *gen_task_template
   name: noPassthrough_gen
@@ -4852,39 +4771,6 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "run idl tests"
-
-- name: buildscripts_test
-  tags: []
-  depends_on: []
-  commands:
-  - *f_expansions_write
-  - func: "do non-compile setup"
-  - func: "set up remote credentials"
-  - *f_expansions_write
-  - func: "configure evergreen api credentials"
-  - *gen_feature_flags
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
-- <<: *task_template
-  name: resmoke_end2end_tests
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: resmoke_validation_tests
-  tags: []
-  depends_on:
-  - name: archive_dist_test
-  commands:
-  - func: "do setup"
-    vars:
-      extraction_change_dir: build/install/
-      move_outputs: "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
-  - func: "run tests"
 
 - name: test_packages
   tags: []
@@ -5766,20 +5652,6 @@ tasks:
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
          'destination': {'path': '${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
-- <<: *task_template
-  name: streams
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: streams_kafka
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
 
 - name: shared_scons_cache_pruning
   tags: []
@@ -5984,19 +5856,6 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: core
-
-- name: tooling_metrics_test
-  tags: []
-  depends_on: []
-  commands:
-  - *f_expansions_write
-  - func: "do non-compile setup"
-  - func: "set up remote credentials"
-  - *f_expansions_write
-  - func: "configure evergreen api credentials"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
 
 # Test a compilation without extra args from evergreen to simulate local dev compilation.
 - name: scons_dev_compile_smoke_test
