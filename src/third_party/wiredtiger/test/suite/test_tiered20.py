@@ -61,16 +61,23 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         return os.path.join(tempfile.gettempdir(), str(uuid.uuid1()))
 
     def create_flush_drop(self, uri, remove_shared):
+        self.pr("create " + uri)
         self.session.create(uri, "key_format=S,value_format=S")
         c = self.session.open_cursor(uri)
+        self.pr("insert two items to " + uri)
         c["a"] = "a"
         c["b"] = "b"
-
         c.close()
+
         if self.is_tiered_scenario():
             # Do a regular checkpoint first, technically shouldn't be needed?
             self.session.checkpoint()
             self.session.checkpoint('flush_tier=(enabled,force=true)')
+            # Do another checkpoint because it waits for the previous flush to complete.
+            self.session.checkpoint()
+            if (not remove_shared):
+                got = sorted(list(os.listdir(self.bucket)))
+                self.assertTrue(len(got) != 0)
             self.session.drop(uri, "remove_files=true,remove_shared={}".format(wt_boolean(remove_shared)))
         else:
             self.session.drop(uri, "force=true")
@@ -84,6 +91,7 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
     def test_tiered_overwrite(self):
         uri_a = "table:tiereda"
         uri_b = "table:tieredb"
+        uri_c = "table:tieredc"
         uri_b_local_file1 = 'tieredb-0000000001.wtobj'
         # This really only applies to dirstore.
         if self.is_tiered_scenario() and self.is_local_storage:
@@ -115,14 +123,14 @@ class test_tiered20(TieredConfigMixin, wttest.WiredTigerTestCase):
         # or run.
 
         # For this test, we don't clean up what's in the cloud, only clean up locally.
-        self.create_flush_drop(uri_a, False)
+        self.create_flush_drop(uri_c, False)
 
         # Now, we're creating the same URI.  Even though there should be no local
         # files or metadata, it should detect existing items in the cloud.
         # We expect the tiered create will return an EEXIST, with no output message.
         expected_errno = os.strerror(errno.EEXIST)
         self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.create_flush_drop(uri_a, False), expected_errno)
+            lambda: self.create_flush_drop(uri_c, False), expected_errno)
 
         # Now, create another WT home directory and link the buckets together.
         # This emulates multiple systems sharing the same AWS bucket.

@@ -195,6 +195,7 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
   const char *obj_uri, uint32_t op)
 {
     WT_CONFIG_ITEM pfx;
+    WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
     WT_FILE_SYSTEM *bucket_fs;
     WT_STORAGE_SOURCE *storage_source;
@@ -203,14 +204,17 @@ __tier_do_operation(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id, co
     const char *cfg[2], *local_name, *obj_name, *sp_obj_name;
 
     WT_ASSERT(session, (op == WT_TIERED_WORK_FLUSH || op == WT_TIERED_WORK_FLUSH_FINISH));
+    dhandle = (WT_DATA_HANDLE *)tiered;
     tmp = NULL;
     /*
-     * It is possible that the tiered object was closed before the work unit was processed. The work
-     * unit holds a reference on the dhandle but if the bucket storage is gone there is nothing to
-     * do.
+     * The work unit holds a reference on the dhandle so that the structure is valid to look at, but
+     * the dhandle could have been dropped. If it is, there is nothing to do.
      */
-    if (tiered->bstorage == NULL) {
-        __wt_verbose(session, WT_VERB_TIERED, "DO_OP: tiered %p NULL bstorage.", (void *)tiered);
+    WT_ASSERT(session, tiered->bstorage != NULL);
+    if (F_ISSET(dhandle, WT_DHANDLE_DROPPED)) {
+        __wt_verbose(session, WT_VERB_TIERED,
+          "DO_OP: DH %s flags 0x%" PRIx32 " not open or dropped tiered %p.", dhandle->name,
+          dhandle->flags, (void *)tiered);
         return (0);
     }
     storage_source = tiered->bstorage->storage_source;

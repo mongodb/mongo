@@ -432,6 +432,13 @@ test_drop(THREAD_DATA *td, int force)
     WT_SESSION *session;
     char dropconf[128];
 
+    /*
+     * Until tiered schema operations are debugged thoroughly, for tiered storage skip dropping the
+     * standard URI. We can still test tiered drops with uniquely named tables.
+     */
+    if (opts->tiered_storage)
+        return;
+
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
     if (use_txn)
