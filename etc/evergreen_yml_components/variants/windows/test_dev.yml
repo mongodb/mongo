@@ -1,6 +1,11 @@
-# Windows build variants for testing development environments
+# Windows build variants for testing development environments that should run on master,
+# rapid release (7.1, 7.2 etc.) and LTS release (7.0, 6.0 etc.) branch projects
 
 variables:
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/windows/test_dev.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &windows_compile_variant_dependency
   depends_on:
   - name: archive_dist_test_debug
@@ -13,182 +18,103 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
     variant: windows-compile-required
 
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/windows/test_dev.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &windows_expansions
+  compile_variant: *windows_compile_variant_name
+  burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+  exe: ".exe"
+  content_type: application/zip
+  python: '/cygdrive/c/python/python39/python.exe'
+  ext: zip
+  multiversion_platform: windows
+  multiversion_edition: enterprise
+  jstestfuzz_num_generated_files: 35
+  target_resmoke_time: 20
+  max_sub_suites: 5
+  large_distro_name: windows-vsCurrent-large
+  push_path: windows
+  push_bucket: downloads.10gen.com
+  push_name: windows
+  push_arch: x86_64-enterprise
+  test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+  external_auth_jobs_max: 1
+
+
 buildvariants:
-- &enterprise-windows-template
-  <<: *windows_compile_variant_dependency
-  name: &enterprise-windows enterprise-windows
-  display_name: "* Enterprise Windows"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+- name: &windows-compile-required windows-compile-required
+  display_name: "! Windows Compile"
+  run_on:
+  - windows-vsCurrent-xxlarge
   modules:
   - enterprise
-  run_on:
-  - windows-vsCurrent-small
-  expansions: &windows_required_expansions
-    compile_variant: *windows_compile_variant_name
-    burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
-    exe: ".exe"
-    content_type: application/zip
-    python: '/cygdrive/c/python/python39/python.exe'
-    ext: zip
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    target_resmoke_time: 20
-    max_sub_suites: 5
-    large_distro_name: windows-vsCurrent-large
-    push_path: windows
-    push_bucket: downloads.10gen.com
-    push_name: windows
-    push_arch: x86_64-enterprise
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
-    external_auth_jobs_max: 1
-  tasks:
-  - name: audit
-  - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
-    distros:
-    - windows-vsCurrent-large
-  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_windows
-    distros:
-    - windows-2016-dc
-  - name: .jscore .common !.sharding
-  - name: jsCore_auth
-  - name: jsCore_ese
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common
-  - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog !.gcm
-  - name: sasl
-  - name: .sharding .txns
-  - name: sharding_auth_audit_gen
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  - name: .timeseries_crud
-
-- <<: *enterprise-windows-template
-  name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
-  display_name: "! Enterprise Windows (all feature flags)"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   expansions:
-    <<: *windows_required_expansions
-    burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
-    content_type: application/zip
-    python: '/cygdrive/c/python/python39/python.exe'
     ext: zip
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    target_resmoke_time: 20
-    max_sub_suites: 5
-    large_distro_name: windows-vsCurrent-large
-    # To force disable feature flags even on the all feature flags variant, please use this file:
-    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
-    test_flags: >-
-      --runAllFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_windows_tls
-    external_auth_jobs_max: 1
-    # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
-    # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
-    # run too long and hit execution timeouts.
-    # burn_in_task_name: jsCore
-  tasks:
-  - name: .cqf
-  - name: query_golden_classic
-  # - name: burn_in_tasks_gen
-  #   depends_on:
-  #   - name: version_burn_in_gen
-  #     variant: generate-tasks-for-version
-  #     omit_generated_tasks: true
-  #   - name: archive_dist_test_debug
-  #     variant: *windows_compile_variant_name
-  - name: audit
-  - name: auth_audit_gen
-  - name: buildscripts_test
-  - name: .bulk_write
-  - name: causally_consistent_jscore_txns_passthrough
-    distros:
-    - windows-vsCurrent-large
-  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
-  - name: external_auth
-  - name: external_auth_aws
-  - name: external_auth_windows
-    distros:
-    - windows-2016-dc
-  - name: .jscore .common !.sharding
-  - name: jsCore_auth
-  - name: jsCore_column_store_indexes
-  - name: jsCore_ese
-  - name: jsCore_txns_large_txns_format
-  - name: jsCore_wildcard_indexes
-  - name: .jstestfuzz .common
-  - name: noPassthrough_gen
-  - name: noPassthroughWithMongod_gen
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog !.gcm
-  - name: sasl
-  - name: .sharding .txns
-  - name: sharding_auth_audit_gen
-  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  - name: query_stats_aggregation_passthrough
-  - name: query_stats_mongos_aggregation_passthrough
-  - name: query_stats_mongos_passthrough
-  - name: query_stats_passthrough
-  - name: .timeseries_crud
-  - name: unittest_shell_hang_analyzer_gen
-
-- name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
-  display_name: "* Enterprise Windows (Benchmarks)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  run_on:
-  - windows-vsCurrent-small
-  modules:
-  - enterprise
-  expansions:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
       msi
-    exe: ".exe"
     content_type: application/zip
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=windows
       CPPPATH="c:/sasl/include"
       LIBPATH="c:/sasl/lib"
-      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
       --win-version-min=win10
-    num_scons_link_jobs_available: 0.5
+    num_scons_link_jobs_available: 0.3
     python: '/cygdrive/c/python/python39/python.exe'
-    ext: zip
     scons_cache_scope: shared
-    multiversion_platform: windows
-    multiversion_edition: enterprise
-    jstestfuzz_num_generated_files: 35
-    large_distro_name: windows-vsCurrent-large
-    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
-    external_auth_jobs_max: 1
-    compile_variant: *enterprise-windows-benchmarks
+    compile_variant: *windows-compile-required
   tasks:
-  - name: compile_upload_benchmarks_TG
-    distros:
-    - windows-vsCurrent-xlarge
-  - name: .benchmarks !benchmarks_orphaned_first_half !benchmarks_orphaned_second_half
+  - name: compile_ninja_quick_TG
+  - name: compile_test_parallel_core_stream_TG
+  - name: compile_test_parallel_unittest_stream_TG
+  - name: compile_test_parallel_dbtest_stream_TG
+  - name: compile_build_tools_next_TG
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
+  - name: .crypt
+  - name: generate_buildid_to_debug_symbols_mapping
 
-### Security Patch-Specific Build Variants ###
-- <<: *enterprise-windows-template
-  name: &windows-compile-security-patch-only windows-compile-security-patch-only
-  display_name: "~ Windows Security Patch Only"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+- &enterprise-windows-template
+  <<: *windows_compile_variant_dependency
+  name: &enterprise-windows-suggested enterprise-windows-suggested
+  display_name: "* Enterprise Windows"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+  - enterprise
+  run_on:
+  - windows-vsCurrent-small
   expansions:
-    <<: *windows_required_expansions
-    exe: ".exe"
+    <<: *windows_expansions
   tasks:
-  - name: .encrypt .patch_build
-  - name: .sasl .patch_build
+  - name: audit
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+    distros:
+    - windows-vsCurrent-large
+  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
   - name: external_auth_aws
-  - name: external_auth_oidc
+  - name: external_auth_windows
+    distros:
+    - windows-2016-dc
+  - name: .jscore .common !.sharding
+  - name: jsCore_auth
+  - name: jsCore_ese
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .replica_sets .common
+  - name: .replica_sets .multi_oplog !.gcm
+  - name: sasl
+  - name: .sharding .txns
+  - name: sharding_auth_audit_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
+  - name: .timeseries_crud

@@ -1,0 +1,281 @@
+# Windows build variants for testing development environments
+# that should run only on master branch projects
+
+variables:
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/windows/test_dev.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &windows_compile_variant_dependency
+  depends_on:
+  - name: archive_dist_test_debug
+    variant: &windows_compile_variant_name windows-compile-required
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: generate_buildid_to_debug_symbols_mapping
+    variant: windows-compile-required
+
+# THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/windows/test_dev.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &windows_expansions
+  compile_variant: *windows_compile_variant_name
+  burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+  exe: ".exe"
+  content_type: application/zip
+  python: '/cygdrive/c/python/python39/python.exe'
+  ext: zip
+  multiversion_platform: windows
+  multiversion_edition: enterprise
+  jstestfuzz_num_generated_files: 35
+  target_resmoke_time: 20
+  max_sub_suites: 5
+  large_distro_name: windows-vsCurrent-large
+  push_path: windows
+  push_bucket: downloads.10gen.com
+  push_name: windows
+  push_arch: x86_64-enterprise
+  test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+  external_auth_jobs_max: 1
+
+
+buildvariants:
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &windows-bazel-compile windows-bazel-compile
+  display_name: "Windows Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
+  run_on:
+  - windows-vsCurrent-xlarge
+  stepback: false
+  expansions:
+    exe: ".exe"
+    ext: zip
+    content_type: application/zip
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
+      --win-version-min=win10
+    python: '/cygdrive/c/python/python39/python.exe'
+    compile_variant: *windows-bazel-compile
+  tasks:
+    - name: compile_bazel_windows_TG
+
+- name: &windows-dev-compile-suggested windows-dev-compile-suggested
+  display_name: "* Windows Dev Compile"
+  run_on:
+  - windows-vsCurrent-xlarge
+  modules:
+  - enterprise
+  expansions:
+    exe: ".exe"
+    ext: zip
+    content_type: application/zip
+    compile_flags: >-
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+    num_scons_link_jobs_available: 0.2
+    python: '/cygdrive/c/python/python39/python.exe'
+    scons_cache_scope: shared
+    compile_variant: *windows-dev-compile-suggested
+  tasks:
+    - name: scons_compile_smoke_test_TG
+    - name: ninja_compile_smoke_test_TG
+
+- name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
+  display_name: "~ Shared Library Windows (visibility test)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  expansions:
+    # --link-model=dynamic is set by visiblity_test's task_compile_flags
+    # expansion
+    compile_flags: >-
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+      --win-version-min=win10
+    python: '/cygdrive/c/python/python39/python.exe'
+    ext: zip
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    compile_variant: *windows-dynamic-visibility-test
+  tasks:
+  - name: visibility_test_TG
+    distros:
+    - windows-vsCurrent-large
+
+### QO & QE Patch-Specific Build Variants ###
+- name: &windows-compile-query-patch-only windows-compile-query-patch-only
+  display_name: "~ Windows Compile Query Patch Only"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  run_on:
+  - windows-vsCurrent-small
+  modules:
+  - enterprise
+  expansions:
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
+    exe: ".exe"
+    content_type: application/zip
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+      --win-version-min=win10
+    num_scons_link_jobs_available: 0.5
+    python: '/cygdrive/c/python/python39/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    large_distro_name: windows-vsCurrent-large
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+    external_auth_jobs_max: 1
+    compile_variant: *windows-compile-query-patch-only
+  tasks:
+  - name: compile_dist_test_TG
+    distros:
+    - windows-vsCurrent-xlarge
+
+- &enterprise-windows-all-feature-flags-required-template
+  <<: *windows_compile_variant_dependency
+  name: &enterprise-windows-all-feature-flags-required enterprise-windows-all-feature-flags-required
+  display_name: "! Enterprise Windows (all feature flags)"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+  - enterprise
+  run_on:
+  - windows-vsCurrent-small
+  expansions:
+    <<: *windows_expansions
+    burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+    exe: ".exe"
+    content_type: application/zip
+    python: '/cygdrive/c/python/python39/python.exe'
+    ext: zip
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    max_sub_suites: 5
+    large_distro_name: windows-vsCurrent-large
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+    test_flags: >-
+      --runAllFeatureFlagTests
+      --excludeWithAnyTags=incompatible_with_windows_tls
+    external_auth_jobs_max: 1
+    # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
+    # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
+    # run too long and hit execution timeouts.
+    # burn_in_task_name: jsCore
+  tasks:
+  - name: .cqf
+  - name: query_golden_classic
+  # - name: burn_in_tasks_gen
+  #   depends_on:
+  #   - name: version_burn_in_gen
+  #     variant: generate-tasks-for-version
+  #     omit_generated_tasks: true
+  #   - name: archive_dist_test_debug
+  #     variant: *windows_compile_variant_name
+  - name: audit
+  - name: auth_audit_gen
+  - name: buildscripts_test
+  - name: .bulk_write
+  - name: causally_consistent_jscore_txns_passthrough
+    distros:
+    - windows-vsCurrent-large
+  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: external_auth_windows
+    distros:
+    - windows-2016-dc
+  - name: .jscore .common !.sharding
+  - name: jsCore_auth
+  - name: jsCore_column_store_indexes
+  - name: jsCore_ese
+  - name: jsCore_txns_large_txns_format
+  - name: jsCore_wildcard_indexes
+  - name: .jstestfuzz .common
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .replica_sets .common
+  - name: .replica_sets .multi_oplog !.gcm
+  - name: sasl
+  - name: .sharding .txns
+  - name: sharding_auth_audit_gen
+  - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
+  - name: query_stats_aggregation_passthrough
+  - name: query_stats_mongos_aggregation_passthrough
+  - name: query_stats_mongos_passthrough
+  - name: query_stats_passthrough
+  - name: .timeseries_crud
+  - name: unittest_shell_hang_analyzer_gen
+
+- name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
+  display_name: "* Enterprise Windows (Benchmarks)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - windows-vsCurrent-small
+  modules:
+  - enterprise
+  expansions:
+    additional_package_targets: >-
+      archive-mongocryptd
+      archive-mongocryptd-debug
+      msi
+    exe: ".exe"
+    content_type: application/zip
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include"
+      LIBPATH="c:/sasl/lib"
+      -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
+      --win-version-min=win10
+    num_scons_link_jobs_available: 0.5
+    python: '/cygdrive/c/python/python39/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    large_distro_name: windows-vsCurrent-large
+    test_flags: --excludeWithAnyTags=incompatible_with_windows_tls
+    external_auth_jobs_max: 1
+    compile_variant: *enterprise-windows-benchmarks
+  tasks:
+  - name: compile_upload_benchmarks_TG
+    distros:
+    - windows-vsCurrent-xlarge
+  - name: .benchmarks !benchmarks_orphaned_first_half !benchmarks_orphaned_second_half
+
+### Security Patch-Specific Build Variants ###
+- <<: *enterprise-windows-all-feature-flags-required-template
+  name: &windows-compile-security-patch-only windows-compile-security-patch-only
+  display_name: "~ Windows Security Patch Only"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter # This is a patch-only variant but we run on mainline to pick up task history.
+  expansions:
+    <<: *windows_expansions
+    exe: ".exe"
+  tasks:
+  - name: .encrypt .patch_build
+  - name: .sasl .patch_build
+  - name: external_auth_aws
+  - name: external_auth_oidc

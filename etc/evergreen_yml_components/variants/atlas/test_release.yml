@@ -1,4 +1,5 @@
-# Build variants corresponding to Atlas's OS
+# Build variants corresponding to Atlas's OS for testing release environments that should run on master,
+# rapid release (7.1, 7.2 etc.) and LTS release (7.0, 6.0 etc.) branch projects
 
 buildvariants:
 - name: enterprise-rhel-70-64-bit

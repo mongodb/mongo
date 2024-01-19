@@ -1,4 +1,6 @@
-# Ubuntu test dev variants
+# Ubuntu build variants for testing development environments
+# that should run only on master branch projects
+
 variables:
 - &enterprise-ubuntu2204-64-libvoidstar-template
   modules:
@@ -19,6 +21,20 @@ variables:
 
 
 buildvariants:
+# Note that this task is currently optional;
+# This will eventually become suggested, then required.
+- name: &ubuntu2204-arm64-bazel-compile ubuntu2204-arm64-bazel-compile
+  display_name: "Ubuntu 22.04 arm64 Bazel Compile"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  tags: ["bazel_check"]
+  run_on:
+  - ubuntu2204-arm64-small
+  stepback: false
+  expansions:
+    compile_variant: *ubuntu2204-arm64-bazel-compile
+  tasks:
+    - name: compile_bazel_TG
+
 - <<: *enterprise-ubuntu2204-64-libvoidstar-template
   name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.

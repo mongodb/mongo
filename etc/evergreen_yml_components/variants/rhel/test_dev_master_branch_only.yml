@@ -1,9 +1,10 @@
-# RHEL build variants for testing development environments that should run only on master branch projects
+# RHEL build variants for testing development environments
+# that should run only on master branch projects
 
 variables:
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-x86-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
@@ -14,8 +15,8 @@ variables:
   stepback: false
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-x86-dynamic-compile-expansions
   scons_cache_scope: shared
@@ -29,9 +30,9 @@ variables:
     --link-model=dynamic
 
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
@@ -44,9 +45,9 @@ variables:
   - name: generate_buildid_to_debug_symbols_mapping
 
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &generic_linux_compile_expansions  # The most commonly used compile expansions.
   scons_cache_scope: shared
@@ -54,9 +55,9 @@ variables:
   has_packages: false
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
@@ -71,9 +72,9 @@ variables:
     variant: linux-x86-dynamic-compile
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -85,9 +86,9 @@ variables:
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions

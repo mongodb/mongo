@@ -1,9 +1,10 @@
-# RHEL build variants for testing development environments that should run on master, rapid release (7.1, 7.2 etc.) and LTS release (7.0, 6.0 etc.) branch projects
+# RHEL build variants for testing development environments that should run on master,
+# rapid release (7.1, 7.2 etc.) and LTS release (7.0, 6.0 etc.) branch projects
 
 variables:
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-x86-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
@@ -14,8 +15,8 @@ variables:
   stepback: false
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux-x86-dynamic-compile-expansions
   scons_cache_scope: shared
@@ -29,9 +30,9 @@ variables:
     --link-model=dynamic
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_dynamic_compile_variant_dependency
   depends_on:
@@ -46,9 +47,9 @@ variables:
     variant: linux-x86-dynamic-compile
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -60,9 +61,9 @@ variables:
   compile_variant: *linux_x86_dynamic_compile_variant_name
 
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &enterprise-rhel-80-64-bit-dynamic-expansions
   <<: *linux_x86_generic_expansions
@@ -78,8 +79,9 @@ variables:
   large_distro_name: rhel80-medium
 
 # THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &linux_debug_aubsan_compile_variant_dependency
   depends_on:
@@ -96,10 +98,9 @@ variables:
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
 # THIS HAS COPIES IN:
-# - etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - aubsan_options: &aubsan_options >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -107,8 +108,9 @@ variables:
     ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
 # THIS HAS COPIES IN:
+# - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-# - etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+# - etc/evergreen_yml_components/variants/rhel/test_dev.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &aubsan-lite-required-expansions
   compile_variant: *linux_debug_aubsan_compile_variant_name

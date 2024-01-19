@@ -1,4 +1,5 @@
-# Miscellaneous build variants that should run only on master branch projects and should be excluded during branching
+# Miscellaneous build variants that should run only on master branch projects
+# and should be excluded during branching
 
 buildvariants:
 - name: &enterprise-windows-build-metrics enterprise-windows-build-metrics

@@ -62,33 +62,27 @@ include:
 
 - filename: etc/evergreen_yml_components/variants/misc/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/misc/misc.yml
-- filename: etc/evergreen_yml_components/variants/misc/misc_exclude_while_branching.yml
+- filename: etc/evergreen_yml_components/variants/misc/misc_master_branch_only.yml
 
-- filename: etc/evergreen_yml_components/variants/sanitizer/build_dev.yml
-- filename: etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
-- filename: etc/evergreen_yml_components/variants/sanitizer/test_dev_release.yml
-
-- filename: etc/evergreen_yml_components/variants/ninja/build.yml
-
-- filename: etc/evergreen_yml_components/variants/amazon/build_dev.yml
 - filename: etc/evergreen_yml_components/variants/amazon/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/amazon/test_dev_master_branch_only.yml
 
-- filename: etc/evergreen_yml_components/variants/macos/build_dev.yml
-- filename: etc/evergreen_yml_components/variants/macos/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/macos/test_dev_master_branch_only.yml
 
-- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_branch.yml
-- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_lts_branches.yml
-- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_rapid_lts_branches.yml
+- filename: etc/evergreen_yml_components/variants/rhel/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_and_lts_branches_only.yml
+- filename: etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
 
-- filename: etc/evergreen_yml_components/variants/ubuntu/build_dev.yml
-- filename: etc/evergreen_yml_components/variants/ubuntu/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 
-- filename: etc/evergreen_yml_components/variants/windows/build_dev.yml
+- filename: etc/evergreen_yml_components/variants/ubuntu/test_dev_master_branch_only.yml
+
 - filename: etc/evergreen_yml_components/variants/windows/test_dev.yml
-- filename: etc/evergreen_yml_components/variants/windows/test_in_memory.yml
+- filename: etc/evergreen_yml_components/variants/windows/test_dev_master_and_lts_branches_only.yml
+- filename: etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml
 
-- filename: etc/evergreen_yml_components/variants/wiredtiger/build_dev.yml
-- filename: etc/evergreen_yml_components/variants/wiredtiger/test_dev.yml
+- filename: etc/evergreen_yml_components/variants/wiredtiger/test_dev_master_branch_only.yml
 
 
 parameters:

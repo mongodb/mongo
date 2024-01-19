@@ -1,4 +1,5 @@
-# Miscellaneous build variants
+# Miscellaneous build variants that should run on master, rapid release (7.1, 7.2 etc.)
+# and LTS release (7.0, 6.0 etc.) branch projects
 
 buildvariants:
 - name: run-all-affected-jstests
@@ -44,3 +45,152 @@ buildvariants:
   tasks:
   - name: sync_repo_with_copybara
     priority: 50
+
+- name: enterprise-windows-ninja
+  display_name: "Ninja Build: Enterprise Windows"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  expansions:
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include c:/snmp/include"
+      LIBPATH="c:/sasl/lib c:/snmp/lib"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      --win-version-min=win10
+    compile_variant: enterprise-windows-ninja
+  tasks:
+  - name: compile_ninja_next_TG
+    distros:
+    - windows-vsCurrent-xlarge
+  - name: compile_ninja_TG
+    distros:
+    - windows-vsCurrent-xlarge
+
+- name: macos-enterprise-ninja
+  display_name: "Ninja Build: macOS Enterprise"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+    compile_variant: macos-enterprise-ninja
+  tasks:
+  - name: compile_ninja_next_TG
+  - name: compile_ninja_TG
+
+- name: macos-ninja-build-profiles
+  display_name: "Ninja Build Profiles: macOS"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++
+  tasks:
+  - name: compile_ninja_default_profile_TG
+  - name: compile_ninja_opt_profile_TG
+  - name: compile_ninja_fast_profile_TG
+  - name: compile_ninja_compiledb_profile_TG
+
+- name: macos-arm-ninja-build-profiles
+  display_name: "Ninja Build Profiles: macOS ARM"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100-arm64
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++
+  tasks:
+  - name: compile_ninja_default_profile_TG
+  - name: compile_ninja_opt_profile_TG
+  - name: compile_ninja_fast_profile_TG
+  - name: compile_ninja_compiledb_profile_TG
+
+- name: windows-ninja-build-profiles
+  display_name: "Ninja Build Profiles: Windows"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  expansions:
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=windows
+      CPPPATH="c:/sasl/include c:/snmp/include"
+      -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")
+      LIBPATH="c:/sasl/lib c:/snmp/lib"
+      --win-version-min=win10
+  tasks:
+  - name: compile_ninja_default_profile_TG
+    distros:
+    - windows-vsCurrent-xlarge
+  - name: compile_ninja_opt_profile_TG
+    distros:
+    - windows-vsCurrent-xlarge
+  - name: compile_ninja_fast_profile_TG
+    distros:
+    - windows-vsCurrent-xxlarge
+  - name: compile_ninja_compiledb_profile_TG
+    distros:
+    - windows-vsCurrent-xxlarge
+
+- name: ubuntu1804-ninja-build-profiles
+  display_name: "Ninja Build Profiles: Ubuntu 18.04"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-small
+  stepback: false
+  expansions:
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo)
+    repo_edition: enterprise
+    has_packages: false
+    compile_variant: ubuntu1804-ninja-build-profiles
+  tasks:
+  - name: compile_ninja_default_profile_linux_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_opt_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_san_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_fast_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_compiledb_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+
+- name: enterprise-rhel-80-64-bit-dynamic-ninja
+  display_name: "Ninja Build: Enterprise RHEL 8.0"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions:
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --link-model=dynamic
+    has_packages: false
+  tasks:
+  - name: compile_ninja_next_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_ninja_TG
+    distros:
+    - rhel80-xlarge
