@@ -104,6 +104,7 @@ COMMANDS="
 2>&1 ./s_string > ${t_pfx}s_string
 2>&1 ./s_tags > ${t_pfx}tags
 2>&1 ./s_typedef -c > ${t_pfx}s_typedef_c
+2>&1 ./s_visibility_checks > ${t_pfx}s_visibility_checks
 2>&1 ./s_void > ${t_pfx}s_void
 2>&1 ./s_whitespace > ${t_pfx}s_whitespace
 2>&1 python3 function.py > ${t_pfx}py_function
