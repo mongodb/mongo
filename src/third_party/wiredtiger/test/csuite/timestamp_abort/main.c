@@ -1770,6 +1770,13 @@ main(int argc, char *argv[])
      */
     testutil_parse_end_opt(opts);
 
+    /*
+     * Don't allow testing backups in the compatibility mode. MongoDB no longer uses it, and the
+     * compatibility mode is inherently incompatible with backup-related fixes that add new log
+     * records. So disallow the test.
+     */
+    testutil_assert(!(opts->compat && use_backups));
+
     testutil_work_dir_from_path(home, sizeof(home), opts->home);
 
     /*
