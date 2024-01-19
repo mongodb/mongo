@@ -52,9 +52,12 @@ class ClusterExplain {
 public:
     /**
      * Returns an explain command request wrapping the passed in command at the given verbosity
-     * level, propagating generic top-level command arguments.
+     * level, propagating generic top-level command arguments. Additionally passed command is
+     * appended with query settings.
      */
-    static BSONObj wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity);
+    static BSONObj wrapAsExplain(const BSONObj& cmdObj,
+                                 ExplainOptions::Verbosity verbosity,
+                                 const BSONObj& querySettings = BSONObj());
 
     /**
      * Determines the kind of "execution stage" that mongos would use in order to collect the

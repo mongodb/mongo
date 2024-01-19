@@ -32,6 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/hint.idl"
+    - "mongo/db/query/query_settings/query_settings.idl"
 
 commands:
     distinct:
@@ -65,3 +66,7 @@ commands:
                 description: "The index name to use or the index specification document."
                 type: indexHint
                 default: BSONObj()
+            querySettings:
+                description: "Query settings for the given query"
+                type: QuerySettings
+                optional: true

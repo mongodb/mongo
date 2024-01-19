@@ -127,8 +127,20 @@ void throwOnBadARSResponse(const AsyncRequestsSender::Response& arsResponse) {
 }  // namespace
 
 // static
-BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity) {
-    auto filtered = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
+BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
+                                      ExplainOptions::Verbosity verbosity,
+                                      const BSONObj& querySettings) {
+    const auto filtered = [&]() {
+        BSONObjIterator cmdIter(cmdObj);
+        BSONObjBuilder explainBuilder;
+        CommandHelpers::filterCommandRequestForPassthrough(&cmdIter, &explainBuilder);
+
+        // Propagate query settings if there are any.
+        if (!querySettings.isEmpty()) {
+            explainBuilder.append("querySettings", querySettings);
+        }
+        return explainBuilder.obj();
+    }();
     BSONObjBuilder out;
     out.append("explain", filtered);
     out.append("verbosity", ExplainOptions::verbosityString(verbosity));

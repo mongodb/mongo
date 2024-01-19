@@ -7,8 +7,8 @@ selector:
     - jstests/core/**/*.js
   exclude_files:
     # TODO SERVER-81601 Re-enable once query settings support views.
+    - jstests/core/views/*.js
     - jstests/core/query/agg_hint.js
-    - jstests/core/views/views_find.js
 
     # Query settings do not force indexes, and therefore empty filter will result in collection scans.
     - jstests/core/index/geo/geo6.js
