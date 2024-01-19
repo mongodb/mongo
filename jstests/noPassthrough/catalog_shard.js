@@ -193,8 +193,8 @@ const newShardName =
 
     // Use write concern to verify the commands support them. Any values weaker than the default
     // sharding metadata write concerns will be upgraded.
-    let removeRes = assert.commandWorked(
-        st.s0.adminCommand({transitionToDedicatedConfigServer: 1, writeConcern: {wtimeout: 100}}));
+    let removeRes = assert.commandWorked(st.s0.adminCommand(
+        {transitionToDedicatedConfigServer: 1, writeConcern: {wtimeout: 1000 * 60 * 60 * 24}}));
     assert.eq("started", removeRes.state);
 
     // The removal won't complete until all chunks and dbs are moved off the config shard.
@@ -324,8 +324,8 @@ const newShardName =
 
     // Use write concern to verify the command support them. Any values weaker than the default
     // sharding metadata write concerns will be upgraded.
-    assert.commandWorked(
-        st.s.adminCommand({transitionFromDedicatedConfigServer: 1, writeConcern: {wtimeout: 100}}));
+    assert.commandWorked(st.s.adminCommand(
+        {transitionFromDedicatedConfigServer: 1, writeConcern: {wtimeout: 1000 * 60 * 60 * 24}}));
 
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);
