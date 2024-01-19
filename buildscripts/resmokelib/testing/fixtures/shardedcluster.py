@@ -24,14 +24,15 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                  mongod_options=None, dbpath_prefix=None, preserve_dbpath=False, num_shards=1,
                  num_rs_nodes_per_shard=1, num_mongos=1, enable_balancer=True, auth_options=None,
                  configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
-                 config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False):
+                 config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False,
+                 replica_set_endpoint=False):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
             (1) The cluster has no dedicated routers.
             (2) Each shard-server in the cluster is started with the "--routerPort" CLI switch to enable routing.
             (3) An arbitrary subset of size `num_routers` of the shard-servers are chosen at fixture startup to serve as the routers,
-                and all routing requests are directed to the routing ports of those nodes. 
+                and all routing requests are directed to the routing ports of those nodes.
             TODO SERVER-81470: Support a mix of routing-enabled and routing-disabled shard servers in embedded router mode.
         """
 
@@ -62,6 +63,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.auth_options = auth_options
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
         self.embedded_router_mode = embedded_router
+        self.replica_endpoint_mode = replica_set_endpoint
 
         # Options for roles - shardsvr, configsvr.
         self.configsvr_options = self.fixturelib.make_historic(
@@ -87,6 +89,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.configsvr = None
         self.mongos = []
         self.shards = []
+
+        self.is_ready = False
 
     def pids(self):
         """:return: pids owned by this fixture if any."""
@@ -190,6 +194,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         for shard in self.shards:
             self.refresh_logical_session_cache(shard)
 
+        self.is_ready = True
+
     # TODO: Remove with SERVER-80100.
     def _await_auto_bootstrapped_config_shard(self, config_shard_rs):
         deadline = time.time() + ShardedClusterFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
@@ -273,6 +279,8 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             self.logger.error("Stopping the sharded cluster fixture failed.")
             raise self.fixturelib.ServerFailure(teardown_handler.get_error_message())
 
+        self.is_ready = False
+
     def is_running(self):
         """Return true if all nodes in the cluster are all still operating."""
         return (self.configsvr is not None and self.configsvr.is_running()
@@ -288,6 +296,18 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
+        if self.is_ready and self.replica_endpoint_mode:
+            # The replica set endpoint would only become active after the replica set has become a
+            # config shard (i.e. after the addShard or transitionFromConfigServer step) so before
+            # that we must connect to a mongos or the router port of a mongod to run sharding
+            # commands.
+            if len(self.shards) == 0:
+                raise ValueError(
+                    "Must call install_rs_shard() before calling get_internal_connection_string()")
+            if len(self.shards) > 1:
+                raise ValueError("Cannot use replica set endpoint on a multi-shard cluster")
+            return self.shards[0].get_driver_connection_url()
+
         return "mongodb://" + self.get_internal_connection_string()
 
     def get_node_info(self):

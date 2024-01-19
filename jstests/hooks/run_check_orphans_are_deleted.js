@@ -11,22 +11,25 @@ assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a 
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
-if (topology.type !== Topology.kShardedCluster) {
+if (topology.type == Topology.kShardedCluster) {
+    for (let shardName of Object.keys(topology.shards)) {
+        const shard = topology.shards[shardName];
+        let shardPrimary;
+
+        if (shard.type === Topology.kStandalone) {
+            shardPrimary = shard.mongod;
+        } else if (shard.type === Topology.kReplicaSet) {
+            shardPrimary = shard.primary;
+        } else {
+            throw new Error('Unrecognized topology format: ' + tojson(topology));
+        }
+
+        CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), new Mongo(shardPrimary), shardName);
+    }
+} else if (topology.type == Topology.kReplicaSet && topology.configsvr &&
+           TestData.testingReplicaSetEndpoint) {
+    CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), new Mongo(topology.primary), "config");
+} else {
     throw new Error('Orphan documents check must be run against a sharded cluster, but got: ' +
                     tojson(topology));
-}
-
-for (let shardName of Object.keys(topology.shards)) {
-    const shard = topology.shards[shardName];
-    let shardPrimary;
-
-    if (shard.type === Topology.kStandalone) {
-        shardPrimary = shard.mongod;
-    } else if (shard.type === Topology.kReplicaSet) {
-        shardPrimary = shard.primary;
-    } else {
-        throw new Error('Unrecognized topology format: ' + tojson(topology));
-    }
-
-    CheckOrphansAreDeletedHelpers.runCheck(db.getMongo(), new Mongo(shardPrimary), shardName);
 }

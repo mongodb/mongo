@@ -644,6 +644,10 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
+  - name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
+  - name: sharded_jscore_txns_with_replica_set_endpoint_gen
+  - name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
+  - name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
   - name: streams
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs

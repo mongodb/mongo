@@ -43,7 +43,7 @@ verifyMetaFields(coll);
 
 // Skip in sharded passthrough suites since query on time-series time field cannot target the
 // command to one single shard.
-if (!db.getMongo().isMongos()) {
+if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
     assert.commandWorked(testDB.runCommand({
         update: coll.getName(),
         updates: [{

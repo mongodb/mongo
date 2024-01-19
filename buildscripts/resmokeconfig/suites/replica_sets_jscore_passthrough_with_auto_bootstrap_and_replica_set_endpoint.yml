@@ -1,3 +1,9 @@
+# This suite is based on the replica_sets_jscore_txns passthrough suite. It is used for testing that
+# there is no feature parity issue between a replica set before and after it has been bootstrapped
+# as a single-shard cluster as long as the replica set endpoint is enabled. When feature parity is
+# achieved, the set of tests disabled in this suite should be the same as the set of tests disabled
+# in the replica_sets_jscore_txns passthrough suite.
+
 test_kind: js_test
 
 selector:
@@ -38,8 +44,6 @@ selector:
     - jstests/core/txns/prepare_conflict.js
 
     # The tests below are disabled because of sharding auto-bootstrap and replica set endpoint.
-    # Cannot specify "runtimeConstants" option to a mongos since it is internal-only.
-    - jstests/core/command_let_variables.js
     # Cannot specify "$_requestResumeToken" option to a mongos since it is internal-only.
     - jstests/core/find_with_resume_after_param.js
     - jstests/core/resume_query_from_non_existent_record.js

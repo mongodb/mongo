@@ -32,7 +32,7 @@ function checkResponseFields(command, commandType) {
     assert(res.localTime, "localTime possibly missing:" + tojson(res));
     assert(res.connectionId, "connectionId missing or false" + tojson(res));
 
-    if (!testingReplication) {
+    if (!testingReplication && !TestData.testingReplicaSetEndpoint) {
         var badFields = [];
         var unwantedReplSetFields = [
             "setName",

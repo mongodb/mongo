@@ -104,7 +104,7 @@ if (!isMongos && getOptimizer(explain) == "classic") {
     }
 }
 
-if (!isMongos) {
+if (!isMongos && !TestData.testingReplicaSetEndpoint) {
     // Test that if runtimeConstants and let are both specified, both will coexist.
     // Runtime constants are not allowed on mongos passthroughs.
     let constants = {

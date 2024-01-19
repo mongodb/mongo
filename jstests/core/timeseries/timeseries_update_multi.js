@@ -215,7 +215,7 @@ const doc_id_12_time_int_metric = {
 
 // Query on the metaField and modify the timeField.
 // Skip tests changing the shard key value in sharding.
-if (!db.getMongo().isMongos()) {
+if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
     (function testMetaFieldQueryTimeFieldUpdate() {
         testUpdate({
             timeseriesOptions: {metaField: metaFieldName},
@@ -335,7 +335,7 @@ if (!db.getMongo().isMongos()) {
 
 // This command will fail because all time-series collections require a time field.
 // Skip tests changing the shard key value in sharding.
-if (!db.getMongo().isMongos()) {
+if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
     (function testRemoveTimeField() {
         testUpdate({
             timeseriesOptions: {metaField: metaFieldName},
@@ -357,7 +357,7 @@ if (!db.getMongo().isMongos()) {
 
 // This command will fail because the time field must be a timestamp.
 // Skip tests changing the shard key value in sharding.
-if (!db.getMongo().isMongos()) {
+if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
     (function testChangeTimeFieldType() {
         testUpdate({
             timeseriesOptions: {metaField: metaFieldName},
@@ -829,7 +829,7 @@ if (!db.getMongo().isMongos()) {
  */
 // Run an upsert that doesn't include an _id.
 // Skip upsert tests in sharding as the query has to be on the shard key field.
-if (!db.getMongo().isMongos()) {
+if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
     (function testUpsertWithNoId() {
         testUpdate({
             timeseriesOptions: {metaField: metaFieldName},
@@ -1024,7 +1024,7 @@ const fixedBucketOptions = {
     bucketMaxSpanSeconds: bucketParam,
     bucketRoundingSeconds: bucketParam
 };
-if (!db.getMongo().isMongos()) {
+if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
     (function testUpsertSupplyDoc_NoFilter() {
         testUpdate({
             timeseriesOptions: fixedBucketOptions,

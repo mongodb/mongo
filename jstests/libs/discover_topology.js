@@ -23,6 +23,7 @@ export var DiscoverTopology = (function() {
         res.passives = res.passives || [];
         return {
             type: Topology.kReplicaSet,
+            configsvr: res.configsvr == 2,
             primary: res.primary,
             nodes: [...res.hosts, ...res.passives]
         };

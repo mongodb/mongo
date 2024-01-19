@@ -1,13 +1,15 @@
 import {MetadataConsistencyChecker} from "jstests/libs/check_metadata_consistency_helpers.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {DiscoverTopology, Topology} from "jstests/libs/discover_topology.js";
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 
+const conn = db.getMongo();
+
 {
     // Check that we are running on a sharded cluster
-    let isShardedCluster = false;
+    let topology;
     try {
-        isShardedCluster = FixtureHelpers.isMongos(db);
+        topology = DiscoverTopology.findConnectedNodes(conn);
     } catch (e) {
         if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
             ErrorCodes.isNetworkTimeoutError(e.code)) {
@@ -19,8 +21,10 @@ assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a 
             throw e;
         }
     }
-    assert(isShardedCluster, "Metadata consistency check must be run against a sharded cluster");
+    assert(topology.type == Topology.kShardedCluster ||
+               (topology.type == Topology.kReplicaSet && topology.configsvr &&
+                TestData.testingReplicaSetEndpoint),
+           "Metadata consistency check must be run against a sharded cluster");
 }
 
-const mongos = db.getMongo();
-MetadataConsistencyChecker.run(mongos);
+MetadataConsistencyChecker.run(conn);

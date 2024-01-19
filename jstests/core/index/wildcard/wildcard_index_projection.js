@@ -16,7 +16,7 @@ const coll = db[collName];
 coll.drop();
 coll.createIndex({"$**": 1}, {wildcardProjection: {name: 0, type: 0, _id: 1}});
 
-const sharded = FixtureHelpers.isMongos(db);
+const sharded = FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint;
 
 const indexes = coll.getIndexes().filter(idx => idx.name === "$**_1");
 assert.eq(1, indexes.length);

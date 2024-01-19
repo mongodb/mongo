@@ -164,7 +164,7 @@ if (columnstoreEnabled) {
 }
 
 // Hidden index on capped collection.
-if (!FixtureHelpers.isMongos(db)) {
+if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
     coll = assertDropAndRecreateCollection(db, collName, {capped: true, size: 100});
     validateHiddenIndexBehaviour({query: {a: 1}, index_type: 1});
     coll = assertDropAndRecreateCollection(db, collName);

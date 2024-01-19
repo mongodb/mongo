@@ -657,7 +657,7 @@ export function planHasStage(db, root, stage) {
     const matchingStages = getPlanStages(root, stage);
 
     // If we are executing against a mongos, we may get more than one occurrence of the stage.
-    if (FixtureHelpers.isMongos(db)) {
+    if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
         return matchingStages.length >= 1;
     } else {
         assert.lt(matchingStages.length,

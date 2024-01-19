@@ -1110,6 +1110,12 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding"]
   commands:
@@ -1122,12 +1128,24 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
+- <<: *gen_task_template
+  name: sharded_jscore_txns_with_replica_set_endpoint_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+
 - <<: *task_template
   name: sharded_jscore_txns_sharded_collections
   tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "txns"]
   commands:
   - func: "do setup"
   - func: "run tests"
+
+- <<: *gen_task_template
+  name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
 
 - <<: *task_template
   name: sharded_jscore_txns_without_snapshot
@@ -1213,6 +1231,12 @@ tasks:
 - <<: *gen_task_template
   name: sharding_jscore_passthrough_with_auto_bootstrap_gen
   tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
+  tags: []
   commands:
   - func: "generate resmoke tasks"
 

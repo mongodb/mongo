@@ -13,7 +13,7 @@ testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});
 const session = db.getMongo().startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(dbName);
 
-if (FixtureHelpers.isMongos(db)) {
+if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Access the collection before creating indexes so it can be implicitly sharded.
     assert.eq(sessionDB[collName].find().itcount(), 0);
 }

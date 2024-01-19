@@ -234,7 +234,9 @@ assert.commandWorked(subpath_idx_coll.createIndex({"a.$**": "columnstore"}));
 // Note that this is only applicable in non-sharded environments, as the index will not be able to
 // cover the query if we need the shard key.
 explain = subpath_idx_coll.find({a: 1}, {_id: 0, a: 1}).explain();
-assert(planHasStage(db, explain, "COLUMN_SCAN") || FixtureHelpers.isMongos(db), explain);
+assert(planHasStage(db, explain, "COLUMN_SCAN") || FixtureHelpers.isMongos(db) ||
+           TestData.testingReplicaSetEndpoint,
+       explain);
 
 // Index does not cover query.
 explain = subpath_idx_coll.find({b: 1}, {_id: 0, b: 1}).explain();
@@ -246,7 +248,7 @@ explain = subpath_idx_coll.find({a: 1}, {_id: 0, a: 1}).explain();
 assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 // Hint the subpath index.
-if (!FixtureHelpers.isMongos(db)) {
+if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
     explain =
         subpath_idx_coll.find({a: 1}, {_id: 0, a: 1}).hint({"a.$**": "columnstore"}).explain();
     assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);

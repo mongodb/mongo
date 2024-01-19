@@ -21,7 +21,7 @@ mydb.foo.drop({writeConcern: {w: "majority"}});
 
 assert.commandWorked(mydb.createCollection("foo", {writeConcern: {w: "majority"}}));
 
-if (FixtureHelpers.isMongos(db)) {
+if (FixtureHelpers.isMongos(db) || TestData.testingReplicaSetEndpoint) {
     // Before starting the transaction below, access the collection so it can be implicitly
     // sharded and force all shards to refresh their database versions because the refresh
     // requires an exclusive lock and would block behind the transaction.

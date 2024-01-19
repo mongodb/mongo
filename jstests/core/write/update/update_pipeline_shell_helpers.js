@@ -107,7 +107,7 @@ assert.docEq(expectedFindOneAndUpdatePostImage, findOneAndUpdatePostImage);
 
 // We skip these tests under sharded fixtures, since sharded passthroughs require that FAM queries
 // contain the shard key.
-if (!FixtureHelpers.isMongos(db)) {
+if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
     let explain = testColl.explain("queryPlanner").update({a: 2}, [{$set: {y: 999}}]);
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "COLLSCAN"));
     assert(planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"));

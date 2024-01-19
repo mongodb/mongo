@@ -63,8 +63,9 @@ export var ShardingOverrideCommon = (function() {
      * @returns nothing
      */
     function shardCollectionWithSpec({db, collName, shardKey, timeseriesSpec}) {
-        // Don't attempt to shard if this operation is running on mongoD.
-        if (!FixtureHelpers.isMongos(db)) {
+        // Only attempt to shard if this operation is running on a mongos or a mongod with replica
+        // set endpoint enabled.
+        if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
             return;
         }
 

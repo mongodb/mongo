@@ -67,8 +67,12 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
 
         # TODO SERVER-75675 do not skip index consistency check
         shell_options = self._shell_options.copy() if self._shell_options is not None else {}
-        shell_options.update(
-            {'global_vars': {'TestData': {'skipCheckingIndexesConsistentAcrossCluster': True}}})
+        if "global_vars" not in shell_options:
+            shell_options["global_vars"] = {}
+        if "TestData" not in shell_options["global_vars"]:
+            shell_options["global_vars"]["TestData"] = {}
+        shell_options["global_vars"]["TestData"][
+            "skipCheckingIndexesConsistentAcrossCluster"] = True
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
             test.logger, test, self, self._js_filename, shell_options)
