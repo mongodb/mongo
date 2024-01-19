@@ -461,7 +461,7 @@ __posix_file_read_mmap(
     pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
     if (pfh->mmap_buf == NULL || pfh->mmap_resizing)
-        return (__posix_file_read(file_handle, wt_session, offset, len, buf));
+        goto use_syscall;
 
     __wt_verbose_debug2(session, WT_VERB_READ,
       "read-mmap: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT
@@ -470,6 +470,11 @@ __posix_file_read_mmap(
 
     /* Indicate that we might be using the mapped area */
     (void)__wt_atomic_addv32(&pfh->mmap_usecount, 1);
+    /* Check after incrementing use count if we raced a resizing thread. */
+    if (pfh->mmap_resizing) {
+        (void)__wt_atomic_subv32(&pfh->mmap_usecount, 1);
+        goto use_syscall;
+    }
 
     /*
      * If the I/O falls inside the mapped buffer, and the buffer is not being re-sized, we will use
@@ -488,6 +493,7 @@ __posix_file_read_mmap(
     if (mmap_success)
         return (0);
 
+use_syscall:
     /* We couldn't use mmap for some reason, so use the system call. */
     return (__posix_file_read(file_handle, wt_session, offset, len, buf));
 }
@@ -652,10 +658,15 @@ __posix_file_write_mmap(
       file_handle->name, pfh->fd, offset, len, (void *)pfh->mmap_buf, pfh->mmap_size);
 
     if (pfh->mmap_buf == NULL || pfh->mmap_resizing)
-        return (__posix_file_write(file_handle, wt_session, offset, len, buf));
+        goto use_syscall;
 
     /* Indicate that we might be using the mapped area */
     (void)__wt_atomic_addv32(&pfh->mmap_usecount, 1);
+    /* Check after incrementing use count if we raced a resizing thread. */
+    if (pfh->mmap_resizing) {
+        (void)__wt_atomic_subv32(&pfh->mmap_usecount, 1);
+        goto use_syscall;
+    }
 
     /*
      * If the I/O falls inside the mapped buffer, and the buffer is not being re-sized, we will use
@@ -674,6 +685,7 @@ __posix_file_write_mmap(
     if (mmap_success)
         return (0);
 
+use_syscall:
     /* We couldn't use mmap for some reason, so use the system call. */
     WT_RET(__posix_file_write(file_handle, wt_session, offset, len, buf));
 
