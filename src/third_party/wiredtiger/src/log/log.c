@@ -1001,7 +1001,7 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
     WT_ERR(__wt_logrec_read(session, &p, end, &rectype));
     if (rectype != WT_LOGREC_SYSTEM)
         WT_ERR_MSG(session, WT_ERROR, "System log record missing");
-    WT_ERR(__wt_log_recover_system(session, &p, end, lsnp));
+    WT_ERR(__wt_log_recover_prevlsn(session, &p, end, lsnp));
 
 err:
     __wt_scr_free(session, &buf);
@@ -1236,11 +1236,11 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
      */
     WT_SET_LSN(&log->alloc_lsn, log->fileid, WT_LOG_END_HEADER);
     /*
-     * If we're running the version where we write a system record do so now and update the
+     * If we're running the version where we write the previous LSN, do so now and update the
      * alloc_lsn.
      */
     if (log->log_version >= WT_LOG_VERSION_SYSTEM) {
-        WT_RET(__wt_log_system_record(session, log_fh, &logrec_lsn));
+        WT_RET(__wt_log_system_prevlsn(session, log_fh, &logrec_lsn));
         WT_SET_LSN(&log->alloc_lsn, log->fileid, log->first_record);
     }
     WT_ASSIGN_LSN(&end_lsn, &log->alloc_lsn);
