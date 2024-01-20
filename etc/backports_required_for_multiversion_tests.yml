@@ -553,6 +553,8 @@ last-continuous:
     ticket: SERVER-84130
   - test_file: jstests/noPassthrough/disallow_new_transactions_at_shutdown_on_mongos.js
     ticket: SERVER-77667
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   - test_file: jstests/core/timeseries/timeseries_lookup.js
     ticket: SERVER-79637
   - test_file: jstests/core/notablescan.js
@@ -1172,6 +1174,8 @@ last-lts:
     ticket: SERVER-84130
   - test_file: jstests/noPassthrough/disallow_new_transactions_at_shutdown_on_mongos.js
     ticket: SERVER-77667
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   - test_file: jstests/core/timeseries/timeseries_lookup.js
     ticket: SERVER-79637
   - test_file: jstests/core/notablescan.js
