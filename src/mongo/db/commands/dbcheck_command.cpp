@@ -1198,6 +1198,11 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         if (!(currIndexKey && (keyString == currIndexKey.get().keyString))) {
             // Check if we should finish this batch.
             if (batchStats.nKeys >= _info.maxDocsPerBatch) {
+                LOGV2_DEBUG(8520200,
+                            3,
+                            "Finish the current batch because maxDocsPerBatch is met.",
+                            "maxDocsPerBatch"_attr = _info.maxDocsPerBatch,
+                            "batchStats.nKeys"_attr = batchStats.nKeys);
                 batchStats.finishedIndexBatch = true;
                 break;
             }
@@ -1208,6 +1213,10 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         }
 
         if (Date_t::now() > batchStats.deadline) {
+            LOGV2_DEBUG(8520201,
+                        3,
+                        "Finish the current batch because batch deadline is met.",
+                        "batch deadline"_attr = batchStats.deadline);
             batchStats.finishedIndexBatch = true;
             break;
         }
