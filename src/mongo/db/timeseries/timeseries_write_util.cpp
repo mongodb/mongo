@@ -770,14 +770,15 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
                             bucket_catalog::BucketToReopen{suitableBucket, validator};
                     }
 
-                    swResult = bucket_catalog::insert(opCtx,
-                                                      bucketCatalog,
-                                                      viewNs,
-                                                      bucketsColl->getDefaultCollator(),
-                                                      timeSeriesOptions,
-                                                      measurementDoc,
-                                                      combine,
-                                                      reopeningContext);
+                    swResult = bucket_catalog::insertWithReopeningContext(
+                        opCtx,
+                        bucketCatalog,
+                        viewNs,
+                        bucketsColl->getDefaultCollator(),
+                        timeSeriesOptions,
+                        measurementDoc,
+                        combine,
+                        *reopeningContext);
                 } else if (auto* waiter = get_if<bucket_catalog::InsertWaiter>(&insertResult)) {
                     // Need to wait for another operation to finish, then retry. This could be
                     // another reopening request or a previously prepared write batch for the same

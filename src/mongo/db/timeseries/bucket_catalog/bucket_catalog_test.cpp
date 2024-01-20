@@ -1965,14 +1965,15 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     reopeningContext.bucketToReopen = BucketToReopen{bucketDoc, validator};
 
     // We should be able to pass in a valid bucket and insert into it.
-    result = insert(_opCtx,
-                    *_bucketCatalog,
-                    _ns1,
-                    _getCollator(_ns1),
-                    _getTimeseriesOptions(_ns1),
-                    ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
-                    CombineWithInsertsFromOtherClients::kAllow,
-                    &reopeningContext);
+    result = insertWithReopeningContext(
+        _opCtx,
+        *_bucketCatalog,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
+        CombineWithInsertsFromOtherClients::kAllow,
+        reopeningContext);
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(holds_alternative<SuccessfulInsertion>(result.getValue()));
     batch = get<SuccessfulInsertion>(result.getValue()).batch;
@@ -2050,14 +2051,15 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     reopeningContext.bucketToReopen = BucketToReopen{bucketDoc, validator};
 
     // We should get an WriteConflict back if we pass in an outdated bucket.
-    result = insert(_opCtx,
-                    *_bucketCatalog,
-                    _ns1,
-                    _getCollator(_ns1),
-                    _getTimeseriesOptions(_ns1),
-                    ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
-                    CombineWithInsertsFromOtherClients::kAllow,
-                    &reopeningContext);
+    result = insertWithReopeningContext(
+        _opCtx,
+        *_bucketCatalog,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
+        CombineWithInsertsFromOtherClients::kAllow,
+        reopeningContext);
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::WriteConflict);
 }
@@ -2459,14 +2461,13 @@ TEST_F(BucketCatalogTest, InsertWithMultipleOpenBucketsPerMetadata) {
     // metadata that it could choose from. When the feature flag is enabled it should choose the
     // first bucket that it finds that also has a time range suitable for the document we are
     // inserting.
-    auto result = internal::insert(_opCtx,
-                                   *_bucketCatalog,
-                                   _ns1,
-                                   autoColl->getDefaultCollator(),
-                                   autoColl->getTimeseriesOptions().get(),
-                                   doc,
-                                   CombineWithInsertsFromOtherClients::kAllow,
-                                   internal::AllowBucketCreation::kNo);
+    auto result = insert(_opCtx,
+                         *_bucketCatalog,
+                         _ns1,
+                         autoColl->getDefaultCollator(),
+                         autoColl->getTimeseriesOptions().get(),
+                         doc,
+                         CombineWithInsertsFromOtherClients::kAllow);
 
     // Assert that the insert was successful, and that whichever bucket has the smaller
     // minTime is the one that received the measurement. This makes the test more resilient

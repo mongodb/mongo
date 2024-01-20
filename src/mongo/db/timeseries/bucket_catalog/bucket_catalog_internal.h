@@ -155,7 +155,9 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
  * then we check both that the candidate bucket is open and that its time range accomadates the
  * time value of the measurement we are attempting to write.
  */
-Bucket* useBucket(Stripe& stripe,
+Bucket* useBucket(OperationContext* opCtx,
+                  BucketCatalog& catalog,
+                  Stripe& stripe,
                   WithLock stripeLock,
                   const CreationInfo& info,
                   AllowBucketCreation mode);
@@ -228,20 +230,6 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
     AllowBucketCreation mode,
     CreationInfo& info,
     Bucket& existingBucket);
-
-/**
- * Helper method to perform the heavy lifting for both 'tryInsert' and 'insert'. See documentation
- * on callers for more details.
- */
-StatusWith<InsertResult> insert(OperationContext* opCtx,
-                                BucketCatalog& catalog,
-                                const NamespaceString& ns,
-                                const StringDataComparator* comparator,
-                                const TimeseriesOptions& options,
-                                const BSONObj& doc,
-                                CombineWithInsertsFromOtherClients combine,
-                                AllowBucketCreation mode,
-                                ReopeningContext* reopeningContext = nullptr);
 
 /**
  * Wait for other batches to finish so we can prepare 'batch'

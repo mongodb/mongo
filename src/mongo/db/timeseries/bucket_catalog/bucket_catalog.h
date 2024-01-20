@@ -253,9 +253,25 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
  * closed in order to make space to insert the document. Any caller who receives the same batch may
  * commit or abort the batch after claiming commit rights. See WriteBatch for more details.
  *
- * If 'reopeningContext' is passed with a bucket, we will reopen that bucket and attempt to add
+ * We will attempt to reopen the bucket passed via 'reopeningContext' and attempt to add
  * 'doc' to that bucket. Otherwise we will attempt to find a suitable open bucket, or open a new
  * bucket if none exists.
+ */
+StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
+                                                    BucketCatalog& catalog,
+                                                    const NamespaceString& ns,
+                                                    const StringDataComparator* comparator,
+                                                    const TimeseriesOptions& options,
+                                                    const BSONObj& doc,
+                                                    CombineWithInsertsFromOtherClients combine,
+                                                    ReopeningContext& reopeningContext);
+
+/**
+ * Returns the WriteBatch into which the document was inserted and a list of any buckets that were
+ * closed in order to make space to insert the document. Any caller who receives the same batch may
+ * commit or abort the batch after claiming commit rights. See WriteBatch for more details.
+ *
+ * We will attempt to find a suitable open bucket, or open a new bucket if none exists.
  */
 StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 BucketCatalog& catalog,
@@ -263,8 +279,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 const StringDataComparator* comparator,
                                 const TimeseriesOptions& options,
                                 const BSONObj& doc,
-                                CombineWithInsertsFromOtherClients combine,
-                                ReopeningContext* reopeningContext = nullptr);
+                                CombineWithInsertsFromOtherClients combine);
 
 /**
  * If a 'tryInsert' call returns a 'InsertWaiter' object, the caller should use this function to
