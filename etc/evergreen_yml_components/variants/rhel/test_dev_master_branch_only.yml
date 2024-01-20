@@ -124,7 +124,6 @@ variables:
       MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=on
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -435,7 +434,6 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=on
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: true
@@ -498,7 +496,6 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=on
     scons_cache_scope: shared
     compile_variant: *enterprise-rhel-80-benchmarks
   tasks:
@@ -643,7 +640,6 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --enterprise-features=hot_backups
       --link-model=dynamic
-      --use-diagnostic-latches=on
     compile_variant: *hot_backups-rhel-70-64-bit
     has_packages: false
     scons_cache_mode: all
@@ -667,6 +663,7 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
       --link-model=dynamic
     scons_cache_mode: all
     scons_cache_scope: shared
@@ -700,7 +697,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
-      --use-diagnostic-latches=on
     test_flags: >-
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -744,7 +740,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
-      --use-diagnostic-latches=on
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
@@ -790,7 +785,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
-      --use-diagnostic-latches=on
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -838,7 +832,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
-      --use-diagnostic-latches=on
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
@@ -884,7 +877,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
-      --use-diagnostic-latches=on
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-

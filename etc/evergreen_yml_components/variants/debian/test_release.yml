@@ -15,6 +15,7 @@ buildvariants:
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     scons_cache_scope: shared
     large_distro_name: debian10-build
     compile_variant: enterprise-debian10-64
@@ -41,6 +42,7 @@ buildvariants:
       MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: debian11
     multiversion_edition: targeted
@@ -102,6 +104,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -154,6 +157,7 @@ buildvariants:
       MONGO_DISTMOD=debian12
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: debian12
     multiversion_edition: targeted
@@ -214,6 +218,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=debian12
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"

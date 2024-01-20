@@ -15,6 +15,7 @@ buildvariants:
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
@@ -45,6 +46,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel70
     multiversion_edition: targeted
@@ -100,6 +102,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     compile_variant: rhel76_compile_rhel70
   tasks:
   - name: compile_and_archive_dist_test_TG
@@ -123,6 +126,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel80
     multiversion_edition: targeted
@@ -185,6 +189,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -319,6 +324,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
@@ -377,6 +383,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
@@ -438,7 +445,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: rhel90
     multiversion_edition: targeted
@@ -494,7 +501,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel90
@@ -568,6 +575,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     has_packages: true
     packager_script: packager.py
@@ -626,6 +634,7 @@ buildvariants:
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
@@ -695,6 +704,7 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --use-diagnostic-latches=off
       --link-model=dynamic
       ENABLE_GRPC_BUILD=1
     compile_variant: enterprise-rhel-82-arm64-grpc
