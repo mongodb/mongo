@@ -19,6 +19,17 @@ assert.commandWorked(
     db.createCollection(collName, {timeseries: {timeField: "time", granularity: 'seconds'}}));
 assert.commandWorked(coll.createIndex({"time": 1}));
 
+// Setting prepareUnique should return an error on a time-series collection.
+assert.commandFailedWithCode(
+    db.runCommand(
+        {"collMod": collName, "index": {"keyPattern": {"time": 1}, "prepareUnique": true}}),
+    ErrorCodes.InvalidOptions);
+
+assert.commandFailedWithCode(
+    db.runCommand(
+        {"collMod": collName, "index": {"keyPattern": {"time": 1}, "prepareUnique": false}}),
+    ErrorCodes.InvalidOptions);
+
 // Tries to convert a time-series secondary index to TTL index.
 assert.commandFailedWithCode(
     db.runCommand(

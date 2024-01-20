@@ -317,6 +317,8 @@ last-continuous:
     ticket: SERVER-84013
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-82353
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   - test_file: jstests/core/timeseries/timeseries_lookup.js
     ticket: SERVER-79637
   - test_file: jstests/core/notablescan.js
@@ -700,6 +702,8 @@ last-lts:
     ticket: SERVER-84013
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-82353
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   - test_file: jstests/core/timeseries/timeseries_lookup.js
     ticket: SERVER-79637
   - test_file: jstests/core/notablescan.js
