@@ -114,11 +114,14 @@ void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
         bucket.memoryUsage += batch.max.objsize();
     }
 
-    if (bucket.decompressed.has_value()) {
-        batch.decompressed = std::move(bucket.decompressed);
-        bucket.decompressed.reset();
-        bucket.memoryUsage -= (batch.decompressed.value().before.objsize() +
-                               batch.decompressed.value().after.objsize());
+    batch.uncompressed = std::move(bucket.uncompressed);
+    bucket.uncompressed = {};
+    bucket.memoryUsage -= batch.uncompressed.objsize();
+
+    if (bucket.compressed) {
+        batch.compressed = std::move(bucket.compressed);
+        bucket.compressed.reset();
+        bucket.memoryUsage -= batch.compressed->objsize();
     }
 }
 
@@ -537,19 +540,16 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
 
         auto prevMemoryUsage = bucket->memoryUsage;
 
-        // Clear the compression state and memory usage from the previous operation as we're about
-        // to replace it with the compression state from the user operation that committed.
-        if (bucket->decompressed) {
-            bucket->memoryUsage -=
-                (bucket->decompressed->before.objsize() + bucket->decompressed->after.objsize());
-            bucket->decompressed = boost::none;
-        }
+        // The uncompressed and compressed images should have already been moved to the batch by
+        // this point.
+        invariant(!bucket->compressed && bucket->uncompressed.isEmpty());
 
-        // Take ownership of the committed batch's decompressed image.
-        if (batch->decompressed) {
-            bucket->decompressed = std::move(batch->decompressed);
-            bucket->memoryUsage +=
-                bucket->decompressed->before.objsize() + bucket->decompressed->after.objsize();
+        // Take ownership of the committed batch's uncompressed and compressed images.
+        bucket->uncompressed = std::move(batch->uncompressed);
+        bucket->memoryUsage += bucket->uncompressed.objsize();
+        if (batch->compressed) {
+            bucket->compressed = std::move(batch->compressed);
+            bucket->memoryUsage += bucket->compressed->objsize();
         }
 
         catalog.memoryUsage.fetchAndAdd(bucket->memoryUsage - prevMemoryUsage);

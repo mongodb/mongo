@@ -338,8 +338,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesDecompressAndUpdateOp) {
         uncompressedPreImage, kTimeseriesOptions.getTimeField(), ns, /*validateCompression=*/true);
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
-    batch->decompressed =
-        DecompressionResult{*preImageCompressionResult.compressedBucket, uncompressedPreImage};
+    batch->uncompressed = uncompressedPreImage;
+    batch->compressed = *preImageCompressionResult.compressedBucket;
 
     const BSONObj expectedDiff = fromjson(
         R"({
@@ -396,8 +396,8 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesDecompressAndUpdateOpWithMeta) {
         uncompressedPreImage, kTimeseriesOptions.getTimeField(), ns, /*validateCompression=*/true);
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
-    batch->decompressed =
-        DecompressionResult{*preImageCompressionResult.compressedBucket, uncompressedPreImage};
+    batch->uncompressed = uncompressedPreImage;
+    batch->compressed = *preImageCompressionResult.compressedBucket;
 
     const BSONObj expectedDiff = fromjson(
         R"({

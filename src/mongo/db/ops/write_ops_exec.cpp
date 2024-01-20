@@ -2374,7 +2374,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                   str::stream() << "Expected 1 insertion of document with _id '" << docId
                                 << "', but found " << output.result.getValue().getN() << ".");
     } else {
-        auto op = batch->decompressed.has_value()
+        auto op = batch->compressed
             ? timeseries::makeTimeseriesDecompressAndUpdateOp(
                   opCtx,
                   batch,

@@ -149,9 +149,12 @@ public:
     // Approximate memory usage of this bucket.
     uint64_t memoryUsage = sizeof(*this);
 
+    // The uncompressed bucket.
+    BSONObj uncompressed;
+
     // If set, bucket is compressed on disk, and first prepared batch will need to decompress it
     // before updating.
-    boost::optional<DecompressionResult> decompressed;
+    boost::optional<BSONObj> compressed;
 };
 
 /**

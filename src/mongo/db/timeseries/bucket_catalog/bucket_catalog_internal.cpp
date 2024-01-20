@@ -122,13 +122,13 @@ void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
     // Bucket is not compressed, likely because compression failed.
     // TODO SERVER-80653: This should no longer be possible with a retry mechanism on bucket
     // compression failure.
-    if (!bucket.decompressed) {
+    if (!bucket.compressed) {
         return;
     }
 
     ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, bucket.key.ns);
-    stats.incNumBytesUncompressed(bucket.decompressed->after.objsize());
-    stats.incNumBytesCompressed(bucket.decompressed->before.objsize());
+    stats.incNumBytesUncompressed(bucket.uncompressed.objsize());
+    stats.incNumBytesCompressed(bucket.compressed->objsize());
 }
 
 /**
@@ -444,10 +444,15 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
             return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};
         }
         bucket->size = decompressed.value().objsize();
-        bucket->decompressed = DecompressionResult{bucketDoc, decompressed.value()};
+        bucket->uncompressed = decompressed.value();
+        bucket->compressed = bucketDoc;
         bucket->memoryUsage += (decompressed.value().objsize() + bucketDoc.objsize());
     } else {
         bucket->size = bucketDoc.objsize();
+        if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            bucket->uncompressed = bucketDoc;
+        }
     }
 
     // Populate the top-level data field names.

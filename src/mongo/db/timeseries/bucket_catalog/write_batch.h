@@ -93,8 +93,9 @@ struct WriteBatch {
     BSONObj min;  // Batch-local min; full if first batch, updates otherwise.
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
     uint32_t numPreviouslyCommittedMeasurements = 0;
-    StringMap<std::size_t> newFieldNamesToBeInserted;   // Value is hash of string key
-    boost::optional<DecompressionResult> decompressed;  // If set, bucket is compressed on-disk.
+    StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
+    BSONObj uncompressed;
+    boost::optional<BSONObj> compressed;  // If set, bucket is compressed on-disk.
 
     bool openedDueToMetadata =
         false;  // If true, bucket has been opened due to the inserted measurement having different

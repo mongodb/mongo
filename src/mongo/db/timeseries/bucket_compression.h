@@ -64,15 +64,6 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
                                  const NamespaceString& nss,
                                  bool validateDecompression);
 
-/**
- * A simple struct holding the before (compressed) and after (decompressed) state of a bucket
- * document.
- */
-struct DecompressionResult {
-    BSONObj before;
-    BSONObj after;
-};
-
 boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc);
 
 /**

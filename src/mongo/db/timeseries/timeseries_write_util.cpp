@@ -600,9 +600,14 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     // TODO SERVER-80653: Handle bucket compression failure.
     BucketDocument bucketDoc = makeNewDocumentForWrite(batch, metadata);
     BSONObj bucketToInsert = bucketDoc.uncompressedBucket;
+
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        invariant(bucketDoc.compressedBucket);
+        batch->uncompressed = bucketDoc.uncompressedBucket.getOwned();
+    }
     if (bucketDoc.compressedBucket) {
-        batch->decompressed = DecompressionResult{bucketDoc.compressedBucket->getOwned(),
-                                                  bucketDoc.uncompressedBucket.getOwned()};
+        batch->compressed = bucketDoc.compressedBucket->getOwned();
         bucketToInsert = *bucketDoc.compressedBucket;
     }
 
@@ -617,8 +622,54 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
-    write_ops::UpdateCommandRequest op(bucketsNs,
-                                       {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
+    if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        write_ops::UpdateCommandRequest op(bucketsNs,
+                                           {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
+        op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
+        return op;
+    }
+
+    auto updateMod = makeTimeseriesUpdateOpEntry(opCtx, batch, metadata).getU();
+    auto updated = doc_diff::applyDiff(batch->uncompressed,
+                                       updateMod.getDiff(),
+                                       updateMod.mustCheckExistenceForInsertOperations());
+
+    // Hold the uncompressed bucket document that's currently on-disk prior to this write batch
+    // running.
+    auto before = std::move(batch->uncompressed);
+
+    // TODO SERVER-80653: Handle bucket compression failure.
+    auto compressionResult = timeseries::compressBucket(
+        updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
+    batch->uncompressed = updated;
+    if (compressionResult.compressedBucket) {
+        batch->compressed = *compressionResult.compressedBucket;
+    } else {
+        // Clear the previous compression state if we're inserting an uncompressed bucket due to
+        // compression failure.
+        batch->compressed = boost::none;
+    }
+
+    auto after = compressionResult.compressedBucket ? *compressionResult.compressedBucket : updated;
+
+    auto bucketTransformationFunc = [before = std::move(before), after = std::move(after)](
+                                        const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+        // Make sure the document hasn't changed since we read it into the BucketCatalog.
+        // This should not happen, but since we can double-check it here, we can guard
+        // against the missed update that would result from simply replacing with 'after'.
+        if (!timeseries::decompressBucket(bucketDoc).value_or(bucketDoc).binaryEqual(before)) {
+            throwWriteConflictException("Bucket document changed between initial read and update");
+        }
+        return after;
+    };
+
+    auto updates = makeTimeseriesTransformationOpEntry(
+        opCtx,
+        /*bucketId=*/batch->bucketHandle.bucketId.oid,
+        /*transformationFunc=*/std::move(bucketTransformationFunc));
+
+    write_ops::UpdateCommandRequest op(bucketsNs, {updates});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
 }
@@ -633,11 +684,11 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
     auto updateMod = makeTimeseriesUpdateOpEntry(opCtx, batch, metadata).getU();
     auto diff = updateMod.getDiff();
     auto updated = doc_diff::applyDiff(
-        batch->decompressed.value().after, diff, updateMod.mustCheckExistenceForInsertOperations());
+        batch->uncompressed, diff, updateMod.mustCheckExistenceForInsertOperations());
 
     // Holds the compressed bucket document that's currently on-disk prior to this write batch
     // running.
-    auto before = std::move(batch->decompressed.value().before);
+    auto before = std::move(*batch->compressed);
 
     CompressionResult compressionResult;
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -645,12 +696,13 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
         // TODO SERVER-80653: Handle bucket compression failure.
         compressionResult = timeseries::compressBucket(
             updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
+        batch->uncompressed = updated;
         if (compressionResult.compressedBucket) {
-            batch->decompressed = DecompressionResult{*compressionResult.compressedBucket, updated};
+            batch->compressed = *compressionResult.compressedBucket;
         } else {
             // Clear the previous compression state if we're inserting an uncompressed bucket due to
             // compression failure.
-            batch->decompressed = boost::none;
+            batch->compressed = boost::none;
         }
     }
 
@@ -817,7 +869,7 @@ void makeWriteRequest(OperationContext* opCtx,
             batch, bucketsNs, metadata, std::move(stmtIds[batch->bucketHandle.bucketId.oid])));
         return;
     }
-    if (batch->decompressed.has_value()) {
+    if (batch->compressed) {
         updateOps->push_back(makeTimeseriesDecompressAndUpdateOp(
             opCtx,
             batch,
