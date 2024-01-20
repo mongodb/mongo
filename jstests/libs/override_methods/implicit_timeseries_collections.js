@@ -17,13 +17,6 @@ const originalAssertEq = assert.eq;
 const timeFieldName = "overrideTimeFieldName";
 const metaFieldName = "metaFieldName"
 
-// A set of dollar operators that need to be specially handled in the update command.
-const dollarOperatorsSet = [
-    "$set",
-    "$setOnInsert",
-    "$addFields",
-];
-
 const denylistedNamespaces = [
     /^admin\./,
     /^config\./,
@@ -59,13 +52,17 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
             createCollectionImplicitly(
                 conn.getDB(dbName), `${dbName}.${cmdObj[cmdName]}`, cmdObj[cmdName]);
             // Add the timestamp property to every document in the insert.
-            cmdObj["documents"].forEach(doc => {
-                doc[timeFieldName] = timeValue;
-            });
+            if ("documents" in cmdObj) {
+                cmdObj["documents"].forEach(doc => {
+                    doc[timeFieldName] = timeValue;
+                });
+            }
             let insertResult = clientFunction.apply(conn, makeFuncArgs(cmdObj));
-            cmdObj["documents"].forEach(doc => {
-                delete doc[timeFieldName];
-            });
+            if ("documents" in cmdObj) {
+                cmdObj["documents"].forEach(doc => {
+                    delete doc[timeFieldName];
+                });
+            }
             return insertResult;
         }
         case "create": {
@@ -137,7 +134,9 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
 // Override the default runCommand with our custom version.
 OverrideHelpers.overrideRunCommand(runCommandOverride);
 
-// ----------------------- Rewriting Assert Functions ---------------------------------
+/**
+ * Rewrites the assert equality check.
+ */
 assert.eq = function(a, b, message) {
     try {
         originalAssertEq(a, b, message);
@@ -181,7 +180,7 @@ function createCollectionImplicitly(db, collFullName, collName) {
 }
 
 /**
- * Helper method to remove the time field from the cursor returned.
+ * Removes the time field from the cursor returned.
  */
 function cleanUpResultCursor(result, batchName) {
     if (!("cursor" in result)) {
