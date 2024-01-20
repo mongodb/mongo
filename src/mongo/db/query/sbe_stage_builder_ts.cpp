@@ -221,7 +221,9 @@ boost::optional<TypedExpression> SlotBasedStageBuilder::buildVectorizedExpr(SbEx
         if (abt.is<optimizer::Constant>()) {
             // We consider constant expressions as compatible with block processing.
             auto [tag, value] = abt.cast<optimizer::Constant>()->get();
-            return TypedExpression{sbe::makeE<sbe::EConstant>(tag, value), getTypeSignature(tag)};
+            auto [cpyTag, cpyVal] = sbe::value::copyValue(tag, value);
+            return TypedExpression{sbe::makeE<sbe::EConstant>(cpyTag, cpyVal),
+                                   getTypeSignature(tag)};
         } else {
             Vectorizer vectorizer(_state.frameIdGenerator,
                                   forFilterStage ? Vectorizer::Purpose::Filter
