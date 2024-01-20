@@ -4388,6 +4388,86 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
     future.default_timed_get();
 }
 
+TEST_F(BulkWriteExecTest, TestMaxRoundsWithoutProgress) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint(
+        kShardIdA,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {100, 200}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+
+    std::vector<MockRange> range{MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))};
+    auto singleShardNSTargeter = std::make_unique<MockNSTargeter>(nss, std::move(range));
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(std::move(singleShardNSTargeter));
+
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(0, BSON("x" << 1))},
+        {NamespaceInfoEntry(nss)});
+
+    LOGV2(7777801, "Sending an unordered request with stale shard versions.");
+    auto future = launchAsync([&] {
+        // Both ops will return StaleShardVersion, the MockNSTargeter will never successfully
+        // refresh these so we will return them until we eventually get NoProgressMade.
+        request.setOrdered(false);
+        auto replyInfo = bulk_write_exec::execute(operationContext(), targeters, request);
+        ASSERT_EQUALS(replyInfo.replyItems.size(), 2u);
+        ASSERT_NOT_OK(replyInfo.replyItems[0].getStatus());
+        ASSERT_EQUALS(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::NoProgressMade);
+        ASSERT_NOT_OK(replyInfo.replyItems[1].getStatus());
+        ASSERT_EQUALS(replyInfo.replyItems[1].getStatus().code(), ErrorCodes::NoProgressMade);
+        ASSERT_EQUALS(replyInfo.summaryFields.nErrors, 2);
+    });
+
+    int kMaxRoundsWithoutProgress = 5;
+
+    // Return multiple StaleShardVersion errors as we attempt to make progress on the request.
+    for (int i = 0; i < (1 + kMaxRoundsWithoutProgress); i++) {
+        // Mock a bulkWrite response to respond to the second op, which is valid.
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            BulkWriteCommandReply reply;
+            auto epoch = OID::gen();
+            Timestamp timestamp(1);
+            reply.setCursor(BulkWriteCommandResponseCursor(
+                0,  // cursorId
+                std::vector<mongo::BulkWriteReplyItem>{
+                    BulkWriteReplyItem(
+                        0,
+                        Status(StaleConfigInfo(nss,
+                                               ShardVersionFactory::make(
+                                                   ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                   boost::optional<CollectionIndexes>(boost::none)),
+                                               ShardVersionFactory::make(
+                                                   ChunkVersion({epoch, timestamp}, {2, 0}),
+                                                   boost::optional<CollectionIndexes>(boost::none)),
+                                               ShardId(kShardIdA)),
+                               "Stale error")),
+                    BulkWriteReplyItem(
+                        1,
+                        Status(StaleConfigInfo(nss,
+                                               ShardVersionFactory::make(
+                                                   ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                   boost::optional<CollectionIndexes>(boost::none)),
+                                               ShardVersionFactory::make(
+                                                   ChunkVersion({epoch, timestamp}, {2, 0}),
+                                                   boost::optional<CollectionIndexes>(boost::none)),
+                                               ShardId(kShardIdA)),
+                               "Stale error"))},
+                NamespaceString::makeBulkWriteNSS(boost::none)));
+            reply.setNErrors(2);
+            reply.setNInserted(0);
+            reply.setNDeleted(0);
+            reply.setNMatched(0);
+            reply.setNModified(0);
+            reply.setNUpserted(0);
+            return reply.toBSON();
+        });
+    }
+
+    future.default_timed_get();
+}
+
 TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("foo.bar");
     ShardEndpoint endpoint(
@@ -4612,10 +4692,6 @@ TEST(BulkWriteTest, getApproximateSize) {
     item = BulkWriteReplyItem{0, Status{std::move(extra), reason}};
     ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
 }
-
-// TODO(SERVER-72790): Test refreshing targeters on stale config errors, including the case where
-// NoProgressMade is returned if stale config retry doesn't make any progress after
-// kMaxRoundsWithoutProgress.
 
 }  // namespace
 
