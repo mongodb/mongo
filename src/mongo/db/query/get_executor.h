@@ -88,7 +88,10 @@ class CountRequest;
  * ('requestCollation' is empty).
  */
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
-    OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss);
+    OperationContext* opCtx,
+    const BSONObj& requestCollation,
+    const NamespaceString& nss,
+    boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
  * Filters indexes retrieved from index catalog by allowed indices in query settings.
@@ -246,7 +249,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const CollectionPtr* collection,
     const CountCommandRequest& request,
-    bool explain,
     const NamespaceString& nss);
 
 /**

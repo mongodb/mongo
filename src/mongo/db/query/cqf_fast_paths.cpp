@@ -820,7 +820,7 @@ boost::optional<ExecParams> tryGetSBEExecutorViaFastPath(
                                         query->getExpCtx(),
                                         query->nss(),
                                         collections,
-                                        query->getExplain(),
+                                        query->getExplain().has_value(),
                                         indexHint,
                                         nullptr /*pipeline*/,
                                         query);

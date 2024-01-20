@@ -138,8 +138,7 @@ namespace impl {
             {.expCtx = std::move(expCtxForCq),
              .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                                    .extensionsCallback = extensionsCallback,
-                                                   .allowedFeatures = allowedMatcherFeatures},
-             .explain = request.getIsExplain()});
+                                                   .allowedFeatures = allowedMatcherFeatures}});
     }
 }  // namespace impl
 

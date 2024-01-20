@@ -447,10 +447,8 @@ public:
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
             expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
-            auto cq = std::make_unique<CanonicalQuery>(
-                CanonicalQueryParams{.expCtx = std::move(expCtx),
-                                     .parsedFind = std::move(parsedRequest),
-                                     .explain = true});
+            auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+                .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});
 
             // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
             // $$USER_ROLES for the find command.

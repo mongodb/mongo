@@ -1373,7 +1373,8 @@ bool isEligibleForBonsai(OperationContext* opCtx,
                          const CollectionPtr& collection,
                          const CanonicalQuery& cq) {
     auto eligibility = determineBonsaiEligibility(opCtx, collection, cq);
-    return isEligibleForBonsaiUnderFrameworkControl(opCtx, cq.getExplain(), eligibility);
+    return isEligibleForBonsaiUnderFrameworkControl(
+        opCtx, cq.getExplain().has_value(), eligibility);
 }
 
 BonsaiEligibility isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {

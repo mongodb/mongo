@@ -71,7 +71,6 @@ struct CanonicalQueryParams {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::variant<std::unique_ptr<ParsedFindCommand>, ParsedFindCommandParams> parsedFind;
     std::vector<boost::intrusive_ptr<DocumentSource>> pipeline = {};
-    bool explain = false;
     bool isCountLike = false;
     bool isSearchQuery = false;
 };
@@ -254,8 +253,9 @@ public:
         return toStringShort(true);
     }
 
-    bool getExplain() const {
-        return _explain;
+    boost::optional<ExplainOptions::Verbosity> getExplain() const {
+        invariant(_expCtx);
+        return _expCtx->explain;
     }
 
     bool getForceClassicEngine() const {
@@ -292,10 +292,6 @@ public:
 
     boost::optional<size_t> getMaxMatchExpressionParams() const {
         return _maxMatchExpressionParams;
-    }
-
-    void setExplain(bool explain) {
-        _explain = explain;
     }
 
     bool getForceGenerateRecordId() const {
@@ -437,8 +433,6 @@ private:
     // are not pushed down into '_cqPipeline'. This is used by the executor to prepare corresponding
     // metadata.
     QueryMetadataBitSet _remainingSearchMetadataDeps;
-
-    bool _explain = false;
 
     // Determines whether the classic engine must be used.
     bool _forceClassicEngine = true;

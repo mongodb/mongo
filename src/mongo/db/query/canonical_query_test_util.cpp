@@ -141,12 +141,17 @@ std::unique_ptr<CanonicalQuery> CanonicalQueryTest::canonicalize(const char* que
     findCommand->setHint(fromjson(hintStr));
     findCommand->setMin(fromjson(minStr));
     findCommand->setMax(fromjson(maxStr));
+
+    auto expCtx = makeExpressionContext(opCtx(), *findCommand);
+    if (explain) {
+        expCtx->explain = explain::VerbosityEnum::kQueryPlanner;
+    }
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx(), *findCommand),
+        .expCtx = std::move(expCtx),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
-        .explain = explain});
+    });
 }
 
 }  // namespace mongo

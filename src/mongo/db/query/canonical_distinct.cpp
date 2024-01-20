@@ -299,9 +299,7 @@ CanonicalDistinct CanonicalDistinct::parse(const boost::intrusive_ptr<Expression
                                                               std::move(findRequest)));
 
     auto cq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = expCtx,
-                             .parsedFind = std::move(parsedFind),
-                             .explain = expCtx->explain.has_value()});
+        CanonicalQueryParams{.expCtx = expCtx, .parsedFind = std::move(parsedFind)});
 
     if (auto collator = expCtx->getCollator()) {
         cq->setCollator(collator->clone());

@@ -194,10 +194,20 @@
 namespace mongo {
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
-    OperationContext* opCtx, const BSONObj& requestCollation, const NamespaceString& nss) {
+    OperationContext* opCtx,
+    const BSONObj& requestCollation,
+    const NamespaceString& nss,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     invariant(opCtx);
 
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss);
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    nullptr /* collator */,
+                                                    nss,
+                                                    boost::none /* runtimeConstants */,
+                                                    boost::none /* letParameters */,
+                                                    false /* allowDiskUse */,
+                                                    true /* mayDbProfile */,
+                                                    verbosity);
     if (!requestCollation.isEmpty()) {
         auto statusWithCollator = CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext())
                                       ->makeFromBSON(requestCollation);
@@ -1719,7 +1729,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
 
         auto eligibility = determineBonsaiEligibility(opCtx, mainColl, *canonicalQuery);
         if (isEligibleForBonsaiUnderFrameworkControl(
-                opCtx, canonicalQuery->getExplain(), eligibility)) {
+                opCtx, canonicalQuery->getExplain().has_value(), eligibility)) {
             optimizer::QueryHints queryHints = getHintsFromQueryKnobs();
             const bool fastIndexNullHandling = queryHints._fastIndexNullHandling;
 
@@ -2562,7 +2572,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const CollectionPtr* coll,
     const CountCommandRequest& request,
-    bool explain,
     const NamespaceString& nss) {
     const auto& collection = *coll;
 
@@ -2584,7 +2593,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
                                                .extensionsCallback = std::move(extensionsCallback),
                                                .allowedFeatures =
                                                    MatchExpressionParser::kAllowAllSpecialFeatures},
-         .explain = explain,
          .isCountLike = true});
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();

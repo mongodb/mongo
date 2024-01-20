@@ -975,7 +975,6 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
                  .extensionsCallback = ExtensionsCallbackReal(expCtx->opCtx, &nss),
                  .allowedFeatures = matcherFeatures,
                  .projectionPolicies = ProjectionPolicies::aggregateProjectionPolicies()},
-         .explain = static_cast<bool>(expCtx->explain),
          .isCountLike = *shouldProduceEmptyDocs,
          .isSearchQuery = PipelineD::isSearchPresentAndEligibleForSbe(pipeline)});
 

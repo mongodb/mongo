@@ -307,15 +307,16 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    const bool isExplain = true;
     const std::string cmdStr =
         "{find:'bogusns', filter:{$or:[{a:1,b:1},{a:1,c:1}]}, projection:{a:1}, sort:{b:1}, '$db': "
         "'test'}";
     auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(cmdStr));
-    auto baseCq = std::make_unique<CanonicalQuery>(
-        CanonicalQueryParams{.expCtx = makeExpressionContext(opCtx.get(), *findCommand),
-                             .parsedFind = ParsedFindCommandParams{std::move(findCommand)},
-                             .explain = isExplain});
+    auto expCtx = makeExpressionContext(opCtx.get(), *findCommand);
+    expCtx->explain = explain::VerbosityEnum::kQueryPlanner;
+    auto baseCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
+        .expCtx = std::move(expCtx),
+        .parsedFind = ParsedFindCommandParams{std::move(findCommand)},
+    });
 
     MatchExpression* firstClauseExpr = baseCq->getPrimaryMatchExpression()->getChild(0);
     auto childCq = std::make_unique<CanonicalQuery>(opCtx.get(), *baseCq, 0);
@@ -334,8 +335,6 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQueryWithSpecialFeature) {
     // meant to reproduce SERVER-XYZ.
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
-
-    const bool isExplain = true;
     const std::string cmdStr = R"({
         find:'bogusns',
         filter: {
@@ -349,12 +348,14 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQueryWithSpecialFeature) {
         $db: 'test'
     })";
     auto findCommand = query_request_helper::makeFromFindCommandForTests(fromjson(cmdStr));
+    auto expCtx = makeExpressionContext(opCtx.get(), *findCommand);
+    expCtx->explain = explain::VerbosityEnum::kQueryPlanner;
     auto baseCq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
-        .expCtx = makeExpressionContext(opCtx.get(), *findCommand),
+        .expCtx = std::move(expCtx),
         .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand),
                                               .allowedFeatures =
                                                   MatchExpressionParser::kAllowAllSpecialFeatures},
-        .explain = isExplain});
+    });
 
     // Note: be sure to use the second child to get $text, since we 'normalize' and sort the
     // MatchExpression tree as part of canonicalization. This will put the text search clause

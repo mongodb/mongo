@@ -224,7 +224,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
                 .findCommand = std::move(findCommand),
                 .extensionsCallback = ExtensionsCallbackReal(opCtx, &collectionPtr->ns()),
                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures},
-        .explain = cq->getExplain()});
+    });
 
     return uassertStatusOK(getExecutorFind(
         opCtx, MultipleCollectionAccessor{coll}, std::move(cqWithoutProjection), yieldPolicy));

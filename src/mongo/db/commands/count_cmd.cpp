@@ -259,10 +259,9 @@ public:
         }
 
         auto expCtx = makeExpressionContextForGetExecutor(
-            opCtx, request.getCollation().value_or(BSONObj()), nss);
+            opCtx, request.getCollation().value_or(BSONObj()), nss, verbosity);
 
-        auto statusWithPlanExecutor =
-            getExecutorCount(expCtx, &collection, request, true /*explain*/, nss);
+        auto statusWithPlanExecutor = getExecutorCount(expCtx, &collection, request, nss);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -367,13 +366,14 @@ public:
                         CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
         }
 
-        auto statusWithPlanExecutor =
-            getExecutorCount(makeExpressionContextForGetExecutor(
-                                 opCtx, request.getCollation().value_or(BSONObj()), nss),
-                             &collection,
-                             request,
-                             false /*explain*/,
-                             nss);
+        auto statusWithPlanExecutor = getExecutorCount(
+            makeExpressionContextForGetExecutor(opCtx,
+                                                request.getCollation().value_or(BSONObj()),
+                                                nss,
+                                                boost::none /* verbosity */),
+            &collection,
+            request,
+            nss);
         uassertStatusOK(statusWithPlanExecutor.getStatus());
 
         auto exec = std::move(statusWithPlanExecutor.getValue());
