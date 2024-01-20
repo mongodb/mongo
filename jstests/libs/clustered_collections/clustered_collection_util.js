@@ -81,9 +81,16 @@ export var ClusteredCollectionUtil = class {
             createOptions.expireAfterSeconds !== null) {
             extraData.expireAfterSeconds = createOptions.expireAfterSeconds;
         }
-        const expectedListIndexesOutput =
-            Object.extend(extraData, fullCreateOptions.clusteredIndex);
-        assert.docEq(expectedListIndexesOutput, listIndexes.cursor.firstBatch[0]);
+        // TODO (SERVER-85312): Re-enable this after we branch for 8.1 so that multiversion
+        // will test 8.1 <> 8.0.
+        const version = db.version().split('.');
+        if (version[0] >= 8 || (version[0] == 7 && version[1] == 3) ||
+            typeof (extraData.expireAfterSeconds) === 'undefined' ||
+            extraData.expireAfterSeconds === null) {
+            const expectedListIndexesOutput =
+                Object.extend(extraData, fullCreateOptions.clusteredIndex);
+            assert.docEq(expectedListIndexesOutput, listIndexes.cursor.firstBatch[0]);
+        }
     }
 
     static testBasicClusteredCollection(db, collName, clusterKey) {
