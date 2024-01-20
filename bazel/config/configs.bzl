@@ -349,3 +349,23 @@ detect_odr_violations = rule(
     implementation = lambda ctx: detect_odr_violations_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# build_enterprise_module
+# =========
+
+# Original documentation is:
+#   Comma-separated list of modules to build. Empty means none. Default is all.
+# As Bazel will not support the module building in the same way as Scons, the only
+# module is supported at present is the enterprise
+# more: https://mongodb.slack.com/archives/C05V4F6GZ6J/p1705687513581639
+
+build_enterprise_provider = provider(
+    doc = """Build enterprise module""",
+    fields = ["enabled"],
+)
+
+build_enterprise = rule(
+    implementation = lambda ctx: build_enterprise_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

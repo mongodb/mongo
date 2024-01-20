@@ -27,6 +27,7 @@ load(
     "shared_archive",
     "linker",
     "detect_odr_violations",
+    "build_enterprise",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -886,4 +887,27 @@ config_setting(
 selects.config_setting_group(
     name = "detect_odr_violations_required_settings",
     match_all = [":opt_off", ":detect_odr_violations_enabled", ":linker_gold"],
+)
+
+# --------------------------------------
+# build_enterprise
+# --------------------------------------
+
+build_enterprise(
+    name = "build_enterprise",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "build_enterprise_enabled",
+    flag_values = {
+        "//bazel/config:build_enterprise": "True",
+    },
+)
+
+config_setting(
+    name = "build_enterprise_disabled",
+    flag_values = {
+        "//bazel/config:build_enterprise": "False",
+    },
 )
