@@ -179,8 +179,8 @@ define_build_mode(TSan
 )
 
 define_build_mode(Coverage
-    C_COMPILER_FLAGS "--coverage"
-    CXX_COMPILER_FLAGS "--coverage"
+    C_COMPILER_FLAGS "--coverage -fprofile-arcs"
+    CXX_COMPILER_FLAGS "--coverage -fprofile-arcs"
     LINK_FLAGS "--coverage"
     # Disable Coverage on MSVC compilers (unsupported).
     DEPENDS "NOT MSVC"
