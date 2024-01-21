@@ -440,11 +440,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
         }
 
         if (cmdIndex.getPrepareUnique()) {
-            // Check if prepareUnique is being set on a time-series collection.
-            if (isTimeseries) {
-                return {ErrorCodes::InvalidOptions,
-                        "cannot set 'prepareUnique' for indexes of a time-series collection."};
-            }
             parsed.numModifications++;
             // Attempting to modify with the same value should be treated as a no-op.
             if (cmrIndex->idx->prepareUnique() == *cmdIndex.getPrepareUnique() ||
