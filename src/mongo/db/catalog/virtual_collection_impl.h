@@ -558,7 +558,7 @@ public:
 
 private:
     void unimplementedTasserted() const {
-        MONGO_UNIMPLEMENTED_TASSERT(6968504);
+        MONGO_UNIMPLEMENTED_TASSERT(6968506);
     }
 
     struct SharedState {

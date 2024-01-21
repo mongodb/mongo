@@ -33,3 +33,4 @@ iasserted(28, "words");
 iassertNoTrace(29, "words");
 iassertedNoTrace(30, "words");
 MONGO_UNREACHABLE_TASSERT(31);
+MONGO_UNIMPLEMENTED_TASSERT(32);
