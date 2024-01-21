@@ -365,6 +365,28 @@ wt_cursor_search(WT_CURSOR *cursor, const data_value &key)
 }
 
 /*
+ * wt_cursor_truncate --
+ *     Truncate in WiredTiger using the provided cursors.
+ */
+inline int
+wt_cursor_truncate(WT_SESSION *session, const char *uri, WT_CURSOR *cursor_start,
+  WT_CURSOR *cursor_stop, const data_value &start, const data_value &stop)
+{
+    if (start == NONE)
+        cursor_start = nullptr;
+    else
+        set_wt_cursor_key(cursor_start, start);
+    if (stop == NONE)
+        cursor_stop = nullptr;
+    else
+        set_wt_cursor_key(cursor_stop, stop);
+
+    return session->truncate(session,
+      cursor_start == nullptr && cursor_stop == nullptr ? uri : nullptr, cursor_start, cursor_stop,
+      nullptr);
+}
+
+/*
  * wt_cursor_update --
  *     Update in WiredTiger using the provided cursor.
  */

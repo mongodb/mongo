@@ -116,3 +116,32 @@ verify_using_debug_log(TEST_OPTS *opts, const char *home, bool test_failing)
     testutil_check(session->close(session, nullptr));
     testutil_check(conn->close(conn, nullptr));
 }
+
+/*
+ * verify_workload --
+ *     Verify the workload by running it in both the model and WiredTiger.
+ */
+void
+verify_workload(const model::kv_workload &workload, TEST_OPTS *opts, const std::string &home,
+  const char *env_config)
+{
+    /* Run the workload in the model. */
+    model::kv_database database;
+    workload.run(database);
+
+    /* Run the workload in WiredTiger. */
+    testutil_recreate_dir(home.c_str());
+    workload.run_in_wiredtiger(home.c_str(), env_config);
+
+    /* Open the database that we just created. */
+    WT_CONNECTION *conn;
+    testutil_wiredtiger_open(opts, home.c_str(), env_config, nullptr, &conn, false, false);
+
+    /* Verify. */
+    std::vector<std::string> tables = model::wt_list_tables(conn);
+    for (auto &t : tables)
+        testutil_assert(database.table(t.c_str())->verify_noexcept(conn));
+
+    /* Clean up. */
+    testutil_check(conn->close(conn, nullptr));
+}
