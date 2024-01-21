@@ -4519,7 +4519,7 @@ tasks:
         vars:
           perf-test-name: evict-fairness.wtperf
           maxruns: 1
-          wtarg: -args ['"-C statistics_log=(wait=10000,on_close=true,json=false,sources=[file:])", "-o reopen_connection=false"'] -ops ['"eviction_page_seen"']
+          wtarg: -args ['"-C statistics_log=(wait=10000,on_close=true,json=true,sources=[file:])", "-o reopen_connection=false"'] -ops ['"eviction_page_seen"']
       - func: "validate-expected-stats"
         vars:
           stat_file: './test_stats/evergreen_out_evict-fairness.wtperf.json'
