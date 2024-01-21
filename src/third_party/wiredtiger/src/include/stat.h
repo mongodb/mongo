@@ -780,17 +780,9 @@ struct __wt_connection_stats {
     int64_t lock_dhandle_wait_internal;
     int64_t lock_dhandle_read_count;
     int64_t lock_dhandle_write_count;
-    int64_t lock_durable_timestamp_wait_application;
-    int64_t lock_durable_timestamp_wait_internal;
-    int64_t lock_durable_timestamp_read_count;
-    int64_t lock_durable_timestamp_write_count;
     int64_t lock_metadata_count;
     int64_t lock_metadata_wait_application;
     int64_t lock_metadata_wait_internal;
-    int64_t lock_read_timestamp_wait_application;
-    int64_t lock_read_timestamp_wait_internal;
-    int64_t lock_read_timestamp_read_count;
-    int64_t lock_read_timestamp_write_count;
     int64_t lock_schema_count;
     int64_t lock_schema_wait_application;
     int64_t lock_schema_wait_internal;

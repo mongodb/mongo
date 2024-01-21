@@ -1759,17 +1759,9 @@ static const char *const __stats_connection_desc[] = {
   "lock: dhandle lock internal thread time waiting (usecs)",
   "lock: dhandle read lock acquisitions",
   "lock: dhandle write lock acquisitions",
-  "lock: durable timestamp queue lock application thread time waiting (usecs)",
-  "lock: durable timestamp queue lock internal thread time waiting (usecs)",
-  "lock: durable timestamp queue read lock acquisitions",
-  "lock: durable timestamp queue write lock acquisitions",
   "lock: metadata lock acquisitions",
   "lock: metadata lock application thread wait time (usecs)",
   "lock: metadata lock internal thread wait time (usecs)",
-  "lock: read timestamp queue lock application thread time waiting (usecs)",
-  "lock: read timestamp queue lock internal thread time waiting (usecs)",
-  "lock: read timestamp queue read lock acquisitions",
-  "lock: read timestamp queue write lock acquisitions",
   "lock: schema lock acquisitions",
   "lock: schema lock application thread wait time (usecs)",
   "lock: schema lock internal thread wait time (usecs)",
@@ -2475,17 +2467,9 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->lock_dhandle_wait_internal = 0;
     stats->lock_dhandle_read_count = 0;
     stats->lock_dhandle_write_count = 0;
-    stats->lock_durable_timestamp_wait_application = 0;
-    stats->lock_durable_timestamp_wait_internal = 0;
-    stats->lock_durable_timestamp_read_count = 0;
-    stats->lock_durable_timestamp_write_count = 0;
     stats->lock_metadata_count = 0;
     stats->lock_metadata_wait_application = 0;
     stats->lock_metadata_wait_internal = 0;
-    stats->lock_read_timestamp_wait_application = 0;
-    stats->lock_read_timestamp_wait_internal = 0;
-    stats->lock_read_timestamp_read_count = 0;
-    stats->lock_read_timestamp_write_count = 0;
     stats->lock_schema_count = 0;
     stats->lock_schema_wait_application = 0;
     stats->lock_schema_wait_internal = 0;
@@ -3219,21 +3203,9 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->lock_dhandle_wait_internal += WT_STAT_READ(from, lock_dhandle_wait_internal);
     to->lock_dhandle_read_count += WT_STAT_READ(from, lock_dhandle_read_count);
     to->lock_dhandle_write_count += WT_STAT_READ(from, lock_dhandle_write_count);
-    to->lock_durable_timestamp_wait_application +=
-      WT_STAT_READ(from, lock_durable_timestamp_wait_application);
-    to->lock_durable_timestamp_wait_internal +=
-      WT_STAT_READ(from, lock_durable_timestamp_wait_internal);
-    to->lock_durable_timestamp_read_count += WT_STAT_READ(from, lock_durable_timestamp_read_count);
-    to->lock_durable_timestamp_write_count +=
-      WT_STAT_READ(from, lock_durable_timestamp_write_count);
     to->lock_metadata_count += WT_STAT_READ(from, lock_metadata_count);
     to->lock_metadata_wait_application += WT_STAT_READ(from, lock_metadata_wait_application);
     to->lock_metadata_wait_internal += WT_STAT_READ(from, lock_metadata_wait_internal);
-    to->lock_read_timestamp_wait_application +=
-      WT_STAT_READ(from, lock_read_timestamp_wait_application);
-    to->lock_read_timestamp_wait_internal += WT_STAT_READ(from, lock_read_timestamp_wait_internal);
-    to->lock_read_timestamp_read_count += WT_STAT_READ(from, lock_read_timestamp_read_count);
-    to->lock_read_timestamp_write_count += WT_STAT_READ(from, lock_read_timestamp_write_count);
     to->lock_schema_count += WT_STAT_READ(from, lock_schema_count);
     to->lock_schema_wait_application += WT_STAT_READ(from, lock_schema_wait_application);
     to->lock_schema_wait_internal += WT_STAT_READ(from, lock_schema_wait_internal);
