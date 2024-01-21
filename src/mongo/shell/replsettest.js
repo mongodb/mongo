@@ -3835,15 +3835,11 @@ var ReplSetTest = function ReplSetTest(opts) {
         }
     }
 
-    function _newMongo(host) {
-        return new Mongo(host, undefined, {gRPC: false});
-    }
-
     /**
      * Constructor, which instantiates the ReplSetTest object from an existing set.
      */
     function _constructFromExistingSeedNode(rst, seedNode) {
-        const conn = _newMongo(seedNode);
+        const conn = new Mongo(seedNode);
         if (jsTest.options().keyFile) {
             rst.keyFile = jsTest.options().keyFile;
         }
@@ -3855,7 +3851,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         rst.nodes = existingNodes.map(node => {
             // Note: the seed node is required to be operational in order for the Mongo
             // shell to connect to it. In this code there is no fallback to other nodes.
-            let conn = _newMongo(node);
+            let conn = new Mongo(node);
             conn.name = conn.host;
             return conn;
         });
@@ -3886,7 +3882,7 @@ var ReplSetTest = function ReplSetTest(opts) {
 
         let i = 0;
         rst.nodes = nodeHosts.map((node) => {
-            const conn = _newMongo(node);
+            const conn = Mongo(node);
             conn.name = conn.host;
             conn.port = node.split(':')[1];
             if (pidValue !== undefined && pidValue[i] !== undefined) {

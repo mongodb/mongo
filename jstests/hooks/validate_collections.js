@@ -6,17 +6,14 @@ export class CollectionValidator {
         return validateCollectionsImpl(db, obj);
     }
 
-    // 'gRPC' can be specified in opts to determine whether the provided hostList should be
-    // connected to via gRPC or not. If unspecified, gRPC will not be used.
-    validateNodes(hostList, opts = {}) {
+    validateNodes(hostList) {
         // We run the scoped threads in a try/finally block in case any thread throws an exception,
         // in which case we want to still join all the threads.
         let threads = [];
 
         try {
             hostList.forEach(host => {
-                const thread =
-                    new Thread(validateCollectionsThread, validateCollectionsImpl, host, opts);
+                const thread = new Thread(validateCollectionsThread, validateCollectionsImpl, host);
                 threads.push(thread);
                 thread.start();
             });
@@ -117,10 +114,10 @@ function validateCollectionsImpl(db, obj) {
 }
 
 // Run a separate thread to validate collections on each server in parallel.
-function validateCollectionsThread(validatorFunc, host, {gRPC}) {
+function validateCollectionsThread(validatorFunc, host) {
     try {
         print('Running validate() on ' + host);
-        const conn = new Mongo(host, undefined, {gRPC: !!gRPC});
+        const conn = new Mongo(host);
         conn.setSecondaryOk();
         jsTest.authenticate(conn);
 

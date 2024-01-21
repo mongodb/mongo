@@ -98,12 +98,13 @@ export var FixtureHelpers = (function() {
      * functions. If the fixture is a standalone, will run the function on the database directly.
      */
     function mapOnEachShardNode({db, func, primaryNodeOnly}) {
-        function getRequestedConns(conn) {
+        function getRequestedConns(host) {
+            const conn = new Mongo(host);
             const isMaster = conn.getDB("test").isMaster();
 
             if (isMaster.hasOwnProperty("setName")) {
                 // It's a repl set.
-                const rs = new ReplSetTest(isMaster.me);
+                const rs = new ReplSetTest(host);
                 return primaryNodeOnly ? [rs.getPrimary()] : rs.nodes;
             } else {
                 // It's a standalone.
@@ -116,12 +117,10 @@ export var FixtureHelpers = (function() {
             const shardObjs = db.getSiblingDB("config").shards.find().sort({_id: 1}).toArray();
 
             for (let shardObj of shardObjs) {
-                connList = connList.concat(
-                    getRequestedConns(new Mongo(shardObj.host, undefined, {gRPC: false})));
+                connList = connList.concat(getRequestedConns(shardObj.host));
             }
         } else {
-            connList = getRequestedConns(
-                new Mongo(db.getMongo().host, undefined, {gRPC: db.getMongo().isGRPC()}));
+            connList = connList.concat(getRequestedConns(db.getMongo().host));
         }
 
         return connList.map((conn) => func(conn.getDB(db.getName())));
@@ -157,16 +156,11 @@ export var FixtureHelpers = (function() {
             return db.getMongo();
         }
         const configDB = db.getSiblingDB("config");
-        const dbs = configDB.databases.find();
-        if (dbs.size() === 0) {
-            return db.getMongo();
-        }
-
         let shardConn = null;
-        dbs.forEach(function(dbObj) {
+        configDB.databases.find().forEach(function(dbObj) {
             if (dbObj._id === db.getName()) {
                 const shardObj = configDB.shards.findOne({_id: dbObj.primary});
-                shardConn = new Mongo(shardObj.host, undefined, {gRPC: false});
+                shardConn = new Mongo(shardObj.host);
             }
         });
         assert.neq(null, shardConn, "could not find shard hosting database " + db.getName());

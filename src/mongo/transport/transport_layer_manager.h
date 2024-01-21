@@ -69,7 +69,6 @@ public:
     virtual void appendStatsForFTDC(BSONObjBuilder& bob) const = 0;
 
     virtual TransportLayer* getEgressLayer() = 0;
-    virtual const std::vector<std::unique_ptr<TransportLayer>>& getTransportLayers() const = 0;
 
 #ifdef MONGO_CONFIG_SSL
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,

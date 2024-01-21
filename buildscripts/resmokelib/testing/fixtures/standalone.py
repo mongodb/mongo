@@ -199,12 +199,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         """Return the internal connection string."""
         return f"{self._get_hostname()}:{self.port}"
 
-    def get_shell_connection_string(self):
+    def get_shell_connection_url(self):
         port = self.port if not self.config.SHELL_GRPC else self.grpcPort
         return f"{self._get_hostname()}:{port}"
-
-    def get_shell_connection_url(self):
-        return "mongodb://" + self.get_shell_connection_string()
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""

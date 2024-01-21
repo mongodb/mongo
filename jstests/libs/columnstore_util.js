@@ -39,7 +39,7 @@ export function safeToCreateColumnStoreIndex(db) {
 
 export function safeToCreateColumnStoreIndexInCluster(nodes) {
     for (const node of nodes) {
-        const conn = new Mongo(node, undefined, {gRPC: false});
+        const conn = new Mongo(node);
         if (FixtureHelpers.isMongos(conn.getDB("admin"))) {
             continue;
         }

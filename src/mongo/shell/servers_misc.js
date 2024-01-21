@@ -152,6 +152,7 @@ startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
     if (noConnect) {
         args.push("--nodb");
     } else if (typeof (globalThis.db) == "object") {
+        const setParameters = jsTestOptions().setParameters || {};
         if (globalThis.db.getMongo().isGRPC()) {
             args.push("--gRPC");
         }

@@ -1021,7 +1021,7 @@ var ShardingTest = function ShardingTest(params) {
         }
 
         this["rs" + n].awaitSecondaryNodes();
-        this._connections[n] = new Mongo(this["rs" + n].getURL(), undefined, {gRPC: false});
+        this._connections[n] = new Mongo(this["rs" + n].getURL());
         this._connections[n].shardName = prevShardName;
         this["shard" + n] = this._connections[n];
     };
@@ -1675,7 +1675,7 @@ var ShardingTest = function ShardingTest(params) {
 
             this._connections.push(null);
 
-            let rsConn = new Mongo(rs.getURL(), undefined, {gRPC: false});
+            let rsConn = new Mongo(rs.getURL());
             rsConn.name = rs.getURL();
 
             this._connections[i] = rsConn;
