@@ -66,7 +66,7 @@ sample_rate=1
 
 context = Context()
 conn_config = ""
-conn_config += ",cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000,statistics=[all,clear],statistics_log=(wait=1,json=true,on_close=true)"   # explicitly added
+conn_config += ",cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000,statistics=[all,clear],statistics_log=(wait=1,json=false,on_close=true)"   # explicitly added
 conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 

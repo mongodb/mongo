@@ -33,7 +33,7 @@ from wtdataset import SimpleDataSet
 # test_gc03.py
 # Test that checkpoint cleans the obsolete history store pages that are in-memory.
 class test_gc03(test_gc_base):
-    conn_config = 'cache_size=4GB,statistics=(all),statistics_log=(json,wait=0,on_close=true)'
+    conn_config = 'cache_size=4GB,statistics=(all),statistics_log=(wait=0,on_close=true)'
 
     def get_stat(self, stat):
         stat_cursor = self.session.open_cursor('statistics:')

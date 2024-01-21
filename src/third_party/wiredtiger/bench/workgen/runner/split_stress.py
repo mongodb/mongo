@@ -37,7 +37,7 @@ from workgen import *
 
 context = Context()
 # Connection configuration.
-conn_config = "cache_size=100MB,log=(enabled=false),statistics=[fast],statistics_log=(wait=1,json=true)"
+conn_config = "cache_size=100MB,log=(enabled=false),statistics=[fast],statistics_log=(wait=1,json=false)"
 conn = context.wiredtiger_open("create," + conn_config)
 s = conn.open_session("")
 
