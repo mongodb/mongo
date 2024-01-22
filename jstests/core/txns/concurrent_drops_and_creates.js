@@ -15,22 +15,19 @@ import {
     retryOnceOnTransientAndRestartTxnOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 
-const dbName1 = "test1";
-const dbName2 = "test2";
+const dbName = jsTest.name();
 const collNameA = "coll_A";
 const collNameB = "coll_B";
 
 const sessionOutsideTxn = db.getMongo().startSession({causalConsistency: true});
-const testDB1 = sessionOutsideTxn.getDatabase(dbName1);
-const testDB2 = sessionOutsideTxn.getDatabase(dbName2);
-testDB1.runCommand({drop: collNameA, writeConcern: {w: "majority"}});
-testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}});
+const testDB = sessionOutsideTxn.getDatabase(dbName);
+testDB.runCommand({drop: collNameA, writeConcern: {w: "majority"}});
+testDB.runCommand({drop: collNameB, writeConcern: {w: "majority"}});
 
 const session = db.getMongo().startSession({causalConsistency: false});
-const sessionDB1 = session.getDatabase(dbName1);
-const sessionDB2 = session.getDatabase(dbName2);
-const sessionCollA = sessionDB1[collNameA];
-const sessionCollB = sessionDB2[collNameB];
+const sessionDB = session.getDatabase(dbName);
+const sessionCollA = sessionDB[collNameA];
+const sessionCollB = sessionDB[collNameB];
 
 //
 // A transaction with snapshot read concern cannot write to a collection that has been dropped
@@ -58,17 +55,16 @@ retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
 // Drop collection B outside of the transaction. Advance the cluster time of the session
 // performing the drop to ensure it happens at a later cluster time than the transaction began.
 sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
-assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
+assert.commandWorked(testDB.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
 
 // This test cause a StaleConfig error on sharding so no command will succeed.
 if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
     // We can perform reads on the dropped collection as it existed when we started the transaction.
-    assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));
+    assert.commandWorked(sessionDB.runCommand({find: sessionCollB.getName()}));
 
     // However, trying to perform a write will cause a write conflict.
     assert.commandFailedWithCode(
-        sessionDB2.runCommand(
-            {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
+        sessionDB.runCommand({findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true}),
         ErrorCodes.WriteConflict);
 
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
@@ -80,7 +76,7 @@ if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
     // visible, the findAndModify will not match any existing documents.
     // TODO (SERVER-39704): Remove use of retryOnceOnTransientAndRestartTxnOnMongos.
     retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-        const res = sessionDB2.runCommand(
+        const res = sessionDB.runCommand(
             {findAndModify: sessionCollB.getName(), update: {a: 1}, upsert: true});
         assert.commandWorked(res);
         assert.eq(res.value, null);
@@ -95,7 +91,7 @@ if (!session.getClient().isMongos() && !TestData.testingReplicaSetEndpoint) {
 
 // Ensure collection A exists and collection B does not exist.
 assert.commandWorked(sessionCollA.insert({}));
-testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}});
+testDB.runCommand({drop: collNameB, writeConcern: {w: "majority"}});
 
 // Start the transaction with a write to collection A.
 session.startTransaction({readConcern: {level: "snapshot"}});
@@ -104,7 +100,7 @@ assert.commandWorked(sessionCollA.insert({}));
 // Create collection B outside of the transaction. Advance the cluster time of the session
 // performing the drop to ensure it happens at a later cluster time than the transaction began.
 sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
-assert.commandWorked(testDB2.runCommand({create: collNameB}));
+assert.commandWorked(testDB.runCommand({create: collNameB}));
 
 // We can insert to collection B in the transaction as the transaction does not have a collection on
 // this namespace (even as it exist at latest). A collection will be implicitly created and we will
