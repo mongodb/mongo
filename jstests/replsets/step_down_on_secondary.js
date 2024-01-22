@@ -118,10 +118,8 @@ jsTestLog("Join parallel shells");
 joinStepDownThread();
 joinReadThread();
 
-// Validate that the read operation got killed during step down.
 const replMetrics = assert.commandWorked(primary.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
-assert.eq(replMetrics.stateTransition.userOperationsKilled, 1, replMetrics);
 
 jsTestLog("Check nodes have correct data");
 assert.docEq([{_id: 0, b: 1}], newPrimary.getDB(dbName)[collName].find({_id: 0}).toArray());

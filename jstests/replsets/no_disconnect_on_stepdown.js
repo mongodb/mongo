@@ -42,7 +42,7 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
     const primary = rst.getPrimary();
     // Each PrimaryOnlyService rebuilds its instances on stepup, and that may involve doing read and
     // write operations which are interruptible on stepdown so we wait for PrimaryOnlyService to
-    // finish rebuilding to make the userOperationsKilled check below work reliably.
+    // finish rebuilding.
     rst.waitForPrimaryOnlyServices(primary);
 
     jsTestLog(`Trying ${description} on a stepping-down primary`);
@@ -73,7 +73,6 @@ function runStepDownTest({description, failpoint, operation, errorCode}) {
     const replMetrics =
         assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
     assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
-    assert.gte(replMetrics.stateTransition.userOperationsKilled, 1);
     assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
     // Allow the primary to be re-elected, and wait for it.

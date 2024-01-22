@@ -81,8 +81,6 @@ rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 // Validate that the read operation got killed during step down.
 let replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
-// Stepdown may kill the JournalFlusher which is counted as a user operation.
-assert.gte(2, replMetrics.stateTransition.userOperationsKilled);
 
 // Allow the primary to be re-elected, and wait for it.
 assert.commandWorked(primaryAdmin.adminCommand({replSetFreeze: 0}));

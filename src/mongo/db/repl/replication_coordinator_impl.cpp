@@ -213,10 +213,10 @@ auto& lastStateTransition =
     makeSynchronizedMetric<std::string>("repl.stateTransition.lastStateTransition");
 
 // Tracks the number of operations killed on state transition.
-CounterMetric userOpsKilled("repl.stateTransition.userOperationsKilled");
+CounterMetric totalOpsKilled("repl.stateTransition.totalOperationsKilled");
 
 // Tracks the number of operations left running on state transition.
-CounterMetric userOpsRunning("repl.stateTransition.userOperationsRunning");
+CounterMetric totalOpsRunning("repl.stateTransition.totalOperationsRunning");
 
 // Tracks the number of times we have successfully performed automatic reconfigs to remove
 // 'newlyAdded' fields.
@@ -2360,8 +2360,8 @@ void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
     const size_t numOpsRunning) const {
 
     // Clear the current metrics before setting.
-    userOpsKilled.decrement(userOpsKilled.get());
-    userOpsRunning.decrement(userOpsRunning.get());
+    totalOpsKilled.decrement(totalOpsKilled.get());
+    totalOpsRunning.decrement(totalOpsRunning.get());
 
     switch (stateTransition) {
         case ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepUp:
@@ -2377,13 +2377,13 @@ void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
             MONGO_UNREACHABLE;
     }
 
-    userOpsKilled.increment(numOpsKilled);
-    userOpsRunning.increment(numOpsRunning);
+    totalOpsKilled.increment(numOpsKilled);
+    totalOpsRunning.increment(numOpsRunning);
 
     BSONObjBuilder bob;
     bob.append("lastStateTransition", **lastStateTransition);
-    bob.appendNumber("userOpsKilled", userOpsKilled.get());
-    bob.appendNumber("userOpsRunning", userOpsRunning.get());
+    bob.appendNumber("totalOpsKilled", totalOpsKilled.get());
+    bob.appendNumber("totalOpsRunning", totalOpsRunning.get());
 
     LOGV2(21340, "State transition ops metrics", "metrics"_attr = bob.obj());
 }
@@ -2709,9 +2709,9 @@ void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
                 locker->wasGlobalLockTakenInModeConflictingWithWrites() ||
                 PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict()) {
                 serviceCtx->killOperation(lk, toKill, reason);
-                arsc->incrementUserOpsKilled();
+                arsc->incrementTotalOpsKilled();
             } else {
-                arsc->incrementUserOpsRunning();
+                arsc->incrementTotalOpsRunning();
             }
         }
     }
@@ -2804,9 +2804,9 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn()
     ErrorCodes::Error killReason = ErrorCodes::InterruptedDueToReplStateChange;
 
     while (true) {
-        // Reset the value before killing user operations as we only want to track the number
+        // Reset the value before killing operations as we only want to track the number
         // of operations that's running after step down.
-        _userOpsRunning = 0;
+        _totalOpsRunning = 0;
         _replCord->_killConflictingOpsOnStepUpAndStepDown(this, killReason);
 
         // Destroy all stashed transaction resources, in order to release locks.
@@ -2826,7 +2826,7 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_killOpThreadFn()
                     lock, Milliseconds(10).toSystemDuration(), [this] { return _killSignaled; })) {
                 LOGV2(21344, "Stopped killing user operations");
                 _replCord->updateAndLogStateTransitionMetrics(
-                    _stateTransition, getUserOpsKilled(), getUserOpsRunning());
+                    _stateTransition, getTotalOpsKilled(), getTotalOpsRunning());
                 _killSignaled = false;
                 return;
             }
@@ -2847,20 +2847,21 @@ void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::_stopAndWaitForKi
     _killOpThread.reset();
 }
 
-size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getUserOpsKilled() const {
-    return _userOpsKilled;
+size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getTotalOpsKilled() const {
+    return _totalOpsKilled;
 }
 
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementUserOpsKilled(size_t val) {
-    _userOpsKilled += val;
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementTotalOpsKilled(size_t val) {
+    _totalOpsKilled += val;
 }
 
-size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getUserOpsRunning() const {
-    return _userOpsRunning;
+size_t ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::getTotalOpsRunning() const {
+    return _totalOpsRunning;
 }
 
-void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementUserOpsRunning(size_t val) {
-    _userOpsRunning += val;
+void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::incrementTotalOpsRunning(
+    size_t val) {
+    _totalOpsRunning += val;
 }
 
 void ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::rstlRelease() {

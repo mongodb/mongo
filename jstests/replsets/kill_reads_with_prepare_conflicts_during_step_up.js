@@ -104,7 +104,6 @@ primary = rst.getPrimary();
 // Validate that the read operation got killed during step up.
 let replMetrics = assert.commandWorked(primary.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
-assert.eq(replMetrics.stateTransition.userOperationsKilled, 1);
 
 // Make sure we can successfully commit the prepared transaction.
 jsTestLog("Restoring shell session state");

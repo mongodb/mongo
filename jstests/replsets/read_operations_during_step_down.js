@@ -99,12 +99,14 @@ var getMoreRes = assert.commandWorked(
     primaryDB.runCommand({"getMore": cursorIdToBeReadAfterStepDown, collection: collName}));
 assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 
-// Validate that no operations got killed on step down and no network disconnection happened due
-// to failed unacknowledged operations.
+// Validate that no network disconnection happened due to failed unacknowledged operations.
 const replMetrics = assert.commandWorked(primaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
 // Should account for find and getmore commands issued before step down.
-assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
+// TODO (SERVER-85259): Remove references to replMetrics.stateTransition.userOperations*
+assert.gte(replMetrics.stateTransition.totalOperationsRunning ||
+               replMetrics.stateTransition.userOperationsRunning,
+           2);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, 0);
 
 rst.stopSet();

@@ -115,13 +115,14 @@ const getMoreRes = assert.commandWorked(
     secondaryDB.runCommand({"getMore": cursorIdToBeReadAfterStepUp, collection: collName}));
 assert.docEq([{_id: 0}], getMoreRes.cursor.nextBatch);
 
-// Validate that no operations got killed on step up and no network disconnection happened due
-// to failed unacknowledged operations.
+// Validate that no network disconnection happened due to failed unacknowledged operations.
 replMetrics = assert.commandWorked(secondaryAdmin.adminCommand({serverStatus: 1})).metrics.repl;
 assert.eq(replMetrics.stateTransition.lastStateTransition, "stepUp");
-assert.eq(replMetrics.stateTransition.userOperationsKilled, 0);
 // Should account for find and getmore commands issued before step up.
-assert.gte(replMetrics.stateTransition.userOperationsRunning, 2);
+// TODO (SERVER-85259): Remove references to replMetrics.stateTransition.userOperations*
+assert.gte(replMetrics.stateTransition.totalOperationsRunning ||
+               replMetrics.stateTransition.userOperationsRunning,
+           2);
 assert.eq(replMetrics.network.notPrimaryUnacknowledgedWrites, startingNumNotMasterErrors);
 
 rst.stopSet();

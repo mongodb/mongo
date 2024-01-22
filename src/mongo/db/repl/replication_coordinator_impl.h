@@ -744,24 +744,24 @@ private:
         void rstlReacquire();
 
         /*
-         * Returns _userOpsKilled value.
+         * Returns _totalOpsKilled value.
          */
-        size_t getUserOpsKilled() const;
+        size_t getTotalOpsKilled() const;
 
         /*
-         * Increments _userOpsKilled by val.
+         * Increments _totalOpsKilled by val.
          */
-        void incrementUserOpsKilled(size_t val = 1);
+        void incrementTotalOpsKilled(size_t val = 1);
 
         /*
-         * Returns _userOpsRunning value.
+         * Returns _totalOpsRunning value.
          */
-        size_t getUserOpsRunning() const;
+        size_t getTotalOpsRunning() const;
 
         /*
-         * Increments _userOpsRunning by val.
+         * Increments _totalOpsRunning by val.
          */
-        void incrementUserOpsRunning(size_t val = 1);
+        void incrementTotalOpsRunning(size_t val = 1);
 
         /*
          * Returns the step up/step down opCtx.
@@ -815,9 +815,9 @@ private:
         // Thread that will run killOpThreadFn().
         std::unique_ptr<stdx::thread> _killOpThread;
         // Tracks number of operations killed on step up / step down.
-        size_t _userOpsKilled = 0;
+        size_t _totalOpsKilled = 0;
         // Tracks number of operations left running on step up / step down.
-        size_t _userOpsRunning = 0;
+        size_t _totalOpsRunning = 0;
         // Protects killSignaled and stopKillingOps cond. variable.
         Mutex _mutex = MONGO_MAKE_LATCH("AutoGetRstlForStepUpStepDown::_mutex");
         // Signals thread about the change of killSignaled value.
