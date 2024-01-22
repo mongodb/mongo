@@ -485,7 +485,7 @@ void BSONColumn::Iterator::_handleEOO() {
 }
 
 bool BSONColumn::Iterator::_isLiteral(char control) {
-    return (control & 0xE0) == 0;
+    return (control & 0xE0) == 0 || control == (char)MinKey || control == (char)MaxKey;
 }
 
 bool BSONColumn::Iterator::_isInterleavedStart(char control) {
