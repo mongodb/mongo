@@ -297,7 +297,7 @@ def is_supported_linux():
         # /etc/os-release provided by systemd are these two. It's best here to
         # assume the rest will succeed and take the ones that fail individually.
         if os_id == "amzn":
-            if version_id.startswith("2018") or version_id.startswith("2016"):
+            if version_id.startswith("2018") or version_id.startswith("2016") or version_id.startswith("2023"):
                 return False
         if os_id == "opensuse":
             return False
@@ -313,31 +313,31 @@ def prerequisites_satisfied(package_manager):
         LOG.error('You are using an unsupported platform.\n' \
               'Please visit: https://compass.mongodb.com/community-supported-platforms' \
               ' to view available community supported packages.')
-        return False
+        return 2
 
     if platform.machine() != 'x86_64':
         LOG.error('Sorry, MongoDB Compass is only supported on 64-bit Intel platforms.' \
               ' If you believe you\'re seeing this message in error please open a' \
               ' ticket on the SERVER project at https://jira.mongodb.org/')
-        return False
+        return 3
 
     if sys.platform == 'osx' and get_osx_version() < SUPPORTED_OSX_VERSION:
         LOG.error('You are using an unsupported Mac OSX version. Please upgrade\n' \
               'to at least version 10.10 (Yosemite) to install Compass.')
-        return False
+        return 4
 
     if sys.platform.startswith('linux'):
         if os.getuid() != 0:
             LOG.error('You must run this script as root.')
-            return False
+            return 5
 
         if not is_supported_linux():
             LOG.error('You are using an unsupported Linux distribution.\n' \
                       'Please visit: https://compass.mongodb.com/community-supported-platforms' \
                       ' to view available community supported packages.')
-            return False
+            return 6
 
-    return True
+    return 0
 
 
 def get_package_type(package_manager):
@@ -360,8 +360,9 @@ def download_and_install_compass():
 
     package_manager = get_package_manager()
 
-    if not prerequisites_satisfied(package_manager):
-        return sys.exit(1)
+    prereq_error = prerequisites_satisfied(package_manager)
+    if prereq_error != 0:
+        return sys.exit(prereq_error)
 
     _, filename = tempfile.mkstemp(suffix=PKG_MANAGER_SUFFIXES[package_manager])
     is_successful = True
