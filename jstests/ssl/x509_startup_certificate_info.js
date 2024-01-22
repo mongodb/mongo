@@ -15,16 +15,16 @@ const SERVER_CERT_INFO = {
     "type": "Server",
     "subject": "CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US",
     "issuer": "CN=Kernel Test CA,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US",
-    "thumbprint": "BF2E341D28D7CEAADA534A11D75189D4ECABB551"
+    "thumbprint": cat(SERVER_CERT + ".digest.sha1")
 };
 const CLUSTER_CERT_INFO = {
     "type": "Cluster",
     "subject": "CN=clustertest,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US",
     "issuer": "CN=Kernel Test CA,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US",
-    "thumbprint": "FD85F9F6F380EE53F46F497253453731DC885335"
+    "thumbprint": cat(CLUSTER_CERT + ".digest.sha1")
 };
 const CRL_INFO = {
-    "thumbprint": "551FEF8D916CE363E5488AD7F4BD60E3D1EC2BD8"
+    "thumbprint": cat(CRL_FILE + ".digest.sha1")
 };
 
 function runTest(checkMongos,
