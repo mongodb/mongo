@@ -19,7 +19,6 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
-      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: macos
   tasks:
@@ -72,7 +71,6 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
-      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: macos-arm64
   tasks:
@@ -130,7 +128,6 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx.vars
-      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos
   tasks:
@@ -172,7 +169,6 @@ buildvariants:
       -j$(sysctl -n hw.logicalcpu)
       --libc++
       --variables-files=etc/scons/xcode_macosx_arm.vars
-      --use-diagnostic-latches=off
     resmoke_jobs_max: 6
     compile_variant: enterprise-macos-arm64
   tasks:

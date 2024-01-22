@@ -22,7 +22,6 @@ buildvariants:
       MONGO_DISTMOD=rhel81
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -79,7 +78,6 @@ buildvariants:
       MONGO_DISTMOD=rhel81
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     compile_variant: enterprise-rhel-81-ppc64le-shared
   tasks:
   - name: compile_test_serial_TG
@@ -107,7 +105,6 @@ buildvariants:
       -j3
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-      --use-diagnostic-latches=off
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -161,7 +158,6 @@ buildvariants:
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --linker=gold
-      --use-diagnostic-latches=off
     compile_variant: enterprise-rhel-83-s390x-shared
   tasks:
   - name: compile_test_serial_TG

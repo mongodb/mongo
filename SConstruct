@@ -453,7 +453,7 @@ add_option(
 add_option(
     'use-diagnostic-latches',
     choices=['on', 'off'],
-    default='on',
+    default='off',
     help='Enable annotated Mutex types',
     type='choice',
 )

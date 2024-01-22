@@ -17,7 +17,6 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_increased_memlock_limits,requires_latch_analyzer
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
@@ -74,7 +73,6 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
@@ -136,7 +134,6 @@ buildvariants:
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -203,7 +200,6 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -270,7 +266,6 @@ buildvariants:
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
@@ -333,7 +328,6 @@ buildvariants:
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --use-diagnostic-latches=off
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -372,7 +366,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
@@ -431,7 +425,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --use-diagnostic-latches=off
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     test_flags: --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true

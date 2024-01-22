@@ -28,6 +28,7 @@ variables:
     -j$(grep -c ^processor /proc/cpuinfo)
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --link-model=dynamic
+    --use-diagnostic-latches=on
 
 - &amazon_linux2_arm64_dynamic_compile_variant_dependency
   depends_on:

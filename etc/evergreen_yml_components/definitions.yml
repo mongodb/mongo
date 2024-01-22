@@ -3333,6 +3333,7 @@ tasks:
         --link-model=dynamic
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_${clang_tidy_toolchain}_clang.vars
+        --use-diagnostic-latches=on
       show_scons_timings: false
   - command: subprocess.exec
     type: test
