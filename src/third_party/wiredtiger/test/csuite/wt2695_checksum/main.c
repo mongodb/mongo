@@ -56,7 +56,8 @@ main(int argc, char *argv[])
     size_t len;
     uint32_t hw, sw;
     uint8_t *data;
-    u_int i, j;
+    uint8_t data_ff[32];
+    u_int i, j, length, misalignment;
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
@@ -70,6 +71,7 @@ main(int argc, char *argv[])
 
     /* Allocate aligned memory for the data. */
     data = dcalloc(DATASIZE, sizeof(uint8_t));
+    memset(data_ff, 0xff, sizeof(data_ff));
 
     /*
      * Some simple known checksums.
@@ -131,7 +133,7 @@ main(int argc, char *argv[])
         check(hw, sw, len, "random power-of-two");
 
         len *= 2;
-        if (len > DATASIZE)
+        if (len > DATASIZE || len == 0)
             len = 512;
     }
 
@@ -139,12 +141,25 @@ main(int argc, char *argv[])
      * Checksums of random data chunks.
      */
     for (i = 0; i < WT_THOUSAND; ++i) {
-        len = __wt_random(&rnd) % DATASIZE;
+        do {
+            len = __wt_random(&rnd) % DATASIZE;
+        } while (len == 0);
         for (j = 0; j < len; ++j)
             data[j] = __wt_random(&rnd) & 0xff;
         hw = __wt_checksum(data, len);
         sw = __wt_checksum_sw(data, len);
         check(hw, sw, len, "random");
+    }
+
+    /*
+     * "Strobed" misalignments - test every combo of size/misalignment up to 16B.
+     */
+    for (length = 0; length < 16; length++) {
+        for (misalignment = 0; misalignment < 16; misalignment++) {
+            hw = __wt_checksum(&data_ff[misalignment], length);
+            sw = __wt_checksum_sw(&data_ff[misalignment], length);
+            check(hw, sw, length, "0xff: strobed");
+        }
     }
 
     free(data);
