@@ -6,8 +6,8 @@ requireSSLProvider('openssl', function() {
 
     const SERVER_CERT = 'jstests/libs/server.pem';
     const COMBINED_CA_CERT = 'jstests/ssl/x509/root-and-trusted-ca.pem';
-    const CA_HASH = '539D91F8202641BF85C0C36C88FF69F3062D4AB370CECBF9B950A8B97DE72EAE';
-    const TRUSTED_CA_HASH = 'AEAEBB1BA947A7C1428D39EF6166B83409D0245D28013C9FDD71DF9E69BEA52B';
+    const CA_HASH = cat('jstests/libs/ca.pem.digest.sha256');
+    const TRUSTED_CA_HASH = cat('jstests/libs/trusted-ca.pem.digest.sha256');
 
     // Common suffix, keep the lines short.
     const RDN_SUFFIX = ',O=MongoDB,L=New York City,ST=New York,C=US';

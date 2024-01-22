@@ -38,7 +38,9 @@ function runTest(conn) {
     const external = conn.getDB('$external');
     external.createUser({user: NAME, roles: [{'role': 'readWrite', 'db': 'test'}]});
 
+    jsTest.log("testClient " + NAME);
     testClient(conn, NAME);
+    jsTest.log("testClient null");
     testClient(conn, null);
 }
 
@@ -46,8 +48,10 @@ function runTest(conn) {
 const mongod = MongoRunner.runMongod({
     auth: '',
     sslMode: 'requireSSL',
+    // Server PEM file is server.pem to match the shell's ca.pem.
     sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT,
+    // Server CA file is non-expiring-ca.pem to match the shell's client-custom-oids.pem.
+    sslCAFile: 'jstests/libs/non-expiring-ca.pem',
     sslAllowInvalidCertificates: '',
 });
 runTest(mongod);
