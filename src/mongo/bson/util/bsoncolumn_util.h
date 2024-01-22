@@ -39,7 +39,7 @@ static constexpr char kInterleavedStartArrayRootControlByte = (char)0xF2;
 static constexpr uint8_t kInvalidScaleIndex = 0xFF;
 
 inline bool isUncompressedLiteralControlByte(uint8_t control) {
-    return (control & 0xE0) == 0;
+    return (control & 0xE0) == 0 || control == (uint8_t)MinKey || control == (uint8_t)MaxKey;
 }
 
 inline bool isInterleavedStartControlByte(char control) {
