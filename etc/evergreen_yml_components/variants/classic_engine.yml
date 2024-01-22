@@ -49,8 +49,6 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine
   display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
   cron: "0 0 * * 0"  # once a week (Sunday midnight UTC)
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   stepback: false
@@ -156,8 +154,6 @@ buildvariants:
 - name: &rhel80-debug-asan-classic-engine rhel80-debug-asan-classic-engine
   display_name: "* ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 0 * * 2"  # once a week (Tuesday midnight UTC)
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -240,8 +236,6 @@ buildvariants:
 - name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
   display_name: "* UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 0 * * 4"  # once a week (Thursday midnight UTC)
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false

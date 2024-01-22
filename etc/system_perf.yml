@@ -57,7 +57,6 @@ variables:
 
   _src_dir: &src_dir src/mongo
   _modules: &modules
-    - enterprise
     - mongo-tools
     # - mongo
     - dsi
@@ -147,11 +146,6 @@ modules:
 #    prefix: ${workdir}/src
 #    branch: master
   ###
-  - name: enterprise
-    owner: 10gen
-    repo: mongo-enterprise-modules
-    prefix: src/mongo/db/modules
-    branch: v7.0
   - name: mongo-tools
     owner: mongodb
     repo: mongo-tools
@@ -729,7 +723,6 @@ tasks:
         params:
           directory: src
           revisions:
-            enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
       - func: "compile mongo tools"
@@ -749,7 +742,6 @@ tasks:
         params:
           directory: src
           revisions:
-            enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
       - func: "compile mongo tools"
@@ -766,8 +758,6 @@ tasks:
       - command: git.get_project
         params:
           directory: src
-          revisions:
-            enterprise: ${enterprise_rev}
       - func: "compile prep"
       - func: "compile mongocrypt shlib"
 

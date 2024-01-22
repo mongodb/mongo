@@ -32,12 +32,13 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
+      --modules=
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
-    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
+    test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling --enableEnterpriseTests=off
     separate_debug: off
     compile_variant: rhel80-asan
   tasks:
@@ -50,8 +51,6 @@ buildvariants:
 - name: rhel80-debug-asan
   display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -138,8 +137,6 @@ buildvariants:
 - name: rhel80-debug-ubsan
   display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false
@@ -219,8 +216,6 @@ buildvariants:
   name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   stepback: false

@@ -21,8 +21,6 @@ variables:
   run_on:
   - rhel80-xlarge
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  modules:
-    - enterprise
   stepback: false
 
 - &linux-x86-dynamic-compile-expansions
@@ -40,8 +38,6 @@ variables:
   run_on:
   - amazon2-arm64-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
-  modules:
-    - enterprise
   stepback: false
 
 - &linux-arm64-dynamic-compile-expansions
@@ -127,8 +123,6 @@ buildvariants:
 - <<: *generic_linux_compile_params
   name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
   display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
-  modules:
-  - enterprise
   expansions:
     <<: *generic_linux_compile_expansions
     separate_debug: off
@@ -172,8 +166,6 @@ buildvariants:
   display_name: "! Windows Compile"
   run_on:
   - windows-vsCurrent-xlarge
-  modules:
-  - enterprise
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   expansions:
     exe: ".exe"
@@ -243,8 +235,6 @@ buildvariants:
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-grpc-suggested linux-x86-dynamic-grpc-suggested
   display_name: "* Linux x86 Shared Library with GRPC"
-  modules:
-    - enterprise
   stepback: false
   expansions:
     <<: *generic_linux_compile_expansions

@@ -31,7 +31,6 @@ variables:
       variant: task_generation
 
 - modules: &perf_modules
-    - enterprise
     - dsi
     - genny
     - workloads

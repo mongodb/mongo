@@ -4,8 +4,6 @@ buildvariants:
 - name: enterprise-rhel-80-64-bit-inmem
   display_name: Enterprise RHEL 8.0 (inMemory)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions:
@@ -78,8 +76,6 @@ buildvariants:
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions:

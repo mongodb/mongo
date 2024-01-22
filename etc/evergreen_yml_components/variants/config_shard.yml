@@ -42,8 +42,6 @@ buildvariants:
   name: enterprise-rhel-80-64-bit-dynamic-config-shard
   display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   stepback: false

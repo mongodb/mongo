@@ -99,7 +99,7 @@ buildvariants:
   - rhel80-medium
   expansions:
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    test_flags: --excludeWithAnyTags=requires_http_client
+    test_flags: --excludeWithAnyTags=requires_http_client --enableEnterpriseTests=off
     target_resmoke_time: 15
     max_sub_suites: 5
     large_distro_name: rhel80-medium
@@ -140,8 +140,6 @@ buildvariants:
   name: &enterprise-windows-required enterprise-windows-required
   display_name: "! Enterprise Windows"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - windows-vsCurrent-small
   expansions: &windows_required_expansions
@@ -206,8 +204,6 @@ buildvariants:
   name: &enterprise-rhel-80-64-bit-dynamic-required enterprise-rhel-80-64-bit-dynamic-required
   display_name: "! Shared Library Enterprise RHEL 8.0"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-dynamic-expansions
@@ -327,8 +323,6 @@ buildvariants:
   name: &rhel80-debug-aubsan-lite-required rhel80-debug-aubsan-lite-required
   display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
   run_on:
   - rhel80-build
   expansions: &aubsan-lite-required-expansions
@@ -401,8 +395,6 @@ buildvariants:
 ###########################################
 
 - name: &copybara-sync-between-repos copybara-sync-between-repos
-  modules:
-  - enterprise
   display_name: "* Copybara Sync Between Repos"
   activate: true
   run_on:
