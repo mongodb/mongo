@@ -6,19 +6,18 @@
  * for each thread.
  *
  * @tags: [
- *  assumes_standalone_mongod,
- *  assumes_unsharded_collection,
+ *  incompatible_with_macos,
+ *  requires_compact,
  *  # The config fuzzer may try to stress wiredtiger which can cause this test to timeout.
  *  does_not_support_config_fuzzer,
  *  # The compact test requires large enough collections for the compact operation to do work. This
  *  # can cause too much cache pressure for some concurrency tests with transactions.
  *  does_not_support_transactions,
- *  featureFlagAutoCompact,
- *  incompatible_with_macos,
- *  multiversion_incompatible,
- *  requires_compact,
  *  # Compact is not supported for in memory databases.
- *  requires_persistence
+ *  requires_persistence,
+ *  assumes_standalone_mongod,
+ *  assumes_unsharded_collection,
+ *  multiversion_incompatible
  * ]
  */
 
