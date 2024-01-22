@@ -71,5 +71,6 @@ try {
     if (HOST_TYPE == "windows") {
         const trusted_ca_thumbprint = cat('jstests/libs/trusted-ca.pem.digest.sha1');
         runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
+        runProgram("certutil.exe", "-delstore", "-user", "-f", "CA", trusted_ca_thumbprint);
     }
 }

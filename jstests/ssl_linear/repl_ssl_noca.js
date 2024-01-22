@@ -74,5 +74,6 @@ try {
     if (_isWindows()) {
         const ca_thumbprint = cat('jstests/libs/ca.pem.digest.sha1');
         runProgram("certutil.exe", "-delstore", "-f", "Root", ca_thumbprint);
+        runProgram("certutil.exe", "-delstore", "-user", "-f", "CA", ca_thumbprint);
     }
 }
