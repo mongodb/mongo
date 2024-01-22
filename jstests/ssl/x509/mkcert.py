@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 This script (re)generates x509 certificates from a definition file.
-Invoke as `python3 jstests/ssl/x509/mkcert.py --config certs.yml`
+Invoke as `python3 jstests/ssl/x509/mkcert.py --config jstests/ssl/x509/certs.yml`
+and `python3 jstests/ssl/x509/mkcert.py --config src/mongo/db/modules/enterprise/jstests/libs/certs.yml`
 Optionally providing a cert ID to only regenerate a single cert.
 """
 import argparse
