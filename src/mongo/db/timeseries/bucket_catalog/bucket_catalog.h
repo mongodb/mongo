@@ -173,14 +173,20 @@ public:
     static BucketCatalog& get(OperationContext* opCtx);
 
     BucketCatalog()
-        : stripes(numberOfStripes),
+        : bucketStateRegistry(trackingContext),
+          stripes(numberOfStripes),
           memoryUsageThreshold(getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes) {}
     BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold)
-        : numberOfStripes(numberOfStripes),
+        : bucketStateRegistry(trackingContext),
+          numberOfStripes(numberOfStripes),
           stripes(numberOfStripes),
           memoryUsageThreshold(memoryUsageThreshold) {}
     BucketCatalog(const BucketCatalog&) = delete;
     BucketCatalog operator=(const BucketCatalog&) = delete;
+
+    // Stores an accurate count of the bytes allocated and deallocated for all the data held by
+    // tracked members of the BucketCatalog.
+    TrackingContext trackingContext;
 
     // Stores state information about all buckets managed by the catalog, across stripes.
     BucketStateRegistry bucketStateRegistry;
@@ -219,6 +225,12 @@ public:
  * was not created with a metadata field name.
  */
 BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& bucket);
+
+/**
+ * Returns the memory usage of the bucket catalog across all stripes from the approximated memory
+ * usage, and the tracked memory usage from the TrackingAllocator.
+ */
+uint64_t getMemoryUsage(const BucketCatalog& catalog);
 
 /**
  * Tries to insert 'doc' into a suitable bucket. If an open bucket is full (or has incompatible

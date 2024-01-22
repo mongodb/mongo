@@ -1050,7 +1050,7 @@ void expireIdleBuckets(OperationContext* opCtx,
     int32_t numExpired = 0;
 
     while (!stripe.idleBuckets.empty() &&
-           catalog.memoryUsage.load() > catalog.memoryUsageThreshold() &&
+           getMemoryUsage(catalog) > catalog.memoryUsageThreshold() &&
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe.idleBuckets.back();
 
@@ -1071,7 +1071,7 @@ void expireIdleBuckets(OperationContext* opCtx,
     }
 
     while (!stripe.archivedBuckets.empty() &&
-           catalog.memoryUsage.load() > catalog.memoryUsageThreshold() &&
+           getMemoryUsage(catalog) > catalog.memoryUsageThreshold() &&
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
 
         auto& [hash, archivedSet] = *stripe.archivedBuckets.begin();

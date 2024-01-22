@@ -43,6 +43,8 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/db/timeseries/timeseries_tracked_types.h"
+#include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -119,16 +121,19 @@ struct BucketStateRegistry {
     Era currentEra = 0;
 
     // Mapping of era to counts of how many buckets are associated with that era.
-    std::map<Era, uint64_t> bucketsPerEra;
+    tracked_map<Era, uint64_t> bucketsPerEra;
 
     // Bucket state for synchronization with direct writes.
-    stdx::unordered_map<BucketId, std::variant<BucketState, DirectWriteCounter>, BucketHasher>
+    tracked_unordered_map<BucketId, std::variant<BucketState, DirectWriteCounter>, BucketHasher>
         bucketStates;
 
     // Registry storing 'clearSetOfBuckets' operations. Maps from era to a lambda function which
     // takes in information about a Bucket and returns whether the Bucket belongs to the cleared
     // set.
-    std::map<Era, ShouldClearFn> clearedSets;
+    // TODO SERVER-85565: use tracked type for ShouldClearFn.
+    tracked_map<Era, ShouldClearFn> clearedSets;
+
+    BucketStateRegistry(TrackingContext& trackingContext);
 };
 
 BucketStateRegistry::Era getCurrentEra(const BucketStateRegistry& registry);

@@ -52,6 +52,7 @@
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -180,6 +181,10 @@ BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& handle) {
     }
 
     return bucket->key.metadata.toBSON();
+}
+
+uint64_t getMemoryUsage(const BucketCatalog& catalog) {
+    return catalog.memoryUsage.load() + catalog.trackingContext.allocated();
 }
 
 StatusWith<InsertResult> tryInsert(OperationContext* opCtx,

@@ -113,6 +113,13 @@ void markIndividualBucketCleared(BucketStateRegistry& registry,
 }
 }  // namespace
 
+BucketStateRegistry::BucketStateRegistry(TrackingContext& trackingContext)
+    : bucketsPerEra(make_tracked_map<Era, uint64_t>(trackingContext)),
+      bucketStates(make_tracked_unordered_map<BucketId,
+                                              std::variant<BucketState, DirectWriteCounter>,
+                                              BucketHasher>(trackingContext)),
+      clearedSets(make_tracked_map<Era, ShouldClearFn>(trackingContext)) {}
+
 BucketStateRegistry::Era getCurrentEra(const BucketStateRegistry& registry) {
     stdx::lock_guard lk{registry.mutex};
     return registry.currentEra;
