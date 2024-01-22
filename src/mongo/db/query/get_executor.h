@@ -114,8 +114,7 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
 void fillOutPlannerParams(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const CanonicalQuery* canonicalQuery,
-                          QueryPlannerParams* plannerParams,
-                          bool ignoreQuerySettings = false);
+                          QueryPlannerParams* plannerParams);
 /**
  * Overload of the above function that does two things:
  * - Calls the single collection overload of 'fillOutPlannerParams' on the main collection held
@@ -126,8 +125,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
 void fillOutPlannerParams(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
                           const CanonicalQuery* canonicalQuery,
-                          QueryPlannerParams* plannerParams,
-                          bool ignoreQuerySettings = false);
+                          QueryPlannerParams* plannerParams);
 
 /**
  * Return whether or not any component of the path 'path' is multikey given an index key pattern

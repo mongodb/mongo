@@ -35,7 +35,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
-#include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
@@ -88,7 +87,6 @@ struct QueryPlannerParams {
         : options(options),
           indexFiltersApplied(false),
           querySettingsApplied(false),
-          collscanDirection(boost::none),
           maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
           clusteredCollectionCollator(nullptr),
           availableMemoryBytes(0) {}
@@ -191,13 +189,6 @@ struct QueryPlannerParams {
 
     // Were query settings applied?
     bool querySettingsApplied;
-
-    // TODO SERVER-85321 Centralize the COLLSCAN direction hinting mechanism.
-    //
-    // Optional hint for specifying the allowed collection scan direction. Unlike cursor '$natural'
-    // hints, this does not force the planner to prefer collection scans over other candidate
-    // solutions. This is currently used for applying query settings '$natural' hints.
-    boost::optional<NaturalOrderHint::Direction> collscanDirection;
 
     // What's the max number of indexed solutions we want to output?  It's expensive to compare
     // plans via the MultiPlanStage, and the set of possible plans is very large for certain

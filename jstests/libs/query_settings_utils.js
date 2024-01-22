@@ -104,12 +104,10 @@ export class QuerySettingsUtils {
     assertQueryShapeConfiguration(expectedQueryShapeConfigurations, shouldRunExplain = true) {
         assert.soon(
             () => {
-                let currentQueryShapeConfigurationWo = this.getQuerySettings();
-                currentQueryShapeConfigurationWo.sort(bsonWoCompare);
-                let expectedQueryShapeConfigurationWo = [...expectedQueryShapeConfigurations];
-                expectedQueryShapeConfigurationWo.sort(bsonWoCompare);
-                return bsonWoCompare(currentQueryShapeConfigurationWo,
-                                     expectedQueryShapeConfigurationWo) == 0;
+                const current = this.getQuerySettings().map(x => tojson(x)).sort();
+                const expected = expectedQueryShapeConfigurations.map(x => tojson(x)).sort();
+                return current.length == expected.length &&
+                    current.every((v, i, a) => v == expected[i]);
             },
             "current query settings = " + tojson(this.getQuerySettings()) +
                 ", expected query settings = " + tojson(expectedQueryShapeConfigurations));

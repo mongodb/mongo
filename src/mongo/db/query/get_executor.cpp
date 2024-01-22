@@ -443,89 +443,6 @@ bool applyQuerySettings(const CollectionPtr& collection,
                                                 notInAllowedIndexes),
                                  plannerParams->indices.end());
 
-    // Handle the '$natural' and cluster key (for clustered indexes) cases. Iterate over the
-    // 'allowedIndexes' list and resolve the allowed directions for performing collection scans. If
-    // no '$natural' hint is present then collection scans are forbidden.
-    //
-    // The possible cases for '$natural' allowed indexes are:
-    //     * [] - All collection scans are forbidden.
-    //        * Sets the 'NO_TABLE_SCAN' planner parameter flag to 'true'.
-    //        * Sets the 'collscanDirection' planner parameter to 'boost::none'.
-    //
-    //    * [{$natural: 1}] - Only forward collection scans are allowed.
-    //        * Unsets the 'NO_TABLE_SCAN' planner parameter flag.
-    //        * Sets the 'collscanDirection' to 'NaturalOrderHint::Direction::kForward'.
-    //
-    //    * [{$natural: -1}] - Only backward collection scans are allowed.
-    //        * Unsets the 'NO_TABLE_SCAN' planner parameter flag.
-    //        * Sets the 'collscanDirection' to 'NaturalOrderHint::Direction::kBackward'.
-    //
-    //    * [{$natural: 1}, {$natural: -1}] - All collection scan directions are allowed.
-    //        * Unsets the 'NO_TABLE_SCAN' planner parameter flag.
-    //        * Sets the 'collscanDirection' planner parameter to 'boost::none'.
-    const auto& clusteredInfo = plannerParams->clusteredInfo;
-    bool forwardAllowed = false;
-    bool backwardAllowed = false;
-    for (const auto& allowedIndex : allowedIndexes) {
-        visit(OverloadedVisitor{
-                  // If the collection is clustered, then allow both collection scan directions when
-                  // the provided index key pattern matches the cluster key.
-                  [&](const mongo::IndexKeyPattern& indexKeyPattern) {
-                      if (!clusteredInfo) {
-                          return;
-                      }
-                      const auto& clusteredKeyPattern = clusteredInfo->getIndexSpec().getKey();
-                      if (indexKeyPattern.woCompare(clusteredKeyPattern) == 0) {
-                          forwardAllowed = backwardAllowed = true;
-                      }
-                  },
-                  // Similarly, if the collection is clustered and the provided index name matches
-                  // the clustered index name then allow both collection scan directions.
-                  [&](const mongo::IndexName& indexName) {
-                      if (!clusteredInfo) {
-                          return;
-                      }
-
-                      const auto& clusteredIndexName = clusteredInfo->getIndexSpec().getName();
-                      tassert(7923300,
-                              "clusteredIndex's name should be filled in by default after creation",
-                              clusteredIndexName.has_value());
-                      if (indexName == *clusteredIndexName) {
-                          forwardAllowed = backwardAllowed = true;
-                      }
-                  },
-                  // Allow only the direction specified by the explicit '$natural' hint.
-                  [&](const mongo::NaturalOrderHint& hint) {
-                      switch (hint.direction) {
-                          case NaturalOrderHint::Direction::kForward:
-                              forwardAllowed = true;
-                              break;
-                          case NaturalOrderHint::Direction::kBackward:
-                              backwardAllowed = true;
-                              break;
-                      }
-                  },
-              },
-              allowedIndex.getHint());
-    }
-
-    if (!forwardAllowed && !backwardAllowed) {
-        // No '$natural' or cluster key hint present. Ensure that table scans are forbidden.
-        plannerParams->options |= QueryPlannerParams::Options::NO_TABLE_SCAN;
-    } else {
-        // At least one direction is allowed. Clear out the 'NO_TABLE_SCAN' flag if it exists,
-        // as query settings should have a higher precedence over server parameters.
-        plannerParams->options &= ~QueryPlannerParams::Options::NO_TABLE_SCAN;
-
-        // Enforce the scan direction if needed.
-        const bool bothDirectionsAllowed = forwardAllowed && backwardAllowed;
-        if (!bothDirectionsAllowed) {
-            plannerParams->collscanDirection = forwardAllowed
-                ? NaturalOrderHint::Direction::kForward
-                : NaturalOrderHint::Direction::kBackward;
-        }
-    }
-
     plannerParams->querySettingsApplied = true;
     return true;
 }
@@ -555,17 +472,8 @@ void applyIndexFilters(const CollectionPtr& collection,
  */
 void applyQuerySettingsOrIndexFilters(const CollectionPtr& collection,
                                       const CanonicalQuery& canonicalQuery,
-                                      QueryPlannerParams* plannerParams,
-                                      bool ignoreQuerySettings) {
-    bool didApplyQuerySettings = [&] {
-        // Skip 'querySettings' application for this query. The 'ignoreQuerySettings' flag
-        // denotes that the planner previously failed to generate a viable plan using the
-        // provided index hints and engaged the fallback to multi-planning.
-        if (ignoreQuerySettings) {
-            return false;
-        }
-        return applyQuerySettings(collection, canonicalQuery, plannerParams);
-    }();
+                                      QueryPlannerParams* plannerParams) {
+    bool didApplyQuerySettings = applyQuerySettings(collection, canonicalQuery, plannerParams);
 
     // Try to apply index filters only if query settings were not applied.
     if (!didApplyQuerySettings) {
@@ -633,10 +541,25 @@ void fillOutPlannerCollectionInfo(OperationContext* opCtx,
 void fillOutPlannerParams(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const CanonicalQuery* canonicalQuery,
-                          QueryPlannerParams* plannerParams,
-                          bool ignoreQuerySettings) {
+                          QueryPlannerParams* plannerParams) {
     invariant(canonicalQuery);
     bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+
+    // _id queries can skip checking the catalog for indices since they will always use the _id
+    // index.
+    if (!isIdHackEligibleQuery(
+            collection, canonicalQuery->getFindCommandRequest(), canonicalQuery->getCollator())) {
+        // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
+        fillOutIndexEntries(opCtx,
+                            apiStrict,
+                            canonicalQuery,
+                            collection,
+                            plannerParams->indices,
+                            plannerParams->columnStoreIndexes);
+
+        // If query supports index filters or query settings, filter params.indices.
+        applyQuerySettingsOrIndexFilters(collection, *canonicalQuery, plannerParams);
+    }
 
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
@@ -697,24 +620,6 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->clusteredCollectionCollator = collection->getDefaultCollator();
     }
 
-    // _id queries can skip checking the catalog for indices since they will always use the _id
-    // index.
-    if (isIdHackEligibleQuery(
-            collection, canonicalQuery->getFindCommandRequest(), canonicalQuery->getCollator())) {
-        return;
-    }
-
-    // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
-    fillOutIndexEntries(opCtx,
-                        apiStrict,
-                        canonicalQuery,
-                        collection,
-                        plannerParams->indices,
-                        plannerParams->columnStoreIndexes);
-
-    // If query supports index filters or query settings, filter params.indices.
-    applyQuerySettingsOrIndexFilters(
-        collection, *canonicalQuery, plannerParams, ignoreQuerySettings);
 
     fillOutPlannerCollectionInfo(opCtx,
                                  collection,
@@ -769,10 +674,8 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
 void fillOutPlannerParams(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
                           const CanonicalQuery* canonicalQuery,
-                          QueryPlannerParams* plannerParams,
-                          bool ignoreQuerySettings) {
-    fillOutPlannerParams(
-        opCtx, collections.getMainCollection(), canonicalQuery, plannerParams, ignoreQuerySettings);
+                          QueryPlannerParams* plannerParams) {
+    fillOutPlannerParams(opCtx, collections.getMainCollection(), canonicalQuery, plannerParams);
     plannerParams->secondaryCollectionsInfo =
         fillOutSecondaryCollectionsInformation(opCtx, collections, canonicalQuery);
 }
@@ -1024,7 +927,6 @@ public:
         : _opCtx{opCtx},
           _cq{cq},
           _yieldPolicy{yieldPolicy},
-          _providedPlannerParams{plannerOptions},
           _result{std::make_unique<ResultType>()} {
         invariant(_cq);
         _plannerParams = plannerOptions;
@@ -1088,31 +990,22 @@ public:
         boost::optional<size_t> cachedPlanHash = boost::none;
         if (auto cacheResult = buildCachedPlan(planCacheKey); cacheResult) {
             return {std::move(cacheResult)};
-        }
-
-        // If we are processing an explain, get the cached plan hash if there is one. This is
-        // used for the "isCached" field.
-        if (MONGO_unlikely(_cq->isExplainAndCacheIneligible())) {
+        } else if (MONGO_unlikely(_cq->isExplainAndCacheIneligible())) {
+            // If we are processing an explain, get the cached plan hash if there is one. This is
+            // used for the "isCached" field.
             cachedPlanHash = getCachedPlanHash(planCacheKey);
         }
 
-        auto result = finishPrepare(/* ignoreQuerySettings*/ false);
-        const bool shouldRetryWithoutQuerySettings =
-            !result.isOK() && _plannerParams.querySettingsApplied;
-        if (shouldRetryWithoutQuerySettings) {
-            restorePlannerParams();
-            result = finishPrepare(/* ignoreQuerySettings */ true);
-        }
-
-        // Set the cachedPlanHash on the result.
+        // Finish preparing, then set the cachedPlanHash on the result.
+        auto result = finishPrepare();
         if (result.isOK()) {
             result.getValue()->setCachedPlanHash(cachedPlanHash);
         }
         return result;
     }
 
-    StatusWith<std::unique_ptr<ResultType>> finishPrepare(bool ignoreQuerySettings) {
-        initializePlannerParamsIfNeeded(ignoreQuerySettings);
+    StatusWith<std::unique_ptr<ResultType>> finishPrepare() {
+        initializePlannerParamsIfNeeded();
         if (SubplanStage::needsSubplanning(*_cq)) {
             LOGV2_DEBUG(20924,
                         2,
@@ -1202,18 +1095,13 @@ protected:
     /**
      * Fills out planner parameters if not already filled.
      */
-    void initializePlannerParamsIfNeeded(bool ignoreQuerySettings = false) {
+    void initializePlannerParamsIfNeeded() {
         if (_plannerParamsInitialized) {
             return;
         }
-        _plannerParams = _providedPlannerParams;
-        fillOutPlannerParams(
-            _opCtx, getMainCollection(), _cq, &_plannerParams, ignoreQuerySettings);
-        _plannerParamsInitialized = true;
-    }
+        fillOutPlannerParams(_opCtx, getMainCollection(), _cq, &_plannerParams);
 
-    void restorePlannerParams() {
-        _plannerParamsInitialized = false;
+        _plannerParamsInitialized = true;
     }
 
     /**
@@ -1270,8 +1158,6 @@ protected:
     QueryPlannerParams _plannerParams;
     // Used to avoid filling out the planner params twice.
     bool _plannerParamsInitialized = false;
-    // Used for restoring initialized planner parameters to their original values if needed.
-    const QueryPlannerParams _providedPlannerParams;
     // In-progress result value of the prepare() call.
     std::unique_ptr<ResultType> _result;
 };
@@ -3029,8 +2915,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     const CanonicalQuery* canonicalQuery = canonicalDistinct.getQuery();
     const BSONObj& hint = canonicalQuery->getFindCommandRequest().getHint();
 
-    applyQuerySettingsOrIndexFilters(
-        collection, *canonicalQuery, &plannerParams, /* ignoreQuerySettings */ false);
+    applyQuerySettingsOrIndexFilters(collection, *canonicalQuery, &plannerParams);
 
     // If there exists an index filter, we ignore all hints. Else, we only keep the index specified
     // by the hint. Since we cannot have an index with name $natural, that case will clear the

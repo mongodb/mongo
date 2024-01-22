@@ -10,9 +10,6 @@ selector:
     - jstests/core/views/*.js
     - jstests/core/query/agg_hint.js
 
-    # TODO SERVER-85242 Re-enable once the fallback mechanism also covers runtime planning errors.
-    - jstests/core/query/or/orj.js
-
     # Query settings do not force indexes, and therefore empty filter will result in collection scans.
     - jstests/core/index/geo/geo6.js
     - jstests/core/index/index_check6.js
