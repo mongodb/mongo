@@ -40,6 +40,7 @@ variables:
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --enable-http-client=on
     --link-model=dynamic
+    --use-diagnostic-latches=on
   num_scons_link_jobs_available: 0.99
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
@@ -143,6 +144,7 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
+      --use-diagnostic-latches=on
     compile_variant: *linux-debug-aubsan-compile-required
 
 - &linux-64-debug-required-template
@@ -225,6 +227,7 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
+      --use-diagnostic-latches=on
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
@@ -263,6 +266,7 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
+      --use-diagnostic-latches=on
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -347,6 +351,7 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
+      --use-diagnostic-latches=on
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,corrupts_data
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -430,6 +435,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
+      --use-diagnostic-latches=on
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling,corrupts_data
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
