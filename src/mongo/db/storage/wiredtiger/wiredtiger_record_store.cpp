@@ -1769,7 +1769,7 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     // During startup recovery, the collectionAlwaysNeedsSizeAdjustment flag is not set by default
     // for the sake of efficiency. However, if we reach this point, we may need to set it in order
     // to ensure that capped deletes can occur on documents inserted earlier in startup recovery.
-    if (inReplicationRecovery(opCtx->getServiceContext()) &&
+    if (inReplicationRecovery(opCtx->getServiceContext()).load() &&
         !sizeRecoveryState(opCtx->getServiceContext())
              .collectionAlwaysNeedsSizeAdjustment(getIdent())) {
         checkSize(opCtx);

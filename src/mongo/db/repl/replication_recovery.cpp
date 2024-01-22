@@ -457,12 +457,12 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
     }
 
     const auto serviceCtx = getGlobalServiceContext();
-    inReplicationRecovery(serviceCtx) = true;
+    inReplicationRecovery(serviceCtx).store(true);
     ON_BLOCK_EXIT([serviceCtx] {
         invariant(
-            inReplicationRecovery(serviceCtx),
+            inReplicationRecovery(serviceCtx).load(),
             "replication recovery flag is unexpectedly unset when exiting recoverFromOplog()");
-        inReplicationRecovery(serviceCtx) = false;
+        inReplicationRecovery(serviceCtx).store(false);
     });
 
     // If we were passed in a stable timestamp, we are in rollback recovery and should recover from

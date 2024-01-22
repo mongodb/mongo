@@ -1621,7 +1621,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     // or when collection creation is not part of a stable checkpoint.
     const auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
     const bool inRollback = replCoord && replCoord->getMemberState().rollback();
-    if (inRollback || inReplicationRecovery(getGlobalServiceContext())) {
+    if (inRollback || inReplicationRecovery(getGlobalServiceContext()).load()) {
         ret->checkSize(opCtx);
     }
 

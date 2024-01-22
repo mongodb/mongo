@@ -91,8 +91,9 @@ private:
 SizeRecoveryState& sizeRecoveryState(ServiceContext* serviceCtx);
 
 /**
- * Returns a mutable reference to a boolean decoration on 'serviceCtx', which indicates whether or
- * not the server is currently undergoing replication recovery.
+ * Returns a mutable reference to an atomic boolean decoration on 'serviceCtx', which indicates
+ * whether or not the server is currently undergoing replication recovery. Callers must explicitly
+ * call 'load' and 'store' on this reference to get/set the underlying boolean.
  */
-bool& inReplicationRecovery(ServiceContext* serviceCtx);
+AtomicWord<bool>& inReplicationRecovery(ServiceContext* serviceCtx);
 }  // namespace mongo

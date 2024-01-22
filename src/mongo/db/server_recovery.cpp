@@ -37,12 +37,12 @@
 
 namespace mongo {
 namespace {
-const auto getInReplicationRecovery = ServiceContext::declareDecoration<bool>();
+const auto getInReplicationRecovery = ServiceContext::declareDecoration<AtomicWord<bool>>();
 const auto getSizeRecoveryState = ServiceContext::declareDecoration<SizeRecoveryState>();
 }  // namespace
 
 bool SizeRecoveryState::collectionNeedsSizeAdjustment(const std::string& ident) const {
-    if (!inReplicationRecovery(getGlobalServiceContext())) {
+    if (!inReplicationRecovery(getGlobalServiceContext()).load()) {
         return true;
     }
 
@@ -65,7 +65,7 @@ void SizeRecoveryState::clearStateBeforeRecovery() {
 }
 }  // namespace mongo
 
-bool& mongo::inReplicationRecovery(ServiceContext* serviceCtx) {
+mongo::AtomicWord<bool>& mongo::inReplicationRecovery(ServiceContext* serviceCtx) {
     return getInReplicationRecovery(serviceCtx);
 }
 
