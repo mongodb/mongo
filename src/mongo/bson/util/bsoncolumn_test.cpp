@@ -5337,6 +5337,160 @@ TEST_F(BSONColumnTest, AppendMinKeyInSubObjAfterMerge) {
         cb.append(createElementObj(obj.obj())), DBException, ErrorCodes::InvalidBSONType);
 }
 
+TEST_F(BSONColumnTest, DecompressMinKey) {
+    BufBuilder expected;
+    appendLiteral(expected, createElementMinKey());
+    appendEOO(expected);
+
+    BSONBinData binData;
+    binData.data = expected.buf();
+    binData.length = expected.len();
+    binData.type = Column;
+
+    verifyDecompression(binData, {createElementMinKey()});
+}
+
+TEST_F(BSONColumnTest, DecompressMaxKey) {
+    BufBuilder expected;
+    appendLiteral(expected, createElementMaxKey());
+    appendEOO(expected);
+
+    BSONBinData binData;
+    binData.data = expected.buf();
+    binData.length = expected.len();
+    binData.type = Column;
+
+    verifyDecompression(binData, {createElementMaxKey()});
+}
+
+TEST_F(BSONColumnTest, DecompressMinKeyInSubObj) {
+    BSONObjBuilder obj;
+    {
+        BSONObjBuilder builder = obj.subobjStart("root");
+        builder.append(createElementMinKey());
+    }
+
+    BSONObj ref = obj.obj();
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, ref);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData binData;
+    binData.data = expected.buf();
+    binData.length = expected.len();
+    binData.type = Column;
+
+    verifyDecompression(binData, {createElementObj(ref)});
+}
+
+TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterInterleaveStart) {
+
+    BSONObjBuilder obj;
+    {
+        BSONObjBuilder builder = obj.subobjStart("root");
+        builder.append(createElementMinKey());
+    }
+
+    std::vector<BSONElement> elems = {createElementObj(BSON("root" << BSON("0" << 1))),
+                                      createElementObj(obj.obj())};
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendLiteral(expected, createElementMinKey());
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData binData;
+    binData.data = expected.buf();
+    binData.length = expected.len();
+    binData.type = Column;
+
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterInterleaveStartInAppendMode) {
+    BSONObjBuilder obj;
+    {
+        BSONObjBuilder builder = obj.subobjStart("root");
+        builder.append(createElementMinKey());
+    }
+
+    std::vector<BSONElement> elems(7, createElementObj(BSON("root" << BSON("0" << 1))));
+    elems.push_back(createElementObj(obj.obj()));
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, elems[0].Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues,
+                            kDeltaForBinaryEqualValues},
+                           1);
+    appendLiteral(expected, createElementMinKey());
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData binData;
+    binData.data = expected.buf();
+    binData.length = expected.len();
+    binData.type = Column;
+
+    verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, DecompressMinKeyInSubObjAfterMerge) {
+    BSONObjBuilder obj;
+    {
+        BSONObjBuilder builder = obj.subobjStart("root");
+        builder.append("a", "asd");
+        builder.append(createElementMinKey());
+    }
+
+    // Make sure we handle MinKey even if we would detect that "a" needs to be merged before
+    // observing the MinKey.
+    std::vector<BSONElement> elems = {createElementObj(BSON("root" << BSON("0" << 1))),
+                                      createElementObj(obj.obj())};
+
+    BufBuilder expected;
+    appendInterleavedStart(expected,
+                           BSON("root" << BSON("a"
+                                               << "asd"
+                                               << "0" << 1)));
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {
+                               boost::none,
+                               kDeltaForBinaryEqualValues,
+                           },
+                           1);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {
+                               kDeltaForBinaryEqualValues,
+                           },
+                           1);
+    appendLiteral(expected, createElementMinKey());
+    appendEOO(expected);
+    appendEOO(expected);
+
+    BSONBinData binData;
+    binData.data = expected.buf();
+    binData.length = expected.len();
+    binData.type = Column;
+
+    verifyDecompression(binData, elems);
+}
+
 // The large literal emits this on Visual Studio: Fatal error C1091: compiler limit: string exceeds
 // 65535 bytes in length
 #if !defined(_MSC_VER) || _MSC_VER >= 1929
