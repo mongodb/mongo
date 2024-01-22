@@ -100,8 +100,10 @@ public:
                "warning: compact operation has blocking behaviour and is slow, enabling auto "
                "compact will allow compact to run on any collection at any time. You can cancel "
                "by disabling auto compact.\n"
-               "{ autoCompact : <bool>, [force:<bool>], [freeSpaceTargetMB:<int64_t>] }\n"
-               "  force - allows to run on a replica set primary\n";
+               "{ autoCompact : <bool>, [force:<bool>], [freeSpaceTargetMB:<int64_t>], "
+               "[runOnce:<bool>] }\n"
+               "  force - allows to run on a replica set primary\n"
+               "  runOnce - executes compaction on the database only once\n";
     }
 };
 
