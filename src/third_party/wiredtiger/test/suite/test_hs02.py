@@ -79,12 +79,13 @@ class test_hs02(wttest.WiredTigerTestCase):
         ds2 = SimpleDataSet(self, uri2, 0, key_format=self.key_format, value_format="S")
         ds2.populate()
 
+        # Commit at timestamp 1.
+        bigvalue = "aaaaa" * 100
+        self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
+
         # Pin oldest and stable to timestamp 1.
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1) +
             ',stable_timestamp=' + self.timestamp_str(1))
-
-        bigvalue = "aaaaa" * 100
-        self.large_updates(uri, bigvalue, ds, nrows // 3, 1)
 
         # Check that all updates are seen
         self.check(bigvalue, uri, nrows // 3, 1)

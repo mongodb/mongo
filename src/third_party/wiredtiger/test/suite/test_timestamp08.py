@@ -85,7 +85,7 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 5),
-                '/less than the stable timestamp/')
+                '/after the stable timestamp/')
         self.session.rollback_transaction()
 
         # When explicitly set, commit timestamp for a transaction can be earlier
@@ -105,7 +105,7 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 7)
         self.session.commit_transaction()
 
-        # Read timestamp >= oldest timestamp
+        # Read timestamp < oldest timestamp
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(7) +
             ',stable_timestamp=' + self.timestamp_str(7))
         with self.expectedStdoutPattern('less than the oldest timestamp'):

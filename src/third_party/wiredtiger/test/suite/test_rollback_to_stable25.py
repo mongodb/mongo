@@ -231,11 +231,11 @@ class test_rollback_to_stable25(wttest.WiredTigerTestCase):
         format = 'key_format=r,value_format=S'
         self.session.create(uri, format + ', log=(enabled=false)')
 
-        # Pin oldest timestamp to 5.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
+        # Pin oldest timestamp to 2.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(2))
 
-        # Start stable timestamp at 5.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
+        # Start stable timestamp at 2.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
 
         value_a = "aaaaa" * 10
         value_b = "bbbbb" * 10

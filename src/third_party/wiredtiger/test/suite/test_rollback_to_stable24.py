@@ -74,11 +74,11 @@ class test_rollback_to_stable24(wttest.WiredTigerTestCase):
         format = 'key_format={},value_format=S'.format(self.key_format)
         self.session.create(uri, format + ', log=(enabled=false)')
 
-        # Pin oldest timestamp to 10.
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+        # Pin oldest timestamp to 5.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(5))
 
-        # Start stable timestamp at 10.
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(10))
+        # Start stable timestamp at 5.
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
 
         value_a = "aaaaa" * 100
         value_b = "bbbbb" * 100
