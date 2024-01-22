@@ -253,8 +253,8 @@ int authorizationManagerCacheSize;
 AuthorizationManagerImpl::AuthorizationManagerImpl(
     ServiceContext* service, std::unique_ptr<AuthzManagerExternalState> externalState)
     : _externalState(std::move(externalState)),
-      _authSchemaVersionCache(service, _threadPool, _externalState.get()),
-      _userCache(service,
+      _authSchemaVersionCache(service->getService(), _threadPool, _externalState.get()),
+      _userCache(service->getService(),
                  _threadPool,
                  authorizationManagerCacheSize,
                  &_authSchemaVersionCache,
@@ -618,9 +618,7 @@ std::vector<AuthorizationManager::CachedUserInfo> AuthorizationManagerImpl::getU
 }
 
 AuthorizationManagerImpl::AuthSchemaVersionCache::AuthSchemaVersionCache(
-    ServiceContext* service,
-    ThreadPoolInterface& threadPool,
-    AuthzManagerExternalState* externalState)
+    Service* service, ThreadPoolInterface& threadPool, AuthzManagerExternalState* externalState)
     : ReadThroughCache(
           _mutex,
           service,
@@ -644,7 +642,7 @@ AuthorizationManagerImpl::AuthSchemaVersionCache::_lookup(OperationContext* opCt
 }
 
 AuthorizationManagerImpl::UserCacheImpl::UserCacheImpl(
-    ServiceContext* service,
+    Service* service,
     ThreadPoolInterface& threadPool,
     int cacheSize,
     AuthSchemaVersionCache* authSchemaVersionCache,

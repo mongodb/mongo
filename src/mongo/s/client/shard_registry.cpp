@@ -112,7 +112,7 @@ ShardRegistry::ShardRegistry(ServiceContext* service,
       }()),
       _cache(std::make_unique<Cache>(
           _cacheMutex,
-          _service,
+          _service->getService(),
           _threadPool,
           [this](OperationContext* opCtx,
                  const Singleton& key,

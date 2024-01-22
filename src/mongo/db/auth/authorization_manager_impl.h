@@ -192,7 +192,7 @@ private:
      */
     class AuthSchemaVersionCache : public ReadThroughCache<int, int> {
     public:
-        AuthSchemaVersionCache(ServiceContext* service,
+        AuthSchemaVersionCache(Service* service,
                                ThreadPoolInterface& threadPool,
                                AuthzManagerExternalState* externalState);
 
@@ -215,7 +215,7 @@ private:
      */
     class UserCacheImpl : public UserCache {
     public:
-        UserCacheImpl(ServiceContext* service,
+        UserCacheImpl(Service* service,
                       ThreadPoolInterface& threadPool,
                       int cacheSize,
                       AuthSchemaVersionCache* authSchemaVersionCache,

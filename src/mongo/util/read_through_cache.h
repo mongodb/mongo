@@ -66,7 +66,7 @@ class ReadThroughCacheBase {
     ReadThroughCacheBase& operator=(const ReadThroughCacheBase&) = delete;
 
 protected:
-    ReadThroughCacheBase(ServiceContext* service, ThreadPoolInterface& threadPool);
+    ReadThroughCacheBase(Service* service, ThreadPoolInterface& threadPool);
 
     virtual ~ReadThroughCacheBase();
 
@@ -97,9 +97,9 @@ protected:
 
     Date_t _now();
 
-    // Service context under which this cache has been instantiated (used for access to service-wide
+    // Service under which this cache has been instantiated (used for access to service-wide
     // functionality, such as client/operation context creation)
-    ServiceContext* const _serviceContext;
+    Service* const _service;
 
 private:
     // Thread pool to be used for invoking the blocking 'lookup' calls
@@ -543,7 +543,7 @@ public:
      * same key may group together for a single `lookup`.
      */
     ReadThroughCache(Mutex& mutex,
-                     ServiceContext* service,
+                     Service* service,
                      ThreadPoolInterface& threadPool,
                      LookupFn lookupFn,
                      int cacheSize)

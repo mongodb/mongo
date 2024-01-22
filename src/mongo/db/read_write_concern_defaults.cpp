@@ -366,7 +366,7 @@ ReadWriteConcernDefaults::Cache::Cache(ServiceContext* service,
                                        FetchDefaultsFn fetchDefaultsFn)
     : ReadThroughCache(
           _mutex,
-          service,
+          service->getService(),
           threadPool,
           [this](OperationContext* opCtx, Type, const ValueHandle& unusedCachedValue) {
               return LookupResult(lookup(opCtx));

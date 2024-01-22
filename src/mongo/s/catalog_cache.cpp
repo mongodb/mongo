@@ -883,7 +883,7 @@ CatalogCache::DatabaseCache::DatabaseCache(ServiceContext* service,
                                            CatalogCacheLoader& catalogCacheLoader)
     : ReadThroughCache(
           _mutex,
-          service,
+          service->getService(),
           threadPool,
           [this](OperationContext* opCtx,
                  const DatabaseName& dbName,
@@ -947,7 +947,7 @@ CatalogCache::CollectionCache::CollectionCache(ServiceContext* service,
                                                CatalogCacheLoader& catalogCacheLoader)
     : ReadThroughCache(
           _mutex,
-          service,
+          service->getService(),
           threadPool,
           [this](OperationContext* opCtx,
                  const NamespaceString& nss,
@@ -1079,7 +1079,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 CatalogCache::IndexCache::IndexCache(ServiceContext* service, ThreadPoolInterface& threadPool)
     : ReadThroughCache(
           _mutex,
-          service,
+          service->getService(),
           threadPool,
           [this](OperationContext* opCtx,
                  const NamespaceString& nss,

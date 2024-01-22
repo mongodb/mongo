@@ -53,7 +53,7 @@ StatsCache::StatsCache(ServiceContext* service,
                        int size)
     : ReadThroughCache(
           _mutex,
-          service,
+          service->getService(),
           threadPool,
           [this](OperationContext* opCtx,
                  const StatsPathString& statsPath,

@@ -1112,7 +1112,7 @@ StatusWith<OCSPValidationContext> extractOcspUris(SSL_CTX* context,
 class OCSPCache : public ReadThroughCache<OCSPCacheKey, OCSPFetchResponse> {
 public:
     OCSPCache(ServiceContext* service)
-        : ReadThroughCache(_mutex, service, _threadPool, _lookup, tlsOCSPCacheSize) {
+        : ReadThroughCache(_mutex, service->getService(), _threadPool, _lookup, tlsOCSPCacheSize) {
         _threadPool.startup();
     }
 

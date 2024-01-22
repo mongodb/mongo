@@ -37,16 +37,16 @@
 
 namespace mongo {
 
-ReadThroughCacheBase::ReadThroughCacheBase(ServiceContext* service, ThreadPoolInterface& threadPool)
-    : _serviceContext(service), _threadPool(threadPool) {}
+ReadThroughCacheBase::ReadThroughCacheBase(Service* service, ThreadPoolInterface& threadPool)
+    : _service(service), _threadPool(threadPool) {}
 
 ReadThroughCacheBase::~ReadThroughCacheBase() = default;
 
 struct ReadThroughCacheBase::CancelToken::TaskInfo {
-    TaskInfo(ServiceContext* service, Mutex& cancelTokenMutex)
+    TaskInfo(Service* service, Mutex& cancelTokenMutex)
         : service(service), cancelTokenMutex(cancelTokenMutex) {}
 
-    ServiceContext* const service;
+    Service* const service;
 
     Mutex& cancelTokenMutex;
     Status cancelStatus{Status::OK()};
@@ -66,13 +66,14 @@ void ReadThroughCacheBase::CancelToken::tryCancel() {
         Status(ErrorCodes::ReadThroughCacheLookupCanceled, "Internal only: task canceled");
     if (_info->opCtxToCancel) {
         stdx::lock_guard clientLock(*_info->opCtxToCancel->getClient());
-        _info->service->killOperation(clientLock, _info->opCtxToCancel, _info->cancelStatus.code());
+        _info->service->getServiceContext()->killOperation(
+            clientLock, _info->opCtxToCancel, _info->cancelStatus.code());
     }
 }
 
 ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
     WorkWithOpContext work) noexcept {
-    auto taskInfo = std::make_shared<CancelToken::TaskInfo>(_serviceContext, _cancelTokensMutex);
+    auto taskInfo = std::make_shared<CancelToken::TaskInfo>(_service, _cancelTokensMutex);
 
     _threadPool.schedule(
         [work = std::move(work), taskInfo](Status cancelStatusAtTaskBegin) mutable {
@@ -81,7 +82,7 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
                 return;
             }
 
-            ThreadClient tc(taskInfo->service->getService());
+            ThreadClient tc(taskInfo->service);
 
             // TODO(SERVER-74659): Please revisit if this thread could be made killable.
             {
@@ -109,7 +110,7 @@ ReadThroughCacheBase::CancelToken ReadThroughCacheBase::_asyncWork(
 }
 
 Date_t ReadThroughCacheBase::_now() {
-    return _serviceContext->getFastClockSource()->now();
+    return _service->getServiceContext()->getFastClockSource()->now();
 }
 
 }  // namespace mongo
