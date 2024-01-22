@@ -41,7 +41,7 @@ a notice will be included in
 | [linenoise]                | BSD-3-Clause      | Unknown + changes |                      |                ✗                |
 | [mongo-c-driver]           | Apache-2.0        | 1.23.0            |          ✗           |                ✗                |
 | [MozJS]                    | MPL-2.0           | ESR 91.3.0        |                      |                ✗                |
-| [MurmurHash3]              | Public Domain     | Unknown + changes |          ✗           |                ✗                |
+| [MurmurHash3]              | Public Domain     | a6bd3ce + changes |          ✗           |                ✗                |
 | [ocspbuilder]              | MIT               | 0.10.2            |                      |                                 |
 | [ocspresponder]            | Apache-2.0        | 0.5.0             |                      |                                 |
 | [pcre2]                    | BSD-3-Clause      | 10.40             |                      |                ✗                |
@@ -80,7 +80,7 @@ a notice will be included in
 [linenoise]: https://github.com/antirez/linenoise
 [mongo-c-driver]: https://github.com/mongodb/mongo-c-driver
 [MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
-[MurmurHash3]: https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
+[MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
 [ocspbuilder]: https://github.com/wbond/ocspbuilder
 [ocspresponder]: https://github.com/threema-ch/ocspresponder
 [pcre2]: http://www.pcre.org/
