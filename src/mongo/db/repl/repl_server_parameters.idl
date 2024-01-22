@@ -814,3 +814,11 @@ feature_flags:
         cpp_varname: feature_flags::gReduceMajorityWriteLatency
         default: false
         shouldBeFCVGated: true
+
+    featureFlagReplicateVectoredInsertsTransactionally:
+        description: >-
+            When enabled, multiple inserts as part a single command will be batched in one or more
+            applyOps oplog entries rather than making a single oplog entry per insert.
+        cpp_varname: feature_flags::gReplicateVectoredInsertsTransactionally
+        default: false
+        shouldBeFCVGated: true
