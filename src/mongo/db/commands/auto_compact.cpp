@@ -40,6 +40,7 @@
 #include "mongo/db/commands/compact_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -57,6 +58,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "AutoCompact command requires its feature flag to be enabled",
+                    gFeatureFlagAutoCompact.isEnabled(
+                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassertStatusOK(autoCompact(opCtx,
                                         request().getCommandParameter(),
                                         request().getRunOnce(),
