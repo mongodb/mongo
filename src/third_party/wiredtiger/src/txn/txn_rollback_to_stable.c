@@ -157,6 +157,17 @@ __rollback_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *first
                 F_CLR(stable_upd, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS);
             if (tombstone != NULL)
                 F_CLR(tombstone, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS);
+        } else if (WT_IS_HS(session->dhandle) && stable_upd->type != WT_UPDATE_TOMBSTONE) {
+            /*
+             * History store will have a combination of both tombstone and update/modify types in
+             * the update list to represent the time window of an update. When we are aborting the
+             * tombstone, make sure to remove all of the remaining updates also. In most of the
+             * scenarios, there will be only one update present except when the data store is a
+             * prepared commit where it is possible to have more than one update. The existing
+             * on-disk versions are removed while processing the on-disk entries.
+             */
+            for (; stable_upd != NULL; stable_upd = stable_upd->next)
+                stable_upd->txnid = WT_TXN_ABORTED;
         }
         if (stable_update_found != NULL)
             *stable_update_found = true;
@@ -1425,10 +1436,18 @@ __rollback_to_stable_hs_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t roll
     WT_ERR(__wt_session_get_dhandle(session, WT_HS_URI, NULL, NULL, 0));
 
     /*
-     * The rollback operation should be performed on the history store file when the checkpoint
-     * durable start/stop timestamp is greater than the rollback timestamp.
+     * The rollback operation should be skipped if there is no stable timestamp. Otherwise, it
+     * should be performed if one of the following criteria is satisfied:
+     * - The history store has dirty content.
+     * - The checkpoint durable start/stop timestamp is greater than the rollback timestamp.
+     *
+     * Note that the corresponding code in __rollback_to_stable_btree_apply also checks whether
+     * there _are_ timestamped updates by checking max_durable_ts; that check is redundant here for
+     * several reasons, the most immediate being that max_durable_ts cannot be none (zero) because
+     * it's greater than rollback_timestamp, which is itself greater than zero.
      */
-    if (max_durable_ts > rollback_timestamp) {
+    if ((S2BT(session)->modified || max_durable_ts > rollback_timestamp) &&
+      rollback_timestamp != WT_TS_NONE) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           "tree rolled back with durable timestamp: %s",
           __wt_timestamp_to_string(max_durable_ts, ts_string[0]));
@@ -1457,7 +1476,6 @@ __rollback_to_stable_btree_apply(
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM cval, value, key;
     WT_DECL_RET;
-    WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t max_durable_ts, newest_start_durable_ts, newest_stop_durable_ts;
     size_t addr_size;
     uint64_t rollback_txnid, write_gen;
@@ -1470,7 +1488,6 @@ __rollback_to_stable_btree_apply(
     if (!WT_BTREE_PREFIX(uri) || strcmp(uri, WT_HS_URI) == 0 || strcmp(uri, WT_METAFILE_URI) == 0)
         return (0);
 
-    txn_global = &S2C(session)->txn_global;
     addr_size = 0;
     rollback_txnid = 0;
     write_gen = 0;
@@ -1526,15 +1543,12 @@ __rollback_to_stable_btree_apply(
     }
 
     /*
-     * The rollback to stable will skip the tables during recovery and shutdown in the following
-     * conditions.
-     * 1. Empty table.
-     * 2. Table has timestamped updates without a stable timestamp.
+     * During recovery, a table is skipped by RTS if one of the conditions is met:
+     * 1. The table is empty or newly-created.
+     * 2. The table has timestamped updates without a stable timestamp.
      */
-    if ((F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
-          F_ISSET(S2C(session), WT_CONN_CLOSING_CHECKPOINT)) &&
-      (addr_size == 0 ||
-        (txn_global->stable_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
+    if (F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
+      (addr_size == 0 || (rollback_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           "skip rollback to stable on file %s because %s", uri,
           addr_size == 0 ? "its checkpoint address length is 0" :
@@ -1682,7 +1696,16 @@ __rollback_to_stable_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t ro
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+    /*
+     * Performing eviction in parallel to a checkpoint can lead to a situation where the history
+     * store has more updates than its corresponding data store. Performing history store cleanup at
+     * the end can enable the removal of any such unstable updates that are written to the history
+     * store.
+     *
+     * Do not perform the final pass on the history store in an in-memory configuration as it
+     * doesn't exist.
+     */
+    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         WT_ERR(__rollback_to_stable_hs_final_pass(session, rollback_timestamp));
 
 err:

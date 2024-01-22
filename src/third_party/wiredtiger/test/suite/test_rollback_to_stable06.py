@@ -52,7 +52,12 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
+    evict = [
+        ('no_evict', dict(evict=False)),
+        ('evict', dict(evict=True))
+    ]
+
+    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values, evict)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -121,6 +126,22 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
             self.assertEqual(hs_removed, 0)
         else:
             self.assertGreaterEqual(upd_aborted + hs_removed + keys_removed, nrows * 4)
+
+        # Reinsert the same updates with the same timestamps and flush to disk.
+        # If the updates have not been correctly removed by RTS WiredTiger will
+        # see the key already exists in the history store and abort.
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+        self.large_updates(uri, value_b, ds, nrows, self.prepare, 30)
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 40)
+        self.large_updates(uri, value_d, ds, nrows, self.prepare, 50)
+
+        # Do a checkpoint before shutdown
+        if not self.in_memory:
+            self.session.checkpoint()
+
+        # Evict the pages to disk
+        if self.evict:
+            self.evict_cursor(uri, nrows, value_d)
 
 if __name__ == '__main__':
     wttest.run()
