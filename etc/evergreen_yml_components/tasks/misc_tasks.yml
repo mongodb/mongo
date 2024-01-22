@@ -1,0 +1,1190 @@
+# This file contains miscellaneous tasks
+
+################################################
+#                   Variable                   #
+################################################
+variables:
+- &antithesis_task_template
+  name: antithesis_task_template
+  tags: ["assigned_to_jira_team_devprod_correctness", "antithesis"]
+  depends_on:
+    name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: suite_name
+      resmoke_args: >-
+        --arg=val
+        --flag
+
+# THIS HAS COPIES IN
+# - etc/evergreen_yml_components/definitions.yml
+# - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/misc_tasks.yml
+# ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
+- &compile_task_group_template
+  name: compile_task_group_template
+  max_hosts: 1
+  tasks: []
+  setup_task:
+  - func: "f_expansions_write"
+  - func: "apply compile expansions"
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
+  - func: "get engflow creds"
+  teardown_task:
+  - func: "f_expansions_write"
+  - func: "attach scons logs"
+  - func: "attach report"
+  - func: "attach artifacts"
+  - func: "attach local resmoke invocation"
+  - func: "attach multiversion download links"
+  - func: "kill processes"
+  - func: "save mongo coredumps"
+  - func: "generate hang analyzer tasks"
+  - func: "save failed unittests"
+  - func: "save UndoDB recordings"
+  - func: "save unstripped dbtest"
+  - func: "save hang analyzer debugger files"
+  - func: "save disk statistics"
+  - func: "save system resource information"
+  - func: "save libfuzzertest corpora"
+  - func: "remove files"
+    vars:
+      files: >-
+        src/resmoke_error_code
+        src/build/scons/config.log
+        src/*.gcda.gcov
+        src/gcov-intermediate-files.tgz
+        src/*.core src/*.mdmp src/*.core.gz src/*.mdmp.gz
+        mongo-coredumps.json
+        src/dist-unittests/bin/*
+        src/dist-unittests/lib/*
+        mongo-unittests.tgz
+        src/debugger*.*
+        src/mongo-hanganalyzer.tgz
+        diskstats.tgz
+        system-resource-info.tgz
+        ${report_file|src/report.json}
+        ${archive_file|src/archive.json}
+  setup_group_can_fail_task: true
+  setup_group:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  # The python virtual environment is installed in ${workdir}, which is created in
+  # "set up venv".
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "f_expansions_write"
+  - func: "configure evergreen api credentials"
+  - func: "get buildnumber"
+  - func: "f_expansions_write"
+  - func: "set up credentials"
+  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+  - func: "set up win mount script"
+  - func: "generate compile expansions"
+  - func: "f_expansions_write"
+  teardown_group:
+  - func: "f_expansions_write"
+  - func: "umount shared scons directory"
+  - func: "cleanup environment"
+  timeout:
+  - func: "f_expansions_write"
+  - func: "run hang analyzer"
+  - func: "wait for resmoke to shutdown"
+
+- &jepsen_config_vars
+  jepsen_key_time_limit: --key-time-limit 15
+  jepsen_protocol_version: --protocol-version 1
+  jepsen_read_concern: ""
+  jepsen_read_with_find_and_modify: ""
+  jepsen_storage_engine: ""
+  jepsen_test_name: ""
+  # Empirically, we've had greater success in reproducing the issues found in MongoDB versions
+  # 3.4.0-rc3 and 3.4.0-rc4 when running Jepsen with at least --time-limit=600.
+  jepsen_time_limit: --time-limit 1200
+  jepsen_write_concern: ""
+  mongod_conf: --mongod-conf mongod_verbose.conf
+
+# Template for running Jepsen tests
+- &run_jepsen_template
+  name: run_jepsen_template
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+
+# Templates used by powercycle
+- &powercycle_remote_credentials
+  private_key_file: src/powercycle.pem
+  private_key_remote: ${__project_aws_ssh_key_value}
+
+
+################################################
+#                    Tasks                     #
+################################################
+tasks:
+- <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_multi_stmt_txn_kill_primary
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_multi_stmt_txn_kill_primary
+
+- <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_with_stepdowns_and_balancer
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_with_stepdowns_and_balancer
+
+- <<: *antithesis_task_template
+  name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_with_stepdowns_and_balancer
+      resmoke_args: >-
+        --configShard=0
+        --numShards=2
+        --excludeWithAnyTags=config_shard_incompatible
+
+- <<: *antithesis_task_template
+  name: antithesis_config_fuzzer_stress_concurrency_sharded_replication
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: concurrency_sharded_replication
+      resmoke_args: >-
+        --fuzzMongodConfigs=stress
+        --fuzzMongosConfigs=normal
+        --excludeWithAnyTags=does_not_support_config_fuzzer
+
+- <<: *antithesis_task_template
+  name: antithesis_core
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: core
+
+- <<: *antithesis_task_template
+  name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
+
+- <<: *antithesis_task_template
+  name: antithesis_jstestfuzz_sharded
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: jstestfuzz_sharded
+
+- <<: *antithesis_task_template
+  name: antithesis_replica_sets_jscore_passthrough
+  commands:
+  - func: "do setup"
+  - func: "do setup for antithesis"
+  - func: "antithesis image build and push"
+    vars:
+      suite: replica_sets_jscore_passthrough
+
+- name: build_metrics_tasks_gen
+  tags: ["assigned_to_jira_team_devprod_build"]
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/evergreen_gen_build_metrics_tasks.py"
+  - command: archive.targz_pack
+    params:
+      target: build_metrics_task_gen.tgz
+      source_dir: "src"
+      include:
+      - "build_metrics_task_gen.json"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: build_metrics_task_gen.tgz
+      remote_file: ${project}/${build_variant}/${revision}/build-metrics/${task_name}-${build_id}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: Build Metrics Task Gen JSON
+  - command: generate.tasks
+    params:
+      files:
+      - src/build_metrics_task_gen.json
+
+- name: check_feature_flag_tags
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  patch_only: true
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/feature_flag_tags_check.sh"
+
+- name: check_for_todos
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  exec_timeout_secs: 600 # 10 minute timeout
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "configure evergreen api credentials"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/todos_check.sh"
+
+- name: daily_task_scanner
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/run_python_script.sh"
+        - "buildscripts/daily_task_scan.py"
+        - "-f=task_errors.txt"
+
+- name: determine_patch_tests
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/gen_patch_test_tags.sh"
+
+- name: generate_buildid_to_debug_symbols_mapping
+  tags: ["assigned_to_jira_team_devprod_correctness", "symbolizer"]
+  stepback: false
+  patchable: true
+  depends_on:
+  - archive_dist_test_debug
+  commands:
+  - func: "f_expansions_write"
+  - func: "do setup"
+  - func: "configure evergreen api credentials"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
+
+- name: idl_tests
+  tags: ["assigned_to_jira_team_server_servicearch"]
+  depends_on:
+  - name: archive_dist_test
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "run idl tests"
+
+- name: iwyu_self_test
+  tags: ["assigned_to_jira_team_devprod_build"]
+  commands:
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/iwyu/test/run_tests.py"
+
+# Smoke test to ensure the Server still works with Jepsen
+- <<: *run_jepsen_template
+  name: jepsen-config_fuzzer_smoke
+  tags: ["assigned_to_jira_team_server_repl"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+      jepsen_time_limit: --time-limit 120
+
+# Smoke test to ensure the Server still works with Jepsen
+- <<: *run_jepsen_template
+  name: jepsen-smoke
+  tags: ["assigned_to_jira_team_server_repl"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+      jepsen_time_limit: --time-limit 120
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_list-append
+  tags: ["assigned_to_jira_team_server_repl", "jepsen_docker"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen docker setup"
+  - func: "setup jepsen docker config fuzzer"
+  - func: "run jepsen docker test"
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_read-concern-majority
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_read-concern-majority_w1
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+      jepsen_write_concern: --write-concern w1
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_register_findAndModify
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_register_linearizableRead
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_config_fuzzer_set_linearizableRead
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "setup jepsen config fuzzer"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      mongod_conf: --mongod-conf mongod.conf
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: set
+
+- <<: *run_jepsen_template
+  name: jepsen_list-append
+  tags: ["assigned_to_jira_team_server_repl", "jepsen_docker"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen docker setup"
+  - func: "run jepsen docker test"
+
+- <<: *run_jepsen_template
+  name: jepsen_read-concern-majority
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+
+- <<: *run_jepsen_template
+  name: jepsen_read-concern-majority_w1
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: read-concern-majority
+      jepsen_write_concern: --write-concern w1
+
+- <<: *run_jepsen_template
+  name: jepsen_register_findAndModify
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_with_find_and_modify: --read-with-find-and-modify
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_register_linearizableRead
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: register
+
+- <<: *run_jepsen_template
+  name: jepsen_set_linearizableRead
+  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  commands:
+  - func: "do setup"
+  - func: "do jepsen setup"
+  - func: "run jepsen test"
+    vars:
+      <<: *jepsen_config_vars
+      jepsen_read_concern: --read-concern linearizable
+      jepsen_storage_engine: --storage-engine wiredTiger
+      jepsen_test_name: set
+
+- name: lint_clang_format
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "scons lint"
+    vars:
+      targets: lint-clang-format
+
+- name: lint_cpplint
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "scons lint"
+    vars:
+      targets: lint-lint.py
+
+- name: lint_errorcodes
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "scons lint"
+    vars:
+      targets: lint-errorcodes
+
+- name: lint_eslint
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "scons lint"
+    vars:
+      targets: lint-eslint
+
+# Check that the mutational fuzzer can parse all JS filess.
+- name: lint_fuzzer_sanity_all
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity all"
+
+# Check that the mutational fuzzer can parse JS files modified in a patch build.
+- name: lint_fuzzer_sanity_patch
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  patch_only: true
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "setup jstestfuzz"
+  - func: "lint fuzzer sanity patch"
+
+- name: lint_large_files_check
+  tags: ["assigned_to_jira_team_devprod_build"]
+  exec_timeout_secs: 600 # 10 minute timeout
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/run_python_script.sh"
+      - "buildscripts/large_file_check.py"
+      - "--exclude"
+      - "src/third_party/*"
+
+# Confirm that the poetry.lock file is up to date with pyproject.toml
+- name: lint_poetry_lock
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/functions/poetry_lock_check.py"
+
+- name: lint_pylinters
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "scons lint"
+    vars:
+      targets: lint-pylinters
+
+- name: lint_sconslinters
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "scons lint"
+    vars:
+      targets: lint-sconslinters
+
+- name: lint_shellscripts
+  tags: ["assigned_to_jira_team_devprod_correctness", "lint"]
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/lint_shellscripts.sh"
+
+- name: lint_yaml
+  tags: ["assigned_to_jira_team_devprod_correctness", "lint"]
+  depends_on: []
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/lint_yaml.sh"
+
+- name: monitor_mongo_fork_10gen
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "monitor mongo fork 10gen"
+
+- name: powercycle
+  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: powercycle_gen
+  tags: ["assigned_to_jira_team_server_storage_engines"]
+  commands:
+  - func: "generate powercycle tasks"
+    vars:
+      task_names: >-
+        powercycle
+        powercycle_kill_mongod
+        powercycle_replication_smalloplog
+        powercycle_syncdelay
+      num_tasks: 1
+
+- name: powercycle_kill_mongod
+  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: powercycle_last_lts_fcv
+  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: powercycle_replication
+  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: powercycle_replication_smalloplog
+  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: powercycle_sentinel
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  exec_timeout_secs: 604800 # 7 days
+  commands:
+  - func: "run powercycle sentinel"
+    vars:
+      gen_task: powercycle_smoke_skip_compile_gen
+
+- name: powercycle_smoke
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_remote_credentials
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: powercycle_smoke_skip_compile_gen
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - func: "generate powercycle tasks"
+    vars:
+      task_names: >-
+        powercycle_smoke_skip_compile
+      num_tasks: 20
+      exec_timeout_secs: 604800 # 7 days
+      timeout_secs: 604800 # 7 days
+      set_up_retry_count: 1800
+      run_powercycle_args: --sshAccessRetryCount=1800
+
+- name: powercycle_syncdelay
+  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: powercycle_write_concern_majority
+  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
+- name: selinux_rhel7_enterprise
+  tags: ["assigned_to_jira_team_server_security"]
+  depends_on:
+  - name: archive_dist_test
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
+  - func: "run selinux tests"
+    vars:
+      user: root
+      distro: rhel76-selinux
+      test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
+- name: selinux_rhel7_org
+  tags: ["assigned_to_jira_team_server_security"]
+  depends_on:
+  - name: archive_dist_test
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
+  - func: "run selinux tests"
+    vars:
+      user: root
+      distro: rhel76-selinux
+      test_list: jstests/selinux/*.js
+
+- name: selinux_rhel8_enterprise
+  tags: ["assigned_to_jira_team_server_security"]
+  depends_on:
+  - name: archive_dist_test
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
+  - func: "run selinux tests"
+    vars:
+      distro: rhel80-selinux
+      test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
+- name: selinux_rhel8_org
+  tags: ["assigned_to_jira_team_server_security"]
+  depends_on:
+  - name: archive_dist_test
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
+  - func: "run selinux tests"
+    vars:
+      distro: rhel80-selinux
+      test_list: jstests/selinux/*.js
+
+- name: selinux_rhel9_enterprise
+  tags: ["assigned_to_jira_team_server_security"]
+  depends_on:
+  - name: archive_dist_test
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
+  - func: "run selinux tests"
+    vars:
+      distro: rhel90-selinux
+      test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
+
+- name: selinux_rhel9_org
+  tags: ["assigned_to_jira_team_server_security"]
+  depends_on:
+  - name: archive_dist_test
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "set up venv"
+  - func: "fetch packages"
+  - func: "fetch binaries"
+  - func: "extract binaries"
+  - func: "run selinux tests"
+    vars:
+      distro: rhel90-selinux
+      test_list: jstests/selinux/*.js
+
+- name: sync_repo_with_copybara
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "configure evergreen api credentials"
+  - func: "sync repo with copybara"
+
+- name: test_api_version_compatibility
+  tags: ["assigned_to_jira_team_server_repl"]
+  depends_on:
+  - name: archive_dist_test
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "do setup"
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/check_idl_compat.sh"
+
+- name: test_packages
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  depends_on:
+  - name: package
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "run package test"
+    vars:
+      docker_username: ${dockerhub_username}
+      docker_password: ${dockerhub_password}
+
+- name: test_packages_release
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "run release package test"
+    vars:
+      docker_username: ${dockerhub_username}
+      docker_password: ${dockerhub_password}
+
+- name: validate_commit_message
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  exec_timeout_secs: 600 # 10 minute timeout
+  commands:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/commit_message_validate.sh"
+      env:
+        JIRA_AUTH_ACCESS_TOKEN: ${jira_auth_access_token}
+        JIRA_AUTH_ACCESS_TOKEN_SECRET: ${jira_auth_access_token_secret}
+        JIRA_AUTH_CONSUMER_KEY: ${jira_auth_consumer_key}
+        JIRA_AUTH_KEY_CERT: ${jira_auth_key_cert}
+
+- name: version_burn_in_gen
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "f_expansions_write"
+  - func: "add git tag"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "generate version burn in"
+
+- &version_expansions_gen
+  name: version_expansions_gen
+  tags: ["assigned_to_jira_team_devprod_build"]
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "f_expansions_write"
+  - func: "add git tag"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "generate and upload version expansions"
+  - func: "generate and upload resmoke constants"
+
+- <<: *version_expansions_gen
+  name: version_expansions_future_git_tag_multiversion_gen
+
+- name: version_gen
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "f_expansions_write"
+  - func: "add git tag"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "generate version"
+
+- name: version_gen_validation
+  tags: ["assigned_to_jira_team_devprod_correctness"]
+  commands:
+  - command: manifest.load
+  - func: "git get project"
+  - func: "f_expansions_write"
+  - func: "add git tag"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "generate version validation"
+
+
+################################################
+#                 Task Groups                  #
+################################################
+task_groups:
+- <<: *compile_task_group_template
+  name: build_metrics_gen_TG
+  tasks:
+  - build_metrics_tasks_gen
+
+- <<: *compile_task_group_template
+  name: libdeps_graph_linting_TG
+  tasks:
+  - libdeps_graph_linting
+
+- <<: *compile_task_group_template
+  name: iwyu_self_test_TG
+  tasks:
+  - iwyu_self_test

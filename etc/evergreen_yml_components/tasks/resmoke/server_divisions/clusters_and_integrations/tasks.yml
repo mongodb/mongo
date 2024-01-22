@@ -114,6 +114,7 @@ variables:
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
+# - etc/evergreen_yml_components/tasks/misc_tasks.yml
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &compile_task_group_template
   name: compile_task_group_template
