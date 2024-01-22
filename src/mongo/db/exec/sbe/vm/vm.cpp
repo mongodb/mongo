@@ -2725,7 +2725,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMergeObjects(Ari
 
     invariant(tagAgg == value::TypeTags::Object);
 
-    if (tagField == value::TypeTags::Nothing || tagField == value::TypeTags::Null) {
+    // If our field is nothing or null or it's not an object, return the accumulator state.
+    if (tagField == value::TypeTags::Nothing || tagField == value::TypeTags::Null ||
+        (tagField != value::TypeTags::Object && tagField != value::TypeTags::bsonObject)) {
         guard.reset();
         return {true, tagAgg, valAgg};
     }

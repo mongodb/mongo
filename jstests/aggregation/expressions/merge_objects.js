@@ -89,6 +89,8 @@ result = coll.aggregate([
              ])
              .toArray();
 assert.eq(result, [{_id: 9, mergedDocument: {b: undefined}}]);
+result = coll.aggregate({'$group': {_id: 0, m: {$mergeObjects: undefined}}}).toArray();
+assert.eq(result, [{_id: 0, m: {}}]);
 
 // Test output with missing values.
 assert.commandWorked(coll.insert({_id: 10, a: {b: 1}}));
