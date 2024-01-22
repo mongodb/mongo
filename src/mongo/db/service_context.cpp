@@ -66,8 +66,6 @@
 namespace mongo {
 namespace {
 
-using ConstructorActionList = std::list<ServiceContext::ConstructorDestructorActions>;
-
 ServiceContext* globalServiceContext = nullptr;
 
 }  // namespace
@@ -119,9 +117,9 @@ public:
         if (!role.has(ClusterRole::RouterServer))
             role += ClusterRole::ShardServer;
         if (role.has(ClusterRole::RouterServer))
-            _router = std::make_unique<Service>(sc, ClusterRole::RouterServer);
+            _router = Service::make(sc, ClusterRole::RouterServer);
         if (role.has(ClusterRole::ShardServer))
-            _shard = std::make_unique<Service>(sc, ClusterRole::ShardServer);
+            _shard = Service::make(sc, ClusterRole::ShardServer);
     }
 
     /** The `role` here must be ShardServer or RouterServer exactly. */
@@ -134,8 +132,8 @@ public:
     }
 
 private:
-    std::unique_ptr<Service> _shard;
-    std::unique_ptr<Service> _router;
+    Service::UniqueService _shard;
+    Service::UniqueService _router;
 };
 
 Service::~Service() = default;
@@ -477,61 +475,69 @@ void ServiceContext::notifyStartupComplete() {
     _startupCompleteCondVar.notify_all();
 }
 
-namespace {
-
-/**
- * Accessor function to get the global list of ServiceContext constructor and destructor
- * functions.
- */
-ConstructorActionList& registeredConstructorActions() {
-    static ConstructorActionList cal;
-    return cal;
-}
-
-}  // namespace
-
-ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
-    std::string name, ConstructorAction constructor, DestructorAction destructor)
-    : ConstructorActionRegisterer(
+template <typename T>
+ConstructorActionRegistererType<T>::ConstructorActionRegistererType(std::string name,
+                                                                    ConstructorAction constructor,
+                                                                    DestructorAction destructor)
+    : ConstructorActionRegistererType(
           std::move(name), {}, std::move(constructor), std::move(destructor)) {}
 
-ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
+template <typename T>
+ConstructorActionRegistererType<T>::ConstructorActionRegistererType(
     std::string name,
     std::vector<std::string> prereqs,
     ConstructorAction constructor,
     DestructorAction destructor)
-    : ConstructorActionRegisterer(
+    : ConstructorActionRegistererType(
           std::move(name), prereqs, {}, std::move(constructor), std::move(destructor)) {}
 
-ServiceContext::ConstructorActionRegisterer::ConstructorActionRegisterer(
+template <typename T>
+ConstructorActionRegistererType<T>::ConstructorActionRegistererType(
     std::string name,
     std::vector<std::string> prereqs,
     std::vector<std::string> dependents,
     ConstructorAction constructor,
     DestructorAction destructor) {
     if (!destructor)
-        destructor = [](ServiceContext*) {
+        destructor = [](T*) {
         };
     _registerer.emplace(
         std::move(name),
         [this, constructor, destructor](InitializerContext*) {
-            _iter = registeredConstructorActions().emplace(registeredConstructorActions().end(),
-                                                           std::move(constructor),
-                                                           std::move(destructor));
+            _iter = ConstructorActionRegistererType::registeredConstructorActions().emplace(
+                ConstructorActionRegistererType::registeredConstructorActions().end(),
+                std::move(constructor),
+                std::move(destructor));
         },
-        [this](DeinitializerContext*) { registeredConstructorActions().erase(_iter); },
+        [this](DeinitializerContext*) {
+            ConstructorActionRegistererType::registeredConstructorActions().erase(_iter);
+        },
         std::move(prereqs),
         std::move(dependents));
 }
 
+template class ConstructorActionRegistererType<ServiceContext>;
+template class ConstructorActionRegistererType<Service>;
+
 ServiceContext::UniqueServiceContext ServiceContext::make() {
     auto service = std::make_unique<ServiceContext>();
-    onCreate(service.get(), registeredConstructorActions());
+    onCreate(service.get(), ConstructorActionRegisterer::registeredConstructorActions());
     return UniqueServiceContext{service.release()};
 }
 
-void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* service) const {
-    onDestroy(service, registeredConstructorActions());
+Service::UniqueService Service::make(ServiceContext* sc, ClusterRole role) {
+    auto service = std::unique_ptr<Service>(new Service(sc, role));
+    onCreate(service.get(), ConstructorActionRegisterer::registeredConstructorActions());
+    return UniqueService{service.release()};
+}
+
+void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* sc) const {
+    onDestroy(sc, ConstructorActionRegisterer::registeredConstructorActions());
+    delete sc;
+}
+
+void Service::ServiceDeleter::operator()(Service* service) const {
+    onDestroy(service, ConstructorActionRegisterer::registeredConstructorActions());
     delete service;
 }
 
