@@ -110,6 +110,11 @@ using QueryStatsStore = PartitionedCache<std::size_t,
  */
 class QueryStatsStoreManager {
 public:
+    // The query stats store can be configured using these objects on a per-ServiceContext level.
+    // This is essentially global, but can be manipulated by unit tests.
+    static const ServiceContext::Decoration<std::unique_ptr<QueryStatsStoreManager>> get;
+    static const ServiceContext::Decoration<std::unique_ptr<RateLimiting>> getRateLimiter;
+
     template <typename... QueryStatsStoreArgs>
     QueryStatsStoreManager(size_t cacheSize, size_t numPartitions)
         : _queryStatsStore(std::make_unique<QueryStatsStore>(cacheSize, numPartitions)),
@@ -144,12 +149,6 @@ private:
      */
     AtomicWord<size_t> _maxSize;
 };
-
-const auto queryStatsStoreDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<QueryStatsStoreManager>>();
-
-const auto queryStatsRateLimiter =
-    ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
 
 /**
  * Acquire a reference to the global queryStats store.

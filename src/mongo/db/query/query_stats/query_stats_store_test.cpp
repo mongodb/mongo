@@ -274,7 +274,7 @@ TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
     auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, {std::move(fcrCopy)}));
     RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
 
-    auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(opCtx->getServiceContext());
+    auto&& globalQueryStatsStoreManager = QueryStatsStoreManager::get(opCtx->getServiceContext());
     globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
 
     // The shapification process will bloat the input query over the 16 MB memory limit. Assert

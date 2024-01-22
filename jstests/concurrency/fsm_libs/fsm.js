@@ -157,7 +157,10 @@ export var fsm = (function() {
                 fn.call(args.data, args.db, args.collName, connCache);
             }
 
-            var nextState = getWeightedRandomChoice(args.transitions[currentState], Random.rand());
+            assert(args.transitions.hasOwnProperty(currentState),
+                   `No transitions defined for state: ${currentState}`);
+            const nextState =
+                getWeightedRandomChoice(args.transitions[currentState], Random.rand());
             currentState = nextState;
         }
 

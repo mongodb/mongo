@@ -68,6 +68,15 @@ namespace mongo::query_stats {
 
 CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
 
+const Decorable<ServiceContext>::Decoration<std::unique_ptr<QueryStatsStoreManager>>
+    QueryStatsStoreManager::get =
+        ServiceContext::declareDecoration<std::unique_ptr<QueryStatsStoreManager>>();
+
+const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiting>>
+    QueryStatsStoreManager::getRateLimiter =
+        ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
+
+
 namespace {
 
 CounterMetric queryStatsEvictedMetric("queryStats.numEvicted");
@@ -125,14 +134,14 @@ public:
         assertConfigurationAllowed();
         auto requestedSize = memory_util::convertToSizeInBytes(memSize);
         auto cappedSize = capQueryStatsStoreSize(requestedSize);
-        auto& queryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
+        auto& queryStatsStoreManager = QueryStatsStoreManager::get(serviceCtx);
         size_t numEvicted = queryStatsStoreManager->resetSize(cappedSize);
         queryStatsEvictedMetric.increment(numEvicted);
     }
 
     void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) {
         assertConfigurationAllowed();
-        queryStatsRateLimiter(serviceCtx).get()->setSamplingRate(samplingRate);
+        QueryStatsStoreManager::getRateLimiter(serviceCtx).get()->setSamplingRate(samplingRate);
     }
 };
 
@@ -150,7 +159,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         query_stats_util::queryStatsStoreOnParamChangeUpdater(serviceCtx) =
             std::make_unique<QueryStatsOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
-        auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
+        auto&& globalQueryStatsStoreManager = QueryStatsStoreManager::get(serviceCtx);
         // Initially the queryStats store used the same number of partitions as the plan cache, that
         // is the number of cpu cores. However, with performance investigation we found that when
         // the size of the partitions was too large, it took too long to copy out and read one
@@ -172,7 +181,7 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
         auto configuredSamplingRate = internalQueryStatsRateLimit.load();
-        queryStatsRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
+        QueryStatsStoreManager::getRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
             configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate, Seconds{1});
     }};
 
@@ -184,7 +193,8 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
     // During initialization, FCV may not yet be setup but queries could be run. We can't
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
-    return isQueryStatsFeatureEnabled() && queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
+    return isQueryStatsFeatureEnabled() &&
+        QueryStatsStoreManager::get(serviceCtx)->getMaxSize() > 0;
 }
 
 /**
@@ -194,14 +204,23 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
 bool shouldCollect(const ServiceContext* serviceCtx) {
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    auto samplingRate = queryStatsRateLimiter(serviceCtx)->getSamplingRate();
+    auto samplingRate = QueryStatsStoreManager::getRateLimiter(serviceCtx)->getSamplingRate();
     if (samplingRate <= 0) {
+        LOGV2_DEBUG(8473001,
+                    5,
+                    "sampling rate is <= 0, skipping this request",
+                    "samplingRate"_attr = samplingRate);
         return false;
     }
     // Check if rate limiting allows us to collect queryStats for this request.
     if (samplingRate < INT_MAX &&
-        !queryStatsRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
+        !QueryStatsStoreManager::getRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         queryStatsRateLimitedRequestsMetric.increment();
+        LOGV2_DEBUG(8473002,
+                    5,
+                    "rate limited this request",
+                    "samplingRate"_attr = samplingRate,
+                    "totalLimited"_attr = queryStatsRateLimitedRequestsMetric.get());
         return false;
     }
     return true;
@@ -264,6 +283,10 @@ void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<Key>(void)> makeKey) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
+        LOGV2_DEBUG(8473000,
+                    5,
+                    "not collecting query stats for this request since it is disabled",
+                    "featureEnabled"_attr = isQueryStatsFeatureEnabled());
         return;
     }
 
@@ -323,7 +346,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
             "Query stats is not enabled without the feature flag on and a cache size greater than "
             "0 bytes",
             isQueryStatsEnabled(opCtx->getServiceContext()));
-    return queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
+    return QueryStatsStoreManager::get(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
 QueryStatsSnapshot captureMetrics(const OperationContext* opCtx,
@@ -351,7 +374,7 @@ void writeQueryStats(OperationContext* opCtx,
                      std::unique_ptr<Key> key,
                      const QueryStatsSnapshot& snapshot,
                      std::unique_ptr<SupplementalStatsEntry> supplementalMetrics) {
-    if (!queryStatsKeyHash) {
+    if (!key) {
         return;
     }
 
@@ -368,7 +391,10 @@ void writeQueryStats(OperationContext* opCtx,
         return;
     }
     auto&& queryStatsStore =
-        queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
+        QueryStatsStoreManager::get(opCtx->getServiceContext())->getQueryStatsStore();
+    dassert(absl::HashOf(*key) == queryStatsKeyHash,
+            "Expecting query stats key to hash to the given hash. Is the OpCtx state being "
+            "incorrectly re-used?");
     auto&& [statusWithMetrics, partitionLock] =
         queryStatsStore.getWithPartitionLock(*queryStatsKeyHash);
     if (statusWithMetrics.isOK()) {
