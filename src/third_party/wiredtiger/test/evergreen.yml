@@ -564,7 +564,7 @@ functions:
         wt_hang_analyzer_option="-c -o file -o stdout"
 
         echo "Calling the wt hang analyzer ..."
-        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" ${python_binary|python3} ../test/wt_hang_analyzer/wt_hang_analyzer.py $wt_hang_analyzer_option
+        PATH="/opt/mongodbtoolchain/v4/bin:$PATH" ${python_binary|python3} ../test/wt_hang_analyzer/wt_hang_analyzer.py $wt_hang_analyzer_option
 
   "save wt hang analyzer core/debugger files":
     - command: archive.targz_pack
