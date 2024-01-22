@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/unittest/assert.h"
@@ -643,6 +644,30 @@ TEST_F(NamespaceStringTest, isDbOnly) {
         ASSERT_FALSE(nss.isDbOnly());
     }
 }
+
+TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyColl) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", false);
+    TenantId tenantId(OID::gen());
+    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "dbTest");
+    auto nssInclColl = makeNamespaceString(dbName, "coll");
+    ASSERT_EQ(nssInclColl.toString_forTest(), "dbTest.coll");
+
+    auto nssEmptyColl = makeNamespaceString(dbName, "");
+    ASSERT_EQ(nssEmptyColl.toString_forTest(), "dbTest");
+}
+
+
+TEST_F(NamespaceStringTest, CheckFormatNamespaceEmptyCollMultitenancy) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    TenantId tenantId(OID::gen());
+    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "dbTest");
+    auto nssInclColl = makeNamespaceString(dbName, "coll");
+    ASSERT_EQ(nssInclColl.toString_forTest(), "dbTest.coll");
+
+    auto nssEmptyColl = makeNamespaceString(dbName, "");
+    ASSERT_EQ(nssEmptyColl.toString_forTest(), "dbTest");
+}
+
 
 }  // namespace
 }  // namespace mongo

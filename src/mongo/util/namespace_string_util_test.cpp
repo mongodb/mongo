@@ -551,4 +551,26 @@ TEST(NamespaceStringUtilTest, SerializingEmptyNamespaceSting) {
         ASSERT_EQ(NamespaceStringUtil::serialize(emptyTenantIdDbNss, sc), expectedSerialization);
     }
 }
+
+TEST(NamespaceStringUtilTest, CheckEmptyCollectionSerialize) {
+    const auto serializeCtx = SerializationContext::stateDefault();
+    const TenantId tenantId(OID::gen());
+
+    const auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, "dbTest");
+    const auto nssEmptyColl = NamespaceString::createNamespaceString_forTest(dbName, "");
+    const auto nssEmptySerialized = NamespaceStringUtil::serialize(nssEmptyColl, serializeCtx);
+    ASSERT_EQ(nssEmptySerialized, "dbTest");
+}
+
+TEST(NamespaceStringUtilTest, CheckEmptyCollectionSerializeMultitenancy) {
+    const auto authSerializeCtx = SerializationContext::stateAuthPrevalidated();
+    const TenantId tenantId(OID::gen());
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    const auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, "dbTestMulti");
+    const auto nssEmptyColl = NamespaceString::createNamespaceString_forTest(dbName, "");
+    const auto nssAuthEmptySerialized =
+        NamespaceStringUtil::serialize(nssEmptyColl, authSerializeCtx);
+    ASSERT_EQ(nssAuthEmptySerialized, (tenantId.toString() + "_dbTestMulti"));
+}
 }  // namespace mongo
