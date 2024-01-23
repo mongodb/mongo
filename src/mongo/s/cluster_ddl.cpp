@@ -57,6 +57,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/read_through_cache.h"
@@ -118,6 +119,10 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         request.setDbName(DatabaseName::kAdmin);
         if (suggestedPrimaryId)
             request.setPrimaryShardId(*suggestedPrimaryId);
+
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter.annotateCreatedDatabase(dbName);
+        }
 
         // If this is a database creation triggered by a command running inside a transaction, the
         // _configsvrCreateDatabase command here will also need to run inside that session. Yield

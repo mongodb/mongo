@@ -134,7 +134,8 @@ public:
          */
         BSONObj attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                         BSONObj cmd,
-                                        bool isFirstStatementInThisParticipant) const;
+                                        bool isFirstStatementInThisParticipant,
+                                        bool hasTxnCreatedAnyDatabase) const;
 
         // True if the participant has been chosen as the coordinator for its transaction
         const bool isCoordinator{false};
@@ -576,6 +577,13 @@ public:
             return true;
         }
 
+        /**
+         * Annotate that this transaction has attempted to create database 'dbName'.
+         */
+        void annotateCreatedDatabase(DatabaseName dbName) {
+            p().createdDatabases.insert(dbName);
+        }
+
     private:
         /**
          * Resets the router's state. Used when the router sees a new transaction for the first
@@ -768,14 +776,16 @@ public:
         const repl::ReadConcernArgs& readConcernArgs,
         const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
         const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
-        bool doAppendStartTransaction);
+        bool doAppendStartTransaction,
+        bool hasTxnCreatedAnyDatabase);
 
     /**
      * Appends the needed fields when continuing a transaction on a participant.
      */
     static BSONObj appendFieldsForContinueTransaction(
         BSONObj cmdObj,
-        const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern);
+        const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
+        bool hasTxnCreatedAnyDatabase);
 
     /**
      * Returns a new read concern settings object by combining the input settings.
@@ -873,6 +883,9 @@ private:
 
         // Track whether commit or abort have been initiated.
         bool terminationInitiated{false};
+
+        // Tracks databases that this transaction has attempted to create.
+        std::set<DatabaseName> createdDatabases;
     } _p;
 };
 

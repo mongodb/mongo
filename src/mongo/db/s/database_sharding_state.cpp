@@ -44,6 +44,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -119,6 +120,41 @@ private:
 
 const ServiceContext::Decoration<DatabaseShardingStateMap> DatabaseShardingStateMap::get =
     ServiceContext::declareDecoration<DatabaseShardingStateMap>();
+
+
+void checkPlacementConflictTimestamp(const boost::optional<LogicalTime> atClusterTime,
+                                     const DatabaseVersion& receivedDatabaseVersion,
+                                     const DatabaseName& dbName,
+                                     const DatabaseVersion& installedDatabaseVersion) {
+    // placementConflictTimestamp equal to Timestamp(0, 0) means ignore, even for atClusterTime
+    // transactions.
+    const auto shouldIgnorePlacementConflict = receivedDatabaseVersion.getPlacementConflictTime()
+        ? receivedDatabaseVersion.getPlacementConflictTime()->asTimestamp() == Timestamp(0, 0)
+        : false;
+
+    if (atClusterTime && !shouldIgnorePlacementConflict) {
+        uassert(ErrorCodes::MigrationConflict,
+                str::stream() << "Database " << dbName.toStringForErrorMsg()
+                              << " has undergone a catalog change operation at time "
+                              << installedDatabaseVersion.getTimestamp()
+                              << " and no longer satisfies the requirements for the current "
+                                 "transaction which requires "
+                              << atClusterTime->asTimestamp() << ". Transaction will be aborted.",
+                atClusterTime->asTimestamp() >= installedDatabaseVersion.getTimestamp());
+    } else if (receivedDatabaseVersion.getPlacementConflictTime() &&
+               !shouldIgnorePlacementConflict) {
+        uassert(ErrorCodes::MigrationConflict,
+                str::stream() << "Database " << dbName.toStringForErrorMsg()
+                              << " has undergone a catalog change operation at time "
+                              << installedDatabaseVersion.getTimestamp()
+                              << " and no longer satisfies the requirements for the current "
+                                 "transaction which requires "
+                              << receivedDatabaseVersion.getPlacementConflictTime()->asTimestamp()
+                              << ". Transaction will be aborted.",
+                receivedDatabaseVersion.getPlacementConflictTime()->asTimestamp() >=
+                    installedDatabaseVersion.getTimestamp());
+    }
+}
 
 }  // namespace
 
@@ -214,6 +250,10 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
     uassert(StaleDbRoutingVersion(_dbName, receivedVersion, *wantedVersion),
             str::stream() << "Version mismatch for the database " << _dbName.toStringForErrorMsg(),
             receivedVersion == *wantedVersion);
+
+    // Check placement conflicts for multi-document transactions.
+    const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    checkPlacementConflictTimestamp(atClusterTime, receivedVersion, _dbName, *wantedVersion);
 }
 
 void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx) const {

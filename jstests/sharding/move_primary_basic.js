@@ -201,9 +201,9 @@ jsTest.log('Test that metadata has changed');
     const nextMetadata = config.databases.findOne({_id: dbName});
     assert.eq(shard1.shardName, nextMetadata.primary);
 
-    // The identifiers have not changed, but the version (lastMod) has been bumped.
+    // UUID has not changed, but timestamp and lastMod have been bumped.
     assert.eq(previousMetadata.version.uuid, nextMetadata.version.uuid);
-    assert.eq(previousMetadata.version.timestamp, nextMetadata.version.timestamp);
+    assert.eq(-1, timestampCmp(previousMetadata.version.timestamp, nextMetadata.version.timestamp));
     assert.eq(previousMetadata.version.lastMod + 1, nextMetadata.version.lastMod);
 }
 

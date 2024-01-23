@@ -394,7 +394,7 @@ last-continuous:
   - test_file: jstests/sharding/query/sharded_lookup_execution.js
     ticket: SERVER-77427
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-77506
+    ticket: SERVER-82353
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-73685
   - test_file: jstests/sharding/fsync_lock_ddl_lock.js
@@ -549,6 +549,10 @@ last-continuous:
     ticket: SERVER-83685
   - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
     ticket: SERVER-83685
+  - test_file: jstests/sharding/move_primary_basic.js
+    ticket: SERVER-82353
+  - test_file: jstests/sharding/store_historical_placement_data.js
+    ticket: SERVER-82353
   - test_file: jstests/core/timeseries/timeseries_bucket_level_filter.js
     ticket: SERVER-84130
   - test_file: jstests/noPassthrough/disallow_new_transactions_at_shutdown_on_mongos.js
@@ -1011,7 +1015,7 @@ last-lts:
   - test_file: jstests/sharding/query/sharded_lookup_execution.js
     ticket: SERVER-77427
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-77506
+    ticket: SERVER-82353
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-73685
   - test_file: jstests/sharding/fsync_lock_ddl_lock.js
@@ -1168,6 +1172,10 @@ last-lts:
     ticket: SERVER-83685
   - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
     ticket: SERVER-83685
+  - test_file: jstests/sharding/move_primary_basic.js
+    ticket: SERVER-82353
+  - test_file: jstests/sharding/store_historical_placement_data.js
+    ticket: SERVER-82353
   - test_file: jstests/core/timeseries/timeseries_bucket_level_filter.js
     ticket: SERVER-84130
   - test_file: jstests/noPassthrough/disallow_new_transactions_at_shutdown_on_mongos.js
