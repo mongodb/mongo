@@ -83,7 +83,8 @@ def send_failure_message_to_slack(expansions):
     current_version_id = expansions.get("version_id", None)
     error_msg = (
         "Evergreen task '* Copybara Sync Between Repos' failed\n"
-        f"For more details: <https://spruce.mongodb.com/version/{current_version_id}|here>.")
+        "See troubleshooting doc <http://go/copybara-troubleshoot|here>.\n"
+        f"See task log here: <https://spruce.mongodb.com/version/{current_version_id}|here>.")
 
     evg_api = RetryingEvergreenApi.get_api(config_file=".evergreen.yml")
     evg_api.send_slack_message(
