@@ -1203,4 +1203,96 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
                                                               makeInt32(5)});
 }
 
+TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestNumeric) {
+    value::ViewOfValueAccessor blockAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(1));
+    block.push_back(makeInt32(2));
+    block.push_back(makeInt32(3));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(5));
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto [arrayTag, arrayVal] = value::makeNewArray();
+    auto array = value::getArrayView(arrayVal);
+    array->push_back(makeInt32(1));
+    array->push_back(makeInt32(5));
+    array->push_back(makeInt32(10));
+
+    auto expr = makeE<sbe::EFunction>(
+        "valueBlockIsMember",
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EConstant>(arrayTag, arrayVal)));
+
+    auto compiledExpr = compileExpression(*expr);
+
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockOfBool(runTag, runVal, {true, false, false, false, true});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestString) {
+    value::ViewOfValueAccessor blockAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeBigString("teststring1"));
+    block.push_back(value::makeBigString("teststring2"));
+    block.push_back(value::makeBigString("teststring3"));
+    block.push_back(makeNothing());
+    block.push_back(value::makeBigString("teststring5"));
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto [arrayTag, arrayVal] = value::makeNewArray();
+    auto array = value::getArrayView(arrayVal);
+    array->push_back(value::makeBigString("teststring1"));
+    array->push_back(value::makeBigString("teststring5"));
+    array->push_back(value::makeBigString("teststring10"));
+
+    auto expr = makeE<sbe::EFunction>(
+        "valueBlockIsMember",
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EConstant>(arrayTag, arrayVal)));
+
+    auto compiledExpr = compileExpression(*expr);
+
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockOfBool(runTag, runVal, {true, false, false, false, true});
+}
+
+TEST_F(SBEBlockExpressionTest, BlockIsMemberOnNothingTest) {
+    value::ViewOfValueAccessor blockAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(makeInt32(1));
+    block.push_back(makeInt32(2));
+    block.push_back(makeInt32(3));
+    block.push_back(makeNothing());
+    block.push_back(makeInt32(5));
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto expr = makeE<sbe::EFunction>(
+        "valueBlockIsMember",
+        sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EConstant>(value::TypeTags::Nothing, 0)));
+
+    auto compiledExpr = compileExpression(*expr);
+
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      makeNothing(), makeNothing(), makeNothing(), makeNothing(), makeNothing()});
+}
 }  // namespace mongo::sbe

@@ -1270,5 +1270,93 @@ TEST(VectorizerTest, ConvertProjection) {
         *processed.expr);
 }
 
+TEST(VectorizerTest, ConvertEqMemberOnCell) {
+    auto tree = make<BinaryOp>(
+        Operations::EqMember,
+        make<Variable>("inputVar"),
+        Constant::array(sbe::value::makeIntOrLong(9), sbe::value::makeIntOrLong(16)));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"cellFoldValues_F\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"FunctionCall\", \n"
+        "            name: \"valueBlockIsMember\", \n"
+        "            arguments: [\n"
+        "                {\n"
+        "                    nodeType: \"FunctionCall\", \n"
+        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+        "                    arguments: [\n"
+        "                        {\n"
+        "                            nodeType: \"Variable\", \n"
+        "                            name: \"inputVar\"\n"
+        "                        }\n"
+        "                    ]\n"
+        "                }, \n"
+        "                {\n"
+        "                    nodeType: \"Const\", \n"
+        "                    tag: \"Array\", \n"
+        "                    value: [\n"
+        "                        9, \n"
+        "                        16\n"
+        "                    ]\n"
+        "                }\n"
+        "            ]\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
+
+TEST(VectorizerTest, ConvertIsMemberFunction) {
+    auto tree = make<FunctionCall>("isMember",
+                                   makeSeq(make<Variable>("inputVar"), make<Variable>("inList")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "inputVar"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"valueBlockIsMember\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inList\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
 }  // namespace
 }  // namespace mongo::stage_builder

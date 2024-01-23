@@ -275,6 +275,35 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             }
             break;
         }
+        case optimizer::Operations::EqMember: {
+            Tree lhs = op.getLeftChild().visit(*this);
+            if (!lhs.expr.has_value()) {
+                return lhs;
+            }
+            Tree rhs = op.getRightChild().visit(*this);
+            if (!rhs.expr.has_value()) {
+                return rhs;
+            }
+
+            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
+                if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                    return {makeABTFunction("valueBlockIsMember"_sd,
+                                            std::move(*lhs.expr),
+                                            std::move(*rhs.expr)),
+                            TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                                .include(rhs.typeSignature.intersect(TypeSignature::kNothingType)),
+                            lhs.sourceCell};
+                }
+            } else {
+                // Preserve scalar operation.
+                return {
+                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                    TypeSignature::kBooleanType.include(
+                        rhs.typeSignature.intersect(TypeSignature::kNothingType)),
+                    {}};
+            }
+            break;
+        }
         case optimizer::Operations::And:
         case optimizer::Operations::Or: {
             Tree lhs = op.getLeftChild().visit(*this);
@@ -314,7 +343,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                                           std::move(*lhs.expr),
                                           makeLet(mask,
                                                   makeABTFunction(
-                                                      "valueBlockLogicalNot",
+                                                      "valueBlockLogicalNot"_sd,
                                                       makeABTFunction(
                                                           "valueBlockFillEmpty"_sd,
                                                           makeVariable(lhsVar),
@@ -513,6 +542,18 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                         .include(TypeSignature::kNothingType),
                     args[2].sourceCell};
             }
+        }
+
+        if ((arity == 2) && op.name() == "isMember"s &&
+            TypeSignature::kBlockType.isSubset(args[0].typeSignature)) {
+            optimizer::ABTVector functionArgs;
+            functionArgs.reserve(arity);
+            functionArgs.emplace_back(std::move(*args[0].expr));
+            functionArgs.emplace_back(std::move(*args[1].expr));
+            return {makeABTFunction("valueBlockIsMember"_sd, std::move(functionArgs)),
+                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                        .include(args[1].typeSignature.intersect(TypeSignature::kNothingType)),
+                    args[0].sourceCell};
         }
     }
     // We don't support this function applied to multiple blocks at the same time.

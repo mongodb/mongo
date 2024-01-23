@@ -36,6 +36,8 @@
 #include "mongo/db/exec/sbe/values/generic_compare.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/matcher/in_list_data.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
@@ -928,6 +930,77 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellBlockGetFlat
     return {false,
             value::TypeTags::valueBlock,
             value::bitcastFrom<value::ValueBlock*>(&cell->getValueBlock())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockIsMember(
+    ArityType arity) {
+    auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(0);
+    auto [arrOwned, arrTag_, arrVal_] = getFromStack(1);
+
+    invariant(valBlockTag == value::TypeTags::valueBlock);
+    auto valueBlockView = value::getValueBlock(valBlockVal);
+
+    if (!value::isArray(arrTag_) && arrTag_ != value::TypeTags::inListData) {
+        auto blockOut = std::make_unique<value::MonoBlock>(
+            valueBlockView->tryCount().get_value_or(valueBlockView->extract().count),
+            value::TypeTags::Nothing,
+            0);
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
+    }
+
+    auto arrTag = arrTag_;
+    auto arrVal = arrVal_;
+
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNonNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Boolean,
+                                                   ColumnOpType::ReturnBoolOnMissing{}};
+
+    auto isInList = [](value::TypeTags inputTag, value::Value inputVal, InListData* inListData) {
+        return inputTag != value::TypeTags::Nothing && inListData->contains(inputTag, inputVal);
+    };
+
+    auto isMemberOfSet =
+        [](value::TypeTags inputTag, value::Value inputVal, value::ValueSetType& valueSet) {
+            return valueSet.find({inputTag, inputVal}) != valueSet.end();
+        };
+
+    auto res = [&]() {
+        if (arrTag == value::TypeTags::inListData) {
+            auto inListData = value::getInListDataView(arrVal);
+
+            return valueBlockView->map(
+                value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
+                    return std::pair{value::TypeTags::Boolean,
+                                     value::bitcastFrom<bool>(isInList(tag, val, inListData))};
+                }));
+        } else if (arrTag == value::TypeTags::ArraySet) {
+            auto arrSet = value::getArraySetView(arrVal);
+            auto& values = arrSet->values();
+
+            return valueBlockView->map(
+                value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
+                    return std::pair{value::TypeTags::Boolean,
+                                     value::bitcastFrom<bool>(isMemberOfSet(tag, val, values))};
+                }));
+        } else {
+            value::ValueSetType values(0, value::ValueHash(nullptr), value::ValueEq(nullptr));
+            value::arrayForEach(arrTag, arrVal, [&](value::TypeTags elemTag, value::Value elemVal) {
+                values.insert({elemTag, elemVal});
+            });
+
+            return valueBlockView->map(
+                value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
+                    return std::pair{value::TypeTags::Boolean,
+                                     value::bitcastFrom<bool>(isMemberOfSet(tag, val, values))};
+                }));
+        }
+    }();
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
 }
 
 }  // namespace mongo::sbe::vm

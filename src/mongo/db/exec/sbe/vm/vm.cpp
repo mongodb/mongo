@@ -9476,6 +9476,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockSize(arity);
         case Builtin::valueBlockNone:
             return builtinValueBlockNone(arity);
+        case Builtin::valueBlockIsMember:
+            return builtinValueBlockIsMember(arity);
         case Builtin::cellFoldValues_F:
             return builtinCellFoldValues_F(arity);
         case Builtin::cellFoldValues_P:
@@ -9960,6 +9962,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockSize";
         case Builtin::valueBlockNone:
             return "valueBlockNone";
+        case Builtin::valueBlockIsMember:
+            return "valueBlockIsMember";
         case Builtin::cellFoldValues_F:
             return "cellFoldValues_F";
         case Builtin::cellFoldValues_P:
