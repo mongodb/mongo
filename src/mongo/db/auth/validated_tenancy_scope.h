@@ -52,6 +52,13 @@ public:
     ValidatedTenancyScope() = delete;
     ValidatedTenancyScope(const ValidatedTenancyScope&) = default;
 
+    std::strong_ordering operator<=>(const ValidatedTenancyScope& rhs) const {
+        return _originalToken <=> rhs._originalToken;
+    }
+
+    bool operator==(const ValidatedTenancyScope& vts) const = default;
+    bool operator!=(const ValidatedTenancyScope& vts) const = default;
+
     bool hasAuthenticatedUser() const;
 
     const UserName& authenticatedUser() const;

@@ -81,8 +81,6 @@ selector:
   - jstests/core/**/benchrun_pipeline_updates.js
   # QueryExecutorStats assertions are hardcoded for single-node results
   - jstests/aggregation/sources/lookup/lookup_query_stats.js
-  # TODO SERVER-81009: fix VTS missing from opCtx for distinct transactions
-  - jstests/core/txns/view_reads_in_transaction.js
 
 executor:
   archive:

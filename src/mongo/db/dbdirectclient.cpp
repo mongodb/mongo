@@ -138,6 +138,7 @@ double DBDirectClient::getSoTimeout() const {
 
 namespace {
 DbResponse loopbackBuildResponse(OperationContext* const opCtx, Message& toSend) {
+    auth::ValidatedTenancyScopeGuard tenancyStasher(opCtx);
     DirectClientScope directClientScope(opCtx);
     StashTransactionResourcesForDBDirect stashedTxnResources(opCtx);
 
