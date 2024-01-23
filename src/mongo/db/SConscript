@@ -961,6 +961,7 @@ env.Library(
         's/global_user_write_block_state.cpp',
         's/operation_sharding_state.cpp',
         's/range_arithmetic.cpp',
+        's/scoped_collection_metadata.cpp',
         's/shard_key_index_util.cpp',
         's/sharding_api_d_params.idl',
         's/sharding_migration_critical_section.cpp',

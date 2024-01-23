@@ -133,6 +133,8 @@ public:
     bool keyBelongsToMe(const BSONObj& key) const {
         return _impl->get().keyBelongsToMe(key);
     }
+
+    bool isRangeEntirelyOwned(const BSONObj& min, const BSONObj& max) const;
 };
 
 }  // namespace mongo

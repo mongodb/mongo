@@ -58,7 +58,7 @@ commands:
   autoSplitVector:
     command_name: autoSplitVector
     cpp_name: AutoSplitVectorRequest
-    description: "Internal autoSplitVector command"
+    description: "Returns the split points for a chunk, given a range and the maximum chunk size."
     strict: false
     namespace: concatenate_with_db
     api_version: ""

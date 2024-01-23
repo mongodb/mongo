@@ -139,6 +139,7 @@ let testCases = {
     applyOps: {skip: "primary only"},
     authSchemaUpgrade: {skip: "primary only"},
     authenticate: {skip: "does not return user data"},
+    autoSplitVector: {skip: "primary only"},
     balancerCollectionStatus: {skip: "primary only"},
     balancerStart: {skip: "primary only"},
     balancerStatus: {skip: "primary only"},

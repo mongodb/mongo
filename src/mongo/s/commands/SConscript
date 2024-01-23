@@ -34,6 +34,7 @@ env.Library(
         'cluster_abort_unshard_collection_cmd.cpp',
         'cluster_abort_transaction_cmd_s.cpp',
         'cluster_analyze_cmd.cpp',
+        'cluster_auto_split_vector_cmd.cpp',
         'cluster_build_info.cpp',
         'cluster_bulk_write_cmd_s.cpp',
         'cluster_cleanup_reshard_collection_cmd.cpp',

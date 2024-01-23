@@ -26,4 +26,5 @@ export const commandsAddedToMongosSinceLastLTS = [
     "removeQuerySettings",
     "unshardCollection",
     "changePrimary",
+    "autoSplitVector",
 ];

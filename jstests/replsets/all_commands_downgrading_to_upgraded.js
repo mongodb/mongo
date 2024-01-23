@@ -272,7 +272,28 @@ const allCommands = {
         isAdminCommand: true,
         isReplSetOnly: true,
     },
-    autoSplitVector: {skip: isAnInternalCommand},
+    autoSplitVector: {
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB('admin').runCommand({shardCollection: fullNs, key: {a: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+        },
+        command: {
+            autoSplitVector: collName,
+            keyPattern: {a: 1},
+            min: {a: MinKey},
+            max: {a: MaxKey},
+            maxChunkSizeBytes: 1024 * 1024
+        },
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        isShardedOnly: true,
+        isAdminCommand: false,
+    },
     balancerCollectionStatus: {
         command: {balancerCollectionStatus: fullNs},
         isShardedOnly: true,
