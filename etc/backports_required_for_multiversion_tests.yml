@@ -416,7 +416,7 @@ last-continuous:
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-79446
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-77506
+    ticket: SERVER-82353
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
@@ -445,6 +445,10 @@ last-continuous:
     ticket: SERVER-83685
   - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
     ticket: SERVER-83685
+  - test_file: jstests/sharding/move_primary_basic.js
+    ticket: SERVER-82353
+  - test_file: jstests/sharding/store_historical_placement_data.js
+    ticket: SERVER-82353
   - test_file: jstests/core/timeseries/timeseries_bucket_level_filter.js
     ticket: SERVER-84130
   - test_file: jstests/core/txns/out_not_blocked_by_txn.js
@@ -911,7 +915,7 @@ last-lts:
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-79446
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-77506
+    ticket: SERVER-82353
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
@@ -936,6 +940,10 @@ last-lts:
     ticket: SERVER-83685
   - test_file: jstests/noPassthroughWithMongod/lookup_with_limit.js
     ticket: SERVER-83685
+  - test_file: jstests/sharding/move_primary_basic.js
+    ticket: SERVER-82353
+  - test_file: jstests/sharding/store_historical_placement_data.js
+    ticket: SERVER-82353
   - test_file: jstests/core/timeseries/timeseries_bucket_level_filter.js
     ticket: SERVER-84130
   - test_file: jstests/core/txns/out_not_blocked_by_txn.js

@@ -48,7 +48,18 @@ structs:
                 optional: true
             timestamp:
                 type: timestamp
-                description: "Uniquely identifies to distinguish different incarnations of this database."
+                description: "Unique identifier to distinguish major events in the lifetime of a
+                   database, such as create/drop and change of primary."
             lastMod:
                 type: int
                 description: "an integer which is bumped whenever the database's primary shard changes"
+            placementConflictTime:
+                type: logicalTime
+                optional: true
+                description: "This optional value represents a conservative upper bound for placement
+                            changes (i.e., movePrimary or drop+recreate) for any collection which might
+                            be accessed for the lifetime of the transaction. If specified, transactions
+                            will fail with a retryable MigrationConflict error if any placement changes
+                            have committed since this time.
+                            A value of Timestamp(0, 0) means that the shard should avoid checking 
+                            placement conflicts timestamps for the database."

@@ -330,7 +330,13 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             "Requested primary shard {} is draining"_format(toShardId.toString()),
             !toShardEntry.getDraining());
 
-    const auto transactionChain = [dbName, expectedDbVersion, toShardId](
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    const auto validAfter = currentTime.clusterTime().asTimestamp();
+    tassert(8235300,
+            "New database timestamp must be newer than previous one",
+            validAfter > expectedDbVersion.getTimestamp());
+
+    const auto transactionChain = [dbName, expectedDbVersion, toShardId, validAfter](
                                       const txn_api::TransactionClient& txnClient,
                                       ExecutorPtr txnExec) {
         const auto updateDatabaseEntryOp = [&] {
@@ -347,7 +353,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             }();
 
             const auto update = [&] {
-                const auto newDbVersion = expectedDbVersion.makeUpdated();
+                auto newDbVersion = expectedDbVersion.makeUpdated();
+                newDbVersion.setTimestamp(validAfter);
 
                 BSONObjBuilder bsonBuilder;
                 bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShardId);
