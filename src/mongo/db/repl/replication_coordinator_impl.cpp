@@ -1484,9 +1484,17 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeAndWallTimeForward(
     const OpTimeAndWallTime& opTimeAndWallTime) {
     stdx::unique_lock<Latch> lock(_mutex);
 
-    invariant(opTimeAndWallTime.opTime <= _getMyLastWrittenOpTime_inlock());
-    if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
-        _reportUpstream_inlock(std::move(lock));
+    const auto lastWrittenOpTime = _getMyLastWrittenOpTime_inlock();
+    // When initial sync starts, we will reset lastWritten/lastApplied/lastDurable to null. In this
+    // case, we ignore the update to lastDurable because initial sync will set it at the end. We
+    // could also invariant whether we are in the middle of initial sync when lastWritten is null,
+    // but considering that this is a critical path and the cost of checking initialSyncFlag, we
+    // don't do that.
+    if (!lastWrittenOpTime.isNull()) {
+        invariant(opTimeAndWallTime.opTime <= lastWrittenOpTime);
+        if (_setMyLastDurableOpTimeAndWallTimeForward(lock, opTimeAndWallTime)) {
+            _reportUpstream_inlock(std::move(lock));
+        }
     }
 }
 
