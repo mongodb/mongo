@@ -111,6 +111,31 @@ MONGO_FAIL_POINT_DEFINE(applyPrepareTxnOpsFailsWithWriteConflict);
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOutForApplyPrepare);
 
+class ScopedSetTxnInfoOnOperationContext {
+public:
+    ScopedSetTxnInfoOnOperationContext(OperationContext* opCtx,
+                                       const LogicalSessionId& lsid,
+                                       const TxnNumber& txnNumber,
+                                       boost::optional<TxnRetryCounter> txnRetryCounter)
+        : _opCtx(opCtx) {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        opCtx->setLogicalSessionId(lsid);
+        opCtx->setTxnNumber(txnNumber);
+        if (txnRetryCounter.has_value()) {
+            opCtx->setTxnRetryCounter(*txnRetryCounter);
+        }
+        opCtx->setInMultiDocumentTransaction();
+    }
+
+    // The opCtx may be used to apply later operations in a batch, clean up before reusing.
+    ~ScopedSetTxnInfoOnOperationContext() {
+        stdx::lock_guard<Client> lk(*_opCtx->getClient());
+        _opCtx->resetMultiDocumentTransactionState();
+    }
+
+    OperationContext* _opCtx;
+};
+
 // Given a vector of OplogEntry pointers, copy and return a vector of OplogEntry's.
 std::vector<OplogEntry> _copyOps(const std::vector<const OplogEntry*>& ops) {
     std::vector<OplogEntry> res;
@@ -261,6 +286,15 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                                        Timestamp commitTimestamp,
                                        Timestamp durableTimestamp) {
     invariant(repl::OplogApplication::inRecovering(mode));
+    invariant(entry.getSessionId().has_value(),
+              "A transaction operation must always have a session id");
+    invariant(entry.getTxnNumber().has_value(),
+              "A transaction operation must always have a txn number");
+    ScopedSetTxnInfoOnOperationContext scopedTxnInfo(
+        opCtx,
+        *entry.getSessionId(),
+        *entry.getTxnNumber(),
+        entry.getOperationSessionInfo().getTxnRetryCounter());
 
     auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
 
@@ -293,6 +327,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                 wunit.commit();
             }
         });
+
     return status;
 }
 
@@ -305,20 +340,8 @@ Status _applyCommitTransaction(OperationContext* opCtx,
                                const LogicalSessionId& lsid,
                                TxnNumber txnNumber,
                                Timestamp commitTimestamp) {
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->setLogicalSessionId(lsid);
-        opCtx->setTxnNumber(txnNumber);
-        if (auto txnRetryCounter = commitOp.getOperationSessionInfo().getTxnRetryCounter()) {
-            opCtx->setTxnRetryCounter(*txnRetryCounter);
-        }
-        opCtx->setInMultiDocumentTransaction();
-    }
-    // This opCtx can be used to apply later operations in the batch, clean up before reusing.
-    ON_BLOCK_EXIT([opCtx]() {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->resetMultiDocumentTransactionState();
-    });
+    ScopedSetTxnInfoOnOperationContext scopedTxnInfo(
+        opCtx, lsid, txnNumber, commitOp.getOperationSessionInfo().getTxnRetryCounter());
 
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
@@ -342,20 +365,8 @@ Status _applyAbortTransaction(OperationContext* opCtx,
                               const OplogEntry& abortOp,
                               const LogicalSessionId& lsid,
                               TxnNumber txnNumber) {
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->setLogicalSessionId(lsid);
-        opCtx->setTxnNumber(txnNumber);
-        if (auto txnRetryCounter = abortOp.getOperationSessionInfo().getTxnRetryCounter()) {
-            opCtx->setTxnRetryCounter(*txnRetryCounter);
-        }
-        opCtx->setInMultiDocumentTransaction();
-    }
-    // This opCtx can be used to apply later operations in the batch, clean up before reusing.
-    ON_BLOCK_EXIT([opCtx]() {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->resetMultiDocumentTransactionState();
-    });
+    ScopedSetTxnInfoOnOperationContext scopedTxnInfo(
+        opCtx, lsid, txnNumber, abortOp.getOperationSessionInfo().getTxnRetryCounter());
 
     // The write on transaction table may be applied concurrently, so refreshing state
     // from disk may read that write, causing starting a new transaction on an existing
@@ -582,6 +593,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                                 const std::vector<OplogEntry>& txnOps,
                                 repl::OplogApplication::Mode mode,
                                 boost::optional<std::vector<StmtId>> stmtIds = boost::none) {
+    ScopedSetTxnInfoOnOperationContext scopedTxnInfo(
+        opCtx, lsid, txnNumber, prepareOp.getOperationSessionInfo().getTxnRetryCounter());
 
     // Block application of prepare oplog entries on secondaries when a concurrent
     // background index build is running. This will prevent hybrid index builds from
@@ -613,22 +626,6 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
                 opCtx, uuid, IndexBuildProtocol::kSinglePhase);
         }
     }
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->setLogicalSessionId(lsid);
-        opCtx->setTxnNumber(txnNumber);
-        if (auto txnRetryCounter = prepareOp.getOperationSessionInfo().getTxnRetryCounter()) {
-            opCtx->setTxnRetryCounter(*txnRetryCounter);
-        }
-        opCtx->setInMultiDocumentTransaction();
-    }
-    // This opCtx can be used to apply later operations in the batch, clean up before
-    // reusing.
-    ON_BLOCK_EXIT([opCtx]() {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        opCtx->resetMultiDocumentTransactionState();
-    });
 
     return repl::writeConflictRetryWithLimit(
         opCtx, "applying prepare transaction", prepareOp.getNss(), [&] {
