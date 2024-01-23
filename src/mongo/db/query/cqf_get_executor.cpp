@@ -514,8 +514,10 @@ static ExecParams createExecutor(
         MONGO_UNREACHABLE;
     }
 
-    abtPrinter = std::make_unique<ABTPrinter>(
-        phaseManager.getMetadata(), std::move(toExplain), explainVersion);
+    abtPrinter = std::make_unique<ABTPrinter>(phaseManager.getMetadata(),
+                                              std::move(toExplain),
+                                              explainVersion,
+                                              std::move(phaseManager.getQueryParameters()));
 
     // (Possibly) cache the SBE plan.
     if (planCacheKey && shouldCachePlan(*sbePlan)) {

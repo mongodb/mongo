@@ -492,4 +492,8 @@ const QueryParameterMap& OptPhaseManager::getQueryParameters() const {
     return _queryParameters;
 }
 
+QueryParameterMap& OptPhaseManager::getQueryParameters() {
+    return _queryParameters;
+}
+
 }  // namespace mongo::optimizer

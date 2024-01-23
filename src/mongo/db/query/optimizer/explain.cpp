@@ -77,10 +77,12 @@ namespace mongo::optimizer {
 
 ABTPrinter::ABTPrinter(Metadata metadata,
                        PlanAndProps planAndProps,
-                       const ExplainVersion explainVersion)
+                       const ExplainVersion explainVersion,
+                       QueryParameterMap qpMap)
     : _metadata(std::move(metadata)),
       _planAndProps(std::move(planAndProps)),
-      _explainVersion(explainVersion) {}
+      _explainVersion(explainVersion),
+      _queryParameters(std::move(qpMap)) {}
 
 BSONObj ABTPrinter::explainBSON() const {
     const auto explainPlanStr = [&](const std::string& planStr) {
@@ -115,6 +117,33 @@ BSONObj ABTPrinter::explainBSON() const {
     }
 
     MONGO_UNREACHABLE;
+}
+
+BSONObj ABTPrinter::getQueryParameters() const {
+    // To obtain consistent explain results, we display the parameters in the order of their sorted
+    // ids.
+    std::vector<int32_t> paramIds;
+    for (const auto& elem : _queryParameters) {
+        paramIds.push_back(elem.first);
+    }
+    std::sort(paramIds.begin(), paramIds.end());
+
+    BSONObjBuilder result;
+    for (const auto& paramId : paramIds) {
+        std::stringstream idStream;
+        idStream << paramId;
+        BSONObjBuilder paramBuilder(result.subobjStart(idStream.str()));
+        const auto& constant = _queryParameters.at(paramId).get();
+        paramBuilder.append("value", sbe::value::print(constant));
+
+        std::stringstream typeStream;
+        typeStream << constant.first;
+        paramBuilder.append("type", typeStream.str());
+
+        paramBuilder.doneFast();
+    }
+
+    return result.obj();
 }
 
 bool constexpr operator<(const ExplainVersion v1, const ExplainVersion v2) {

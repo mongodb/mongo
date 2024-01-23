@@ -179,6 +179,8 @@ public:
 
     const QueryParameterMap& getQueryParameters() const;
 
+    QueryParameterMap& getQueryParameters();
+
     bool hasPhase(OptPhase phase) const;
 
 private:

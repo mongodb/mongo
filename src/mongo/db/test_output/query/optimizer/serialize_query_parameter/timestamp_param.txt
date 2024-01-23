@@ -1,0 +1,5 @@
+# Golden test output of SerializeQueryParameter/TimestampParam
+
+==== VARIATION: timestamp ====
+-- OUTPUT:
+{ 0: { value: "Timestamp(0, 0)", type: "Timestamp" } }

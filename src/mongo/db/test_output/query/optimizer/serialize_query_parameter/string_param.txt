@@ -1,0 +1,5 @@
+# Golden test output of SerializeQueryParameter/StringParam
+
+==== VARIATION: string ====
+-- OUTPUT:
+{ 0: { value: ""hello"", type: "StringSmall" } }

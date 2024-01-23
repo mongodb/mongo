@@ -1,0 +1,5 @@
+# Golden test output of SerializeQueryParameter/MaxKeyParam
+
+==== VARIATION: MaxKey ====
+-- OUTPUT:
+{ 0: { value: "maxKey", type: "MaxKey" } }

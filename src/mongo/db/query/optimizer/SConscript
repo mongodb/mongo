@@ -151,6 +151,7 @@ env.CppUnitTest(
     source=[
         'bool_expression_test.cpp',
         'explain_paths_exprs_test.cpp',
+        'explain_query_params_test.cpp',
         'index_union_optimizer_test.cpp',
         'logical_rewriter_optimizer_test.cpp',
         'optimizer_test.cpp',

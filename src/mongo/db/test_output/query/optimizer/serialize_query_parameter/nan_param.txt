@@ -1,0 +1,5 @@
+# Golden test output of SerializeQueryParameter/NanParam
+
+==== VARIATION: nan ====
+-- OUTPUT:
+{ 0: { value: "nan", type: "NumberDouble" } }

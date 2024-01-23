@@ -176,6 +176,14 @@ function analyzeTopLevelExplain(
             expectedParsedQuery,
             `Expected the parsedQuery field to be ${tojson(expectedParsedQuery)} but got ${
                 tojson(path.parsedQuery)}. The whole top-level explain is ${tojson(nodeExplain)}.`);
+
+        // Assert that the queryParameters sub-object exists.
+        assert(
+            path.winningPlan.hasOwnProperty("queryParameters"),
+            `Explain does not have the "winningPlan.queryParameters" field. The whole top-level explain is ${
+                tojson(nodeExplain)}`);
+
+        // Assert that optimizationTimeMillis is present.
         assert(
             path.hasOwnProperty("optimizationTimeMillis"),
             `Explain does not have the "optimizationTimeMillis" field. The whole top-level explain is ${

@@ -81,6 +81,11 @@ public:
         return "COLLSCAN";
     }
 
+    BSONObj getQueryParameters() const override final {
+        // Fast path queries don't get parameterized.
+        return {};
+    }
+
 private:
     const BSONObj _explainBSON;
 };

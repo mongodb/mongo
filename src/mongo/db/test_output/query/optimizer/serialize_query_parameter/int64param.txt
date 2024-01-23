@@ -1,0 +1,5 @@
+# Golden test output of SerializeQueryParameter/Int64Param
+
+==== VARIATION: int64 ====
+-- OUTPUT:
+{ 0: { value: "5", type: "NumberInt64" } }

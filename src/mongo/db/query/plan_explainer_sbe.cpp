@@ -464,6 +464,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     const boost::optional<BSONObj>& execPlanDebugInfo,
     const boost::optional<BSONObj>& optimizerExplain,
     const boost::optional<std::string>& planSummary,
+    const boost::optional<BSONObj>& queryParams,
     const boost::optional<BSONArray>& remotePlanInfo,
     ExplainOptions::Verbosity verbosity,
     bool isCached) {
@@ -497,6 +498,7 @@ PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
     if (optimizerExplain) {
         // TODO SERVER-84429 Implement "isCached" field for Bonsai.
         plan.append("queryPlan", *optimizerExplain);
+        plan.append("queryParameters", *queryParams);
     } else {
         plan.append("isCached", isCached);
         plan.append("queryPlan", bob.obj());
@@ -583,11 +585,16 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     // Append a planSummary only for CQF plans.
     auto planSummary = _optimizerData ? boost::make_optional(getPlanSummary()) : boost::none;
 
+    // Append the query parameters map only for CQF plans.
+    auto queryParams =
+        _optimizerData ? boost::make_optional(_optimizerData->getQueryParameters()) : boost::none;
+
     return buildPlanStatsDetails(_solution,
                                  *stats,
                                  buildExecPlanDebugInfo(_root, _rootData),
                                  buildCascadesPlan(),
                                  planSummary,
+                                 queryParams,
                                  buildRemotePlanInfo(),
                                  verbosity,
                                  _matchesCachedPlan);
@@ -605,6 +612,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             boost::none /* execPlanDebugInfo */,
             boost::none /* optimizerExplain */,
             boost::none, /* planSummary */
+            boost::none, /* queryParams */
             boost::none /* remotePlanInfo */,
             ExplainOptions::Verbosity::kExecAllPlans,
             _matchesCachedPlan);
@@ -633,6 +641,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
                                             execPlanDebugInfo,
                                             boost::none /* optimizerExplain */,
                                             boost::none, /* planSummary */
+                                            boost::none /* queryParams */,
                                             boost::none /* remotePlanInfo */,
                                             verbosity,
                                             candidate.matchesCachedPlan));

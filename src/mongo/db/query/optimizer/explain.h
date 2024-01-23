@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/cascades/memo_explain_interface.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
@@ -68,16 +69,21 @@ bool isEOFPlan(ABT::reference_type node);
  */
 class ABTPrinter : public AbstractABTPrinter {
 public:
-    ABTPrinter(Metadata metadata, PlanAndProps planAndProps, ExplainVersion explainVersion);
+    ABTPrinter(Metadata metadata,
+               PlanAndProps planAndProps,
+               ExplainVersion explainVersion,
+               QueryParameterMap qpMap);
 
     BSONObj explainBSON() const override final;
     std::string getPlanSummary() const override final;
+    BSONObj getQueryParameters() const override final;
 
 private:
     // Metadata field used to populate index information for index scans in the planSummary field.
     Metadata _metadata;
     PlanAndProps _planAndProps;
     ExplainVersion _explainVersion;
+    QueryParameterMap _queryParameters;
 };
 
 /**
