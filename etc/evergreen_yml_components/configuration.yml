@@ -73,7 +73,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v7.3
 
 - name: wtdevelop
   repo: git@github.com:wiredtiger/wiredtiger.git
