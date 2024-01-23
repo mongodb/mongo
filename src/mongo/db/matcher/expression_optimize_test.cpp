@@ -48,7 +48,6 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -57,10 +56,10 @@
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -73,9 +72,9 @@ using unittest::assertGet;
 
 /**
  * Helper function to parse the given BSON object as a MatchExpression, checks the status,
- * and return the MatchExpression*.
+ * and return the MatchExpression pointer.
  */
-MatchExpression* parseMatchExpression(const BSONObj& obj) {
+std::unique_ptr<MatchExpression> parseMatchExpression(const BSONObj& obj) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     StatusWithMatchExpression status =
         MatchExpressionParser::parse(obj,
@@ -89,7 +88,7 @@ MatchExpression* parseMatchExpression(const BSONObj& obj) {
         FAIL(ss);
     }
 
-    return status.getValue().release();
+    return std::move(status.getValue());
 }
 
 /**
@@ -504,6 +503,21 @@ TEST(ExpressionOptimizeTest, OrRewrittenToInWithParameters) {
         matchExpr.get(), boost::none /*maxParamCount=*/, 0 /*startingParamId=*/, &parameterized);
     ASSERT_TRUE(parameterized);
     ASSERT_BSONOBJ_EQ(matchExpr->serialize(), obj);
+}
+
+TEST(ExpressionOptimizeTest, PartialOrToInRewriteDoesNotGenerateDirectlyNestedOr) {
+    // Test with the boolean simplifier on and off. In both cases, we should get the same result
+    // expression after optimization. This makes sure to test that 'MatchExpression::optimize()'
+    // itself does not unnecessarily generate intermediate nested $or nodes as described in
+    // SERVER-83602.
+    for (auto booleanSimplificationEnabled : {false, true}) {
+        RAIIServerParameterControllerForTest simplifierParamController(
+            "internalQueryEnableBooleanExpressionsSimplifier", booleanSimplificationEnabled);
+        BSONObj obj = fromjson("{$or: [{x: {$eq: 3}}, {x: {$eq: 4}}, {y: 5}, {z: 6}]}");
+        auto optimizedMatchExpression = MatchExpression::optimize(parseMatchExpression(obj));
+        ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(),
+                          fromjson("{$or: [{x: {$in: [3, 4]}}, {y: {$eq: 5}}, {z: {$eq: 6}}]}"));
+    }
 }
 
 TEST(ExpressionOptimizeTest, NorRemovesAlwaysFalseChildren) {

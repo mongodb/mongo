@@ -33,7 +33,6 @@
 #include <algorithm>
 #include <iterator>
 #include <string>
-#include <type_traits>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -353,20 +352,20 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             if (countEquivEqPaths > 1) {
                 tassert(3401202, "There must be a common path", childPath);
                 auto inExpression = std::make_unique<InMatchExpression>(StringData(*childPath));
-                auto nonEquivOrExpr =
-                    (countNonEquivExpr > 0) ? std::make_unique<OrMatchExpression>() : nullptr;
+                std::vector<std::unique_ptr<MatchExpression>> nonEquivOrChildren;
+                nonEquivOrChildren.reserve(countNonEquivExpr);
                 BSONArrayBuilder bab;
                 size_t numInEqualities = 0;
 
                 for (auto& childExpression : children) {
                     if (*childPath != childExpression->path()) {
-                        nonEquivOrExpr->add(std::move(childExpression));
+                        nonEquivOrChildren.push_back(std::move(childExpression));
                     } else if (childExpression->matchType() == MatchExpression::EQ) {
                         std::unique_ptr<EqualityMatchExpression> eqExpressionPtr{
                             static_cast<EqualityMatchExpression*>(childExpression.release())};
                         if (isRegEx(eqExpressionPtr->getData()) ||
                             eqExpressionPtr->getCollator() != eqCollator) {
-                            nonEquivOrExpr->add(std::move(eqExpressionPtr));
+                            nonEquivOrChildren.push_back(std::move(eqExpressionPtr));
                         } else {
                             bab.append(eqExpressionPtr->getData());
                             ++numInEqualities;
@@ -382,13 +381,13 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                                 "Conversion from OR to IN should always succeed",
                                 status == Status::OK());
                     } else {
-                        nonEquivOrExpr->add(std::move(childExpression));
+                        nonEquivOrChildren.push_back(std::move(childExpression));
                     }
                 }
                 children.clear();
                 tassert(3401204,
                         "Incorrect number of non-equivalent expressions",
-                        !nonEquivOrExpr || nonEquivOrExpr->numChildren() == countNonEquivExpr);
+                        nonEquivOrChildren.size() == countNonEquivExpr);
 
                 auto inEqualities = bab.obj();
                 tassert(3401205,
@@ -409,11 +408,13 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 if (countNonEquivExpr > 0) {
                     auto parentOrExpr = std::make_unique<OrMatchExpression>();
                     parentOrExpr->add(std::move(inExpression));
-                    if (countNonEquivExpr == 1) {
-                        parentOrExpr->add(nonEquivOrExpr->releaseChild(0));
-                    } else {
-                        parentOrExpr->add(std::move(nonEquivOrExpr));
-                    }
+
+                    // Move all of the non-equivalent children of the original $or so that they
+                    // become children of the newly constructed $or node.
+                    auto&& childVec = *parentOrExpr->getChildVector();
+                    std::move(std::make_move_iterator(nonEquivOrChildren.begin()),
+                              std::make_move_iterator(nonEquivOrChildren.end()),
+                              std::back_inserter(childVec));
                     return parentOrExpr;
                 }
                 // The Boolean simplifier is disabled since we don't want to simplify
