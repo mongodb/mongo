@@ -35,6 +35,8 @@ overrides:
     exec_timeout: 270 # 4.5 hours
   - task: sharding
     exec_timeout: 180  # 3 hours
+  - task: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm
+    exec_timeout: 180  # 3 hours
 
   enterprise-rhel80-debug-tsan:
   - task: aggregation_expression_multiversion_fuzzer
