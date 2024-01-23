@@ -147,17 +147,6 @@ def generate_mongod_parameters(rng, mode):
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
     ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])
 
-    ret["oplogFetcherUsesExhaust"] = rng.choice([True, False])
-    ret["replWriterThreadCount"] = rng.randint(1, 256)
-    ret["replBatchLimitOperations"] = rng.randint(1, 1000 * 1000)
-    ret["replBatchLimitBytes"] = rng.randint(16 * 1024 * 1024, 100 * 1024 * 1024)
-    # For `initialSyncSourceReadPreference`, the option `secondary` is excluded from the fuzzer
-    # because the generated mongod parameters are used for every node in the replica set, so the
-    # secondaries in the replica set will not be able to find a valid sync source.
-    ret["initialSyncSourceReadPreference"] = rng.choice(
-        ["nearest", "primary", "primaryPreferred", "secondaryPreferred"])
-    ret["initialSyncMethod"] = rng.choice(["fileCopyBased", "logical"])
-
     # We need a higher timeout to account for test slowness
     ret["receiveChunkWaitForRangeDeleterTimeoutMS"] = 300000
     ret["defaultConfigCommandTimeoutMS"] = 90000
