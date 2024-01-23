@@ -162,7 +162,7 @@ modules:
   - name: enterprise
     repo: git@github.com:10gen/mongo-enterprise-modules.git
     prefix: src/mongo/db/modules
-    branch: master
+    branch: v7.3
   # Pinned to version 100.7.2
   - name: mongo-tools
     repo: git@github.com:mongodb/mongo-tools.git
