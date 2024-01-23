@@ -1932,71 +1932,6 @@ env.Library(
 )
 
 env.Library(
-    target='service_liaison',
-    source=[
-        'service_liaison.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/crypto/sha1_block',
-        'keys_collection_document',
-        'vector_clock',
-    ],
-)
-
-envWithAsio = env.Clone()
-envWithAsio.InjectThirdParty(libraries=['asio'])
-
-envWithAsio.Library(
-    target='service_liaison_mock',
-    source=[
-        'service_liaison_mock.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/session/kill_sessions',
-        '$BUILD_DIR/mongo/util/periodic_runner_factory',
-        'service_liaison',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/executor/async_timer_mock',
-    ],
-)
-
-envWithAsio.Library(
-    target='service_liaison_mongod',
-    source=[
-        'service_liaison_mongod.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/session/logical_session_id',
-        '$BUILD_DIR/mongo/util/clock_sources',
-        '$BUILD_DIR/mongo/util/periodic_runner',
-        'query_exec',
-        'service_context',
-        'service_liaison',
-    ],
-)
-
-env.Library(
-    target='service_liaison_mongos',
-    source=[
-        'service_liaison_mongos.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/session/logical_session_id',
-        '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
-        '$BUILD_DIR/mongo/util/clock_sources',
-        '$BUILD_DIR/mongo/util/periodic_runner',
-        'service_context',
-        'service_liaison',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
-        'server_base',
-    ],
-)
-
-env.Library(
     target='index_commands_idl',
     source=[
         'create_indexes.idl',
@@ -2544,10 +2479,9 @@ env.Library(
         'repl/topology_coordinator',
         'rw_concern_d',
         'serverless/shard_split_commands',
-        'service_liaison_mongod',
         'session/kill_sessions_local',
+        'session/service_liaison_mongod',
         'session/sessions_collection_rs',
-        'session/sessions_collection_standalone',
         'shard_role',
         'startup_warnings_mongod',
         'stats/change_collection_server_status',
@@ -2668,13 +2602,11 @@ env.Library(
         'serverless/multitenancy_check',
         'serverless/shard_split_donor_service',
         'service_context_d',
-        'service_liaison_mongod',
         'session/kill_sessions',
         'session/kill_sessions_local',
-        'session/logical_session_cache_impl',
+        'session/service_liaison_mongod',
         'session/session_catalog_mongod',
         'session/sessions_collection_rs',
-        'session/sessions_collection_standalone',
         'set_change_stream_state_coordinator',
         'shard_role',
         'startup_recovery',
@@ -2846,6 +2778,7 @@ if wiredtiger:
             'read_write_concern_provenance_test.cpp',
             'record_id_test.cpp',
             'server_options_test.cpp',
+            'service_liaison_mock.cpp',
             'session/internal_session_pool_test.cpp',
             'session/internal_transactions_reap_service_test.cpp',
             'session/logical_session_cache_test.cpp',
@@ -2880,6 +2813,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/clock_source_mock',
             '$BUILD_DIR/mongo/util/net/network',
             '$BUILD_DIR/mongo/util/net/ssl_options_server',
+            '$BUILD_DIR/mongo/util/periodic_runner_factory',
             '$BUILD_DIR/mongo/util/progress_meter',
             'auth/auth',
             'auth/authmocks',
@@ -2932,7 +2866,6 @@ if wiredtiger:
             's/shard_server_test_fixture',
             'server_base',
             'server_options_servers',
-            'service_liaison_mock',
             'session/logical_session_cache_impl',
             'session/logical_session_id_helpers',
             'session/session_catalog_mongod',

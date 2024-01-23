@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,76 +29,70 @@
 
 #pragma once
 
-#include <functional>
 #include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/service_liaison.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class ServiceContext;
-
 /**
- * A service-dependent type for the LogicalSessionCache to use to find the
- * current time, schedule periodic refresh jobs, and get a list of sessions
- * that are being used for long-running queries on the service context.
+ * This is the service liaison for the logical session cache.
  *
- * Mongod and mongos implement their own classes to fulfill this interface.
+ * This class will return active sessions for cursors stored in the
+ * global cursor manager and cursors in per-collection managers. This
+ * class will also walk the service context to find all sessions for
+ * currently-running operations on this server.
+ *
+ * Job scheduling on this class will be handled behind the scenes by a
+ * periodic runner for this mongos. The time will be returned from the
+ * system clock.
  */
-class ServiceLiaison {
+class ServiceLiaisonImpl : public ServiceLiaison {
 public:
-    virtual ~ServiceLiaison();
+    using GetOpenCursorsFn = unique_function<LogicalSessionIdSet(OperationContext*)>;
 
-    /**
-     * Return a list of sessions that are currently being used to run operations
-     * on this service.
-     */
-    virtual LogicalSessionIdSet getActiveOpSessions() const = 0;
+    using KillCursorsFn = unique_function<int(OperationContext*, const SessionKiller::Matcher&)>;
 
-    /**
-     * Return a list of sessions that are currently attached to open cursors
-     */
-    virtual LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const = 0;
+    ServiceLiaisonImpl(GetOpenCursorsFn getOpenCursorsFn, KillCursorsFn killCursorsFn)
+        : _getOpenCursorsFn(std::move(getOpenCursorsFn)),
+          _killCursorsFn(std::move(killCursorsFn)){};
 
-    /**
-     * Schedule a job to be run at regular intervals until the server shuts down.
-     *
-     * The ServiceLiaison should start its background runner on construction, and
-     * should continue fielding job requests through scheduleJob until join() is
-     * called.
-     */
-    virtual void scheduleJob(PeriodicRunner::PeriodicJob job) = 0;
+    LogicalSessionIdSet getActiveOpSessions() const override;
+    LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const override;
 
-    /**
-     * Stops the service liaison from running any more jobs scheduled
-     * through scheduleJob. This method may block and wait for background threads to
-     * join. Implementations should make it safe for this method to be called
-     * multiple times, or concurrently by different threads.
-     */
-    virtual void join() = 0;
+    void scheduleJob(PeriodicRunner::PeriodicJob job) override;
 
-    /**
-     * Return the current time.
-     */
-    virtual Date_t now() const = 0;
+    void join() override;
 
-    /**
-     * Deligates to a similarly named function on a cursor manager.
-     */
-    virtual std::pair<Status, int> killCursorsWithMatchingSessions(
-        OperationContext* opCtx, const SessionKiller::Matcher& matcher) = 0;
+    Date_t now() const override;
+
+    int killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                        const SessionKiller::Matcher& matcher) override;
 
 protected:
     /**
      * Returns the service context.
      */
-    virtual ServiceContext* _context() = 0;
+    ServiceContext* _context() override;
+
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ServiceLiaisonImpl::_mutex");
+    std::vector<PeriodicJobAnchor> _jobs;
+
+private:
+    const GetOpenCursorsFn _getOpenCursorsFn;
+    const KillCursorsFn _killCursorsFn;
 };
 
 }  // namespace mongo

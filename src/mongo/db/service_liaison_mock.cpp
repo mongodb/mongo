@@ -108,11 +108,11 @@ const KillAllSessionsByPattern* MockServiceLiaisonImpl::matchKilled(const Logica
     return _matcher->match(lsid);
 }
 
-std::pair<Status, int> MockServiceLiaisonImpl::killCursorsWithMatchingSessions(
-    OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
+int MockServiceLiaisonImpl::killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                            const SessionKiller::Matcher& matcher) {
 
     _matcher = matcher;
-    return std::make_pair(Status::OK(), 0);
+    return 0;
 }
 
 }  // namespace mongo

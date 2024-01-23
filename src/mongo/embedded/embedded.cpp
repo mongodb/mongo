@@ -78,9 +78,10 @@
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_liaison_mongod.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_impl.h"
+#include "mongo/db/session/service_liaison_impl.h"
+#include "mongo/db/session/service_liaison_shard.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/session/sessions_collection_standalone.h"
 #include "mongo/db/startup_recovery.h"
@@ -391,13 +392,16 @@ ServiceContext* initialize(const char* yaml_config) {
     srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&startupOpCtx))));  // NOLINT
 
     // Set up the logical session cache
-    LogicalSessionCache::set(serviceContext,
-                             std::make_unique<LogicalSessionCacheImpl>(
-                                 std::make_unique<ServiceLiaisonMongod>(),
-                                 std::make_shared<SessionsCollectionStandalone>(),
-                                 [](OperationContext*, SessionsCollection&, Date_t) {
-                                     return 0; /* No op */
-                                 }));
+    LogicalSessionCache::set(
+        serviceContext,
+        std::make_unique<LogicalSessionCacheImpl>(
+            std::make_unique<ServiceLiaisonImpl>(
+                service_liaison_shard_callbacks::getOpenCursorSessions,
+                service_liaison_shard_callbacks::killCursorsWithMatchingSessions),
+            std::make_shared<SessionsCollectionStandalone>(),
+            [](OperationContext*, SessionsCollection&, Date_t) {
+                return 0; /* No op */
+            }));
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore

@@ -399,7 +399,7 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
     auto killRes = _service->killCursorsWithMatchingSessions(opCtx, std::move(matcher));
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        _stats.setLastSessionsCollectionJobCursorsClosed(killRes.second);
+        _stats.setLastSessionsCollectionJobCursorsClosed(killRes);
     }
 }
 

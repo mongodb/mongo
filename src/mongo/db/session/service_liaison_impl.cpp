@@ -34,11 +34,10 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/session/logical_session_id_gen.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/db/session/service_liaison_impl.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
 
@@ -47,7 +46,7 @@
 
 namespace mongo {
 
-LogicalSessionIdSet ServiceLiaisonMongos::getActiveOpSessions() const {
+LogicalSessionIdSet ServiceLiaisonImpl::getActiveOpSessions() const {
     LogicalSessionIdSet activeSessions;
 
     invariant(hasGlobalServiceContext());
@@ -72,19 +71,11 @@ LogicalSessionIdSet ServiceLiaisonMongos::getActiveOpSessions() const {
     return activeSessions;
 }
 
-LogicalSessionIdSet ServiceLiaisonMongos::getOpenCursorSessions(OperationContext* opCtx) const {
-    LogicalSessionIdSet openCursorSessions;
-
-    invariant(hasGlobalServiceContext());
-
-    // Append any in-use session ids from the global cluster cursor managers.
-    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
-    cursorManager->appendActiveSessions(&openCursorSessions);
-
-    return openCursorSessions;
+LogicalSessionIdSet ServiceLiaisonImpl::getOpenCursorSessions(OperationContext* opCtx) const {
+    return _getOpenCursorsFn(opCtx);
 }
 
-void ServiceLiaisonMongos::scheduleJob(PeriodicRunner::PeriodicJob job) {
+void ServiceLiaisonImpl::scheduleJob(PeriodicRunner::PeriodicJob job) {
     invariant(hasGlobalServiceContext());
     auto jobAnchor = getGlobalServiceContext()->getPeriodicRunner()->makeJob(std::move(job));
     jobAnchor.start();
@@ -95,26 +86,25 @@ void ServiceLiaisonMongos::scheduleJob(PeriodicRunner::PeriodicJob job) {
     }
 }
 
-void ServiceLiaisonMongos::join() {
+void ServiceLiaisonImpl::join() {
     auto jobs = [&] {
         stdx::lock_guard lk(_mutex);
         return std::exchange(_jobs, {});
     }();
 }
 
-Date_t ServiceLiaisonMongos::now() const {
+Date_t ServiceLiaisonImpl::now() const {
     invariant(hasGlobalServiceContext());
     return getGlobalServiceContext()->getFastClockSource()->now();
 }
 
-ServiceContext* ServiceLiaisonMongos::_context() {
+ServiceContext* ServiceLiaisonImpl::_context() {
     return getGlobalServiceContext();
 }
 
-std::pair<Status, int> ServiceLiaisonMongos::killCursorsWithMatchingSessions(
-    OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
-    auto cursorManager = Grid::get(getGlobalServiceContext())->getCursorManager();
-    return cursorManager->killCursorsWithMatchingSessions(opCtx, matcher);
+int ServiceLiaisonImpl::killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                        const SessionKiller::Matcher& matcher) {
+    return _killCursorsFn(opCtx, matcher);
 }
 
 }  // namespace mongo

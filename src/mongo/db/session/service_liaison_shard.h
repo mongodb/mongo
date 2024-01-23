@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,59 +29,24 @@
 
 #pragma once
 
-#include <utility>
-#include <vector>
-
-#include <boost/move/utility_core.hpp>
-
-#include "mongo/base/status.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_liaison.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_killer.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/periodic_runner.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
+
 /**
- * This is the service liaison to mongos for the logical session cache.
- *
- * This class will return active sessions for cursors stored in the
- * global cursor manager and cursors in per-collection managers. This
- * class will also walk the service context to find all sessions for
- * currently-running operations on this server.
- *
- * Job scheduling on this class will be handled behind the scenes by a
- * periodic runner for this mongos. The time will be returned from the
- * system clock.
+ * This encapsulates the callbacks to implement the methods to return the cursors for the opened
+ * sessions or kill the cursors that matches the given session for a logical session cache acting as
+ * a shard.
  */
-class ServiceLiaisonMongos : public ServiceLiaison {
-public:
-    LogicalSessionIdSet getActiveOpSessions() const override;
-    LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx) const override;
+namespace service_liaison_shard_callbacks {
 
-    void scheduleJob(PeriodicRunner::PeriodicJob job) override;
+LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx);
 
-    void join() override;
+int killCursorsWithMatchingSessions(OperationContext* opCtx, const SessionKiller::Matcher& matcher);
 
-    Date_t now() const override;
-
-    std::pair<Status, int> killCursorsWithMatchingSessions(
-        OperationContext* opCtx, const SessionKiller::Matcher& matcher) override;
-
-protected:
-    /**
-     * Returns the service context.
-     */
-    ServiceContext* _context() override;
-
-    Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "ServiceLiaisonMongos::_mutex");
-    std::vector<PeriodicJobAnchor> _jobs;
-};
+}  // namespace service_liaison_shard_callbacks
 
 }  // namespace mongo

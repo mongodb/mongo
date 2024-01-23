@@ -95,15 +95,25 @@ env.Library(
 )
 
 env.Library(
-    target='sessions_collection_standalone',
+    target='service_liaison_mongod',
     source=[
+        'service_liaison_shard.cpp',
         'sessions_collection_standalone.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        'logical_session_cache_impl',
         'logical_session_id',
         'sessions_collection',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
+        '$BUILD_DIR/mongo/util/clock_sources',
+        '$BUILD_DIR/mongo/util/periodic_runner',
     ],
 )
 
@@ -127,9 +137,11 @@ env.Library(
     target='logical_session_cache_impl',
     source=[
         'logical_session_cache_impl.cpp',
+        'service_liaison_impl.cpp',
+        'service_liaison_router.cpp',
+        'service_liaison.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_liaison',
         'kill_sessions',
         'logical_session_cache',
         'logical_session_id_helpers',

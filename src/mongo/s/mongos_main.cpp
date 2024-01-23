@@ -81,11 +81,12 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_impl.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/service_liaison_impl.h"
+#include "mongo/db/session/service_liaison_router.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_killer.h"
@@ -954,9 +955,12 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     LogicalSessionCache::set(
         serviceContext,
-        std::make_unique<LogicalSessionCacheImpl>(std::make_unique<ServiceLiaisonMongos>(),
-                                                  std::make_unique<SessionsCollectionSharded>(),
-                                                  RouterSessionCatalog::reapSessionsOlderThan));
+        std::make_unique<LogicalSessionCacheImpl>(
+            std::make_unique<ServiceLiaisonImpl>(
+                service_liaison_router_callbacks::getOpenCursorSessions,
+                service_liaison_router_callbacks::killCursorsWithMatchingSessions),
+            std::make_unique<SessionsCollectionSharded>(),
+            RouterSessionCatalog::reapSessionsOlderThan));
 
     transport::ServiceExecutor::startupAll(serviceContext);
 

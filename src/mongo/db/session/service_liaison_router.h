@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,15 +29,23 @@
 
 #pragma once
 
-#include <memory>
-
-#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_killer.h"
 
 namespace mongo {
 
-enum class LogicalSessionCacheServer { kSharded, kConfigServer, kReplicaSet, kStandalone };
+/**
+ * This encapsulates the callbacks to implement the methods to return the cursors for the opened
+ * sessions or kill the cursors that matches the given session for a logical session cache acting as
+ * a router.
+ */
+namespace service_liaison_router_callbacks {
 
-std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCacheServer state,
-                                                              bool isRouterServer);
+LogicalSessionIdSet getOpenCursorSessions(OperationContext* opCtx);
+
+int killCursorsWithMatchingSessions(OperationContext* opCtx, const SessionKiller::Matcher& matcher);
+
+}  // namespace service_liaison_router_callbacks
 
 }  // namespace mongo

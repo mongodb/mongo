@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_liaison.h"
+#include "mongo/db/session/service_liaison.h"
 
 namespace mongo {
 
