@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -51,6 +52,19 @@ void assertSbeValueEquals(Element actual, Element expected, bool omitStringTypeC
     auto strActual = value::printTagAndVal(actual);
     auto strExpected = value::printTagAndVal(expected);
     ASSERT_EQ(strActual, strExpected);
+}
+
+void verifyDecompressionIterative(BSONObj& obj, Element expected) {
+    BSONColumnBuilder cb;
+    cb.append(obj.firstElement());
+    auto binData = cb.finalize();
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{static_cast<const char*>(binData.data),
+                                                (size_t)binData.length};
+    ElementStorage allocator;
+    std::vector<Element> container{{}};
+    col.decompressIterative<SBEColumnMaterializer>(container, allocator);
+    assertSbeValueEquals(container.back(), expected);
 }
 
 template <typename T>
@@ -154,6 +168,80 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerMissing) {
     collector.appendMissing();
     ASSERT_EQ(vec.back(), Element({value::TypeTags::Nothing, 0}));
     ASSERT_EQ(vec.back(), bson::convertFrom<true /* view */>(BSONElement{}));
+}
+
+// Basic test for decompressIterative. There will be more exhaustive tests in bsoncolumn_test.cpp.
+TEST_F(BSONColumnMaterializerTest, DecompressIterativeSimpleWithSBEMaterializer) {
+    BSONObj obj = BSON("" << true);
+    verifyDecompressionIterative(obj, {value::TypeTags::Boolean, 1});
+
+    obj = BSON("" << false);
+    verifyDecompressionIterative(obj, {value::TypeTags::Boolean, 0});
+
+    obj = BSON("" << (int32_t)100);
+    verifyDecompressionIterative(obj,
+                                 {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100)});
+
+    obj = BSON("" << (int64_t)10000);
+    verifyDecompressionIterative(
+        obj, {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10000)});
+
+    obj = BSON("" << (double)123.982);
+    verifyDecompressionIterative(
+        obj, {value::TypeTags::NumberDouble, value::bitcastFrom<double>(123.982)});
+
+    Decimal128 decimal{123.982};
+    obj = BSON("" << decimal);
+    verifyDecompressionIterative(obj,
+                                 {value::TypeTags::NumberDecimal,
+                                  value::bitcastFrom<const char*>(obj.firstElement().value())});
+
+    Date_t date = Date_t::fromMillisSinceEpoch(1702334800770);
+    obj = BSON("" << date);
+    verifyDecompressionIterative(
+        obj, {value::TypeTags::Date, value::bitcastFrom<long long>(date.toMillisSinceEpoch())});
+
+    Timestamp ts{date};
+    obj = BSON("" << ts);
+    uint64_t uts = ConstDataView{obj.firstElement().value()}.read<LittleEndian<uint64_t>>();
+    verifyDecompressionIterative(obj, {value::TypeTags::Timestamp, uts});
+
+    StringData strBig{"hello_world"};
+    obj = BSON("" << strBig);
+    verifyDecompressionIterative(
+        obj,
+        {value::TypeTags::bsonString, value::bitcastFrom<const char*>(obj.firstElement().value())});
+
+    uint8_t binData[] = {100, 101, 102, 103};
+    BSONBinData bsonBinData{binData, sizeof(binData), BinDataGeneral};
+    obj = BSON("" << bsonBinData);
+    verifyDecompressionIterative(obj,
+                                 {value::TypeTags::bsonBinData,
+                                  value::bitcastFrom<const char*>(obj.firstElement().value())});
+
+    BSONCode code{StringData{"x = 0"}};
+    obj = BSON("" << code);
+    verifyDecompressionIterative(obj,
+                                 {value::TypeTags::bsonJavascript,
+                                  value::bitcastFrom<const char*>(obj.firstElement().value())});
+
+    auto oid = OID::gen();
+    obj = BSON("" << oid);
+    verifyDecompressionIterative(obj,
+                                 {value::TypeTags::bsonObjectId,
+                                  value::bitcastFrom<const char*>(obj.firstElement().value())});
+
+    // Not all types are compressed in BSONColumn. Since the decompression code is identical, we
+    // will test returning one of the uncompressed types.
+    BSONCodeWScope codeWScope{"print(`${x}`)", BSON("x" << 10)};
+    obj = BSON("" << codeWScope);
+    verifyDecompressionIterative(obj,
+                                 {value::TypeTags::bsonCodeWScope,
+                                  value::bitcastFrom<const char*>(obj.firstElement().value())});
+
+    // Test EOO.
+    obj = {};
+    verifyDecompressionIterative(obj, {value::TypeTags::Nothing, 0});
 }
 
 }  // namespace

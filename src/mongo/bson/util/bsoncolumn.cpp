@@ -845,17 +845,12 @@ boost::intrusive_ptr<ElementStorage> BSONColumn::release() {
 
 namespace bsoncolumn {
 
-BSONColumnBlockBased::BSONColumnBlockBased(const char* buffer, size_t size) {}
+BSONColumnBlockBased::BSONColumnBlockBased(const char* buffer, size_t size)
+    : _binary(buffer), _size(size) {}
 
 template <class Buffer>
 requires Appendable<Buffer>
 void BSONColumnBlockBased::decompress(Buffer& buffer) const {
-    invariant(false, "not implemented");
-}
-
-template <class Buffer>
-requires Appendable<Buffer>
-void BSONColumnBlockBased::decompressIterative(Buffer& buffer) const {
     invariant(false, "not implemented");
 }
 
@@ -944,8 +939,8 @@ BSONElement BSONElementMaterializer::materialize(ElementStorage& allocator, cons
 }
 
 /**
- * Create a BSONElement with memory from allocator. Both String and Code are treated similarly and
- * use this helper.
+ * Create a BSONElement with memory from allocator. Both String and Code are treated similarly
+ * and use this helper.
  */
 BSONElement BSONElementMaterializer::writeStringData(ElementStorage& allocator,
                                                      BSONType bsonType,

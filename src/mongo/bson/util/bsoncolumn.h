@@ -672,7 +672,65 @@ public:
      */
     template <class Buffer>
     requires Appendable<Buffer>
-    void decompressIterative(Buffer& buffer) const;
+    void decompressIterative(Buffer& buffer) const {
+        BSONColumn blockColumn(_binary, _size);
+        for (auto&& elem : blockColumn) {
+            switch (elem.type()) {
+                case NumberInt:
+                    buffer.template append<int32_t>(elem);
+                    break;
+                case NumberLong:
+                    buffer.template append<int64_t>(elem);
+                    break;
+                case NumberDouble:
+                    buffer.template append<double>(elem);
+                    break;
+                case NumberDecimal:
+                    buffer.template append<Decimal128>(elem);
+                    break;
+                case Bool:
+                    buffer.template append<bool>(elem);
+                    break;
+                case jstOID:
+                    buffer.template append<OID>(elem);
+                    break;
+                case Date:
+                    buffer.template append<Date_t>(elem);
+                    break;
+                case Code:
+                    buffer.template append<BSONCode>(elem);
+                    break;
+                case String:
+                    buffer.template append<StringData>(elem);
+                    break;
+                case bsonTimestamp:
+                    buffer.template append<Timestamp>(elem);
+                    break;
+                case BinData:
+                    buffer.template append<BSONBinData>(elem);
+                    break;
+                // Below are types that cannot be compressed, so we will append the BSONElement.
+                case DBRef:
+                case RegEx:
+                case Symbol:
+                case CodeWScope:
+                case Object:
+                case Array:
+                case Undefined:
+                case jstNULL:
+                    buffer.template append<BSONElement>(elem);
+                    break;
+                case EOO:
+                    buffer.appendMissing();
+                    break;
+                // We don't store MinKey or MaxKey.
+                case MaxKey:
+                case MinKey:
+                default:
+                    MONGO_UNREACHABLE
+            }
+        }
+    }
 
     /**
      * Wrapper that expects the caller to define a Materializer and a Container to receive a
@@ -740,6 +798,8 @@ public:
     bool contains(BSONType type) const;
 
 private:
+    const char* _binary;
+    size_t _size;
 };
 
 /**
