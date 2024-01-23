@@ -783,6 +783,12 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     }
 
     result = createIndexOnConfigCollection(
+        opCtx, NamespaceString::kConfigDatabasesNamespace, BSON("_id" << 1), unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create _id_ index on config db");
+    }
+
+    result = createIndexOnConfigCollection(
         opCtx, NamespaceString::kConfigsvrShardsNamespace, BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create host_1 index on config db");
