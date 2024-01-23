@@ -410,7 +410,7 @@ void
 __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     struct timespec cur_time;
-    uint64_t time_diff;
+    uint64_t time_diff_msg, time_diff_start;
     int progress;
 
     if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG_1))
@@ -418,9 +418,10 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
     __wt_epoch(session, &cur_time);
 
-    /* Log one progress message every twenty seconds. */
-    time_diff = WT_TIMEDIFF_SEC(cur_time, session->compact->last_progress);
-    if (time_diff > WT_PROGRESS_MSG_PERIOD) {
+    /* Log one progress message periodically. */
+    time_diff_msg = WT_TIMEDIFF_SEC(cur_time, session->compact->last_progress);
+    time_diff_start = WT_TIMEDIFF_SEC(cur_time, session->compact->begin);
+    if (time_diff_msg > WT_PROGRESS_MSG_PERIOD) {
         session->compact->last_progress = cur_time;
 
         /*
@@ -431,8 +432,8 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block)
             __wt_verbose_debug1(session, WT_VERB_COMPACT_PROGRESS,
               "compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64
               " pages, rewritten %" PRIu64 " pages (%" PRIu64 "MB)",
-              block->name, time_diff, block->compact_pages_reviewed, block->compact_pages_rewritten,
-              block->compact_bytes_rewritten / WT_MEGABYTE);
+              block->name, time_diff_start, block->compact_pages_reviewed,
+              block->compact_pages_rewritten, block->compact_bytes_rewritten / WT_MEGABYTE);
             __wt_verbose_debug1(session, WT_VERB_COMPACT,
               "%s: still collecting information for estimating the progress", block->name);
         } else {
@@ -442,8 +443,9 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block)
             __wt_verbose_debug1(session, WT_VERB_COMPACT_PROGRESS,
               "compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64
               " pages, rewritten %" PRIu64 " pages (%" PRIu64 "MB), approx. %d%% done",
-              block->name, time_diff, block->compact_pages_reviewed, block->compact_pages_rewritten,
-              block->compact_bytes_rewritten / WT_MEGABYTE, progress);
+              block->name, time_diff_start, block->compact_pages_reviewed,
+              block->compact_pages_rewritten, block->compact_bytes_rewritten / WT_MEGABYTE,
+              progress);
         }
     }
 }
