@@ -41,6 +41,11 @@ namespace mongo {
 class TrackingAllocatorTest : public unittest::Test {};
 
 TEST_F(TrackingAllocatorTest, STLContainerSimple) {
+#if _ITERATOR_DEBUG_LEVEL >= 2
+    // If iterator debugging is on, skip this test as additional memory gets allocated.
+    return;
+#endif
+
     timeseries::TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
@@ -73,6 +78,11 @@ TEST_F(TrackingAllocatorTest, STLContainerSimple) {
 }
 
 TEST_F(TrackingAllocatorTest, STLContainerCopy) {
+#if _ITERATOR_DEBUG_LEVEL >= 2
+    // If iterator debugging is on, skip this test as additional memory gets allocated.
+    return;
+#endif
+
     timeseries::TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
@@ -97,6 +107,11 @@ TEST_F(TrackingAllocatorTest, STLContainerCopy) {
 }
 
 TEST_F(TrackingAllocatorTest, STLContainerMove) {
+#if _ITERATOR_DEBUG_LEVEL >= 2
+    // If iterator debugging is on, skip this test as additional memory gets allocated.
+    return;
+#endif
+
     timeseries::TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
@@ -121,6 +136,11 @@ TEST_F(TrackingAllocatorTest, STLContainerMove) {
 }
 
 TEST_F(TrackingAllocatorTest, STLContainerNested) {
+#if _ITERATOR_DEBUG_LEVEL >= 2
+    // If iterator debugging is on, skip this test as additional memory gets allocated.
+    return;
+#endif
+
     timeseries::TrackingContext trackingContext;
     ASSERT_EQ(0, trackingContext.allocated());
 
