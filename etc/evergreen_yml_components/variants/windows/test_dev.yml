@@ -24,7 +24,7 @@ variables:
 # ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THOSE FILES
 - &windows_expansions
   compile_variant: *windows_compile_variant_name
-  burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
+  burn_in_tests_build_variant: enterprise-windows-required
   exe: ".exe"
   content_type: application/zip
   python: '/cygdrive/c/python/python39/python.exe'
