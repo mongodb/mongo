@@ -181,6 +181,8 @@ functions:
           ${HAVE_DIAGNOSTIC|} \
           ${GNU_C_VERSION|} \
           ${GNU_CXX_VERSION|} \
+          ${CLANG_C_VERSION|} \
+          ${CLANG_CXX_VERSION|} \
           ${ENABLE_AZURE|} \
           ${ENABLE_CPPSUITE|} \
           ${ENABLE_GCP|} \
@@ -1527,10 +1529,6 @@ tasks:
         vars:
           HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Debug
-      - func: "compile wiredtiger"
-        vars:
-          CLANG_C_VERSION: -DCLANG_C_VERSION=6.0
-          CLANG_CXX_VERSION: -DCLANG_CXX_VERSION=6.0
       - func: "compile wiredtiger"
         vars:
           CLANG_C_VERSION: -DCLANG_C_VERSION=7
