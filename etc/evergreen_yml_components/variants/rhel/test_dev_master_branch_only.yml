@@ -28,6 +28,7 @@ variables:
     -j$(grep -c ^processor /proc/cpuinfo)
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --link-model=dynamic
+    --use-diagnostic-latches=on
 
 # THIS HAS COPIES IN
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -232,6 +233,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
       ENABLE_GRPC_BUILD=1
+      --use-diagnostic-latches=on
     compile_variant: *linux-x86-dynamic-grpc-suggested
     clang_tidy_toolchain: v4
     large_distro_name: rhel80-xlarge

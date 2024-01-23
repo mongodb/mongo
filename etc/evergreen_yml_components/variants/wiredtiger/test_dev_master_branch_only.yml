@@ -40,6 +40,7 @@ variables:
     --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     --enable-http-client=on
     --link-model=dynamic
+    --use-diagnostic-latches=on
   num_scons_link_jobs_available: 0.99
 
 
