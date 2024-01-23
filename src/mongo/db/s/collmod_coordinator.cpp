@@ -73,6 +73,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_state.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
 #include "mongo/util/read_through_cache.h"
@@ -460,10 +461,8 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         opCtx, originalNss(), cmd, true, &collModResBuilder));
                     auto collModRes = collModResBuilder.obj();
 
-                    const auto dbInfo = uassertStatusOK(
-                        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss().dbName()));
-                    const auto shard = uassertStatusOK(
-                        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo->getPrimary()));
+                    const auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
+                        opCtx, ShardingState::get(opCtx)->shardId()));
                     BSONObjBuilder builder;
                     builder.appendElements(collModRes);
                     BSONObjBuilder subBuilder(builder.subobjStart("raw"));
