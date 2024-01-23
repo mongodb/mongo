@@ -82,6 +82,8 @@ selector:
   - jstests/core/administrative/profile/profile_hide_index.js
   - jstests/core/failcommand_failpoint.js
   - jstests/core/comment_field.js
+  # TODO SERVER-81009: fix VTS missing from opCtx for distinct transactions.
+  - jstests/core/txns/view_reads_in_transaction.js
 
 executor:
   archive:

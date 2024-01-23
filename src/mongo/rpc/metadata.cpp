@@ -121,11 +121,6 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
     }
 
     readImpersonatedUserMetadata(impersonationElem, opCtx);
-
-    invariant(!auth::ValidatedTenancyScope::get(opCtx).has_value() ||
-              (opMsg.validatedTenancyScope &&
-               *auth::ValidatedTenancyScope::get(opCtx) == *opMsg.validatedTenancyScope));
-
     auth::ValidatedTenancyScope::set(opCtx, opMsg.validatedTenancyScope);
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
