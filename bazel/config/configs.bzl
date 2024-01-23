@@ -76,11 +76,22 @@ use_gdbserver = rule(
 # libunwind
 # =========
 
-use_libunwind_provider = provider(fields = ["enabled"])
+libunwind_values = ["auto", "on", "off"]
 
-use_libunwind = rule(
-    implementation = lambda ctx: use_libunwind_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
+libunwind_provider = provider(
+    doc = "Enable libunwind for backtraces (use \"auto\" to enable only if its available on the current platform)",
+    fields = {"libunwind": "choose one of " + ".".join(libunwind_values)},
+)
+
+def libunwind_impl(ctx):
+    libunwind_value = ctx.build_setting_value
+    if libunwind_value not in libunwind_values:
+        fail(str(ctx.label) + " libunwind allowed to take values {" + ", ".join(libunwind_values) + "} but was set to unallowed value " + libunwind_value)
+    return libunwind_provider(libunwind = libunwind_value)
+
+libunwind = rule(
+    implementation = libunwind_impl,
+    build_setting = config.string(flag = True),
 )
 
 # =========

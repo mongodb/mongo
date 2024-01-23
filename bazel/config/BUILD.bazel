@@ -2,7 +2,7 @@ load(
     "//bazel/config:configs.bzl",
     "build_mode",
     "compiler_type",
-    "use_libunwind",
+    "libunwind",
     "use_gdbserver",
     "spider_monkey_dbg",
     "allocator",
@@ -292,26 +292,52 @@ config_setting(
 )
 
 # --------------------------------------
-# Libunwind options
+# libunwind options
 # --------------------------------------
 
-use_libunwind(
-    name = "use_libunwind",
-    build_setting_default = False,
+libunwind(
+    name = "libunwind",
+    build_setting_default = "auto",
 )
 
+# Underscored settings are for flagging configuration errors and for evaluating auto.
+# Use :libunwind_enabled to check the final result of whether or not it's enabled.
 config_setting(
-    name = "use_libunwind_enabled",
+    name = "_libunwind_on",
     flag_values = {
-        "//bazel/config:use_libunwind": "True",
+        "//bazel/config:libunwind": "on",
     },
 )
 
 config_setting(
-    name = "use_libunwind_disabled",
+    name = "_libunwind_off",
     flag_values = {
-        "//bazel/config:use_libunwind": "False",
+        "//bazel/config:libunwind": "off",
     },
+)
+
+config_setting(
+    name = "_libunwind_auto",
+    flag_values = {
+        "//bazel/config:libunwind": "auto",
+    },
+)
+
+selects.config_setting_group(
+    name = "_libunwind_enabled_by_auto",
+    match_all = [":_libunwind_auto", "@platforms//os:linux"],
+)
+
+selects.config_setting_group(
+    name = "_libunwind_enabled_by_on",
+    match_all = [":_libunwind_on", "@platforms//os:linux"],
+)
+
+# Final setting intended for external use.
+#   (libunwind == on && os == linux) || (libunwind == auto && os == linux)
+selects.config_setting_group(
+    name = "libunwind_enabled",
+    match_any = [":_libunwind_enabled_by_on", ":_libunwind_enabled_by_auto"],
 )
 
 # --------------------------------------

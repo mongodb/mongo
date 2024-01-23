@@ -103,15 +103,25 @@ LINKER_LINKFLAGS = select({
     "//bazel/config:linker_lld": ["-fuse-ld=lld"],
 })
 
+REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE = (
+    "\nError:\n" +
+    "    libunwind=on is only supported on linux"
+)
+
+# These will throw an error if the following condition is not met:
+# (libunwind == on && os == linux) || libunwind == off || libunwind == auto
 LIBUNWIND_DEPS = select({
-    "//bazel/config:use_libunwind_enabled": ["//src/third_party/unwind:unwind"],
-    "//conditions:default": [],
-})
+    "//bazel/config:libunwind_enabled": ["//src/third_party/unwind:unwind"],
+    "//bazel/config:_libunwind_off": [],
+    "//bazel/config:_libunwind_auto": [],
+}, no_match_error = REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE)
 
 LIBUNWIND_DEFINES = select({
-    "//bazel/config:use_libunwind_enabled": ["MONGO_CONFIG_USE_LIBUNWIND"],
-    "//conditions:default": [],
-})
+    "//bazel/config:libunwind_enabled": ["MONGO_CONFIG_USE_LIBUNWIND"],
+    "//bazel/config:_libunwind_off": [],
+    "//bazel/config:_libunwind_auto": [],
+}, no_match_error = REQUIRED_SETTINGS_LIBUNWIND_ERROR_MESSAGE)
+
 
 REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE = (
     "\nError:\n" +
