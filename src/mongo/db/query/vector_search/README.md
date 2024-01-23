@@ -8,7 +8,7 @@ This document covers the `mongod` side of the vector search implementation.
 
 ## Overview
 
-Vector search is implemented as an aggregation stage that behaves similarly to [`$search`](https://github.com/10gen/mongo-enterprise-modules/blob/master/src/search/README.md). The `$vectorSearch` stage must be the first stage in the pipeline, always run on `mongod`. Users specify the query vector and path to search over as well as several `mongot`-specific knobs. `$vectorSearch` fetches results from `mongot` via a cursor-based protocol that parallels (and reuses code from) `$search`.
+Vector search is implemented as an aggregation stage that behaves similarly to [`$search`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md). The `$vectorSearch` stage must be the first stage in the pipeline, always run on `mongod`. Users specify the query vector and path to search over as well as several `mongot`-specific knobs. `$vectorSearch` fetches results from `mongot` via a cursor-based protocol that parallels (and reuses code from) `$search`.
 
 ## Details
 
@@ -16,7 +16,7 @@ Vector search is implemented as an aggregation stage that behaves similarly to [
 
 #### Parameters
 
-[`$vectorSearch`](https://github.com/10gen/mongo-enterprise-modules/blob/master/src/vector_search/document_source_vector_search.h) takes several [parameters](https://github.com/10gen/mongo-enterprise-modules/blob/master/src/vector_search/document_source_vector_search.idl) that are passed on to `mongot`. These include:
+[`$vectorSearch`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.h) takes several [parameters](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.idl) that are passed on to `mongot`. These include:
 
 | Parameter | Description |
 | --------- | -------- |
@@ -27,7 +27,7 @@ Vector search is implemented as an aggregation stage that behaves similarly to [
 | index | index to use for the search |
 | filter | optional pre-filter to apply before searching |
 
-Validation for most of these fields occurs on `mongot`, with the exception of `filter`. `mongot` does not yet support complex MQL semantics, so the `filter` is limited to simple comparisons (e.g. `$eq`, `$lt`, `$gte`) on basic field types. This is validated on `mongod` with a [custom `MatchExpressionVisitor`](https://github.com/10gen/mongo-enterprise-modules/blob/3bde4a9af09d7b5c3cadc488166f8b5695d95c2d/src/vector_search/filter_validator.cpp#L55).
+Validation for most of these fields occurs on `mongot`, with the exception of `filter`. `mongot` does not yet support complex MQL semantics, so the `filter` is limited to simple comparisons (e.g. `$eq`, `$lt`, `$gte`) on basic field types. This is validated on `mongod` with a [custom `MatchExpressionVisitor`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/vector_search/filter_validator.cpp).
 
 Additionally, `limit` may be used by `mongod` to ensure correct results in sharded clusters (described below). All other parameters are passed through to `mongot` for algorithm-specific behavior.
 
@@ -37,7 +37,7 @@ The `$vectorSearch` stage supports sending `getMore` requests to `mongot` when a
 
 ### idLookup
 
-An `$_internalSearchIdLookup` stage is [inserted into the pipeline](https://github.com/10gen/mongo-enterprise-modules/blob/3bde4a9af09d7b5c3cadc488166f8b5695d95c2d/src/vector_search/document_source_vector_search.cpp#L165) directly after the `$vectorSearch` stage (always on `mongod`) so that full documents can be returned to the user, as vector indexes do not support any kind of stored source functionality.
+An `$_internalSearchIdLookup` stage is [inserted into the pipeline](https://github.com/mongodb/mongo/blob/636d0c1ce26d905cc508a73ada598950e16860b5/src/mongo/db/pipeline/search/document_source_vector_search.cpp#L204) directly after the `$vectorSearch` stage (always on `mongod`) so that full documents can be returned to the user, as vector indexes do not support any kind of stored source functionality.
 
 Note that there are no mitigations in place to handle idLookup reducing the size of the result set when it filters out orphans. The `limit` parameter passed to `$vectorSearch` is understood to be a maximum, so we may generate that number of results and then subsequently drop orphans, ending with fewer than `limit` documents. This differs from `$search`, where we would request more documents from `mongot` to make up for the orphans.
 
@@ -47,14 +47,14 @@ Results are returned in descending score order from `mongot`. A metadata field w
 
 ### Sharding
 
-In a sharded environment, results are merged and [sorted in descending order](https://github.com/10gen/mongo-enterprise-modules/blob/3bde4a9af09d7b5c3cadc488166f8b5695d95c2d/src/vector_search/document_source_vector_search.h#L37) on the `$vectorSearchScore` metadata field. Additionally, the `limit` parameter specified in `$vectorSearch` is applied after merging by [inserting an additional `$limit` stage](https://github.com/10gen/mongo-enterprise-modules/blob/3bde4a9af09d7b5c3cadc488166f8b5695d95c2d/src/vector_search/document_source_vector_search.h#L36) into the merging pipeline. 
+In a sharded environment, results are merged and [sorted in descending order](https://github.com/mongodb/mongo/blob/636d0c1ce26d905cc508a73ada598950e16860b5/src/mongo/db/pipeline/search/document_source_vector_search.h#L62) on the `$vectorSearchScore` metadata field. Additionally, the `limit` parameter specified in `$vectorSearch` is applied after merging by [inserting an additional `$limit` stage]() into the merging pipeline.
 
 If a user-specified `$limit` exists in the pipeline following `$vectorSearch` that is smaller than the `$vectorSearch` limit value, this is pushed down to the shards as well, although it is not sent to `mongot`.
 
 ### Index Management
 
-Vector indexes are managed through the existing [search index management commands](https://github.com/10gen/mongo-enterprise-modules/blob/master/src/search/README.md#search-index-commands), due to the fact that they are stored in the same way as search indexes on `mongot`.
+Vector indexes are managed through the existing [search index management commands](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/search/README.md#search-index-commands), due to the fact that they are stored in the same way as search indexes on `mongot`.
 
 ### Testing
 
-The `vectorSearch` command is supported by [`mongotmock`](https://github.com/10gen/mongo-enterprise-modules/blob/3bde4a9af09d7b5c3cadc488166f8b5695d95c2d/src/search/mongotmock/mongotmock_commands.cpp#L172) for testing.
+The `vectorSearch` command is supported by [`mongotmock`](https://github.com/mongodb/mongo/blob/636d0c1ce26d905cc508a73ada598950e16860b5/src/mongo/db/query/search/mongotmock/mongotmock_commands.cpp#L194) for testing.

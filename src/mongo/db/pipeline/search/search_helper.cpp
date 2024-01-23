@@ -523,7 +523,6 @@ boost::optional<executor::TaskExecutorCursor> getSearchMetadataCursor(DocumentSo
     return boost::none;
 }
 
-// TODO this one could move i guess
 std::function<void(BSONObjBuilder& bob)> buildSearchGetMoreFunc(
     std::function<boost::optional<long long>()> calcDocsNeeded) {
     if (!calcDocsNeeded) {

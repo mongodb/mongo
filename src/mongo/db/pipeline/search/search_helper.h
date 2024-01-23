@@ -112,6 +112,9 @@ void assertSearchMetaAccessValid(const Pipeline::SourceContainer& shardsPipeline
  * 1. Desugars $search stage into $_internalSearchMongotRemote and $_internalSearchIdLookup
  * stages.
  * 2. injects shard filterer for $_internalSearchIdLookup stage on shard only.
+ *
+ * This function is only called for preparing the pipeline for execution in the classic engine,
+ * since $search in SBE is not desugared.
  */
 void prepareSearchForTopLevelPipeline(Pipeline* pipeline);
 
@@ -121,6 +124,9 @@ void prepareSearchForTopLevelPipeline(Pipeline* pipeline);
  * this method should only be invoked for the DocumentSource-based implementation.
  * The preparation works desugars $search stage into $_internalSearchMongotRemote and
  * $_internalSearchIdLookup stages.
+ *
+ * This function is only called for preparing the pipeline for execution in the classic engine,
+ * since $search in SBE is not desugared.
  */
 void prepareSearchForNestedPipeline(Pipeline* pipeline);
 
