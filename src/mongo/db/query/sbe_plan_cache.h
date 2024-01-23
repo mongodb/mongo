@@ -231,6 +231,8 @@ struct CachedSbePlan {
 };
 
 using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
+using CachedPlanHolder =
+    mongo::CachedPlanHolder<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 
 struct BudgetEstimator {
     /**
