@@ -70,19 +70,24 @@ namespace mongo {
 
 namespace dps = ::mongo::dotted_path_support;
 
-static Status parseFlatPoint(const BSONElement& elem, Point* out, bool allowAddlFields = false) {
+// Convenience function to extract flat point coordinates from enclosing element.
+// Note, coordinate elements must not outlive the parent element.
+Status GeoParser::parseFlatPointCoordinates(const BSONElement& elem,
+                                            BSONElement& x,
+                                            BSONElement& y,
+                                            bool allowAddlFields /* = false */) {
     if (!elem.isABSONObj()) {
         return BAD_VALUE("Point must be an array or object, instead got type "
                          << typeName(elem.type()));
     }
 
     BSONObjIterator it(elem.Obj());
-    BSONElement x = it.next();
+    x = it.next();
     if (!x.isNumber()) {
         return BAD_VALUE("Point must only contain numeric elements, instead got type "
                          << typeName(x.type()));
     }
-    BSONElement y = it.next();
+    y = it.next();
     if (!y.isNumber()) {
         return BAD_VALUE("Point must only contain numeric elements, instead got type "
                          << typeName(y.type()));
@@ -90,6 +95,16 @@ static Status parseFlatPoint(const BSONElement& elem, Point* out, bool allowAddl
     if (!allowAddlFields && it.more()) {
         return BAD_VALUE("Point must only contain two numeric elements");
     }
+    return Status::OK();
+}
+
+static Status parseFlatPoint(const BSONElement& elem, Point* out, bool allowAddlFields = false) {
+    BSONElement x, y;
+    auto status = GeoParser::parseFlatPointCoordinates(elem, x, y, allowAddlFields);
+    if (!status.isOK()) {
+        return status;
+    }
+
     out->x = x.number();
     out->y = y.number();
     // Point coordinates must be finite numbers, neither NaN or infinite.
