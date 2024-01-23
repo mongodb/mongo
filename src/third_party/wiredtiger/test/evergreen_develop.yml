@@ -65,7 +65,7 @@ buildvariants:
     - name: doc-update
 
 - name: code-statistics
-  display_name: "Code statistics (ARM)"
+  display_name: "Code statistics (ARM64)"
   run_on:
   - ubuntu2004-arm64-small
   expansions:
