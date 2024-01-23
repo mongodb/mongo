@@ -171,6 +171,36 @@ std::vector<bool> canProvideSortWithMergeSort(
     }
     return shouldReverseScan;
 }
+
+/**
+ * Resolves the final direction hint to be used in collection scans, as there multiple mechanisms of
+ * overriding the planner's direction decision. It does so by enforcing the following precedence:
+ * timeseries traversal preference > query settings '$natural' hint > cursor '$natural' hint.
+ */
+boost::optional<int> determineCollScanHintedDirection(const CanonicalQuery& query,
+                                                      const QueryPlannerParams& params) {
+    // If present, let the traversal preference decide what order to scan to avoid a blocking
+    // sort.
+    if (params.traversalPreference.has_value()) {
+        return boost::none;
+    }
+
+    // Otherwise use the direction specified by query settings if available.
+    if (auto querySettingsDirection = params.collscanDirection) {
+        return static_cast<int>(*querySettingsDirection);
+    }
+
+    // Next, try to determine the scan direction using the '$natural' cursor hint.
+    const BSONObj& cursorHint = query.getFindCommandRequest().getHint();
+    if (cursorHint.isEmpty() || params.querySettingsApplied) {
+        return boost::none;
+    }
+    auto naturalHint = cursorHint[query_request_helper::kNaturalSortField];
+    if (!naturalHint) {
+        return boost::none;
+    }
+    return naturalHint.safeNumberInt() >= 0 ? 1 : -1;
+}
 }  // namespace
 
 namespace mongo {
@@ -543,23 +573,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
     csn->shouldWaitForOplogVisibility =
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
-    csn->direction = direction;
+    csn->direction = determineCollScanHintedDirection(query, params).value_or(direction);
     csn->isOplog = isOplog;
     csn->isClustered = params.clusteredInfo ? true : false;
 
     if (params.clusteredInfo) {
         csn->clusteredIndex = params.clusteredInfo->getIndexSpec();
-    }
-
-    const BSONObj& hint = query.getFindCommandRequest().getHint();
-    if (!hint.isEmpty()) {
-        BSONElement natural = hint[query_request_helper::kNaturalSortField];
-        // If we have a natural hint and a time series traversal preference, let the traversal
-        // preference decide what order to scan, so that we can avoid a blocking sort.
-        if (natural && !params.traversalPreference) {
-            // If the hint is {$natural: +-1} this changes the direction of the collection scan.
-            csn->direction = natural.safeNumberInt() >= 0 ? 1 : -1;
-        }
     }
 
     // If the client requested a resume token and we are scanning the oplog, prepare

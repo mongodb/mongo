@@ -3,9 +3,7 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
 function hasSupportedHint(cmdObj) {
-    return "hint" in cmdObj &&
-        // TODO SERVER-79233 Remove this condition once '$natural' hints are supported as well.
-        !(typeof cmdObj.hint === "object" && "$natural" in cmdObj.hint);
+    return "hint" in cmdObj;
 }
 
 function getCommandType(cmdObj) {

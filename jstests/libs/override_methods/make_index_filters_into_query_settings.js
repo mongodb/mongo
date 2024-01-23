@@ -54,8 +54,16 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
         return {ok: 1};
     }
 
+    // Query settings differ from index filters in the sense that they need explicit '$natural'
+    // hints to allow for collection scans. Otherwise, 'COLLSCAN' stages are outright forbidden and
+    // it's possible that the re-planning fallback will generate an undesired IXSCAN stage.
+    //
+    // To prevent this from happening we append '{$natural: 1}' and '{$natural: -1}' to allow both
+    // forward and backward collection scans.
     queryInstance["$db"] = dbName;
-    const settings = {indexHints: {allowedIndexes: cmdObj["indexes"]}};
+    const settings = {
+        indexHints: {allowedIndexes: [...cmdObj["indexes"], {$natural: 1}, {$natural: -1}]}
+    };
 
     // Run setQuerySettings command.
     const adminDb = conn.getDB("admin");
@@ -99,10 +107,15 @@ function planCacheListFiltersToDollarQuerySettings(conn, cmdObj) {
             ])
             .toArray();
 
+    function isNotNaturalHint(allowedIndex) {
+        return typeof allowedIndex !== "object" || !allowedIndex.hasOwnProperty("$natural");
+    }
     function fromQueryShapeConfigurationToIndexFilter(queryShapeConfig) {
         let indexFilter = {
             query: queryShapeConfig.representativeQuery.filter,
-            indexes: queryShapeConfig.settings.indexHints.allowedIndexes
+            // Remove the previously added '$natural' hints to ensure that the results match the
+            // expected output.
+            indexes: queryShapeConfig.settings.indexHints.allowedIndexes.filter(isNotNaturalHint)
         };
         addOptionalQueryFields(queryShapeConfig.representativeQuery, indexFilter);
         return indexFilter;
