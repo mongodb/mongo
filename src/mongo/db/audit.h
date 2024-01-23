@@ -324,7 +324,8 @@ void logShutdown(Client* client);
 void logLogout(Client* client,
                StringData reason,
                const BSONArray& initialUsers,
-               const BSONArray& updatedUsers);
+               const BSONArray& updatedUsers,
+               const boost::optional<Date_t>& loginTime);
 
 /**
  * Logs the result of a createIndex command.

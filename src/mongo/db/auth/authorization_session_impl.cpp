@@ -310,6 +310,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
     _authenticatedUser = std::move(user);
     _expirationTime = std::move(expirationTime);
     _expiredUserName = boost::none;
+    _loginTime = Date_t::now();
 
     // If there are any users and roles in the impersonation data, clear it out.
     clearImpersonatedUserData();
@@ -354,6 +355,7 @@ void AuthorizationSessionImpl::logoutSecurityTokenUser(Client* client) {
     // security tokens don't represent a permanent login.
     clearImpersonatedUserData();
     _updateInternalAuthorizationState();
+    _loginTime = boost::none;
 }
 
 void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData reason) {
@@ -368,14 +370,15 @@ void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData rea
 
     if (authenticatedUser) {
         auto names = BSON_ARRAY(authenticatedUser.value()->getName().toBSON());
-        audit::logLogout(client, reason, names, BSONArray());
+        audit::logLogout(client, reason, names, BSONArray(), _loginTime);
     } else if (expiredUserName) {
         auto names = BSON_ARRAY(expiredUserName.value().toBSON());
-        audit::logLogout(client, reason, names, BSONArray());
+        audit::logLogout(client, reason, names, BSONArray(), _loginTime);
     } else {
         return;
     }
 
+    _loginTime = boost::none;
     _expirationTime = boost::none;
 
     clearImpersonatedUserData();

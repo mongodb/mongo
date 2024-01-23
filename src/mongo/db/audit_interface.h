@@ -243,7 +243,8 @@ public:
     virtual void logLogout(Client* client,
                            StringData reason,
                            const BSONArray& initialUsers,
-                           const BSONArray& updatedUsers) const = 0;
+                           const BSONArray& updatedUsers,
+                           const boost::optional<Date_t>& loginTime) const = 0;
 
     /**
      * Logs the result of a createIndex command.
@@ -559,7 +560,8 @@ public:
     void logLogout(Client* client,
                    StringData reason,
                    const BSONArray& initialUsers,
-                   const BSONArray& updatedUsers) const {};
+                   const BSONArray& updatedUsers,
+                   const boost::optional<Date_t>& loginTime) const {};
 
     void logCreateIndex(Client* client,
                         const BSONObj* indexSpec,

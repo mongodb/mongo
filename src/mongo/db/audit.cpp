@@ -210,9 +210,10 @@ void logShutdown(Client* client) {
 void logLogout(Client* client,
                StringData reason,
                const BSONArray& initialUsers,
-               const BSONArray& updatedUsers) {
+               const BSONArray& updatedUsers,
+               const boost::optional<Date_t>& loginTime) {
     AuditInterface::get(client->getServiceContext())
-        ->logLogout(client, reason, initialUsers, updatedUsers);
+        ->logLogout(client, reason, initialUsers, updatedUsers, loginTime);
 }
 
 void logCreateIndex(Client* client,

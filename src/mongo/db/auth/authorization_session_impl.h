@@ -255,5 +255,9 @@ private:
     // If the session is expired, this represents the UserName that was formerly authenticated on
     // this connection.
     boost::optional<UserName> _expiredUserName;
+
+    // login time is recorded when the user is added and authorized. This information is used in
+    // lout logs.
+    boost::optional<Date_t> _loginTime;
 };
 }  // namespace mongo
