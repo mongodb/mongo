@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/sbe_block_test_helpers.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -50,19 +51,6 @@ public:
             tvPairs.push_back({value::TypeTags::Boolean, value::bitcastFrom<bool>(b)});
         }
         assertBlockEq(tag, val, tvPairs);
-    }
-
-    std::unique_ptr<value::ValueBlock> makeHeterogeneousBoolBlock(std::vector<bool> bools) {
-        std::unique_ptr<value::ValueBlock> block = std::make_unique<value::HeterogeneousBlock>();
-        for (auto b : bools) {
-            auto [t, v] = makeBool(b);
-            static_cast<value::HeterogeneousBlock*>(block.get())->push_back(t, v);
-        }
-        return block;
-    }
-
-    std::unique_ptr<value::ValueBlock> makeBoolBlock(std::vector<bool> bools) {
-        return std::make_unique<value::BoolBlock>(bools);
     }
 
     void assertBlockEq(value::TypeTags blockTag,

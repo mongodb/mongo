@@ -45,6 +45,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/block_hashagg.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -110,6 +111,10 @@ inline size_t estimate(const AggExprPair& expr) {
     }
     size += expr.acc->estimateSize();
     return size;
+}
+
+inline size_t estimate(const BlockHashAggStage::BlockRowAccumulators& acc) {
+    return size_estimator::estimate(acc.blockAgg) + size_estimator::estimate(acc.rowAgg);
 }
 
 inline size_t estimate(const WindowStage::Window& window) {

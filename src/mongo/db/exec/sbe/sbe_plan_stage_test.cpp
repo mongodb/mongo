@@ -175,16 +175,11 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
     return {resultsTag, resultsVal};
 }
 
-void PlanStageTestFixture::runTest(value::TypeTags inputTag,
-                                   value::Value inputVal,
-                                   value::TypeTags expectedTag,
-                                   value::Value expectedVal,
-                                   const MakeStageFn<value::SlotId>& makeStage) {
-    auto ctx = makeCompileCtx();
-
-    // Set up a ValueGuard to ensure `expected` gets released.
-    value::ValueGuard expectedGuard{expectedTag, expectedVal};
-
+std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTest(
+    CompileCtx* ctx,
+    value::TypeTags inputTag,
+    value::Value inputVal,
+    const MakeStageFn<value::SlotId>& makeStage) {
     // Generate a mock scan from `input` with a single output slot.
     auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
 
@@ -193,15 +188,49 @@ void PlanStageTestFixture::runTest(value::TypeTags inputTag,
     auto [outputSlot, stage] = makeStage(scanSlot, std::move(scanStage));
 
     // Prepare the tree and get the SlotAccessor for the output slot.
-    auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
+    auto resultAccessor = prepareTree(ctx, stage.get(), outputSlot);
 
     // Get all the results produced by the PlanStage we want to test.
-    auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
-    value::ValueGuard resultGuard{resultsTag, resultsVal};
+    return getAllResults(stage.get(), resultAccessor);
+}
 
+void PlanStageTestFixture::runTest(value::TypeTags inputTag,
+                                   value::Value inputVal,
+                                   value::TypeTags expectedTag,
+                                   value::Value expectedVal,
+                                   const MakeStageFn<value::SlotId>& makeStage) {
+    // Set up a ValueGuard to ensure `expected` gets released.
+    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+
+    auto ctx = makeCompileCtx();
+    auto [resultsTag, resultsVal] = runTest(ctx.get(), inputTag, inputVal, makeStage);
+
+    value::ValueGuard resultGuard{resultsTag, resultsVal};
     // Compare the results produced with the expected output and assert that they match.
     assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
 }
+
+std::pair<value::TypeTags, value::Value> PlanStageTestFixture::runTestMulti(
+    size_t numInputSlots,
+    value::TypeTags inputTag,
+    value::Value inputVal,
+    const MakeStageFn<value::SlotVector>& makeStageMulti) {
+    auto ctx = makeCompileCtx();
+
+    // Generate a mock scan from `input` with multiple output slots.
+    auto [scanSlots, scanStage] = generateVirtualScanMulti(numInputSlots, inputTag, inputVal);
+
+    // Call the `makeStage` callback to create the PlanStage that we want to test, passing in
+    // the mock scan subtree and its output slot.
+    auto [outputSlots, stage] = makeStageMulti(scanSlots, std::move(scanStage));
+
+    // Prepare the tree and get the SlotAccessor for the output slot.
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
+
+    // Get all the results produced by the PlanStage we want to test.
+    return getAllResultsMulti(stage.get(), resultAccessors);
+}
+
 
 void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         value::TypeTags inputTag,
@@ -209,23 +238,10 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         value::TypeTags expectedTag,
                                         value::Value expectedVal,
                                         const MakeStageFn<value::SlotVector>& makeStageMulti) {
-    auto ctx = makeCompileCtx();
-
     // Set up a ValueGuard to ensure `expected` gets released.
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
-    // Generate a mock scan from `input` with multiple output slots.
-    auto [scanSlots, scanStage] = generateVirtualScanMulti(numInputSlots, inputTag, inputVal);
-
-    // Call the `makeStageMulti` callback to create the PlanStage that we want to test, passing
-    // in the mock scan subtree and its output slots.
-    auto [outputSlots, stage] = makeStageMulti(scanSlots, std::move(scanStage));
-
-    // Prepare the tree and get the SlotAccessors for the output slots.
-    auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
-
-    // Get all the results produced by the PlanStage we want to test.
-    auto [resultsTag, resultsVal] = getAllResultsMulti(stage.get(), resultAccessors);
+    auto [resultsTag, resultsVal] = runTestMulti(numInputSlots, inputTag, inputVal, makeStageMulti);
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
     // Compare the results produced with the expected output and assert that they match.
