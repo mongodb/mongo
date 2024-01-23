@@ -79,6 +79,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
@@ -1013,6 +1014,12 @@ Status createCollection(OperationContext* opCtx,
     if (!status.isOK()) {
         return status;
     }
+
+    uassert(ErrorCodes::CommandNotSupported,
+            "Replicate recordIds may not be run without featureFlagReplicateRecordIds enabled",
+            !options.replicateRecordIds ||
+                gFeatureFlagReplicateRecordIds.isEnabled(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     if (options.isView()) {
         // system.profile will have new document inserts due to profiling. Inserts aren't supported

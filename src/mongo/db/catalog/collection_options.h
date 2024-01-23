@@ -174,6 +174,9 @@ struct CollectionOptions {
 
     // The options for collections with encrypted fields
     boost::optional<EncryptedFieldConfig> encryptedFieldConfig;
+
+    // When 'true', will use the same recordIds across all nodes in the replica set.
+    bool replicateRecordIds = false;
 };
 
 Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns);

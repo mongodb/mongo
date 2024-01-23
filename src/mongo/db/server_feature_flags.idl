@@ -58,6 +58,11 @@ feature_flags:
         cpp_varname: gFeatureFlagBulkWriteCommand
         default: false
         shouldBeFCVGated: false
+    featureFlagReplicateRecordIds:
+        description: "Enable creating collections with the replicateRecordIds option."
+        cpp_varname: gFeatureFlagReplicateRecordIds
+        default: false
+        shouldBeFCVGated: true
     featureFlagAuditConfigClusterParameter:
         description: "Enable use of new auditConfig cluster server parameter"
         cpp_varname: feature_flags::gFeatureFlagAuditConfigClusterParameter
