@@ -51,7 +51,7 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kEnterWriteCriticalSectionOnCoordinator: "enterWriteCriticalSectionOnCoordinator"
+            kEnterWriteCriticalSectionOnCoordinatorAndDataShard: "enterWriteCriticalSectionOnCoordinatorAndDataShard"
             kTranslateRequestParameters: "translateRequestParameters"
             kCreateCollectionOnCoordinator: "createCollectionOnCoordinator"
             kEnterCriticalSection: "enterCriticalSection"
@@ -116,4 +116,11 @@ structs:
             shardIds:
                 type: array<shard_id>
                 description: "The list of shards involved in the create collection operation."
+                optional: true
+            selectedDataShard:
+                type: shard_id
+                description: >-
+                    The chosen data shard for the collection creation if creating a new unsharded collection.
+                    The current data shard for the unsharded collection if sharding an existing
+                    collection.
                 optional: true

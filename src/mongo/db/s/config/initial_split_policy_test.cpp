@@ -235,18 +235,6 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
                        DBException,
                        ErrorCodes::InvalidOptions);
 
-    // We can only specify a shard for the data with unsplittable collections.
-    ASSERT_THROWS_CODE(create_collection_util::createPolicy(opCtx(),
-                                                            kCorrectShardKey,
-                                                            false,
-                                                            {},
-                                                            1,
-                                                            true,
-                                                            false /*unsplittable*/,
-                                                            ShardId("shard1")),
-                       DBException,
-                       ErrorCodes::InvalidOptions);
-
     auto singleChunksOnShardPolicy = create_collection_util::createPolicy(
         opCtx(), kCorrectShardKey, false, {}, 1, true, true /*unsplittable*/, kShardId0);
 
@@ -264,6 +252,24 @@ TEST_F(InitialSingleChunkOnShardSplitChunks, InitialSingleChunkOnShardSplitChunk
 
     ASSERT_EQ(nonPrimaryConfig.chunks.size(), 1);
     ASSERT_EQ(nonPrimaryConfig.chunks[0].getShard(), kShardId1);
+
+    auto shardedSingleChunksOnShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, false, {}, 1, true, false /*unsplittable*/, kShardId0);
+
+    auto shardedConfig = shardedSingleChunksOnShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId0});
+
+    ASSERT_EQ(shardedConfig.chunks.size(), 1);
+    ASSERT_EQ(shardedConfig.chunks[0].getShard(), kShardId0);
+
+    auto shardedSingleChunksOnNonPrimaryShardPolicy = create_collection_util::createPolicy(
+        opCtx(), kCorrectShardKey, false, {}, 1, true, false /*unsplittable*/, kShardId1);
+
+    auto shardedNonPrimaryConfig = shardedSingleChunksOnNonPrimaryShardPolicy->createFirstChunks(
+        opCtx(), kCorrectShardKey, {UUID::gen(), kShardId1});
+
+    ASSERT_EQ(shardedNonPrimaryConfig.chunks.size(), 1);
+    ASSERT_EQ(shardedNonPrimaryConfig.chunks[0].getShard(), kShardId1);
 }
 
 class GenerateInitialSplitChunksTestBase : public ConfigServerTestFixture {
