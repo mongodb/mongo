@@ -2,7 +2,9 @@
 import os
 import shutil
 from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
+import http
 import requests
+from retry import retry
 
 import structlog
 import buildscripts.resmokelib.config as _config
@@ -38,11 +40,16 @@ def generate_mongo_version_file():
         mongo_version_fh.write("mongo_version: " + res)
 
 
+@retry(tries=5, delay=3)
 def get_releases_file_from_remote():
     """Get the latest releases.yml from github."""
     try:
         with open(RELEASES_YAML, "wb") as file:
-            file.write(requests.get(MASTER_RELEASES_REMOTE_FILE).content)
+            response = requests.get(MASTER_RELEASES_REMOTE_FILE)
+            if response.status_code != http.HTTPStatus.OK:
+                raise RuntimeError("Http response for releases yml file was not 200 but was " +
+                                   response.status_code)
+            file.write(response.content)
         LOGGER.info(f"Got releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
     except Exception as exc:
         LOGGER.warning(f"Could not get releases.yml file remotely: {MASTER_RELEASES_REMOTE_FILE}")
