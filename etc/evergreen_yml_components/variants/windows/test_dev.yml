@@ -84,8 +84,8 @@ buildvariants:
 
 - &enterprise-windows-template
   <<: *windows_compile_variant_dependency
-  name: &enterprise-windows-suggested enterprise-windows-suggested
-  display_name: "* Enterprise Windows"
+  name: &enterprise-windows-required enterprise-windows-required
+  display_name: "! Enterprise Windows"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise

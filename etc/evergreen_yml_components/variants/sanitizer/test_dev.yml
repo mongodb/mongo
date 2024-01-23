@@ -196,7 +196,7 @@ buildvariants:
 - &rhel80-debug-aubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency
   name: &rhel80-debug-aubsan-lite rhel80-debug-aubsan-lite
-  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
   cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
   modules:
   - enterprise
