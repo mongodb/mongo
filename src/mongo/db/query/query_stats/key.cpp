@@ -42,6 +42,33 @@ BSONObj scrubHighCardinalityFields(const ClientMetadata* clientMetadata) {
     return clientMetadata->documentWithoutMongosInfo();
 }
 
+BSONObj shapifyReadPreference(boost::optional<BSONObj> readPreference) {
+    if (!readPreference) {
+        return BSONObj();
+    }
+
+    BSONObjBuilder builder;
+    for (const auto& elem : *readPreference) {
+        if (elem.fieldNameStringData() != "tags"_sd) {
+            builder.append(elem);
+            continue;
+        }
+
+        // Sort the $readPreference tags so that different orderings still map to one query stats
+        // store key.
+        BSONObjSet sortedTags = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+        for (const auto& tag : elem.Array()) {
+            sortedTags.insert(tag.Obj());
+        }
+
+        BSONArrayBuilder arrBuilder(builder.subarrayStart("tags"_sd));
+        for (const auto& tag : sortedTags) {
+            arrBuilder.append(tag);
+        }
+    }
+    return builder.obj();
+}
+
 }  // namespace
 
 UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shape> queryShape,
@@ -57,8 +84,8 @@ UniversalKeyComponents::UniversalKeyComponents(std::unique_ptr<query_shape::Shap
     : _clientMetaData(scrubHighCardinalityFields(clientMetadata)),
       _commentObj(commentObj.value_or(BSONObj()).getOwned()),
       _hintObj(hint.value_or(BSONObj()).getOwned()),
-      _readPreference(readPreference.value_or(BSONObj()).getOwned()),
       _writeConcern(writeConcern.value_or(BSONObj()).getOwned()),
+      _shapifiedReadPreference(shapifyReadPreference(readPreference)),
       _shapifiedReadConcern(shapifyReadConcern(readConcern.value_or(BSONObj()))),
       _comment(commentObj ? _commentObj.firstElement() : BSONElement()),
       _queryShape(std::move(queryShape)),
@@ -99,7 +126,8 @@ size_t UniversalKeyComponents::size() const {
         (_apiParams ? sizeof(*_apiParams) + shape_helpers::optionalSize(_apiParams->getAPIVersion())
                     : 0) +
         _hintObj.objsize() + (_hasField.clientMetaData ? _clientMetaData.objsize() : 0) +
-        _commentObj.objsize() + (_hasField.readPreference ? _readPreference.objsize() : 0) +
+        _commentObj.objsize() +
+        (_hasField.readPreference ? _shapifiedReadPreference.objsize() : 0) +
         (_hasField.readConcern ? _shapifiedReadConcern.objsize() : 0) +
         (_hasField.writeConcern ? _writeConcern.objsize() : 0);
 }
@@ -132,7 +160,7 @@ void UniversalKeyComponents::appendTo(BSONObjBuilder& bob, const SerializationOp
     }
 
     if (_hasField.readPreference) {
-        bob.append("$readPreference", _readPreference);
+        bob.append("$readPreference", _shapifiedReadPreference);
     }
 
     if (_hasField.writeConcern) {

@@ -98,9 +98,10 @@ struct UniversalKeyComponents {
     BSONObj _clientMetaData;  // Preserve this value.
     BSONObj _commentObj;      // Shapify this value.
     BSONObj _hintObj;         // Preserve this value.
-    BSONObj _readPreference;  // Preserve this value.
     BSONObj _writeConcern;    // Preserve this value.
 
+    // Preserved literal except value of 'tags' field is sorted.
+    BSONObj _shapifiedReadPreference;
     // Preserved literal except afterClusterTime is shapified.
     BSONObj _shapifiedReadConcern;
 
@@ -173,7 +174,7 @@ H AbslHashValue(H h, const UniversalKeyComponents& components) {
                       // Note we use the comment's type in the hash function.
                       components._comment.type(),
                       simpleHash(components._hintObj),
-                      simpleHash(components._readPreference),
+                      simpleHash(components._shapifiedReadPreference),
                       simpleHash(components._writeConcern),
                       simpleHash(components._shapifiedReadConcern),
                       components._apiParams ? APIParameters::Hash{}(*components._apiParams) : 0,
