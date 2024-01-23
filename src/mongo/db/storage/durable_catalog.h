@@ -175,6 +175,12 @@ public:
                                                                const RecordId& catalogId) const;
 
     /**
+     * Helper which constructs a DurableCatalogEntry given 'catalogId' and 'obj'.
+     */
+    boost::optional<DurableCatalogEntry> parseCatalogEntry(const RecordId& catalogId,
+                                                           const BSONObj& obj) const;
+
+    /**
      * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
      * 'md.indexes' contains a new index entry, then this method generates a new index ident and
      * adds it to the catalog entry.
@@ -350,12 +356,6 @@ private:
     std::string _newInternalIdent(StringData identStem);
 
     std::string _newRand();
-
-    /**
-     * Helper which constructs a DurableCatalogEntry given 'catalogId' and 'obj'.
-     */
-    DurableCatalogEntry _getDurableCatalogEntry(const RecordId& catalogId,
-                                                const BSONObj& obj) const;
 
     /**
      * The '_randLock' must be passed in.

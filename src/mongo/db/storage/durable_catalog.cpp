@@ -259,7 +259,7 @@ boost::optional<DurableCatalogEntry> DurableCatalog::scanForCatalogEntryByNss(
         auto entryNss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
             obj["ns"].String());
         if (entryNss == nss) {
-            return _getDurableCatalogEntry(record->id, obj);
+            return parseCatalogEntry(record->id, obj);
         }
     }
 
@@ -271,15 +271,9 @@ boost::optional<DurableCatalogEntry> DurableCatalog::scanForCatalogEntryByUUID(
     auto cursor = _rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         BSONObj obj = record->data.releaseToBson();
-
-        if (isFeatureDocument(obj)) {
-            // Skip over the version document because it doesn't correspond to a collection.
-            continue;
-        }
-
-        std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md = _parseMetaData(obj["md"]);
-        if (md->options.uuid == uuid) {
-            return _getDurableCatalogEntry(record->id, obj);
+        auto entry = parseCatalogEntry(record->id, obj);
+        if (entry && entry->metadata->options.uuid == uuid) {
+            return entry;
         }
     }
 
@@ -402,17 +396,7 @@ BSONObj DurableCatalog::_findEntry(OperationContext* opCtx, const RecordId& cata
 boost::optional<DurableCatalogEntry> DurableCatalog::getParsedCatalogEntry(
     OperationContext* opCtx, const RecordId& catalogId) const {
     BSONObj obj = _findEntry(opCtx, catalogId);
-    if (obj.isEmpty()) {
-        return boost::none;
-    }
-
-    // For backwards compatibility where older version have a written feature document. This
-    // document cannot be parsed into a DurableCatalogEntry. See SERVER-57125.
-    if (isFeatureDocument(obj)) {
-        return boost::none;
-    }
-
-    return _getDurableCatalogEntry(catalogId, obj);
+    return parseCatalogEntry(catalogId, obj);
 }
 
 std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalog::_parseMetaData(
@@ -837,8 +821,18 @@ bool DurableCatalog::isIndexPresent(OperationContext* opCtx,
     return offset >= 0;
 }
 
-DurableCatalogEntry DurableCatalog::_getDurableCatalogEntry(const RecordId& catalogId,
-                                                            const BSONObj& obj) const {
+boost::optional<DurableCatalogEntry> DurableCatalog::parseCatalogEntry(const RecordId& catalogId,
+                                                                       const BSONObj& obj) const {
+    if (obj.isEmpty()) {
+        return boost::none;
+    }
+
+    // For backwards compatibility where older version have a written feature document. This
+    // document cannot be parsed into a DurableCatalogEntry. See SERVER-57125.
+    if (isFeatureDocument(obj)) {
+        return boost::none;
+    }
+
     BSONElement idxIdent = obj["idxIdent"];
     return DurableCatalogEntry{catalogId,
                                obj["ident"].String(),
