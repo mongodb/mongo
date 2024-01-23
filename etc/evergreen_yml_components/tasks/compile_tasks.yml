@@ -288,7 +288,7 @@ tasks:
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug --sandbox_writable_path=$TMPDIR"
+        BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
         ICECC=
         --build-profile=fast
         --ninja=disabled

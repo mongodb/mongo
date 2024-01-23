@@ -482,6 +482,10 @@ def generate(env: SCons.Environment.Environment) -> None:
         if normalized_os != "linux" or normalized_arch not in ["arm64", 'amd64']:
             bazel_internal_flags.append('--config=local')
 
+        evergreen_tmp_dir = env.GetOption("evergreen-tmp-dir")
+        if normalized_os == "macos" and evergreen_tmp_dir:
+            bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
+
         Globals.bazel_base_build_command = [
             os.path.abspath("bazelisk"),
             'build',

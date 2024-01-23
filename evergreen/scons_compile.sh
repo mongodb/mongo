@@ -54,6 +54,9 @@ fi
 
 extra_args="$extra_args SPLIT_DWARF=0 GDB_INDEX=0 ENABLE_OOM_RETRY=1"
 
+echo "Setting evergreen tmp dir to $TMPDIR"
+extra_args="$extra_args --evergreen-tmp-dir='${TMPDIR}'"
+
 if [ "${generating_for_ninja}" = "true" ] && [ "Windows_NT" = "$OS" ]; then
   vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
   export PATH="$(echo "$(cd "$vcvars" && cmd /C "vcvarsall.bat amd64 && C:/cygwin/bin/bash -c 'echo \$PATH'")" | tail -n +6)":$PATH

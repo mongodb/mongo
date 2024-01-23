@@ -797,6 +797,12 @@ add_option(
     help='Bypass link-model=dynamic check for macos versions <12.',
 )
 
+add_option(
+    'evergreen-tmp-dir',
+    help='Configures the path to the evergreen configured tmp directory.',
+    default=None,
+)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
