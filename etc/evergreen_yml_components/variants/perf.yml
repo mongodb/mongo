@@ -1118,10 +1118,6 @@ buildvariants:
     - name: tsbs_query_finance_sharded
     - name: tsbs_query_sharded_balancer
     - name: tsbs_query_finance_sharded_balancer
-    - name: medical_workload_diagnosis_50_50_high_value
-      # cron: *high-value-workload-cron
-    - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
-      # cron: *high-value-workload-cron
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-shard-heuristic-bonsai.arm.aws.2023-11
