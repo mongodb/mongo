@@ -1619,15 +1619,6 @@ buildvariants:
   #     - name: linkbench
   #     - name: linkbench2
 
-  # - name: renew-ssl-cert
-  #   display_name: Renew SSL Cert
-  #   cron: "0 0 * * 4" # 00:00 on Thursday
-  #   modules: *modules
-  #   run_on: # Certbot with route53 plugin is installed on Ubuntu 20.04
-  #     - "ubuntu2004-small"
-  #   tasks:
-  #     - name: renew_ssl_cert
-
   # - name: linux-standalone.2022-11
   #   display_name: Linux Standalone 2022-11
   #   cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
