@@ -772,7 +772,7 @@ buildvariants:
   stepback: false
   expansions:
     <<: *enterprise-rhel80-debug-tsan-expansions-template
-    large_distro_name: rhel80-large
+    large_distro_name: rhel80-xlarge
     core_analyzer_distro_name: rhel80-xlarge
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
