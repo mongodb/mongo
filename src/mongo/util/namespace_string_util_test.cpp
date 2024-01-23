@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -154,6 +155,28 @@ TEST(NamespaceStringUtilTest,
         boost::none, tenantNsStr, SerializationContext::stateDefault());
     ASSERT_EQ(nss.tenantId(), boost::none);
     ASSERT_EQ(nss.dbName().toString_forTest(), dbNameStr);
+}
+
+TEST(NamespaceStringUtilTest, NamespaceStringToDatabaseNameRoundTrip) {
+    struct Scenario {
+        bool multitenancy;
+        boost::optional<TenantId> tenant;
+        std::string database;
+    };
+
+    for (auto& scenario : {
+             Scenario{false, boost::none, "foo"},
+             Scenario{true, boost::none, "config"},
+             Scenario{true, TenantId{OID::gen()}, "foo"},
+         }) {
+        RAIIServerParameterControllerForTest mc("multitenancySupport", scenario.multitenancy);
+
+        auto expected = NamespaceString::createNamespaceString_forTest(
+            scenario.tenant, scenario.database, "bar");
+        auto actual = NamespaceStringUtil::deserialize(expected.dbName(), "bar");
+
+        ASSERT_EQ(actual, expected);
+    }
 }
 
 // Deserialize NamespaceString when multitenancySupport and featureFlagRequireTenantID are disabled.

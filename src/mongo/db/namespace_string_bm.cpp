@@ -97,6 +97,24 @@ void BM_CreateLongNsFromConstexpr(benchmark::State& state) {
     }
 }
 
+void BM_NamespaceStringShortDbName(benchmark::State& state) {
+    const auto dbName = "short"_sd;
+    NamespaceString ns = makeNS(dbName, kMapCollName);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(ns.dbName());
+    }
+}
+
+void BM_NamespaceStringLongDbName(benchmark::State& state) {
+    const std::string dbName(60, 'x');
+    NamespaceString ns = makeNS(dbName, kMapCollName);
+
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(ns.dbName());
+    }
+}
+
 void searchInMap(benchmark::State& state, const NamespaceString& ns) {
     immutable::map<DatabaseName, std::shared_ptr<int>> dbMap;
 
@@ -148,6 +166,10 @@ BENCHMARK(BM_NamespaceStringCreation)->DenseRange(1, 63);
 BENCHMARK(BM_CreateShortNsFromConstexpr);
 
 BENCHMARK(BM_CreateLongNsFromConstexpr);
+
+BENCHMARK(BM_NamespaceStringShortDbName);
+
+BENCHMARK(BM_NamespaceStringLongDbName);
 
 BENCHMARK(BM_NamespaceStringShortDbNameMapLookupExist);
 

@@ -62,7 +62,7 @@
 
 namespace mongo {
 
-class NamespaceString {
+class NamespaceString : private DatabaseName {
 public:
     /**
      * The NamespaceString reserved constants are actually this `ConstantProxy`
@@ -210,7 +210,34 @@ public:
     /**
      * Constructs a NamespaceString for the given database.
      */
-    explicit NamespaceString(DatabaseName dbName) : _data(std::move(dbName._data)) {}
+    explicit NamespaceString(DatabaseName dbName)
+        : DatabaseName(std::move(dbName._data), DatabaseName::TrustedInitTag{}) {
+        // Given that NamespaceString is a DatabaseName, it is possible the `dbName` parameter is
+        // created from another `NamespaceString` and contains a collection. In this case we want to
+        // resize the underlying `data` to discard the previous collection.
+        const size_t expectedSize = DatabaseName::sizeWithTenant();
+        _data.resize(expectedSize + kDataOffset);
+    }
+
+    /**
+     * Construct a NamespaceString from a const reference. This constructor is required to avoid
+     * invoking DatabaseName(const DatabaseName&..) which would discard the collection from the
+     * underlying data.
+     */
+    NamespaceString(NamespaceString&& ns) = default;
+
+    NamespaceString(const NamespaceString& ns) : DatabaseName(ns._data, TrustedInitTag{}) {}
+
+    NamespaceString& operator=(NamespaceString&& ns) = default;
+
+    /**
+     * Copy assignment operator. This cannot be defaulted as we must avoid calling DatabaseName copy
+     * assignment operator which would discard the collection from _data.
+     */
+    NamespaceString& operator=(const NamespaceString& ns) {
+        _data = ns._data;
+        return *this;
+    }
 
     /**
      * Constructs a NamespaceString in the global config db, "config.<collName>".
@@ -358,7 +385,7 @@ public:
 
 
     boost::optional<TenantId> tenantId() const {
-        if (!_hasTenantId()) {
+        if (!hasTenantId()) {
             return boost::none;
         }
 
@@ -376,19 +403,15 @@ public:
      * This function must only be used in unit tests.
      */
     StringData db_forTest() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return StringData{_data.data() + offset, _dbNameOffsetEnd()};
+        return db_deprecated();
     }
 
-    DatabaseName dbName() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return DatabaseName{_data.substr(0, offset + _dbNameOffsetEnd()),
-                            DatabaseName::TrustedInitTag{}};
+    const DatabaseName& dbName() const {
+        return *this;
     }
 
     StringData coll() const {
-        const auto offset =
-            kDataOffset + _dbNameOffsetEnd() + 1 + (_hasTenantId() ? OID::kOIDSize : 0);
+        const auto offset = kDataOffset + dbSize() + 1 + tenantIdSize();
         if (offset > _data.size()) {
             return {};
         }
@@ -458,13 +481,16 @@ public:
         return nss.toStringWithTenantId();
     }
 
+    /**
+     * Returns the size of the database and collection (including the 'dot').
+     */
     size_t size() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        auto offset = kDataOffset + tenantIdSize();
         return _data.size() - offset;
     }
 
     size_t dbSize() const {
-        return _dbNameOffsetEnd();
+        return DatabaseName::size();
     }
 
     bool isEmpty() const {
@@ -541,8 +567,7 @@ public:
      * foo.a = false
      */
     bool isDbOnly() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return offset + _dbNameOffsetEnd() == _data.size();
+        return kDataOffset + DatabaseName::sizeWithTenant() == _data.size();
     }
 
     /**
@@ -761,11 +786,11 @@ public:
     static bool validCollectionName(StringData coll);
 
     int compare(const NamespaceString& other) const {
-        if (_hasTenantId() && !other._hasTenantId()) {
+        if (hasTenantId() && !other.hasTenantId()) {
             return 1;
         }
 
-        if (other._hasTenantId() && !_hasTenantId()) {
+        if (other.hasTenantId() && !hasTenantId()) {
             return -1;
         }
 
@@ -794,10 +819,6 @@ public:
 
     friend bool operator==(const NamespaceString& lhs, const NamespaceString& rhs) {
         return lhs._data == rhs._data;
-    }
-
-    friend bool operator!=(const NamespaceString& lhs, const NamespaceString& rhs) {
-        return lhs._data != rhs._data;
     }
 
     friend bool operator<(const NamespaceString& lhs, const NamespaceString& rhs) {
@@ -838,8 +859,8 @@ private:
      * Constructs a NamespaceString from the fully qualified namespace named in "ns" and the
      * tenantId. "ns" is NOT expected to contain the tenantId.
      */
-    explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns)
-        : _data(makeData(tenantId, ns)) {}
+    NamespaceString(boost::optional<TenantId> tenantId, StringData ns)
+        : DatabaseName(makeData(tenantId, ns), DatabaseName::TrustedInitTag{}) {}
 
     /**
      * Constructs a NamespaceString for the given database and collection names.
@@ -853,12 +874,13 @@ private:
                 "namespaces cannot have embedded null characters",
                 collectionName.find('\0') == std::string::npos);
 
-        _data.resize(collectionName.empty() ? dbName._data.size()
-                                            : dbName._data.size() + 1 + collectionName.size());
-        std::memcpy(_data.data(), dbName._data.data(), dbName._data.size());
+        const size_t dbAndDiscriminatorSize = dbName.sizeWithTenant() + kDataOffset;
+        _data.resize(collectionName.empty() ? dbAndDiscriminatorSize
+                                            : dbAndDiscriminatorSize + 1 + collectionName.size());
+        std::memcpy(_data.data(), dbName._data.data(), dbAndDiscriminatorSize);
         if (!collectionName.empty()) {
-            *reinterpret_cast<uint8_t*>(_data.data() + dbName._data.size()) = '.';
-            std::memcpy(_data.data() + dbName._data.size() + 1,
+            *reinterpret_cast<uint8_t*>(_data.data() + dbAndDiscriminatorSize) = '.';
+            std::memcpy(_data.data() + dbAndDiscriminatorSize + 1,
                         collectionName.rawData(),
                         collectionName.size());
         }
@@ -870,14 +892,14 @@ private:
      * NOT expected to contain a tenantId.
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
-        : _data(makeData(tenantId, db, collectionName)) {}
+        : DatabaseName(makeData(tenantId, db, collectionName), DatabaseName::TrustedInitTag{}) {}
 
     std::string toString() const {
         return ns().toString();
     }
 
     std::string toStringWithTenantId() const {
-        if (_hasTenantId()) {
+        if (hasTenantId()) {
             return str::stream() << TenantId{OID::from(&_data[kDataOffset])} << "_" << ns();
         }
 
@@ -889,7 +911,7 @@ private:
      * test needing access to ns().
      */
     StringData ns() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
+        auto offset = kDataOffset + tenantIdSize();
         return StringData{_data.data() + offset, _data.size() - offset};
     }
 
@@ -900,21 +922,12 @@ private:
      * at the DatabaseNameUtil::serialize method which takes in a DatabaseName object.
      */
     StringData db_deprecated() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return StringData{_data.data() + offset, _dbNameOffsetEnd()};
+        return dbName().db();
     }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);
     static constexpr uint8_t kTenantIdMask = 0x80;
     static constexpr uint8_t kDatabaseNameOffsetEndMask = 0x7F;
-
-    inline bool _hasTenantId() const {
-        return static_cast<uint8_t>(_data.front()) & kTenantIdMask;
-    }
-
-    inline size_t _dbNameOffsetEnd() const {
-        return static_cast<uint8_t>(_data.front()) & kDatabaseNameOffsetEndMask;
-    }
 
     std::string makeData(boost::optional<TenantId> tenantId,
                          StringData db,
@@ -969,21 +982,6 @@ private:
 
         return makeData(tenantId, ns.substr(0, dotIndex), ns.substr(dotIndex + 1, ns.size()));
     }
-
-    // In order to reduce the size of a NamespaceString, we pack all possible namespace data
-    // into a single std::string with the following in-memory layout:
-    //
-    //      1 byte         12 byte optional tenant id               remaining bytes
-    //    discriminator       (see more below)                        namespace
-    //  |<------------->|<--------------------------->|<-------------------------------------->|
-    //  [---------------|----|----|----|----|----|----|----|----|----|----|----|----|----|----|]
-    //  0               1                            12                                       ??
-    //
-    // The MSB of the discriminator tells us whether a tenant id is present, and the remaining
-    // bits store the offset of end of the databaes component of the namespace. Database names
-    // must be 64 characters or shorter, so we can be confident the length will fit in three bits.
-
-    std::string _data{'\0'};
 };
 
 /**
@@ -1020,7 +1018,7 @@ public:
     /**
      * Returns the database name.
      */
-    DatabaseName dbName() const {
+    const DatabaseName& dbName() const {
         if (holds_alternative<NamespaceString>(_nssOrUUID)) {
             return get<NamespaceString>(_nssOrUUID).dbName();
         }

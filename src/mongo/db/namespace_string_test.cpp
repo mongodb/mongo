@@ -56,8 +56,16 @@ protected:
         return NamespaceString(tenantId, ns);
     }
 
+    NamespaceString makeNamespaceString(const DatabaseName& dbName) {
+        return NamespaceString(dbName);
+    }
+
     NamespaceString makeNamespaceString(const DatabaseName& dbName, StringData coll) {
         return NamespaceString(dbName, coll);
+    }
+
+    NamespaceString makeNamespaceString(StringData dbName, StringData coll) {
+        return NamespaceString(boost::none, dbName, coll);
     }
 
     NamespaceString makeNamespaceString(boost::optional<TenantId> tenantId,
@@ -306,6 +314,11 @@ TEST_F(NamespaceStringTest, CollectionValidNames) {
     ASSERT(!NamespaceString::validCollectionName("a\0b"_sd));
 }
 
+TEST_F(NamespaceStringTest, DbForSharding) {
+    ASSERT_EQ(makeNamespaceString("foo", "bar").db_forSharding(), "foo");
+    ASSERT_EQ(makeNamespaceString("foo", "").db_forSharding(), "foo");
+}
+
 TEST_F(NamespaceStringTest, nsToDatabase1) {
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo.bar"));
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo"));
@@ -371,6 +384,8 @@ TEST_F(NamespaceStringTest, EmptyDbWithColl) {
     NamespaceString nss = makeNamespaceString(boost::none, "", "coll");
     ASSERT_EQ(nss.db_forTest(), StringData{});
     ASSERT_EQ(nss.coll(), "coll");
+    ASSERT_EQ(nss.dbName(), DatabaseName::kEmpty);
+    ASSERT_EQ(nss.dbName().compare(DatabaseName::kEmpty), 0);
 }
 
 TEST_F(NamespaceStringTest, NSSWithTenantId) {
@@ -379,13 +394,17 @@ TEST_F(NamespaceStringTest, NSSWithTenantId) {
     {
         std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
         NamespaceString nss = makeNamespaceString(tenantId, "foo.bar");
+        DatabaseName db = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
+
         ASSERT_EQ(nss.size(), 7);
         ASSERT_EQ(nss.ns_forTest(), "foo.bar");
         ASSERT_EQ(nss.toString_forTest(), "foo.bar");
         ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
         ASSERT_EQ(nss.db_forTest(), "foo");
         ASSERT_EQ(nss.coll(), "bar");
+        ASSERT_EQ(nss.dbName(), db);
         ASSERT_EQ(nss.dbName().toString_forTest(), "foo");
+        ASSERT_EQ(nss.dbName().size(), db.size());
         ASSERT_EQ(nss.size(), 7);
         ASSERT(nss.tenantId());
         ASSERT(nss.dbName().tenantId());
@@ -607,6 +626,80 @@ TEST_F(NamespaceStringTest, EmptyNamespaceString) {
     ASSERT_EQ(emptyNss.toStringForErrorMsg(), "");
 }
 
+TEST_F(NamespaceStringTest, NsFromDbOnly) {
+    DatabaseName db = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString ns(db);
+
+    ASSERT_EQ(ns.size(), 6);
+    ASSERT_EQ(ns, makeNamespaceString(boost::none, "testdb", ""));
+}
+
+TEST_F(NamespaceStringTest, ConstRefAssignmentOperator) {
+    NamespaceString expected{makeNamespaceString("foo", "bar")};
+
+    NamespaceString actual;
+    actual = expected;
+
+    ASSERT_EQ(actual, expected);
+    ASSERT_EQ(actual.coll(), "bar");
+}
+
+// Verify we can create a new NamespaceString with a DatabaseName created by ns.dbName(). We must
+// ensure we discard the collection from `ns` and we don't end up with `db.collection.collection`.
+TEST_F(NamespaceStringTest, NamespaceToDatabaseRoundtrip) {
+    auto dbName = "test"_sd;
+    auto collName = "foo"_sd;
+    auto otherCollName = "othername"_sd;
+
+    NamespaceString ns = makeNamespaceString(boost::none, dbName, collName);
+    NamespaceString nsDbOnly =
+        makeNamespaceString(DatabaseName::createDatabaseName_forTest(boost::none, dbName));
+    NamespaceString nsWithOtherColl = makeNamespaceString(boost::none, dbName, otherCollName);
+
+    auto runChecks = [&](const DatabaseName& db) {
+        ASSERT_EQ(db.size(), 4);
+
+        auto nsWithEmptyColl = makeNamespaceString(db);
+        ASSERT_EQ(nsWithEmptyColl, nsDbOnly);
+        ASSERT_EQ(nsWithEmptyColl.compare(nsDbOnly), 0);
+
+        auto newNs = makeNamespaceString(db, collName);
+        ASSERT_EQ(newNs.size(), 8);
+        ASSERT_EQ(ns, newNs);
+        ASSERT_EQ(ns.compare(newNs), 0);
+
+        auto anotherColl = makeNamespaceString(db, otherCollName);
+        ASSERT_EQ(anotherColl.size(), 14);
+        ASSERT_EQ(anotherColl.coll(), otherCollName);
+        ASSERT_EQ(anotherColl, nsWithOtherColl);
+        ASSERT_EQ(anotherColl.compare(nsWithOtherColl), 0);
+    };
+
+    const DatabaseName& dbRef = ns.dbName();
+    runChecks(dbRef);
+
+    const DatabaseName dbVal(ns.dbName());
+    runChecks(dbVal);
+}
+
+TEST_F(NamespaceStringTest, HashTest) {
+    auto ns = NamespaceString::createNamespaceString_forTest(boost::none, "foo", "bar");
+    auto ns2 = NamespaceString::createNamespaceString_forTest(boost::none, "foo", "bar");
+
+    auto db = DatabaseName::createDatabaseName_forTest(boost::none, "foo");
+
+    using NsHash = absl::Hash<NamespaceString>;
+    using DbHash = absl::Hash<DatabaseName>;
+
+    ASSERT_EQ(DbHash()(db), DbHash()(ns.dbName()));
+    ASSERT_EQ(NsHash()(ns), NsHash()(ns2));
+    ASSERT_EQ(NsHash()(ns2),
+              NsHash()(NamespaceString::createNamespaceString_forTest(ns.dbName(), "bar")));
+
+    ASSERT_EQ(NsHash()(NamespaceString(ns.dbName())),
+              NsHash()(NamespaceString::createNamespaceString_forTest(boost::none, "foo", "")));
+}
+
 TEST_F(NamespaceStringTest, isDbOnly) {
     TenantId tenantId(OID::gen());
 
@@ -636,7 +729,6 @@ TEST_F(NamespaceStringTest, isDbOnly) {
             DatabaseName::createDatabaseName_forTest(tenantId, "foo"), "bar")};
 
     for (const auto& nss : dbOnlyNamespaces) {
-        std::cout << "nss=" << nss.toStringForErrorMsg() << std::endl;
         ASSERT_TRUE(nss.isDbOnly());
     }
 

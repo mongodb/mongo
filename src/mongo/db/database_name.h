@@ -79,7 +79,7 @@ public:
                 return *_dbName;
             }
 
-        private:
+        protected:
             StringData _db;
             mutable std::once_flag _once;
             mutable const DatabaseName* _dbName = nullptr;
@@ -102,7 +102,7 @@ public:
             return _get().toString();
         }
 
-    private:
+    protected:
         const DatabaseName& _get() const {
             return _sharedState->get();
         }
@@ -123,6 +123,26 @@ public:
     DatabaseName() = default;
 
     /**
+     * Construct a new DatabaseName from a reference. This reference could be a NamespaceString so
+     * only use the discriminator, tenant id and database name from its data.
+     */
+    DatabaseName(const DatabaseName& dbName)
+        : _data(dbName.view().substr(0, dbName.sizeWithTenant() + kDataOffset)) {}
+
+    DatabaseName(DatabaseName&& dbName) = default;
+
+    DatabaseName& operator=(DatabaseName&& dbName) = default;
+
+    /**
+     * Copy assignment operator. dbName could be a NamespaceString so only use the discriminator,
+     * tenant id and database name from its data.
+     */
+    DatabaseName& operator=(const DatabaseName& dbName) {
+        _data = dbName.view().substr(0, dbName.sizeWithTenant() + kDataOffset).toString();
+        return *this;
+    }
+
+    /**
      * This function constructs a DatabaseName without checking for presence of TenantId.
      *
      * MUST only be used for tests.
@@ -133,16 +153,18 @@ public:
     }
 
     boost::optional<TenantId> tenantId() const {
-        if (!_hasTenantId()) {
+        if (!hasTenantId()) {
             return boost::none;
         }
 
         return TenantId{OID::from(&_data[kDataOffset])};
     }
 
+    /**
+     * Returns the size of the name of this Database.
+     */
     size_t size() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return _data.size() - offset;
+        return static_cast<uint8_t>(_data.front()) & kDatabaseNameOffsetEndMask;
     }
 
     bool isEmpty() const {
@@ -253,31 +275,31 @@ public:
         return toString();
     }
 
+    /**
+     * Returns true if the db names of `this` and `other` are equal, ignoring case, *and* they both
+     * refer to the same tenant ID (or none).
+     * The tenant comparison *is* case-sensitive.
+     */
     bool equalCaseInsensitive(const DatabaseName& other) const {
-        return StringData{_data.data() + kDataOffset, _data.size() - kDataOffset}
-            .equalCaseInsensitive(
-                StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
+        return tenantIdView() == other.tenantIdView() && db().equalCaseInsensitive(other.db());
     }
 
     int compare(const DatabaseName& other) const {
-        if (_hasTenantId() && !other._hasTenantId()) {
+        if (hasTenantId() && !other.hasTenantId()) {
             return 1;
         }
 
-        if (other._hasTenantId() && !_hasTenantId()) {
+        if (other.hasTenantId() && !hasTenantId()) {
             return -1;
         }
 
-        return StringData{_data.data() + kDataOffset, _data.size() - kDataOffset}.compare(
-            StringData{other._data.data() + kDataOffset, other._data.size() - kDataOffset});
+        return StringData{_data.data() + kDataOffset, sizeWithTenant()}.compare(
+            StringData{other._data.data() + kDataOffset, other.sizeWithTenant()});
     }
 
     friend bool operator==(const DatabaseName& lhs, const DatabaseName& rhs) {
-        return lhs._data == rhs._data;
-    }
-
-    friend bool operator!=(const DatabaseName& lhs, const DatabaseName& rhs) {
-        return lhs._data != rhs._data;
+        return lhs.view().substr(kDataOffset, lhs.sizeWithTenant()) ==
+            rhs.view().substr(kDataOffset, rhs.sizeWithTenant());
     }
 
     friend bool operator<(const DatabaseName& lhs, const DatabaseName& rhs) {
@@ -298,14 +320,17 @@ public:
 
     template <typename H>
     friend H AbslHashValue(H h, const DatabaseName& obj) {
-        return H::combine(std::move(h), obj._data);
+        //  _data might contain a collection : only hash the discriminator, tenant and database.
+        return H::combine(
+            std::move(h),
+            std::string_view{obj.view().substr(0, obj.sizeWithTenant() + kDataOffset)});
     }
 
     friend auto logAttrs(const DatabaseName& obj) {
         return "db"_attr = obj;
     }
 
-private:
+protected:
     friend class NamespaceString;
     friend class NamespaceStringOrUUID;
     friend class DatabaseNameUtil;
@@ -313,6 +338,34 @@ private:
 
     template <typename T>
     friend class AuthName;
+
+    /**
+     * Returns the size of the optional tenant id.
+     */
+    size_t tenantIdSize() const {
+        return hasTenantId() ? OID::kOIDSize : 0;
+    }
+
+    /**
+     * Returns the size of database name plus the size of the tenant.
+     */
+    size_t sizeWithTenant() const {
+        return size() + tenantIdSize();
+    }
+
+    /**
+     * Returns the offset from the start of _data to the start of the database name.
+     */
+    size_t dbNameOffsetStart() const {
+        return kDataOffset + tenantIdSize();
+    }
+
+    /**
+     * Returns a view of the internal string.
+     */
+    StringData view() const {
+        return _data;
+    }
 
     /**
      * Constructs a DatabaseName from the given tenantId and database name.
@@ -350,8 +403,15 @@ private:
     }
 
     StringData db() const {
-        auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
-        return StringData{_data.data() + offset, _data.size() - offset};
+        return view().substr(dbNameOffsetStart(), size());
+    }
+
+    StringData tenantIdView() const {
+        if (!hasTenantId()) {
+            return {};
+        }
+
+        return view().substr(kDataOffset, OID::kOIDSize);
     }
 
     std::string toString() const {
@@ -359,7 +419,7 @@ private:
     }
 
     std::string toStringWithTenantId() const {
-        if (_hasTenantId()) {
+        if (hasTenantId()) {
             auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
             return str::stream() << tenantId.toString() << "_" << db();
         }
@@ -371,7 +431,7 @@ private:
     static constexpr uint8_t kTenantIdMask = 0x80;
     static constexpr uint8_t kDatabaseNameOffsetEndMask = 0x7F;
 
-    inline bool _hasTenantId() const {
+    bool hasTenantId() const {
         return static_cast<uint8_t>(_data.front()) & kTenantIdMask;
     }
 
@@ -379,7 +439,30 @@ private:
     struct TrustedInitTag {};
     DatabaseName(std::string data, TrustedInitTag) : _data(std::move(data)) {}
 
-    // Same in-memory layout as NamespaceString, see documentation in its header
+    /**
+     * We pack all possible namespaces data into a string consisting of these concatenated parts:
+     *
+     * Length      Name            Description
+     * ---------------------------------------------------------------------------------------------
+     *      1      discriminator   Consists of bit fields:
+     *                             [0..6] : dbSize : length of the database part (cannot exceed
+     *                                               64 characters). 7 bits.
+     *                             [7]    : hasTenant : MSB. 1 if there is a tenant.
+     *
+     *     12      tenant ID       OID that uniquely identify the tenant for this namespace.
+     *                             Optional, only if hasTenant == 1.
+     *
+     * dbSize      database        Database name, size equal to the dbSize component of the
+     *                             discriminator.
+     *
+     *      1      dot             Dot character between the database and the collection.
+     *                             Optional, only if `this` is a NamespaceString and there is
+     *                             space left in the string.
+     *
+     *    ...      collection      Collection name.
+     *                             Optional, only if `this` is a NamespaceString and there is space
+     *                             left in the string.
+     */
     std::string _data{'\0'};
 };
 
