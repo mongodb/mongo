@@ -776,7 +776,21 @@ void writeTelemetry(OperationContext* opCtx,
     if (!telemetryKey) {
         return;
     }
-    auto&& telemetryStore = getTelemetryStore(opCtx);
+
+    // It's possible that telemetry was enabled in registerRequest but has been disabled since
+    // (e.g., by FCV downgrade or setting the store size to 0). Rather than calling
+    // getTelemetryStore (which would trigger a uassert if telemetry is disabled), we return and
+    // log a message if telemetry is disabled, and otherwise grab the telemetry store directly.
+    if (!isTelemetryEnabled(opCtx->getServiceContext())) {
+        LOGV2_DEBUG(8456700,
+                    2,
+                    "Telemetry was enabled when the command started but is now disabled. "
+                    "Metrics will not be collected.",
+                    "telemetryKey"_attr = *telemetryKey);
+        return;
+    }
+    auto&& telemetryStore =
+        telemetryStoreDecoration(opCtx->getServiceContext())->getTelemetryStore();
     auto&& [statusWithMetrics, partitionLock] = telemetryStore.getWithPartitionLock(*telemetryKey);
     std::shared_ptr<TelemetryMetrics> metrics;
     if (statusWithMetrics.isOK()) {

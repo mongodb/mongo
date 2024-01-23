@@ -71,3 +71,30 @@ function getTelemetryRedacted(conn) {
     assert.commandWorked(result);
     return result.cursor.firstBatch;
 }
+
+/**
+ * @param {object} conn - connection to database
+ * @param {object} options {
+ *  {String} collName - name of collection
+ *  {boolean} redactIdentifiers - whether or not to redact identifiers
+ * }
+ */
+function getTelemetryFindCmd(conn, options = {
+    collName: "",
+    redactIdentifiers: false,
+}) {
+    // Filter out agg queries, including $queryStats.
+    let matchExpr = {"key.find": {$exists: true}, "key.client.application.name": "MongoDB Shell"};
+    if (options.collName) {
+        matchExpr["key.cmdNs.coll"] = options.collName;
+    }
+    const pipeline = [
+        {$telemetry: {redactIdentifiers: options.redactIdentifiers}},
+        {$match: matchExpr},
+        // Sort on queryStats key so entries are in a deterministic order.
+        {$sort: {key: 1}},
+    ];
+    const result = conn.adminCommand({aggregate: 1, pipeline: pipeline, cursor: {}});
+    assert.commandWorked(result);
+    return result.cursor.firstBatch;
+}
