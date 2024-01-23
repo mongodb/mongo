@@ -20,6 +20,7 @@ executor:
         TestData:
           defaultReadConcernLevel: null
           enableMajorityReadConcern: ''
+          nonClusteredConfigTransactions: true
   fixture:
     class: ReplicaSetFixture
     mixed_bin_versions: new_new_old

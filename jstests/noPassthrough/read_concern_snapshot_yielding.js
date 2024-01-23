@@ -19,7 +19,9 @@ TestData.numDocs = 4;
 
 // Set 'internalQueryExecYieldIterations' to 2 to ensure that commands yield on the second try
 // (i.e. after they have established a snapshot but before they have returned any documents).
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 2}));
+const defaultYieldIterations = 2;
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: defaultYieldIterations}));
 
 // Set 'internalQueryExecYieldPeriodMS' to 24 hours to significantly reduce a probability of a
 // situation occuring where the execution threads do not receive enough CPU time and commands yield
@@ -54,7 +56,17 @@ function populateCollection() {
     }));
 }
 
-function testCommand(awaitCommandFn, curOpFilter, testWriteConflict) {
+function testCommand(awaitCommandFn, curOpFilter, testWriteConflict, setYieldIterations) {
+    // TODO (SERVER-85570) Currently, some tests need three yield iterations when
+    // config.transactions is clustered because clustered collections may require more than two
+    // yield iterations to reach the first document in a collection scan. Create a new failpoint
+    // that more accurately pauses execution between acquiring a snapshot and returning the
+    // first document and eliminate the use of setting yield iterations in this test.
+    if (setYieldIterations) {
+        assert.commandWorked(db.adminCommand(
+            {setParameter: 1, internalQueryExecYieldIterations: setYieldIterations}));
+    }
+
     //
     // Test that the command can be killed.
     //
@@ -165,6 +177,12 @@ function testCommand(awaitCommandFn, curOpFilter, testWriteConflict) {
         exitCode = awaitCommand({checkExitSuccess: false});
         assert.neq(0, exitCode, "Expected shell to exit with failure due to WriteConflict");
     }
+
+    // Reset the yield iterations parameter to the test's default.
+    if (setYieldIterations) {
+        assert.commandWorked(db.adminCommand(
+            {setParameter: 1, internalQueryExecYieldIterations: defaultYieldIterations}));
+    }
 }
 
 // Test find.
@@ -253,7 +271,7 @@ testCommand(function() {
     // Only update one existing doc committed before the transaction.
     assert.eq(res.n, 1, tojson(res));
     assert.eq(res.nModified, 1, tojson(res));
-}, {op: "update"}, true);
+}, {op: "update"}, true, 3);
 
 // Test delete.
 testCommand(function() {
@@ -265,7 +283,7 @@ testCommand(function() {
     assert.commandWorked(session.commitTransaction_forTesting());
     // Only remove one existing doc committed before the transaction.
     assert.eq(res.n, 1, tojson(res));
-}, {op: "remove"}, true);
+}, {op: "remove"}, true, 3);
 
 // Test findAndModify.
 testCommand(function() {
@@ -278,7 +296,7 @@ testCommand(function() {
     assert(res.hasOwnProperty("lastErrorObject"));
     assert.eq(res.lastErrorObject.n, 0, tojson(res));
     assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));
-}, {"command.findAndModify": "coll"}, true);
+}, {"command.findAndModify": "coll"}, true, 3);
 
 testCommand(function() {
     const session = db.getMongo().startSession({causalConsistency: false});
@@ -290,6 +308,6 @@ testCommand(function() {
     assert(res.hasOwnProperty("lastErrorObject"));
     assert.eq(res.lastErrorObject.n, 0, tojson(res));
     assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));
-}, {"command.findAndModify": "coll"}, true);
+}, {"command.findAndModify": "coll"}, true, 3);
 
 rst.stopSet();

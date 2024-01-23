@@ -14,6 +14,7 @@ executor:
     shell_options:
       global_vars:
         TestData:
+          nonClusteredConfigTransactions: true
           skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
       nodb: ''
 matrix_suite: true

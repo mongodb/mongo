@@ -20,6 +20,7 @@ executor:
         TestData:
           defaultReadConcernLevel: null
           enableMajorityReadConcern: ''
+          nonClusteredConfigTransactions: true
   fixture:
     class: ShardedClusterFixture
     mixed_bin_versions: new_old_old_new

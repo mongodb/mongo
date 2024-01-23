@@ -18,6 +18,7 @@ executor:
       global_vars:
         TestData:
           disableImplicitSessions: true
+          nonClusteredConfigTransactions: true
       objcheck: ''
   fixture:
     class: ReplicaSetFixture

@@ -26,6 +26,7 @@ executor:
           networkErrorAndTxnOverrideConfig:
             retryOnNetworkErrors: true
             wrapCRUDinTransactions: true
+          nonClusteredConfigTransactions: true
           overrideRetryAttempts: 3
           sessionOptions:
             causalConsistency: true

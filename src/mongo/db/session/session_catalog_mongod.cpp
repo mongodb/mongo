@@ -50,12 +50,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/database_name.h"
@@ -71,6 +73,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_transactions_reap_service.h"
 #include "mongo/db/session/kill_sessions.h"
@@ -379,6 +382,12 @@ int removeExpiredTransactionSessionsFromDisk(
 
 void createTransactionTable(OperationContext* opCtx) {
     CollectionOptions options;
+    // We cluster by _id for improved performance at the cost of increased index maintenance.
+    // Because we only have one partial index on this collection, the performance benefit outweighs
+    // that cost.
+    if (feature_flags::gFeatureFlagClusteredConfigTransactions.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()))
+        options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
     auto storageInterface = repl::StorageInterface::get(opCtx);
     auto createCollectionStatus = storageInterface->createCollection(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, options);

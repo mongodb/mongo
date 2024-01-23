@@ -15,7 +15,11 @@ executor:
     - CheckReplDBHash
     - ValidateCollections
     tests: true
-  config: {}
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          nonClusteredConfigTransactions: true
   fixture:
     class: ReplicaSetFixture
     mixed_bin_versions: new_new_old

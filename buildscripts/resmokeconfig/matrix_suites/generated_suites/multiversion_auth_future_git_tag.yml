@@ -18,6 +18,7 @@ executor:
           auth: true
           keyFile: jstests/libs/authTestsKey
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+          nonClusteredConfigTransactions: true
           skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
       nodb: ''
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly

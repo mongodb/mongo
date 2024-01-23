@@ -3323,6 +3323,16 @@ var ReplSetTest = function ReplSetTest(opts) {
             options.setParameter.featureFlagAllMongodsAreSharded = true;
         }
 
+        if (jsTest.options().nonClusteredConfigTransactions) {
+            options.setParameter.featureFlagClusteredConfigTransactions = false;
+        }
+        const olderThan73 =
+            MongoRunner.compareBinVersions(MongoRunner.getBinVersionFor('7.3'),
+                                           MongoRunner.getBinVersionFor(options.binVersion)) === 1;
+        if (olderThan73) {
+            delete options.setParameter.featureFlagClusteredConfigTransactions;
+        }
+
         if (tojson(options) != tojson({}))
             printjson(options);
 

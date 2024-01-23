@@ -91,6 +91,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/read_concern_level.h"
@@ -455,6 +456,9 @@ void updateSessionEntry(OperationContext* opCtx,
     dassert(updateRequest.getUpdateModification().type() ==
             write_ops::UpdateModification::Type::kReplacement);
     const auto updateMod = updateRequest.getUpdateModification().getUpdateReplacement();
+    auto idToFetch = updateRequest.getQuery().firstElement();
+    auto toUpdateIdDoc = idToFetch.wrap();
+    auto startingSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
 
     // TODO SERVER-58243: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(
@@ -477,27 +481,31 @@ void updateSessionEntry(OperationContext* opCtx,
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto idIndex = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
+    RecordId recordId;
+    if (collection.getCollectionPtr()->isClustered()) {
+        recordId = record_id_helpers::keyForObj(toUpdateIdDoc);
+    } else {
+        auto idIndex = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
 
-    uassert(
-        40672,
-        str::stream() << "Failed to fetch _id index for "
-                      << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg(),
-        idIndex);
+        uassert(40672,
+                str::stream()
+                    << "Failed to fetch _id index for "
+                    << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg(),
+                idIndex);
 
-    const IndexCatalogEntry* entry =
-        collection.getCollectionPtr()->getIndexCatalog()->getEntry(idIndex);
-    auto indexAccess = entry->accessMethod()->asSortedData();
-    // Since we are looking up a key inside the _id index, create a key object consisting of only
-    // the _id field.
-    auto idToFetch = updateRequest.getQuery().firstElement();
-    auto toUpdateIdDoc = idToFetch.wrap();
-    dassert(idToFetch.fieldNameStringData() == "_id"_sd);
-    auto recordId =
-        indexAccess->findSingle(opCtx, collection.getCollectionPtr(), entry, toUpdateIdDoc);
-    auto startingSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
+        const IndexCatalogEntry* entry =
+            collection.getCollectionPtr()->getIndexCatalog()->getEntry(idIndex);
+        auto indexAccess = entry->accessMethod()->asSortedData();
+        // Since we are looking up a key inside the _id index, create a key object consisting of
+        // only the _id field.
+        dassert(idToFetch.fieldNameStringData() == "_id"_sd);
+        recordId =
+            indexAccess->findSingle(opCtx, collection.getCollectionPtr(), entry, toUpdateIdDoc);
+    }
 
-    if (recordId.isNull()) {
+    RecordData originalRecordData;
+    if (!collection.getCollectionPtr()->getRecordStore()->findRecord(
+            opCtx, recordId, &originalRecordData)) {
         // Upsert case.
         auto status = collection_internal::insertDocument(
             opCtx, collection.getCollectionPtr(), InsertStatement(updateMod), nullptr, false);
@@ -513,9 +521,7 @@ void updateSessionEntry(OperationContext* opCtx,
         return;
     }
 
-    auto originalRecordData =
-        collection.getCollectionPtr()->getRecordStore()->dataFor(opCtx, recordId);
-    auto originalDoc = originalRecordData.toBson();
+    auto originalDoc = originalRecordData.releaseToBson();
 
     const auto parentLsidFieldName = SessionTxnRecord::kParentSessionIdFieldName;
     uassert(
