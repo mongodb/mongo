@@ -83,6 +83,9 @@ buildvariants:
   - name: compile_test_serial_TG
     distros:
     - rhel81-power8-large
+  - name: compile_test_parallel_unittest_stream_TG
+    distros:
+    - rhel81-power8-large
 
 - &enterprise-rhel-83-s390x-template
   name: enterprise-rhel-83-s390x
@@ -161,5 +164,8 @@ buildvariants:
     compile_variant: enterprise-rhel-83-s390x-shared
   tasks:
   - name: compile_test_serial_TG
+    distros:
+    - rhel83-zseries-large
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
     - rhel83-zseries-large

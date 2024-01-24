@@ -23,7 +23,7 @@ buildvariants:
     compile_variant: macos
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_build_tools_next_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: .causally_consistent !.sharding
@@ -75,7 +75,7 @@ buildvariants:
     compile_variant: macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_build_tools_next_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: .causally_consistent !.sharding
@@ -132,7 +132,7 @@ buildvariants:
     compile_variant: enterprise-macos
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_build_tools_next_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -173,7 +173,7 @@ buildvariants:
     compile_variant: enterprise-macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: compile_build_tools_next_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough

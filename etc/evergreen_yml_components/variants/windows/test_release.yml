@@ -106,6 +106,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-xxlarge
+  - name: compile_test_parallel_unittest_stream_TG
+    distros:
+    - windows-vsCurrent-xxlarge
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen

@@ -644,12 +644,16 @@ DEFAULT_UNIT_TEST_LIST = "build/unittests.txt"
 DEFAULT_INTEGRATION_TEST_LIST = "build/integration_tests.txt"
 DEFAULT_LIBFUZZER_TEST_LIST = "build/libfuzzer_tests.txt"
 DEFAULT_PRETTY_PRINTER_TEST_LIST = "build/pretty_printer_tests.txt"
-
+SPLIT_UNITTESTS_LISTS = [
+    f"build/{test_group}_quarter_unittests.txt"
+    for test_group in ['first', 'second', 'third', 'fourth']
+]
 # External files or executables, used as suite selectors, that are created during the build and
 # therefore might not be available when creating a test membership map.
 EXTERNAL_SUITE_SELECTORS = (DEFAULT_BENCHMARK_TEST_LIST, DEFAULT_UNIT_TEST_LIST,
                             DEFAULT_INTEGRATION_TEST_LIST, DEFAULT_DBTEST_EXECUTABLE,
-                            DEFAULT_LIBFUZZER_TEST_LIST, DEFAULT_PRETTY_PRINTER_TEST_LIST)
+                            DEFAULT_LIBFUZZER_TEST_LIST, DEFAULT_PRETTY_PRINTER_TEST_LIST,
+                            *SPLIT_UNITTESTS_LISTS)
 
 # Where to look for logging and suite configuration files
 CONFIG_DIR = None

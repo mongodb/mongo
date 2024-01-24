@@ -6576,11 +6576,22 @@ env.FinalizeInstallDependencies()
 # Create a install-all-meta alias that excludes unittests. This is most useful in
 # static builds where the resource requirements of linking 100s of static unittest
 # binaries is prohibitive.
-candidate_nodes = set([
-    str(gchild) for gchild in env.Flatten(
-        [child.all_children() for child in env.Alias('install-all-meta')[0].all_children()])
-])
-names = [f'install-{env["AIB_META_COMPONENT"]}', 'install-tests', env["UNITTEST_ALIAS"]]
+candidate_nodes = set()
+for child in env.Alias('install-all-meta')[0].all_children():
+    candidate_nodes.add(child)
+    for gchild in child.all_children():
+        candidate_nodes.add(gchild)
+
+names = [
+    f'install-{env["AIB_META_COMPONENT"]}',
+    'install-tests',
+    env["UNITTEST_ALIAS"],
+    'install-first-quarter-unittests',
+    'install-second-quarter-unittests',
+    'install-third-quarter-unittests',
+    'install-fourth-quarter-unittests',
+]
+
 env.Alias('install-all-meta-but-not-unittests', [
     node for node in candidate_nodes if str(node) not in names
     and not str(node).startswith(tuple([prefix_name + '-' for prefix_name in names]))
