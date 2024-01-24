@@ -380,3 +380,16 @@ build_enterprise = rule(
     implementation = lambda ctx: build_enterprise_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# streams-release-build
+# =========
+streams_release_build_provider = provider(
+    doc = """If set, will include the enterprise streams module in a release build.""",
+    fields = ["enabled"],
+)
+
+streams_release_build = rule(
+    implementation = lambda ctx: streams_release_build_provider(enabled = ctx.build_setting_value),
+    build_setting = config.bool(flag = True),
+)

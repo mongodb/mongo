@@ -28,6 +28,7 @@ load(
     "linker",
     "detect_odr_violations",
     "build_enterprise",
+    "streams_release_build",
 )
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
@@ -936,4 +937,40 @@ config_setting(
     flag_values = {
         "//bazel/config:build_enterprise": "False",
     },
+)
+
+# --------------------------------------
+# stream_release_build
+# --------------------------------------
+
+streams_release_build(
+    name = "streams_release_build",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "streams_release_build_enabled",
+    flag_values = {
+        "//bazel/config:streams_release_build": "True",
+    },
+)
+
+config_setting(
+    name = "streams_release_build_disabled",
+    flag_values = {
+        "//bazel/config:streams_release_build": "False",
+    },
+)
+
+selects.config_setting_group(
+    name = "platform_for_streaming_build",
+    match_any = [":linux_aarch64", ":linux_x86_64"],
+)
+
+# TODO: another conditional check for openssl is required to be ported from -
+#   https://github.com/10gen/mongo/blob/master/SConstruct#L6039
+# Depends on: https://jira.mongodb.org/browse/SERVER-80599
+selects.config_setting_group(
+    name = "streams_release_build_required_setting",
+    match_all = [":release", ":streams_release_build_enabled", ":platform_for_streaming_build"],
 )
