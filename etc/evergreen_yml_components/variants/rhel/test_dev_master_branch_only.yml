@@ -1075,7 +1075,7 @@ buildvariants:
     max_sub_suites: 3
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=resource_intensive
+      --excludeWithAnyTags=resource_intensive,featureFlagSbeFull
   depends_on:
   - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
