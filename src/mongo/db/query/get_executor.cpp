@@ -1937,7 +1937,8 @@ bool shouldAttemptSBE(const CanonicalQuery* canonicalQuery) {
         return *queryFramework == QueryFrameworkControlEnum::kTrySbeEngine;
     }
 
-    return !canonicalQuery->getForceClassicEngine();
+    return !QueryKnobConfiguration::decoration(canonicalQuery->getOpCtx())
+                .isForceClassicEngineEnabled();
 }
 }  // namespace
 

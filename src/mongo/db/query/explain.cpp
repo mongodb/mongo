@@ -61,6 +61,7 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -112,7 +113,8 @@ void generatePlannerInfo(PlanExecutor* exec,
     }();
     if (mainCollection && exec->getCanonicalQuery()) {
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
-            !exec->getCanonicalQuery()->getForceClassicEngine()) {
+            !QueryKnobConfiguration::decoration(exec->getCanonicalQuery()->getOpCtx())
+                 .isForceClassicEngineEnabled()) {
             const auto planCacheKeyInfo =
                 plan_cache_key_factory::make(*exec->getCanonicalQuery(),
                                              collections,

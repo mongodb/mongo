@@ -69,6 +69,11 @@ bool QueryKnobConfiguration::getSbeDisableTimeSeriesForOp() {
     return _sbeDisableTimeSeriesValue;
 }
 
+bool QueryKnobConfiguration::isForceClassicEngineEnabled() {
+    _tryToSetAllValues();
+    return _queryFrameworkControlValue == QueryFrameworkControlEnum::kForceClassicEngine;
+}
+
 size_t QueryKnobConfiguration::getPlanEvaluationMaxResultsForOp() {
     _tryToSetAllValues();
     return _planEvaluationMaxResults;

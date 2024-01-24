@@ -384,7 +384,7 @@ bool findSbeCompatibleStagesForPushdown(
     const Pipeline* pipeline,
     std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
     // No pushdown if we're using the classic engine.
-    if (cq->getForceClassicEngine()) {
+    if (QueryKnobConfiguration::decoration(cq->getOpCtx()).isForceClassicEngineEnabled()) {
         return false;
     }
 

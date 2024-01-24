@@ -172,10 +172,6 @@ void CanonicalQuery::initCq(boost::intrusive_ptr<ExpressionContext> expCtx,
 
     _findCommand = std::move(parsedFind->findCommandRequest);
 
-    const auto frameworkControl =
-        QueryKnobConfiguration::decoration(expCtx->opCtx).getInternalQueryFrameworkControlForOp();
-    _forceClassicEngine = frameworkControl == QueryFrameworkControlEnum::kForceClassicEngine;
-
     if (optimizeMatchExpression) {
         _primaryMatchExpression =
             MatchExpression::normalize(std::move(parsedFind->filter),
@@ -406,7 +402,8 @@ std::string CanonicalQuery::toStringShort(bool forErrMsg) const {
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
-    return (!_forceClassicEngine && _sbeCompatible)
+    return (!QueryKnobConfiguration::decoration(getOpCtx()).isForceClassicEngineEnabled() &&
+            _sbeCompatible)
         ? canonical_query_encoder::encodeSBE(*this,
                                              canonical_query_encoder::Optimizer::kSbeStageBuilders)
         : canonical_query_encoder::encodeClassic(*this);

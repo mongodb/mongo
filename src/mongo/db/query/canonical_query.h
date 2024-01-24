@@ -258,10 +258,6 @@ public:
         return _expCtx->explain;
     }
 
-    bool getForceClassicEngine() const {
-        return _forceClassicEngine;
-    }
-
     void setSbeCompatible(bool sbeCompatible) {
         _sbeCompatible = sbeCompatible;
     }
@@ -433,9 +429,6 @@ private:
     // are not pushed down into '_cqPipeline'. This is used by the executor to prepare corresponding
     // metadata.
     QueryMetadataBitSet _remainingSearchMetadataDeps;
-
-    // Determines whether the classic engine must be used.
-    bool _forceClassicEngine = true;
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;

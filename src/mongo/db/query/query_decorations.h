@@ -42,6 +42,9 @@ public:
     bool getSbeDisableGroupPushdownForOp();
     bool getSbeDisableLookupPushdownForOp();
     bool getSbeDisableTimeSeriesForOp();
+    /** Returns true if internal query framework control knob is set to 'forceClassicEngine', false
+     * otherwise.*/
+    bool isForceClassicEngineEnabled();
     size_t getPlanEvaluationMaxResultsForOp();
     size_t getMaxScansToExplodeForOp();
     /**

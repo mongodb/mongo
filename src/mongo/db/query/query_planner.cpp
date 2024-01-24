@@ -90,6 +90,7 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -343,7 +344,7 @@ Status computeColumnScanIsPossibleStatus(const CanonicalQuery& query,
                 "A columnstore index can only be used with queries in the SBE engine. The given "
                 "query is not eligible for this engine (yet)"};
     }
-    if (query.getForceClassicEngine()) {
+    if (QueryKnobConfiguration::decoration(query.getOpCtx()).isForceClassicEngineEnabled()) {
         return {ErrorCodes::InvalidOptions,
                 "A columnstore index can only be used with queries in the SBE engine, but the "
                 "query specified to force the classic engine"};
@@ -547,9 +548,10 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildSearchQuerySolution(
     }
 
     if (query.isSearchQuery()) {
-        tassert(7816300,
-                "Pushing down $search into SBE but forceClassicEngine is true.",
-                !query.getForceClassicEngine());
+        tassert(
+            7816300,
+            "Pushing down $search into SBE but forceClassicEngine is on",
+            !QueryKnobConfiguration::decoration(query.getOpCtx()).isForceClassicEngineEnabled());
 
         tassert(7816301,
                 "Pushing down $search into SBE but featureFlagSearchInSbe is disabled.",
