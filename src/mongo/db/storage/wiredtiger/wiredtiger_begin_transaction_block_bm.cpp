@@ -137,18 +137,6 @@ void BM_setTimestamp(benchmark::State& state) {
     }
 }
 
-// This could be moved to a _util bm. It's here to avoid pulling WiredTigerTestHelper into its own
-// header.
-void BM_exportTableToBSON(benchmark::State& state) {
-    WiredTigerTestHelper helper;
-    for (auto _ : state) {
-        auto bob = BSONObjBuilder{};
-        auto status = WiredTigerUtil::exportTableToBSON(
-            helper.wtSession(), "table:mytable", "statistics=(all)", &bob);
-        ASSERT_OK(status);
-    }
-}
-
 BENCHMARK(BM_WiredTigerBeginTxnBlock);
 BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
                    PrepareConflictBehavior::kEnforce,
@@ -169,7 +157,6 @@ BENCHMARK_TEMPLATE(BM_WiredTigerBeginTxnBlockWithArgs,
                    PrepareConflictBehavior::kIgnoreConflictsAllowWrites,
                    RoundUpPreparedTimestamps::kRound);
 BENCHMARK(BM_setTimestamp);
-BENCHMARK(BM_exportTableToBSON);
 
 }  // namespace
 }  // namespace mongo

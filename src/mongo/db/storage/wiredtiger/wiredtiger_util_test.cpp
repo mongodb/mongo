@@ -302,48 +302,6 @@ TEST_F(WiredTigerUtilMetadataTest, CheckApplicationMetadataFormatInvalidURI) {
 
 class WiredTigerUtilTest : public ServiceContextTest {};
 
-TEST_F(WiredTigerUtilTest, ExportMissingTableToBSON) {
-    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto opCtx{makeOperationContext()};
-    shard_role_details::setRecoveryUnit(
-        opCtx.get(),
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
-                                                 harnessHelper.getOplogManager()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
-            ->getSession();
-    auto bob = BSONObjBuilder{};
-    auto status = WiredTigerUtil::exportTableToBSON(
-        session->getSession(), "statistics:table:no_such_table", "statistics=(fast)", &bob);
-    ASSERT_NOT_OK(status);
-}
-
-TEST_F(WiredTigerUtilTest, ExportExistingTableToBSON) {
-    WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
-    auto opCtx{makeOperationContext()};
-    shard_role_details::setRecoveryUnit(
-        opCtx.get(),
-        std::make_unique<WiredTigerRecoveryUnit>(harnessHelper.getSessionCache(),
-                                                 harnessHelper.getOplogManager()),
-        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    WiredTigerSession* session =
-        checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()))
-            ->getSession();
-    WT_SESSION* wtSession = session->getSession();
-    ASSERT_OK(wtRCToStatus(wtSession->create(wtSession, "table:mytable", nullptr), wtSession));
-    auto bob = BSONObjBuilder{};
-    auto status = WiredTigerUtil::exportTableToBSON(
-        session->getSession(), "statistics:table:mytable", "statistics=(fast)", &bob);
-    ASSERT_OK(status);
-    auto o = bob.obj();
-    ASSERT_TRUE(o.isValid());
-    ASSERT_EQUALS("statistics:table:mytable", o.getField(StringData("uri")).String());
-    ASSERT_EQUALS(13, o.nFields());
-    auto cw = o.getField(StringData("cache_walk")).Obj();
-    ASSERT_EQUALS(21, cw.nFields());
-}
-
 TEST_F(WiredTigerUtilTest, GetStatisticsValueMissingTable) {
     WiredTigerUtilHarnessHelper harnessHelper("statistics=(all)");
     auto opCtx{makeOperationContext()};
