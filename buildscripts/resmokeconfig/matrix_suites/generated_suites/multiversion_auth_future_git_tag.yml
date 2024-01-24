@@ -19,6 +19,8 @@ executor:
           keyFile: jstests/libs/authTestsKey
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
           nonClusteredConfigTransactions: true
+          setParameters:
+            bsonTestValidationVersion: 1
           skipEnforceTimeseriesBucketsAreAlwaysCompressedOnValidate: true
       nodb: ''
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly

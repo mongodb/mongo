@@ -73,14 +73,16 @@ public:
                                   const RecordData& record,
                                   long long* nNonCompliantDocuments,
                                   size_t* dataSize,
-                                  ValidateResults* results);
+                                  ValidateResults* results,
+                                  ValidationVersion validationVersion = currentValidationVersion);
     /**
      * Traverses the record store to retrieve every record and go through its document key
      * set to keep track of the index consistency during a validation.
      */
     void traverseRecordStore(OperationContext* opCtx,
                              ValidateResults* results,
-                             BSONObjBuilder* output);
+                             BSONObjBuilder* output,
+                             ValidationVersion validationVersion);
 
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys

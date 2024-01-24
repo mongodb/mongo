@@ -219,7 +219,8 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
         ValidateResults tempValidateResults;
         BSONObjBuilder tempBuilder;
 
-        indexValidator->traverseRecordStore(opCtx, &tempValidateResults, &tempBuilder);
+        indexValidator->traverseRecordStore(
+            opCtx, &tempValidateResults, &tempBuilder, validateState->validationVersion());
     }
 
     LOGV2_OPTIONS(
@@ -654,7 +655,8 @@ Status validate(OperationContext* opCtx,
         // the collection. For clustered collections, the validator also verifies that the
         // record key (RecordId) matches the cluster key field in the record value (document's
         // cluster key).
-        indexValidator.traverseRecordStore(opCtx, results, output);
+        indexValidator.traverseRecordStore(
+            opCtx, results, output, additionalOptions.validationVersion);
 
         // Pause collection validation while a lock is held and between collection and index data
         // validation.

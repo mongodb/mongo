@@ -405,8 +405,14 @@ private:
 template <bool precise, typename BSONValidator>
 class ValidateBuffer {
 public:
-    ValidateBuffer(const char* data, uint64_t maxLength, BSONValidator validator)
-        : _data(data), _maxLength(maxLength), _validator(validator) {
+    ValidateBuffer(const char* data,
+                   uint64_t maxLength,
+                   BSONValidator validator,
+                   ValidationVersion validationVersion)
+        : _data(data),
+          _maxLength(maxLength),
+          _validator(validator),
+          _validationVersion(validationVersion) {
         if constexpr (precise)
             _frames.resize(BSONDepth::getMaxAllowableDepth() + 1);
     }
@@ -560,14 +566,14 @@ private:
         return true;
     }
 
-    static const char* _validateSpecial(Cursor cursor, uint8_t type) {
+    const char* _validateSpecial(Cursor cursor, uint8_t type) {
         switch (type) {
             case BSONType::BinData: {
                 auto count = cursor.template read<uint32_t>();
                 auto subtype = cursor.template read<uint8_t>();
                 const char* columnStart = cursor.ptr;
                 cursor.skip(count);
-                if (subtype == BinDataType::Column) {
+                if (subtype == BinDataType::Column && _validationVersion >= V2_Column) {
                     /* do not pass down cursor; we want to reset the nesting depth */
                     uassert(NonConformantBSON,
                             "Invalid BSON column",
@@ -695,26 +701,34 @@ private:
     typename Frames::iterator _currFrame;  // Frame currently being validated.
     Frames _frames;  // Has end pointers to check and the containing element for precise mode.
     BSONValidator _validator;
+    ValidationVersion _validationVersion;
 };
 
 template <typename BSONValidator>
-Status _doValidate(const char* originalBuffer, uint64_t maxLength, BSONValidator validator) {
+Status _doValidate(const char* originalBuffer,
+                   uint64_t maxLength,
+                   BSONValidator validator,
+                   ValidationVersion validationVersion) {
     // First try validating using the fast but less precise version. That version will return
     // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases and
     // actual failures will rerun the precise version that gives a detailed error context.
-    if (MONGO_likely((ValidateBuffer<false, BSONValidator>(originalBuffer, maxLength, validator)
+    if (MONGO_likely((ValidateBuffer<false, BSONValidator>(
+                          originalBuffer, maxLength, validator, validationVersion)
                           .validate()
                           .isOK())))
         return Status::OK();
 
-    return ValidateBuffer<true, BSONValidator>(originalBuffer, maxLength, validator).validate();
+    return ValidateBuffer<true, BSONValidator>(
+               originalBuffer, maxLength, validator, validationVersion)
+        .validate();
 }
 
 class ColumnValidator {
 public:
     static Status doValidateBSONColumn(const char* originalBuffer,
                                        int maxLength,
-                                       BSONValidateModeEnum mode) noexcept {
+                                       BSONValidateModeEnum mode,
+                                       ValidationVersion validationVersion) noexcept {
         // run control pointer through to end of buffer
         // run over literal data as directed by lengths from control
         // check formatting of Simple8B blocks
@@ -748,14 +762,15 @@ public:
                     int size;
                     if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
                         size = ValidateBuffer<false, DefaultValidator>(
-                                   ptr, end - ptr, DefaultValidator())
+                                   ptr, end - ptr, DefaultValidator(), validationVersion)
                                    .validateAndMeasureElem();
                     else if (mode == BSONValidateModeEnum::kExtended)
                         size = ValidateBuffer<false, ExtendedValidator>(
-                                   ptr, end - ptr, ExtendedValidator())
+                                   ptr, end - ptr, ExtendedValidator(), validationVersion)
                                    .validateAndMeasureElem();
                     else if (mode == BSONValidateModeEnum::kFull)
-                        size = ValidateBuffer<false, FullValidator>(ptr, end - ptr, FullValidator())
+                        size = ValidateBuffer<false, FullValidator>(
+                                   ptr, end - ptr, FullValidator(), validationVersion)
                                    .validateAndMeasureElem();
                     else
                         MONGO_UNREACHABLE;
@@ -810,26 +825,32 @@ private:
 
 Status validateBSON(const char* originalBuffer,
                     uint64_t maxLength,
-                    BSONValidateModeEnum mode) noexcept {
+                    BSONValidateModeEnum mode,
+                    ValidationVersion validationVersion) noexcept {
     if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
-        return _doValidate(originalBuffer, maxLength, DefaultValidator());
+        return _doValidate(originalBuffer, maxLength, DefaultValidator(), validationVersion);
     else if (mode == BSONValidateModeEnum::kExtended)
-        return _doValidate(originalBuffer, maxLength, ExtendedValidator());
+        return _doValidate(originalBuffer, maxLength, ExtendedValidator(), validationVersion);
     else if (mode == BSONValidateModeEnum::kFull)
-        return ValidateBuffer<true, FullValidator>(originalBuffer, maxLength, FullValidator())
+        return ValidateBuffer<true, FullValidator>(
+                   originalBuffer, maxLength, FullValidator(), validationVersion)
             .validate();
     else
         MONGO_UNREACHABLE;
 }
 
-Status validateBSON(const BSONObj& obj, BSONValidateModeEnum mode) {
-    return validateBSON(obj.objdata(), obj.objsize(), mode);
+Status validateBSON(const BSONObj& obj,
+                    BSONValidateModeEnum mode,
+                    ValidationVersion validationVersion) noexcept {
+    return validateBSON(obj.objdata(), obj.objsize(), mode, validationVersion);
 }
 
 Status validateBSONColumn(const char* originalBuffer,
                           int maxLength,
-                          BSONValidateModeEnum mode) noexcept {
-    return ColumnValidator::doValidateBSONColumn(originalBuffer, maxLength, mode);
+                          BSONValidateModeEnum mode,
+                          ValidationVersion validationVersion) noexcept {
+    return ColumnValidator::doValidateBSONColumn(
+        originalBuffer, maxLength, mode, validationVersion);
 }
 
 }  // namespace mongo

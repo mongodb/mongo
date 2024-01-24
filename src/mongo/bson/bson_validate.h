@@ -38,6 +38,17 @@
 
 namespace mongo {
 
+enum ValidationVersion {
+    /* Original validator */
+    V1_Original = 1,
+    /* Adds validation for the content of Column-typed BinData */
+    V2_Column = 2
+};
+
+// When adding new versions of BSON validation, update both this and the range and the
+// default for the server parameter in src/mongo/bson/bson_validate.idl
+static constexpr ValidationVersion currentValidationVersion = V2_Column;
+
 /**
  * Checks that the buf holds a BSON object as defined in http://bsonspec.org/spec.html.
  * Note that maxLength is the buffer size, NOT the BSON size.
@@ -61,12 +72,16 @@ namespace mongo {
  */
 Status validateBSON(const char* buf,
                     uint64_t maxLength,
-                    BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault) noexcept;
+                    BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault,
+                    ValidationVersion validationVersion = currentValidationVersion) noexcept;
 
-Status validateBSON(const BSONObj& obj, BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault);
+Status validateBSON(const BSONObj& obj,
+                    BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault,
+                    ValidationVersion validationVersion = currentValidationVersion) noexcept;
 
 Status validateBSONColumn(const char* buf,
                           int maxLength,
-                          BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault) noexcept;
+                          BSONValidateModeEnum mode = BSONValidateModeEnum::kDefault,
+                          ValidationVersion validationVersion = currentValidationVersion) noexcept;
 
 }  // namespace mongo

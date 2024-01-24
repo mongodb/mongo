@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/namespace_string.h"
@@ -102,6 +103,7 @@ enum class RepairMode {
 struct AdditionalOptions {
     bool enforceTimeseriesBucketsAreAlwaysCompressed = false;
     bool warnOnSchemaValidation = false;  // only warn on schema validation failure
+    ValidationVersion validationVersion = currentValidationVersion;
 };
 
 /**

@@ -45,3 +45,17 @@ enums:
       kDefault: "kDefault"
       kExtended: "kExtended"
       kFull: "kFull"
+
+# Server paramaters for validation.
+# Range and default value should be kept in sync with src/mongo/bson/bson_validate.h
+
+server_parameters:
+  bsonTestValidationVersion:
+    description: "The version of the BSON validator that will be used to check correctness of data in test environments"
+    set_at: startup
+    cpp_vartype: int
+    cpp_varname: bsonTestValidationVersion
+    validator:
+      gte: 1
+      lte: 2
+    default: 2

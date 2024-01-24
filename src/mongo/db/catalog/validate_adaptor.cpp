@@ -611,9 +611,10 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordData& record,
                                        long long* nNonCompliantDocuments,
                                        size_t* dataSize,
-                                       ValidateResults* results) {
-    Status status =
-        validateBSON(record.data(), record.size(), _validateState->getBSONValidateMode());
+                                       ValidateResults* results,
+                                       ValidationVersion validationVersion) {
+    Status status = validateBSON(
+        record.data(), record.size(), _validateState->getBSONValidateMode(), validationVersion);
     if (!status.isOK()) {
         if (status.code() != ErrorCodes::NonConformantBSON) {
             return status;
@@ -660,7 +661,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults* results,
-                                          BSONObjBuilder* output) {
+                                          BSONObjBuilder* output,
+                                          ValidationVersion validationVersion) {
     _numRecords = 0;  // need to reset it because this function can be called more than once.
     long long dataSizeTotal = 0;
     long long interruptIntervalNumBytes = 0;
@@ -719,8 +721,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
-        Status status = validateRecord(
-            opCtx, record->id, record->data, &nNonCompliantDocuments, &validatedSize, results);
+        Status status = validateRecord(opCtx,
+                                       record->id,
+                                       record->data,
+                                       &nNonCompliantDocuments,
+                                       &validatedSize,
+                                       results,
+                                       validationVersion);
 
         // Log the out-of-order entries as errors.
         //

@@ -97,6 +97,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
 
     // Return warnings instead of errors on schema validation failures.
     _warnOnSchemaValidation = additionalOptions.warnOnSchemaValidation;
+    _validationVersion = additionalOptions.validationVersion;
 
     // RepairMode is incompatible with the ValidateModes kBackground and
     // kForegroundFullEnforceFastCount.

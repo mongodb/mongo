@@ -36,6 +36,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate_gen.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -434,6 +436,9 @@ public:
         additionalOptions.enforceTimeseriesBucketsAreAlwaysCompressed =
             cmdObj["enforceTimeseriesBucketsAreAlwaysCompressed"].trueValue();
         additionalOptions.warnOnSchemaValidation = cmdObj["warnOnSchemaValidation"].trueValue();
+        additionalOptions.validationVersion = getTestCommandsEnabled()
+            ? (ValidationVersion)bsonTestValidationVersion
+            : currentValidationVersion;
 
         ValidateResults validateResults;
         Status status = CollectionValidation::validate(
