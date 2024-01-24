@@ -626,13 +626,13 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                           source == OperationSource::kFromMigrate);
                 lastOpFixer->finishedOpSuccessfully();
                 globalOpCounters.gotInserts(batch.size());
-                ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(
-                    opCtx->getWriteConcern(), batch.size());
                 SingleWriteResult result;
                 result.setN(1);
 
                 std::fill_n(std::back_inserter(out->results), batch.size(), std::move(result));
                 if (source != OperationSource::kTimeseriesInsert) {
+                    ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(
+                        opCtx->getWriteConcern(), batch.size());
                     curOp.debug().additiveMetrics.incrementNinserted(batch.size());
                 }
                 return true;
@@ -648,8 +648,10 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     // multi-statement transactions, capped collections, and if we failed all-at-once inserting.
     for (auto it = batch.begin(); it != batch.end(); ++it) {
         globalOpCounters.gotInsert();
-        ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
-            opCtx->getWriteConcern());
+        if (source != OperationSource::kTimeseriesInsert) {
+            ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
+                opCtx->getWriteConcern());
+        }
         try {
             writeConflictRetry(opCtx, "insert", nss, [&] {
                 try {
@@ -1351,9 +1353,10 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     OperationSource source,
     bool forgoOpCounterIncrements) {
     globalOpCounters.gotUpdate();
-    ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
     if (source != OperationSource::kTimeseriesInsert) {
+        ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(
+            opCtx->getWriteConcern());
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setNS_inlock(
             source == OperationSource::kTimeseriesUpdate ? ns.getTimeseriesViewNamespace() : ns);
@@ -2961,6 +2964,8 @@ write_ops::InsertCommandReply performTimeseriesWrites(
 
     curOp->debug().additiveMetrics.ninserted = baseReply.getN();
     globalOpCounters.gotInserts(baseReply.getN());
+    ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInserts(opCtx->getWriteConcern(),
+                                                                        baseReply.getN());
 
     return insertReply;
 }

@@ -128,11 +128,8 @@ export class BulkWriteMetricChecker {
                 wC0.update.wmajority, uMaj, wC1.update.wmajority, "update.wmajority mismatch");
             checkEqual(
                 wC0.delete.wmajority, deleted, wC1.delete.wmajority, "delete.wmajority mismatch");
-            // TODO SERVER-84737 timeseries opWriteConcernCounters.insert.
-            checkEqual(wC0.insert.wmajority,
-                       (this.timeseries ? 0 : inserted),
-                       wC1.insert.wmajority,
-                       "insert.wmajority mismatch");
+            checkEqual(
+                wC0.insert.wmajority, inserted, wC1.insert.wmajority, "insert.wmajority mismatch");
 
             checkEqual(wC0.update.none, uNone, wC1.update.none, "update.none mismatch");
             checkEqual(wC0.delete.none, 0, wC1.delete.none, "delete.none mismatch");
