@@ -260,7 +260,7 @@ buildvariants:
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-mongo-perf-standalone.arm.aws.2023-11
-  display_name: PERF Monogo-Perf Standalone inMemory ARM AWS 2023-11
+  display_name: PERF Mongo-Perf Standalone inMemory ARM AWS 2023-11
   cron: &linux-microbench-cron "0 0 * * *"  # Everyday at 00:00
   modules: *perf_modules
   expansions:
