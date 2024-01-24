@@ -333,6 +333,7 @@ buildvariants:
     max_sub_suites: 5
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --excludeWithAnyTags=featureFlagSbeFull
     large_distro_name: rhel80-medium
   depends_on:
   - name: archive_dist_test_debug
@@ -454,7 +455,7 @@ buildvariants:
     <<: *aubsan-lite-required-expansions
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits
+      --excludeWithAnyTags=requires_ocsp_stapling,requires_increased_memlock_limits,featureFlagSbeFull
   tasks:
   - name: .aggregation !.sbe_only
   - name: .auth
