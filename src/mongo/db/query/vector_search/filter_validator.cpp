@@ -117,12 +117,7 @@ public:
         unsupportedExpression(expr);
     }
 
-    /**
-     * Allows $eq operator.
-     */
-    void visit(const EqualityMatchExpression* expr) override {
-        validateOperandType(expr->getData());
-    }
+    void visit(const EqualityMatchExpression* expr) override {}
 
     void visit(const ExistsMatchExpression* expr) override {
         unsupportedExpression(expr);
@@ -132,19 +127,9 @@ public:
         unsupportedExpression(expr);
     }
 
-    /**
-     * Allows $gte operator.
-     */
-    void visit(const GTEMatchExpression* expr) override {
-        validateOperandType(expr->getData());
-    }
+    void visit(const GTEMatchExpression* expr) override {}
 
-    /**
-     * Allows $gt operator.
-     */
-    void visit(const GTMatchExpression* expr) override {
-        validateOperandType(expr->getData());
-    }
+    void visit(const GTMatchExpression* expr) override {}
 
     void visit(const GeoMatchExpression* expr) override {
         unsupportedExpression(expr);
@@ -154,15 +139,9 @@ public:
         unsupportedExpression(expr);
     }
 
-    /**
-     * Allows $in operator.
-     */
     void visit(const InMatchExpression* expr) override {
         uassert(7828302, str::stream() << "Matching null is not supported.", !expr->hasNull());
         uassert(7828303, str::stream() << "Matching regex is not supported.", !expr->hasRegex());
-        for (const auto& _equality : expr->getEqualities()) {
-            validateOperandType(_equality);
-        }
     }
 
     void visit(const InternalBucketGeoWithinMatchExpression* expr) override {
@@ -273,19 +252,9 @@ public:
         unsupportedExpression(expr);
     }
 
-    /**
-     * Allows $lte operator.
-     */
-    void visit(const LTEMatchExpression* expr) override {
-        validateOperandType(expr->getData());
-    }
+    void visit(const LTEMatchExpression* expr) override {}
 
-    /**
-     * Allows $lt operator.
-     */
-    void visit(const LTMatchExpression* expr) override {
-        validateOperandType(expr->getData());
-    }
+    void visit(const LTMatchExpression* expr) override {}
 
     void visit(const ModMatchExpression* expr) override {
         unsupportedExpression(expr);
@@ -349,15 +318,6 @@ private:
         uasserted(7828300,
                   str::stream() << "Match expression is not supported for $vectorSearch: "
                                 << expr->matchType());
-    }
-    void validateOperandType(const BSONElement& operand) {
-        uassert(
-            7828301,
-            str::stream() << "Operand type is not supported for $vectorSearch: " << operand.type(),
-            operand.type() == BSONType::Bool || operand.type() == BSONType::String ||
-                operand.type() == BSONType::NumberInt || operand.type() == BSONType::NumberLong ||
-                operand.type() == BSONType::NumberDouble || operand.type() == BSONType::Date ||
-                operand.type() == BSONType::jstOID);
     }
 };
 
