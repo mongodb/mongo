@@ -65,6 +65,10 @@ public:
         return {};
     }
 
+    bool isInitialSource() const final {
+        return true;
+    }
+
     /**
      * Returns true as the desugared pipeline begins with a $queue stage.
      */
