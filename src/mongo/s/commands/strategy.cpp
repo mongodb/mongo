@@ -1083,9 +1083,20 @@ void ParseAndRunCommand::RunAndRetry::_onNeedRetargetting(Status& status) {
 
     auto opCtx = _parc->_rec->getOpCtx();
     const auto staleNs = staleInfo->getNss();
+    const auto& originalNs = _parc->_invocation->ns();
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         staleNs, staleInfo->getVersionWanted(), staleInfo->getShardId());
+
+    if ((staleNs.isTimeseriesBucketsCollection() || originalNs.isTimeseriesBucketsCollection()) &&
+        staleNs != originalNs) {
+        // A timeseries might've been created, so we need to invalidate the original namespace
+        // version.
+        Grid::get(opCtx)
+            ->catalogCache()
+            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                originalNs, boost::none, staleInfo->getShardId());
+    }
 
     catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
 
