@@ -961,6 +961,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_LOG *log;
+    uint64_t now;
 
     conn = S2C(session);
 
@@ -1006,6 +1007,9 @@ __wt_logmgr_create(WT_SESSION_IMPL *session)
     WT_RET(__wt_log_open(session));
     WT_RET(__wt_log_slot_init(session, true));
 
+    /* Write the start log record on creation, which is before recovery is run. */
+    __wt_seconds(session, &now);
+    WT_RET(__wt_log_printf(session, "SYSTEM: Log manager created at %" PRIu64, now));
     return (0);
 }
 
@@ -1017,6 +1021,7 @@ int
 __wt_logmgr_open(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
+    uint64_t now;
     uint32_t session_flags;
 
     conn = S2C(session);
@@ -1078,6 +1083,10 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
         conn->log_tid_set = true;
     }
 
+    /* Write another startup log record with timestamp after recovery completes. */
+    __wt_seconds(session, &now);
+    WT_RET(__wt_log_printf(
+      session, "SYSTEM: Log manager threads started post-recovery at %" PRIu64, now));
     return (0);
 }
 
