@@ -115,61 +115,75 @@ modules:
   # (search update-repos-here) in this repo, and etc/system_perf.yml and
   # etc/perf.yml in mongodb/mongo
   - name: dsi
-    repo: git@github.com:10gen/dsi.git
+    owner: 10gen
+    repo: dsi
     prefix: ${workdir}/src
     branch: master
   - name: genny
-    repo: git@github.com:10gen/genny.git
+    owner: 10gen
+    repo: genny
     prefix: ${workdir}/src
     branch: master
   - name: workloads
-    repo: git@github.com:10gen/workloads.git
+    owner: 10gen
+    repo: workloads
     prefix: ${workdir}/src
     branch: master
   - name: linkbench
-    repo: git@github.com:10gen/linkbench.git
+    owner: 10gen
+    repo: linkbench
     prefix: ${workdir}/src
     branch: master
   - name: linkbench2
-    repo: git@github.com:10gen/linkbench2.git
+    owner: 10gen
+    repo: linkbench2
     prefix: ${workdir}/src
     branch: master
   - name: tsbs
-    repo: git@github.com:mongodb-forks/tsbs.git
+    owner: mongodb-forks
+    repo: tsbs
     prefix: ${workdir}/src
     branch: main
   - name: mongo-perf
-    repo: git@github.com:mongodb/mongo-perf.git
+    owner: mongodb
+    repo: mongo-perf
     prefix: ${workdir}/src
     branch: master
   - name: YCSB
-    repo: git@github.com:mongodb-labs/YCSB.git
+    owner: mongodb-labs
+    repo: YCSB
     prefix: ${workdir}/src
     branch: production
   - name: py-tpcc
-    repo: git@github.com:mongodb-labs/py-tpcc.git
+    owner: mongodb-labs
+    repo: py-tpcc
     prefix: ${workdir}/src
     branch: production
   - name: flamegraph
-    repo: git@github.com:mongodb-forks/flamegraph.git
+    owner: mongodb-forks
+    repo: flamegraph
     prefix: ${workdir}/src
     branch: master
   #  - name: mongo
-  #    repo: git@github.com:mongodb/mongo.git
+  #    owner: mongodb
+  #    repo: mongo
   #    prefix: ${workdir}/src
   #    branch: master
   ###
   - name: enterprise
-    repo: git@github.com:10gen/mongo-enterprise-modules.git
+    owner: 10gen
+    repo: mongo-enterprise-modules
     prefix: src/mongo/db/modules
     branch: master
   # Pinned to version 100.7.2
   - name: mongo-tools
-    repo: git@github.com:mongodb/mongo-tools.git
+    owner: mongodb
+    repo: mongo-tools
     prefix: mongo-tools/src/github.com/mongodb
     branch: db8c5c4
   - name: PrivateWorkloads
-    repo: git@github.com:10gen/PrivateWorkloads.git
+    owner: 10gen
+    repo: PrivateWorkloads
     prefix: ${workdir}/src
     branch: production
 
