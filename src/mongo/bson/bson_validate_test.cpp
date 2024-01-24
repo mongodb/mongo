@@ -934,6 +934,46 @@ TEST(BSONValidateColumn, BSONColumnInBSON) {
     ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
 }
 
+TEST(BSONValidateColumn, BSONColumnInBSONRespectsVersion) {
+    BSONColumnBuilder cb;
+    cb.append(BSON("a"
+                   << "deadbeef")
+                  .getField("a"));
+    cb.append(BSON("a" << 1).getField("a"));
+    cb.append(BSON("a" << 2).getField("a"));
+    cb.append(BSON("a" << 1).getField("a"));
+    BSONBinData columnData = cb.finalize();
+    BSONObj obj = BSON("a" << columnData);
+
+    // Change one important byte.
+    ((char*)columnData.data)[0] = '0';
+    obj = BSON("a" << columnData);
+
+    // Default refuses bad column
+    Status status = validateBSON(obj, BSONValidateMode::kDefault);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj, BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj, BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+
+    // V2 refuses bad column
+    status = validateBSON(obj, BSONValidateMode::kDefault, mongo::V2_Column);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj, BSONValidateMode::kExtended, mongo::V2_Column);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj, BSONValidateMode::kFull, mongo::V2_Column);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+
+    // V1 passes bad column on default/extended, refuses on full
+    status = validateBSON(obj, BSONValidateMode::kDefault, mongo::V1_Original);
+    ASSERT_OK(status);
+    status = validateBSON(obj, BSONValidateMode::kExtended, mongo::V1_Original);
+    ASSERT_OK(status);
+    status = validateBSON(obj, BSONValidateMode::kFull, mongo::V1_Original);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+}
+
 TEST(BSONValidateColumn, BSONColumnMissingEOO) {
     BSONColumnBuilder cb;
     cb.append(BSON("a"

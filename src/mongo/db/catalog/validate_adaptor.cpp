@@ -538,14 +538,16 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordData& record,
                                        long long* nNonCompliantDocuments,
                                        size_t* dataSize,
-                                       ValidateResults* results) {
+                                       ValidateResults* results,
+                                       ValidationVersion validationVersion) {
     auto validateBSONMode = BSONValidateMode::kDefault;
     const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
     if (fcvSnapshot.isVersionInitialized() &&
         feature_flags::gExtendValidateCommand.isEnabled(fcvSnapshot)) {
         validateBSONMode = _validateState->getBSONValidateMode();
     }
-    const Status status = validateBSON(record.data(), record.size(), validateBSONMode);
+    const Status status =
+        validateBSON(record.data(), record.size(), validateBSONMode, validationVersion);
     if (!status.isOK()) {
         if (status.code() != ErrorCodes::NonConformantBSON) {
             return status;
@@ -592,7 +594,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                                           ValidateResults* results,
-                                          BSONObjBuilder* output) {
+                                          BSONObjBuilder* output,
+                                          ValidationVersion validationVersion) {
     _numRecords = 0;  // need to reset it because this function can be called more than once.
     long long dataSizeTotal = 0;
     long long interruptIntervalNumBytes = 0;
@@ -651,8 +654,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
-        Status status = validateRecord(
-            opCtx, record->id, record->data, &nNonCompliantDocuments, &validatedSize, results);
+        Status status = validateRecord(opCtx,
+                                       record->id,
+                                       record->data,
+                                       &nNonCompliantDocuments,
+                                       &validatedSize,
+                                       results,
+                                       validationVersion);
 
         // validatedSize = dataSize is not a general requirement as some storage engines may use
         // padding, but we still require that they return the unpadded record data.

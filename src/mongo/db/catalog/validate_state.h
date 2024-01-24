@@ -196,6 +196,10 @@ public:
         return _warnOnSchemaValidation;
     }
 
+    ValidationVersion validationVersion() const {
+        return _validationVersion;
+    }
+
     boost::optional<Timestamp> getValidateTimestamp() {
         return _validateTs;
     }
@@ -242,6 +246,7 @@ private:
     bool _timeseriesDataInconsistency = false;
     bool _BSONDataNonConformant = false;
     bool _warnOnSchemaValidation = false;
+    ValidationVersion _validationVersion = currentValidationVersion;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;

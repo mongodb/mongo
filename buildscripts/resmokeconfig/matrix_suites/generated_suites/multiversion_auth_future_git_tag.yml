@@ -18,6 +18,8 @@ executor:
           auth: true
           keyFile: jstests/libs/authTestsKey
           keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+          setParameters:
+            bsonTestValidationVersion: 1
       nodb: ''
       password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
       username: __system

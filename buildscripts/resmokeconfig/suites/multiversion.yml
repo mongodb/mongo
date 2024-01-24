@@ -29,3 +29,7 @@ executor:
   config:
     shell_options:
       nodb: ''
+      global_vars:
+        TestData:
+          setParameters:
+            bsonTestValidationVersion: 1
