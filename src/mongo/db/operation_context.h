@@ -53,13 +53,10 @@
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -330,7 +327,7 @@ public:
     /**
      * Returns the top-level WriteUnitOfWork associated with this operation context, if any.
      */
-    WriteUnitOfWork* getWriteUnitOfWork() {
+    WriteUnitOfWork* getWriteUnitOfWork_DO_NOT_USE() {
         return _writeUnitOfWork.get();
     }
 
@@ -338,7 +335,7 @@ public:
      * Sets a top-level WriteUnitOfWork for this operation context, to be held for the duration
      * of the given network operation.
      */
-    void setWriteUnitOfWork(std::unique_ptr<WriteUnitOfWork> writeUnitOfWork) {
+    void setWriteUnitOfWork_DO_NOT_USE(std::unique_ptr<WriteUnitOfWork> writeUnitOfWork) {
         invariant(writeUnitOfWork || _writeUnitOfWork);
         invariant(!(writeUnitOfWork && _writeUnitOfWork));
 

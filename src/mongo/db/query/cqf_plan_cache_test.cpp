@@ -31,6 +31,7 @@
  * This file contains tests for mongo/db/query/cqf_get_executor.h
  */
 
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"

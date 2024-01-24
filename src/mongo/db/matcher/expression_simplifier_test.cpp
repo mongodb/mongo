@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -37,7 +38,6 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/stream_utils.h"
 
 namespace mongo {
 namespace {
@@ -113,7 +113,6 @@ inline void assertDNFTransformation(const MatchExpression& expr, const MatchExpr
     ASSERT_TRUE(result);
     assertExpr(&expected, result->get());
 }
-}  // namespace
 
 TEST(ExpressionSimplifierTests, SimpleEq) {
     BSONObj operand = BSON("a" << 5);
@@ -499,4 +498,6 @@ TEST(ExpressionSimplifierTests, NorAlwaysBoolean) {
     assertSimplification(*parse("{$nor: [{$or: [{a: 1}, {a: {$ne: 1}}]}]}"), alwaysFalse);
     assertSimplification(*parse("{$nor: [{$alwaysFalse: 1}, {$alwaysTrue: 1}]}"), alwaysFalse);
 }
+
+}  // namespace
 }  // namespace mongo

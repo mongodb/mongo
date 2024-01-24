@@ -31,16 +31,14 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
-
-class OperationContext;
-class RecordId;
 
 // Keep "milestones" against the oplog to efficiently remove the old records when the collection
 // grows beyond its desired maximum size.
@@ -76,13 +74,7 @@ public:
                                                int64_t bytesRemoved,
                                                const RecordId& firstRemovedId);
 
-    void getOplogTruncateMarkersStats(BSONObjBuilder& builder) const {
-        builder.append("totalTimeProcessingMicros", _totalTimeProcessing.count());
-        builder.append("processingMethod", _processBySampling ? "sampling" : "scanning");
-        if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
-            builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
-        }
-    }
+    void getOplogTruncateMarkersStats(BSONObjBuilder& builder) const;
 
     // Resize oplog size
     void adjust(OperationContext* opCtx, int64_t maxSize);

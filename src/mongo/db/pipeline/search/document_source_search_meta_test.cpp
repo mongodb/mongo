@@ -30,6 +30,7 @@
 #include <boost/intrusive_ptr.hpp>
 #include <vector>
 
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"

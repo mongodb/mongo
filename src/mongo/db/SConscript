@@ -689,13 +689,13 @@ env.Library(
         'multi_key_path_tracker',
         'session/logical_session_id',
         'storage/recovery_unit_base',
-        'storage/write_unit_of_work',
         'write_concern_options',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/processinfo',
         'server_base',
         'storage/storage_change_lock',
+        'storage/write_unit_of_work',
     ],
 )
 
@@ -976,8 +976,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
         '$BUILD_DIR/mongo/s/grid',
         'concurrency/lock_manager',
-        'index/index_access_method',
         'shard_role_api_stor_ex',
+        'storage/write_unit_of_work',
         'views/views',
     ],
     LIBDEPS_PRIVATE=[
@@ -1001,7 +1001,6 @@ env.Library(
         'catalog/collection_catalog',
         'catalog/database_holder',
         'shard_role_api',
-        'storage/write_unit_of_work',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
@@ -1346,12 +1345,11 @@ env.Library(
         'index_build_entry_helpers.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
-        '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
-        '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        'catalog/collection_crud',
+        'catalog/commit_quorum_options',
+        'catalog/index_build_entry_idl',
+        'catalog/local_oplog_info',
+        'concurrency/exception_util',
         'dbhelpers',
         'server_base',
         'service_context',
@@ -1417,7 +1415,6 @@ env.Library(
     LIBDEPS=[
         'query/query_stats/query_stats',
         'read_write_concern_defaults',
-        'repl/read_concern_args',
         'repl/speculative_majority_read_info',
         'stats/timer_stats',
     ],
@@ -1456,7 +1453,7 @@ env.Library(
         'catalog/index_key_validate',
         'index_builds_coordinator_interface',
         'server_base',
-        'storage/write_unit_of_work',
+        'shard_role_api',
     ],
 )
 

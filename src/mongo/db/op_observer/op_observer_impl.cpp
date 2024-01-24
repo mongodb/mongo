@@ -759,7 +759,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         // Do not add writes to the profile collection to the list of transaction operations, since
         // these are done outside the transaction. There is no top-level WriteUnitOfWork when we are
         // in a SideTransactionBlock.
-        if (!opCtx->getWriteUnitOfWork()) {
+        if (!shard_role_details::getWriteUnitOfWork(opCtx)) {
             invariant(nss.isSystemDotProfile());
             return;
         }

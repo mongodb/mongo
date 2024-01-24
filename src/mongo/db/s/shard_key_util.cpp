@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/shard_key_util.h"
+
 #include <absl/container/node_hash_map.h>
 #include <boost/container/small_vector.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
@@ -64,7 +66,6 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_key_index_util.h"
-#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/write_concern_options.h"

@@ -1453,7 +1453,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/storage_file_util',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
         'tenant_migration_state_machine_idl',
     ],
 )

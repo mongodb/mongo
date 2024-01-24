@@ -42,19 +42,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/json.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
-
-class BSONObj;
-class OperationContext;
-
 namespace repl {
 
 class ReadConcernArgs {

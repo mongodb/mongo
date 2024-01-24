@@ -48,6 +48,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/canonical_distinct.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"

@@ -29,6 +29,7 @@
 
 #include "mongo/db/concurrency/locker.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/dump_lock_manager.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"

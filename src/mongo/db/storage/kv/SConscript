@@ -7,12 +7,14 @@ env = env.Clone()
 # Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_drop_pending_ident_reaper',
-    source=['kv_drop_pending_ident_reaper.cpp'],
+    source=[
+        'kv_drop_pending_ident_reaper.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
-        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/mongo/db/shard_role_api',
     ],
 )
 

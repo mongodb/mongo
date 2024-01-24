@@ -890,8 +890,8 @@ env.Library(
 env.Library(
     target='txn_cmd_request',
     source=[
-        "txn_cmds.idl",
-        "txn_two_phase_commit_cmds.idl",
+        'txn_cmds.idl',
+        'txn_two_phase_commit_cmds.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
@@ -906,9 +906,8 @@ env.Library(
         'map_reduce_out_options.cpp',
         'map_reduce.idl',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
@@ -925,10 +924,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interface_factory',
         '$BUILD_DIR/mongo/db/query/map_reduce_output_format',
         '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'map_reduce_parser',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

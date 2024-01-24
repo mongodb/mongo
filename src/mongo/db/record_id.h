@@ -103,7 +103,7 @@ public:
         return RecordId(kMaxRepr);
     }
 
-    RecordId() : _format(Format::kNull){};
+    RecordId() : _format(Format::kNull) {}
 
     ~RecordId() {
         if (_format == Format::kBigStr) {
@@ -113,7 +113,7 @@ public:
 
     RecordId(RecordId&& other) : _format(other._format), _data(other._data) {
         other._format = kNull;
-    };
+    }
 
     RecordId(const RecordId& other) : _format(other._format), _data(other._data) {
         if (_format == Format::kBigStr) {
@@ -127,7 +127,7 @@ public:
         RecordId tmp{other};
         *this = std::move(tmp);
         return *this;
-    };
+    }
 
 
     RecordId& operator=(RecordId&& other) {

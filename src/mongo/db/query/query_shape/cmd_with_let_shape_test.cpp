@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape/cmd_with_let_shape.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -40,7 +41,6 @@ static const NamespaceString kDefaultTestNss =
     NamespaceString::createNamespaceString_forTest("testDB.testColl");
 
 class CmdWithLetShapeTest : public unittest::Test {};
-
 
 struct DummyInnerComponent : public CmdSpecificShapeComponents {
     DummyInnerComponent(){};

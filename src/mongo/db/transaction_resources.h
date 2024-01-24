@@ -266,7 +266,6 @@ inline void replaceRecoveryUnit(OperationContext* opCtx) {
  */
 std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* opCtx);
 
-
 /**
  * Associates the OperatingContext with a different RecoveryUnit for getMore or
  * subtransactions, see RecoveryUnitSwap. The new state is passed and the old state is
@@ -276,6 +275,12 @@ std::unique_ptr<RecoveryUnit> releaseAndReplaceRecoveryUnit(OperationContext* op
 WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
                                                    std::unique_ptr<RecoveryUnit> unit,
                                                    WriteUnitOfWork::RecoveryUnitState state);
+
+inline WriteUnitOfWork* getWriteUnitOfWork(OperationContext* opCtx) {
+    return opCtx->getWriteUnitOfWork_DO_NOT_USE();
+}
+
+void setWriteUnitOfWork(OperationContext* opCtx, std::unique_ptr<WriteUnitOfWork> writeUnitOfWork);
 
 /**
  * This class is a container for all the collection resources which are currently acquired by a

@@ -596,14 +596,14 @@ TEST_F(TxnParticipantTest, StashAndUnstashResources) {
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
     ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
-    ASSERT(opCtx()->getWriteUnitOfWork());
+    ASSERT(shard_role_details::getWriteUnitOfWork(opCtx()));
     ASSERT(shard_role_details::getLocker(opCtx())->isLocked());
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     txnParticipant.stashTransactionResources(opCtx());
     ASSERT_NOT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
     ASSERT_NOT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
-    ASSERT(!opCtx()->getWriteUnitOfWork());
+    ASSERT(!shard_role_details::getWriteUnitOfWork(opCtx()));
 
     // Unset the read concern on the OperationContext. This is needed to unstash.
     repl::ReadConcernArgs::get(opCtx()) = repl::ReadConcernArgs();
@@ -613,7 +613,7 @@ TEST_F(TxnParticipantTest, StashAndUnstashResources) {
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
     ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
-    ASSERT(opCtx()->getWriteUnitOfWork());
+    ASSERT(shard_role_details::getWriteUnitOfWork(opCtx()));
 
     // Commit the transaction. This allows us to release locks.
     txnParticipant.commitUnpreparedTransaction(opCtx());
@@ -1673,7 +1673,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
     txnParticipant.unstashTransactionResources(opCtx(), "find");
     ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
     ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
-    ASSERT(opCtx()->getWriteUnitOfWork());
+    ASSERT(shard_role_details::getWriteUnitOfWork(opCtx()));
 
     {
         // Make it look like we're in a DBDirectClient running a nested operation.
@@ -1684,7 +1684,7 @@ TEST_F(TxnParticipantTest, StashInNestedSessionIsANoop) {
         // OperationContext are unaffected.
         ASSERT_EQUALS(originalLocker, shard_role_details::getLocker(opCtx()));
         ASSERT_EQUALS(originalRecoveryUnit, shard_role_details::getRecoveryUnit(opCtx()));
-        ASSERT(opCtx()->getWriteUnitOfWork());
+        ASSERT(shard_role_details::getWriteUnitOfWork(opCtx()));
     }
 }
 
@@ -3171,7 +3171,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     // Perform initial unstash which sets up a WriteUnitOfWork.
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "find");
-    ASSERT(opCtx()->getWriteUnitOfWork());
+    ASSERT(shard_role_details::getWriteUnitOfWork(opCtx()));
     ASSERT(shard_role_details::getLocker(opCtx())->isLocked());
 
     // Prepare the transaction and extend the duration in the prepared state.
@@ -3181,7 +3181,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     txnParticipant.stashTransactionResources(opCtx());
-    ASSERT(!opCtx()->getWriteUnitOfWork());
+    ASSERT(!shard_role_details::getWriteUnitOfWork(opCtx()));
 
     // Verify that the Session's report of its own stashed state aligns with our expectations.
     auto stashedState = txnParticipant.reportStashedState(opCtx());
@@ -3226,7 +3226,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     // Unstash the stashed resources. This restores the original Locker and RecoveryUnit to the
     // OperationContext.
     txnParticipant.unstashTransactionResources(opCtx(), "commitTransaction");
-    ASSERT(opCtx()->getWriteUnitOfWork());
+    ASSERT(shard_role_details::getWriteUnitOfWork(opCtx()));
 
     // With the resources unstashed, verify that the Session reports an empty stashed state.
     ASSERT(txnParticipant.reportStashedState(opCtx()).isEmpty());
@@ -3257,7 +3257,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
     // Perform initial unstash which sets up a WriteUnitOfWork.
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.unstashTransactionResources(opCtx(), "find");
-    ASSERT(opCtx()->getWriteUnitOfWork());
+    ASSERT(shard_role_details::getWriteUnitOfWork(opCtx()));
     ASSERT(shard_role_details::getLocker(opCtx())->isLocked());
 
     // Prepare transaction and extend duration in the prepared state.
@@ -3295,7 +3295,7 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResources) {
 
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     txnParticipant.stashTransactionResources(opCtx());
-    ASSERT(!opCtx()->getWriteUnitOfWork());
+    ASSERT(!shard_role_details::getWriteUnitOfWork(opCtx()));
 
     // With the resources stashed, verify that the Session reports an empty unstashed state.
     BSONObjBuilder builder;

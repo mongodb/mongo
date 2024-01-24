@@ -1280,8 +1280,8 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
     // We must hold the Client lock to change the Locker on the OperationContext. Hence the
     // WithLock.
 
-    _ruState = opCtx->getWriteUnitOfWork()->release();
-    opCtx->setWriteUnitOfWork(nullptr);
+    _ruState = shard_role_details::getWriteUnitOfWork(opCtx)->release();
+    shard_role_details::setWriteUnitOfWork(opCtx, nullptr);
 
     _locker = shard_role_details::swapLocker(
         opCtx, std::make_unique<Locker>(opCtx->getServiceContext()), wl);
@@ -1388,7 +1388,8 @@ void TransactionParticipant::TxnResources::release(OperationContext* opCtx) {
     invariant(oldState == WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork,
               str::stream() << "RecoveryUnit state was " << oldState);
 
-    opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(opCtx, _ruState));
+    shard_role_details::setWriteUnitOfWork(
+        opCtx, WriteUnitOfWork::createForSnapshotResume(opCtx, _ruState));
 
     auto& apiParameters = APIParameters::get(opCtx);
     apiParameters = _apiParameters;
@@ -1405,20 +1406,20 @@ TransactionParticipant::SideTransactionBlock::SideTransactionBlock(OperationCont
     : _opCtx(opCtx) {
     // Do nothing if we are already in a SideTransactionBlock. We can tell we are already in a
     // SideTransactionBlock because there is no top level write unit of work.
-    if (!_opCtx->getWriteUnitOfWork()) {
+    if (!shard_role_details::getWriteUnitOfWork(_opCtx)) {
         return;
     }
 
     // Release WUOW.
-    _ruState = opCtx->getWriteUnitOfWork()->release();
-    opCtx->setWriteUnitOfWork(nullptr);
+    _ruState = shard_role_details::getWriteUnitOfWork(_opCtx)->release();
+    shard_role_details::setWriteUnitOfWork(_opCtx, nullptr);
 
     // Remember the locking state of WUOW, opt out two-phase locking, but don't release locks.
-    shard_role_details::getLocker(opCtx)->releaseWriteUnitOfWork(&_WUOWLockSnapshot);
+    shard_role_details::getLocker(_opCtx)->releaseWriteUnitOfWork(&_WUOWLockSnapshot);
 
     // Release recovery unit, saving the recovery unit off to the side, keeping open the storage
     // transaction.
-    _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(opCtx);
+    _recoveryUnit = shard_role_details::releaseAndReplaceRecoveryUnit(_opCtx);
 }
 
 TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
@@ -1436,7 +1437,8 @@ TransactionParticipant::SideTransactionBlock::~SideTransactionBlock() {
               str::stream() << "RecoveryUnit state was " << oldState);
 
     // Restore WUOW.
-    _opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(_opCtx, _ruState));
+    shard_role_details::setWriteUnitOfWork(
+        _opCtx, WriteUnitOfWork::createForSnapshotResume(_opCtx, _ruState));
 }
 
 void TransactionParticipant::Participant::_stashActiveTransaction(OperationContext* opCtx) {
@@ -1646,7 +1648,7 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     // Stashed transaction resources do not exist for this in-progress multi-document transaction.
     // Set up the transaction resources on the opCtx. Must be done after setting up the read
     // snapshot.
-    opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+    shard_role_details::setWriteUnitOfWork(opCtx, std::make_unique<WriteUnitOfWork>(opCtx));
 
     // The Client lock must not be held when executing this failpoint as it will block currentOp
     // execution.
@@ -1788,7 +1790,7 @@ TransactionParticipant::Participant::prepareTransaction(
 
     shard_role_details::getRecoveryUnit(opCtx)->setPrepareTimestamp(
         prepareOplogSlot.getTimestamp());
-    opCtx->getWriteUnitOfWork()->prepare();
+    shard_role_details::getWriteUnitOfWork(opCtx)->prepare();
     p().needToWriteAbortEntry = true;
 
     // Don't write oplog entry on secondaries.
@@ -2102,15 +2104,15 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
 
 void TransactionParticipant::Participant::_commitStorageTransaction(OperationContext* opCtx,
                                                                     bool isSplitPreparedTxn) {
-    invariant(opCtx->getWriteUnitOfWork());
+    invariant(shard_role_details::getWriteUnitOfWork(opCtx));
     invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn);
     try {
-        opCtx->getWriteUnitOfWork()->commit();
+        shard_role_details::getWriteUnitOfWork(opCtx)->commit();
     } catch (const ExceptionFor<ErrorCodes::WriteConflict>&) {
         CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
         throw;
     }
-    opCtx->setWriteUnitOfWork(nullptr);
+    shard_role_details::setWriteUnitOfWork(opCtx, nullptr);
 
     // We must clear the recovery unit and locker for the 'config.transactions' and oplog entry
     // writes.
@@ -2433,7 +2435,7 @@ void TransactionParticipant::Participant::_finishAbortingActiveTransaction(
     } else if (opCtx->getTxnNumber() == o().activeTxnNumberAndRetryCounter.getTxnNumber()) {
         if (o().txnState.isInRetryableWriteMode()) {
             // The active transaction is not a multi-document transaction.
-            invariant(opCtx->getWriteUnitOfWork() == nullptr);
+            invariant(!shard_role_details::getWriteUnitOfWork(opCtx));
             return;
         }
 
@@ -2497,7 +2499,7 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
                         repl::ReadConcernArgs::get(opCtx));
 
     // Reset the WUOW. We should be able to abort empty transactions that don't have WUOW.
-    if (opCtx->getWriteUnitOfWork()) {
+    if (shard_role_details::getWriteUnitOfWork(opCtx)) {
         // There are two cases that are legal to abort a unit of work without RSTL:
         // 1. We are aborting a split prepared transaction, in which case the RSTL is held by
         //    the original prepared transaction.
@@ -2505,7 +2507,7 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
         //    a WriteUnitOfWork but not have allocated the storage transaction.
         invariant(shard_role_details::getLocker(opCtx)->isRSTLLocked() || isSplitPreparedTxn ||
                   !shard_role_details::getRecoveryUnit(opCtx)->isActive());
-        opCtx->setWriteUnitOfWork(nullptr);
+        shard_role_details::setWriteUnitOfWork(opCtx, nullptr);
     }
 
     // We must clear the recovery unit and locker so any post-transaction writes can run without

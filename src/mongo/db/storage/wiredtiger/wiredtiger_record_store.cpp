@@ -308,6 +308,15 @@ void WiredTigerRecordStore::OplogTruncateMarkers::updateMarkersAfterCappedTrunca
     });
 }
 
+void WiredTigerRecordStore::OplogTruncateMarkers::getOplogTruncateMarkersStats(
+    BSONObjBuilder& builder) const {
+    builder.append("totalTimeProcessingMicros", _totalTimeProcessing.count());
+    builder.append("processingMethod", _processBySampling ? "sampling" : "scanning");
+    if (auto oplogMinRetentionHours = storageGlobalParams.oplogMinRetentionHours.load()) {
+        builder.append("oplogMinRetentionHours", oplogMinRetentionHours);
+    }
+}
+
 void WiredTigerRecordStore::OplogTruncateMarkers::awaitHasExcessMarkersOrDead(
     OperationContext* opCtx) {
     // Wait until kill() is called or there are too many collection markers.

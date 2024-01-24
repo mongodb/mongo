@@ -76,7 +76,7 @@ void FallbackOpObserver::onInserts(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
-    if (inMultiDocumentTransaction && !opCtx->getWriteUnitOfWork()) {
+    if (inMultiDocumentTransaction && !shard_role_details::getWriteUnitOfWork(opCtx)) {
         return;
     }
 

@@ -48,7 +48,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
-#include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -178,7 +177,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
-    if (inMultiDocumentTransaction && !opCtx->getWriteUnitOfWork()) {
+    if (inMultiDocumentTransaction && !shard_role_details::getWriteUnitOfWork(opCtx)) {
         return;
     }
 

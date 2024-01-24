@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/document_source.h"

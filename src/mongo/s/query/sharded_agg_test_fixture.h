@@ -29,11 +29,11 @@
 
 #pragma once
 
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 

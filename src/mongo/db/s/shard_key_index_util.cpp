@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/s/shard_key_index_util.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -39,7 +40,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 
@@ -47,9 +47,9 @@
 
 
 namespace mongo {
-
 namespace {
-boost::optional<ShardKeyIndex> _findShardKeyPrefixedIndex(
+
+boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexCatalog* indexCatalog,
@@ -208,12 +208,12 @@ bool isLastNonHiddenRangedShardKeyIndex(OperationContext* opCtx,
         return false;
     }
 
-    return !_findShardKeyPrefixedIndex(opCtx,
-                                       collection,
-                                       collection->getIndexCatalog(),
-                                       indexName,
-                                       shardKey,
-                                       true /* requireSingleKey */)
+    return !findShardKeyPrefixedIndex(opCtx,
+                                      collection,
+                                      collection->getIndexCatalog(),
+                                      indexName,
+                                      shardKey,
+                                      true /* requireSingleKey */)
                 .has_value();
 }
 
@@ -222,13 +222,13 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx
                                                          const BSONObj& shardKey,
                                                          bool requireSingleKey,
                                                          std::string* errMsg) {
-    return _findShardKeyPrefixedIndex(opCtx,
-                                      collection,
-                                      collection->getIndexCatalog(),
-                                      boost::none,
-                                      shardKey,
-                                      requireSingleKey,
-                                      errMsg);
+    return findShardKeyPrefixedIndex(opCtx,
+                                     collection,
+                                     collection->getIndexCatalog(),
+                                     boost::none,
+                                     shardKey,
+                                     requireSingleKey,
+                                     errMsg);
 }
 
 }  // namespace mongo
