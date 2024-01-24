@@ -898,6 +898,9 @@ buildvariants:
   - name: compile_test_serial_TG
     distros:
     - rhel80-build
+  - name: compile_test_parallel_unittest_stream_TG
+    distros:
+    - rhel80-build
     patch_only: true
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:

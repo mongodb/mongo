@@ -159,6 +159,9 @@ buildvariants:
   - name: compile_test_serial_TG
     distros:
     - windows-vsCurrent-xlarge
+  - name: compile_test_parallel_unittest_stream_TG
+    distros:
+    - windows-vsCurrent-xlarge
   - name: burn_in_tests_gen
     depends_on:
     - name: version_burn_in_gen
