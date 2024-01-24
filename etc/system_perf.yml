@@ -1709,7 +1709,7 @@ buildvariants:
 
   - &linux-microbenchmarks-standalone-arm
     name: perf-mongo-perf-standalone.arm.aws.2023-11
-    display_name: PERF Monogo-Perf Standalone inMemory ARM AWS 2023-11
+    display_name: PERF Mongo-Perf Standalone inMemory ARM AWS 2023-11
     cron: "0 0 * * 0"   # Weekly, Sundays at 12 AM
     modules: *modules
     expansions: &standalone-arm-expansions
