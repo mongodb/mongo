@@ -2405,9 +2405,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         SbExpr filterExpr = generateFilter(_state, mn->filter.get(), childResultSlot, &outputs);
 
         if (!filterExpr.isNull()) {
-            VariableTypes varTypes = buildVariableTypes(outputs);
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(_state, &varTypes).expr, root->nodeId());
+                std::move(stage), filterExpr.extractExpr(_state).expr, root->nodeId());
         }
     }
 

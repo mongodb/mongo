@@ -94,10 +94,6 @@ public:
     TypeSignature operator()(optimizer::ABT& node, optimizer::Constant& value, bool saveInference);
     TypeSignature operator()(optimizer::ABT& n, optimizer::Variable& var, bool saveInference);
 
-    TypeSignature operator()(optimizer::ABT& n,
-                             optimizer::LambdaAbstraction& lambda,
-                             bool saveInference);
-
     TypeSignature operator()(optimizer::ABT& n, optimizer::Let& let, bool saveInference);
 
     TypeSignature operator()(optimizer::ABT& n, optimizer::UnaryOp& op, bool saveInference);
