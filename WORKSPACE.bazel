@@ -49,6 +49,7 @@ http_archive(
 # Poetry rules for managing Python dependencies
 http_archive(
     name = "rules_poetry",
+    sha256 = "59b6f654885059465880d641dbf45a1babad512c6ae7347b01ad03eebd615e0a",
     strip_prefix = "rules_poetry-fc645faf7fb2e7f6c8fce968801e2a63dc1332bb",
     urls = ["https://github.com/mongodb-forks/rules_poetry/archive/fc645faf7fb2e7f6c8fce968801e2a63dc1332bb.tar.gz"],
 )
