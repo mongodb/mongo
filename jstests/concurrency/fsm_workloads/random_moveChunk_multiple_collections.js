@@ -9,37 +9,13 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
+import {
+    runWithManualRetriesIfInStepdownSuite
+} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
 const dbNames = ['db0', 'db1', 'db2'];
 const collNames = ['collA', 'collB', 'collC'];
-
-const withSkipRetryOnNetworkError = (fn) => {
-    const previousSkipRetryOnNetworkError = TestData.skipRetryOnNetworkError;
-    TestData.skipRetryOnNetworkError = true;
-
-    let res = undefined;
-    try {
-        res = fn();
-    } finally {
-        TestData.skipRetryOnNetworkError = previousSkipRetryOnNetworkError;
-    }
-
-    return res;
-};
-
-const runWithManualRetriesIfInStepdownSuite = (fn) => {
-    if (TestData.runningWithShardStepdowns) {
-        var result = undefined;
-        assert.soonNoExcept(() => {
-            result = withSkipRetryOnNetworkError(fn);
-            return true;
-        });
-        return result;
-    } else {
-        return fn();
-    }
-};
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = dbNames.length * collNames.length;

@@ -288,3 +288,9 @@ export function killRunningMoveChunk(admin) {
     assert.eq(
         true, abortedMigration, "Failed to abort migration, current running ops: " + inProgressStr);
 }
+
+export function migrationsAreAllowed(db, collName) {
+    const configDB = db.getSiblingDB("config");
+    const nss = `${db.getName()}.${collName}`;
+    return configDB.collections.countDocuments({_id: nss, allowMigrations: {$ne: false}}) > 0;
+}

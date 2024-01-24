@@ -11,6 +11,7 @@
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {findFirstBatch} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
@@ -127,17 +128,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         this.ownedIds[collName] = [];
 
         // Search the collection to find the _ids of docs assigned to this thread.
-        const docsOwnedByThread =
-            assert
-                .commandWorked(db.runCommand({
-                    find: collName,
-                    filter: {tid: this.tid},
-                    // Use a large batch size so that a getMore command is never needed since
-                    // getMore is not retryable and so running it is not allowed in the suites with
-                    // stepdown/kill/terminate.
-                    batchSize: 1000,
-                }))
-                .cursor.firstBatch;
+        const docsOwnedByThread = findFirstBatch(db, collName, {tid: this.tid}, 1000);
         assert.neq(0, docsOwnedByThread.size);
         docsOwnedByThread.forEach(doc => {
             this.ownedIds[collName].push(doc._id);

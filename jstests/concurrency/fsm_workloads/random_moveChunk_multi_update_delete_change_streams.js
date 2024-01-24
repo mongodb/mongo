@@ -11,6 +11,10 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {fsm} from "jstests/concurrency/fsm_libs/fsm.js";
+import {
+    runWithManualRetriesIfInStepdownSuite,
+    withSkipRetryOnNetworkError
+} from "jstests/concurrency/fsm_workload_helpers/stepdown_suite_helpers.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
@@ -24,33 +28,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Keep track of the number of write operations. Used only as a sort element for the operations
     // side-table.
     $config.data.writesCount = 0;
-
-    const withSkipRetryOnNetworkError = (fn) => {
-        const previousSkipRetryOnNetworkError = TestData.skipRetryOnNetworkError;
-        TestData.skipRetryOnNetworkError = true;
-
-        let res = undefined;
-        try {
-            res = fn();
-        } finally {
-            TestData.skipRetryOnNetworkError = previousSkipRetryOnNetworkError;
-        }
-
-        return res;
-    };
-
-    const runWithManualRetriesIfInStepdownSuite = (fn) => {
-        if (TestData.runningWithShardStepdowns) {
-            var result = undefined;
-            assert.soonNoExcept(() => {
-                result = withSkipRetryOnNetworkError(fn);
-                return true;
-            });
-            return result;
-        } else {
-            return fn();
-        }
-    };
 
     $config.states.multiUpdate = function(db, collName, connCache) {
         const id = this.getIdForThread(collName);
