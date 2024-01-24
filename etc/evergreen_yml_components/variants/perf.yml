@@ -1,24 +1,32 @@
 variables:
 - &amazon2_x86_compile_variant_dependency
   depends_on:
-  - name: schedule_global_auto_tasks
-    variant: task_generation
   - name: package_new_compile
     variant: amazon2-x86-compile
 
 - &amazon_linux2_arm64_compile_variant_dependency
   depends_on:
-  - name: schedule_global_auto_tasks
-    variant: task_generation
   - name: package_new_compile
     variant: amazon2-arm64-compile
 
 - &rhel70_x86_compile_variant_dependency
   depends_on:
-  - name: schedule_global_auto_tasks
-    variant: task_generation
   - name: package_new_compile
     variant: rhel70-x86-compile
+
+- &schedule_variant_auto_tasks_task
+  name: schedule_variant_auto_tasks
+  activate: false
+  depends_on:
+    - name: schedule_global_auto_tasks
+      variant: task_generation
+
+- &schedule_patch_auto_tasks_task
+  name: schedule_patch_auto_tasks
+  activate: false
+  depends_on:
+    - name: schedule_global_auto_tasks
+      variant: task_generation
 
 - modules: &perf_modules
     - enterprise
@@ -55,8 +63,8 @@ buildvariants:
   run_on:
     - "rhel70-perf-atlas-large"
   tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
     - name: tpcc
@@ -84,8 +92,8 @@ buildvariants:
   run_on:
     - "rhel70-perf-atlas-large"
   tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
     - name: tpcc
@@ -112,8 +120,8 @@ buildvariants:
   run_on:
     - "rhel70-perf-shard"
   tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_w1.2023-09
     - name: crud_workloads_majority
@@ -151,8 +159,8 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_w1.2023-09
     - name: ycsb_60GB.2023-09
@@ -221,8 +229,8 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
     - name: crud_workloads_majority
@@ -253,8 +261,8 @@ buildvariants:
   run_on:
     - "rhel70-perf-replset"
   tasks:
-    - name: schedule_patch_auto_tasks
-    - name: schedule_variant_auto_tasks
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
     - name: initialsync-large
     - name: initialsync-large-fcbis
 
