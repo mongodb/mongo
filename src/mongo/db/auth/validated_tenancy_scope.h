@@ -52,6 +52,13 @@ public:
     ValidatedTenancyScope() = delete;
     ValidatedTenancyScope(const ValidatedTenancyScope&) = default;
 
+    bool operator==(const ValidatedTenancyScope& rhs) const {
+        return _originalToken == rhs._originalToken;
+    }
+    bool operator!=(const ValidatedTenancyScope& rhs) const {
+        return !(*this == rhs);
+    }
+
     bool hasAuthenticatedUser() const;
 
     const UserName& authenticatedUser() const;

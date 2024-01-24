@@ -360,4 +360,24 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(TenantId tenant,
     return ValidatedTenancyScope(std::move(tenant));
 }
 
+ValidatedTenancyScopeGuard::ValidatedTenancyScopeGuard(OperationContext* opCtx) : _opCtx(opCtx) {
+    _validatedTenancyScope = ValidatedTenancyScope::get(opCtx);
+    ValidatedTenancyScope::set(opCtx, boost::none);
+
+    _tenantProtocol = tenantProtocolDecoration(_opCtx->getClient());
+    if (_tenantProtocol) {
+        tenantProtocolDecoration(_opCtx->getClient()) =
+            auth::ValidatedTenancyScope::TenantProtocol::kDefault;
+    }
+}
+
+ValidatedTenancyScopeGuard::~ValidatedTenancyScopeGuard() {
+    if (_validatedTenancyScope) {
+        ValidatedTenancyScope::set(_opCtx, _validatedTenancyScope);
+    }
+    if (_tenantProtocol) {
+        tenantProtocolDecoration(_opCtx->getClient()) = _tenantProtocol;
+    }
+};
+
 }  // namespace mongo::auth

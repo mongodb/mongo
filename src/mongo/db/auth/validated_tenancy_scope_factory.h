@@ -104,5 +104,23 @@ private:
     static ValidatedTenancyScope parseToken(Client* client, StringData securityToken);
 };
 
+/**
+ * An RAII type used with the DBDirectClient to reset the tenancy scope of an operation context,
+ * since the DBDirectClient reuses the same context, invalidating tenant isolation guardrails.
+ */
+class ValidatedTenancyScopeGuard {
+public:
+    ValidatedTenancyScopeGuard(OperationContext* opCtx);
+    ~ValidatedTenancyScopeGuard();
+
+    ValidatedTenancyScopeGuard(const ValidatedTenancyScopeGuard&) = delete;
+    void operator=(const ValidatedTenancyScopeGuard&) = delete;
+
+private:
+    OperationContext* _opCtx{nullptr};
+    boost::optional<ValidatedTenancyScope> _validatedTenancyScope;
+    boost::optional<auth::ValidatedTenancyScope::TenantProtocol> _tenantProtocol;
+};
+
 }  // namespace auth
 }  // namespace mongo
