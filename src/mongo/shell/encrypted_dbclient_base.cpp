@@ -32,6 +32,7 @@
 #include <boost/none.hpp>
 #include <cstdint>
 #include <cstring>
+#include <fmt/format.h>
 #include <iterator>
 #include <js/Class.h>
 #include <js/Object.h>
@@ -793,24 +794,29 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
 
     BSONObj dataKeyObj = _conn->findOne(std::move(findCmd));
     if (dataKeyObj.isEmpty()) {
-        uasserted(ErrorCodes::BadValue, "Invalid keyID.");
+        uasserted(ErrorCodes::BadValue,
+                  fmt::format("Unable to find key ID {} from {} on node {}",
+                              uuid.toString(),
+                              fullNameNS.toStringForErrorMsg(),
+                              _conn->getServerAddress()));
     }
 
     auto keyStoreRecord = KeyStoreRecord::parse(IDLParserContext("root"), dataKeyObj);
-    if (dataKeyObj.hasField("version"_sd)) {
-        uassert(ErrorCodes::BadValue,
-                "Invalid version, must be either 0 or undefined",
-                dataKeyObj.getIntField("version"_sd) == 0);
-    }
 
     BSONElement elem = dataKeyObj.getField("keyMaterial"_sd);
-    uassert(ErrorCodes::BadValue, "Invalid key.", elem.isBinData(BinDataType::BinDataGeneral));
     uassert(ErrorCodes::BadValue,
-            "Invalid version, must be either 0 or undefined",
+            fmt::format("Key ID {} is not a generic BinData type", uuid.toString()),
+            elem.isBinData(BinDataType::BinDataGeneral));
+
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Key ID {} has invalid version - must be either 0 or undefined",
+                        uuid.toString()),
             keyStoreRecord.getVersion() == 0);
 
     auto dataKey = keyStoreRecord.getKeyMaterial();
-    uassert(ErrorCodes::BadValue, "Invalid data key.", dataKey.length() != 0);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Key ID {} has invalid length", uuid.toString()),
+            dataKey.length() != 0);
 
     return keyStoreRecord.toBSON();
 }
