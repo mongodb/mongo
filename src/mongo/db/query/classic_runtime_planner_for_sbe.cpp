@@ -47,7 +47,8 @@ PlannerBase::PlannerBase(OperationContext* opCtx, PlannerData plannerData)
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlanExecutor(
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
-    bool isFromPlanCache) {
+    bool isFromPlanCache,
+    boost::optional<size_t> cachedPlanHash) {
     stage_builder::prepareSlotBasedExecutableTree(_opCtx,
                                                   sbePlanAndData.first.get(),
                                                   &sbePlanAndData.second,
@@ -59,6 +60,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                                   nullptr /* remoteCursors */);
 
     auto nss = cq()->nss();
+    tassert(8551900,
+            "Solution must be present if cachedPlanHash is present",
+            solution != nullptr || !cachedPlanHash.has_value());
+    bool matchesCachedPlan = cachedPlanHash && *cachedPlanHash == solution->hash();
     return uassertStatusOK(
         plan_executor_factory::make(_opCtx,
                                     extractCq(),
@@ -70,8 +75,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                     std::move(nss),
                                     extractSbeYieldPolicy(),
                                     isFromPlanCache,
-                                    // TODO SERVER-85519 Support isCached explain field
-                                    false /* matchesCachedPlan */,
+                                    matchesCachedPlan,
                                     false /* generatedByBonsai */,
                                     OptimizerCounterInfo{} /* used for Bonsai */,
                                     // TODO SERVER-85518 Support remoteCursors and remoteExplains
@@ -100,8 +104,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPl
     plan_cache_util::updatePlanCache(
         opCtx(), collections(), *cq(), *_solution, *sbePlanAndData.first, sbePlanAndData.second);
 
-    return prepareSbePlanExecutor(
-        std::move(_solution), std::move(sbePlanAndData), false /*isFromPlanCache*/);
+    return prepareSbePlanExecutor(std::move(_solution),
+                                  std::move(sbePlanAndData),
+                                  false /*isFromPlanCache*/,
+                                  cachedPlanHash());
 }
 
 CachedPlanner::CachedPlanner(OperationContext* opCtx,
@@ -114,7 +120,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
     return prepareSbePlanExecutor(nullptr /*solution*/,
                                   {std::move(_cachedPlanHolder->cachedPlan->root),
                                    std::move(_cachedPlanHolder->cachedPlan->planStageData)},
-                                  true /*isFromPlanCache*/);
+                                  true /*isFromPlanCache*/,
+                                  boost::none /*cachedPlanHash*/);
 }
 
 }  // namespace mongo::classic_runtime_planner_for_sbe

@@ -50,6 +50,7 @@ struct PlannerData {
     std::unique_ptr<WorkingSet> workingSet;
     const MultipleCollectionAccessor& collections;
     const QueryPlannerParams& plannerParams;
+    boost::optional<size_t> cachedPlanHash;
 };
 
 class PlannerInterface {
@@ -71,7 +72,8 @@ protected:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> prepareSbePlanExecutor(
         std::unique_ptr<QuerySolution> solution,
         std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
-        bool isFromPlanCache);
+        bool isFromPlanCache,
+        boost::optional<size_t> cachedPlanHash);
 
     OperationContext* opCtx() {
         return _opCtx;
@@ -99,6 +101,10 @@ protected:
 
     size_t plannerOptions() const {
         return _plannerData.plannerParams.options;
+    }
+
+    boost::optional<size_t> cachedPlanHash() const {
+        return _plannerData.cachedPlanHash;
     }
 
 private:
