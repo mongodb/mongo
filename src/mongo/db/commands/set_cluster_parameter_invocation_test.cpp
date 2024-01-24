@@ -110,27 +110,17 @@ private:
 class DBClientMock : public DBClientService {
 public:
     DBClientMock(
-        std::function<StatusWith<BatchedCommandResponse>(
-            BSONObj, BSONObj, const boost::optional<TenantId>&)> updateParameterOnDiskMock) {
+        std::function<BatchedCommandResponse(BSONObj, BSONObj, const boost::optional<TenantId>&)>
+            updateParameterOnDiskMock) {
         this->updateParameterOnDiskMockImpl = updateParameterOnDiskMock;
     }
 
-    StatusWith<BatchedCommandResponse> updateParameterOnDisk(
-        OperationContext* opCtx,
+    BatchedCommandResponse updateParameterOnDisk(
         BSONObj query,
         BSONObj update,
-        bool upsert,
         const WriteConcernOptions&,
         const boost::optional<TenantId>& tenantId) override {
         return updateParameterOnDiskMockImpl(query, update, tenantId);
-    }
-
-    StatusWith<BatchedCommandResponse> insertParameterOnDisk(
-        OperationContext* opCtx,
-        BSONObj update,
-        const WriteConcernOptions&,
-        const boost::optional<TenantId>& tenantId) override {
-        return BatchedCommandResponse();
     }
 
     Timestamp getUpdateClusterTime(OperationContext*) override {
@@ -139,8 +129,7 @@ public:
     }
 
 private:
-    std::function<StatusWith<BatchedCommandResponse>(
-        BSONObj, BSONObj, const boost::optional<TenantId>&)>
+    std::function<BatchedCommandResponse(BSONObj, BSONObj, const boost::optional<TenantId>&)>
         updateParameterOnDiskMockImpl;
 };
 
@@ -162,7 +151,9 @@ MockServerParameter alwaysInvalidatingServerParameter(StringData name) {
 
 DBClientMock alwaysSucceedingDbClient() {
     DBClientMock dbServiceMock([&](BSONObj, BSONObj, const boost::optional<TenantId>&) {
-        return BatchedCommandResponse();
+        BatchedCommandResponse result;
+        result.setStatus(Status::OK());
+        return result;
     });
 
     return dbServiceMock;
@@ -170,7 +161,8 @@ DBClientMock alwaysSucceedingDbClient() {
 
 DBClientMock tenantIdReportingDbClient() {
     DBClientMock dbServiceMock([&](BSONObj, BSONObj, const boost::optional<TenantId>& tenantId) {
-        return Status(ErrorCodes::UnknownError, tenantId ? tenantId->toString() : "");
+        uasserted(ErrorCodes::UnknownError, tenantId ? tenantId->toString() : "");
+        return BatchedCommandResponse();
     });
 
     return dbServiceMock;
@@ -178,7 +170,8 @@ DBClientMock tenantIdReportingDbClient() {
 
 DBClientMock alwaysFailingDbClient() {
     DBClientMock dbServiceMock([&](BSONObj, BSONObj, const boost::optional<TenantId>&) {
-        return Status(ErrorCodes::UnknownError, "DB Client Update Failed");
+        uasserted(ErrorCodes::UnknownError, "DB Client Update Failed");
+        return BatchedCommandResponse();
     });
 
     return dbServiceMock;

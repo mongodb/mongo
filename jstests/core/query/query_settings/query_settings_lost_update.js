@@ -5,7 +5,6 @@
  * @tags: [
  *   command_not_supported_in_serverless,
  *   directly_against_shardsvrs_incompatible,
- *   does_not_support_stepdowns,
  *   featureFlagQuerySettings,
  *   tenant_migration_incompatible,
  *   uses_parallel_shell,
