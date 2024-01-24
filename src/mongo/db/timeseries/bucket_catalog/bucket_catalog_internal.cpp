@@ -1321,12 +1321,13 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
         return {it->second, catalog.globalExecutionStats};
     }
 
-    auto res = catalog.executionStats.emplace(ns, std::make_shared<ExecutionStats>());
+    auto res = catalog.executionStats.emplace(
+        ns, make_shared_tracked<ExecutionStats>(catalog.trackingContext));
     return {res.first->second, catalog.globalExecutionStats};
 }
 
-std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
-                                                  const NamespaceString& ns) {
+shared_tracked_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
+                                                     const NamespaceString& ns) {
     static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
 
     stdx::lock_guard catalogLock{catalog.mutex};
@@ -1338,7 +1339,7 @@ std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
     return kEmptyStats;
 }
 
-std::pair<NamespaceString, std::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+std::pair<NamespaceString, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
     BucketCatalog& sideBucketCatalog) {
     stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
     invariant(sideBucketCatalog.executionStats.size() == 1);
@@ -1346,7 +1347,7 @@ std::pair<NamespaceString, std::shared_ptr<ExecutionStats>> getSideBucketCatalog
 }
 
 void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
-                                        std::shared_ptr<ExecutionStats> collStats,
+                                        shared_tracked_ptr<ExecutionStats> collStats,
                                         const NamespaceString& viewNs) {
     ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, viewNs);
     addCollectionExecutionStats(stats, *collStats);

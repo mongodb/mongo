@@ -32,6 +32,7 @@
 #include <boost/smart_ptr/allocate_unique.hpp>
 #include <memory>
 #include <scoped_allocator>
+#include <vector>
 
 #include "mongo/db/timeseries/timeseries_tracking_allocator.h"
 #include "mongo/db/timeseries/timeseries_tracking_context.h"
@@ -94,6 +95,15 @@ using tracked_string =
 template <class... Args>
 tracked_string make_tracked_string(TrackingContext& trackingContext, Args... args) {
     return tracked_string(args..., trackingContext.makeAllocator<char>());
+}
+
+template <class T>
+using tracked_vector =
+    std::vector<T, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<T>>>;
+
+template <class T, class... Args>
+tracked_vector<T> make_tracked_vector(TrackingContext& trackingContext, Args... args) {
+    return tracked_vector<T>(args..., trackingContext.makeAllocator<T>());
 }
 
 }  // namespace mongo::timeseries

@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/timeseries/timeseries_tracked_types.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -74,7 +75,7 @@ struct ExecutionStats {
 
 class ExecutionStatsController {
 public:
-    ExecutionStatsController(const std::shared_ptr<ExecutionStats>& collectionStats,
+    ExecutionStatsController(const shared_tracked_ptr<ExecutionStats>& collectionStats,
                              ExecutionStats& globalStats)
         : _collectionStats(collectionStats), _globalStats(&globalStats) {}
 
@@ -113,7 +114,7 @@ public:
     void incNumFailedDecompressBuckets(long long increment = 1);
 
 private:
-    std::shared_ptr<ExecutionStats> _collectionStats;
+    shared_tracked_ptr<ExecutionStats> _collectionStats;
     ExecutionStats* _globalStats;
 };
 

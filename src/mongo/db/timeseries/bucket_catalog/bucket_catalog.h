@@ -172,15 +172,8 @@ public:
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
 
-    BucketCatalog()
-        : bucketStateRegistry(trackingContext),
-          stripes(numberOfStripes),
-          memoryUsageThreshold(getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes) {}
-    BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold)
-        : bucketStateRegistry(trackingContext),
-          numberOfStripes(numberOfStripes),
-          stripes(numberOfStripes),
-          memoryUsageThreshold(memoryUsageThreshold) {}
+    BucketCatalog();
+    BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold);
     BucketCatalog(const BucketCatalog&) = delete;
     BucketCatalog operator=(const BucketCatalog&) = delete;
 
@@ -195,13 +188,14 @@ public:
     // independently locked and operated on in parallel. The size of the stripe vector should not be
     // changed after initialization.
     const std::size_t numberOfStripes = 32;
-    std::vector<Stripe> stripes;
+    tracked_vector<Stripe> stripes;
 
     // Per-namespace execution stats. This map is protected by 'mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the
     // lock. The object itself is thread-safe (using atomics).
+    // TODO SERVER-85655: Track NamespaceString memory usage.
     mutable Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::mutex");
-    stdx::unordered_map<NamespaceString, std::shared_ptr<ExecutionStats>> executionStats;
+    tracked_unordered_map<NamespaceString, shared_tracked_ptr<ExecutionStats>> executionStats;
 
     // Global execution stats used to report aggregated metrics in server status.
     ExecutionStats globalExecutionStats;

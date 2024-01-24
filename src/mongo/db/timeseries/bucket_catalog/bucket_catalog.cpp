@@ -72,6 +72,8 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 MONGO_FAIL_POINT_DEFINE(runPostCommitDebugChecks);
 
+const std::size_t kDefaultNumberOfStripes = 32;
+
 /**
  * Prepares the batch for commit. Sets min/max appropriately, records the number of
  * documents that have previously been committed to the bucket, and renders the batch
@@ -165,6 +167,19 @@ SuccessfulInsertion::SuccessfulInsertion(std::shared_ptr<WriteBatch>&& b, Closed
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
 }
+
+BucketCatalog::BucketCatalog()
+    : BucketCatalog(kDefaultNumberOfStripes,
+                    getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes) {}
+
+BucketCatalog::BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold)
+    : bucketStateRegistry(trackingContext),
+      numberOfStripes(numberOfStripes),
+      stripes(make_tracked_vector<Stripe>(trackingContext, numberOfStripes)),
+      executionStats(
+          make_tracked_unordered_map<NamespaceString, shared_tracked_ptr<ExecutionStats>>(
+              trackingContext)),
+      memoryUsageThreshold(memoryUsageThreshold) {}
 
 BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
@@ -676,7 +691,7 @@ void appendExecutionStats(const BucketCatalog& catalog,
                           const NamespaceString& ns,
                           BSONObjBuilder& builder) {
     invariant(!ns.isTimeseriesBucketsCollection());
-    const std::shared_ptr<ExecutionStats> stats = internal::getExecutionStats(catalog, ns);
+    const shared_tracked_ptr<ExecutionStats> stats = internal::getExecutionStats(catalog, ns);
     appendExecutionStatsToBuilder(*stats, builder);
 }
 

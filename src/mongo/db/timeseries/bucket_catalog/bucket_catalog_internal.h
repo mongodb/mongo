@@ -384,21 +384,21 @@ ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
 /**
  * Retrieves the execution stats for the given namespace, if they have already been initialized.
  */
-std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
-                                                  const NamespaceString& ns);
+shared_tracked_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
+                                                     const NamespaceString& ns);
 
 /**
  * Retrieves the execution stats from the side bucket catalog.
  * Assumes the side bucket catalog has the stats of one collection.
  */
-std::pair<NamespaceString, std::shared_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+std::pair<NamespaceString, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
     BucketCatalog& sideBucketCatalog);
 
 /**
  * Merges the execution stats of a collection into the bucket catalog.
  */
 void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
-                                        std::shared_ptr<ExecutionStats> collStats,
+                                        shared_tracked_ptr<ExecutionStats> collStats,
                                         const NamespaceString& viewNs);
 
 /**

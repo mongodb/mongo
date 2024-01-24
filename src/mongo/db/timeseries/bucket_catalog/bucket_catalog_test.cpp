@@ -1769,9 +1769,6 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
-    RAIIServerParameterControllerForTest memoryController{
-        "timeseriesIdleBucketExpiryMemoryUsageThreshold",
-        500};  // An absurdly low limit that only allows us one open bucket at a time.
     FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
 
@@ -1842,6 +1839,11 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         ASSERT(
             holds_alternative<std::monostate>(get<ReopeningContext>(result.getValue()).candidate));
     }
+
+    // Set a memory limit that only allows one open bucket at a time.
+    int memoryThreshold = getMemoryUsage(*_bucketCatalog) - 1;
+    RAIIServerParameterControllerForTest memoryController{
+        "timeseriesIdleBucketExpiryMemoryUsageThreshold", memoryThreshold};
 
     // Now let's insert something with a different meta, so we open a new bucket, see we're past the
     // memory limit, and archive the existing bucket.
