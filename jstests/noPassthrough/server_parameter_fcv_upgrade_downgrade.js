@@ -102,8 +102,10 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
         const updateVal = initval + 1;
         assert.commandWorked(admin.runCommand({setClusterParameter: {[sp]: {intData: updateVal}}}));
 
-        const changed = assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
-        assert.eq(val(changed), updateVal);
+        assert.soon(() => {
+            const changed = assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
+            return val(changed) == updateVal;
+        });
         assertParamExistenceInGetParamStar(
             assert.commandWorked(admin.runCommand({getClusterParameter: "*"})), sp, true);
         if (verifyStateCallback !== undefined) {
@@ -136,8 +138,10 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
 
         assert.commandWorked(admin.runCommand({setClusterParameter: {[sp]: {intData: updateVal}}}));
 
-        const changedAgain = assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
-        assert.eq(val(changedAgain), updateVal);
+        assert.soon(() => {
+            const changedAgain = assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
+            return val(changedAgain) == updateVal;
+        });
 
         assertParamExistenceInGetParamStar(
             assert.commandWorked(admin.runCommand({getClusterParameter: "*"})), sp, true);
