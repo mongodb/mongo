@@ -52,6 +52,18 @@ build:local --experimental_remote_cache_compression=false
 build:local --grpc_keepalive_time=0s
 build:local --legacy_important_outputs
 
+# Disable remote execution and caching for public releases
+--config=public-release
+build:public-release --remote_executor=
+build:public-release --remote_cache=
+build:public-release --bes_backend=
+build:public-release --bes_results_url=
+build:public-release --tls_client_certificate=
+build:public-release --tls_client_key=
+build:public-release --experimental_remote_cache_compression=false
+build:public-release --grpc_keepalive_time=0s
+build:public-release --legacy_important_outputs
+
 
 # try to import the bazelrc files if available
 try-import %workspace%/.bazelrc.local

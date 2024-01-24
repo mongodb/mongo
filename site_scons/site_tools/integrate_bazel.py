@@ -483,6 +483,12 @@ def generate(env: SCons.Environment.Environment) -> None:
         if normalized_os != "linux" or normalized_arch not in ["arm64", 'amd64']:
             bazel_internal_flags.append('--config=local')
 
+        # Disable remote execution for public release builds.
+        if env.GetOption("release") is not None and (
+                env.GetOption("cache-dir") is None
+                or env.GetOption("cache-dir") == "$BUILD_ROOT/scons/cache"):
+            bazel_internal_flags.append('--config=public-release')
+
         evergreen_tmp_dir = env.GetOption("evergreen-tmp-dir")
         if normalized_os == "macos" and evergreen_tmp_dir:
             bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
