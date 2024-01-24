@@ -2316,9 +2316,13 @@ export const authCommandsLib = {
         },
         {
             testname: "autoCompact",
-            // Not need to actually enable background compaction, just verify the user can run this command
+            // Not need to actually enable background compaction, just verify the user can run this
+            // command.
             command: {autoCompact: false},
             skipSharded: true,
+            skipTest: (conn) => {
+              return !TestData.setParameters.featureFlagAutoCompact;
+            },
             testcases: [
                 {
                   runOnDb: adminDbName,
