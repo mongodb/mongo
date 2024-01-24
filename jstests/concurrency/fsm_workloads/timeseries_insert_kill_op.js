@@ -34,7 +34,9 @@ export const $config = (function() {
         } else if (res.hasOwnProperty('writeConcernError')) {
             assert.eq(res.writeConcernError.code, ErrorCodes.Interrupted, tojson(res));
         } else {
-            assert.commandWorkedOrFailedWithCode(res, ErrorCodes.Interrupted, tojson(res));
+            // TODO (SERVER-85548): Clean up error codes
+            assert.commandWorkedOrFailedWithCode(
+                res, [ErrorCodes.Interrupted, 8555700, 8555701], tojson(res));
         }
     };
 

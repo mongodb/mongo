@@ -107,7 +107,7 @@ validateUpdateIndex(
     docs,
     [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
     testCases.DROP_COLLECTION,
-    ErrorCodes.NamespaceNotFound);
+    [ErrorCodes.NamespaceNotFound, 8555700, 8555701]);  // TODO (SERVER-85548): revisit error codes
 
 // Attempt to update a document in a collection that has been replaced with a non-time-series
 // collection.
@@ -115,7 +115,7 @@ validateUpdateIndex(
     docs,
     [{q: {[metaFieldName]: {a: "B"}}, u: {$set: {[metaFieldName]: {c: "C"}}}, multi: true}],
     testCases.REPLACE_COLLECTION,
-    ErrorCodes.NamespaceNotFound);
+    [ErrorCodes.NamespaceNotFound, 8555700, 8555701]);  // TODO (SERVER-85548): revisit error codes
 
 // Attempt to update a document in a collection that has been replaced with a new time-series
 // collection with a different metaField.

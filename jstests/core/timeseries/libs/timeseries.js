@@ -261,6 +261,12 @@ export var TimeseriesTest = class {
     static getBucketsCollName(collName) {
         return `system.buckets.${collName}`;
     }
+
+    static assertInsertWorked(res) {
+        // TODO (SERVER-85548): Remove helper and revert to assert.commandWorked, no expected error
+        // codes
+        return assert.commandWorkedOrFailedWithCode(res, [8555700, 8555701]);
+    }
 };
 
 TimeseriesTest.BucketVersion = {

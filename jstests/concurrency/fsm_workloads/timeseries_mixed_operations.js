@@ -8,6 +8,8 @@
  * ]
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
@@ -35,7 +37,7 @@ export const $config = (function() {
                 [timeFieldName]: new Date(),
                 first: true,
             });
-            assert.commandWorked(res);
+            TimeseriesTest.assertInsertWorked(res);
             assert.eq(1, res.nInserted, tojson(res));
         },
 
@@ -50,7 +52,7 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: true});
-            assert.commandWorked(res);
+            TimeseriesTest.assertInsertWorked(res);
             assert.eq(res.insertedIds.length, batchSize);
         },
 
@@ -65,7 +67,7 @@ export const $config = (function() {
                 });
             }
             const res = coll.insertMany(docs, {ordered: false});
-            assert.commandWorked(res);
+            TimeseriesTest.assertInsertWorked(res);
             assert.eq(res.insertedIds.length, batchSize);
         },
 

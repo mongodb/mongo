@@ -16,6 +16,7 @@ import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js';
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {getPlanStages} from "jstests/libs/analyze_plan.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
@@ -63,8 +64,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
                 [this.timeField]: new Date(timer),
                 f: metaVal,
             };
-            assert.commandWorked(db[collName].insert(doc));
-            assert.commandWorked(db[this.nonShardCollName].insert(doc));
+            TimeseriesTest.assertInsertWorked(db[collName].insert(doc));
+            TimeseriesTest.assertInsertWorked(db[this.nonShardCollName].insert(doc));
         }
     };
 

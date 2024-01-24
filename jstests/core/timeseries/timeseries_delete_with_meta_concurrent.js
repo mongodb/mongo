@@ -105,13 +105,15 @@ const objA = {
 };
 
 // Attempt to delete from a collection that has been dropped.
-validateDeleteIndex([objA],
-                    [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
-                    ErrorCodes.NamespaceNotFound,
-                    testCases.DROP_COLLECTION);
+validateDeleteIndex(
+    [objA],
+    [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
+    [ErrorCodes.NamespaceNotFound, 8555700, 8555701],  // TODO (SERVER-85548): revisit error codes
+    testCases.DROP_COLLECTION);
 
 // Attempt to delete from a collection that has been replaced with a non-time-series collection.
-validateDeleteIndex([objA],
-                    [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
-                    ErrorCodes.NamespaceNotFound,
-                    testCases.REPLACE_COLLECTION);
+validateDeleteIndex(
+    [objA],
+    [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
+    [ErrorCodes.NamespaceNotFound, 8555700, 8555701],  // TODO (SERVER-85548): revisit error codes
+    testCases.REPLACE_COLLECTION);

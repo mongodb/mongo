@@ -6,6 +6,9 @@
  *   does_not_support_stepdowns,
  * ]
  */
+
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 export const $config = (function() {
     var data = {prefix: "create_timeseries_collection"};
 
@@ -30,7 +33,7 @@ export const $config = (function() {
             collName = getCollectionName(this.prefix, collName, this.tid);
 
             const coll = db.getCollection(collName);
-            assert.commandWorked(coll.insert({
+            TimeseriesTest.assertInsertWorked(coll.insert({
                 _id: this.num,
                 measurement: "measurement",
                 time: ISODate(),

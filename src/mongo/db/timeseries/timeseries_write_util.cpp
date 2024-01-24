@@ -466,11 +466,12 @@ write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateComma
 }
 
 void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Could not find time-series buckets collection for write",
-            bucketsColl);
-    uassert(ErrorCodes::InvalidOptions,
-            "Time-series buckets collection is missing time-series options",
+    uassert(
+        8555700,
+        "Catalog changed during operation, could not find time series buckets collection for write",
+        bucketsColl);
+    uassert(8555701,
+            "Catalog changed during operation, missing time-series options",
             bucketsColl->getTimeseriesOptions());
 }
 

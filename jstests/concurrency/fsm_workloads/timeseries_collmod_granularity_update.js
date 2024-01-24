@@ -50,9 +50,9 @@ export const $config = (function() {
                                   Random.randInt(24),
                                   Random.randInt(60),
                                   Random.randInt(60));
-            assert.commandWorked(
+            TimeseriesTest.assertInsertWorked(
                 db[shardedCollName(i)].insert({[timeField]: time, [valueField]: this.tid}));
-            assert.commandWorked(
+            TimeseriesTest.assertInsertWorked(
                 db[unshardedCollName(i)].insert({[timeField]: time, [valueField]: this.tid}));
             this.docCount[i]++;
         },

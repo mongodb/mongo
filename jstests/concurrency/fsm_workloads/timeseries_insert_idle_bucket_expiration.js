@@ -9,6 +9,8 @@
  * ]
  */
 
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
 export const $config = (function() {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
@@ -26,7 +28,8 @@ export const $config = (function() {
                 [metaFieldName]: (tid * numDocs) + i,
             });
         }
-        assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: ordered}));
+        TimeseriesTest.assertInsertWorked(
+            db.runCommand({insert: collName, documents: docs, ordered: ordered}));
     };
 
     const states = {
