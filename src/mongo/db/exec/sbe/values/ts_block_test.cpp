@@ -31,6 +31,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
+#include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
@@ -50,59 +51,71 @@ const BSONObj kSampleBucket = fromjson(R"(
     "control" : {"version" : 1},
     "meta" : "A",
     "data" : {
-        "_id" : {"0" : 0}
+        "_id" : {"0" : 0, "1": 1, "2": 2, "3": 3}
     }
 })");
 
 TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
     // A TsCellBlockForTopLevelField can be created in an "unowned" state.
+    auto bucketElem = kSampleBucket["data"]["_id"].embeddedObject();
     auto cellBlock = std::make_unique<value::TsCellBlockForTopLevelField>(
-        1,     /* count */
-        false, /* owned */
+        bucketElem.nFields(), /* count */
+        false,                /* owned */
         value::TypeTags::bsonObject,
-        value::bitcastFrom<const char*>(kSampleBucket["data"]["_id"].embeddedObject().objdata()),
+        value::bitcastFrom<const char*>(bucketElem.objdata()),
         false, /* isTimefield */
         std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u}),
         std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u}));
 
     auto& valBlock = cellBlock->getValueBlock();
 
-    const auto expectedTagVal = bson::convertFrom<true>(kSampleBucket["data"]["_id"]["0"]);
+    auto checkBlockIsValid = [](value::ValueBlock& valBlock) {
+        {
+            auto extractedVals = valBlock.extract();
+            ASSERT(extractedVals.count == 4);
+            for (size_t i = 0; i < extractedVals.count; ++i) {
+                auto expectedT = value::TypeTags::NumberDouble;
+                auto expectedV = value::bitcastFrom<double>(double(i));
 
+                ASSERT_THAT(extractedVals[i], ValueEq(std::make_pair(expectedT, expectedV)))
+                    << "Expected value extracted from cloned CellBlock to be same as original";
+            }
+        }
+    };
 
-    // And we can read its values.
+    // Test that we can clone the block before extracting it, and we get the right results.
+    auto cellBlockCloneBeforeExtract = cellBlock->clone();
+    auto valBlockCloneBeforeExtract = valBlock.clone();
+    checkBlockIsValid(cellBlockCloneBeforeExtract->getValueBlock());
+    checkBlockIsValid(*valBlockCloneBeforeExtract);
+
+    // Now extract the original block, and ensure we get the right results.
     {
-        auto extractedVals = valBlock.extract();
-        ASSERT_EQ(extractedVals.count, 1) << "Expected only one value";
-        ASSERT_THAT(std::make_pair(extractedVals.tags[0], extractedVals.vals[0]),
-                    ValueEq(expectedTagVal))
-            << "Expected value extracted from block to be same as original";
+        valBlock.extract();
+
+        checkBlockIsValid(valBlock);
+        checkBlockIsValid(cellBlock->getValueBlock());
     }
 
-    // And we can clone the CellBlock.
-    auto cellBlockClone = cellBlock->clone();
-    auto valBlockClone = valBlock.clone();
+    // Check that we can clone the original cell block _after_ extracting, and still get valid
+    // results.
+    auto cellBlockCloneAfterExtract = cellBlock->clone();
+    auto valBlockCloneAfterExtract = valBlock.clone();
+    checkBlockIsValid(cellBlockCloneAfterExtract->getValueBlock());
+    checkBlockIsValid(*valBlockCloneAfterExtract);
 
     // And if we destroy the originals, we should still be able to read the clones.
     cellBlock.reset();
+
+    //
     // 'valBlock' is now invalid.
+    //
 
-    // If we get the values from the cloned CellBlock, we should see the same data.
-    {
-        auto& valsFromClonedCellBlock = cellBlockClone->getValueBlock();
-        auto extractedVals = valsFromClonedCellBlock.extract();
-        ASSERT_THAT(std::make_pair(extractedVals.tags[0], extractedVals.vals[0]),
-                    ValueEq(expectedTagVal))
-            << "Expected value extracted from cloned CellBlock to be same as original";
-    }
+    checkBlockIsValid(cellBlockCloneBeforeExtract->getValueBlock());
+    checkBlockIsValid(*valBlockCloneBeforeExtract);
 
-    // If we extract the values from the cloned ValueBlock, we should see the same data.
-    {
-        auto extractedVals = valBlockClone->extract();
-        ASSERT_THAT(std::make_pair(extractedVals.tags[0], extractedVals.vals[0]),
-                    ValueEq(expectedTagVal))
-            << "Expected value from cloned ValueBlock to be same as original";
-    }
+    checkBlockIsValid(cellBlockCloneAfterExtract->getValueBlock());
+    checkBlockIsValid(*valBlockCloneAfterExtract);
 }
 
 // Buckets with the v1 schema are not guaranteed to be sorted by the time field.
