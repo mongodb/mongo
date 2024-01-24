@@ -4720,6 +4720,69 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
     future.default_timed_get();
 }
 
+TEST_F(BulkWriteExecTest, TestGetMoreFromInitialResponse) {
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpoint0(
+        kShardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nss0, endpoint0));
+
+    BulkWriteCommandRequest request(
+        {BulkWriteInsertOp(0, BSON("x" << 1)), BulkWriteInsertOp(0, BSON("x" << 2))},
+        {NamespaceInfoEntry(nss0)});
+
+    LOGV2(7695800, "Executing a bulkWrite which should succeed.");
+
+    auto future = launchAsync([&] {
+        auto client = getService()->makeClient("thread");
+        getServiceContext()->makeOperationContext(client.get());
+        auto reply = bulk_write_exec::execute(operationContext(), targeters, request);
+        // Should have 2 reply items, 1 from the original response and 1 from the getMore.
+        ASSERT_EQUALS(reply.replyItems.size(), 2u);
+        ASSERT_EQUALS(reply.summaryFields.nInserted, 2);
+    });
+
+    // Mock a response for the request which should contain a cursorID.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        LOGV2(7695801, "Mocking a first response that requires a getMore");
+
+        ASSERT(request.cmdObj.hasField("bulkWrite"));
+
+        BulkWriteCommandReply reply;
+        reply.setCursor(BulkWriteCommandResponseCursor(
+            12345,  // cursorId
+            std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)},
+            NamespaceString::makeBulkWriteNSS(boost::none)));
+        reply.setNErrors(0);
+        reply.setNInserted(2);
+        reply.setNDeleted(0);
+        reply.setNMatched(0);
+        reply.setNModified(0);
+        reply.setNUpserted(0);
+        return reply.toBSON();
+    });
+
+    // Mock a response for the getMore which contains the remaining response.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        LOGV2(7695802, "Mocking getMore response.");
+
+        ASSERT(request.cmdObj.hasField("getMore"));
+        ASSERT_EQ(request.cmdObj.getField("getMore").numberInt(), 12345);
+
+        CursorGetMoreReply reply;
+        GetMoreResponseCursor value;
+        value.setResponseCursorBase(
+            ResponseCursorBase(0, NamespaceString::makeBulkWriteNSS(boost::none)));
+        BulkWriteReplyItem item = BulkWriteReplyItem(1);
+        value.setNextBatch({item.toBSON()});
+        reply.setCursor(value);
+        return reply.toBSON();
+    });
+
+    future.default_timed_get();
+}
+
 TEST(BulkWriteTest, getApproximateSize) {
     BulkWriteReplyItem item{0, Status::OK()};
     ASSERT_EQUALS(item.getApproximateSize(), item.serialize().objsize());
