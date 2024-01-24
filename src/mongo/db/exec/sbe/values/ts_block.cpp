@@ -377,7 +377,9 @@ std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
 
     // If the block has been decompressed into a HeterogenousBlock or Homogeneous copy, we need to
     // copy this decompressed block.
-    cpy->_decompressedBlock = _decompressedBlock->clone();
+    if (_decompressedBlock) {
+        cpy->_decompressedBlock = _decompressedBlock->clone();
+    }
 
     return cpy;
 }
