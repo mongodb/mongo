@@ -866,13 +866,18 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                    // We can run into StaleConfig errors when cloning collections. To make it
                    // safer during retry, we retry the whole cloning process and rely on the
                    // resume token to be correct.
-                   resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {
-                       _runOnceWithNaturalOrder(opCtx.get(),
-                                                MongoProcessInterface::create(opCtx.get()),
-                                                executor,
-                                                cleanupExecutor,
-                                                cancelToken);
-                   });
+                   shardVersionRetry(opCtx.get(),
+                                     Grid::get(opCtx.get())->catalogCache(),
+                                     _sourceNss,
+                                     "resharding collection clone fetching with natural order"_sd,
+                                     [&] {
+                                         _runOnceWithNaturalOrder(
+                                             opCtx.get(),
+                                             MongoProcessInterface::create(opCtx.get()),
+                                             executor,
+                                             cleanupExecutor,
+                                             cancelToken);
+                                     });
                    // If we got here, we succeeded and there is no more to come.  Otherwise
                    // _runOnceWithNaturalOrder would uassert.
                    chainCtx->moreToCome = false;
