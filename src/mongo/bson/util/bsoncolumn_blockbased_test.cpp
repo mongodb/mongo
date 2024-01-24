@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -172,6 +173,70 @@ void assertEquals<BSONCode>(const BSONCode& lhs, const BSONCode& rhs) {
 template <typename T>
 void assertEquals(const T& lhs, const T& rhs) {
     ASSERT_EQ(lhs, rhs);
+}
+
+/**
+ * A simple path that traverses an object for a set of fields make up a path.
+ */
+struct TestPath {
+    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+        BSONObj obj = refObj;
+        size_t idx = 0;
+        for (auto& field : _fields) {
+            auto elem = obj[field];
+            if (elem.eoo()) {
+                return {};
+            }
+            if (idx == _fields.size() - 1) {
+                return {elem.value()};
+            }
+            if (elem.type() != Object) {
+                return {};
+            }
+            obj = elem.Obj();
+            ++idx;
+        }
+
+        return {};
+    }
+
+    const std::vector<std::string> _fields;
+};
+
+TEST_F(BSONColumnBlockBasedTest, DecompressPath) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {
+        BSON("a" << 10 << "b" << BSON("c" << int64_t(20))),
+        BSON("a" << 11 << "b" << BSON("c" << int64_t(21))),
+        BSON("a" << 12 << "b" << BSON("c" << int64_t(22))),
+        BSON("a" << 13 << "b" << BSON("c" << int64_t(23))),
+    };
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    BSONColumnBlockBased col{cb.finalize()};
+
+    ElementStorage allocator;
+    std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
+        {TestPath{{"a"}}, {}},
+        {TestPath{{"b", "c"}}, {}},
+    };
+
+    // Decompress only the values of "a" to the vector.
+    col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), 4);
+    ASSERT_EQ(paths[0].second[0].Int(), 10);
+    ASSERT_EQ(paths[0].second[1].Int(), 11);
+    ASSERT_EQ(paths[0].second[2].Int(), 12);
+    ASSERT_EQ(paths[0].second[3].Int(), 13);
+
+    ASSERT_EQ(paths[1].second.size(), 4);
+    ASSERT_EQ(paths[1].second[0].Long(), 20);
+    ASSERT_EQ(paths[1].second[1].Long(), 21);
+    ASSERT_EQ(paths[1].second[2].Long(), 22);
+    ASSERT_EQ(paths[1].second[3].Long(), 23);
 }
 
 }  // namespace

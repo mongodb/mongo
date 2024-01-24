@@ -244,5 +244,50 @@ TEST_F(BSONColumnMaterializerTest, DecompressIterativeSimpleWithSBEMaterializer)
     verifyDecompressionIterative(obj, {value::TypeTags::Nothing, 0});
 }
 
+/**
+ * A simple path that just requests the field "a" if it exists. This corresponds to the path
+ *     Get("a") / Id
+ * This type is just a placeholder until SERVER-84620 is complete.
+ */
+struct TestPath {
+    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+        for (auto fld : refObj) {
+            if (fld.fieldNameStringData() == "a") {
+                return {fld.value()};
+            }
+        }
+
+        return {};
+    }
+};
+
+TEST_F(BSONColumnMaterializerTest, SBEMaterializerPath) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {
+        BSON("a" << 10 << "b" << 20),
+        BSON("a" << 11 << "b" << 21),
+        BSON("a" << 12 << "b" << 23),
+        BSON("a" << 13 << "b" << 24),
+    };
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    ElementStorage allocator;
+    std::vector<std::pair<TestPath, std::vector<Element>>> paths{{TestPath{}, {}}};
+
+    // Decompress only the values of "a" to the vector.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    auto& container = paths[0].second;
+    ASSERT_EQ(container.size(), 4);
+    ASSERT_EQ(container[0], Element({value::TypeTags::NumberInt32, 10}));
+    ASSERT_EQ(container[1], Element({value::TypeTags::NumberInt32, 11}));
+    ASSERT_EQ(container[2], Element({value::TypeTags::NumberInt32, 12}));
+    ASSERT_EQ(container[3], Element({value::TypeTags::NumberInt32, 13}));
+}
+
 }  // namespace
 }  // namespace mongo::sbe::bsoncolumn

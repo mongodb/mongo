@@ -67,60 +67,6 @@ constexpr int kMaxCapacity = BSONObjMaxUserSize;
 // Memory offset to get to BSONElement value when field name is an empty string.
 constexpr int kElementValueOffset = 2;
 
-/**
- * Helper class to perform recursion over a BSONObj. Two functions are provided:
- *
- * EnterSubObjFunc is called before recursing deeper, it may output an RAII object to perform logic
- * when entering/exiting a subobject.
- *
- * ElementFunc is called for every non-object element encountered during the recursion.
- */
-template <typename EnterSubObjFunc, typename ElementFunc>
-class BSONObjTraversal {
-public:
-    BSONObjTraversal(bool recurseIntoArrays,
-                     BSONType rootType,
-                     EnterSubObjFunc enterFunc,
-                     ElementFunc elemFunc)
-        : _enterFunc(std::move(enterFunc)),
-          _elemFunc(std::move(elemFunc)),
-          _recurseIntoArrays(recurseIntoArrays),
-          _rootType(rootType) {}
-
-    bool traverse(const BSONObj& obj) {
-        if (_recurseIntoArrays) {
-            return _traverseIntoArrays(""_sd, obj, _rootType);
-        } else {
-            return _traverseNoArrays(""_sd, obj, _rootType);
-        }
-    }
-
-private:
-    bool _traverseNoArrays(StringData fieldName, const BSONObj& obj, BSONType type) {
-        [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
-
-        return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
-            return elem.type() == Object
-                ? _traverseNoArrays(elem.fieldNameStringData(), elem.Obj(), Object)
-                : _elemFunc(elem);
-        });
-    }
-
-    bool _traverseIntoArrays(StringData fieldName, const BSONObj& obj, BSONType type) {
-        [[maybe_unused]] auto raii = _enterFunc(fieldName, obj, type);
-
-        return std::all_of(obj.begin(), obj.end(), [this, &fieldName](auto&& elem) {
-            return elem.type() == Object || elem.type() == Array
-                ? _traverseIntoArrays(elem.fieldNameStringData(), elem.Obj(), elem.type())
-                : _elemFunc(elem);
-        });
-    }
-
-    EnterSubObjFunc _enterFunc;
-    ElementFunc _elemFunc;
-    bool _recurseIntoArrays;
-    BSONType _rootType;
-};
 
 }  // namespace
 
@@ -847,6 +793,11 @@ namespace bsoncolumn {
 
 BSONColumnBlockBased::BSONColumnBlockBased(const char* buffer, size_t size)
     : _binary(buffer), _size(size) {}
+
+BSONColumnBlockBased::BSONColumnBlockBased(BSONBinData bin)
+    : BSONColumnBlockBased(static_cast<const char*>(bin.data), bin.length) {
+    tassert(8471202, "Invalid BSON type for column", bin.type == BinDataType::Column);
+}
 
 template <class Buffer>
 requires Appendable<Buffer>
