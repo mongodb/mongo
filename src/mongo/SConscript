@@ -212,6 +212,7 @@ baseEnv.Library(
         'util/hex.cpp',
         'util/itoa.cpp',
         'util/platform_init.cpp',
+        'util/shared_buffer_fragment_builder.cpp',
         'util/shell_exec.cpp',
         'util/signal_handlers_synchronous.cpp',
         'util/stacktrace.cpp',

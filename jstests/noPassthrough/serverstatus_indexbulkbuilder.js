@@ -192,7 +192,7 @@ assert.eq(indexBulkBuilderSection.count, 4, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 2, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 2, tojson(indexBulkBuilderSection));
-expectedSpilledRanges += 2;
+expectedSpilledRanges += 1;
 assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
