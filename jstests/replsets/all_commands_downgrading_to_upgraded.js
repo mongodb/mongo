@@ -268,6 +268,7 @@ const allCommands = {
         skip: "requires additional authentication setup"
     },
     autoCompact: {
+        checkFeatureFlag: "AutoCompact",
         command: {autoCompact: false},
         isAdminCommand: true,
         isReplSetOnly: true,
