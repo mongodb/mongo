@@ -758,7 +758,7 @@ public:
                                 ptr == end);
                         return Status::OK();
                     }
-                } else if (isBSONColumnControlLiteral(control)) {
+                } else if (bsoncolumn::isUncompressedLiteralControlByte(control)) {
                     int size;
                     if (MONGO_likely(mode == BSONValidateModeEnum::kDefault))
                         size = ValidateBuffer<false, DefaultValidator>(
@@ -776,7 +776,7 @@ public:
                         MONGO_UNREACHABLE;
 
                     ptr += size;
-                } else if (isBSONColumnInterleavedStart(control)) {
+                } else if (bsoncolumn::isInterleavedStartControlByte(control)) {
                     // interleaved objects begin with a reference object, and then a series
                     // of diff blocks for followup objects, ending with an EOO
                     ptr++;
@@ -789,7 +789,7 @@ public:
                     interleavedMode = true;
                 } else {
                     // Simple8b block sequence, just check for memory overflow of block count
-                    uint8_t numBlocks = numSimple8bBlocksInBSONColumnControl(control);
+                    uint8_t numBlocks = bsoncolumn::numSimple8bBlocksForControlByte(control);
                     int size = sizeof(uint64_t) * numBlocks;
                     uassert(NonConformantBSON,
                             "BSONColumn blocks exceed buffer size",
@@ -803,21 +803,6 @@ public:
 
         // We should not get here for a valid object, the final EOO should have returned OK
         return Status(NonConformantBSON, "Missing terminating EOO");
-    }
-
-private:
-    static bool isBSONColumnControlLiteral(char control) {
-        return (control & 0xE0) == 0;
-    }
-
-    static uint8_t numSimple8bBlocksInBSONColumnControl(char control) {
-        return (control & 0x0F) + 1;
-    }
-
-    static bool isBSONColumnInterleavedStart(char control) {
-        return control == bsoncolumn::kInterleavedStartControlByteLegacy ||
-            control == bsoncolumn::kInterleavedStartControlByte ||
-            control == bsoncolumn::kInterleavedStartArrayRootControlByte;
     }
 };
 
