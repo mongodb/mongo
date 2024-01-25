@@ -37,6 +37,15 @@ static constexpr char kInterleavedStartControlByteLegacy = (char)0xF0;
 static constexpr char kInterleavedStartControlByte = (char)0xF1;
 static constexpr char kInterleavedStartArrayRootControlByte = (char)0xF2;
 
+inline bool isUncompressedLiteralControlByte(uint8_t control) {
+    return (control & 0xE0) == 0 || control == (uint8_t)MinKey || control == (uint8_t)MaxKey;
+}
+
+inline bool isInterleavedStartControlByte(char control) {
+    return control == kInterleavedStartControlByteLegacy ||
+        control == kInterleavedStartControlByte || control == kInterleavedStartArrayRootControlByte;
+}
+
 inline bool isLiteralControlByte(char control) {
     return (control & 0xE0) == 0;
 }
