@@ -6,6 +6,9 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
+  # These tests run in the sharded_collections_txns_uninitialized_fcv passthrough suite.
+  - jstests/core/txns/**/*.js
+
   ### Tests that are excluded because of initial sync (from replica_sets_initsync_jscore_passthrough.yml)
   # Tests that query the system.profile collection cannot run in this suite since an initial sync
   # may insert unexpected operations into the profile collection.
@@ -94,37 +97,10 @@ selector:
   - jstests/core/**/optimized_match_explain.js
   - jstests/core/**/sort_array.js
 
-  ### Tests that are excluded because of sharding and transactions (from sharded_jscore_txns_sharded_collections.yml)
-  # Profile can only be run against the admin database on mongos.
-  - jstests/core/txns/transactions_profiling.js
-  - jstests/core/txns/transactions_profiling_with_drops.js
-
-  # Implicitly creates a database through a collection rename, which does not work in a sharded
-  # cluster.
-  - jstests/core/txns/transactions_block_ddl.js
-
-  # transactionLifetimeLimitSeconds parameter is not available in mongos.
-  - jstests/core/txns/abort_expired_transaction.js
-  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
-  - jstests/core/txns/kill_op_on_txn_expiry.js
-
-  # Uses hangAfterCollectionInserts failpoint not available on mongos.
-  - jstests/core/txns/speculative_snapshot_includes_all_writes.js
-
-  # View tests aren't expected to work when collections are implicitly sharded.
-  - jstests/core/txns/view_reads_in_transaction.js
-
-  # These workloads explicitly create collections inside multi-document transactions. These are
-  # non-idempotent operations, and the implicit collection sharding logic upon collection access
-  # results in premature collection creation, causing the workloads to fail.
-  - jstests/core/txns/create_collection.js
-  - jstests/core/txns/create_collection_parallel.js
-  - jstests/core/txns/create_indexes.js
-  - jstests/core/txns/create_indexes_parallel.js
-  - jstests/core/txns/commands_in_txns_read_concern.js
-
   # Will fail all commands including those needed to forward command to initial sync node.
   - jstests/core/failcommand_failpoint.js
+  # Has asserts that depend on the use of fsyncLock which is skipped by this passthrough.
+  - jstests/core/ddl/killop_drop_collection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
