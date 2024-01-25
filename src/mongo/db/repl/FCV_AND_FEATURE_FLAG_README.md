@@ -70,6 +70,22 @@ on this FCV, this should all be using the same `FCVSnapshot`. But if you're doin
 checks at different points in time, such as over multiple functions,or multiple distinct feature flag enablement checks (i.e. `featureFlagXX.isEnabled && featureFlagYY.isEnabled`), you should acquire a new FCV snapshot since the old one
 may be stale. 
 
+## Checking FCV in a JS Test
+Sometimes JS tests need to branch on FCV, for example if the test runs in multiversion suites and exercises behavior that differs depending
+on a node's FCV.
+
+You can accomplish this by using `getParameter` to obtain the FCV. You should also file a SERVER ticket and add a TODO as a reminder
+to remove the FCV check when it is no longer needed in the future.
+```js
+// TODO SERVER-XXXXX: Remove branching once last-lts FCV is >= X.Y.
+const fcvDoc = db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, 'X.Y') >= 0) {
+    // code here for FCV >= X.Y
+} else {
+    // code here for FCV < X.Y
+}
+```
+
 # setFeatureCompatibilityVersion Command Overview
 
 The FCV can be set using the `setFeatureCompatibilityVersion` admin command to one of the following:
