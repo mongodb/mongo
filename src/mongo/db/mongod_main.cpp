@@ -99,6 +99,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
@@ -454,6 +455,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             "Running wiredTiger without journaling in a replica set is not supported. Make sure "
             "you are not using --nojournal and that storage.journal.enabled is not set to "
             "'false'");
+        exitCleanly(EXIT_BADOPTIONS);
+    }
+
+    if (gAllowDocumentsGreaterThanMaxUserSize && replSettings.usingReplSets()) {
+        LOGV2_ERROR(8472200,
+                    "allowDocumentsGreaterThanMaxUserSize can only be used in standalone mode");
         exitCleanly(EXIT_BADOPTIONS);
     }
 
