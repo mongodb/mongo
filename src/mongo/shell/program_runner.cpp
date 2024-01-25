@@ -753,6 +753,37 @@ void ProgramRunner::launchProcess(int child_stdout) {
             _exit(static_cast<int>(ExitCode::fail));  // do not pass go, do not call atexit handlers
         }
 
+        // If the "namedPipeInput" key exists in _envp, the value specifies a named pipe to input
+        // data into a new program. We expect this value to be the absolute path of the named pipe.
+        auto namedPipeInput = _envp.find("namedPipeInput");
+        if (namedPipeInput != _envp.end()) {
+            auto namedPipeFilePath = namedPipeInput->second;
+
+#ifdef _WIN32
+            // "//./pipe/" is the required path start of all named pipes on Windows, where "//." is
+            // the abbreviation for the local server name and "/pipe" is a literal. (These also work
+            // with Windows-native backslashes instead of forward slashes.
+            namedPipeFilePath = "//./pipe/" + namedPipeFilePath;
+#endif
+
+            const char* pipe_path = namedPipeFilePath.c_str();
+            int fifo_fd = open(pipe_path, O_RDONLY);
+            if (fifo_fd == -1) {
+                perror("Unable to open named pipe to read input");
+                _exit(static_cast<int>(ExitCode::fail));
+            }
+
+            if (dup2(fifo_fd, STDIN_FILENO) == -1) {
+                perror("Unable to dup2 named pipe file descriptor");
+                _exit(static_cast<int>(ExitCode::fail));
+            }
+
+            if (close(fifo_fd) == -1) {
+                perror("Unable to close named pipe file descriptor");
+                _exit(static_cast<int>(ExitCode::fail));
+            }
+        }
+
         execve(argvStorage[0],
                const_cast<char**>(argvStorage.data()),
                const_cast<char**>(envpStorage.data()));
