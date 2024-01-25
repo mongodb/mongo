@@ -325,7 +325,7 @@ public:
         @return point to region that was skipped.  pointer may change later (on realloc), so for
         immediate use only
     */
-    char* skip(int n) {
+    char* skip(size_t n) {
         return grow(n);
     }
 
@@ -394,7 +394,7 @@ public:
     }
     void appendBuf(const void* src, size_t len) {
         if (len)
-            memcpy(grow((int)len), src, len);
+            memcpy(grow(len), src, len);
     }
 
     template <class T>
@@ -403,7 +403,7 @@ public:
     }
 
     void appendStr(StringData str, bool includeEndingNull = true) {
-        const int len = str.size() + (includeEndingNull ? 1 : 0);
+        const size_t len = str.size() + (includeEndingNull ? 1 : 0);
         str.copyTo(grow(len), includeEndingNull);
     }
 
@@ -423,8 +423,8 @@ public:
     }
 
     /* returns the pre-grow write position */
-    char* grow(int by) {
-        if (MONGO_likely(by <= _end - _nextByte)) {
+    char* grow(size_t by) {
+        if (MONGO_likely(by <= static_cast<size_t>(_end - _nextByte))) {
             char* oldNextByte = _nextByte;
             _nextByte += by;
             return oldNextByte;
