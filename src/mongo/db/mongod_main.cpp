@@ -95,6 +95,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/fcv_op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -581,6 +582,12 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         LOGV2_ERROR(5019200,
                     "Cannot specify both repair and replSet at the same time (remove --replSet to "
                     "be able to --repair)");
+        exitCleanly(ExitCode::badOptions);
+    }
+
+    if (gAllowDocumentsGreaterThanMaxUserSize && replSettings.usingReplSets()) {
+        LOGV2_ERROR(8472200,
+                    "allowDocumentsGreaterThanMaxUserSize can only be used in standalone mode");
         exitCleanly(ExitCode::badOptions);
     }
 
