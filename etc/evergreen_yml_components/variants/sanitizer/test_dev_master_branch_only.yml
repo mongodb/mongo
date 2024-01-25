@@ -409,16 +409,12 @@ buildvariants:
   - name: compile_test_parallel_unittest_stream_TG
   - name: aggregation !.feature_flag_guarded
   - name: auth_gen
-  - name: causally_consistent_jscore_txns_passthrough
   - name: disk_wiredtiger
   - name: failpoints
   - name: .jscore .common !.auth !.sharding
-  - name: jsCore_txns_large_txns_format
   - name: mongosTest
   - name: replica_sets_gen
-  - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: .ssl
-  - name: .stitch
 
 - name: &enterprise-macos enterprise-macos
   display_name: "Enterprise macOS DEBUG"
@@ -446,12 +442,10 @@ buildvariants:
   - name: compile_test_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore !.ssl
+  - name: fle
+  - name: fle2
   - name: .jscore .common !.decimal !.sharding
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
-  - name: timeseries_crud_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
 
