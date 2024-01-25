@@ -419,5 +419,27 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentLotsOfGrows) {
     ASSERT_EQ(8 * kBlockSize, builder.memUsage());
 }
 
+TEST_F(SharedBufferTest, ManyUnusedBuffers) {
+    constexpr size_t kBlockSize = 16;
+    SharedBufferFragmentBuilder builder(
+        kBlockSize, SharedBufferFragmentBuilder::DoubleGrowStrategy(kBlockSize));
+
+    {
+        // Create many fragments, stop using them them all at once, and expect freeUnused to reclaim
+        // all but one.
+        std::vector<SharedBufferFragment> fragments;
+        for (int i = 0; i < 128; i++) {
+            builder.start(kBlockSize);
+            ASSERT_EQ(kBlockSize, builder.capacity());
+            fragments.emplace_back(builder.finish(kBlockSize));
+            ASSERT_EQ(kBlockSize * (i + 1), builder.totalFragmentBytesUsed());
+            ASSERT_EQ(kBlockSize * (i + 1), builder.memUsage());
+        }
+    }
+
+    builder.freeUnused();
+    ASSERT_EQ(kBlockSize, builder.memUsage());
+}
+
 }  // namespace
 }  // namespace mongo
