@@ -762,44 +762,6 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderDiscriminator) {
     ASSERT_EQ((uint8_t)'\004', end);
 }
 
-TEST_F(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator1) {
-    // test that when passed in a Discriminator it gets added.
-    BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
-
-    key_string::HeapBuilder ks1(
-        key_string::Version::V1, ALL_ASCENDING, key_string::Discriminator::kExclusiveBefore);
-    ks1.appendBSONElement(doc["fieldA"]);
-    ks1.appendBSONElement(doc["fieldB"]);
-    key_string::Value data1 = ks1.release();
-
-    key_string::HeapBuilder ks2(
-        key_string::Version::V1, ALL_ASCENDING, key_string::Discriminator::kExclusiveAfter);
-    ks2.appendBSONElement(doc["fieldA"]);
-    ks2.appendBSONElement(doc["fieldB"]);
-    key_string::Value data2 = ks2.release();
-
-    ASSERT_EQ(data1.compareWithoutDiscriminator(data2), 0);
-}
-
-TEST_F(KeyStringBuilderTest, KeyStringValueCompareWithoutDiscriminator2) {
-    // test that when passed in a Discriminator it gets added.
-    BSONObj doc = BSON("fieldA" << 1 << "fieldB" << 2);
-
-    key_string::HeapBuilder ks1(
-        key_string::Version::V1, ALL_ASCENDING, key_string::Discriminator::kExclusiveBefore);
-    ks1.appendBSONElement(doc["fieldA"]);
-    ks1.appendBSONElement(doc["fieldB"]);
-    key_string::Value data1 = ks1.release();
-
-    key_string::HeapBuilder ks2(
-        key_string::Version::V1, ALL_ASCENDING, key_string::Discriminator::kExclusiveAfter);
-    ks2.appendBSONElement(doc["fieldA"]);
-    ks2.appendBSONElement(doc["fieldA"]);
-    key_string::Value data2 = ks2.release();
-
-    ASSERT_EQ(data1.compareWithoutDiscriminator(data2), 1);
-}
-
 TEST_F(KeyStringBuilderTest, DoubleInvalidIntegerPartV0) {
     // Test that an illegally encoded double throws an error.
     const char* data =

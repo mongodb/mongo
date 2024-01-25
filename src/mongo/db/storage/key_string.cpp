@@ -2755,14 +2755,6 @@ void toBsonSafe(const char* buffer,
     }
 }
 
-int Value::compareWithoutDiscriminator(const Value& other) const {
-    return key_string::compare(
-        getBuffer(),
-        other.getBuffer(),
-        !isEmpty() ? sizeWithoutDiscriminatorAtEnd(getBuffer(), getSize()) : 0,
-        !other.isEmpty() ? sizeWithoutDiscriminatorAtEnd(other.getBuffer(), other.getSize()) : 0);
-}
-
 BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
     BSONObjBuilder builder;
     toBsonSafe(buffer, len, ord, typeBits, builder);
@@ -2831,17 +2823,6 @@ size_t sizeWithoutRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
 
     invariant(bufSize >= ridSize + numSegments);
     return bufSize - ridSize - numSegments;
-}
-
-size_t sizeWithoutDiscriminatorAtEnd(const void* bufferRaw, size_t bufSize) {
-    keyStringAssert(8328701,
-                    fmt::format("Input too short to decode RecordId. bufSize: {}", bufSize),
-                    bufSize >= 2);  // smallest possible encoding of a RecordId.
-    const char* ptr = static_cast<const char*>(bufferRaw) + bufSize - 1;
-    uint8_t ctype = ConstDataView(ptr).read<uint8_t>();
-    tassert(8328700, "Expect keystring to have a kEnd byte at the end", ctype == kEnd);
-    ctype = ConstDataView(ptr - 1).read<uint8_t>();
-    return ctype == kLess || ctype == kGreater ? bufSize - 2 : bufSize - 1;
 }
 
 RecordId decodeRecordIdLong(BufReader* reader) {
