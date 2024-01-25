@@ -231,5 +231,114 @@ TEST(TypeCheckerTest, FoldFillEmptyVariable) {
     ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::NumberInt64).typesMask);
 }
 
+TEST(TypeCheckerTest, FoldTraverseF) {
+    // Run traverseF on a slot variable.
+    auto tree1 =
+        make<FunctionCall>("traverseF",
+                           makeSeq(make<Variable>(getABTVariableName(1)),
+                                   make<LambdaAbstraction>(
+                                       getABTLocalVariableName(2, 0),
+                                       make<BinaryOp>(Operations::Gt,
+                                                      make<Variable>(getABTLocalVariableName(2, 0)),
+                                                      Constant::int32(8))),
+                                   Constant::boolean(false)));
+    TypeSignature signature = TypeChecker{}.typeCheck(tree1);
+    ASSERT_EQ(
+        signature.typesMask,
+        getTypeSignature(sbe::value::TypeTags::Boolean, sbe::value::TypeTags::Nothing).typesMask);
+    // Inject the information that the slot contains a number (and not an array).
+    TypeChecker checker;
+    checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
+    signature = checker.typeCheck(tree1);
+
+    // The result should be a Let expression having the comparison in its body.
+    ASSERT(tree1.is<Let>() && tree1.cast<Let>()->in().is<BinaryOp>());
+    ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::Boolean).typesMask);
+
+    // Run it on a constant array.
+    auto tree2 =
+        make<FunctionCall>("traverseF",
+                           makeSeq(Constant::array(sbe::value::makeIntOrLong(78)),
+                                   make<LambdaAbstraction>(
+                                       getABTLocalVariableName(2, 0),
+                                       make<BinaryOp>(Operations::Gt,
+                                                      make<Variable>(getABTLocalVariableName(2, 0)),
+                                                      Constant::int32(8))),
+                                   Constant::boolean(false)));
+    signature = TypeChecker{}.typeCheck(tree2);
+
+    ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::Boolean).typesMask);
+
+    // Run it on a constant number.
+    auto tree3 =
+        make<FunctionCall>("traverseF",
+                           makeSeq(Constant::int32(78),
+                                   make<LambdaAbstraction>(
+                                       getABTLocalVariableName(2, 0),
+                                       make<BinaryOp>(Operations::Gt,
+                                                      make<Variable>(getABTLocalVariableName(2, 0)),
+                                                      Constant::int32(8))),
+                                   Constant::boolean(false)));
+    signature = TypeChecker{}.typeCheck(tree3);
+
+    // The result should be a Let expression having the comparison in its body.
+    ASSERT(tree3.is<Let>() && tree1.cast<Let>()->in().is<BinaryOp>());
+    ASSERT_EQ(signature.typesMask, getTypeSignature(sbe::value::TypeTags::Boolean).typesMask);
+}
+
+TEST(TypeCheckerTest, FoldTraverseP) {
+    // Run traverseP on a slot variable.
+    auto tree1 =
+        make<FunctionCall>("traverseP",
+                           makeSeq(make<Variable>(getABTVariableName(1)),
+                                   make<LambdaAbstraction>(
+                                       getABTLocalVariableName(2, 0),
+                                       make<BinaryOp>(Operations::Mult,
+                                                      make<Variable>(getABTLocalVariableName(2, 0)),
+                                                      Constant::int32(90))),
+                                   Constant::int32(0)));
+    TypeSignature signature = TypeChecker{}.typeCheck(tree1);
+    ASSERT_EQ(signature.typesMask,
+              TypeSignature::kArrayType.include(TypeSignature::kAnyScalarType).typesMask);
+    // Inject the information that the slot contains a number (and not an array).
+    TypeChecker checker;
+    checker.bind(getABTVariableName(1), TypeSignature::kNumericType);
+    signature = checker.typeCheck(tree1);
+
+    // The result should be a Let expression having the multiplication in its body.
+    ASSERT(tree1.is<Let>() && tree1.cast<Let>()->in().is<BinaryOp>());
+    ASSERT_EQ(signature.typesMask, TypeSignature::kNumericType.typesMask);
+
+    // Run it on a constant array.
+    auto tree2 =
+        make<FunctionCall>("traverseP",
+                           makeSeq(Constant::array(sbe::value::makeIntOrLong(78)),
+                                   make<LambdaAbstraction>(
+                                       getABTLocalVariableName(2, 0),
+                                       make<BinaryOp>(Operations::Mult,
+                                                      make<Variable>(getABTLocalVariableName(2, 0)),
+                                                      Constant::int32(90))),
+                                   Constant::int32(0)));
+    signature = TypeChecker{}.typeCheck(tree2);
+
+    ASSERT_EQ(signature.typesMask, TypeSignature::kArrayType.typesMask);
+
+    // Run it on a constant number.
+    auto tree3 =
+        make<FunctionCall>("traverseP",
+                           makeSeq(Constant::int32(78),
+                                   make<LambdaAbstraction>(
+                                       getABTLocalVariableName(2, 0),
+                                       make<BinaryOp>(Operations::Mult,
+                                                      make<Variable>(getABTLocalVariableName(2, 0)),
+                                                      Constant::int32(90))),
+                                   Constant::int32(0)));
+    signature = TypeChecker{}.typeCheck(tree3);
+
+    // The result should be a Let expression having the multiplication in its body.
+    ASSERT(tree3.is<Let>() && tree1.cast<Let>()->in().is<BinaryOp>());
+    ASSERT_EQ(signature.typesMask, TypeSignature::kNumericType.typesMask);
+}
+
 }  // namespace
 }  // namespace mongo::stage_builder
