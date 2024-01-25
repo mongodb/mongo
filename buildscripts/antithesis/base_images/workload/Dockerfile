@@ -22,12 +22,9 @@ RUN ln -f $(which python3.10) /usr/bin/python3
 
 RUN python -m pip install --upgrade pip wheel
 
-# Ensure the sanitizer runtime is present (libclang-common) and symbolizer (llvm)
+# Ensure the symbolizer is present (llvm)
 ARG LLVM_VERSION=12
-RUN apt-get install -y libclang-common-${LLVM_VERSION}-dev llvm-${LLVM_VERSION}
-
-# Ensure the dynamic linker can find the sanitizer runtimes
-RUN dirname $(find /usr/lib -name libclang_rt.asan-x86_64.so) > /etc/ld.so.conf.d/sanitizer.conf && ldconfig
+RUN apt-get install -y llvm-${LLVM_VERSION}
 
 # Copy TSAN suppressions
 COPY tsan.suppressions /etc/tsan.suppressions

@@ -405,6 +405,16 @@ add_option(
 )
 
 add_option(
+    'shared-libsan',
+    choices=['on', 'off'],
+    default='off',
+    nargs='?',
+    const='on',
+    help='dynamically link to sanitizer runtime(s)',
+    type='choice',
+)
+
+add_option(
     'allocator',
     choices=["auto", "system", "tcmalloc", "tcmalloc-experimental"],
     default=build_profile.allocator,
@@ -4103,6 +4113,34 @@ def doConfigure(myenv):
         using_ubsan = 'undefined' in sanitizer_list
         using_msan = 'memory' in sanitizer_list
 
+        if get_option('shared-libsan') == 'on' and len(sanitizer_list) > 0:
+            if not myenv.ToolchainIs('clang') or not myenv.TargetOSIs('linux'):
+                env.FatalError('Error: --shared-libsan is only supported with clang on linux')
+
+            def get_san_lib_path(sanitizer):
+                # TODO SERVER-83727: the v4 clang toolchain doesn't support shared TSAN. Add
+                # support here once the toolchain is upgraded.
+                san_to_lib = {
+                    'address': 'asan',
+                    'undefined': 'ubsan_standalone',
+                }
+                sanitizer_lib = san_to_lib.get(sanitizer)
+                if sanitizer_lib is None:
+                    env.FatalError(
+                        f'Error: --shared-libsan is not supported with {sanitizer} sanitizer')
+                arch = env['TARGET_ARCH']
+                san_rt_name = f'libclang_rt.{sanitizer_lib}-{arch}.so'
+                p = subprocess.run([env['CXX'], f'-print-file-name={san_rt_name}'],
+                                   capture_output=True, text=True)
+                clang_rt_path = p.stdout.strip()
+                if not os.path.isfile(clang_rt_path):
+                    env.FatalError(f"Error: couldn't find sanitizer runtime library {san_rt_name}")
+                return clang_rt_path
+
+            env['SANITIZER_RUNTIME_LIBS'] = [
+                get_san_lib_path(sanitizer) for sanitizer in sanitizer_list
+            ]
+
         if using_lsan:
             env.FatalError("Please use --sanitize=address instead of --sanitize=leak")
 
@@ -4181,6 +4219,11 @@ def doConfigure(myenv):
             myenv.Append(CCFLAGS=['-fno-omit-frame-pointer'])
         else:
             myenv.ConfError('Failed to enable sanitizers with flag: {0}', sanitizer_option)
+
+        if get_option('shared-libsan') == 'on':
+            shared_libsan_option = '-shared-libsan'
+            if myenv.AddToCCFLAGSIfSupported(shared_libsan_option):
+                myenv.Append(LINKFLAGS=[shared_libsan_option])
 
         myenv['SANITIZERS_ENABLED'] = sanitizer_list
 
@@ -6026,6 +6069,15 @@ env.AutoInstall(
     AIB_COMPONENT='pretty-printer-tests',
     AIB_COMPONENTS_EXTRA=['dist-test'],
 )
+
+if 'SANITIZER_RUNTIME_LIBS' in env:
+    env.AutoInstall(
+        target='$PREFIX_LIBDIR',
+        source=[env.File(path) for path in env['SANITIZER_RUNTIME_LIBS']],
+        AIB_COMPONENT='dist',
+        AIB_ROLE='runtime',
+        AIB_COMPONENTS_EXTRA=['dist-test'],
+    )
 
 env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'
 

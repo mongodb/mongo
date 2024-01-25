@@ -42,8 +42,6 @@ buildvariants:
   expansions:
     <<: *enterprise-ubuntu2204-64-libvoidstar-expansions-template
     compile_variant: *enterprise-ubuntu2204-64-libvoidstar
-    # Do not set link-model=dynamic on this build. The antithesis image builder
-    # scripts cannot handle the shared library build
     compile_flags: >-
       --ssl
       --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204
@@ -70,8 +68,9 @@ buildvariants:
       --ocsp-stapling=off MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
-      CCFLAGS="-fsanitize-coverage=trace-pc-guard -shared-libasan"
-      LINKFLAGS="-shared-libasan"
+      --shared-libsan
+      --link-model=dynamic
+      CCFLAGS="-fsanitize-coverage=trace-pc-guard"
       LIBS="voidstar"
       --use-diagnostic-latches=on
     san_options: >-

@@ -16,12 +16,9 @@ RUN mkdir -p /scripts
 RUN apt-get update
 RUN apt-get install -y curl python3
 
-# Ensure the sanitizer runtime is present (libclang-common) and symbolizer (llvm-12)
+# Ensure the symbolizer is present (llvm)
 ARG LLVM_VERSION=12
-RUN apt-get install -y libclang-common-${LLVM_VERSION}-dev llvm-${LLVM_VERSION}
-
-# Ensure the dynamic linker can find the sanitizer runtimes
-RUN dirname $(find /usr/lib -name libclang_rt.asan-x86_64.so) > /etc/ld.so.conf.d/sanitizer.conf && ldconfig
+RUN apt-get install -y llvm-${LLVM_VERSION}
 
 # Copy TSAN suppressions
 COPY tsan.suppressions /etc/tsan.suppressions
