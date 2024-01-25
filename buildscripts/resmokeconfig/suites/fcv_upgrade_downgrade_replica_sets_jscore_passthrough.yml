@@ -97,6 +97,7 @@ selector:
   # of commands. If they profile the setFCV command, this could cause the test to fail.
   - jstests/core/administrative/profile/profile_sampling.js
   - jstests/core/administrative/profile/profile1.js
+  - jstests/aggregation/sources/lookup/profile_lookup.js
 
 executor:
   archive:
