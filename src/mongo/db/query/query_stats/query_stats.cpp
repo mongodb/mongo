@@ -295,6 +295,11 @@ void registerRequest(OperationContext* opCtx,
         return;
     }
 
+    // Don't record queries from internal clients.
+    if (opCtx->getClient()->isInternalClient()) {
+        return;
+    }
+
     auto& opDebug = CurOp::get(opCtx)->debug();
 
     if (opDebug.queryStatsInfo.wasRateLimited) {
