@@ -276,9 +276,7 @@ WriteUnitOfWork::RecoveryUnitState setRecoveryUnit(OperationContext* opCtx,
                                                    std::unique_ptr<RecoveryUnit> unit,
                                                    WriteUnitOfWork::RecoveryUnitState state);
 
-inline WriteUnitOfWork* getWriteUnitOfWork(OperationContext* opCtx) {
-    return opCtx->getWriteUnitOfWork_DO_NOT_USE();
-}
+WriteUnitOfWork* getWriteUnitOfWork(OperationContext* opCtx);
 
 void setWriteUnitOfWork(OperationContext* opCtx, std::unique_ptr<WriteUnitOfWork> writeUnitOfWork);
 
