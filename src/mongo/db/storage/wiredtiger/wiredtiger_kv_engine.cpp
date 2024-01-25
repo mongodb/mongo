@@ -619,14 +619,38 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
     _sessionCache.reset(nullptr);
 }
 
-void WiredTigerKVEngine::notifyStartupComplete(OperationContext* opCtx) {
+void WiredTigerKVEngine::notifyStorageStartupRecoveryComplete() {
     unpinOldestTimestamp(kPinOldestTimestampAtStartupName);
-    WiredTigerUtil::notifyStartupComplete();
+    WiredTigerUtil::notifyStorageStartupRecoveryComplete();
+}
+
+void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opCtx) {
+    // The assertion below verifies that our oldest timestamp is not ahead of a non-zero stable
+    // timestamp upon exiting startup recovery. This is because it is not safe to begin taking
+    // stable checkpoints while the oldest timestamp is ahead of the stable timestamp.
+    //
+    // If we recover from an unstable checkpoint, such as in the startup recovery for restore case
+    // after we have finished oplog replay, we will start up with a null stable timestamp. As a
+    // result, we can safely advance the oldest timestamp.
+    //
+    // If we recover with a stable checkpoint, the stable timestamp will be set to the previous
+    // value. In this case, we expect the oldest timestamp to be advanced in lockstep with the
+    // stable timestamp during any recovery process, and so the oldest timestamp should never exceed
+    // the stable timestamp.
+    // TODO (SERVER-85688): Re-enable this invariant once the stable timestamp is correctly handled
+    // during startup recovery for restore.
+    // const Timestamp oldest = getOldestTimestamp();
+    // const Timestamp stable = getStableTimestamp();
+    // uassert(8470600,
+    //         str::stream() << "Oldest timestamp " << oldest
+    //                       << " is ahead of non-zero stable timestamp " << stable,
+    //         (stable.isNull() || oldest.isNull() || oldest <= stable));
 
     if (!gEnableAutoCompaction)
         return;
 
-    // Background compaction should not be executed if:
+    // Notify the storage engine that it is safe to take stable checkpoints, as the data is now in a
+    // stable state. Background compaction should not be executed if:
     // - checkpoints are disabled or,
     // - user writes are not allowed.
     uassert(8373400,

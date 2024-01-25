@@ -176,9 +176,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     ShardingState::create_forTest_DO_NOT_USE(serviceContext);
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
-
-    auto opCtx = serviceContext->makeOperationContext(getClient());
-    serviceContext->getStorageEngine()->notifyStartupComplete(opCtx.get());
+    serviceContext->getStorageEngine()->notifyStorageStartupRecoveryComplete();
 
     if (options._indexBuildsCoordinator) {
         IndexBuildsCoordinator::set(serviceContext, std::move(options._indexBuildsCoordinator));

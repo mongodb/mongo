@@ -99,8 +99,7 @@ public:
         repl::ReplicationCoordinator::set(getGlobalServiceContext(),
                                           std::make_unique<repl::ReplicationCoordinatorMock>(
                                               getGlobalServiceContext(), replSettings));
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        _engine.notifyStartupComplete(opCtx.get());
+        _engine.notifyStorageStartupRecoveryComplete();
     }
 
     ~WiredTigerRecoveryUnitHarnessHelper() {}

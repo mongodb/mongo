@@ -948,7 +948,7 @@ void WiredTigerUtil::validateTableLogging(WiredTigerRecoveryUnit& ru,
     }
 }
 
-void WiredTigerUtil::notifyStartupComplete() {
+void WiredTigerUtil::notifyStorageStartupRecoveryComplete() {
     removeTableChecksFile();
 }
 

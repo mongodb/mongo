@@ -482,7 +482,7 @@ void ServiceContext::waitForStartupComplete() {
     _startupCompleteCondVar.wait(lk, [this] { return _startupComplete; });
 }
 
-void ServiceContext::notifyStartupComplete() {
+void ServiceContext::notifyStorageStartupRecoveryComplete() {
     stdx::unique_lock<Latch> lk(_mutex);
     _startupComplete = true;
     lk.unlock();

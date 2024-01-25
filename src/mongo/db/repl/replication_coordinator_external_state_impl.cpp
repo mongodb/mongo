@@ -248,6 +248,9 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
         return;
 
     invariant(replCoord);
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    invariant(storageEngine);
+
     _oplogBuffer = std::make_unique<OplogBufferBlockingQueue>(&bufferGauge);
 
     // No need to log OplogBuffer::startup because the blocking queue implementation
@@ -288,6 +291,10 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _syncSourceFeedbackThread = std::make_unique<stdx::thread>([this, bgSyncPtr, replCoord] {
         _syncSourceFeedback.run(_taskExecutor.get(), bgSyncPtr, replCoord);
     });
+
+    // Notify the storage engine that we have completed startup recovery and are transitioning to
+    // steady state replication.
+    storageEngine->notifyReplStartupRecoveryComplete(opCtx);
 }
 
 void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(

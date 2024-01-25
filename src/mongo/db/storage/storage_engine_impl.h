@@ -90,7 +90,9 @@ public:
 
     virtual ~StorageEngineImpl();
 
-    virtual void notifyStartupComplete(OperationContext* opCtx) override;
+    virtual void notifyStorageStartupRecoveryComplete() override;
+
+    virtual void notifyReplStartupRecoveryComplete(OperationContext* opCtx) override;
 
     virtual RecoveryUnit* newRecoveryUnit() override;
 

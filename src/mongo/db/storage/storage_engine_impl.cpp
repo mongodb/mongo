@@ -911,8 +911,12 @@ void StorageEngineImpl::startTimestampMonitor() {
     _timestampMonitor->addListener(&_collectionCatalogCleanupTimestampListener);
 }
 
-void StorageEngineImpl::notifyStartupComplete(OperationContext* opCtx) {
-    _engine->notifyStartupComplete(opCtx);
+void StorageEngineImpl::notifyStorageStartupRecoveryComplete() {
+    _engine->notifyStorageStartupRecoveryComplete();
+}
+
+void StorageEngineImpl::notifyReplStartupRecoveryComplete(OperationContext* opCtx) {
+    _engine->notifyReplStartupRecoveryComplete(opCtx);
 }
 
 RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {

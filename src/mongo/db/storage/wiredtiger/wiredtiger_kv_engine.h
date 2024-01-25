@@ -145,7 +145,8 @@ public:
 
     ~WiredTigerKVEngine();
 
-    void notifyStartupComplete(OperationContext* opCtx) override;
+    void notifyStorageStartupRecoveryComplete() override;
+    void notifyReplStartupRecoveryComplete(OperationContext* opCtx) override;
 
     void setRecordStoreExtraOptions(const std::string& options);
     void setSortedDataInterfaceExtraOptions(const std::string& options);

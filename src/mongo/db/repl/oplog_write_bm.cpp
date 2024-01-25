@@ -227,7 +227,7 @@ public:
                                                                  oplogApplierOptions,
                                                                  _oplogApplierThreadPool.get());
 
-        _svcCtx->notifyStartupComplete();
+        _svcCtx->notifyStorageStartupRecoveryComplete();
     }
 
     ~TestServiceContext() {

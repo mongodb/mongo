@@ -216,7 +216,7 @@ ExitCode initAndListen() {
         return ExitCode::netError;
     }
 
-    serviceContext->notifyStartupComplete();
+    serviceContext->notifyStorageStartupRecoveryComplete();
 
 #ifndef _WIN32
     initialize_server_global_state::signalForkSuccess();

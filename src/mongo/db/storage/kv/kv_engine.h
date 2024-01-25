@@ -66,7 +66,15 @@ public:
      * When all of the storage startup tasks are completed as a whole, then this function is called
      * by the external force managing the startup process.
      */
-    virtual void notifyStartupComplete(OperationContext* opCtx) {}
+    virtual void notifyStorageStartupRecoveryComplete() {}
+
+    /**
+     * Perform any operations in the storage layer that are unblocked now that the server has exited
+     * recovery and considers itself stable.
+     *
+     * This will be called during a node's transition to steady state replication.
+     */
+    virtual void notifyReplStartupRecoveryComplete(OperationContext* opCtx) {}
 
     virtual RecoveryUnit* newRecoveryUnit() = 0;
 

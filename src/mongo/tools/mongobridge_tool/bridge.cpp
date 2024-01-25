@@ -547,7 +547,7 @@ int bridgeMain(int argc, char** argv) {
         return static_cast<int>(ExitCode::netError);
     }
 
-    serviceContext->notifyStartupComplete();
+    serviceContext->notifyStorageStartupRecoveryComplete();
     return static_cast<int>(waitForShutdown());
 }
 

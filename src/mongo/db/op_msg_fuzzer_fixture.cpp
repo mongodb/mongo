@@ -146,8 +146,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
         _serviceContext,
         std::make_unique<repl::ReplicationCoordinatorMock>(_serviceContext, repl::ReplSettings()));
 
-    auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
-    _serviceContext->getStorageEngine()->notifyStartupComplete(opCtx.get());
+    _serviceContext->getStorageEngine()->notifyStorageStartupRecoveryComplete();
 }
 
 OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {

@@ -610,7 +610,7 @@ public:
     /*
      * Marks initialization as complete and all transport layers as started.
      */
-    void notifyStartupComplete();
+    void notifyStorageStartupRecoveryComplete();
 
     /**
      * Set the OpObserver.

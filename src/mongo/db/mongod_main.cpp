@@ -724,7 +724,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // the upgrade flag to true.
     auto storageEngine = serviceContext->getStorageEngine();
     invariant(storageEngine);
-    storageEngine->notifyStartupComplete(startupOpCtx.get());
+    storageEngine->notifyStorageStartupRecoveryComplete();
 
     BackupCursorHooks::initialize(serviceContext);
 
@@ -1166,7 +1166,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         quickExit(ExitCode::fail);
     }
 
-    serviceContext->notifyStartupComplete();
+    serviceContext->notifyStorageStartupRecoveryComplete();
 
 #ifndef _WIN32
     initialize_server_global_state::signalForkSuccess();

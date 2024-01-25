@@ -346,7 +346,7 @@ public:
                                      std::vector<std::string>& errors,
                                      std::vector<std::string>& warnings);
 
-    static void notifyStartupComplete();
+    static void notifyStorageStartupRecoveryComplete();
 
     static bool useTableLogging(const NamespaceString& nss);
 

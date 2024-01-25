@@ -377,7 +377,7 @@ ServiceContext* initialize(const char* yaml_config) {
 
     // Notify the storage engine that startup is completed before repair exits below, as repair sets
     // the upgrade flag to true.
-    serviceContext->getStorageEngine()->notifyStartupComplete(startupOpCtx.get());
+    serviceContext->getStorageEngine()->notifyStorageStartupRecoveryComplete();
 
     if (storageGlobalParams.upgrade) {
         LOGV2(22553, "finished checking dbs");
@@ -403,7 +403,7 @@ ServiceContext* initialize(const char* yaml_config) {
     // operation context anymore
     startupOpCtx.reset();
 
-    serviceContext->notifyStartupComplete();
+    serviceContext->notifyStorageStartupRecoveryComplete();
 
     // Init succeeded, no need for global deinit.
     giGuard.dismiss();
