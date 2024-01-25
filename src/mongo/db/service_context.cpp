@@ -279,6 +279,7 @@ void ServiceContext::setTransportLayerManager(
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {
     ServiceContext* const service = client->getServiceContext();
+    OperationIdManager::get(service).eraseClientFromMap(client);
     {
         stdx::lock_guard<Latch> lk(service->_mutex);
         invariant(service->_clients.erase(client));
