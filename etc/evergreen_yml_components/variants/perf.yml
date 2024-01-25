@@ -9,11 +9,6 @@ variables:
   - name: package_new_compile
     variant: amazon2-arm64-compile
 
-- &rhel70_x86_compile_variant_dependency
-  depends_on:
-  - name: package_new_compile
-    variant: rhel70-x86-compile
-
 - &schedule_variant_auto_tasks_task
   name: schedule_variant_auto_tasks
   activate: false
@@ -72,7 +67,7 @@ buildvariants:
     - name: linkbench
     - name: linkbench2
 
-- <<: *rhel70_x86_compile_variant_dependency
+- <<: *amazon2_x86_compile_variant_dependency
   name: perf-atlas-M60-real.intel.azure.2023-11
   display_name: PERF M60-Atlas ReplSet Intel Azure 2023-11
   cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
@@ -82,7 +77,7 @@ buildvariants:
     canaries: none
     atlas_setup: M60-repl-azure
     use_custom_build_azure: true
-    compile_variant: rhel70-x86-compile
+    compile_variant: amazon2-x86-compile
     infrastructure_provisioning: workload_client_intel.2023-11
     infrastructure_provisioning_release: 2023-09
     workload_setup: 2022-11
