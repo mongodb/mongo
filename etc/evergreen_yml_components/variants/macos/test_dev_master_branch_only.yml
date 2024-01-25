@@ -75,11 +75,9 @@ buildvariants:
   - name: compile_test_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
+  - name: fle
+  - name: fle2
   - name: .jscore .common !.decimal !.sharding
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
-  - name: .timeseries_crud
