@@ -10,7 +10,7 @@
  *  requires_fcv_61,
  * ]
  */
-import {getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkNWouldDelete, getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
 
 export const $config = (function() {
     // 'data' is passed (copied) to each of the worker threads.
@@ -43,10 +43,18 @@ export const $config = (function() {
             if (clusterTopology === '') {
                 assert(getPlanStage(expl, "BATCHED_DELETE"), tojson(expl));
             } else {
+                // Normally, we target both shards; however, in rare cases when the balancer is
+                // running, we may only target a single shard if during the last refresh, a shard no
+                // longer owns a chunk it used to, which makes targeting more specific.
                 const shardNames = Object.keys(clusterTopology.shards);
                 const stages = getPlanStages(expl, "BATCHED_DELETE");
-                assert.eq(stages.length, shardNames.length, tojson(expl));
+                assert.gte(stages.length, 1, tojson(expl));
+                assert.lte(stages.length, shardNames.length, tojson(expl));
             }
+
+            // Verify we wouldn't delete anything, since no ObjectId() would match the
+            // predicate {$gte: 0}.
+            checkNWouldDelete(expl, 0);
             assert.commandWorked(db[collName].remove({}));
         }
 
