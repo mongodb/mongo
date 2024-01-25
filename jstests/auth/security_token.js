@@ -67,7 +67,9 @@ function runTest(conn, multitenancyEnabled, rst = undefined) {
         assert.commandFailed(baseAdmin.runCommand(countUserCmd));
         baseConn._setSecurityToken(undefined);
     } else {
-        assert.commandFailed(admin.runCommand(createUserCmd));
+        conn._setSecurityToken(_createTenantToken({tenant: tenantID}));
+        assert.commandFailedWithCode(admin.runCommand({ping: 1}), ErrorCodes.Unauthorized);
+        conn._setSecurityToken(undefined);
     }
 
     if (rst) {

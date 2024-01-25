@@ -184,10 +184,6 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 uassert(40430, "Multiple body sections in message", !haveBody);
                 haveBody = true;
                 msg.body = sectionsBuf.read<Validated<BSONObj>>();
-
-                if (auto* multitenancyCheck = MultitenancyCheck::getPtr()) {
-                    multitenancyCheck->checkDollarTenantField(msg.body);
-                }
                 break;
             }
 
