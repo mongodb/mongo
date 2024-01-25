@@ -102,7 +102,6 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     bool apiStrict,
     const SerializationContext& serializationContext) {
     try {
-        // TODO SERVER-75930: pass serializationContext in
         return parseFromBSON(
             /*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict, serializationContext);
     } catch (const AssertionException&) {
@@ -128,8 +127,6 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
     }
 
     AggregateCommandRequest request(nss);
-    // TODO SERVER-75930: tenantId in VTS isn't properly detected by call to parse(IDLParseContext&,
-    // BSONObj&)
     const auto tenantId = nss.tenantId();
     const auto vts = tenantId
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
