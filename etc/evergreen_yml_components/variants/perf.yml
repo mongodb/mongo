@@ -104,6 +104,7 @@ buildvariants:
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
+    - name: ycsb_single_thread
     - name: crud_workloads_majority
     - name: misc_workloads
     - name: map_reduce_workloads
@@ -161,6 +162,7 @@ buildvariants:
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
+    - name: ycsb_single_thread
     - name: crud_workloads_majority
     - name: bestbuy_agg
     - name: bestbuy_agg_merge_different_db
@@ -294,8 +296,9 @@ buildvariants:
   tasks:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
-    - name: industry_benchmarks
-    - name: ycsb_60GB
+    - name: ycsb.2023-09
+    - name: ycsb_single_thread
+    - name: ycsb_60GB.2023-09
     - name: tpcc
     - name: tpcc_majority
     - name: linkbench
@@ -331,6 +334,7 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
+    - name: ycsb_single_thread
     - name: tpcc
     - name: linkbench2
 
@@ -357,6 +361,7 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
+    - name: ycsb_single_thread
       cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
     - name: ycsb_60GB.2023-09
     - name: tpcc
@@ -442,6 +447,7 @@ buildvariants:
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
+    - name: ycsb_single_thread
     - name: crud_workloads_majority
     - name: crud_workloads_w1
     #- name: genny_canaries
@@ -1332,6 +1338,7 @@ buildvariants:
     - name: ycsb_60GB.2023-09
     - name: ycsb.load
     - name: ycsb_60GB.long.2023-09
+    - name: ycsb_single_thread
       cron: *high-value-workload-cron
     - name: ycsb_secondary_reads.2023-09
     - name: crud_workloads_majority
@@ -1414,6 +1421,7 @@ buildvariants:
       cron: *high-value-workload-cron
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
+    - name: ycsb_single_thread
       cron: *high-value-workload-cron
     - name: crud_workloads_majority
     - name: smoke_test

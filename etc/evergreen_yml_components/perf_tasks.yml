@@ -237,6 +237,13 @@ tasks:
         vars:
           test_control: "ycsb-secondary-reads.2023-09"
 
+  - name: ycsb_single_thread
+    priority: 5
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "ycsb-single-thread"
+
   - name: ycsb_w1.2023-09
     priority: 5
     commands:
