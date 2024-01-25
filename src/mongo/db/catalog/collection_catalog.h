@@ -497,6 +497,13 @@ public:
                                                  const NamespaceStringOrUUID& nsOrUUID) const;
 
     /**
+     * Resolves and validates the namespace from the given DatabaseName and UUID.
+     */
+    NamespaceString resolveNamespaceStringFromDBNameAndUUID(OperationContext* opCtx,
+                                                            const DatabaseName& dbName,
+                                                            const UUID& uuid) const;
+
+    /**
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the
      * collection with 'uuid' is not found, false is returned.
      */

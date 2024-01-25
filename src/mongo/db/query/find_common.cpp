@@ -98,7 +98,8 @@ bool FindCommon::haveSpaceForNext(const BSONObj& nextDoc, long long numDocs, siz
 }
 
 void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq) {
-    auto whileWaitingFunc = [&, hasLogged = false]() mutable {
+    bool hasLogged = false;
+    auto whileWaitingFunc = [&]() {
         if (!std::exchange(hasLogged, true)) {
             LOGV2(20908,
                   "Waiting in find before making batch for query",
@@ -109,7 +110,7 @@ void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const Cano
     CurOpFailpointHelpers::waitWhileFailPointEnabled(&mongo::waitInFindBeforeMakingBatch,
                                                      opCtx,
                                                      "waitInFindBeforeMakingBatch",
-                                                     std::move(whileWaitingFunc),
+                                                     whileWaitingFunc,
                                                      cq.nss());
 }
 

@@ -1313,7 +1313,7 @@ BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
 BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
                                              const CollectionPtr& collection,
                                              const CanonicalQuery& cq) {
-    auto request = cq.getFindCommandRequest();
+    auto& request = cq.getFindCommandRequest();
     return BonsaiEligibility{BonsaiEligibility::FullyEligible, getMinRequiredEligibility(opCtx)}
         .setIneligibleIf(!cq.useCqfIfEligible())
         .minOf([&]() { return determineEligibilityCommon(request, opCtx, collection); })

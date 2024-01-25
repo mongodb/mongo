@@ -387,11 +387,19 @@ public:
                     authSession->isAuthorizedToParseNamespaceElement(_request.body.firstElement()));
 
             const auto hasTerm = _request.body.hasField(kTermField);
-            uassertStatusOK(auth::checkAuthForFind(
-                authSession,
-                CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
-                    opCtx, CommandHelpers::parseNsOrUUID(_dbName, _request.body)),
-                hasTerm));
+            const auto nsOrUUID = CommandHelpers::parseNsOrUUID(_dbName, _request.body);
+            if (nsOrUUID.isNamespaceString()) {
+                uassert(ErrorCodes::InvalidNamespace,
+                        str::stream() << "Namespace " << nsOrUUID.toStringForErrorMsg()
+                                      << " is not a valid collection name",
+                        nsOrUUID.nss().isValid());
+                uassertStatusOK(auth::checkAuthForFind(authSession, nsOrUUID.nss(), hasTerm));
+            } else {
+                const auto resolvedNss =
+                    CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
+                        opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
+                uassertStatusOK(auth::checkAuthForFind(authSession, resolvedNss, hasTerm));
+            }
         }
 
         void explain(OperationContext* opCtx,

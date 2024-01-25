@@ -143,7 +143,7 @@ WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* c
     return cursor;
 }
 
-void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, const std::string& config) {
+void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, std::string config) {
     // When releasing the cursor, we would want to check if the session cache is already in shutdown
     // and prevent the race condition that the shutdown starts after the check.
     WiredTigerSessionCache::BlockShutdown blockShutdown(_cache);
@@ -160,7 +160,7 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, const std:
     invariantWTOK(cursor->reset(cursor), _session);
 
     // Cursors are pushed to the front of the list and removed from the back
-    _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor, config));
+    _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor, std::move(config)));
 
     // A negative value for wiredTigercursorCacheSize means to use hybrid caching.
     std::uint32_t cacheSize = abs(gWiredTigerCursorCacheSize.load());

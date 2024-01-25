@@ -101,7 +101,7 @@ WiredTigerCursor::~WiredTigerCursor() {
         // Closes the checkpoint cursor to avoid outdated data view when opening a new one.
         _session->closeCursor(_cursor);
     } else {
-        _session->releaseCursor(_tableID, _cursor, _config);
+        _session->releaseCursor(_tableID, _cursor, std::move(_config));
     }
 }
 

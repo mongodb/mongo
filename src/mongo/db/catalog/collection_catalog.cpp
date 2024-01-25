@@ -1982,20 +1982,22 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
         return nsOrUUID.nss();
     }
 
-    auto resolvedNss = lookupNSSByUUID(opCtx, nsOrUUID.uuid());
+    return resolveNamespaceStringFromDBNameAndUUID(opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
+}
 
+NamespaceString CollectionCatalog::resolveNamespaceStringFromDBNameAndUUID(
+    OperationContext* opCtx, const DatabaseName& dbName, const UUID& uuid) const {
+    auto resolvedNss = lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Unable to resolve " << nsOrUUID.toStringForErrorMsg(),
+            str::stream() << "Unable to resolve " << uuid.toString(),
             resolvedNss && resolvedNss->isValid());
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "UUID: " << nsOrUUID.toStringForErrorMsg()
-                          << " specified in provided db name: "
-                          << nsOrUUID.dbName().toStringForErrorMsg()
+            str::stream() << "UUID: " << uuid.toString()
+                          << " specified in provided db name: " << dbName.toStringForErrorMsg()
                           << " resolved to a collection in a different database, resolved nss: "
                           << (*resolvedNss).toStringForErrorMsg(),
-            resolvedNss->dbName() == nsOrUUID.dbName());
-
+            resolvedNss->dbName() == dbName);
     return std::move(*resolvedNss);
 }
 

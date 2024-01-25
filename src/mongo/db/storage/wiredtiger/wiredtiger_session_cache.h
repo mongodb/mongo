@@ -54,8 +54,8 @@ class WiredTigerSessionCache;
 
 class WiredTigerCachedCursor {
 public:
-    WiredTigerCachedCursor(uint64_t id, uint64_t gen, WT_CURSOR* cursor, const std::string& config)
-        : _id(id), _gen(gen), _cursor(cursor), _config(config) {}
+    WiredTigerCachedCursor(uint64_t id, uint64_t gen, WT_CURSOR* cursor, std::string config)
+        : _id(id), _gen(gen), _cursor(cursor), _config(std::move(config)) {}
 
     uint64_t _id;   // Source ID, assigned to each URI
     uint64_t _gen;  // Generation, used to age out old cursors
@@ -135,7 +135,7 @@ public:
      * Additionally calls into the WiredTigerKVEngine to see if the SizeStorer needs to be flushed.
      * The SizeStorer gets flushed on a periodic basis.
      */
-    void releaseCursor(uint64_t id, WT_CURSOR* cursor, const std::string& config);
+    void releaseCursor(uint64_t id, WT_CURSOR* cursor, std::string config);
 
     /**
      * Close a cursor without releasing it into the cursor cache.

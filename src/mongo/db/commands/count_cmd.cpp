@@ -181,10 +181,19 @@ public:
         }
 
         const auto hasTerm = false;
-        return auth::checkAuthForFind(authSession,
-                                      CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
-                                          opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
-                                      hasTerm);
+        const auto nsOrUUID = CommandHelpers::parseNsOrUUID(dbname, cmdObj);
+        if (nsOrUUID.isNamespaceString()) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Namespace " << nsOrUUID.toStringForErrorMsg()
+                                  << " is not a valid collection name",
+                    nsOrUUID.nss().isValid());
+            return auth::checkAuthForFind(authSession, nsOrUUID.nss(), hasTerm);
+        }
+
+        const auto resolvedNss =
+            CollectionCatalog::get(opCtx)->resolveNamespaceStringFromDBNameAndUUID(
+                opCtx, nsOrUUID.dbName(), nsOrUUID.uuid());
+        return auth::checkAuthForFind(authSession, resolvedNss, hasTerm);
     }
 
     Status explain(OperationContext* opCtx,
