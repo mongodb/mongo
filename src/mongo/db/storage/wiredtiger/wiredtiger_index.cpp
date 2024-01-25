@@ -1719,24 +1719,12 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
-    auto triggerWriteConflictAtPoint = [this, &keyItem](WT_CURSOR* point) {
-        // WT_NOTFOUND may occur during a background index build. Insert a dummy value and
-        // delete it again to trigger a write conflict in case this is being concurrently
-        // indexed by the background indexer.
-        setKey(point, keyItem.Get());
-        point->set_value(point, emptyItem.Get());
-        invariantWTOK(WT_OP_CHECK(point->insert(point)));
-        setKey(point, keyItem.Get());
-        invariantWTOK(WT_OP_CHECK(point->remove(point)));
-    };
-
     if (!dupsAllowed) {
         if (_partial) {
             // Check that the record id matches.  We may be called to unindex records that are not
             // present in the index due to the partial filter expression.
             int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
             if (ret == WT_NOTFOUND) {
-                triggerWriteConflictAtPoint(c);
                 return;
             }
             invariantWTOK(ret);
@@ -1764,7 +1752,6 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
         }
         int ret = WT_OP_CHECK(c->remove(c));
         if (ret == WT_NOTFOUND) {
-            triggerWriteConflictAtPoint(c);
             return;
         }
         invariantWTOK(ret);
@@ -1775,7 +1762,6 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
 
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
-        triggerWriteConflictAtPoint(c);
         return;
     }
     invariantWTOK(ret);
