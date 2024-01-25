@@ -12,6 +12,10 @@ esac
 
 TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v4
 
+archive_fail() {
+    echo "Error: archive [${1}] not found." >&2
+}
+
 if [[ "${machine}" = "Cygwin" ]]; then
     out_dir="/cygdrive/c/setup_script_output.txt"
     desktop_dir="/cygdrive/c/Users/Administrator/Desktop"
@@ -55,10 +59,13 @@ if [[ "${machine}" = "Cygwin" ]]; then
             mkdir -p ${COREDUMP_ARCHIVE_TARGET}
             tar -xzvf ${COREDUMP_ARCHIVE} -C ${COREDUMP_ARCHIVE_TARGET}
             cp -r ${COREDUMP_ARCHIVE_TARGET}/* ${desktop_dir}
+        else
+            archive_fail "core dump"
         fi
 
         # logic for core dumps individually uploaded and gzipped
-        for filename in /cygdrive/z/data/mci/artifacts-*/dump_*.mdmp.gz;
+        filenames=$(find /cygdrive/z/data/mci/artifacts-* -name 'dump_*.mdmp.gz' -o -name 'mongod.*.mdmp.gz')
+        for filename in ${filenames[@]};
         do
             COREDUMP_ARCHIVE=$(readlink -f ${filename} 2>/dev/null)
             COREDUMP_ARCHIVE_BASENAME=$(basename ${COREDUMP_ARCHIVE})
@@ -70,6 +77,18 @@ if [[ "${machine}" = "Cygwin" ]]; then
             DECOMPRESSED_NAME=$(basename ${COREDUMP_ARCHIVE_BASENAME} .gz)
             cp ${COREDUMP_ARCHIVE_TARGET}/${DECOMPRESSED_NAME} ${desktop_dir}
         done
+
+        echo -e "\n=> Extracting Binaries and symbols to Desktop."
+        BIN_ARCHIVE=$(ls /cygdrive/z/data/mci/artifacts-*archive_dist_test*/mongo-*.zip 2>/dev/null)
+        if [[ -f $BIN_ARCHIVE ]]; then
+            BIN_ARCHIVE_PARENT=$(dirname ${BIN_ARCHIVE})
+            BIN_ARCHIVE_TARGET=${BIN_ARCHIVE_PARENT}/extracted_binaries
+            unzip -n ${BIN_ARCHIVE} -d ${BIN_ARCHIVE_TARGET}
+            cp ${BIN_ARCHIVE_TARGET}/dist-test/bin/mongo{,d,s}.pdb ${desktop_dir}
+            cp ${BIN_ARCHIVE_TARGET}/dist-test/bin/mongo{,d,s}.exe ${desktop_dir}
+        else
+            archive_fail "bin"
+        fi
 
         if [[ -z $(ls ${COREDUMP_ARCHIVE_TARGET}/dump* 2>/dev/null) ]]; then
             echo "No core dumps found."
@@ -126,10 +145,6 @@ fi' >> .bash_profile
 
     # As the name suggests, pretty printers. Primarily for boost::optional<T>
     git clone git@github.com:mongodb-forks/Boost-Pretty-Printer.git --branch mongodb-stable &
-
-    archive_fail() {
-        echo "Error: archive [${1}] not found." >&2
-    }
 
     # Discover and unarchive necessary files and source code. This will put mongo binaries and their
     # partner .debug files in the same `debug/bin` directory. The `bin` directory will later be symbolic
