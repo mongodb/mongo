@@ -185,8 +185,10 @@ DatabaseName DatabaseNameUtil::deserializeForStorage(boost::optional<TenantId> t
     // this could run during startup while the FCV is still uninitialized.
     if (gFeatureFlagRequireTenantID.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        if (db != DatabaseName::kAdmin.db() && db != DatabaseName::kLocal.db() &&
-            db != DatabaseName::kConfig.db() && db != DatabaseName::kExternal.db())
+        if (db != DatabaseName::kAdmin.db(omitTenant) &&
+            db != DatabaseName::kLocal.db(omitTenant) &&
+            db != DatabaseName::kConfig.db(omitTenant) &&
+            db != DatabaseName::kExternal.db(omitTenant))
             uassert(7005300, "TenantId must be set", tenantId != boost::none);
 
         return DatabaseName(std::move(tenantId), db);
@@ -220,7 +222,7 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
             case SerializationContext::Prefix::IncludePrefix: {
                 auto dbName = parseFromStringExpectTenantIdInMultitenancyMode(db);
                 if (!dbName.tenantId() && dbName.isInternalDb()) {
-                    return DatabaseName(std::move(tenantId), dbName.db());
+                    return DatabaseName(std::move(tenantId), dbName.db(omitTenant));
                 }
 
                 uassert(

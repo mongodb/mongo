@@ -166,7 +166,7 @@ const std::map<StringData, BuiltinRoleAttributes> kBuiltinRoleMap = {
 
 const stdx::unordered_set<RoleName> kAdminBuiltinRolesNoTenant = {
     //#for $role in $roles
-    RoleName("$role.name"_sd, DatabaseName::kAdmin.db()),
+    RoleName("$role.name"_sd, DatabaseName::kAdmin.db(omitTenant)),
     //#end for
 };
 

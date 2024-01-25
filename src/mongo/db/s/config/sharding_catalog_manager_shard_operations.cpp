@@ -592,7 +592,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     // Disallow adding shard replica set with name 'config'
-    if (!isConfigShard && actualShardName == DatabaseName::kConfig.db()) {
+    if (!isConfigShard && actualShardName == DatabaseName::kConfig.db(omitTenant)) {
         return {ErrorCodes::BadValue, "use of shard replica set with name 'config' is not allowed"};
     }
 
@@ -1590,7 +1590,7 @@ void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCt
             BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
                      BSON("_id" << 1 << "clusterParameterTime" << 1), false)));
         setClusterParameterRequest.setDbName(DatabaseNameUtil::deserialize(
-            tenantId, DatabaseName::kAdmin.db(), SerializationContext::stateDefault()));
+            tenantId, DatabaseName::kAdmin.db(omitTenant), SerializationContext::stateDefault()));
         std::unique_ptr<ServerParameterService> parameterService =
             std::make_unique<ClusterParameterService>();
         SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
@@ -1689,7 +1689,7 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
 
     for (const auto& [tenantId, clusterParameters] : allClusterParameters) {
         const auto& dbName = DatabaseNameUtil::deserialize(
-            tenantId, DatabaseName::kAdmin.db(), SerializationContext::stateDefault());
+            tenantId, DatabaseName::kAdmin.db(omitTenant), SerializationContext::stateDefault());
         // Push cluster parameters into the newly added shard.
         for (auto& parameter : clusterParameters) {
             ShardsvrSetClusterParameter setClusterParamsCmd(

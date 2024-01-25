@@ -157,7 +157,7 @@ public:
                 as->logoutDatabase(
                     opCtx->getClient(),
                     DatabaseNameUtil::deserialize(dbname.tenantId(),
-                                                  DatabaseName::kLocal.db(),
+                                                  DatabaseName::kLocal.db(omitTenant),
                                                   request().getSerializationContext()),
                     "Logging out from local database for test purposes");
             }
@@ -417,7 +417,7 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
 
     if (!hasDBField) {
         // No "db" field was provided, so default to "$external"
-        cmd.append(AuthenticateCommand::kDbNameFieldName, DatabaseName::kExternal.db());
+        cmd.append(AuthenticateCommand::kDbNameFieldName, DatabaseName::kExternal.db(omitTenant));
     }
 
     auto authCmdObj =

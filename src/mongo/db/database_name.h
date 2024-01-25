@@ -55,6 +55,11 @@
 
 namespace mongo {
 
+struct OmitTenant {
+    explicit OmitTenant() = default;
+};
+constexpr inline OmitTenant omitTenant;
+
 /**
  * A DatabaseName is a unique name for database.
  * It holds a database name and tenant id, if one exists. In a serverless environment, a tenant id
@@ -92,8 +97,8 @@ public:
             return _get();
         }
 
-        decltype(auto) db() const {
-            return _get().db();
+        StringData db(OmitTenant) const {
+            return _get().db(omitTenant);
         }
         decltype(auto) tenantId() const {
             return _get().tenantId();
@@ -171,16 +176,16 @@ public:
         return size() == 0;
     }
     bool isAdminDB() const {
-        return db() == DatabaseName::kAdmin.db();
+        return db(omitTenant) == DatabaseName::kAdmin.db(omitTenant);
     }
     bool isLocalDB() const {
-        return db() == DatabaseName::kLocal.db();
+        return db(omitTenant) == DatabaseName::kLocal.db(omitTenant);
     }
     bool isConfigDB() const {
-        return db() == DatabaseName::kConfig.db();
+        return db(omitTenant) == DatabaseName::kConfig.db(omitTenant);
     }
     bool isExternalDB() const {
-        return db() == DatabaseName::kExternal.db();
+        return db(omitTenant) == DatabaseName::kExternal.db(omitTenant);
     }
     bool isInternalDb() const {
         return isAdminDB() || isConfigDB() || isLocalDB();
@@ -220,7 +225,7 @@ public:
 
     static bool isValid(const DatabaseName& dbName,
                         DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
-        return validDBName(dbName.db(), behavior);
+        return validDBName(dbName.db(omitTenant), behavior);
     }
 
     static bool isValid(StringData dbName) {
@@ -232,7 +237,7 @@ public:
      * tolerated in the serialized output, and should otherwise be avoided whenever possible.
      */
     std::string serializeWithoutTenantPrefix_UNSAFE() const {
-        return db().toString();
+        return db(omitTenant).toString();
     }
 
     /**
@@ -281,7 +286,8 @@ public:
      * The tenant comparison *is* case-sensitive.
      */
     bool equalCaseInsensitive(const DatabaseName& other) const {
-        return tenantIdView() == other.tenantIdView() && db().equalCaseInsensitive(other.db());
+        return tenantIdView() == other.tenantIdView() &&
+            db(omitTenant).equalCaseInsensitive(other.db(omitTenant));
     }
 
     int compare(const DatabaseName& other) const {
@@ -328,6 +334,15 @@ public:
 
     friend auto logAttrs(const DatabaseName& obj) {
         return "db"_attr = obj;
+    }
+
+    /**
+     * This method returns the database name without the tenant id. It MUST only be used on
+     * DatabaseName that can never contain a tenant id (such as global database constants) otherwise
+     * data isolation between tenant can break.
+     */
+    StringData db(OmitTenant) const {
+        return view().substr(dbNameOffsetStart(), size());
     }
 
 protected:
@@ -402,10 +417,6 @@ protected:
         }
     }
 
-    StringData db() const {
-        return view().substr(dbNameOffsetStart(), size());
-    }
-
     StringData tenantIdView() const {
         if (!hasTenantId()) {
             return {};
@@ -415,16 +426,16 @@ protected:
     }
 
     std::string toString() const {
-        return db().toString();
+        return db(omitTenant).toString();
     }
 
     std::string toStringWithTenantId() const {
         if (hasTenantId()) {
             auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
-            return str::stream() << tenantId.toString() << "_" << db();
+            return str::stream() << tenantId.toString() << "_" << db(omitTenant);
         }
 
-        return db().toString();
+        return db(omitTenant).toString();
     }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);

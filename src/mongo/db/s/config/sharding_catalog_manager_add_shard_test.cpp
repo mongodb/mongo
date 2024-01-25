@@ -289,8 +289,8 @@ protected:
 
         std::vector<DatabaseName> dbnamesOnTarget;
         for (const auto& tenantId : tenantsOnTarget) {
-            dbnamesOnTarget.push_back(
-                DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kConfig.db()));
+            dbnamesOnTarget.push_back(DatabaseName::createDatabaseName_forTest(
+                tenantId, DatabaseName::kConfig.db(omitTenant)));
         }
 
         if (gMultitenancySupport) {
@@ -320,7 +320,8 @@ protected:
             ASSERT_EQ(results.size(), 1);
             ASSERT_EQ(results[0]["_id"].String(), "testStrClusterParameter");
             ASSERT_EQ(results[0]["strData"].String(),
-                      DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kConfig.db())
+                      DatabaseName::createDatabaseName_forTest(tenantId,
+                                                               DatabaseName::kConfig.db(omitTenant))
                           .toStringWithTenantId_forTest());
         }
     }
@@ -375,8 +376,8 @@ protected:
         for (const auto& [tenantId, params] : localClusterParameters) {
             for (auto& param : params) {
                 SetClusterParameter setClusterParameterRequest(param);
-                setClusterParameterRequest.setDbName(
-                    DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kAdmin.db()));
+                setClusterParameterRequest.setDbName(DatabaseName::createDatabaseName_forTest(
+                    tenantId, DatabaseName::kAdmin.db(omitTenant)));
                 DBDirectClient client(operationContext());
                 ClusterParameterDBClientService dbService(client);
                 std::unique_ptr<ServerParameterService> parameterService =

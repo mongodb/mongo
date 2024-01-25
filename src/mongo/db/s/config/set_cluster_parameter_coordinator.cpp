@@ -157,8 +157,9 @@ void SetClusterParameterCoordinator::_sendSetClusterParameterToAllShards(
     LOGV2_DEBUG(6387001, 1, "Sending setClusterParameter to shards:", "shards"_attr = shards);
 
     ShardsvrSetClusterParameter request(_doc.getParameter());
-    request.setDbName(DatabaseNameUtil::deserialize(
-        _doc.getTenantId(), DatabaseName::kAdmin.db(), SerializationContext::stateDefault()));
+    request.setDbName(DatabaseNameUtil::deserialize(_doc.getTenantId(),
+                                                    DatabaseName::kAdmin.db(omitTenant),
+                                                    SerializationContext::stateDefault()));
     request.setClusterParameterTime(*_doc.getClusterParameterTime());
     sharding_util::sendCommandToShards(
         opCtx,
@@ -172,8 +173,10 @@ void SetClusterParameterCoordinator::_commit(OperationContext* opCtx) {
     LOGV2_DEBUG(6387002, 1, "Updating configsvr cluster parameter");
 
     SetClusterParameter setClusterParameterRequest(_doc.getParameter());
-    setClusterParameterRequest.setDbName(DatabaseNameUtil::deserialize(
-        _doc.getTenantId(), DatabaseName::kAdmin.db(), SerializationContext::stateDefault()));
+    setClusterParameterRequest.setDbName(
+        DatabaseNameUtil::deserialize(_doc.getTenantId(),
+                                      DatabaseName::kAdmin.db(omitTenant),
+                                      SerializationContext::stateDefault()));
     std::unique_ptr<ServerParameterService> parameterService =
         std::make_unique<ClusterParameterService>();
     DBDirectClient client(opCtx);

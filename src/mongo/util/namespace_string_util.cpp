@@ -195,8 +195,9 @@ NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<Tenan
     if (gFeatureFlagRequireTenantID.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         StringData dbName = ns.substr(0, ns.find('.'));
-        if (!(dbName == DatabaseName::kAdmin.db()) && !(dbName == DatabaseName::kLocal.db()) &&
-            !(dbName == DatabaseName::kConfig.db())) {
+        if (!(dbName == DatabaseName::kAdmin.db(omitTenant)) &&
+            !(dbName == DatabaseName::kLocal.db(omitTenant)) &&
+            !(dbName == DatabaseName::kConfig.db(omitTenant))) {
             massert(6972100,
                     str::stream() << "TenantId must be set on nss " << ns,
                     tenantId != boost::none);

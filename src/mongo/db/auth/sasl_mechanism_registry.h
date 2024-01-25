@@ -429,7 +429,7 @@ private:
     using MechList = std::vector<std::unique_ptr<ServerFactoryBase>>;
 
     MechList& _getMapRef(StringData dbName) {
-        return _getMapRef(dbName != DatabaseName::kExternal.db());
+        return _getMapRef(dbName != DatabaseName::kExternal.db(omitTenant));
     }
 
     MechList& _getMapRef(bool internal) {

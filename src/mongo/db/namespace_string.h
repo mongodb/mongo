@@ -108,6 +108,11 @@ public:
         decltype(auto) ns() const {
             return _get().ns();
         }
+        /**
+         * This method should only be called on global DatabaseName constants. It shouldn't be used
+         * with a non-constant or non-global DatabaseName because it discards possible TenantId
+         * values which can break tenant isolation.
+         */
         decltype(auto) db() const {
             return _get().db_deprecated();
         }
@@ -514,10 +519,10 @@ public:
         return coll().startsWith(kGlobalIndexCollectionPrefix);
     }
     bool isAdminDB() const {
-        return db_deprecated() == DatabaseName::kAdmin.db();
+        return db_deprecated() == DatabaseName::kAdmin.db(omitTenant);
     }
     bool isLocalDB() const {
-        return db_deprecated() == DatabaseName::kLocal.db();
+        return db_deprecated() == DatabaseName::kLocal.db(omitTenant);
     }
     bool isSystemDotProfile() const {
         return coll() == kSystemDotProfileCollectionName;
@@ -545,7 +550,7 @@ public:
         return (coll() == kSystemUsers) || (coll() == kSystemRoles);
     }
     bool isConfigDB() const {
-        return db_deprecated() == DatabaseName::kConfig.db();
+        return db_deprecated() == DatabaseName::kConfig.db(omitTenant);
     }
     bool isCommand() const {
         return coll() == "$cmd";
@@ -922,7 +927,7 @@ private:
      * at the DatabaseNameUtil::serialize method which takes in a DatabaseName object.
      */
     StringData db_deprecated() const {
-        return dbName().db();
+        return dbName().db(omitTenant);
     }
 
     static constexpr size_t kDataOffset = sizeof(uint8_t);

@@ -123,7 +123,7 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << command->getName() << " may only be run against the admin database.",
-            !command->adminOnly() || request.getDatabase() == DatabaseName::kAdmin.db());
+            !command->adminOnly() || request.getDatabase() == DatabaseName::kAdmin.db(omitTenant));
 
     auto authzSession = AuthorizationSession::get(client);
     uassert(ErrorCodes::ReauthenticationRequired,

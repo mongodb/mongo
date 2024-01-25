@@ -153,13 +153,14 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
 }
 
 NamespaceString NamespaceString::makeBulkWriteNSS(const boost::optional<TenantId>& tenantId) {
-    return NamespaceString(tenantId, DatabaseName::kAdmin.db(), bulkWriteCursorCol);
+    return NamespaceString(tenantId, DatabaseName::kAdmin.db(omitTenant), bulkWriteCursorCol);
 }
 
 NamespaceString NamespaceString::makeClusterParametersNSS(
     const boost::optional<TenantId>& tenantId) {
-    return tenantId ? NamespaceString(tenantId, DatabaseName::kConfig.db(), "clusterParameters")
-                    : kClusterParametersNamespace;
+    return tenantId
+        ? NamespaceString(tenantId, DatabaseName::kConfig.db(omitTenant), "clusterParameters")
+        : kClusterParametersNamespace;
 }
 
 NamespaceString NamespaceString::makeSystemDotViewsNamespace(const DatabaseName& dbName) {
@@ -194,7 +195,7 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseNa
 
 NamespaceString NamespaceString::makeChangeCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{tenantId, DatabaseName::kConfig.db(), kChangeCollectionName};
+    return NamespaceString{tenantId, DatabaseName::kConfig.db(omitTenant), kChangeCollectionName};
 }
 
 NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
@@ -204,7 +205,8 @@ NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
 
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{tenantId, DatabaseName::kConfig.db(), kPreImagesCollectionName};
+    return NamespaceString{
+        tenantId, DatabaseName::kConfig.db(omitTenant), kPreImagesCollectionName};
 }
 
 NamespaceString NamespaceString::makeReshardingLocalOplogBufferNSS(
@@ -223,12 +225,14 @@ NamespaceString NamespaceString::makeReshardingLocalConflictStashNSS(
 
 NamespaceString NamespaceString::makeTenantUsersCollection(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString(tenantId, DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers);
+    return NamespaceString(
+        tenantId, DatabaseName::kAdmin.db(omitTenant), NamespaceString::kSystemUsers);
 }
 
 NamespaceString NamespaceString::makeTenantRolesCollection(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString(tenantId, DatabaseName::kAdmin.db(), NamespaceString::kSystemRoles);
+    return NamespaceString(
+        tenantId, DatabaseName::kAdmin.db(omitTenant), NamespaceString::kSystemRoles);
 }
 
 NamespaceString NamespaceString::makeCommandNamespace(const DatabaseName& dbName) {
@@ -236,7 +240,7 @@ NamespaceString NamespaceString::makeCommandNamespace(const DatabaseName& dbName
 }
 
 NamespaceString NamespaceString::makeDummyNamespace(const boost::optional<TenantId>& tenantId) {
-    return NamespaceString(tenantId, DatabaseName::kConfig.db(), "dummy.namespace");
+    return NamespaceString(tenantId, DatabaseName::kConfig.db(omitTenant), "dummy.namespace");
 }
 
 std::string NamespaceString::getSisterNS(StringData local) const {
@@ -403,7 +407,7 @@ NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
 }
 
 bool NamespaceString::isImplicitlyReplicated() const {
-    if (db_deprecated() == DatabaseName::kConfig.db()) {
+    if (db_deprecated() == DatabaseName::kConfig.db(omitTenant)) {
         if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() ||
             isChangeCollection()) {
             // Implicitly replicated namespaces are replicated, although they only replicate a
