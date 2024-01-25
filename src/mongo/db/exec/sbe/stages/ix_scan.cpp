@@ -566,7 +566,9 @@ void SimpleIndexScanStage::open(bool reOpen) {
         _seekKeyHighHolder.reset(ownedHi, tagHi, valHi);
 
         // It is a point bound if the lowKey and highKey are same except discriminator.
-        _pointBound = getSeekKeyLow().compareWithoutDiscriminator(*getSeekKeyHigh()) == 0;
+        auto& highKey = *getSeekKeyHigh();
+        _pointBound = getSeekKeyLow().compareWithoutDiscriminator(highKey) == 0 &&
+            highKey.computeElementCount(*_ordering) == _entry->descriptor()->getNumFields();
     } else if (_seekKeyLow) {
         auto [ownedLow, tagLow, valLow] = _bytecode.run(_seekKeyLowCode.get());
         const auto msgTagLow = tagLow;
