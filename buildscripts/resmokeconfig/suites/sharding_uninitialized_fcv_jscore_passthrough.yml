@@ -6,6 +6,8 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
+  # These tests are run in sharded_txns_uninitialized_fcv_jscore_passthrough.
+  - jstests/core/txns/**/*.js
   ### Tests that are excluded because of initial sync (from replica_sets_initsync_jscore_passthrough.yml)
   # Tests that query the system.profile collection cannot run in this suite since an initial sync
   # may insert unexpected operations into the profile collection.
@@ -68,33 +70,14 @@ selector:
   # we expect a second drop to return status OK.
   - jstests/core/**/explain_upsert.js
 
-  ### Tests that are excluded because of sharding and transactions (from sharded_jscore_txns.yml)
-  # Profile can only be run against the admin database on mongos.
-  - jstests/core/txns/transactions_profiling.js
-  - jstests/core/txns/transactions_profiling_with_drops.js
-
-  # Implicitly creates a database through a collection rename, which does not work in a sharded
-  # cluster.
-  - jstests/core/txns/transactions_block_ddl.js
-
-  # transactionLifetimeLimitSeconds parameter is not available in mongos.
-  - jstests/core/txns/abort_expired_transaction.js
-  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
-  - jstests/core/txns/kill_op_on_txn_expiry.js
-
-  # Uses hangAfterCollectionInserts failpoint not available on mongos.
-  - jstests/core/txns/speculative_snapshot_includes_all_writes.js
-
   # Will fail all commands including those needed to forward command to initial sync node.
   - jstests/core/failcommand_failpoint.js
+  # Has asserts that depend on the use of fsyncLock which is skipped by this passthrough.
+  - jstests/core/ddl/killop_drop_collection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
-  # Transactions are not allowed to operate on capped collections.
-  - requires_capped
-  # Prepare is not a command on mongos.
-  - uses_prepare_transaction
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
 
@@ -115,7 +98,7 @@ executor:
         enableTestCommands: 1
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
-    num_shards: 2
+    num_shards: 1
     num_rs_nodes_per_shard: 2
     shard_options:
       start_initial_sync_node: True

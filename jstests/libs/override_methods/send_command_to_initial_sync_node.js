@@ -54,7 +54,9 @@ function maybeSendCommandToInitialSyncNodes(
 
     // Ignore getLog/waitForFailpoint to avoid waiting for a log
     // message or a failpoint to be hit on the initial sync node.
-    if (_commandName == "getLog" || _commandName == "waitForFailPoint") {
+    // Ignore fsync to avoid locking the initial sync node without unlocking.
+    if (_commandName == "getLog" || _commandName == "waitForFailPoint" || _commandName == "fsync" ||
+        _commandName == "fsyncUnlock") {
         return func.apply(conn, makeFuncArgs(commandObj));
     }
 
@@ -74,26 +76,23 @@ function maybeSendCommandToInitialSyncNodes(
         sendCommandToInitialSyncNodeInReplSet(
             conn, _commandName, commandObj, func, makeFuncArgs, "replica set");
     } else if (topology.type == Topology.kShardedCluster) {
-        for (let [shardName, shard] of Object.entries(topology.shards)) {
-            if (shard.type == Topology.kReplicaSet) {
-                const shardPrimaryConn = getConn(shard.primary);
-                if (shardPrimaryConn != null) {
-                    try {
-                        sendCommandToInitialSyncNodeInReplSet(shardPrimaryConn,
-                                                              _commandName,
-                                                              commandObj,
-                                                              func,
-                                                              makeFuncArgs,
-                                                              shardName);
-                    } catch (exp) {
-                        jsTest.log("Unable to apply command " + _commandName + ": " +
-                                   tojson(commandObj) + " on " + shardName +
-                                   " initial sync node: " + tojson(exp));
-                    } finally {
-                        shardPrimaryConn.close();
-                    }
-                }  // Move on if we can't get a connection to the node.
-            }
+        // Forward command to the initial sync node in the first shard in the set.
+        const shards = Object.entries(topology.shards);
+        const [shardName, shard] = shards[0];
+        if (shard.type == Topology.kReplicaSet) {
+            const shardPrimaryConn = getConn(shard.primary);
+            if (shardPrimaryConn != null) {
+                try {
+                    sendCommandToInitialSyncNodeInReplSet(
+                        shardPrimaryConn, _commandName, commandObj, func, makeFuncArgs, shardName);
+                } catch (exp) {
+                    jsTest.log("Unable to apply command " + _commandName + ": " +
+                               tojson(commandObj) + " on " + shardName +
+                               " initial sync node: " + tojson(exp));
+                } finally {
+                    shardPrimaryConn.close();
+                }
+            }  // Move on if we can't get a connection to the node.
         }
         if (topology.configsvr.type == Topology.kReplicaSet) {
             const configConn = getConn(topology.configsvr.primary);
