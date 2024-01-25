@@ -262,8 +262,12 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
             }
 
             {
+                // Implicitly check for collection UUID mismatch - use the 'originalNss()' provided
+                // in the DDL command. Timeseries collections will always throw
+                // CollectionUUIDMismatch, as the collection name is on a view, which doesn't have a
+                // UUID.
                 AutoGetCollection coll{opCtx,
-                                       nss(),
+                                       originalNss(),
                                        MODE_IS,
                                        AutoGetCollection::Options{}
                                            .viewMode(auto_get_collection::ViewMode::kViewsPermitted)

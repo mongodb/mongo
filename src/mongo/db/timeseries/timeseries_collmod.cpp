@@ -43,6 +43,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/pipeline/change_stream_pre_and_post_images_options_gen.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
@@ -68,6 +69,10 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
     if (!timeseriesOptions) {
         return {};
     }
+
+    // If the expected collection UUID is provided, always fail because the user-facing time-series
+    // doesn't have a UUID.
+    checkCollectionUUIDMismatch(opCtx, origNs, nullptr, origCmd.getCollectionUUID());
 
     auto index = origCmd.getIndex();
     if (index && index->getKeyPattern()) {

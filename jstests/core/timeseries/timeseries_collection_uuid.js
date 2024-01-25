@@ -45,6 +45,14 @@ const testInsert = function(uuid, ordered) {
                 uuid);
 };
 
+const testCollMod = function(uuid) {
+    checkResult(testDB.runCommand({
+        collMod: collName,
+        collectionUUID: uuid,
+    }),
+                uuid);
+};
+
 const testUpdate = function(uuid, field) {
     assert.commandWorked(testDB[collName].insert({t: ISODate(), m: 1, a: 1}));
     checkResult(testDB.runCommand({
@@ -74,6 +82,8 @@ const testDelete = function(uuid, field) {
 for (const uuid of [nonexistentUUID, bucketsCollUUID]) {
     testInsert(uuid, true);
     testInsert(uuid, false);
+
+    testCollMod(uuid);
 
     if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
         testUpdate(uuid, "m");

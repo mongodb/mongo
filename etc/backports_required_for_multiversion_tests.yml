@@ -565,6 +565,8 @@ last-continuous:
     ticket: SERVER-83119
   - test_file: jstests/sharding/eof_plan.js
     ticket: SERVER-83119
+  - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
+    ticket: SERVER-84151
   suites: null
 last-lts:
   all:
@@ -1188,4 +1190,6 @@ last-lts:
     ticket: SERVER-83119
   - test_file: jstests/sharding/eof_plan.js
     ticket: SERVER-83119
+  - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
+    ticket: SERVER-84151
   suites: null
