@@ -767,7 +767,7 @@ public:
 
 private:
     static bool isBSONColumnControlLiteral(char control) {
-        return (control & 0xE0) == 0;
+        return (control & 0xE0) == 0 || control == (char)MinKey || control == (char)MaxKey;
     }
 
     static uint8_t numSimple8bBlocksInBSONColumnControl(char control) {
