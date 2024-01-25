@@ -6818,109 +6818,101 @@ TEST_F(BSONColumnTest, FTDCRoundTrip) {
 
 class TestMaterializer {
 public:
-    // Dummy allocator is not used
-    // Normally a materializer either has its own Allocator definition, or templates on an external
-    // allocator and simply declares
-    //
-    // using Allocator = typename TemplateAllocator;
-    class Allocator {
-    public:
-        Allocator() {}
-    };
     using Element = std::
         variant<std::monostate, bool, int32_t, int64_t, double, Timestamp, Date_t, OID, StringData>;
 
     template <typename T>
-    static Element materialize(Allocator& a, const T& val) {
+    static Element materialize(ElementStorage& a, const T& val) {
         return val;
     }
 
     template <typename T>
-    static Element materialize(Allocator& a, const BSONElement& val) {
+    static Element materialize(ElementStorage& a, const BSONElement& val) {
         return std::monostate();
     }
 
 
-    static Element materializeMissing(Allocator& a) {
+    static Element materializeMissing(ElementStorage& a) {
         return std::monostate();
     }
 };
 
 // Some compilers require that specializations be defined outside of class
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(ElementStorage& a,
                                                                      const BSONBinData& val) {
     return StringData((const char*)val.data, val.length);
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONCode>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONCode>(ElementStorage& a,
                                                                   const BSONCode& val) {
     return val.code;
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<bool>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<bool>(ElementStorage& a,
                                                               const BSONElement& val) {
     return val.Bool();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<int32_t>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<int32_t>(ElementStorage& a,
                                                                  const BSONElement& val) {
     return (int32_t)val.Int();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<int64_t>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<int64_t>(ElementStorage& a,
                                                                  const BSONElement& val) {
     return (int64_t)val.Int();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<double>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<double>(ElementStorage& a,
                                                                 const BSONElement& val) {
     return val.Double();
 }
 
 template <>
 TestMaterializer::Element TestMaterializer::materialize<unsigned long long>(
-    Allocator& a, const BSONElement& val) {
+    ElementStorage& a, const BSONElement& val) {
     return val.date();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<Date_t>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<Date_t>(ElementStorage& a,
                                                                 const BSONElement& val) {
     return val.Date();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<OID>(Allocator& a, const BSONElement& val) {
+TestMaterializer::Element TestMaterializer::materialize<OID>(ElementStorage& a,
+                                                             const BSONElement& val) {
     return val.OID();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<StringData>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<StringData>(ElementStorage& a,
                                                                     const BSONElement& val) {
     return val.valueStringData();
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONBinData>(ElementStorage& a,
                                                                      const BSONElement& val) {
     int size = 0;
     return StringData(val.binData(size), size);
 }
 
 template <>
-TestMaterializer::Element TestMaterializer::materialize<BSONCode>(Allocator& a,
+TestMaterializer::Element TestMaterializer::materialize<BSONCode>(ElementStorage& a,
                                                                   const BSONElement& val) {
     return val.valueStringData();
 }
 
 TEST_F(BSONColumnTest, TestCollector) {
-    TestMaterializer::Allocator allocator;
+    ElementStorage allocator;
     std::vector<TestMaterializer::Element> collection;
     Collector<TestMaterializer, std::vector<TestMaterializer::Element>> collector(collection,
                                                                                   allocator);

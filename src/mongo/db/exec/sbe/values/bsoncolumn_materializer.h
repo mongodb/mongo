@@ -43,25 +43,24 @@ namespace mongo::sbe::bsoncolumn {
  */
 struct SBEColumnMaterializer {
     using Element = std::pair<value::TypeTags, value::Value>;
-    using Allocator = ElementStorage;
 
-    static inline Element materialize(Allocator& allocator, bool val) {
+    static inline Element materialize(ElementStorage& allocator, bool val) {
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(val)};
     }
 
-    static inline Element materialize(Allocator& allocator, int32_t val) {
+    static inline Element materialize(ElementStorage& allocator, int32_t val) {
         return {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(val)};
     }
 
-    static inline Element materialize(Allocator& allocator, int64_t val) {
+    static inline Element materialize(ElementStorage& allocator, int64_t val) {
         return {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(val)};
     }
 
-    static inline Element materialize(Allocator& allocator, double val) {
+    static inline Element materialize(ElementStorage& allocator, double val) {
         return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(val)};
     }
 
-    static inline Element materialize(Allocator& allocator, const Decimal128& val) {
+    static inline Element materialize(ElementStorage& allocator, const Decimal128& val) {
         Decimal128::Value dec128Val = val.getValue();
         auto storage = allocator.allocate(sizeof(uint64_t) * 2);
         DataView{storage}.write<LittleEndian<uint64_t>>(dec128Val.low64);
@@ -69,15 +68,15 @@ struct SBEColumnMaterializer {
         return {value::TypeTags::NumberDecimal, value::bitcastFrom<char*>(storage)};
     }
 
-    static inline Element materialize(Allocator& allocator, Date_t val) {
+    static inline Element materialize(ElementStorage& allocator, Date_t val) {
         return {value::TypeTags::Date, value::bitcastFrom<long long>(val.toMillisSinceEpoch())};
     }
 
-    static inline Element materialize(Allocator& allocator, Timestamp val) {
+    static inline Element materialize(ElementStorage& allocator, Timestamp val) {
         return {value::TypeTags::Timestamp, value::bitcastFrom<unsigned long long>(val.asULL())};
     }
 
-    static inline Element materialize(Allocator& allocator, StringData val) {
+    static inline Element materialize(ElementStorage& allocator, StringData val) {
         if (value::canUseSmallString(val)) {
             return value::makeSmallString(val);
         }
@@ -89,7 +88,7 @@ struct SBEColumnMaterializer {
         return {value::TypeTags::bsonString, copyStringWithLengthPrefix(allocator, val)};
     }
 
-    static inline Element materialize(Allocator& allocator, const BSONBinData& val) {
+    static inline Element materialize(ElementStorage& allocator, const BSONBinData& val) {
         // Layout of binary data:
         // - 4-byte signed length of binary data
         // - 1-byte binary subtype
@@ -102,20 +101,20 @@ struct SBEColumnMaterializer {
         return {value::TypeTags::bsonBinData, value::bitcastFrom<char*>(storage)};
     }
 
-    static inline Element materialize(Allocator& allocator, const BSONCode& val) {
+    static inline Element materialize(ElementStorage& allocator, const BSONCode& val) {
         return {value::TypeTags::bsonJavascript, copyStringWithLengthPrefix(allocator, val.code)};
     }
 
-    static inline Element materialize(Allocator& allocator, const OID& val) {
+    static inline Element materialize(ElementStorage& allocator, const OID& val) {
         auto storage = allocator.allocate(OID::kOIDSize);
         memcpy(storage, val.view().view(), OID::kOIDSize);
         return {value::TypeTags::bsonObjectId, value::bitcastFrom<char*>(storage)};
     }
 
     template <typename T>
-    static inline Element materialize(Allocator& allocator, BSONElement val);
+    static inline Element materialize(ElementStorage& allocator, BSONElement val);
 
-    static inline Element materializeMissing(Allocator& allocator) {
+    static inline Element materializeMissing(ElementStorage& allocator) {
         return {value::TypeTags::Nothing, value::Value{0}};
     }
 
@@ -127,7 +126,8 @@ private:
      * A copy is needed here because the StringData instance will be referencing a 16-byte
      * decompressed value that is allocated on the stack.
      */
-    static inline value::Value copyStringWithLengthPrefix(Allocator& allocator, StringData data) {
+    static inline value::Value copyStringWithLengthPrefix(ElementStorage& allocator,
+                                                          StringData data) {
         char* storage = allocator.allocate(sizeof(int32_t) + data.size());
         // The length prefix should include the terminating null byte.
         DataView(storage).write<LittleEndian<int32_t>>(data.size() + 1);
@@ -138,50 +138,50 @@ private:
 };
 
 template <>
-inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<bool>(Allocator& allocator,
-                                                                               BSONElement val) {
+inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<bool>(
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == Bool, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.boolean());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<int32_t>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == NumberInt, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, (int32_t)val._numberInt());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<int64_t>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == NumberLong, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, (int64_t)val._numberLong());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<double>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == NumberDouble, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val._numberDouble());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Decimal128>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == NumberDecimal, "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::NumberDecimal, value::bitcastFrom<const char*>(val.value())};
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Date_t>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == Date, "materialize invoked with incorrect BSONElement type");
     return materialize(allocator, val.date());
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Timestamp>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == bsonTimestamp, "materialize invoked with incorrect BSONElement type");
     uint64_t u = ConstDataView(val.value()).read<LittleEndian<uint64_t>>();
     return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(u)};
@@ -189,7 +189,7 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<Timesta
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<StringData>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == String, "materialize invoked with incorrect BSONElement type");
 
     auto sd = val.valueStringData();
@@ -202,21 +202,21 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<StringD
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<BSONBinData>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == BinData, "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(val.value())};
 }
 
 template <>
 inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<BSONCode>(
-    Allocator& allocator, BSONElement val) {
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == Code, "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::bsonJavascript, value::bitcastFrom<const char*>(val.value())};
 }
 
 template <>
-inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<OID>(Allocator& allocator,
-                                                                              BSONElement val) {
+inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<OID>(
+    ElementStorage& allocator, BSONElement val) {
     dassert(val.type() == jstOID, "materialize invoked with incorrect BSONElement type");
     return {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(val.value())};
 }
@@ -227,7 +227,7 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize<OID>(Al
  * optimizations anyways.
  */
 template <typename T>
-inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize(Allocator& allocator,
+inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize(ElementStorage& allocator,
                                                                          BSONElement val) {
     // Return an SBE value that is a view. It will reference memory that is owned by the BSONColumn.
     return bson::convertFrom<true /* view */>(val);

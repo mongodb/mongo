@@ -170,7 +170,7 @@ public:
         // End of BSONColumn memory block, we may not dereference any memory past this.
         const char* _end = nullptr;
 
-        // Allocator to use when materializing elements
+        // ElementStorage to use when materializing elements
         boost::intrusive_ptr<ElementStorage> _allocator;
 
         /**
@@ -525,7 +525,7 @@ concept Appendable =
  *
  * The data types passed to the materialize() methods could be referencing memory on the stack
  * (e.g., the pointer in a StringData instance) and so implementors should assume this data is
- * ephemeral. The provided Allocator can be used to allocate memory with the lifetime of the
+ * ephemeral. The provided ElementStorage can be used to allocate memory with the lifetime of the
  * BSONColumn instance.
  *
  * The exception to this rule is that BSONElements passed to the materialize() methods may be
@@ -534,7 +534,7 @@ concept Appendable =
  */
 template <class T>
 concept Materializer = requires(T& t,
-                                typename T::Allocator alloc,
+                                ElementStorage& alloc,
                                 StringData strVal,
                                 BSONBinData binVal,
                                 BSONCode codeVal,
@@ -578,10 +578,9 @@ template <class CMaterializer, class Container>
 requires Materializer<CMaterializer>
 class Collector {
     using Element = typename CMaterializer::Element;
-    using CAllocator = typename CMaterializer::Allocator;
 
 public:
-    Collector(Container& collection, CAllocator& allocator)
+    Collector(Container& collection, ElementStorage& allocator)
         : _collection(collection), _allocator(allocator) {}
 
     void append(bool val) {
@@ -643,7 +642,7 @@ private:
     }
 
     Container& _collection;
-    CAllocator& _allocator;
+    ElementStorage& _allocator;
 };
 
 class BSONColumnBlockBased {
@@ -666,7 +665,7 @@ public:
      */
     template <class CMaterializer, class Container>
     requires Materializer<CMaterializer>
-    void decompress(Container& collection, typename CMaterializer::Allocator& allocator) const {
+    void decompress(Container& collection, ElementStorage& allocator) const {
         Collector<CMaterializer, Container> collector(collection, allocator);
         decompress(collector);
     }
@@ -751,8 +750,7 @@ public:
      */
     template <class CMaterializer, class Container>
     requires Materializer<CMaterializer>
-    void decompressIterative(Container& collection,
-                             typename CMaterializer::Allocator& allocator) const {
+    void decompressIterative(Container& collection, ElementStorage& allocator) const {
         Collector<CMaterializer, Container> collector(collection, allocator);
         decompressIterative(collector);
     }
