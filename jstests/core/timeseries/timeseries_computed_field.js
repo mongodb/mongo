@@ -50,6 +50,12 @@ TimeseriesTest.run((insert) => {
         arrOfObj: [{x: 101}, {x: 102}, {x: 103}, {x: 104}],
         obj: {a: 456},
     });
+    // Insert a document that will be placed in a different bucket.
+    insert(coll, {
+        _id: 2,
+        [timeFieldName]: new Date(datePrefix + 300),
+        [metaFieldName]: "gpu",
+    })
 
     // Computing a field on a dotted path which is an array, then grouping on it. Note that the
     // semantics for setting a computed field on a dotted array path are particularly strange, but
@@ -100,5 +106,12 @@ TimeseriesTest.run((insert) => {
                         .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 1, res);
+    }
+
+    {
+        // Include an uneccessary computed field before counting the number of documents.
+        const res = coll.aggregate([{$addFields: {"a": 1}}, {$count: "count"}]).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 3, res);
     }
 });

@@ -75,9 +75,6 @@ using VariableTypes = stdx::
 // Collect the type information of the slots declared in the provided stage output.
 VariableTypes buildVariableTypes(const PlanStageSlots& outputs);
 
-// Return whether the declared outputs contain a block value.
-bool hasBlockOutput(const PlanStageSlots& outputs);
-
 // Run constant folding on the provided ABT tree and return its type signature. If the type
 // information for the visible slots is available in the slotInfo argument, it is used to perform a
 // more precise type checking optimization. On return, the abt argument points to the modified tree.

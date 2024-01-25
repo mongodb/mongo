@@ -794,7 +794,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (!groupFieldMap.empty()) {
         // If we have block values in input, convert them to scalar values before computing the
         // projection.
-        if (hasBlockOutput(childOutputs)) {
+        if (childOutputs.hasBlockOutput()) {
             childStage = buildBlockToRow(std::move(childStage), childOutputs);
         }
 
@@ -812,14 +812,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // the required projection to create it. If we have a single expression, we can try to
     // vectorize it.
     if (auto idExprObj = dynamic_cast<ExpressionObject*>(idExpr.get()); idExprObj) {
-        if (hasBlockOutput(childOutputs)) {
+        if (childOutputs.hasBlockOutput()) {
             childStage = buildBlockToRow(std::move(childStage), childOutputs);
         }
         std::tie(groupBySlots, groupByStage, idFinalExpr) =
             generateGroupByObjKey(_state, idExprObj, childOutputs, std::move(childStage), nodeId);
     } else {
         // Attempt to use a block-enabled project stage.
-        if (hasBlockOutput(childOutputs)) {
+        if (childOutputs.hasBlockOutput()) {
             // The group-by field may end up being 'Nothing' and in that case _id: null will be
             // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
             auto groupByBlockExpr = buildVectorizedExpr(
