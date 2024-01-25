@@ -2312,6 +2312,7 @@ env.Library(
         'concurrency/lock_manager',
         'introspect',
         'matcher/expressions_mongod_only',
+        'mongod_options',
         'query/command_request_response',
         'query_exec',
         'repl/repl_coordinator_interface',
