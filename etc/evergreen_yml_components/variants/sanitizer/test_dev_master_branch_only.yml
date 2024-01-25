@@ -284,9 +284,9 @@ buildvariants:
   - name: compile_test_serial_TG
     distros:
     - windows-vsCurrent-xxlarge
-  - name: compile_build_tools_next_TG
+  - name: compile_test_parallel_unittest_stream_TG
     distros:
-    - windows-vsCurrent-xlarge
+    - windows-vsCurrent-xxlarge
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - windows-vsCurrent-xlarge
@@ -406,7 +406,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_serial_TG
-  - name: compile_build_tools_next_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: aggregation !.feature_flag_guarded
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -443,6 +443,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_serial_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -652,6 +653,7 @@ buildvariants:
       --excludeWithAnyTags=tsan_incompatible
   tasks:
   - name: compile_test_serial_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: compile_integration_and_test_parallel_stream_TG
   - name: check_feature_flag_tags
   # TODO SERVER-82766: timeseries and multiversion fuzzers had been timing out on TSAN builds.
@@ -777,6 +779,7 @@ buildvariants:
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_serial_TG
+  - name: compile_test_parallel_unittest_stream_TG
   - name: .auth
   - name: .concurrency !.no_txns !.compute_mode
   - name: .config_fuzzer
