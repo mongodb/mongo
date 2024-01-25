@@ -64,11 +64,11 @@ linker = rule(
 
 use_gdbserver_provider = provider(
     doc = "Choose if gdbserver should be used",
-    fields = ["type"],
+    fields = ["enabled"],
 )
 
 use_gdbserver = rule(
-    implementation = lambda ctx: use_gdbserver_provider(type = ctx.build_setting_value),
+    implementation = lambda ctx: use_gdbserver_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
 
@@ -133,11 +133,11 @@ allocator = rule(
 
 use_lldbserver_provider = provider(
     doc = "Choose if lldbserver should be used",
-    fields = ["type"],
+    fields = ["enabled"],
 )
 
 use_lldbserver = rule(
-    implementation = lambda ctx: use_lldbserver_provider(type = ctx.build_setting_value),
+    implementation = lambda ctx: use_lldbserver_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
 
