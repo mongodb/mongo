@@ -1804,6 +1804,7 @@ env.Library(
         'concurrency/lock_manager',
         'introspect',
         'matcher/expressions_mongod_only',
+        'mongod_options',
         'query_exec',
         'query/command_request_response',
         'repl/repl_coordinator_interface',
