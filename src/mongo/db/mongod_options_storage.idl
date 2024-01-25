@@ -54,6 +54,20 @@ server_parameters:
             If true, MongoDB will not execute queries that require a table scan and will return an error.
         set_at: [ startup, runtime ]
         cpp_varname: 'storageGlobalParams.noTableScan'
+    allowDocumentsGreaterThanMaxUserSize:
+        description: >-
+            Internal, allows users to insert documents greater than the 16mb maximum user BSON
+            size. This parameter is intended to be used exclusively with the backup/restore
+            process. During some restores, we insert oplog entries from a source cluster directly
+            into a destination cluster's oplog. These oplog entries may exceed the user maximum
+            BSON size, and thus require this parameter for the insert to succeed. These entries
+            were already validated on the source cluster, making the inserts safe. Note that the
+            node must be in standalone mode to enable this parameter, and the documents must still
+            be less than the 16mb + 16kb maximum internal BSON size.
+        set_at: [ startup ]
+        cpp_vartype: bool
+        cpp_varname: gAllowDocumentsGreaterThanMaxUserSize
+        default: false
 
 configs:
     'storage.engine':

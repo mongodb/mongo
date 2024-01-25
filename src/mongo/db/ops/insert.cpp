@@ -45,6 +45,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -98,7 +99,15 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx,
     bool validationDisabled = DocumentValidationSettings::get(opCtx).isInternalValidationDisabled();
 
     if (!validationDisabled) {
-        if (doc.objsize() > BSONObjMaxUserSize)
+        // 'gAllowDocumentsGreaterThanMaxUserSize' should only ever be enabled when restoring a node
+        // from a backup. For some restores, we re-insert whole oplog entries from a
+        // source cluster to a destination cluster. Some generated oplog entries may exceed the user
+        // maximum due to entry metadata, and therefore we should skip BSON size validation for
+        // these inserts. Note that we should only skip the size check when inserting oplog entries
+        // into the oplog and not when inserting user documents. The oplog entries to insert have
+        // already been validated for size on the source cluster, and were successfully inserted
+        // into the source oplog.
+        if (doc.objsize() > BSONObjMaxUserSize && !gAllowDocumentsGreaterThanMaxUserSize)
             return StatusWith<BSONObj>(ErrorCodes::BadValue,
                                        str::stream() << "object to insert too large"
                                                      << ". size in bytes: " << doc.objsize()
