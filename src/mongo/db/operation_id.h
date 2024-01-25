@@ -75,6 +75,12 @@ public:
      */
     LockedClient findAndLockClient(OperationId id) const;
 
+    /**
+     * Removes the client from the _clientByOperationId map. This must be called before the Client
+     * is destructed.
+     */
+    void eraseClientFromMap(Client*);
+
     // For testing purposes only, we can change the lease size to test behavior when we run out of
     // leases to issue. Other than for testing purposes, leaseSize can be considered a private
     // implementation detail, and should not be modified.
@@ -84,12 +90,7 @@ private:
     struct IdPool;
     friend struct ClientState;
 
-    // This lock is acquired when destroying `ClientState`, which is a decoration on `Client`.
-    // If defined via `MONGO_MAKE_LATCH`, acquiring the lock may result in calling into
-    // `LatchAnalyzer`, which is also defined as a `Client` decoration. This could result in
-    // user-after-free accesses if the instance of `LatchAnalyzer` is destroyed before
-    // `ClientState`. Thus, we should define this as a raw mutex.
-    mutable stdx::mutex _mutex;  // NOLINT
+    mutable Mutex _mutex;
     std::unique_ptr<IdPool> _pool;
     stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 
