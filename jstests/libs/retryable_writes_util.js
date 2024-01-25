@@ -89,6 +89,25 @@ export var RetryableWritesUtil = (function() {
         return res;
     }
 
+    function isFailedToSatisfyPrimaryReadPreferenceError(res) {
+        const kReplicaSetMonitorError =
+            /Could not find host matching read preference.*mode:.*primary/;
+        if (res.hasOwnProperty("errmsg")) {
+            return res.errmsg.match(kReplicaSetMonitorError);
+        }
+        if (res.hasOwnProperty("message")) {
+            return res.message.match(kReplicaSetMonitorError);
+        }
+        if (res.hasOwnProperty("writeErrors")) {
+            for (let writeError of res.writeErrors) {
+                if (writeError.errmsg.match(kReplicaSetMonitorError)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     return {
         isRetryableCode,
         errmsgContainsRetryableCodeName,
@@ -96,5 +115,6 @@ export var RetryableWritesUtil = (function() {
         checkTransactionTable,
         assertSameRecordOnBothConnections,
         runRetryableWrite,
+        isFailedToSatisfyPrimaryReadPreferenceError,
     };
 })();

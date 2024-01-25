@@ -236,24 +236,6 @@ function isRetryableMoveChunkResponse(res) {
         res.code === ErrorCodes.CallbackCanceled;
 }
 
-function isFailedToSatisfyPrimaryReadPreferenceError(res) {
-    const kReplicaSetMonitorError = /Could not find host matching read preference.*mode:.*primary/;
-    if (res.hasOwnProperty("errmsg")) {
-        return res.errmsg.match(kReplicaSetMonitorError);
-    }
-    if (res.hasOwnProperty("message")) {
-        return res.message.match(kReplicaSetMonitorError);
-    }
-    if (res.hasOwnProperty("writeErrors")) {
-        for (let writeError of res.writeErrors) {
-            if (writeError.errmsg.match(kReplicaSetMonitorError)) {
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 function hasError(res) {
     return res.ok !== 1 || res.writeErrors || (res.hasOwnProperty("nErrors") && res.nErrors != 0);
 }
@@ -804,7 +786,7 @@ function shouldRetryWithNetworkErrorOverride(
     res, cmdName, startTime, logError, shouldOverrideAcceptableError = true) {
     assert(configuredForNetworkRetry());
 
-    if (isFailedToSatisfyPrimaryReadPreferenceError(res) &&
+    if (RetryableWritesUtil.isFailedToSatisfyPrimaryReadPreferenceError(res) &&
         Date.now() - startTime < 5 * 60 * 1000) {
         // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
         // primary of the replica set. It is possible for the step up attempt of another
@@ -969,7 +951,7 @@ function shouldRetryWithNetworkExceptionOverride(
     if (numNetworkErrorRetries === 0) {
         logError("No retries, throwing");
         throw e;
-    } else if (isFailedToSatisfyPrimaryReadPreferenceError(e) &&
+    } else if (RetryableWritesUtil.isFailedToSatisfyPrimaryReadPreferenceError(e) &&
                Date.now() - startTime < 5 * 60 * 1000) {
         // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
         // primary of the replica set. It is possible for the step up attempt of another
