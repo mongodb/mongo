@@ -1990,7 +1990,7 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
     }
 
     const UpdatePositionArgs::UpdateInfo update(
-        OpTime(), Date_t(), opTime, wallTime, cfgVer, memberId);
+        OpTime(), Date_t(), OpTime(), Date_t(), opTime, wallTime, cfgVer, memberId);
     const auto statusWithOpTime = _setLastOptimeForMember(lock, update);
     _updateStateAfterRemoteOpTimeUpdates(lock, statusWithOpTime.getValue());
     return statusWithOpTime.getStatus();
@@ -2008,7 +2008,7 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
     }
 
     const UpdatePositionArgs::UpdateInfo update(
-        opTime, wallTime, OpTime(), Date_t(), cfgVer, memberId);
+        opTime, wallTime, OpTime(), Date_t(), OpTime(), Date_t(), cfgVer, memberId);
     const auto statusWithOpTime = _setLastOptimeForMember(lock, update);
     _updateStateAfterRemoteOpTimeUpdates(lock, statusWithOpTime.getValue());
     return statusWithOpTime.getStatus();

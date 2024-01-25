@@ -42,6 +42,8 @@ const char UpdatePositionArgs::kCommandFieldName[] = "replSetUpdatePosition";
 const char UpdatePositionArgs::kUpdateArrayFieldName[] = "optimes";
 const char UpdatePositionArgs::kAppliedOpTimeFieldName[] = "appliedOpTime";
 const char UpdatePositionArgs::kAppliedWallTimeFieldName[] = "appliedWallTime";
+const char UpdatePositionArgs::kWrittenOpTimeFieldName[] = "writtenOpTime";
+const char UpdatePositionArgs::kWrittenWallTimeFieldName[] = "writtenWallTime";
 const char UpdatePositionArgs::kDurableOpTimeFieldName[] = "durableOpTime";
 const char UpdatePositionArgs::kDurableWallTimeFieldName[] = "durableWallTime";
 const char UpdatePositionArgs::kMemberIdFieldName[] = "memberId";
@@ -49,12 +51,16 @@ const char UpdatePositionArgs::kConfigVersionFieldName[] = "cfgver";
 
 UpdatePositionArgs::UpdateInfo::UpdateInfo(const OpTime& applied,
                                            const Date_t& appliedWall,
+                                           const OpTime& written,
+                                           const Date_t& writtenWall,
                                            const OpTime& durable,
                                            const Date_t& durableWall,
                                            long long aCfgver,
                                            long long aMemberId)
     : appliedOpTime(applied),
       appliedWallTime(appliedWall),
+      writtenOpTime(written),
+      writtenWallTime(writtenWall),
       durableOpTime(durable),
       durableWallTime(durableWall),
       cfgver(aCfgver),
@@ -86,6 +92,26 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         }
         appliedWallTime = appliedWallTimeElement.Date();
 
+        OpTime writtenOpTime;
+        status = bsonExtractOpTimeField(entry, kWrittenOpTimeFieldName, &writtenOpTime);
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            writtenOpTime = appliedOpTime;
+        } else if (!status.isOK()) {
+            return status;
+        }
+
+        Date_t writtenWallTime = Date_t();
+        BSONElement writtenWallTimeElement;
+        status = bsonExtractTypedField(
+            entry, kWrittenWallTimeFieldName, BSONType::Date, &writtenWallTimeElement);
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            writtenWallTime = appliedWallTime;
+        } else if (!status.isOK()) {
+            return status;
+        } else {
+            writtenWallTime = writtenWallTimeElement.Date();
+        }
+
         Date_t durableWallTime = Date_t();
         BSONElement durableWallTimeElement;
         status = bsonExtractTypedField(
@@ -112,8 +138,14 @@ Status UpdatePositionArgs::initialize(const BSONObj& argsObj) {
         if (!status.isOK())
             return status;
 
-        _updates.push_back(UpdateInfo(
-            appliedOpTime, appliedWallTime, durableOpTime, durableWallTime, cfgver, memberID));
+        _updates.push_back(UpdateInfo(appliedOpTime,
+                                      appliedWallTime,
+                                      writtenOpTime,
+                                      writtenWallTime,
+                                      durableOpTime,
+                                      durableWallTime,
+                                      cfgver,
+                                      memberID));
     }
 
     return Status::OK();
@@ -132,8 +164,9 @@ BSONObj UpdatePositionArgs::toBSON() const {
             BSONObjBuilder updateEntry(updateArray.subobjStart());
             updateEntry.append(kConfigVersionFieldName, update->cfgver);
             updateEntry.append(kMemberIdFieldName, update->memberId);
-            update->durableOpTime.append(&updateEntry, kDurableOpTimeFieldName);
             update->appliedOpTime.append(&updateEntry, kAppliedOpTimeFieldName);
+            update->writtenOpTime.append(&updateEntry, kWrittenOpTimeFieldName);
+            update->durableOpTime.append(&updateEntry, kDurableOpTimeFieldName);
         }
         updateArray.doneFast();
     }

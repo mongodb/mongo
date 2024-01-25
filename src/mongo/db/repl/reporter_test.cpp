@@ -267,9 +267,11 @@ TEST(UpdatePositionArgs, AcceptsUnknownFieldInUpdateInfo) {
     auto updateInfo =
         BSON(UpdatePositionArgs::kConfigVersionFieldName
              << 1 << UpdatePositionArgs::kMemberIdFieldName << 1
-             << UpdatePositionArgs::kDurableOpTimeFieldName << OpTime()
              << UpdatePositionArgs::kAppliedOpTimeFieldName << OpTime()
+             << UpdatePositionArgs::kWrittenOpTimeFieldName << OpTime()
+             << UpdatePositionArgs::kDurableOpTimeFieldName << OpTime()
              << UpdatePositionArgs::kAppliedWallTimeFieldName << now
+             << UpdatePositionArgs::kWrittenWallTimeFieldName << now
              << UpdatePositionArgs::kDurableWallTimeFieldName << now << "unknownField" << 1);
     bob.append(UpdatePositionArgs::kUpdateArrayFieldName, BSON_ARRAY(updateInfo));
     BSONObj cmdObj = bob.obj();
@@ -283,6 +285,7 @@ TEST(UpdatePositionArgs, AcceptsUnknownFieldInUpdateInfo) {
     ASSERT_EQ(updatesArr.nFields(), 1);
     bob2.appendElements(updatesArr[0].Obj());
     bob2.append(UpdatePositionArgs::kAppliedWallTimeFieldName, now);
+    bob2.append(UpdatePositionArgs::kWrittenWallTimeFieldName, now);
     bob2.append(UpdatePositionArgs::kDurableWallTimeFieldName, now);
     bob2.append("unknownField", 1);
     ASSERT_EQ(bob2.obj().woCompare(updateInfo), 0);

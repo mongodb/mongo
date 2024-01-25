@@ -2146,14 +2146,18 @@ StatusWith<BSONObj> TopologyCoordinator::prepareReplSetUpdatePositionCommand(
         }
 
         BSONObjBuilder entry(arrayBuilder.subobjStart());
-        memberData.getLastDurableOpTime().append(&entry,
-                                                 UpdatePositionArgs::kDurableOpTimeFieldName);
-        entry.appendDate(UpdatePositionArgs::kDurableWallTimeFieldName,
-                         memberData.getLastDurableWallTime());
+        memberData.getLastWrittenOpTime().append(&entry,
+                                                 UpdatePositionArgs::kWrittenOpTimeFieldName);
+        entry.appendDate(UpdatePositionArgs::kWrittenWallTimeFieldName,
+                         memberData.getLastWrittenWallTime());
         memberData.getLastAppliedOpTime().append(&entry,
                                                  UpdatePositionArgs::kAppliedOpTimeFieldName);
         entry.appendDate(UpdatePositionArgs::kAppliedWallTimeFieldName,
                          memberData.getLastAppliedWallTime());
+        memberData.getLastDurableOpTime().append(&entry,
+                                                 UpdatePositionArgs::kDurableOpTimeFieldName);
+        entry.appendDate(UpdatePositionArgs::kDurableWallTimeFieldName,
+                         memberData.getLastDurableWallTime());
         entry.append(UpdatePositionArgs::kMemberIdFieldName, memberData.getMemberId().getData());
         entry.append(UpdatePositionArgs::kConfigVersionFieldName, _rsConfig.getConfigVersion());
     }
