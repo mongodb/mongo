@@ -743,7 +743,9 @@ public:
 
         try {
             // Check this beforehand to ensure we cannot overflow the buffer with any strlen
-            uassert(NonConformantBSON, "BSON column is missing EOO termination", *(end - 1) == EOO);
+            uassert(NonConformantBSON,
+                    "BSON column is missing EOO termination",
+                    ptr < end && *(end - 1) == EOO);
 
             while (ptr < end) {
                 uint8_t control = *ptr;
