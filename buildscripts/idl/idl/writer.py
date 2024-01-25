@@ -423,3 +423,12 @@ def _gen_trie(prefix, words, writer, callback):
                 _gen_trie(prefix + first_letter, fl_words, writer, callback)
 
             first_if = False
+
+
+def gen_string_table_find_function_block(out, in_str, on_match, on_fail, words):
+    # type: (IndentedTextWriter, str, str, str, list[str]) -> None
+    """Wrap a gen_trie generated block as a function."""
+    index = {word: i for i, word in enumerate(words)}
+    out.write_line(f'StringData fieldName{{{in_str}}};')
+    gen_trie(words, out, lambda w: out.write_line(f'return {on_match.format(index[w])};'))
+    out.write_line(f'return {on_fail};')

@@ -116,6 +116,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_query_info',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/ops/delete_request_idl',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec_util',
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/record_id_helpers',

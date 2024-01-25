@@ -85,6 +85,20 @@ def _is_required_serializer_field(field):
     return not field.ignore and not field.optional and not field.default and not field.chained and not field.chained_struct_field
 
 
+def _get_field_kname(*args, **kwargs):
+    """Get the C++ string constant name for a field."""
+    if args:
+        field_name = args[0].cpp_name
+    else:
+        field_name = kwargs["name"]
+    return f'k{common.title_case(field_name)}'
+
+
+def _get_field_enum(field):
+    # type: (ast.Field) -> str
+    return f'Field::{_get_field_kname(field)}'
+
+
 def _get_field_constant_name(field):
     # type: (ast.Field) -> str
     """Get the C++ string constant name for a field."""
@@ -198,6 +212,25 @@ def _gen_field_element_name(field):
 def _gen_mark_present(field_name):
     # type: (str) -> str
     return f'_hasMembers.markPresent(static_cast<size_t>(RequiredFields::{field_name}));'
+
+
+def _is_parse(field):
+    # type: (ast.Field) -> bool
+    """Returns true if `field` should participate in deserialization."""
+    # Do not parse chained fields as fields since they are actually chained types.
+    if field.chained and not field.chained_struct_field:
+        return False
+    # Internal only fields are not parsed from BSON objects
+    if field.type and field.type.internal_only:
+        return False
+    return True
+
+
+def _is_forwarding_disabled(field):
+    # type: (ast.Field) -> bool
+    """Returns true if forwarding is dieabled for `field`."""
+    gfi = field.generic_field_info
+    return not (gfi and gfi.get_should_forward())
 
 
 def _get_constant(name):
@@ -758,6 +791,17 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                         'static constexpr auto kCommandAlias = "${command_alias}"_sd;',
                         command_alias=struct.command_alias))
 
+    def gen_field_enum(self, struct):
+        # type: (ast.Struct) -> None
+        """Declare the public enum and string constants for struct fields."""
+        with self._block('enum class Field {', '};'):
+            for f in struct.fields:
+                self._writer.write_line(f'{_get_field_kname(f)},')
+        with self._block('static constexpr std::array fieldNames{', '};'):
+            for f in struct.fields:
+                self._writer.write_line(f'"{f.name}"_sd,')
+        self._writer.write_empty_line()
+
     def gen_required_field_enum(self, struct):
         self._writer.write_line('enum class RequiredFields : size_t { %s };' % ', '.join(
             [f.cpp_name for f in _get_required_fields(struct)]))
@@ -1177,6 +1221,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.gen_description_comment(struct.description)
                 with self.gen_class_declaration_block(struct.cpp_name):
                     self.write_unindented_line('public:')
+                    self.gen_field_enum(struct)
 
                     if isinstance(struct, ast.Command):
                         if struct.reply_type:
@@ -1238,6 +1283,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                                 self.gen_validators(field)
 
                     self.write_unindented_line('private:')
+                    self._writer.write_line('struct FieldInfo;')
 
                     self.gen_required_field_enum(struct)
                     self.write_empty_line()
@@ -1312,6 +1358,38 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Create a C++ .cpp file code writer."""
         self._target_arch = target_arch
         super(_CppSourceFileWriter, self).__init__(indented_writer)
+
+    def gen_field_info(self, struct):
+        # type: (ast.Struct) -> None
+        """Generates a definition of struct's `FieldInfo` nested type.
+
+        It contains static metadata of struct's members.
+        """
+        cls = common.title_case(struct.cpp_name)
+        with self._block(f'struct {cls}::FieldInfo {{', '};'):
+            for func, pred in (
+                ('findStructField', lambda f: True),
+                ('findRequiredField', _is_required_serializer_field),
+                ('findForwardingDisabledField', _is_forwarding_disabled),
+                ('findParsedField', _is_parse),
+            ):
+                selected_fields = [x for x in filter(pred, struct.fields)]
+                self._writer.write_line('template <typename OnMatch, typename OnFail>')
+                with self._block(
+                        f'static auto {func}(StringData s, const OnMatch& onMatch, const OnFail& onFail) {{',
+                        '};'):
+                    if len(selected_fields) == 0:
+                        self._writer.write_line('return onFail();')
+                    else:
+                        with self._block('static constexpr auto adaptMatch = [](int i) {', '};'):
+                            with self._block('static constexpr auto arr = std::to_array<Field>({',
+                                             '});'):
+                                for f in selected_fields:
+                                    self._writer.write_line(f'{_get_field_enum(f)},')
+                            self._writer.write_line('return arr[i];')
+                        writer.gen_string_table_find_function_block(
+                            self._writer, 's', 'onMatch(adaptMatch({}))', 'onFail()',
+                            [f.name for f in selected_fields])
 
     def _gen_field_deserializer_expression(self, element_name, field, ast_type, tenant):
         # type: (str, ast.Field, ast.Type, str) -> str
@@ -1859,30 +1937,19 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         """Generate the definitions for generic argument or reply field lookup methods."""
         field_list_info = generic_field_list_types.get_field_list_info(struct)
-        defn = field_list_info.get_has_field_method().get_definition()
-
-        field_names = [f.name for f in struct.fields]
-        field_name_map = {f.name: f for f in struct.fields}
-
-        def map_return_true(_field_name):
-            self._writer.write_line("return true;")
-
-        with self._block('%s {' % (defn), '}'):
-            writer.gen_trie(field_names, self._writer, map_return_true)
-            self._writer.write_line('return false;')
+        has_field_defn = field_list_info.get_has_field_method().get_definition()
+        with self._block(f'{has_field_defn} {{', '}'):
+            self._writer.write_line(
+                'return FieldInfo::findStructField(fieldName, [](auto) { return true; }, []{ return false; });'
+            )
 
         self._writer.write_empty_line()
 
-        def map_field(field_name):
-            rv = "true" if field_name_map[field_name].generic_field_info.get_should_forward(
-            ) else "false"
-            self._writer.write_line("return %s;" % (rv))
-
-        defn = field_list_info.get_should_forward_method().get_definition()
-        with self._block('%s {' % (defn, ), '}'):
-            writer.gen_trie(field_names, self._writer, map_field)
-
-            self._writer.write_line('return true;')
+        should_fwd_defn = field_list_info.get_should_forward_method().get_definition()
+        with self._block(f'{should_fwd_defn} {{', '}'):
+            self._writer.write_line(
+                'return FieldInfo::findForwardingDisabledField(fieldName, [](auto) { return false; }, []{ return true; });'
+            )
 
         self._writer.write_empty_line()
 
@@ -1969,17 +2036,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 fn = defer_field if field.name in deferred_field_names else None
                 self.gen_field_deserializer(field, field.type, bson_object, "element",
                                             field_usage_check, tenant, deserialize_fn=fn)
-            self._writer.write_line('continue;')
-
-        def is_parse(field):
-            # Do not parse chained fields as fields since they are actually chained types.
-            if field.chained and not field.chained_struct_field:
-                return False
-            # Internal only fields are not parsed from BSON objects
-            if field.type and field.type.internal_only:
-                return False
-
-            return True
+            self._writer.write_line('return true;')
 
         if 'expectPrefix' in [field.name for field in struct.fields]:
             # Deserialization of 'expectPrefix' modifies the deserializationContext and how
@@ -2014,9 +2071,19 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line('firstFieldFound = true;')
                     self._writer.write_line('continue;')
 
-            field_names = [f.name for f in struct.fields if is_parse(f)]
-            if len(field_names) > 0:
-                writer.gen_trie(field_names, self._writer, map_field)
+            parsed_fields = [f for f in struct.fields if _is_parse(f)]
+            if parsed_fields:
+                with self._block('auto onMatch = [&](Field f) {', '};'):
+                    with self._block('switch (f) {', '}'):
+                        for f in parsed_fields:
+                            with self._block(f'case {_get_field_enum(f)}: {{', '} break;'):
+                                map_field(f.name)
+                        self._writer.write_line('default: return false;')
+                    self._writer.write_line('return false;')
+                with self._block('auto onFail = [] {', '};'):
+                    self._writer.write_line('return false;')
+                self._writer.write_line(
+                    'if (FieldInfo::findParsedField(fieldName, onMatch, onFail)) continue;')
 
             # End of for fields
             # Generate strict check for extranous fields
@@ -2722,31 +2789,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line('return request;')
 
-    def gen_string_constants_definitions(self, struct):
-        # type: (ast.Struct) -> None
-        """Generate a StringData constant for field name in the cpp file."""
-
-        for field in _get_all_fields(struct):
-            # Internal only fields are not parsed from BSON objects
-            if field.type and field.type.internal_only:
-                continue
-
-            self._writer.write_line(
-                common.template_args('constexpr StringData ${class_name}::${constant_name};',
-                                     class_name=common.title_case(struct.cpp_name),
-                                     constant_name=_get_field_constant_name(field)))
-
-        if isinstance(struct, ast.Command):
-            self._writer.write_line(
-                common.template_args('constexpr StringData ${class_name}::kCommandName;',
-                                     class_name=common.title_case(struct.cpp_name)))
-
-            # Declare constexp for commmand alias if specified in the IDL spec.
-            if struct.command_alias:
-                self._writer.write_line(
-                    common.template_args('constexpr StringData ${class_name}::kCommandAlias;',
-                                         class_name=common.title_case(struct.cpp_name)))
-
     def gen_authorization_contract_definition(self, struct):
         # type: (ast.Struct) -> None
         """Generate the authorization contract defintion."""
@@ -3126,7 +3168,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         initializer = spec.globals.configs and spec.globals.configs.initializer
 
-        # pylint: disable=consider-using-ternary
         blockname = (initializer and initializer.name) or (
             'idl_' + hashlib.sha1(header_file_name.encode()).hexdigest())
 
@@ -3229,7 +3270,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             all_structs = spec.structs + cast(List[ast.Struct], spec.commands)
 
             for struct in all_structs:
-                self.gen_string_constants_definitions(struct)
+                self.gen_field_info(struct)
                 self.write_empty_line()
 
                 self.gen_authorization_contract_definition(struct)
