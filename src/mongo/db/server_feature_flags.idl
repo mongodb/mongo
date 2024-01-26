@@ -142,3 +142,9 @@ feature_flags:
         cpp_varname: gFeatureFlagAutoCompact
         default: false
         shouldBeFCVGated: false
+    featureFlagLogSlowOpsBasedOnTimeWorking:
+        description: "Feature flag to enable slow operation logging based on time working rather 
+        than total latency"
+        cpp_varname: gFeatureFlagLogSlowOpsBasedOnTimeWorking
+        default: false
+        shouldBeFCVGated: false
