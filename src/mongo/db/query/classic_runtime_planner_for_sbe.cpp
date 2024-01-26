@@ -49,6 +49,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> sbePlanAndData,
     bool isFromPlanCache,
     boost::optional<size_t> cachedPlanHash) {
+    const auto* expCtx = cq()->getExpCtxRaw();
+    auto remoteCursors =
+        expCtx->explain ? nullptr : search_helpers::getSearchRemoteCursors(cq()->cqPipeline());
+    auto remoteExplains = expCtx->explain
+        ? search_helpers::getSearchRemoteExplains(expCtx, cq()->cqPipeline())
+        : nullptr;
+
     stage_builder::prepareSlotBasedExecutableTree(_opCtx,
                                                   sbePlanAndData.first.get(),
                                                   &sbePlanAndData.second,
@@ -56,8 +63,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                                   collections(),
                                                   sbeYieldPolicy(),
                                                   isFromPlanCache,
-                                                  // TODO SERVER-85518 Support remoteCursors
-                                                  nullptr /* remoteCursors */);
+                                                  remoteCursors.get());
 
     auto nss = cq()->nss();
     tassert(8551900,
@@ -78,9 +84,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                     matchesCachedPlan,
                                     false /* generatedByBonsai */,
                                     OptimizerCounterInfo{} /* used for Bonsai */,
-                                    // TODO SERVER-85518 Support remoteCursors and remoteExplains
-                                    nullptr /* remoteCursors */,
-                                    nullptr /* remoteExplains */));
+                                    std::move(remoteCursors),
+                                    std::move(remoteExplains)));
 }
 
 SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
