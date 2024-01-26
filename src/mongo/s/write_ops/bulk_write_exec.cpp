@@ -1610,18 +1610,26 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                                            &actualCollections[nsInfoIdx],
                                            &hasContactedPrimaryShard[nsInfoIdx]);
 
-            replyItems.emplace_back(writeOp.getWriteItem().getItemIndex(), error.getStatus());
+            auto replyItem =
+                BulkWriteReplyItem(writeOp.getWriteItem().getItemIndex(), error.getStatus());
 
-            // TODO SERVER-79510: Remove this. This is necessary right now because the nModified
-            //  field is lost in the BulkWriteReplyItem -> WriteError transformation but
-            // we want to return nModified for failed updates. However, this does not actually
-            // return a correct value for multi:true updates that partially succeed (i.e. succeed
-            // on one or more shard and fail on one or more shards). In SERVER-79510 we should
-            // return a correct nModified count by summing the success responses' nModified
-            // values.
-            if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update) {
-                replyItems.back().setNModified(0);
+            if (writeOp.hasBulkWriteReplyItem()) {
+                auto successesReplyItem = writeOp.takeBulkWriteReplyItem();
+
+                replyItem.setN(successesReplyItem.getN());
+                replyItem.setNModified(successesReplyItem.getNModified());
+                replyItem.setUpserted(successesReplyItem.getUpserted());
+            } else {
+                // If there was no previous successful response we still need to set nModified=0
+                // for an update op since we lose that information in the BulkWriteReplyItem ->
+                // WriteError transformation.
+                if (writeOp.getWriteItem().getOpType() == BatchedCommandRequest::BatchType_Update) {
+                    replyItem.setNModified(0);
+                }
             }
+
+            replyItems.emplace_back(replyItem);
+
             // We only count nErrors at the end of the command because it is simpler and less error
             // prone. If we counted errors as we encountered them we could hit edge cases where we
             // accidentally count the same error multiple times. At this point in the execution we

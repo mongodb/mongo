@@ -149,7 +149,7 @@ bool WriteOp::hasBulkWriteReplyItem() const {
 }
 
 BulkWriteReplyItem WriteOp::takeBulkWriteReplyItem() {
-    invariant(_state == WriteOpState_Completed);
+    invariant(_state >= WriteOpState_Completed);
     invariant(_bulkWriteReplyItem);
     return std::move(_bulkWriteReplyItem.value());
 }
@@ -295,6 +295,9 @@ void WriteOp::_updateOpState() {
         _state = WriteOpState_Ready;
     } else if (!childErrors.empty()) {
         _error = combineOpErrors(childErrors);
+        if (!childSuccesses.empty()) {
+            _bulkWriteReplyItem = combineBulkWriteReplyItems(childSuccesses);
+        }
         _state = WriteOpState_Error;
     } else if (hasPendingChild && _inTxn) {
         // Return early here since this means that there were no errors while in txn

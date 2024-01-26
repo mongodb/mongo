@@ -4060,6 +4060,88 @@ TEST_F(BulkWriteOpTest, SummaryFieldsAreMergedAcrossReplies) {
     ASSERT_EQ(replyInfo.summaryFields.nDeleted, 1);
 }
 
+// Test that we a success response and a failed response for the same op (from different shards).
+TEST_F(BulkWriteOpTest, SuccessAndErrorsAreMerged) {
+    ShardId shardIdA("shardA");
+    ShardId shardIdB("shardB");
+    NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("foo.bar");
+    ShardEndpoint endpointA(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpointB(
+        shardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterSplitRange(nss0, endpointA, endpointB));
+
+    // Update op targets both shardA and shardB.
+    auto updateOp = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    updateOp.setMulti(true);
+    BulkWriteCommandRequest request({updateOp}, {NamespaceInfoEntry(nss0)});
+    request.setOrdered(false);
+
+    BulkWriteOp op(_opCtx, request);
+
+    TargetedBatchMap targeted;
+    ASSERT_OK(op.target(targeters, false, targeted));
+
+    ASSERT_EQUALS(targeted.size(), 2);
+    ASSERT_EQUALS(targeted[shardIdA]->getWrites().size(), 1u);
+    ASSERT_EQUALS(targeted[shardIdB]->getWrites().size(), 1u);
+
+    // Success response from shard1.
+    auto item = BulkWriteReplyItem(0);
+    item.setNModified(1);
+    item.setN(1);
+    auto reply1 =
+        BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                                  0, {item}, NamespaceString::makeBulkWriteNSS(boost::none)),
+                              0 /* nErrors */,
+                              0 /* nInserted */,
+                              1 /* nMatched */,
+                              1 /* nModified */,
+                              0 /* nUpserted */,
+                              0 /* nDeleted*/)
+            .toBSON()
+            .addFields(BSON("ok" << 1));
+    auto response1 =
+        AsyncRequestsSender::Response{shardIdA,
+                                      StatusWith<executor::RemoteCommandResponse>(
+                                          executor::RemoteCommandResponse(reply1, Microseconds(0))),
+                                      boost::none};
+    op.processChildBatchResponseFromRemote(*targeted[shardIdA], response1, boost::none);
+
+    // Error response from shard2.
+    auto reply2 = BulkWriteCommandReply(
+                      BulkWriteCommandResponseCursor(
+                          0,
+                          {BulkWriteReplyItem(0, Status(ErrorCodes::BadValue, "test error"))},
+                          NamespaceString::makeBulkWriteNSS(boost::none)),
+                      1 /* nErrors */,
+                      0 /* nInserted */,
+                      0 /* nMatched */,
+                      0 /* nModified */,
+                      0 /* nUpserted */,
+                      0 /* nDeleted */)
+                      .toBSON()
+                      .addFields(BSON("ok" << 1));
+    auto response2 =
+        AsyncRequestsSender::Response{shardIdB,
+                                      StatusWith<executor::RemoteCommandResponse>(
+                                          executor::RemoteCommandResponse(reply2, Microseconds(0))),
+                                      boost::none};
+    op.processChildBatchResponseFromRemote(*targeted[shardIdB], response2, boost::none);
+
+    ASSERT(op.isFinished());
+    auto replyInfo = op.generateReplyInfo();
+
+    // Make sure the error response and the success response were combined correctly.
+    ASSERT_EQ(replyInfo.replyItems[0].getOk(), 0);
+    ASSERT_EQ(replyInfo.replyItems[0].getStatus().code(), ErrorCodes::BadValue);
+    ASSERT_EQ(replyInfo.replyItems[0].getN(), 1);
+    ASSERT_EQ(replyInfo.replyItems[0].getNModified(), 1);
+}
+
 // Test that noteWriteOpFinalResponse correctly updates summary fields.
 TEST_F(BulkWriteOpTest, NoteWriteOpFinalResponseUpdatesSummaryFields) {
     ShardId shardIdA("shardA");
