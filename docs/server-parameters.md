@@ -70,8 +70,8 @@ server_parameters:
     deprecated_name: # string or list of strings
     on_update: # string
     condition:
-      expr: # C++ bool expression, runtime evaled
-      constexpr: # C++ bool expression, compile-time eval
+      expr: # C++ bool expression, evaluated at run time
+      constexpr: # C++ bool expression, evaluated at compilation time
       preprocessor: # C preprocessor condition
       min_fcv: # string
       feature_flag: # string
@@ -88,9 +88,8 @@ must be unique across the server instance. More information on the specific fiel
 * `set_at` (required): Must contain the value `startup`, `runtime`, [`startup`, `runtime`], or 
 `cluster`. If `runtime` is specified along with `cpp_varname`, then `decltype(cpp_varname)` must 
 refer to a thread-safe storage type, specifically: `AtomicWord<T>`, `AtomicDouble`, `std::atomic<T>`, 
-or `boost::synchronized<T>`. If `cluster` is specified along with `cpp_varname`, then 
-`decltype(cpp_varname)` must refer to an IDL-defined type that has `ClusterServerParameter` attached 
-as an inline chained struct.
+or `boost::synchronized<T>`. Parameters declared as `cluster` can only be set at runtime and exhibit
+numerous differences. See [Cluster Server Parameters](cluster-server-parameters) below.
 
 * `description` (required): Free-form text field currently used only for commenting the generated C++ 
 code. Future uses may preserve this value for a possible `{listSetParameters:1}` command or other 
@@ -99,7 +98,7 @@ programmatic and potentially user-facing purposes.
 * `cpp_vartype`: Declares the full storage type. If `cpp_vartype` is not defined, it may be inferred 
 from the C++ variable referenced by `cpp_varname`.
 
-* `cpp_varname`: Declares the underlying variable or struct member to use when setting or reading the 
+* `cpp_varname`: Declares the underlying variable or C++ `struct` member to use when setting or reading the 
 server parameter. If defined together with `cpp_vartype`, the storage will be declared as a global 
 variable, and externed in the generated header file. If defined alone, a variable of this name will 
 assume to have been declared and defined by the implementer, and its type will be automatically 
@@ -157,6 +156,32 @@ server_parameters:
       callback: "validateOpensslCipherConfig" # The callback is declared in "ssl_parameters.h"
 ```
 
+### String or Expression Map
+The default and implicit fields above, as well as the `gt`, `lt`, `gte`, and `lte` validators accept 
+either a simple scalar string which is treated as a literal value, or a YAML map containing an 
+attribute called `expr`, which must be a string containing an arbitrary C++ expression to be used 
+as-is. Optionally, an expression map may also include the `is_constexpr: false` attribute, which 
+will suspend enforcement of the value being a `constexpr`.
+
+For example, consider:
+```yaml
+server_parameters:
+  connPoolMaxInUseConnsPerHost:
+    ...
+    cpp_varname: maxInUseConnsPerHost
+    default:
+      expr: std::numeric_limits<int>::max()
+    ...
+```
+
+Here, the server parameter's default value is the evaluation of the C++ expression 
+`std::numeric_limits<int>::max()`. Additionally, since default was not explicitly given the 
+`is_constexpr: false` attribute, it will be round-tripped through the following lambda to guarantee 
+that it does not rely on runtime information.
+```cpp
+[]{ constexpr auto value = <expr>; return value; }()
+```
+
 ### Specialized Server Parameters
 When `cpp_class` is specified on a server parameter, a child class of `ServerParameter` will be 
 created in the `gen.h` file named for either the string value of `cpp_class`, or if it is expressed 
@@ -169,6 +194,7 @@ server_parameters:
       data: string # cpp data type to add to the class as a property named "_data"
       override_ctor: bool # True to allow defining a custom constructor, default: false
       override_set: bool # True to allow defining a custom set() method, default: false
+      override_validate: bool # True to allow defining a custom validate() method, default: false
 ```
 
 `override_ctor`: If `false`, the inherited constructor from the `ServerParameter` base class will be 
@@ -204,7 +230,18 @@ Lastly, a `setFromString` method must always be provided with the following sign
 Status {name}::setFromString(StringData value, const boost::optional<TenantId>& tenantId);
 ```
 
-Note that by default, server parameters are not tenant aware and thus will always have `boost::none`
+The following table summarizes `ServerParameter` method override rules.
+
+| `ServerParameter` method | Override | Default Behavior                                                     |
+| ------------------------ | -------- | -------------------------------------------------------------------- |
+| constructor              | Optional | Instantiates only the name and type.                                 |
+| `set()`                  | Optional | Calls `setFromString()` on a string representation of the new value. |
+| `setFromString()`        | Required | None, won't compile without implementation.                          |
+| `append() // redact=true` | Optional | Replaces parameter value with '###'.                                |
+| `append() // redact=false` | Required | None, won't compile without implementation.                        |
+| `validate()`             | Optional | Returns `Status::OK()` without any checks.                           |
+
+Note that by default, server parameters are not tenant-aware and thus will always have `boost::none`
 provided as `tenantId`, unless defined as cluster server parameters (discussed
 [below](#cluster-server-parameters)).
 
@@ -229,65 +266,85 @@ MONGO_COMPILER_VARIABLE_UNUSED auto* scp_unique_ident = [] {
 Any additional validator and callback would be set on `ret` as determined by the server parameter 
 configuration block.
 
-### Cluster Server Parameters
+## Cluster Server Parameters
 As indicated earlier, one of the options for the `set_at` field is `cluster`. If this value is 
-selected, then the generated server parameter will be known as a cluster server parameter. These 
-server parameters are persisted on a cluster-wide basis via the `setClusterParameter` and 
-`getClusterParameter` commands. Cluster server parameters should be used instead of implementing 
-custom commands to propagate an option cluster-wide, whenever possible.
+selected, then the generated server parameter will be known as a _cluster server parameter_. These 
+server parameters are set at runtime via the `setClusterParameter` command and are propagated to all
+nodes in a sharded cluster or a replica set deployment. Cluster server parameters should be
+preferred to implementing custom parameter propagation whenever possible.
 
 `setClusterParameter` persists the new value of the indicated cluster server parameter onto a 
 majority of nodes on non-sharded replica sets. On sharded clusters, it majority-writes the new value 
-onto every shard and the config server. This ensures that every mongod in the cluster will be able 
+onto every shard and the config server. This ensures that every **mongod** in the cluster will be able 
 to recover the most recently written value for all cluster server parameters on restart. 
-Additionally, `setClusterParameter` blocks until the majority write has succeeded on every replica 
-set in the cluster, which guarantees that the parameter value will not be rolled back after being 
-set. Mongoses poll the config server for updated cluster server parameter values every `clusterServerParameterRefreshIntervalSecs`.
+Additionally, `setClusterParameter` blocks until the majority write succeeds in a replica set
+deployment, which guarantees that the parameter value will not be rolled back after being set.
+In a sharded cluster deployment, the new value has to be majority-committed on the config shard and
+locally-committed on all other shards.
+
+The cluster parameters are persisted in the `config.clusterParameters` collections and cached in
+memory on every **mongod**. The cache updates are done by the `ClusterServerParameterOpObserver` class.
+Every **mongos** also maintains an in-memory cache by polling the config server for updated cluster
+server parameter values every `clusterServerParameterRefreshIntervalSecs` using the
+`ClusterParameterRefresher` periodic job.
 
 `getClusterParameter` returns the cached value of the requested cluster server parameter on the node
 that it is run on. It can accept a single cluster server parameter name, a list of names, or `*` to 
 return all cluster server parameter values on the node.
 
-As indicated in the [Server Parameters Syntax](#server-parameters-syntax) section above, specifying
-`cpp_vartype` for cluster server parameters must result in the usage of an IDL-defined type that has
-`ClusterServerParameter` listed as a chained struct. It is also highly recommended to implement a 
-validator callback function and register it to the cluster server parameter via the `validator` 
+Specifying `cpp_vartype` for cluster server parameters must result in the usage of an IDL-defined
+type that has `ClusterServerParameter` listed as a chained structure. This chaining adds the
+following members to the resulting type:
+
+* `_id` - cluster server parameters are uniquely identified by their names.
+* `clusterParameterTime` - `LogicalTime` at which the current value of the cluster server parameter
+  was updated; used by runtime audit configuration, and to prevent concurrent and redundant cluster
+  parameter updates.
+
+It is highly recommended to specify validation rules or a callback function via the `param.validator`
 field. These validators are called before the new value of the cluster server parameter is written 
 to disk during `setClusterParameter`. 
 See [server_parameter_with_storage_test.idl][cluster-server-param-with-storage-test] and
 [server_parameter_with_storage_test_structs.idl][cluster-server-param-with-storage-test-structs] for
 examples.
 
-Cluster server parameters can also be specified as specialized server parameters. The chart below
-helps depict how base `ServerParameter` methods can be handled:
+### Specialized Cluster Server Parameters
+Cluster server parameters can also be specified as specialized server parameters. The table below
+summarizes `ServerParameter` method override rules in this case.
 
 | `ServerParameter` method    | Override            | Default Behavior                            |
 | --------------------------- | ------------------- | --------------------------------------------|
-| constructor                 | `override_ctor`     | Instantiates only the name and type.        |                 
+| constructor                 | Optional            | Instantiates only the name and type.        |
 | `set()`                     | Required            | None, won't compile without implementation. |
 | `setFromString()`           | Prohibited          | Returns `ErrorCodes::BadValue`.             |
 | `append()`                  | Required            | None, won't compile without implementation. |
-| `validate()`                | `override_validate` | Return `Status::OK()` without any checks.   |
+| `validate()`                | Optional            | Return `Status::OK()` without any checks.   |
 | `reset()`                   | Required            | None, won't compile without implementation. |
 | `getClusterParameterTime()` | Required            | Return `LogicalTime::kUninitialized`.       |
 
- 
-* Specifying `override_ctor` to true is optional. If the cluster server parameter needs to have any
-storage initialized at the same time as parameter registration, then an overridden constructor could
-be useful. Otherwise, the default likely suffices provided that all storage modified via `set()` is
-instantiated in another way.
-* It is highly recommended to specify `override_validate` to true and provide a custom implementation
-of the `validate` method. This ensures that cluster parameters do not get set to nonsensical values.
-* `set()` must be implemented in order to update in-memory parameter storage. It will be called from
-an `OpObserver` after observing a change to the cluster parameter document on-disk.
-* `append()` must be implemented in order to serialize the parameter into BSON for use in 
-`getClusterParameter`.
-* `setFromString()` must never be implemented as cluster server parameters are only set via BSON
-during runtime.  
-* `getClusterParameterTime` must be implemented and should return a `LogicalTime` corresponding to 
-the current version of the cluster server parameter.
-* `reset()` must be implemented and should update the cluster server parameter back to its default
-value.  
+Specifying `override_ctor` to true is optional. An override constructor can be useful for allocating
+additional resources at the time of parameter registration. Otherwise, the default likely suffices,
+provided that memory for holding the current parameter value is allocated automatically.
+
+It is highly recommended to specify `override_validate` to true and provide a custom implementation
+of the `validate()` method. This ensures that cluster parameters do not get set to nonsensical
+values.
+
+The `set()` method must be implemented in order to update the cached parameter value in memory. It
+will be called by the `ClusterServerParameterOpObserver` class after observing a change to the
+cluster parameter document on disk.
+
+The `append()` method must be implemented in order to serialize the parameter into BSON for the
+`getClusterParameter` command.
+
+The `setFromString()` method must not be provided as cluster server parameters are only set via BSON
+during runtime.
+
+The `getClusterParameterTime()` method must be implemented and should return the `LogicalTime`
+corresponding to the current version of the cluster server parameter.
+
+Tue `reset()` method must be implemented and should update the cluster server parameter back to its
+default value.
 
 All cluster server parameters are tenant-aware, meaning that on serverless clusters, each tenant has
 an isolated set of parameters. The `setClusterParameter` and `getClusterParameter` commands will pass
@@ -298,41 +355,181 @@ Specialized server parameters will have to take care to correctly handle the pas
 to enforce tenant isolation.
 
 Like normal server parameters, cluster server parameters can be defined to be dependent on a minimum
-FCV version or a specific feature flag using the `condition: min_fcv/feature_flag:` syntax discussed
-above. During FCV downgrade, the cluster parameter's stored on-disk value will be deleted if either:
+FCV version or a specific feature flag using the `condition.min_fcv` and `condition.feature_flag` syntax discussed
+above. During FCV downgrade, the cluster parameter value stored on disk will be deleted if either:
 (1) The downgraded FCV is lower than the cluster parameter's `min_fcv`, or (2) The cluster
 parameter's `feature_flag` is disabled on the downgraded FCV. While a cluster server parameter is
 disabled due to either of these conditions, `setClusterParameter` on it will always fail, and
-`getClusterParameter` will fail on `mongod`, and return the default value on `mongos` -- this
-difference in behavior is due to `mongos` being unaware of the current FCV.
+`getClusterParameter` will fail on **mongod**, and return the default value on **mongos** -- this
+difference in behavior is due to **mongos** being unaware of the current FCV.
 
 See [server_parameter_specialized_test.idl][specialized-cluster-server-param-test-idl] and 
 [server_parameter_specialized_test.h][specialized-cluster-server-param-test-data] for examples.
 
-### String or Expression Map
-The default and implicit fields above, as well as the `gt`, `lt`, `gte`, and `lte` validators accept 
-either a simple scalar string which is treated as a literal value, or a yaml map containing an 
-attribute called `expr`, which must be a string containing an arbitrary C++ expression to be used 
-as-is. Optionally, an expression map may also include the `is_constexpr: false` attribute, which 
-will suspend enforcement of the value being a `constexpr`.
+### Implementation Details
 
-For example, consider:
-```yaml
-server_parameters:
-  connPoolMaxInUseConnsPerHost:
-    ...
-    cpp_varname: maxInUseConnsPerHost
-    default:
-      expr: std::numeric_limits<int>::max()
-    ...
+The following sequence diagram summarizes `setClusterParameter` in a replica set deployment.
+
+```mermaid
+sequenceDiagram
+    participant D as client
+    participant R as mongod
+    D->>+R: setClusterParameter
+    R->>R: insert / update (majority)
+    R-->>-D: status
 ```
 
-Here, the server parameter's default value is the evaluation of the C++ expression 
-`std::numeric_limits<int>::max()`. Additionally, since default was not explicitly given the 
-`is_constexpr: false` attribute, it will be round-tripped through the following lambda to guarantee 
-that it does not rely on runtime information.
-```cpp
-[]{ constexpr auto value = <expr>; return value; }()
+The following diagram summarizes `setClusterParameter` command implementation in a sharded cluster.
+The current implementation uses two additional internal commands `_configsvrSetClusterParameter` and
+`_shardsvrSetClusterParameter` to propagate new cluster parameter values from **mongos** to the
+config server and from the config server to each shard respectively. The order of the updates (first
+shard servers and then the config server) is intentional. See also
+[configsvr_set_cluster_parameter_command.cpp](../src/mongo/db/s/config/configsvr_set_cluster_parameter_command.cpp)
+and
+[shardsvr_set_cluster_parameter_command.cpp](../src/mongo/db/s/shardsvr_set_cluster_parameter_command.cpp).
+
+```mermaid
+sequenceDiagram
+    participant D as client
+    participant R as mongos
+    participant C as config primary
+    participant S as every shard primary
+    D->>+R: setClusterParameter
+    R->>+C: _configsvrSetClusterParameter
+    loop retry
+        C->>+S: _shardsvrSetClusterParameter
+        S->>S: insert / update (local)
+        S-->>-C: status
+        C->>C: insert / update (majority)
+    end
+    C-->>-R: {ok: 1}
+    R-->>-D: {ok: 1}
+```
+
+The following diagram illustrates the `setClusterParameter` command implementation.
+
+The `SetClusterParameterCmd` class implements the `setClusterParameter` command on **mongos**. The
+implementation details are delegated to the `setClusterParameterImplRouter` function.
+
+The `SetClusterParameterCommand` class implements the `setClusterParameter` command on **mongod**.
+The implementation details are delegated to the `setClusterParameterImplShard` function.
+
+The `setQuerySettings` command implemented by the `SetQuerySettingsCommand` class relies internally
+on the cluster parameter implementation. Since this class is present both on **mongos** and
+**mongod**, the corresponding implementation function needs to be resolved, which is done at runtime
+in
+[set_cluster_parameter_command_impl.cpp](../src/mongo/db/commands/set_cluster_parameter_command_impl.cpp).
+
+```mermaid
+classDiagram
+    class SetClusterParameterCommand {
+        <<mongod>>
+    }
+    class SetClusterParameterCmd {
+        <<mongos>>
+    }
+    class SetQuerySettingsCommand {
+        <<mongod + mongos>>
+    }
+    class ShardsvrSetClusterParameterCommand {
+        <<mongod>>
+    }
+    class SetClusterParameterInvocation {
+        +invoke()
+        +normalizeParameter()
+    }
+    SetClusterParameterCommand ..> SetClusterParameterImplFn: calls
+    SetClusterParameterCmd ..> SetClusterParameterImplFn: calls
+    SetClusterParameterImplFn <|.. setClusterParameterImplRouter: instanceOf
+    SetClusterParameterImplFn <|.. setClusterParameterImplShard: instanceOf
+    `std::function` <|.. SetClusterParameterImplFn: typedef
+    ShardsvrSetClusterParameterCommand ..> SetClusterParameterInvocation: create + invoke()
+    setClusterParameterImplShard ..> SetClusterParameterInvocation: create + invoke()
+    SetQuerySettingsCommand ..> SetClusterParameterImplFn: calls
+```
+
+The following diagram illustrates implementation details of the `SetClusterParameterInvocation`
+class defined in
+[set_cluster_parameter_invocation.cpp](../src/mongo/db/commands/set_cluster_parameter_invocation.cpp).
+This class uses inheritance + virtual methods to reduce the dependencies in unit tests in
+[set_cluster_parameter_invocation_test.cpp](../src/mongo/db/commands/set_cluster_parameter_invocation_test.cpp).
+
+```mermaid
+classDiagram
+    class SetClusterParameterInvocation {
+        +invoke()
+        +normalizeParameter()
+    }
+    class ServerParameterService {
+        <<Abstract>>
+        +get()* ServerParameter
+    }
+    class DBClientService {
+        <<Abstract>>
+        +updateParameterOnDisk()*
+        +insertParameterOnDisk()*
+        +getUpdateClusterTime()*
+    }
+    DBClientService <|-- ClusterParameterDBClientService
+    DBClientService <|-- DBClientMock
+    ServerParameterService <|-- ClusterParameterService
+    ServerParameterService <|-- MockParameterService
+    SetClusterParameterInvocation *-- ServerParameterService
+    SetClusterParameterInvocation *-- DBClientService
+```
+
+The following diagram shows the relevant classes on a config server. The internal
+`_configsvrSetClusterParameterCommand` is implemented in
+[configsvr_set_cluster_parameter_command.cpp](../src/mongo/db/s/config/configsvr_set_cluster_parameter_command.cpp)
+and it does not return anything (void). Updating the `config.clusterParameters` collection on the
+config server and on shards is handled by the `SetClusterParameterCoordinator` class in
+[set_cluster_parameter_coordinator.cpp](../src/mongo/db/s/config/set_cluster_parameter_coordinator.cpp).
+The `SetClusterParameterCoordinator` is initialized with the
+`SetClusterParameterCoordinatorDocument` structure defined in
+[set_cluster_parameter_coordinator_document.idl](../src/mongo/db/s/config/set_cluster_parameter_coordinator_document.idl).
+The fields `clusterParameterTime` and `previousTime` are used to prevent redundant updates and
+concurrent updates respectively.
+
+```mermaid
+classDiagram
+    class SetClusterParameterInvocation {
+        +invoke()
+        +normalizeParameter()
+    }
+    ConfigsvrSetClusterParameterCommand ..> SetClusterParameterInvocation: create + normalizeParameter()
+    class ConfigsvrCoordinatorService {
+        +getService()$
+        +getOrCreateService()
+    }
+    class ConfigsvrSetClusterParameterCommand {
+        <<mongod>>
+    }
+    class ConfigsvrCoordinator {
+        <<single-threaded>>
+        +getCompletionFuture()*
+        #run()
+    }
+    class SetClusterParameterCoordinator {
+        -_commit()
+        -_sendSetClusterParameterToAllShards()
+        -_runImpl()
+    }
+    class SetClusterParameterCoordinatorDocument{
+        <<IDL struct>>
+        +phase
+        +parameter
+        +tenantId
+        +clusterParameterTime
+        +previousTime
+    }
+    ConfigsvrCoordinatorService ..> ConfigsvrCoordinator: returns
+    ConfigsvrCoordinator <|-- ConfigsvrCoordinatorImpl
+    ConfigsvrCoordinatorImpl <|-- SetClusterParameterCoordinator
+    ConfigsvrSetClusterParameterCommand ..> SetClusterParameterCoordinator: getCompletionFuture()
+    ConfigsvrSetClusterParameterCommand ..> ConfigsvrCoordinatorService
+    SetClusterParameterCoordinator ..> SetClusterParameterInvocation: create + invoke()
+    ConfigsvrSetClusterParameterCommand ..> SetClusterParameterCoordinatorDocument: create
+    SetClusterParameterCoordinator ..> SetClusterParameterCoordinatorDocument: use
 ```
 
 [parameters.idl]: ../src/mongo/db/commands/parameters.idl
