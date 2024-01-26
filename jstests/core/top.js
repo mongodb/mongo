@@ -21,7 +21,10 @@
 import {assertTopDiffEq, getTop} from "jstests/libs/stats.js";
 
 const dbName = "toptest";
-const collName = dbName + "coll";
+
+// Skipping the collection from dbcheck during the test.
+const collName = dbName + "_coll_temp";
+const afterTestCollName = dbName + "_coll";
 
 var testDB = db.getSiblingDB(dbName);
 var testColl = testDB[collName];
@@ -156,3 +159,6 @@ lastTop = assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
 res = assert.commandWorked(testColl.dropIndex({x: 1}));
 assertTopDiffEq(testDB, testColl, lastTop, "commands", 1);
 lastTop = assertTopDiffEq(testDB, testColl, lastTop, "writeLock", 1);
+
+// Rename the collection to enable it for dbcheck after the test.
+assert.commandWorked(testColl.renameCollection(afterTestCollName, true /* dropTarget */));
