@@ -2731,6 +2731,21 @@ Discriminator decodeDiscriminator(const char* buffer,
     return Discriminator::kInclusive;
 }
 
+int Value::computeElementCount(Ordering ord) const {
+    int count = 0;
+    BufReader reader(getBuffer(), getSize());
+    for (int i = 0; reader.remaining(); i++) {
+        const bool invert = (ord.get(i) == -1);
+        uint8_t ctype = readType<uint8_t>(&reader, invert);
+        if (ctype == kLess || ctype == kGreater || ctype == kEnd) {
+            return count;
+        }
+        filterKeyFromKeyString(ctype, &reader, invert, _version);
+        ++count;
+    }
+    return count;
+}
+
 void toBsonSafe(const char* buffer,
                 size_t len,
                 Ordering ord,
