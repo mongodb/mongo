@@ -130,10 +130,9 @@ class TestReport(unittest.TestResult):
                 self.num_dynamic += 1
 
         # Set up the test-specific logger.
-        (test_logger, url_endpoint) = logging.loggers.new_test_logger(test.short_name(),
-                                                                      test.basename(), command,
-                                                                      test.logger, self.job_num,
-                                                                      test.id(), self.job_logger)
+        (test_logger, url_endpoint, parsley_url) = logging.loggers.new_test_logger(
+            test.short_name(), test.basename(), command, test.logger, self.job_num, test.id(),
+            self.job_logger)
 
         test_info.add_logger(test_logger)
         test_info.add_logger(self.job_logger)
@@ -141,6 +140,7 @@ class TestReport(unittest.TestResult):
         test_info.exception_extractors = logging.loggers.configure_exception_capture(test_logger)
 
         test_info.url_endpoint = url_endpoint
+        test_info.parsley_url = parsley_url
         if self.logging_prefix is not None:
             test_logger.info(self.logging_prefix)
         # Set job_num in test.
@@ -317,7 +317,7 @@ class TestReport(unittest.TestResult):
                     result["group_id"] = test_info.group_id
 
                 if test_info.url_endpoint is not None:
-                    result["url"] = test_info.url_endpoint
+                    result["url"] = test_info.parsley_url
                     result["url_raw"] = test_info.url_endpoint + "?raw=1"
 
                 results.append(result)
