@@ -71,14 +71,12 @@ assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestamp)
 // BSONTooLarge exception.
 rollbackTest.transitionToRollbackOperations();
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-try {
-    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-} finally {
-    assert.commandWorked(primary.adminCommand(
-        {configureFailPoint: 'holdStableTimestampAtSpecificTimestamp', mode: 'off'}));
-}
-
+rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
+
+// Now that the system is stable, release the pin on the stable timestamp.
+assert.commandWorked(primary.adminCommand(
+    {configureFailPoint: 'holdStableTimestampAtSpecificTimestamp', mode: 'off'}));
 
 primary = rollbackTest.getPrimary();
 
