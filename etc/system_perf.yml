@@ -1429,7 +1429,6 @@ buildvariants:
       canaries: none
       atlas_setup: M60-repl-azure
       use_custom_build_azure: true
-      compile_variant: -rhel70
       infrastructure_provisioning: workload_client_intel.2023-04
       infrastructure_provisioning_release: 2022-11
       workload_setup: 2022-11
@@ -1441,10 +1440,6 @@ buildvariants:
     depends_on:
       - name: compile
         variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-      - name: compile
-        variant: compile-rhel70
       - name: schedule_global_auto_tasks
         variant: task_generation
     tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
