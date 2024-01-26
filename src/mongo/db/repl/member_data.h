@@ -103,6 +103,9 @@ public:
     OpTime getHeartbeatAppliedOpTime() const {
         return _lastResponse.getAppliedOpTime();
     }
+    OpTime getHeartbeatWrittenOpTime() const {
+        return _lastResponse.getWrittenOpTime();
+    }
     OpTime getHeartbeatDurableOpTime() const {
         return _lastResponse.hasDurableOpTime() ? _lastResponse.getDurableOpTime() : OpTime();
     }

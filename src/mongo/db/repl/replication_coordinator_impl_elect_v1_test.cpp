@@ -143,6 +143,8 @@ public:
         hbResp.setConfigTerm(rsConfig.getConfigTerm());
         hbResp.setAppliedOpTimeAndWallTime(
             {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+        hbResp.setWrittenOpTimeAndWallTime(
+            {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
         hbResp.setDurableOpTimeAndWallTime(
             {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
 
@@ -757,6 +759,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     hbResp2.setSetName("mySet");
     hbResp2.setState(MemberState::RS_SECONDARY);
     hbResp2.setAppliedOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+    hbResp2.setWrittenOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     hbResp2.setDurableOpTimeAndWallTime({OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
     net->runUntil(net->now() + Seconds(10));  // run until we've sent a heartbeat request
     const NetworkInterfaceMock::NetworkOperationIterator noi2 = net->getNextReadyRequest();
@@ -799,6 +802,8 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
             hbResp.setState(MemberState::RS_SECONDARY);
             hbResp.setConfigVersion(rsConfig.getConfigVersion());
             hbResp.setAppliedOpTimeAndWallTime(
+                {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
+            hbResp.setWrittenOpTimeAndWallTime(
                 {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
             hbResp.setDurableOpTimeAndWallTime(
                 {OpTime(Timestamp(100, 1), 0), Date_t() + Seconds(100)});
@@ -1274,6 +1279,8 @@ private:
             hbResp.setConfigVersion(config.getConfigVersion());
             hbResp.setTerm(replCoord->getTerm());
             hbResp.setAppliedOpTimeAndWallTime(
+                {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
+            hbResp.setWrittenOpTimeAndWallTime(
                 {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
             hbResp.setDurableOpTimeAndWallTime(
                 {otherNodesOpTime, Date_t() + Seconds(otherNodesOpTime.getSecs())});
@@ -2636,6 +2643,7 @@ protected:
         hbResp.setState(MemberState::RS_SECONDARY);
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
         hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
+        hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
         hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds(opTime.getSecs())});
         return makeResponseStatus(hbResp.toBSON());
     }

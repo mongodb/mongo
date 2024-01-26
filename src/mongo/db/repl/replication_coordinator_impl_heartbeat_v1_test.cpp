@@ -145,6 +145,7 @@ auto makePrimaryHeartbeatResponseFrom(const ReplSetConfig& rsConfig,
     // The smallest valid optime in PV1.
     OpTime opTime(Timestamp(1, 1), 0);
     hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
+    hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
     hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
     BSONObjBuilder responseBuilder;
     responseBuilder << "ok" << 1;
@@ -543,6 +544,7 @@ TEST_F(ReplCoordHBV1Test, RestartingHeartbeatsShouldOnlyCancelScheduledHeartbeat
         // The smallest valid optime in PV1.
         OpTime opTime(Timestamp(1, 1), 0);
         hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
+        hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
         hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
         BSONObjBuilder responseBuilder;
         responseBuilder << "ok" << 1;
@@ -755,6 +757,7 @@ public:
         // The smallest valid optime in PV1.
         OpTime opTime(Timestamp(1, 1), 0);
         hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
+        hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
         hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
 
         BSONObjBuilder responseBuilder;
@@ -1380,6 +1383,7 @@ TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
     hbResp.setConfigVersion(rsConfig.getConfigVersion());
     hbResp.setConfig(rsConfig);
     hbResp.setAppliedOpTimeAndWallTime({time1, getNet()->now()});
+    hbResp.setWrittenOpTimeAndWallTime({time1, getNet()->now()});
     hbResp.setDurableOpTimeAndWallTime({time1, getNet()->now()});
     auto hbRespObj = (BSONObjBuilder(hbResp.toBSON()) << "ok" << 1).obj();
 
@@ -1674,6 +1678,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
         hbResp.setState(MemberState::RS_PRIMARY);
         hbResp.setConfigVersion(rsConfig.getConfigVersion());
         hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
+        hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
         hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
 
         BSONObjBuilder responseBuilder;
@@ -2018,6 +2023,7 @@ TEST_F(ReplCoordHBV1Test, handleHeartbeatResponseForTestEnqueuesValidHandle) {
     hbResp.setConfigVersion(2);
     hbResp.setConfigTerm(1);
     hbResp.setAppliedOpTimeAndWallTime({opTime1, wallTime1});
+    hbResp.setWrittenOpTimeAndWallTime({opTime1, wallTime1});
     hbResp.setDurableOpTimeAndWallTime({opTime1, wallTime1});
     auto hbRespObj = (BSONObjBuilder(hbResp.toBSON()) << "ok" << 1).obj();
 
@@ -2060,6 +2066,7 @@ TEST_F(ReplCoordHBV1Test, NotifiesExternalStateOfChangeOnlyWhenDataChanges) {
     auto net = getNet();
     ReplSetHeartbeatResponse hbResp;
     OpTimeAndWallTime appliedOpTimeAndWallTime = {OpTime({11, 1}, 1), Date_t::now()};
+    OpTimeAndWallTime writtenOpTimeAndWallTime = {OpTime({11, 1}, 1), Date_t::now()};
     OpTimeAndWallTime durableOpTimeAndWallTime = {OpTime({10, 1}, 1), Date_t::now()};
     hbResp.setConfigVersion(config.getConfigVersion());
     hbResp.setConfigTerm(config.getConfigTerm());
@@ -2067,6 +2074,7 @@ TEST_F(ReplCoordHBV1Test, NotifiesExternalStateOfChangeOnlyWhenDataChanges) {
     hbResp.setState(MemberState::RS_SECONDARY);
     hbResp.setElectable(false);
     hbResp.setAppliedOpTimeAndWallTime(appliedOpTimeAndWallTime);
+    hbResp.setWrittenOpTimeAndWallTime(writtenOpTimeAndWallTime);
     hbResp.setDurableOpTimeAndWallTime(durableOpTimeAndWallTime);
     auto hbRespObj = hbResp.toBSON();
     // First heartbeat, to set the stored data for the node.
@@ -2299,6 +2307,7 @@ void HBStepdownAndReconfigTest::sendHBResponse(int targetIndex,
     hbResp.setConfigVersion(configVersion);
     hbResp.setConfigTerm(configTerm);
     hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
+    hbResp.setWrittenOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
     hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
 
     if (includeConfig) {

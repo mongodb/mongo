@@ -49,6 +49,7 @@ MemberData::MemberData() : _health(-1), _authIssue(false), _configIndex(-1), _is
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
+    _lastResponse.setWrittenOpTimeAndWallTime(OpTimeAndWallTime());
 }
 
 MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
@@ -72,6 +73,9 @@ MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
     }
     if (!hbResponse.hasAppliedOpTime()) {
         hbResponse.setAppliedOpTimeAndWallTime(_lastResponse.getAppliedOpTimeAndWallTime());
+    }
+    if (!hbResponse.hasWrittenOpTime()) {
+        hbResponse.setWrittenOpTimeAndWallTime(_lastResponse.getWrittenOpTimeAndWallTime());
     }
     // Log if the state changes
     const bool memberStateChanged = _lastResponse.getState() != hbResponse.getState();
@@ -118,6 +122,7 @@ void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) 
     _lastResponse.setState(MemberState::RS_DOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
+    _lastResponse.setWrittenOpTimeAndWallTime(OpTimeAndWallTime());
     _lastResponse.setSyncingTo(HostAndPort());
 
     // The _lastAppliedOpTime/_lastDurableOpTime fields don't get cleared merely by missing a
@@ -142,6 +147,7 @@ void MemberData::setAuthIssue(Date_t now) {
     _lastResponse.setState(MemberState::RS_UNKNOWN);
     _lastResponse.setElectionTime(Timestamp());
     _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
+    _lastResponse.setWrittenOpTimeAndWallTime(OpTimeAndWallTime());
     _lastResponse.setSyncingTo(HostAndPort());
 }
 

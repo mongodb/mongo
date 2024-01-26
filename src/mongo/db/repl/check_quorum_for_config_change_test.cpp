@@ -254,6 +254,7 @@ executor::RemoteCommandResponse makeHeartbeatResponse(const ReplSetConfig& rsCon
     OpTime opTime(Timestamp(), 0);
     Date_t wallTime = Date_t();
     hbResp.setAppliedOpTimeAndWallTime({opTime, wallTime});
+    hbResp.setWrittenOpTimeAndWallTime({opTime, wallTime});
     hbResp.setDurableOpTimeAndWallTime({opTime, wallTime});
     auto bob = BSONObjBuilder(hbResp.toBSON());
     bob.appendElements(extraFields);

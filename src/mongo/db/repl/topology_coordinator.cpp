@@ -876,16 +876,20 @@ StatusWith<bool> TopologyCoordinator::prepareHeartbeatResponseV1(
     }
 
     OpTimeAndWallTime lastOpApplied;
+    OpTimeAndWallTime lastOpWritten;
     OpTimeAndWallTime lastOpDurable;
 
-    // We include null times for lastApplied and lastDurable if we are in STARTUP_2, as we do not
-    // want to report replication progress and be part of write majorities while in initial sync.
+    // We include null times for lastApplied, lastWritten and lastDurable if we are in STARTUP_2, as
+    // we do not want to report replication progress and be part of write majorities while in
+    // initial sync.
     if (!myState.startup2()) {
         lastOpApplied = getMyLastAppliedOpTimeAndWallTime();
+        lastOpWritten = getMyLastWrittenOpTimeAndWallTime();
         lastOpDurable = getMyLastDurableOpTimeAndWallTime();
     }
 
     response->setAppliedOpTimeAndWallTime(lastOpApplied);
+    response->setWrittenOpTimeAndWallTime(lastOpWritten);
     response->setDurableOpTimeAndWallTime(lastOpDurable);
 
     if (_currentPrimaryIndex != -1) {
@@ -1849,6 +1853,8 @@ void TopologyCoordinator::setCurrentPrimary_forTest(int primaryIndex,
             hbResponse.setElectionTime(electionTime);
             hbResponse.setAppliedOpTimeAndWallTime(
                 {_memberData.at(primaryIndex).getHeartbeatAppliedOpTime(), Date_t() + Seconds(1)});
+            hbResponse.setWrittenOpTimeAndWallTime(
+                {_memberData.at(primaryIndex).getHeartbeatWrittenOpTime(), Date_t() + Seconds(1)});
             hbResponse.setSyncingTo(HostAndPort());
             _memberData.at(primaryIndex)
                 .setUpValues(_memberData.at(primaryIndex).getLastHeartbeat(),
@@ -2183,8 +2189,14 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
             const auto lastAppliedOpTime = memberData.getLastAppliedOpTime();
             entry.append("lastAppliedOpTime", lastAppliedOpTime.toBSON());
 
+            const auto lastWrittenOpTime = memberData.getLastWrittenOpTime();
+            entry.append("lastWrittenOpTime", lastWrittenOpTime.toBSON());
+
             const auto heartbeatAppliedOpTime = memberData.getHeartbeatAppliedOpTime();
             entry.append("heartbeatAppliedOpTime", heartbeatAppliedOpTime.toBSON());
+
+            const auto heartbeatWrittenOpTime = memberData.getHeartbeatWrittenOpTime();
+            entry.append("heartbeatWrittenOpTime", heartbeatWrittenOpTime.toBSON());
 
             const auto heartbeatDurableOpTime = memberData.getHeartbeatDurableOpTime();
             entry.append("heartbeatDurableOpTime", heartbeatDurableOpTime.toBSON());

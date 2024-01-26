@@ -116,6 +116,11 @@ public:
     }
     OpTime getAppliedOpTime() const;
     OpTimeAndWallTime getAppliedOpTimeAndWallTime() const;
+    bool hasWrittenOpTime() const {
+        return _writtenOpTimeSet;
+    }
+    OpTime getWrittenOpTime() const;
+    OpTimeAndWallTime getWrittenOpTimeAndWallTime() const;
     bool hasDurableOpTime() const {
         return _durableOpTimeSet;
     }
@@ -187,6 +192,11 @@ public:
         _appliedOpTime = time.opTime;
         _appliedWallTime = time.wallTime;
     }
+    void setWrittenOpTimeAndWallTime(OpTimeAndWallTime time) {
+        _writtenOpTimeSet = true;
+        _writtenOpTime = time.opTime;
+        _writtenWallTime = time.wallTime;
+    }
     void setDurableOpTimeAndWallTime(OpTimeAndWallTime time) {
         _durableOpTimeSet = true;
         _durableOpTime = time.opTime;
@@ -212,6 +222,10 @@ private:
     bool _appliedOpTimeSet = false;
     OpTime _appliedOpTime;
     Date_t _appliedWallTime;
+
+    bool _writtenOpTimeSet = false;
+    OpTime _writtenOpTime;
+    Date_t _writtenWallTime;
 
     bool _durableOpTimeSet = false;
     OpTime _durableOpTime;

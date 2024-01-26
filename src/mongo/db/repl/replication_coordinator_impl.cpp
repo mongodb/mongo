@@ -2014,6 +2014,24 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
     return statusWithOpTime.getStatus();
 }
 
+Status ReplicationCoordinatorImpl::setLastWrittenOptime_forTest(long long cfgVer,
+                                                                long long memberId,
+                                                                const OpTime& opTime,
+                                                                Date_t wallTime) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    invariant(_settings.isReplSet());
+
+    if (wallTime == Date_t()) {
+        wallTime = Date_t() + Seconds(opTime.getSecs());
+    }
+
+    const UpdatePositionArgs::UpdateInfo update(
+        OpTime(), Date_t(), opTime, wallTime, OpTime(), Date_t(), cfgVer, memberId);
+    const auto statusWithOpTime = _setLastOptimeForMember(lock, update);
+    _updateStateAfterRemoteOpTimeUpdates(lock, statusWithOpTime.getValue());
+    return statusWithOpTime.getStatus();
+}
+
 StatusWith<OpTime> ReplicationCoordinatorImpl::_setLastOptimeForMember(
     WithLock lk, const UpdatePositionArgs::UpdateInfo& args) {
     auto result = _topCoord->setLastOptimeForMember(args, _replExecutor->now());

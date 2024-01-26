@@ -544,6 +544,10 @@ public:
                                         long long memberId,
                                         const OpTime& opTime,
                                         Date_t wallTime = Date_t());
+    Status setLastWrittenOptime_forTest(long long cfgVer,
+                                        long long memberId,
+                                        const OpTime& opTime,
+                                        Date_t wallTime = Date_t());
     Status setLastDurableOptime_forTest(long long cfgVer,
                                         long long memberId,
                                         const OpTime& opTime,
