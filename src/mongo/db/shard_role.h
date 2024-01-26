@@ -72,12 +72,14 @@ struct CollectionOrViewAcquisitionRequest {
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView,
+        Date_t lockAcquisitionDeadline = Date_t::max())
         : nssOrUUID(std::move(nssOrUUID)),
           placementConcern(std::move(placementConcern)),
           readConcern(readConcern),
           operationType(operationType),
-          viewMode(viewMode) {}
+          viewMode(viewMode),
+          lockAcquisitionDeadline(lockAcquisitionDeadline) {}
 
     /**
      * Overload, which acquires a collection by NSS/UUID combination, requiring that, if specified,
@@ -89,13 +91,15 @@ struct CollectionOrViewAcquisitionRequest {
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView,
+        Date_t lockAcquisitionDeadline = Date_t::max())
         : nssOrUUID(std::move(nss)),
           expectedUUID(std::move(uuid)),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
-          viewMode(viewMode) {}
+          viewMode(viewMode),
+          lockAcquisitionDeadline(lockAcquisitionDeadline) {}
 
     /**
      * Overload, which acquires a collection or view by NSS or DB/UUID and infers the placement and
@@ -118,6 +122,7 @@ struct CollectionOrViewAcquisitionRequest {
     repl::ReadConcernArgs readConcern;
     AcquisitionPrerequisites::OperationType operationType;
     AcquisitionPrerequisites::ViewMode viewMode;
+    Date_t lockAcquisitionDeadline;
 };
 
 struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest {
@@ -128,12 +133,14 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
     CollectionAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
                                  PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
-                                 AcquisitionPrerequisites::OperationType operationType)
+                                 AcquisitionPrerequisites::OperationType operationType,
+                                 Date_t lockAcquisitionDeadline = Date_t::max())
         : CollectionOrViewAcquisitionRequest(nssOrUUID,
                                              placementConcern,
                                              readConcern,
                                              operationType,
-                                             AcquisitionPrerequisites::kMustBeCollection) {}
+                                             AcquisitionPrerequisites::kMustBeCollection,
+                                             lockAcquisitionDeadline) {}
 
     /**
      * Overload, which acquires a collection by NSS/UUID combination, requiring that, if specified,
@@ -143,13 +150,15 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
                                  boost::optional<UUID> uuid,
                                  PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
-                                 AcquisitionPrerequisites::OperationType operationType)
+                                 AcquisitionPrerequisites::OperationType operationType,
+                                 Date_t lockAcquisitionDeadline = Date_t::max())
         : CollectionOrViewAcquisitionRequest(nss,
                                              uuid,
                                              placementConcern,
                                              readConcern,
                                              operationType,
-                                             AcquisitionPrerequisites::kMustBeCollection) {}
+                                             AcquisitionPrerequisites::kMustBeCollection,
+                                             lockAcquisitionDeadline) {}
 
     /**
      * Infers the placement and read concerns from the OperationShardingState and ReadConcern values
@@ -159,12 +168,14 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
         OperationContext* opCtx,
         NamespaceString nss,
         AcquisitionPrerequisites::OperationType operationType,
-        boost::optional<UUID> expectedUUID = boost::none);
+        boost::optional<UUID> expectedUUID = boost::none,
+        Date_t lockAcquisitionDeadline = Date_t::max());
 
     static CollectionAcquisitionRequest fromOpCtx(
         OperationContext* opCtx,
         NamespaceStringOrUUID nssOrUUID,
-        AcquisitionPrerequisites::OperationType operationType);
+        AcquisitionPrerequisites::OperationType operationType,
+        Date_t lockAcquisitionDeadline = Date_t::max());
 };
 
 class CollectionOrViewAcquisition;

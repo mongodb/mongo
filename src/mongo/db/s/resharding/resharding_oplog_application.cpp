@@ -171,24 +171,20 @@ void ReshardingOplogApplicationRules::_applyInsertOrUpdate(
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto outputColl = opCtx->runWithDeadline(getDeadline(opCtx), opCtx->getTimeoutError(), [&] {
-        return acquireCollection(opCtx,
-                                 CollectionAcquisitionRequest::fromOpCtx(
-                                     opCtx, _outputNss, AcquisitionPrerequisites::kWrite),
-                                 MODE_IX);
-    });
-
+    auto outputColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, _outputNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
+        MODE_IX);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to apply op during resharding due to missing collection "
                           << _outputNss.toStringForErrorMsg(),
             outputColl.exists());
-
-    auto stashColl = opCtx->runWithDeadline(getDeadline(opCtx), opCtx->getTimeoutError(), [&] {
-        return acquireCollection(opCtx,
-                                 CollectionAcquisitionRequest::fromOpCtx(
-                                     opCtx, _myStashNss, AcquisitionPrerequisites::kWrite),
-                                 MODE_IX);
-    });
+    auto stashColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, _myStashNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
+        MODE_IX);
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to apply op during resharding due to missing collection "
@@ -439,13 +435,11 @@ void ReshardingOplogApplicationRules::_applyDelete(
         // apply rule #1 and delete the doc from the stash collection.
         WriteUnitOfWork wuow(opCtx);
 
-        const auto stashColl =
-            opCtx->runWithDeadline(getDeadline(opCtx), opCtx->getTimeoutError(), [&] {
-                return acquireCollection(opCtx,
-                                         CollectionAcquisitionRequest::fromOpCtx(
-                                             opCtx, _myStashNss, AcquisitionPrerequisites::kWrite),
-                                         MODE_IX);
-            });
+        const auto stashColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(
+                opCtx, _myStashNss, AcquisitionPrerequisites::kWrite, getDeadline(opCtx)),
+            MODE_IX);
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
@@ -471,14 +465,14 @@ void ReshardingOplogApplicationRules::_applyDelete(
     // single replica set transaction that is executed if we apply rule #4, so we therefore must run
     // 'findByIdAndNoopUpdate' as a part of the single replica set transaction.
     runWithTransaction(opCtx, _outputNss, sii, [this, idQuery](OperationContext* opCtx) {
-        const auto outputColl =
-            opCtx->runWithDeadline(getDeadline(opCtx), opCtx->getTimeoutError(), [&] {
-                return acquireCollection(
-                    opCtx,
-                    CollectionAcquisitionRequest::fromOpCtx(
-                        opCtx, _outputNss, AcquisitionPrerequisites::OperationType::kWrite),
-                    MODE_IX);
-            });
+        const auto outputColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx,
+                                                    _outputNss,
+                                                    AcquisitionPrerequisites::OperationType::kWrite,
+                                                    getDeadline(opCtx)),
+            MODE_IX);
+
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
@@ -524,13 +518,13 @@ void ReshardingOplogApplicationRules::_applyDelete(
             }
 
             const auto stashColl =
-                opCtx->runWithDeadline(getDeadline(opCtx), opCtx->getTimeoutError(), [&] {
-                    return acquireCollection(
-                        opCtx,
-                        CollectionAcquisitionRequest::fromOpCtx(
-                            opCtx, coll, AcquisitionPrerequisites::OperationType::kWrite),
-                        MODE_IX);
-                });
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest::fromOpCtx(
+                                      opCtx,
+                                      coll,
+                                      AcquisitionPrerequisites::OperationType::kWrite,
+                                      getDeadline(opCtx)),
+                                  MODE_IX);
 
             uassert(
                 ErrorCodes::NamespaceNotFound,

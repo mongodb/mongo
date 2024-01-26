@@ -154,7 +154,8 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
                                                    ar.readConcern,
                                                    ar.placementConcern,
                                                    ar.operationType,
-                                                   ar.viewMode);
+                                                   ar.viewMode,
+                                                   ar.lockAcquisitionDeadline);
 
             ResolvedNamespaceOrViewAcquisitionRequest resolvedAcquisitionRequest{
                 prerequisites, ResolutionType::kNamespace, nullptr, boost::none};
@@ -547,7 +548,8 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     OperationContext* opCtx,
     NamespaceString nss,
     AcquisitionPrerequisites::OperationType operationType,
-    boost::optional<UUID> expectedUUID) {
+    boost::optional<UUID> expectedUUID,
+    Date_t lockAcquisitionDeadline) {
     auto& oss = OperationShardingState::get(opCtx);
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
 
@@ -555,13 +557,15 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
                                         expectedUUID,
                                         {oss.getDbVersion(nss.dbName()), oss.getShardVersion(nss)},
                                         readConcern,
-                                        operationType);
+                                        operationType,
+                                        lockAcquisitionDeadline);
 }
 
 CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     OperationContext* opCtx,
     NamespaceStringOrUUID nssOrUUID,
-    AcquisitionPrerequisites::OperationType operationType) {
+    AcquisitionPrerequisites::OperationType operationType,
+    Date_t lockAcquisitionDeadline) {
     auto& oss = OperationShardingState::get(opCtx);
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
 
@@ -571,7 +575,8 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
                            oss.getShardVersion(nssOrUUID.nss())}
         : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()), {}};
 
-    return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
+    return CollectionAcquisitionRequest(
+        nssOrUUID, placementConcern, readConcern, operationType, lockAcquisitionDeadline);
 }
 
 CollectionAcquisition::CollectionAcquisition(
@@ -1056,9 +1061,11 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
             return dbLockOptions;
         }();
 
+        const auto lockAcquisitionDeadline =
+            sortedAcquisitionRequests.begin()->second.prerequisites.lockAcquisitionDeadline;
         const auto dbLockMode = isSharedLockMode(mode) ? MODE_IS : MODE_IX;
-        const auto dbLock =
-            std::make_shared<Lock::DBLock>(opCtx, dbName, dbLockMode, Date_t::max(), dbLockOptions);
+        const auto dbLock = std::make_shared<Lock::DBLock>(
+            opCtx, dbName, dbLockMode, lockAcquisitionDeadline, dbLockOptions);
 
         for (auto& ar : sortedAcquisitionRequests) {
             const auto& nss = ar.second.prerequisites.nss;
@@ -1068,11 +1075,12 @@ CollectionOrViewAcquisitions acquireCollectionsOrViews(
                         << dbName.toStringForErrorMsg() << "' vs '"
                         << nss.dbName().toStringForErrorMsg() << "'",
                     dbName == nss.dbName());
+            const auto& lockAcquisitionDeadline = ar.second.prerequisites.lockAcquisitionDeadline;
 
             ar.second.dbLock = dbLock;
             ar.second.acquisitionLocks.dbLock = dbLockMode;
             ar.second.acquisitionLocks.dbLockOptions = dbLockOptions;
-            ar.second.collLock.emplace(opCtx, nss, mode);
+            ar.second.collLock.emplace(opCtx, nss, mode, lockAcquisitionDeadline);
             ar.second.acquisitionLocks.collLock = mode;
         }
 
