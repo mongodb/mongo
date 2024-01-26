@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {

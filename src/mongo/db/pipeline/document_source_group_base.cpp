@@ -171,7 +171,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGroupBase::optimize() {
     auto& idExpressions = _groupProcessor.getMutableIdExpressions();
     auto expCtx = idExpressions[0]->getExpressionContext();
     auto origSbeCompatibility = expCtx->sbeCompatibility;
-    expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+    expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
 
     // TODO: If all idExpressions are ExpressionConstants after optimization, then we know
     // there will be only one group. We should take advantage of that to avoid going through the
@@ -322,7 +322,7 @@ void DocumentSourceGroupBase::initializeFromBson(BSONElement elem) {
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
     VariablesParseState vps = pExpCtx->variablesParseState;
-    pExpCtx->sbeGroupCompatibility = SbeCompatibility::fullyCompatible;
+    pExpCtx->sbeGroupCompatibility = SbeCompatibility::noRequirements;
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         StringData pFieldName = groupField.fieldNameStringData();

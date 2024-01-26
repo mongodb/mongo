@@ -88,10 +88,15 @@ class AggregateCommandRequest;
 enum struct SbeCompatibility {
     // Not implemented in SBE.
     notCompatible,
-    // Implemented in SBE but behind the featureFlagSbeFull flag.
-    flagGuarded,
-    // Implemented in SBE and enabled by default.
-    fullyCompatible,
+    // Requires "featureFlagSbeFull" to be set. New SBE features which are under
+    // development can live under this feature flag until they are ready to be shipped.
+    requiresSbeFull,
+    // Requires the framework control knob to be "trySbeEngine". Fully tested, complete
+    // SBE features belong here.
+    requiresTrySbe,
+    // Used for the narrow feature set that we expose when "trySbeRestricted" is on. These features
+    // are always SBE compatible unless SBE is completely disabled with "forceClassicEngine".
+    noRequirements,
 };
 
 class ExpressionContext : public RefCountable {
@@ -593,24 +598,24 @@ public:
     const bool mayDbProfile = true;
 
     // The lowest SBE compatibility level of all expressions which use this expression context.
-    SbeCompatibility sbeCompatibility = SbeCompatibility::fullyCompatible;
+    SbeCompatibility sbeCompatibility = SbeCompatibility::noRequirements;
 
     // The lowest SBE compatibility level of all accumulators in the $group stage currently
     // being parsed using this expression context. This value is transient and gets
     // reset for every $group stage we parse. Each $group stage has its own per-stage flag.
-    SbeCompatibility sbeGroupCompatibility = SbeCompatibility::fullyCompatible;
+    SbeCompatibility sbeGroupCompatibility = SbeCompatibility::noRequirements;
 
     // The lowest SBE compatibility level of all window functions in the $_internalSetWindowFields
     // stage currently being parsed using this expression context. This value is transient and gets
     // reset for every $_internalSetWindowFields stage we parse. Each $_internalSetWindowFields
     // stage has its own per-stage flag.
-    SbeCompatibility sbeWindowCompatibility = SbeCompatibility::fullyCompatible;
+    SbeCompatibility sbeWindowCompatibility = SbeCompatibility::noRequirements;
 
     // In some situations we could lower the collection access and, maybe, a prefix of a pipeline to
     // SBE but doing so would prevent a specific optimization that exists in the classic engine from
     // being applied. Until we implement the same optimization in SBE, we need to fallback to
     // running the query in the classic engine entirely.
-    SbeCompatibility sbePipelineCompatibility = SbeCompatibility::fullyCompatible;
+    SbeCompatibility sbePipelineCompatibility = SbeCompatibility::noRequirements;
 
     // These fields can be used in a context when API version validations were not enforced during
     // parse time (Example creating a view or validator), but needs to be enforce while querying

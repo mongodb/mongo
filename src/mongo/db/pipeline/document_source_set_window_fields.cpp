@@ -139,7 +139,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
     FieldRefSet fieldSet;
     std::vector<FieldRef> backingRefs;
 
-    expCtx->sbeWindowCompatibility = SbeCompatibility::fullyCompatible;
+    expCtx->sbeWindowCompatibility = SbeCompatibility::noRequirements;
     std::vector<WindowFunctionStatement> outputFields;
     const auto& output = spec.getOutput();
     backingRefs.reserve(output.nFields());
@@ -309,7 +309,7 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
         // detailed explanation.
         auto expCtx = _outputFields[0].expr->expCtx();
         auto origSbeCompatibility = expCtx->sbeCompatibility;
-        expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+        expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
 
         for (auto&& outputField : _outputFields) {
             outputField.expr->optimize();
@@ -380,7 +380,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
         sortBy.emplace(*sortSpec, expCtx);
     }
 
-    expCtx->sbeWindowCompatibility = SbeCompatibility::fullyCompatible;
+    expCtx->sbeWindowCompatibility = SbeCompatibility::noRequirements;
     std::vector<WindowFunctionStatement> outputFields;
     for (auto&& elem : spec.getOutput()) {
         outputFields.push_back(WindowFunctionStatement::parse(elem, sortBy, expCtx.get()));

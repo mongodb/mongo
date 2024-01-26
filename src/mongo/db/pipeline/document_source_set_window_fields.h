@@ -224,7 +224,7 @@ private:
     bool _eof = false;
     // Used by the failpoint to determine when to spill to disk.
     int32_t _numDocsProcessed = 0;
-    SbeCompatibility _sbeCompatibility = SbeCompatibility::fullyCompatible;
+    SbeCompatibility _sbeCompatibility = SbeCompatibility::noRequirements;
 };
 
 }  // namespace mongo

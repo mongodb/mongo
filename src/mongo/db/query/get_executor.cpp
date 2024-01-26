@@ -1926,16 +1926,15 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
 bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, const bool sbeFull) {
     // When featureFlagSbeFull is not enabled, we cannot use SBE unless 'trySbeEngine' is enabled or
     // if 'trySbeRestricted' is enabled, and we have eligible pushed down stages in the cq pipeline.
-    if (!QueryKnobConfiguration::decoration(opCtx).canPushDownFullyCompatibleStages() &&
-        cq.cqPipeline().empty()) {
+    auto& queryKnob = QueryKnobConfiguration::decoration(opCtx);
+    if (!queryKnob.canPushDownFullyCompatibleStages() && cq.cqPipeline().empty()) {
         return false;
     }
 
     // Return true if all the expressions in the CanonicalQuery's filter and projection are SBE
     // compatible.
-    SbeCompatibility minRequiredCompatibility =
-        sbeFull ? SbeCompatibility::flagGuarded : SbeCompatibility::fullyCompatible;
-
+    SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
+        queryKnob.getInternalQueryFrameworkControlForOp(), cq.isSearchQuery(), sbeFull);
     return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
 }
 

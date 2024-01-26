@@ -158,8 +158,8 @@ private:
     // one we already pushed down. boost::none means no push down has occurred yet.
     boost::optional<long long> _smallestLimitPushedDown;
 
-    // TODO SERVER-80226: Change to SbeCompatibility::fullyCompatible when $unwind pushdown enabled.
-    SbeCompatibility _sbeCompatibility{SbeCompatibility::flagGuarded};
+    // TODO SERVER-80226: Change to SbeCompatibility::requiresTrySbe when $unwind pushdown enabled.
+    SbeCompatibility _sbeCompatibility{SbeCompatibility::requiresSbeFull};
 };
 
 }  // namespace mongo

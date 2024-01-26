@@ -965,7 +965,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially
     // allow SBE to execute the portion of the query that's pushed down, even if the portion of
     // the query that is not pushed down contains expressions not supported by SBE.
-    expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+    expCtx->sbeCompatibility = SbeCompatibility::noRequirements;
 
     StatusWith<std::unique_ptr<CanonicalQuery>> cq = CanonicalQuery::make(
         {.expCtx = expCtx,

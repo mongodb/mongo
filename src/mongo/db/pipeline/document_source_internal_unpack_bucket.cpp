@@ -280,7 +280,7 @@ boost::intrusive_ptr<DocumentSourceGroup> createBucketGroupForReorder(
     auto newGroup = DocumentSourceGroup::create(expCtx, groupByExpr, std::move(accumulators));
 
     // The $first accumulator is compatible with SBE.
-    newGroup->setSbeCompatibility(SbeCompatibility::fullyCompatible);
+    newGroup->setSbeCompatibility(SbeCompatibility::noRequirements);
 
     return newGroup;
 }
@@ -1059,7 +1059,7 @@ void DocumentSourceInternalUnpackBucket::setEventFilter(BSONObj eventFilterBson,
     // compatible and check after parsing if the '_eventFilter' made the unpack stage
     // incompatible.
     auto originalSbeCompatibility = pExpCtx->sbeCompatibility;
-    pExpCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+    pExpCtx->sbeCompatibility = SbeCompatibility::noRequirements;
 
     _eventFilter = uassertStatusOK(MatchExpressionParser::parse(
         _eventFilterBson, pExpCtx, ExtensionsCallbackNoop(), Pipeline::kAllowedMatcherFeatures));
@@ -1169,7 +1169,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupStage(Pipeline::SourceContainer:
     // the exprs created by the rewrite mark it as incompatible, so that we can transfer the flag
     // onto the group.
     const SbeCompatibility origSbeCompat = pExpCtx->sbeCompatibility;
-    pExpCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
+    pExpCtx->sbeCompatibility = SbeCompatibility::noRequirements;
 
     // We destruct 'this' object when we replace it with the new group, so the guard has to capture
     // the context's intrusive pointer by value.
@@ -1436,7 +1436,7 @@ tryCreateBucketLevelSortGroup(boost::intrusive_ptr<ExpressionContext> expCtx,
         DocumentSourceGroup::create(expCtx, groupStage->getIdExpression(), {newAccState});
 
     // The bucket-level group uses $first/$last accumulators that are supported by SBE.
-    newGroupStage->setSbeCompatibility(SbeCompatibility::fullyCompatible);
+    newGroupStage->setSbeCompatibility(SbeCompatibility::noRequirements);
     return {newSortStage, newGroupStage};
 }
 }  // namespace
@@ -1931,7 +1931,7 @@ bool DocumentSourceInternalUnpackBucket::isSbeCompatible() {
                         "If _eventFilter is set, we must have determined if it is compatible with "
                         "SBE or not.",
                         _isEventFilterSbeCompatible);
-                if (_isEventFilterSbeCompatible.get() < SbeCompatibility::fullyCompatible) {
+                if (_isEventFilterSbeCompatible.get() < SbeCompatibility::noRequirements) {
                     return false;
                 }
             }

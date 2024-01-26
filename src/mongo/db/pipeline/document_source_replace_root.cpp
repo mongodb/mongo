@@ -81,7 +81,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
     const auto stageName = elem.fieldNameStringData();
 
     SbeCompatibility originalSbeCompatibility =
-        std::exchange(expCtx->sbeCompatibility, SbeCompatibility::fullyCompatible);
+        std::exchange(expCtx->sbeCompatibility, SbeCompatibility::noRequirements);
     ON_BLOCK_EXIT([&] { expCtx->sbeCompatibility = originalSbeCompatibility; });
     auto newRootExpression = [&]() {
         if (stageName == kAliasNameReplaceWith) {

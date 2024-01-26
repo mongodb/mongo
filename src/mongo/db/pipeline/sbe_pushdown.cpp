@@ -51,7 +51,6 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/query_decorations.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/util/assert_util.h"
@@ -81,7 +80,7 @@ boost::intrusive_ptr<DocumentSource> sbeCompatibleProjectionFromSingleDocumentTr
 
     const boost::intrusive_ptr<ExpressionContext>& expCtx = transformStage.getContext();
     SbeCompatibility originalSbeCompatibility =
-        std::exchange(expCtx->sbeCompatibility, SbeCompatibility::fullyCompatible);
+        std::exchange(expCtx->sbeCompatibility, SbeCompatibility::noRequirements);
     ON_BLOCK_EXIT([&] { expCtx->sbeCompatibility = originalSbeCompatibility; });
 
     boost::intrusive_ptr<DocumentSource> projectionStage =
@@ -294,7 +293,7 @@ void prunePushdownStages(std::vector<boost::intrusive_ptr<DocumentSource>>& stag
     bool prunedThisIteration;  // were any stages pruned in the current loop iteration?
     do {
         prunedThisIteration = false;
-        if (SbeCompatibility::flagGuarded >= minRequiredCompatibility) {
+        if (SbeCompatibility::requiresSbeFull >= minRequiredCompatibility) {
             // When 'minRequiredCompatibility' is permissive enough (because featureFlagSbeFull is
             // enabled), do not remove trailing $addFields stages.
         } else {
@@ -395,23 +394,20 @@ bool findSbeCompatibleStagesForPushdown(
         isMainCollectionSharded = mainColl.isSharded_DEPRECATED();
     }
 
-    // SERVER-78998: Refactor these checks so that they do not load their values multiple times
-    // during the same query.
-    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
-        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-    SbeCompatibility minRequiredCompatibility =
-        sbeFullEnabled ? SbeCompatibility::flagGuarded : SbeCompatibility::fullyCompatible;
-
     auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
 
-    // We do a pushdown of all eligible stages when one of 3 conditions are met: the query knob is
-    // set to 'trySbeEngine'; featureFlagSbeFull is enabled; the given query is a search query.
-    const bool doFullPushdown =
-        queryKnob.canPushDownFullyCompatibleStages() || sbeFullEnabled || cq->isSearchQuery();
+    const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
+        queryKnob.getInternalQueryFrameworkControlForOp(), cq->isSearchQuery(), sbeFullEnabled);
+
+    auto meetsRequirements = [&minRequiredCompatibility, &cq](SbeCompatibility stageCompatibility) {
+        return stageCompatibility >= minRequiredCompatibility;
+    };
 
     CompatiblePipelineStages allowedStages = {
-        .group = !queryKnob.getSbeDisableGroupPushdownForOp(),
+        .group = meetsRequirements(SbeCompatibility::noRequirements) &&
+            !queryKnob.getSbeDisableGroupPushdownForOp(),
 
         // If lookup pushdown isn't enabled or the main collection is sharded or any of the
         // secondary namespaces are sharded or are a view, then no $lookup stage will be eligible
@@ -421,40 +417,40 @@ bool findSbeCompatibleStagesForPushdown(
         // whether any secondary collection is a view or is sharded, not which ones are a view or
         // are sharded and which ones aren't. As such, if any secondary collection is a view or is
         // sharded, no $lookup will be eligible for pushdown.
-        .lookup = !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
+        .lookup = meetsRequirements(SbeCompatibility::noRequirements) &&
+            !queryKnob.getSbeDisableLookupPushdownForOp() && !isMainCollectionSharded &&
             !collections.isAnySecondaryNamespaceAViewOrSharded(),
 
-        .transform =
-            doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+        .transform = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
-        .match = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+        .match = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         // TODO (SERVER-80226): SBE execution of 'unwind' stages requires 'featureFlagSbeFull' to be
         // enabled.
-        .unwind = doFullPushdown && SbeCompatibility::flagGuarded >= minRequiredCompatibility,
+        .unwind = meetsRequirements(SbeCompatibility::requiresSbeFull),
 
         // Note: even if its sort pattern is SBE compatible, we cannot push down a $sort stage when
         // the pipeline is the shard part of a sorted-merge query on a sharded collection. It is
         // possible that the merge operation will need a $sortKey field from the sort, and SBE plans
         // do not yet support metadata fields.
-        .sort = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility &&
-            !needsMerge,
+        .sort = meetsRequirements(SbeCompatibility::requiresTrySbe) && !needsMerge,
 
-        .limitSkip =
-            doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+        .limitSkip = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.
-        .search = feature_flags::gFeatureFlagSearchInSbe.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+        .search = meetsRequirements(SbeCompatibility::noRequirements) &&
+            feature_flags::gFeatureFlagSearchInSbe.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
 
-        .window = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
+        .window = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
         // TODO (SERVER-80243): Remove 'featureFlagTimeSeriesInSbe' check.
-        .unpackBucket = feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
-                            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        .unpackBucket = meetsRequirements(SbeCompatibility::noRequirements) &&
+            feature_flags::gFeatureFlagTimeSeriesInSbe.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
             !queryKnob.getSbeDisableTimeSeriesForOp() &&
-            cq->getExpCtx()->sbePipelineCompatibility == SbeCompatibility::fullyCompatible,
+            cq->getExpCtx()->sbePipelineCompatibility == SbeCompatibility::noRequirements,
     };
 
     bool allStagesPushedDown = true;
@@ -515,5 +511,17 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
         collections, canonicalQuery, needsMerge, pipeline, stagesForPushdown);
     canonicalQuery->setCqPipeline(std::move(stagesForPushdown), allStagesPushedDown);
 };
+
+SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
+                                                bool isSearchQuery,
+                                                bool sbeFullEnabled) {
+    if (sbeFullEnabled) {
+        return SbeCompatibility::requiresSbeFull;
+    } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine ||
+               isSearchQuery) {
+        return SbeCompatibility::requiresTrySbe;
+    }
+    return SbeCompatibility::noRequirements;
+}
 
 }  // namespace mongo
