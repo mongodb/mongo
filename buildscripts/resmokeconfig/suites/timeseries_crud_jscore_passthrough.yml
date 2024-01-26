@@ -253,8 +253,6 @@ selector:
   - jstests/core/fsync.js
   # Time-series buckets processing may have different cursor behavior.
   - jstests/core/query/cursor/getmore_invalidated_cursors.js
-  # TODO (SERVER-85205): Try to enable the test(s).
-  - jstests/core/write/update/upsert_and.js
 
   exclude_with_any_tags:
   - requires_sharding

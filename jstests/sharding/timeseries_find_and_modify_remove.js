@@ -198,7 +198,7 @@ setUpShardedCluster();
                     }
                 ]
             }),
-            residualFilter: {$and: [{[metaFieldName]: {$eq: "B"}}, {f: {$eq: 103}}]},
+            residualFilter: {$and: [{f: {$eq: 103}}, {[metaFieldName]: {$eq: "B"}}]},
         },
     });
 })();

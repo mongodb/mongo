@@ -157,6 +157,7 @@ void ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
     }
     _originalExpr = uassertStatusOK(MatchExpressionParser::parse(
         _request->getQuery(), _expCtx, ExtensionsCallbackNoop(), allowedFeatures));
+    _originalExpr = MatchExpression::normalize(std::move(_originalExpr));
 }
 
 Status ParsedUpdateBase::parseRequest() {

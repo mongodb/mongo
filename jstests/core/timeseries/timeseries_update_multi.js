@@ -599,7 +599,7 @@ if (!db.getMongo().isMongos() && !TestData.testingReplicaSetEndpoint) {
             multi: true,
         }],
         resultDocList: [
-            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [20, 2, 3, 4], f: [10, 3, 2, 1]},
+            {_id: 8, [timeFieldName]: dateTime, [metaFieldName]: [1, 2, 20, 4], f: [4, 3, 10, 1]},
             doc_id_2_a_b_array_metric
         ],
         nMatched: 1,

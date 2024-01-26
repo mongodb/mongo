@@ -470,6 +470,8 @@ BucketSpec::SplitPredicates BucketSpec::getPushdownPredicates(
         bucketMetricPred = std::move(bucketPredicate.loosePredicate);
         if (bucketPredicate.rewriteProvidesExactMatchPredicate) {
             residualPred = nullptr;
+        } else {
+            residualPred = MatchExpression::normalize(std::move(residualPred));
         }
     }
 

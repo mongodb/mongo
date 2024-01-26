@@ -143,7 +143,7 @@ const requestConfigurations = {
                     ]
                 }),
                 residualFilter:
-                    {"$and": [{[timeField]: {"$eq": generateTimeValue(0)}}, {"f": {"$eq": 0}}]},
+                    {"$and": [{"f": {"$eq": 0}}, {[timeField]: {"$eq": generateTimeValue(0)}}]},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -166,8 +166,8 @@ const requestConfigurations = {
             [primaryShardName]: {
                 residualFilter: {
                     "$or": [
-                        {"$and": [{[timeField]: {"$eq": generateTimeValue(1)}}, {"f": {"$eq": 1}}]},
-                        {"$and": [{[timeField]: {"$eq": generateTimeValue(3)}}, {"f": {"$eq": 3}}]}
+                        {"$and": [{"f": {"$eq": 1}}, {[timeField]: {"$eq": generateTimeValue(1)}}]},
+                        {"$and": [{"f": {"$eq": 3}}, {[timeField]: {"$eq": generateTimeValue(3)}}]}
                     ]
                 },
                 nBucketsUnpacked: 1,
@@ -177,8 +177,8 @@ const requestConfigurations = {
             [otherShardName]: {
                 residualFilter: {
                     "$or": [
-                        {"$and": [{[timeField]: {"$eq": generateTimeValue(1)}}, {"f": {"$eq": 1}}]},
-                        {"$and": [{[timeField]: {"$eq": generateTimeValue(3)}}, {"f": {"$eq": 3}}]}
+                        {"$and": [{"f": {"$eq": 1}}, {[timeField]: {"$eq": generateTimeValue(1)}}]},
+                        {"$and": [{"f": {"$eq": 3}}, {[timeField]: {"$eq": generateTimeValue(3)}}]}
                     ]
                 },
                 nBucketsUnpacked: 1,
@@ -226,7 +226,7 @@ const requestConfigurations = {
         expectedExplain: {
             [otherShardName]: {
                 residualFilter:
-                    {"$and": [{[timeField]: {"$eq": generateTimeValue(2)}}, {"f": {"$eq": 2}}]},
+                    {"$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}]},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -259,7 +259,7 @@ const requestConfigurations = {
                         }
                     ]
                 }),
-                residualFilter: {"$or": [{"f": {"$eq": 1}}, {"f": {"$eq": 3}}]},
+                residualFilter: {"f": {"$in": [1, 3]}},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -281,7 +281,7 @@ const requestConfigurations = {
                         }
                     ]
                 }),
-                residualFilter: {"$or": [{"f": {"$eq": 1}}, {"f": {"$eq": 3}}]},
+                residualFilter: {"f": {"$in": [1, 3]}},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -322,7 +322,7 @@ const requestConfigurations = {
         expectedExplain: {
             [otherShardName]: {
                 residualFilter:
-                    {"$and": [{[timeField]: {"$eq": generateTimeValue(2)}}, {"f": {"$eq": 2}}]},
+                    {"$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}]},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -388,7 +388,7 @@ const requestConfigurations = {
         expectedExplain: {
             [otherShardName]: {
                 residualFilter:
-                    {"$and": [{[timeField]: {"$eq": generateTimeValue(2)}}, {"f": {"$eq": 2}}]},
+                    {"$and": [{"f": {"$eq": 2}}, {[timeField]: {"$eq": generateTimeValue(2)}}]},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -421,7 +421,7 @@ const requestConfigurations = {
                         }
                     ]
                 }),
-                residualFilter: {"$or": [{"f": {"$eq": 1}}, {"f": {"$eq": 2}}]},
+                residualFilter: {"f": {"$in": [1, 2]}},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
@@ -443,7 +443,7 @@ const requestConfigurations = {
                         }
                     ]
                 }),
-                residualFilter: {"$or": [{"f": {"$eq": 1}}, {"f": {"$eq": 2}}]},
+                residualFilter: {"f": {"$in": [1, 2]}},
                 nBucketsUnpacked: 1,
                 nMeasurementsMatched: 1,
                 nMeasurementsUpdated: 1,
