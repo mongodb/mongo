@@ -35,6 +35,7 @@
 #include <memory>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/change_stream_pre_images_tenant_truncate_markers.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
@@ -69,36 +70,15 @@ namespace mongo {
  */
 class PreImagesTruncateManager {
 public:
-    /**
-     * Statistcs for a truncate pass over a given tenant's pre-images collection.
-     */
-    struct TruncateStats {
-        int64_t bytesDeleted{0};
-        int64_t docsDeleted{0};
-
-        // The number of 'nsUUID's scanned in the truncate pass.
-        int64_t scannedInternalCollections{0};
-
-        // The maximum wall time from the pre-images truncated across the collection.
-        Date_t maxStartWallTime{};
-    };
-
-    /**
-     * If truncate markers do not exist for 'tenantId', create the initial set of markers by
-     * sampling or scanning records in the collection. Otherwise, this is a no-op.
-     */
-    void ensureMarkersInitialized(OperationContext* opCtx,
-                                  boost::optional<TenantId> tenantId,
-                                  const CollectionAcquisition& preImagesColl);
-
     /*
      * Truncates expired pre-images spanning the 'preImagesColl' associated with the 'tenantId'.
      * Performs in-memory cleanup of the tenant's truncate markers whenever an underlying 'nsUUID'
      * associated with pre-images is dropped.
      */
-    TruncateStats truncateExpiredPreImages(OperationContext* opCtx,
-                                           boost::optional<TenantId> tenantId,
-                                           const CollectionPtr& preImagesColl);
+    PreImagesTruncateStats truncateExpiredPreImages(
+        OperationContext* opCtx,
+        boost::optional<TenantId> tenantId,
+        const CollectionAcquisition& preImagesCollection);
 
     /**
      * Exclusively used when the config.preimages collection associated with 'tenantId' is dropped.
@@ -116,23 +96,14 @@ public:
                                const ChangeStreamPreImage& preImage,
                                int64_t bytesInserted);
 
-    using TenantTruncateMarkers =
-        absl::flat_hash_map<UUID, std::shared_ptr<PreImagesTruncateMarkersPerNsUUID>, UUID::Hash>;
-
 private:
     friend class PreImagesTruncateManagerTest;
 
-    void _registerAndInitialiseMarkersForTenant(OperationContext* opCtx,
-                                                boost::optional<TenantId> tenantId,
-                                                const CollectionAcquisition& preImagesCollection);
-    /**
-     * Similar to the 'TenantTruncateMarkers' type, but with an added wrapper which enables copy on
-     * write semantics.
-     */
-    using TenantTruncateMarkersCopyOnWrite =
-        ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>;
-    using TenantMap =
-        ConcurrentSharedValuesMap<boost::optional<TenantId>, TenantTruncateMarkersCopyOnWrite>;
-    TenantMap _tenantMap;
+    std::shared_ptr<PreImagesTenantMarkers> _fetchOrCreateMarkersForPreImagesCollection(
+        OperationContext* opCtx,
+        boost::optional<TenantId> tenantId,
+        const CollectionAcquisition& preImagesCollection);
+
+    ConcurrentSharedValuesMap<boost::optional<TenantId>, PreImagesTenantMarkers> _tenantMap;
 };
 }  // namespace mongo

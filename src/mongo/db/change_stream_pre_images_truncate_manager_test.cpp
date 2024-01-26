@@ -141,7 +141,8 @@ protected:
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
 
-        truncateManager.ensureMarkersInitialized(opCtx, tenantId, preImagesCollRAII);
+        truncateManager._fetchOrCreateMarkersForPreImagesCollection(
+            opCtx, tenantId, preImagesCollRAII);
     };
 
     void createPreImagesCollection(boost::optional<TenantId> tenantId) {
@@ -181,10 +182,10 @@ protected:
     void validateNumRecordsInMarkers(const PreImagesTruncateManager& truncateManager,
                                      boost::optional<TenantId> tenantId,
                                      int64_t expectedNumRecords) {
-        auto tenantCollectionMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(tenantCollectionMarkers);
+        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
+        ASSERT(preImagesTenantMarkers);
 
-        auto markersSnapshot = tenantCollectionMarkers->getUnderlyingSnapshot();
+        auto markersSnapshot = preImagesTenantMarkers->_markersMap.getUnderlyingSnapshot();
         int64_t numRecords{0};
         for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
@@ -199,10 +200,10 @@ protected:
     void validateNumBytesInMarkers(const PreImagesTruncateManager& truncateManager,
                                    boost::optional<TenantId> tenantId,
                                    int64_t expectedNumBytes) {
-        auto tenantCollectionMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(tenantCollectionMarkers);
+        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
+        ASSERT(preImagesTenantMarkers);
 
-        auto markersSnapshot = tenantCollectionMarkers->getUnderlyingSnapshot();
+        auto markersSnapshot = preImagesTenantMarkers->_markersMap.getUnderlyingSnapshot();
         int64_t numBytes{0};
         for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
@@ -217,10 +218,10 @@ protected:
     void validateMarkersDontExistForNsUUID(const PreImagesTruncateManager& truncateManager,
                                            boost::optional<TenantId> tenantId,
                                            const UUID& nsUUID) {
-        auto tenantCollectionMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(tenantCollectionMarkers);
+        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
+        ASSERT(preImagesTenantMarkers);
 
-        ASSERT(!tenantCollectionMarkers->find(nsUUID));
+        ASSERT(!preImagesTenantMarkers->_markersMap.find(nsUUID));
     }
 
     void validateCreationMethod(
@@ -228,10 +229,10 @@ protected:
         boost::optional<TenantId> tenantId,
         const UUID& nsUUID,
         CollectionTruncateMarkers::MarkersCreationMethod expectedCreationMethod) {
-        auto tenantCollectionMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(tenantCollectionMarkers);
+        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
+        ASSERT(preImagesTenantMarkers);
 
-        auto nsUUIDTruncateMarkers = tenantCollectionMarkers->find(nsUUID);
+        auto nsUUIDTruncateMarkers = preImagesTenantMarkers->_markersMap.find(nsUUID);
         ASSERT(nsUUIDTruncateMarkers);
         ASSERT_EQ(nsUUIDTruncateMarkers->markersCreationMethod(), expectedCreationMethod);
     }
@@ -239,18 +240,18 @@ protected:
     void validateMarkersExistForNsUUID(const PreImagesTruncateManager& truncateManager,
                                        boost::optional<TenantId> tenantId,
                                        const UUID& nsUUID) {
-        auto tenantCollectionMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(tenantCollectionMarkers);
+        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
+        ASSERT(preImagesTenantMarkers);
 
-        ASSERT(tenantCollectionMarkers->find(nsUUID));
+        ASSERT(preImagesTenantMarkers->_markersMap.find(nsUUID));
     }
 
     void validateIncreasingRidAndWallTimesInMarkers(const PreImagesTruncateManager& truncateManager,
                                                     boost::optional<TenantId> tenantId) {
-        auto tenantCollectionMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(tenantCollectionMarkers);
+        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
+        ASSERT(preImagesTenantMarkers);
 
-        auto markersSnapshot = tenantCollectionMarkers->getUnderlyingSnapshot();
+        auto markersSnapshot = preImagesTenantMarkers->_markersMap.getUnderlyingSnapshot();
         for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
 

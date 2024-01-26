@@ -481,6 +481,9 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
     // pre-images.
     opCtx->setEnforceConstraints(false);
 
+    // Truncates are untimestamped. Allow multiple truncates to occur.
+    shard_role_details::getRecoveryUnit(opCtx)->allowAllUntimestampedWrites();
+
     const auto preImagesColl = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
@@ -497,12 +500,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
         return 0;
     }
 
-    // Prevent unnecessary latency on an end-user write operation by intialising the truncate
-    // markers lazily during the background cleanup.
-    _truncateManager.ensureMarkersInitialized(opCtx, tenantId, preImagesColl);
-
-    auto truncateStats = _truncateManager.truncateExpiredPreImages(
-        opCtx, tenantId, preImagesColl.getCollectionPtr());
+    auto truncateStats = _truncateManager.truncateExpiredPreImages(opCtx, tenantId, preImagesColl);
 
     if (truncateStats.maxStartWallTime > _purgingJobStats.maxStartWallTime.loadRelaxed()) {
         _purgingJobStats.maxStartWallTime.store(truncateStats.maxStartWallTime);
