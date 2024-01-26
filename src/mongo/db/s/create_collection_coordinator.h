@@ -44,7 +44,6 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
-#include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
@@ -202,24 +201,13 @@ private:
 
     // Enter to the critical section on the coordinator for the namespace and its buckets namespace.
     // Only blocks writes.
-    void _enterWriteCriticalSectionOnCoordinatorAndDataShard(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& token);
+    void _enterWriteCriticalSectionOnCoordinator();
 
     // Translate the request parameters and persist them in the coordinator document.
     void _translateRequestParameters();
 
     // Ensure that the collection is created locally and build the shard key index if necessary.
     void _createCollectionOnCoordinator();
-
-    // Enter to the critical section on the specified shards. Blocks writes and reads.
-    void _enterCriticalSectionOnShards(
-        OperationContext* opCtx,
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& token,
-        const NamespaceString& nss,
-        const std::vector<ShardId>& shardIds,
-        CriticalSectionBlockTypeEnum blockType);
 
     // Enter to the critical section on all the shards. Blocks writes and reads.
     void _enterCriticalSection(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -242,12 +230,10 @@ private:
                               const CancellationToken& token);
 
     // Exit critical sections on participant shards.
-    void _exitCriticalSectionOnShards(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      bool throwIfReasonDiffers,
-                                      std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                      const CancellationToken& token,
-                                      const std::vector<ShardId>& shardIds);
+    void _exitCriticalSectionsOnParticipants(OperationContext* opCtx,
+                                             bool throwIfReasonDiffers,
+                                             std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                             const CancellationToken& token);
 
     mongo::ShardsvrCreateCollectionRequest _request;
 
