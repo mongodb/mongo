@@ -63,16 +63,25 @@ struct MatchExpressionInputParamIdContainer {
         return std::move(_inputParamIdToExpressionVector);
     }
 
-    // Caller must ensure that inputParamId is an increasing sequence of integers starting from 0.
+    // Caller must ensure that inputParamId is an increasing sequence of integers.
     InputParamId insert(const MatchExpression* expr, InputParamId paramId) {
+        if (_inputParamIdToExpressionVector.empty()) {
+            _firstParamId = paramId;
+        }
         _inputParamIdToExpressionVector.emplace_back(expr);
+        tassert(8551600,
+                "Parameters are not provided in an increasing sequence",
+                paramId ==
+                    _firstParamId +
+                        static_cast<InputParamId>(_inputParamIdToExpressionVector.size()) - 1);
 
         if (_usingMap) {
             _expressionToInputParamIdMap.emplace(expr, paramId);
         } else if (size() >= _useMapThreshold) {
             // If size reaches given threshold, build a map for faster lookups.
             for (size_t i = 0; i < _inputParamIdToExpressionVector.size(); i++) {
-                _expressionToInputParamIdMap.emplace(_inputParamIdToExpressionVector[i], i);
+                _expressionToInputParamIdMap.emplace(_inputParamIdToExpressionVector[i],
+                                                     _firstParamId + i);
             }
             _usingMap = true;
         }
@@ -99,7 +108,7 @@ struct MatchExpressionInputParamIdContainer {
                 _inputParamIdToExpressionVector.end(),
                 [expr](const MatchExpression* m) -> bool { return m->equivalent(expr); });
             if (it != _inputParamIdToExpressionVector.end()) {
-                return it - _inputParamIdToExpressionVector.begin();
+                return _firstParamId + (it - _inputParamIdToExpressionVector.begin());
             }
         }
 
@@ -120,9 +129,12 @@ private:
 
     bool _usingMap = false;
 
+    // Keep track of the id of the first parameter.
+    InputParamId _firstParamId;
+
     // Map from assigned InputParamId to parameterized MatchExpression. It can be safely represented
     // as a vector because in 'MatchExpressionParameterizationVisitorContext' we control that
-    // inputParamId is an increasing sequence of integers starting from 0.
+    // inputParamId is an increasing sequence of integers starting from _firstParamId.
     std::vector<const MatchExpression*> _inputParamIdToExpressionVector;
 
     struct MatchExpressionsEqual {
