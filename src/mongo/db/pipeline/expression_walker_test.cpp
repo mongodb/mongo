@@ -213,7 +213,7 @@ TEST_F(ExpressionWalkerTest, SubstitutePathOnlySubstitutesPrefix) {
     auto expression = parseExpression("{$concat: ['$a', '$b', '$a.a', '$b.a', '$$NOW']}");
     walk<Expression>(expression.get(), &substituteWalker);
     ASSERT_BSONOBJ_EQ(fromjson("{$concat: ['$b', '$b', '$b.a', '$b.a', '$$NOW']}"),
-                      expression->serialize(SerializationOptions{}).getDocument().toBson());
+                      expression->serialize().getDocument().toBson());
 }
 
 TEST_F(ExpressionWalkerTest, SubstitutePathSubstitutesWhenThereAreDottedFields) {
@@ -222,7 +222,7 @@ TEST_F(ExpressionWalkerTest, SubstitutePathSubstitutesWhenThereAreDottedFields) 
     auto expression = parseExpression("{$concat: ['$a.b', '$a.b.c', '$c', '$d.e.f']}");
     walk<Expression>(expression.get(), &substituteWalker);
     ASSERT_BSONOBJ_EQ(fromjson("{$concat: ['$a.b', '$x', '$q.r', '$y.f']}"),
-                      expression->serialize(SerializationOptions{}).getDocument().toBson());
+                      expression->serialize().getDocument().toBson());
 }
 
 TEST_F(ExpressionWalkerTest, SubstitutePathSubstitutesWhenExpressionIsNested) {
@@ -232,7 +232,7 @@ TEST_F(ExpressionWalkerTest, SubstitutePathSubstitutesWhenExpressionIsNested) {
         parseExpression("{$multiply: [{$add: ['$a.b', '$c']}, {$ifNull: ['$a.b.c', '$d']}]}");
     walk<Expression>(expression.get(), &substituteWalker);
     ASSERT_BSONOBJ_EQ(fromjson("{$multiply: [{$add: ['$x', '$y']}, {$ifNull: ['$x.c', '$d']}]}"),
-                      expression->serialize(SerializationOptions{}).getDocument().toBson());
+                      expression->serialize().getDocument().toBson());
 }
 
 TEST_F(ExpressionWalkerTest, SubstitutePathDoesNotSubstitutesWhenExpressionHasNoFieldPaths) {
@@ -241,7 +241,7 @@ TEST_F(ExpressionWalkerTest, SubstitutePathDoesNotSubstitutesWhenExpressionHasNo
     auto expression = parseExpression("{$multiply: [1, 2, 3, 4]}");
     walk<Expression>(expression.get(), &substituteWalker);
     ASSERT_BSONOBJ_EQ(fromjson("{$multiply: [{$const: 1}, {$const: 2}, {$const: 3}, {$const: 4}]}"),
-                      expression->serialize(SerializationOptions{}).getDocument().toBson());
+                      expression->serialize().getDocument().toBson());
 }
 
 }  // namespace

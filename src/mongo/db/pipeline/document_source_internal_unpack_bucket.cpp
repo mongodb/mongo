@@ -412,7 +412,7 @@ boost::intrusive_ptr<Expression> rewriteMetaFieldPaths(
     //
     // Clone by serializing and reparsing. There does not seem to be a more idiomatic way to do this
     // at the moment.
-    auto serialized = expr->serialize(SerializationOptions{});
+    auto serialized = expr->serialize();
     auto obj = BSON("f" << serialized);
     auto clonedExpr =
         Expression::parseOperand(pExpCtx.get(), obj.firstElement(), pExpCtx->variablesParseState);

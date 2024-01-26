@@ -4447,7 +4447,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamAddPostImag
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamAddPostImage":{"fullDocument":"updateLookup"}})",
         redact(*docSource));
@@ -4463,7 +4463,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamAddPreImage
                 "fullDocumentBeforeChange": "whenAvailable"
             }
         })",
-        docSource.serialize(SerializationOptions{}).getDocument().toBson());
+        docSource.serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamAddPreImage":{"fullDocumentBeforeChange":"whenAvailable"}})",
         redact(docSource));
@@ -4488,7 +4488,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckInvali
                 }
             }
         })",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckInvalidate":{"startAfterInvalidate":{
                     "_data": "?string"
@@ -4524,7 +4524,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckResuma
                 }
             }
         })",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckResumability":{
                 "resumeToken": {
@@ -4551,7 +4551,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamCheckTopolo
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckTopologyChange":{}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamCheckTopologyChange":{}})",
         redact(*docSource));
@@ -4575,7 +4575,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamEnsureResum
                 }
             }
         })",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalChangeStreamEnsureResumeTokenPresent": {
@@ -4592,7 +4592,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamHandleTopol
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalChangeStreamHandleTopologyChange":{}})",
         redact(*docSource));
@@ -4610,7 +4610,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamSplitLargeE
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$changeStreamSplitLargeEvent":{}})",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$changeStreamSplitLargeEvent":{}})",
         redact(*docSource));
@@ -4636,7 +4636,7 @@ TEST_F(ChangeStreamStageTestNoSetup, RedactDocumentSourceChangeStreamTransform) 
                 "fullDocumentBeforeChange": "off"
             }
         })",
-        docSource->serialize(SerializationOptions{}).getDocument().toBson());
+        docSource->serialize().getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalChangeStreamTransform": {

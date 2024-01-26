@@ -259,8 +259,7 @@ boost::intrusive_ptr<Expression> exprRewriteOperationType(
     opCases.push_back(fromjson("{case: {$ne: ['$o.collMod', '$$REMOVE']}, then: 'modify'}"));
 
     // The default case, if nothing matches.
-    auto defaultCase =
-        ExpressionConstant::create(expCtx.get(), Value())->serialize(SerializationOptions{});
+    auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize();
 
     // Build the final expression object...
     BSONObjBuilder exprBuilder;
@@ -350,8 +349,7 @@ boost::intrusive_ptr<Expression> exprRewriteDocumentKey(
         fromjson("{case: {$in: ['$op', ['i', 'u']]}, then: '" + insertUpdateAndReplacePath + "'}"));
 
     // The default case, if nothing matches.
-    auto defaultCase =
-        ExpressionConstant::create(expCtx.get(), Value())->serialize(SerializationOptions{});
+    auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize();
 
     // Build the expression BSON object.
     BSONObjBuilder exprBuilder;
@@ -1094,8 +1092,7 @@ boost::intrusive_ptr<Expression> exprRewriteNs(
     collCases.push_back(fromjson("{case: {$ne: ['$o.collMod', '$$REMOVE']}, then: '$o.collMod'}"));
 
     // The default case, if nothing matches.
-    auto defaultCase =
-        ExpressionConstant::create(expCtx.get(), Value())->serialize(SerializationOptions{});
+    auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize();
 
     // Build the collection expression object...
     BSONObjBuilder collExprBuilder;

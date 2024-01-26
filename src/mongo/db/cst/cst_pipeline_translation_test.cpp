@@ -823,7 +823,7 @@ TEST(CstPipelineTranslationTest, TranslatesConvertExpression) {
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson(
             "{$convert: {input: {$const: 'true'}, to: {$const: 'bool'}, onNull: {$const: 1}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToBoolExpression) {
@@ -833,7 +833,7 @@ TEST(CstPipelineTranslationTest, TranslatesToBoolExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: {$const: 0}, to: {$const: 'bool'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToDateExpression) {
@@ -843,7 +843,7 @@ TEST(CstPipelineTranslationTest, TranslatesToDateExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: {$const: 0}, to: {$const: 'date'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToDecimalExpression) {
@@ -854,7 +854,7 @@ TEST(CstPipelineTranslationTest, TranslatesToDecimalExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: {$const: 2.02}, to: {$const: 'decimal'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToDoubleExpression) {
@@ -865,7 +865,7 @@ TEST(CstPipelineTranslationTest, TranslatesToDoubleExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: {$const: '5.5'}, to: {$const: 'double'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToIntExpression) {
@@ -875,7 +875,7 @@ TEST(CstPipelineTranslationTest, TranslatesToIntExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: {$const: true}, to: {$const: 'int'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToLongExpression) {
@@ -885,7 +885,7 @@ TEST(CstPipelineTranslationTest, TranslatesToLongExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: {$const: 1.0}, to: {$const: 'long'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToObjectIdExpression) {
@@ -896,7 +896,7 @@ TEST(CstPipelineTranslationTest, TranslatesToObjectIdExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: '$_id', to: {$const: 'objectId'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToStringExpression) {
@@ -907,7 +907,7 @@ TEST(CstPipelineTranslationTest, TranslatesToStringExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: {$const: true}, to: {$const: 'string'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesTypeExpression) {
@@ -923,13 +923,13 @@ TEST(CstPipelineTranslationTest, AbsConstantTranslation) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [{$const: -1}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(
+        ValueComparator().evaluate(Value(fromjson("{$abs: [{$const: -1}]}")) == expr->serialize()));
     cst = CNode{CNode::ObjectChildren{{KeyFieldname::abs, CNode{UserDouble{-1.534}}}}};
     expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [{$const: -1.534}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AbsVariableTransation) {
@@ -938,8 +938,8 @@ TEST(CstPipelineTranslationTest, AbsVariableTransation) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [\"$foo\"]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(
+        ValueComparator().evaluate(Value(fromjson("{$abs: [\"$foo\"]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AbsSingletonArrayTranslation) {
@@ -948,8 +948,8 @@ TEST(CstPipelineTranslationTest, AbsSingletonArrayTranslation) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [{$const: -1}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(
+        ValueComparator().evaluate(Value(fromjson("{$abs: [{$const: -1}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, CeilTranslationTest) {
@@ -958,7 +958,7 @@ TEST(CstPipelineTranslationTest, CeilTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$ceil: [{$const: 1.578}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 TEST(CstPipelineTranslationTest, DivideTranslationTest) {
     const auto cst = CNode{CNode::ObjectChildren{
@@ -967,9 +967,8 @@ TEST(CstPipelineTranslationTest, DivideTranslationTest) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$divide: [{$const: 1.5}, {$const: 1}]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$divide: [{$const: 1.5}, {$const: 1}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, ExpTranslationTest) {
@@ -978,7 +977,7 @@ TEST(CstPipelineTranslationTest, ExpTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$exp: [{$const: 1.5}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, FloorTranslationTest) {
@@ -987,15 +986,15 @@ TEST(CstPipelineTranslationTest, FloorTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$floor: [{$const: 1.5}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 TEST(CstPipelineTranslationTest, LnTranslationTest) {
     const auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::ln, CNode{UserDouble{1.5}}}}};
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$ln: [{$const: 1.5}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(
+        ValueComparator().evaluate(Value(fromjson("{$ln: [{$const: 1.5}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, LogTranslationTest) {
@@ -1005,9 +1004,8 @@ TEST(CstPipelineTranslationTest, LogTranslationTest) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$log: [{$const: 1.5}, {$const: 10}]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$log: [{$const: 1.5}, {$const: 10}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, LogTenTranslationTest) {
@@ -1016,7 +1014,7 @@ TEST(CstPipelineTranslationTest, LogTenTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$log10: [{$const: 1.5}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, ModTranslationTest) {
@@ -1026,9 +1024,8 @@ TEST(CstPipelineTranslationTest, ModTranslationTest) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$mod: [{$const: 15}, {$const: 10}]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$mod: [{$const: 15}, {$const: 10}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, MultiplyTranslationTest) {
@@ -1041,7 +1038,7 @@ TEST(CstPipelineTranslationTest, MultiplyTranslationTest) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$multiply: [{$const: 15}, {$const: 10}, {$const: 2}]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, PowTranslationTest) {
@@ -1052,15 +1049,14 @@ TEST(CstPipelineTranslationTest, PowTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$pow: [{$const: 5}, {$const: 2}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
     cst = CNode{CNode::ObjectChildren{
         {KeyFieldname::pow,
          CNode{CNode::ArrayChildren{CNode{UserDouble{5.846}}, CNode{UserDouble{2.846}}}}}}};
     expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$pow: [{$const: 5.846}, {$const: 2.846}]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$pow: [{$const: 5.846}, {$const: 2.846}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, RoundTranslationTest) {
@@ -1070,9 +1066,8 @@ TEST(CstPipelineTranslationTest, RoundTranslationTest) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$round: [{$const: 1.5786}, {$const: 2}]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$round: [{$const: 1.5786}, {$const: 2}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SqrtTranslationTest) {
@@ -1081,7 +1076,7 @@ TEST(CstPipelineTranslationTest, SqrtTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sqrt: [{$const: 144}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SubtractTranslationTest) {
@@ -1092,8 +1087,7 @@ TEST(CstPipelineTranslationTest, SubtractTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson("{$subtract: [{$const: 1.5786}, {$const: 2}]}")) ==
-        expr->serialize(SerializationOptions{})));
+        Value(fromjson("{$subtract: [{$const: 1.5786}, {$const: 2}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TruncTranslationTest) {
@@ -1103,9 +1097,8 @@ TEST(CstPipelineTranslationTest, TruncTranslationTest) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$trunc: [{$const: 1.5786}, {$const: 2}]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$trunc: [{$const: 1.5786}, {$const: 2}]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesReplaceOneExpression) {
@@ -1119,8 +1112,7 @@ TEST(CstPipelineTranslationTest, TranslatesReplaceOneExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$replaceOne: {input: {$const: 'Antonio'}, find: {$const: 'Ant'}, "
-                       "replacement: {$const: 'T'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+                       "replacement: {$const: 'T'}}}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesReplaceAllExpression) {
@@ -1135,8 +1127,7 @@ TEST(CstPipelineTranslationTest, TranslatesReplaceAllExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$replaceAll: {input: {$const: '10gen'}, find: {$const: '10gen'}, "
-                       "replacement: {$const: 'MongoDB'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+                       "replacement: {$const: 'MongoDB'}}}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesTrimExpression) {
@@ -1149,7 +1140,7 @@ TEST(CstPipelineTranslationTest, TranslatesTrimExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$trim: {input: {$const: '    10gen'}, chars: {$const: 'ge'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesTrimWithoutCharsExpression) {
@@ -1160,9 +1151,8 @@ TEST(CstPipelineTranslationTest, TranslatesTrimWithoutCharsExpression) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$trim: {input: {$const: '    10gen '}}}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$trim: {input: {$const: '    10gen '}}}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesLtrimExpression) {
@@ -1175,7 +1165,7 @@ TEST(CstPipelineTranslationTest, TranslatesLtrimExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$ltrim: {input: {$const: '    10gen'}, chars: {$const: 'ge'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesRtrimExpression) {
@@ -1188,7 +1178,7 @@ TEST(CstPipelineTranslationTest, TranslatesRtrimExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$rtrim: {input: {$const: '10gen '}, chars: {$const: 'ge'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesConcatExpression) {
@@ -1201,7 +1191,7 @@ TEST(CstPipelineTranslationTest, TranslatesConcatExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$concat: [{$const: 'abc'}, {$const: 'def'}, {$const: '1x5'}]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDateToStringExpression) {
@@ -1220,8 +1210,8 @@ TEST(CstPipelineTranslationTest, TranslatesDateToStringExpression) {
         Value(
             fromjson("{$dateToString: {date: \"$date\", format: {$const: \"%Y-%m-%d\"}, timezone: "
                      "{$const: \"America/New_York\"}, onNull: {$const: \"8/10/20\"}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDateFromStringExpression) {
@@ -1239,9 +1229,8 @@ TEST(CstPipelineTranslationTest, TranslatesDateFromStringExpression) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$dateFromString: {dateString: {$const: \"'2017-02-08T12:10:40.787'\"}, "
-                       "format: {$const: \"America/New_York\"}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                       "format: {$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIndexOfCP) {
@@ -1252,9 +1241,8 @@ TEST(CstPipelineTranslationTest, TranslatesIndexOfCP) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson("{$indexOfCP: [{$const: \"ABC\"}, {$const: \"B\"}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(fromjson("{$indexOfCP: [{$const: \"ABC\"}, {$const: \"B\"}]}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIndexOfBytes) {
@@ -1266,8 +1254,8 @@ TEST(CstPipelineTranslationTest, TranslatesIndexOfBytes) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$indexOfBytes: [{$const: \"ABC\"}, {$const: \"B\"}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSplit) {
@@ -1279,8 +1267,8 @@ TEST(CstPipelineTranslationTest, TranslatesSplit) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$split: [{$const: \"sapalaiat\"}, {$const: \"a\"}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesStrLenBytes) {
@@ -1289,10 +1277,9 @@ TEST(CstPipelineTranslationTest, TranslatesStrLenBytes) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$strLenBytes: [{$const: \"four\"}]}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$strLenBytes: [{$const: \"four\"}]}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesStrLenCP) {
@@ -1302,8 +1289,8 @@ TEST(CstPipelineTranslationTest, TranslatesStrLenCP) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$strLenCP: [{$const: \"four\"}]}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesStrCaseCmp) {
@@ -1315,8 +1302,8 @@ TEST(CstPipelineTranslationTest, TranslatesStrCaseCmp) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$strcasecmp: [{$const: \"100\"}, {$const: \"2\"}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, DesugarsSubstrToSubstrBytes) {
@@ -1329,8 +1316,8 @@ TEST(CstPipelineTranslationTest, DesugarsSubstrToSubstrBytes) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$substrBytes: [{$const: \"abc\"}, {$const: 0}, {$const: \"a\"}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSubstrBytes) {
@@ -1343,8 +1330,8 @@ TEST(CstPipelineTranslationTest, TranslatesSubstrBytes) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$substrBytes: [{$const: \"abc\"}, {$const: 0}, {$const: \"a\"}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSubstrCP) {
@@ -1357,8 +1344,8 @@ TEST(CstPipelineTranslationTest, TranslatesSubstrCP) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$substrCP: [{$const: \"abc\"}, {$const: 0}, {$const: \"a\"}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToLower) {
@@ -1368,8 +1355,8 @@ TEST(CstPipelineTranslationTest, TranslatesToLower) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$toLower: [{$const: \"ABC\"}]}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesToUpper) {
@@ -1378,10 +1365,9 @@ TEST(CstPipelineTranslationTest, TranslatesToUpper) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$toUpper: [{$const: \"EZ as 123\"}]}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$toUpper: [{$const: \"EZ as 123\"}]}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesRegexFind) {
@@ -1397,8 +1383,8 @@ TEST(CstPipelineTranslationTest, TranslatesRegexFind) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$regexFind: {input: {$const: \"aeiou\"}, regex: {$const: /.*/i}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesRegexFindAll) {
@@ -1414,8 +1400,8 @@ TEST(CstPipelineTranslationTest, TranslatesRegexFindAll) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$regexFindAll: {input: {$const: \"aeiou\"}, regex: {$const: /.*/i}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesRegexMatch) {
@@ -1431,8 +1417,8 @@ TEST(CstPipelineTranslationTest, TranslatesRegexMatch) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$regexMatch: {input: {$const: \"aeiou\"}, regex: {$const: /.*/i}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSlice) {
@@ -1447,8 +1433,8 @@ TEST(CstPipelineTranslationTest, TranslatesSlice) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$slice: [[{$const: 1}, {$const: 2}, {$const: 3}], {$const: -2}]}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesMeta) {
@@ -1456,9 +1442,9 @@ TEST(CstPipelineTranslationTest, TranslatesMeta) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$meta: \"textScore\"}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(
+        ValueComparator().evaluate(Value(fromjson("{$meta: \"textScore\"}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, RecognizesSingleDollarAsNonConst) {
@@ -1470,7 +1456,7 @@ TEST(CstPipelineTranslationTest, RecognizesSingleDollarAsNonConst) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$trunc: [\"$val\", \"$places\"]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, RecognizesDoubleDollarAsNonConst) {
@@ -1481,7 +1467,7 @@ TEST(CstPipelineTranslationTest, RecognizesDoubleDollarAsNonConst) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: \"$$NOW\", to: {$const: 'date'}}}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AllElementsTrueTest) {
@@ -1492,7 +1478,7 @@ TEST(CstPipelineTranslationTest, AllElementsTrueTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$allElementsTrue: [\"$set\"]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AnyElementsTrueTest) {
@@ -1503,7 +1489,7 @@ TEST(CstPipelineTranslationTest, AnyElementsTrueTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$anyElementTrue: [\"$set\"]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SetDifferenceTest) {
@@ -1514,9 +1500,8 @@ TEST(CstPipelineTranslationTest, SetDifferenceTest) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$setDifference: [\"$set\", \"$set2\"]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$setDifference: [\"$set\", \"$set2\"]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SetEqualsTest) {
@@ -1528,7 +1513,7 @@ TEST(CstPipelineTranslationTest, SetEqualsTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$setEquals: [\"$set\", \"$set2\"]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SetIntersectionTest) {
@@ -1542,7 +1527,7 @@ TEST(CstPipelineTranslationTest, SetIntersectionTest) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setIntersection: [\"$set\", \"$set2\", \"$set3\"]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SetIsSubsetTest) {
@@ -1553,9 +1538,8 @@ TEST(CstPipelineTranslationTest, SetIsSubsetTest) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$setIsSubset: [\"$set\", \"$set2\"]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$setIsSubset: [\"$set\", \"$set2\"]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SetUnionTest) {
@@ -1568,8 +1552,7 @@ TEST(CstPipelineTranslationTest, SetUnionTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson("{$setUnion: [\"$set\", \"$set2\", \"$set3\"]}")) ==
-        expr->serialize(SerializationOptions{})));
+        Value(fromjson("{$setUnion: [\"$set\", \"$set2\", \"$set3\"]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SinTranslationTest) {
@@ -1578,7 +1561,7 @@ TEST(CstPipelineTranslationTest, SinTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sin: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, CosTranslationTest) {
@@ -1587,7 +1570,7 @@ TEST(CstPipelineTranslationTest, CosTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$cos: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TanTranslationTest) {
@@ -1596,7 +1579,7 @@ TEST(CstPipelineTranslationTest, TanTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$tan: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SinhTranslationTest) {
@@ -1605,7 +1588,7 @@ TEST(CstPipelineTranslationTest, SinhTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sinh: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, CoshTranslationTest) {
@@ -1614,7 +1597,7 @@ TEST(CstPipelineTranslationTest, CoshTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$cosh: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TanhTranslationTest) {
@@ -1623,7 +1606,7 @@ TEST(CstPipelineTranslationTest, TanhTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$tanh: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AsinTranslationTest) {
@@ -1632,7 +1615,7 @@ TEST(CstPipelineTranslationTest, AsinTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$asin: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AcosTranslationTest) {
@@ -1641,7 +1624,7 @@ TEST(CstPipelineTranslationTest, AcosTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$acos: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AtanTranslationTest) {
@@ -1650,7 +1633,7 @@ TEST(CstPipelineTranslationTest, AtanTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$atan: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AsinhTranslationTest) {
@@ -1659,7 +1642,7 @@ TEST(CstPipelineTranslationTest, AsinhTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$asinh: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AcoshTranslationTest) {
@@ -1668,7 +1651,7 @@ TEST(CstPipelineTranslationTest, AcoshTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$acosh: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, AtanhTranslationTest) {
@@ -1677,7 +1660,7 @@ TEST(CstPipelineTranslationTest, AtanhTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$atanh: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, DegreesToRadiansTranslationTest) {
@@ -1687,7 +1670,7 @@ TEST(CstPipelineTranslationTest, DegreesToRadiansTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$degreesToRadians: [{$const: 30}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, RadiansToDegreesTranslationTest) {
@@ -1700,7 +1683,7 @@ TEST(CstPipelineTranslationTest, RadiansToDegreesTranslationTest) {
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$radiansToDegrees: [{$const: "
                        "NumberDecimal(\"0.9272952180016122324285124629224290\")}]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, SinArrayTranslationTest) {
@@ -1710,7 +1693,7 @@ TEST(CstPipelineTranslationTest, SinArrayTranslationTest) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$sin: [{$const: 0.927}]}")) ==
-                                           expr->serialize(SerializationOptions{})));
+                                           expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDateToPartsExpression) {
@@ -1727,8 +1710,8 @@ TEST(CstPipelineTranslationTest, TranslatesDateToPartsExpression) {
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$dateToParts: {date: \"$date\", timezone: "
                        "{$const: \"America/New_York\"}, iso8601: {$const: false}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDateFromPartsExpressionNonIso) {
@@ -1751,9 +1734,8 @@ TEST(CstPipelineTranslationTest, TranslatesDateFromPartsExpressionNonIso) {
         Value(fromjson("{$dateFromParts: {year: \"$year\", month: \"$month\", day: \"$day\", "
                        "hour: \"$hour\", minute: \"$minute\", second: \"$second\","
                        "millisecond: \"$millisecond\",  timezone: "
-                       "{$const: \"America/New_York\"}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDateFromPartsExpressionIso) {
@@ -1779,9 +1761,8 @@ TEST(CstPipelineTranslationTest, TranslatesDateFromPartsExpressionIso) {
                        "second: \"$second\", millisecond: \"$millisecond\","
                        "isoWeekYear: \"$isoWeekYear\", isoWeek: \"$isoWeek\","
                        "isoDayOfWeek: \"$isoDayOfWeek\", timezone: "
-                       "{$const: \"America/New_York\"}}}")) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDayOfMonthExpressionArgsDoc) {
@@ -1794,11 +1775,10 @@ TEST(CstPipelineTranslationTest, TranslatesDayOfMonthExpressionArgsDoc) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$dayOfMonth: {date: \"$date\", timezone: "
-                                                  "{$const: \"America/New_York\"}}}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dayOfMonth: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDayOfMonthExpressionArgsExpr) {
@@ -1808,10 +1788,9 @@ TEST(CstPipelineTranslationTest, TranslatesDayOfMonthExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$dayOfMonth" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$dayOfMonth" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                            12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDayOfWeekExpressionArgsDoc) {
@@ -1824,11 +1803,10 @@ TEST(CstPipelineTranslationTest, TranslatesDayOfWeekExpressionArgsDoc) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$dayOfWeek: {date: \"$date\", timezone: "
-                                                  "{$const: \"America/New_York\"}}}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dayOfWeek: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDayOfWeekExpressionArgsExpr) {
@@ -1838,10 +1816,9 @@ TEST(CstPipelineTranslationTest, TranslatesDayOfWeekExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$dayOfWeek" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$dayOfWeek" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                           12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDayOfYearExpressionArgsDoc) {
@@ -1854,11 +1831,10 @@ TEST(CstPipelineTranslationTest, TranslatesDayOfYearExpressionArgsDoc) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$dayOfYear: {date: \"$date\", timezone: "
-                                                  "{$const: \"America/New_York\"}}}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$dayOfYear: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesDayOfYearExpressionArgsExpr) {
@@ -1868,10 +1844,9 @@ TEST(CstPipelineTranslationTest, TranslatesDayOfYearExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$dayOfYear" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$dayOfYear" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                           12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesHourExpressionArgsDoc) {
@@ -1886,8 +1861,8 @@ TEST(CstPipelineTranslationTest, TranslatesHourExpressionArgsDoc) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$hour: {date: \"$date\", timezone: "
                                                           "{$const: \"America/New_York\"}}}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesHourExpressionArgsExpr) {
@@ -1897,10 +1872,9 @@ TEST(CstPipelineTranslationTest, TranslatesHourExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON(
-            "$hour" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$hour" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                      12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIsoDayOfWeekExpressionArgsDoc) {
@@ -1913,11 +1887,10 @@ TEST(CstPipelineTranslationTest, TranslatesIsoDayOfWeekExpressionArgsDoc) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$isoDayOfWeek: {date: \"$date\", timezone: "
-                                                  "{$const: \"America/New_York\"}}}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$isoDayOfWeek: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIsoDayOfWeekExpressionArgsExpr) {
@@ -1927,10 +1900,9 @@ TEST(CstPipelineTranslationTest, TranslatesIsoDayOfWeekExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$isoDayOfWeek"
-                   << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$isoDayOfWeek" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                              12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIsoWeekExpressionArgsDoc) {
@@ -1945,8 +1917,8 @@ TEST(CstPipelineTranslationTest, TranslatesIsoWeekExpressionArgsDoc) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$isoWeek: {date: \"$date\", timezone: "
                                                           "{$const: \"America/New_York\"}}}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIsoWeekExpressionArgsExpr) {
@@ -1956,10 +1928,9 @@ TEST(CstPipelineTranslationTest, TranslatesIsoWeekExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$isoWeek" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$isoWeek" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                         12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIsoWeekYearExpressionArgsDoc) {
@@ -1972,11 +1943,10 @@ TEST(CstPipelineTranslationTest, TranslatesIsoWeekYearExpressionArgsDoc) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$isoWeekYear: {date: \"$date\", timezone: "
-                                                  "{$const: \"America/New_York\"}}}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$isoWeekYear: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesIsoWeekYearExpressionArgsExpr) {
@@ -1986,10 +1956,9 @@ TEST(CstPipelineTranslationTest, TranslatesIsoWeekYearExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$isoWeekYear" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$isoWeekYear" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                             12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesMillisecondExpressionArgsDoc) {
@@ -2002,11 +1971,10 @@ TEST(CstPipelineTranslationTest, TranslatesMillisecondExpressionArgsDoc) {
     auto expCtx = getExpCtx();
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$millisecond: {date: \"$date\", timezone: "
-                                                  "{$const: \"America/New_York\"}}}")) ==
-                                   expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$millisecond: {date: \"$date\", timezone: "
+                       "{$const: \"America/New_York\"}}}")) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesMillisecondExpressionArgsExpr) {
@@ -2016,10 +1984,9 @@ TEST(CstPipelineTranslationTest, TranslatesMillisecondExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$millisecond" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$millisecond" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                             12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesMinuteExpressionArgsDoc) {
@@ -2034,8 +2001,8 @@ TEST(CstPipelineTranslationTest, TranslatesMinuteExpressionArgsDoc) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$minute: {date: \"$date\", timezone: "
                                                           "{$const: \"America/New_York\"}}}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesMinuteExpressionArgsExpr) {
@@ -2045,10 +2012,9 @@ TEST(CstPipelineTranslationTest, TranslatesMinuteExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$minute" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$minute" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                        12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesMonthExpressionArgsDoc) {
@@ -2063,8 +2029,8 @@ TEST(CstPipelineTranslationTest, TranslatesMonthExpressionArgsDoc) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$month: {date: \"$date\", timezone: "
                                                           "{$const: \"America/New_York\"}}}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesMonthExpressionArgsExpr) {
@@ -2074,10 +2040,9 @@ TEST(CstPipelineTranslationTest, TranslatesMonthExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$month" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$month" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                       12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSecondExpressionArgsDoc) {
@@ -2092,8 +2057,8 @@ TEST(CstPipelineTranslationTest, TranslatesSecondExpressionArgsDoc) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$second: {date: \"$date\", timezone: "
                                                           "{$const: \"America/New_York\"}}}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesSecondExpressionArgsExpr) {
@@ -2103,10 +2068,9 @@ TEST(CstPipelineTranslationTest, TranslatesSecondExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON("$second" << BSON(
-                       "date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$second" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                        12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesWeekExpressionArgsDoc) {
@@ -2121,8 +2085,8 @@ TEST(CstPipelineTranslationTest, TranslatesWeekExpressionArgsDoc) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$week: {date: \"$date\", timezone: "
                                                           "{$const: \"America/New_York\"}}}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesWeekExpressionArgsExpr) {
@@ -2132,10 +2096,9 @@ TEST(CstPipelineTranslationTest, TranslatesWeekExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON(
-            "$week" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$week" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                      12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesYearExpressionArgsDoc) {
@@ -2150,8 +2113,8 @@ TEST(CstPipelineTranslationTest, TranslatesYearExpressionArgsDoc) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$year: {date: \"$date\", timezone: "
                                                           "{$const: \"America/New_York\"}}}")) ==
-                                           expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+                                           expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, TranslatesYearExpressionArgsExpr) {
@@ -2161,10 +2124,9 @@ TEST(CstPipelineTranslationTest, TranslatesYearExpressionArgsExpr) {
     auto expr = cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
-        Value(BSON(
-            "$year" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(12345678))))) ==
-        expr->serialize(SerializationOptions{})))
-        << expr->serialize(SerializationOptions{});
+        Value(BSON("$year" << BSON("date" << BSON("$const" << Date_t::fromMillisSinceEpoch(
+                                                      12345678))))) == expr->serialize()))
+        << expr->serialize();
 }
 
 TEST(CstPipelineTranslationTest, ArrayElemAtTranslationTest) {
@@ -2179,7 +2141,7 @@ TEST(CstPipelineTranslationTest, ArrayElemAtTranslationTest) {
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson(
             "{$arrayElemAt: [ [{$const: 0}, {$const: 1}, {$const: 42}], {$const: 2} ]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, ArrayToObjectTranslationTest) {
@@ -2194,7 +2156,7 @@ TEST(CstPipelineTranslationTest, ArrayToObjectTranslationTest) {
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson(
             "{$arrayToObject: [ [{$const: 0}, {$const: 1}], [{$const: 42}, {$const: 2}] ]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, ConcatArraysTranslationTest) {
@@ -2209,7 +2171,7 @@ TEST(CstPipelineTranslationTest, ConcatArraysTranslationTest) {
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson(
             "{$concatArrays: [ [{$const: 0}, {$const: 1}], [{$const: 42}, {$const: 2}] ]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, FilterTranslationTest) {
@@ -2230,8 +2192,7 @@ TEST(CstPipelineTranslationTest, FilterTranslationTest) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$filter: { input: [ {$const: 42}, {$const: 2}  ], as: \"myVar\","
-                       "cond: { $gt: [\"$$myVar\", {$const: 2.5}] }}}")) ==
-        expr->serialize(SerializationOptions{})));
+                       "cond: { $gt: [\"$$myVar\", {$const: 2.5}] }}}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, InTranslationTest) {
@@ -2245,7 +2206,7 @@ TEST(CstPipelineTranslationTest, InTranslationTest) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$in: [ {$const: 1}, [ {$const: 1}, {$const: 2} ] ]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, IndexOfArrayTranslationTest) {
@@ -2259,7 +2220,7 @@ TEST(CstPipelineTranslationTest, IndexOfArrayTranslationTest) {
         cst, expCtx.get(), expCtx->variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$indexOfArray: [ [ {$const: 1}, {$const: 2} ], {$const: 1}]}")) ==
-        expr->serialize(SerializationOptions{})));
+        expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, FirstTranslationTest) {
@@ -2268,9 +2229,8 @@ TEST(CstPipelineTranslationTest, FirstTranslationTest) {
     auto expCtx = getExpCtx();
     auto expr = mongo::cst_pipeline_translation::translateExpression(
         cst, expCtx.get(), expCtx->variablesParseState);
-    ASSERT_TRUE(
-        ValueComparator().evaluate(Value(fromjson("{$first: [ {$const: 1}, {$const: 2} ]}")) ==
-                                   expr->serialize(SerializationOptions{})));
+    ASSERT_TRUE(ValueComparator().evaluate(
+        Value(fromjson("{$first: [ {$const: 1}, {$const: 2} ]}")) == expr->serialize()));
 }
 
 TEST(CstPipelineTranslationTest, IsArrayTranslationTest) {
@@ -2281,7 +2241,7 @@ TEST(CstPipelineTranslationTest, IsArrayTranslationTest) {
         auto expr = mongo::cst_pipeline_translation::translateExpression(
             cst, expCtx.get(), expCtx->variablesParseState);
         ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$isArray: [{$const: 1}] }")) ==
-                                               expr->serialize(SerializationOptions{})));
+                                               expr->serialize()));
     }
     {
         const auto cst = CNode{CNode::ObjectChildren{
@@ -2291,7 +2251,7 @@ TEST(CstPipelineTranslationTest, IsArrayTranslationTest) {
         auto expr = mongo::cst_pipeline_translation::translateExpression(
             cst, expCtx.get(), expCtx->variablesParseState);
         ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$isArray: [[{$const: 1}]] }")) ==
-                                               expr->serialize(SerializationOptions{})));
+                                               expr->serialize()));
     }
     {
         const auto cst = CNode{CNode::ObjectChildren{
@@ -2300,7 +2260,7 @@ TEST(CstPipelineTranslationTest, IsArrayTranslationTest) {
         auto expr = mongo::cst_pipeline_translation::translateExpression(
             cst, expCtx.get(), expCtx->variablesParseState);
         ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$isArray: [\"$myPath\"] }")) ==
-                                               expr->serialize(SerializationOptions{})));
+                                               expr->serialize()));
     }
 }
 }  // namespace

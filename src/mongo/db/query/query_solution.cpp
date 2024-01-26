@@ -1400,7 +1400,7 @@ void ReplaceRootNode::appendToString(str::stream* ss, int indent) const {
         addIndent(ss, indent + 1);
         *ss << "newRoot:\n";
 
-        *ss << newRoot->serialize(SerializationOptions{}).toString();
+        *ss << newRoot->serialize().toString();
     }
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
@@ -1833,12 +1833,11 @@ void GroupNode::appendToString(str::stream* ss, int indent) const {
             if (idx > 0) {
                 *ss << ", ";
             }
-            *ss << "{" << groupName << ": " << exprObj->serialize(SerializationOptions{}).toString()
-                << "}";
+            *ss << "{" << groupName << ": " << exprObj->serialize().toString() << "}";
             ++idx;
         }
     } else {
-        *ss << "{_id: " << groupByExpression->serialize(SerializationOptions{}).toString() << "}";
+        *ss << "{_id: " << groupByExpression->serialize().toString() << "}";
     }
     *ss << '\n';
     addIndent(ss, indent + 1);
@@ -1973,8 +1972,7 @@ void WindowNode::appendToString(str::stream* ss, int indent) const {
     *ss << "WINDOW\n";
     if (partitionBy) {
         addIndent(ss, indent + 1);
-        *ss << "partitionBy = " << (*partitionBy)->serialize(SerializationOptions{}).toString()
-            << '\n';
+        *ss << "partitionBy = " << (*partitionBy)->serialize().toString() << '\n';
     }
     if (sortBy) {
         addIndent(ss, indent + 1);
@@ -1993,7 +1991,7 @@ void WindowNode::appendToString(str::stream* ss, int indent) const {
         outputField.expr->bounds().serialize(boundsDoc, SerializationOptions{});
         auto boundsBson = boundsDoc.freeze().toBson();
         *ss << "{" << outputField.fieldName << ": {" << outputField.expr->getOpName() << ": "
-            << outputField.expr->input()->serialize(SerializationOptions{}).toString()
+            << outputField.expr->input()->serialize().toString()
             << "window: " << boundsBson.toString() << "}}";
     }
     *ss << "]" << '\n';

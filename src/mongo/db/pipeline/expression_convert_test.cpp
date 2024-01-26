@@ -91,7 +91,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
-                    convertExp->serialize(SerializationOptions{}));
+                    convertExp->serialize());
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
@@ -111,7 +111,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onError: {$const: 0}}}")),
-        convertExp->serialize(SerializationOptions{}));
+        convertExp->serialize());
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onError: {$const: 0}}}")),
@@ -131,7 +131,7 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onNull: {$const: 0}}}")),
-        convertExp->serialize(SerializationOptions{}));
+        convertExp->serialize());
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onNull: {$const: 0}}}")),

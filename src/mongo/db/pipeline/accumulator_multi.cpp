@@ -537,7 +537,7 @@ std::tuple<SortPattern, BSONArray, bool> parseAccumulatorTopBottomNSortBy(
             // since the evaluated argument wouldn't have the same metadata as the original
             // document. Instead we use [{$meta: "textScore"}] as the sortFields expression so the
             // sortFields array contains the data we need for sorting.
-            const auto serialized = part.expression->serialize(SerializationOptions{});
+            const auto serialized = part.expression->serialize();
             sortFieldsExpBab.append(serialized.getDocument().toBson());
             hasMeta = true;
         } else {

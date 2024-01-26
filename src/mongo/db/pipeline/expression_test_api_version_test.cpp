@@ -56,7 +56,7 @@ TEST_F(TestApiVersion, UnstableAcceptsBooleanValue) {
         expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(DOC("$_testApiVersion" << DOC("unstable" << true))),
-                    expression->serialize(SerializationOptions{}));
+                    expression->serialize());
 }
 
 TEST_F(TestApiVersion, UnstableDoesNotAcceptNumericValue) {
@@ -78,7 +78,7 @@ TEST_F(TestApiVersion, DeprecatedAcceptsBooleanValue) {
         expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(DOC("$_testApiVersion" << DOC("deprecated" << true))),
-                    expression->serialize(SerializationOptions{}));
+                    expression->serialize());
 }
 
 TEST_F(TestApiVersion, DeprecatedDoesNotAcceptNumericValue) {

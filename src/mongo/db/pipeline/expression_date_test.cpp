@@ -91,7 +91,7 @@ TEST_F(ExpressionDateFromPartsTest, SerializesToObjectSyntax) {
         dateExp->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 }
 
 TEST_F(ExpressionDateFromPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
@@ -213,7 +213,7 @@ TEST_F(ExpressionDateToPartsTest, SerializesToObjectSyntax) {
         dateExp->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 }
 
 TEST_F(ExpressionDateToPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
@@ -463,7 +463,7 @@ TEST_F(DateExpressionTest, SerializesToObjectSyntax) {
             dateExp->serialize(SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
             expectedSerialization);
-        ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+        ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 
         // Test that it serializes to the full format if given a date.
         spec = BSON(expName << Date_t{});
@@ -474,7 +474,7 @@ TEST_F(DateExpressionTest, SerializesToObjectSyntax) {
             dateExp->serialize(SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
             expectedSerialization);
-        ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+        ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 
         // Test that it serializes to the full format if given a date within an array.
         spec = BSON(expName << BSON_ARRAY(Date_t{}));
@@ -483,7 +483,7 @@ TEST_F(DateExpressionTest, SerializesToObjectSyntax) {
             dateExp->serialize(SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
             expectedSerialization);
-        ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+        ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
     }
 }
 
@@ -640,7 +640,7 @@ TEST_F(ExpressionDateToStringTest, SerializesToObjectSyntax) {
         dateExp->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 }
 
 TEST_F(ExpressionDateToStringTest, OptimizesToConstantIfAllInputsAreConstant) {
@@ -869,7 +869,7 @@ TEST_F(ExpressionDateFromStringTest, SerializesToObjectSyntax) {
         dateExp->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 
     // Test that it serializes to the full format if given an object specification.
     spec = BSON("$dateFromString" << BSON("dateString"
@@ -886,7 +886,7 @@ TEST_F(ExpressionDateFromStringTest, SerializesToObjectSyntax) {
         dateExp->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 
     spec = BSON("$dateFromString" << BSON("dateString"
                                           << "2017-07-04T13:06:44Z"
@@ -905,7 +905,7 @@ TEST_F(ExpressionDateFromStringTest, SerializesToObjectSyntax) {
         dateExp->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 
     spec = BSON("$dateFromString" << BSON("dateString"
                                           << "2017-07-04T13:06:44Z"
@@ -930,7 +930,7 @@ TEST_F(ExpressionDateFromStringTest, SerializesToObjectSyntax) {
         dateExp->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(dateExp->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(), expectedSerialization);
 }
 
 TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) {
@@ -1473,12 +1473,12 @@ void assertParsesAndSerializesExpression(boost::intrusive_ptr<ExpressionContextF
         expression->serialize(SerializationOptions{
             .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
         expectedSerialization);
-    ASSERT_VALUE_EQ(expression->serialize(SerializationOptions{}), expectedSerialization);
+    ASSERT_VALUE_EQ(expression->serialize(), expectedSerialization);
 
     // Verify that parsed and then serialized expression is the same.
     ASSERT_VALUE_EQ(Expression::parseExpression(
                         expCtx.get(), expectedSerializedExpressionSpec, expCtx->variablesParseState)
-                        ->serialize(SerializationOptions{}),
+                        ->serialize(),
                     expectedSerialization);
 }
 
@@ -1954,7 +1954,7 @@ TEST_F(ExpressionDateArithmeticsTest, SerializesToObject) {
             dateAddExp->serialize(SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
             expectedSerialization);
-        ASSERT_VALUE_EQ(dateAddExp->serialize(SerializationOptions{}), expectedSerialization);
+        ASSERT_VALUE_EQ(dateAddExp->serialize(), expectedSerialization);
 
         // with timezone
         doc = BSON(expName << BSON("startDate" << Date_t{} << "unit"
@@ -1972,7 +1972,7 @@ TEST_F(ExpressionDateArithmeticsTest, SerializesToObject) {
             dateAddExp->serialize(SerializationOptions{
                 .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}),
             expectedSerialization);
-        ASSERT_VALUE_EQ(dateAddExp->serialize(SerializationOptions{}), expectedSerialization);
+        ASSERT_VALUE_EQ(dateAddExp->serialize(), expectedSerialization);
     }
 }
 
