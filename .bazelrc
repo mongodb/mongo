@@ -23,8 +23,9 @@ build:windows --//bazel/config:linkstatic=True
 # remote execution configs
 build --remote_executor=grpcs://sodalite.cluster.engflow.com
 build --remote_cache=grpcs://sodalite.cluster.engflow.com
-build --bes_backend=grpcs://sodalite.cluster.engflow.com
-build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
+# TODO SERVER-85778 reenable BES
+# build --bes_backend=grpcs://sodalite.cluster.engflow.com
+# build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
 build --experimental_remote_cache_compression=true 
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
