@@ -89,13 +89,15 @@ struct AcquisitionPrerequisites {
                              repl::ReadConcernArgs readConcern,
                              PlacementConcernVariant placementConcern,
                              OperationType operationType,
-                             ViewMode viewMode)
+                             ViewMode viewMode,
+                             Date_t lockAcquisitionDeadline = Date_t::max())
         : nss(std::move(nss)),
           uuid(std::move(uuid)),
           readConcern(std::move(readConcern)),
           placementConcern(std::move(placementConcern)),
           operationType(operationType),
-          viewMode(viewMode) {}
+          viewMode(viewMode),
+          lockAcquisitionDeadline(lockAcquisitionDeadline) {}
 
     NamespaceString nss;
     boost::optional<UUID> uuid;
@@ -104,6 +106,7 @@ struct AcquisitionPrerequisites {
     PlacementConcernVariant placementConcern;
     OperationType operationType;
     ViewMode viewMode;
+    Date_t lockAcquisitionDeadline;
 };
 
 namespace shard_role_details {
