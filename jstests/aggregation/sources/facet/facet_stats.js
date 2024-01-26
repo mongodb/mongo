@@ -8,6 +8,8 @@
 //  assumes_read_concern_unchanged,
 //  assumes_against_mongod_not_mongos,
 //  does_not_support_repeated_reads,
+//  # oplog queries could affect the statistics
+//  assumes_standalone_mongod
 // ]
 
 const testDB = db.getSiblingDB("facet_stats");
