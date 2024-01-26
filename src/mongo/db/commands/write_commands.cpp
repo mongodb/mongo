@@ -327,6 +327,22 @@ boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailP
     return boost::none;
 }
 
+boost::optional<write_ops::WriteError> generateErrorNoTenantMigration(OperationContext* opCtx,
+                                                                      const Status& status,
+                                                                      int index,
+                                                                      size_t numErrors) {
+    constexpr size_t kMaxErrorReasonsToReport = 1;
+    constexpr size_t kMaxErrorSizeToReportAfterMaxReasonsReached = 1024 * 1024;
+
+    if (numErrors > kMaxErrorReasonsToReport) {
+        size_t errorSize = status.reason().size();
+        if (errorSize > kMaxErrorSizeToReportAfterMaxReasonsReached)
+            return write_ops::WriteError(index, status.withReason(""));
+    }
+
+    return write_ops::WriteError(index, status);
+}
+
 boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
                                                      const Status& status,
                                                      int index,
@@ -335,18 +351,16 @@ boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
         return boost::none;
     }
 
-    boost::optional<Status> overwrittenStatus;
-
     if (status == ErrorCodes::TenantMigrationConflict) {
         hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
 
-        overwrittenStatus.emplace(
-            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status));
+        Status overwrittenStatus =
+            tenant_migration_access_blocker::handleTenantMigrationConflict(opCtx, status);
 
         // Interruption errors encountered during batch execution fail the entire batch, so throw on
         // such errors here for consistency.
-        if (ErrorCodes::isInterruption(*overwrittenStatus)) {
-            uassertStatusOK(*overwrittenStatus);
+        if (ErrorCodes::isInterruption(overwrittenStatus)) {
+            uassertStatusOK(overwrittenStatus);
         }
 
         // Tenant migration errors, similarly to migration errors consume too much space in the
@@ -354,25 +368,13 @@ boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
         // 'handleTenantMigrationConflict' above replaces the original status, we need to manually
         // truncate the new reason if the original 'status' was also truncated.
         if (status.reason().empty()) {
-            overwrittenStatus = overwrittenStatus->withReason("");
+            overwrittenStatus = overwrittenStatus.withReason("");
         }
+
+        return generateErrorNoTenantMigration(opCtx, overwrittenStatus, index, numErrors);
     }
 
-    constexpr size_t kMaxErrorReasonsToReport = 1;
-    constexpr size_t kMaxErrorSizeToReportAfterMaxReasonsReached = 1024 * 1024;
-
-    if (numErrors > kMaxErrorReasonsToReport) {
-        size_t errorSize =
-            overwrittenStatus ? overwrittenStatus->reason().size() : status.reason().size();
-        if (errorSize > kMaxErrorSizeToReportAfterMaxReasonsReached)
-            overwrittenStatus =
-                overwrittenStatus ? overwrittenStatus->withReason("") : status.withReason("");
-    }
-
-    if (overwrittenStatus)
-        return write_ops::WriteError(index, std::move(*overwrittenStatus));
-    else
-        return write_ops::WriteError(index, status);
+    return generateErrorNoTenantMigration(opCtx, status, index, numErrors);
 }
 
 template <typename T>
@@ -1058,34 +1060,56 @@ public:
                 return true;
             };
 
-            if (!indices.empty()) {
-                std::for_each(indices.begin(), indices.end(), insert);
-            } else {
-                for (size_t i = 0; i < numDocs; i++) {
-                    if (!insert(i) && request().getOrdered()) {
-                        return {std::move(batches), std::move(stmtIds), i};
+            try {
+                if (!indices.empty()) {
+                    std::for_each(indices.begin(), indices.end(), insert);
+                } else {
+                    for (size_t i = 0; i < numDocs; i++) {
+                        if (!insert(i) && request().getOrdered()) {
+                            return {std::move(batches), std::move(stmtIds), i};
+                        }
                     }
                 }
+            } catch (const DBException& ex) {
+                // Exception insert into bucket catalog, append error and wait for all batches that
+                // we've already managed to write into to commit or abort. We need to wait here as
+                // pointers to memory owned by this command is stored in the WriteBatch(es). This
+                // ensures that no other thread may try to access this memory after this command has
+                // been torn down due to the exception.
+
+                boost::optional<repl::OpTime> opTime;
+                boost::optional<OID> electionId;
+                std::vector<size_t> docsToRetry;
+                errors->emplace_back(
+                    *generateErrorNoTenantMigration(opCtx, ex.toStatus(), 0, errors->size()));
+
+                _getTimeseriesBatchResultsNoTenantMigration(
+                    opCtx, batches, 0, -1, false, errors, &opTime, &electionId, &docsToRetry);
+                throw;
             }
+
 
             return {std::move(batches), std::move(stmtIds), request().getDocuments().size()};
         }
 
-        void _getTimeseriesBatchResults(OperationContext* opCtx,
-                                        const TimeseriesBatches& batches,
-                                        size_t start,
-                                        size_t indexOfLastProcessedBatch,
-                                        bool canContinue,
-                                        std::vector<write_ops::WriteError>* errors,
-                                        boost::optional<repl::OpTime>* opTime,
-                                        boost::optional<OID>* electionId,
-                                        std::vector<size_t>* docsToRetry = nullptr) const {
+        template <typename ErrorGenerator>
+        void _getTimeseriesBatchResultsBase(ErrorGenerator&& errorGenerator,
+                                            OperationContext* opCtx,
+                                            const TimeseriesBatches& batches,
+                                            int64_t start,
+                                            int64_t indexOfLastProcessedBatch,
+                                            bool canContinue,
+                                            std::vector<write_ops::WriteError>* errors,
+                                            boost::optional<repl::OpTime>* opTime,
+                                            boost::optional<OID>* electionId,
+                                            std::vector<size_t>* docsToRetry = nullptr) const {
             boost::optional<write_ops::WriteError> lastError;
             if (!errors->empty()) {
                 lastError = errors->back();
             }
+            invariant(indexOfLastProcessedBatch == (int64_t)batches.size() || lastError);
 
-            for (size_t itr = 0; itr < batches.size(); ++itr) {
+            for (int64_t itr = 0, size = batches.size(); itr < size; ++itr) {
                 const auto& [batch, index] = batches[itr];
                 if (!batch) {
                     continue;
@@ -1101,11 +1125,11 @@ public:
 
                 auto swCommitInfo = batch->getResult();
                 if (swCommitInfo.getStatus() == ErrorCodes::TimeseriesBucketCleared) {
-                    tassert(6023102, "the 'docsToRetry' cannot be null", docsToRetry);
+                    invariant(docsToRetry, "the 'docsToRetry' cannot be null");
                     docsToRetry->push_back(index);
                     continue;
                 }
-                if (auto error = generateError(
+                if (auto error = errorGenerator(
                         opCtx, swCommitInfo.getStatus(), start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
                     continue;
@@ -1128,6 +1152,57 @@ public:
                 }
                 docsToRetry->clear();
             }
+        }
+
+        void _getTimeseriesBatchResults(OperationContext* opCtx,
+                                        const TimeseriesBatches& batches,
+                                        int64_t start,
+                                        int64_t indexOfLastProcessedBatch,
+                                        bool canContinue,
+                                        std::vector<write_ops::WriteError>* errors,
+                                        boost::optional<repl::OpTime>* opTime,
+                                        boost::optional<OID>* electionId,
+                                        std::vector<size_t>* docsToRetry = nullptr) const {
+            auto errorGenerator =
+                [](OperationContext* opCtx, const Status& status, int index, size_t numErrors) {
+                    return generateError(opCtx, status, index, numErrors);
+                };
+            _getTimeseriesBatchResultsBase(errorGenerator,
+                                           opCtx,
+                                           batches,
+                                           start,
+                                           indexOfLastProcessedBatch,
+                                           canContinue,
+                                           errors,
+                                           opTime,
+                                           electionId,
+                                           docsToRetry);
+        }
+
+        void _getTimeseriesBatchResultsNoTenantMigration(
+            OperationContext* opCtx,
+            const TimeseriesBatches& batches,
+            int64_t start,
+            int64_t indexOfLastProcessedBatch,
+            bool canContinue,
+            std::vector<write_ops::WriteError>* errors,
+            boost::optional<repl::OpTime>* opTime,
+            boost::optional<OID>* electionId,
+            std::vector<size_t>* docsToRetry = nullptr) const {
+            auto errorGenerator =
+                [](OperationContext* opCtx, const Status& status, int index, size_t numErrors) {
+                    return generateErrorNoTenantMigration(opCtx, status, index, numErrors);
+                };
+            _getTimeseriesBatchResultsBase(errorGenerator,
+                                           opCtx,
+                                           batches,
+                                           start,
+                                           indexOfLastProcessedBatch,
+                                           canContinue,
+                                           errors,
+                                           opTime,
+                                           electionId,
+                                           docsToRetry);
         }
 
         bool _performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
@@ -1221,16 +1296,37 @@ public:
                     auto stmtIds = isTimeseriesWriteRetryable(opCtx)
                         ? std::move(bucketStmtIds[batch->bucket().id])
                         : std::vector<StmtId>{};
-                    canContinue = _commitTimeseriesBucket(opCtx,
-                                                          batch,
-                                                          start,
-                                                          index,
-                                                          std::move(stmtIds),
-                                                          errors,
-                                                          opTime,
-                                                          electionId,
-                                                          &docsToRetry,
-                                                          retryAttemptsForDup);
+                    try {
+                        canContinue = _commitTimeseriesBucket(opCtx,
+                                                              batch,
+                                                              start,
+                                                              index,
+                                                              std::move(stmtIds),
+                                                              errors,
+                                                              opTime,
+                                                              electionId,
+                                                              &docsToRetry,
+                                                              retryAttemptsForDup);
+                    } catch (const DBException& ex) {
+                        // Exception during commit, append error and wait for all our batches to
+                        // commit or
+                        // abort. We need to wait here as pointers to memory owned by this command
+                        // is stored in the WriteBatch(es). This ensures that no other thread may
+                        // try to access this memory after this command has been torn down due to
+                        // the exception.
+                        errors->emplace_back(*generateErrorNoTenantMigration(
+                            opCtx, ex.toStatus(), start + index, errors->size()));
+                        _getTimeseriesBatchResultsNoTenantMigration(opCtx,
+                                                                    batches,
+                                                                    0,
+                                                                    itr,
+                                                                    canContinue,
+                                                                    errors,
+                                                                    opTime,
+                                                                    electionId,
+                                                                    &docsToRetry);
+                        throw;
+                    }
                     batch.reset();
                     if (!canContinue) {
                         break;
