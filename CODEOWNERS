@@ -16,9 +16,11 @@
 /src/mongo/watchdog @10gen/server-service-architecture
 /src/mongo/logv2 @10gen/server-service-architecture
 
-# Service Architecture owns all of the transport directory except for the below mentioned files.
+# Service Architecture owns all of the above directories except for the below mentioned files.
 # Not specifying an owner sets the file to ownerless.
 /src/mongo/transport/ssl_connection_context.h
+/src/mongo/base/error_codes.yml
+
 
 # Javascript tests owned by Service Architecture
 /jstests/concurrency/fsm_workloads/server_status.js @10gen/server-service-architecture
