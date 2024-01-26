@@ -68,12 +68,12 @@ void walkExpression(MatchExpressionParameterizationVisitorContext* context,
     tree_walker::walk<false, MatchExpression>(expression, &walker);
 }
 
-struct CountInputParamsContext {
-    size_t count{0};
+struct CollectInputParamsContext {
+    std::vector<size_t> paramIds;
 };
-class CountInputParamsVisitor : public MatchExpressionConstVisitor {
+class CollectInputParamsVisitor : public MatchExpressionConstVisitor {
 public:
-    explicit CountInputParamsVisitor(CountInputParamsContext* context) : _context(context) {}
+    explicit CollectInputParamsVisitor(CollectInputParamsContext* context) : _context(context) {}
 
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
@@ -178,16 +178,16 @@ private:
 
     void countParam(boost::optional<MatchExpression::InputParamId> param) {
         if (param) {
-            _context->count++;
+            _context->paramIds.push_back(*param);
         }
     }
 
-    CountInputParamsContext* _context;
+    CollectInputParamsContext* _context;
 };
 
-class CountInputParamWalker {
+class CollectInputParamWalker {
 public:
-    explicit CountInputParamWalker(CountInputParamsVisitor* visitor) : _visitor{visitor} {
+    explicit CollectInputParamWalker(CollectInputParamsVisitor* visitor) : _visitor{visitor} {
         invariant(_visitor);
     }
 
@@ -200,18 +200,18 @@ public:
     void inVisit(long count, const MatchExpression* expr) {}
 
 private:
-    CountInputParamsVisitor* _visitor;
+    CollectInputParamsVisitor* _visitor;
 };
 
 /**
- * Return an number of parameters that are set within given expression tree.
+ * Return the list of parameter numbers that are set within given expression tree.
  */
-size_t countInputParams(const MatchExpression* expression) {
-    CountInputParamsContext context;
-    CountInputParamsVisitor visitor{&context};
-    CountInputParamWalker walker{&visitor};
+std::vector<size_t> collectInputParams(const MatchExpression* expression) {
+    CollectInputParamsContext context;
+    CollectInputParamsVisitor visitor{&context};
+    CollectInputParamWalker walker{&visitor};
     tree_walker::walk<true, MatchExpression>(expression, &walker);
-    return context.count;
+    return context.paramIds;
 }
 
 }  // namespace
@@ -429,7 +429,7 @@ TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithNullSetsNoPara
 TEST(MatchExpressionParameterizationVisitor, InMatchExpressionWithRegexSetsNoParamIds) {
     BSONObj query = BSON("a" << BSON("$in" << BSON_ARRAY(BSONRegEx("/^regex/i"))));
 
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
@@ -490,7 +490,7 @@ TEST(MatchExpressionParameterizationVisitor, ExprMatchExpressionSetsNoParamsIds)
     BSONObj query = BSON("$expr" << BSON("$gte" << BSON_ARRAY("$a"
                                                               << "$b")));
 
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
@@ -502,7 +502,7 @@ TEST(MatchExpressionParameterizationVisitor, ExprMatchExpressionSetsNoParamsIds)
 TEST(MatchExpressionParameterizationVisitor, OrMatchExpressionSetsOneParam) {
     BSONObj query = BSON("$or" << BSON_ARRAY(BSON("a" << 1) << BSON("a" << 1)));
 
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
@@ -515,7 +515,7 @@ TEST(MatchExpressionParameterizationVisitor, OrMatchExpressionSetsThreeParamWith
     BSONObj query =
         BSON("$or" << BSON_ARRAY(BSON("a" << 1) << BSON("b" << 2)) << "a" << 1 << "b" << 3);
 
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
     StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
     ASSERT_TRUE(result.isOK());
 
@@ -596,29 +596,29 @@ TEST(MatchExpressionParameterizationVisitor,
                                              << BSON("$and" << BSON_ARRAY(regexExpr << sizeExpr))));
 
     {
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
         StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
 
         auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression);
         ASSERT_EQ(6, inputParamIdToExpressionMap.size());
-        ASSERT_EQ(6, countInputParams(expression));
+        ASSERT_EQ(6, collectInputParams(expression).size());
     }
 
     {
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
         StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
 
         auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 6);
         ASSERT_EQ(6, inputParamIdToExpressionMap.size());
-        ASSERT_EQ(6, countInputParams(expression));
+        ASSERT_EQ(6, collectInputParams(expression).size());
     }
 
     {
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
         StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
@@ -626,14 +626,14 @@ TEST(MatchExpressionParameterizationVisitor,
         // This tests the optional limit on the maximum number of parameters allowed.
         auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 5);
         ASSERT_EQ(5, inputParamIdToExpressionMap.size());
-        ASSERT_EQ(5, countInputParams(expression));
+        ASSERT_EQ(5, collectInputParams(expression).size());
     }
 
     {
         // Test that the optional number of parameters limit is all-or-nothing for a binary op.
         BSONObj query2 = BSON("a" << BSON("$mod" << BSON_ARRAY(1 << 2)) << "b"
                                   << BSON("$mod" << BSON_ARRAY(3 << 4)));
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
         StatusWithMatchExpression result = MatchExpressionParser::parse(query2, expCtx);
         ASSERT_TRUE(result.isOK());
         MatchExpression* expression = result.getValue().get();
@@ -644,7 +644,103 @@ TEST(MatchExpressionParameterizationVisitor,
         // the last two do not.
         auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 3);
         ASSERT_EQ(2, inputParamIdToExpressionMap.size());
-        ASSERT_EQ(2, countInputParams(expression));
+        ASSERT_EQ(2, collectInputParams(expression).size());
     }
 }
+
+TEST(MatchExpressionParameterizationVisitor, AutoParametrizationWalkerSetsCorrectReusedParamsIds) {
+    BSONObj repeatedEqualityExpr = BSON("x" << 1);
+
+    BSONObj query = BSON("$or" << BSON_ARRAY(repeatedEqualityExpr << repeatedEqualityExpr));
+
+    {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+        ASSERT_TRUE(result.isOK());
+        MatchExpression* expression = result.getValue().get();
+
+        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression);
+        // Check that the two MatchExpression reuse the same parameter.
+        ASSERT_EQ(1, inputParamIdToExpressionMap.size());
+        auto parameters = collectInputParams(expression);
+        ASSERT_EQ(2, parameters.size());
+        ASSERT_EQ(parameters[0], parameters[1]);
+    }
+
+    {
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+        ASSERT_TRUE(result.isOK());
+        MatchExpression* expression = result.getValue().get();
+
+        auto inputParamIdToExpressionMap =
+            MatchExpression::parameterize(expression, boost::none, 15);
+        ASSERT_EQ(1, inputParamIdToExpressionMap.size());
+        auto parameters = collectInputParams(expression);
+        ASSERT_EQ(2, parameters.size());
+        ASSERT_EQ(parameters[0], parameters[1]);
+        // Check that the number of the parameter is indeed starting with parameter ID that was
+        // specified in the call to parameterize().
+        ASSERT_EQ(parameters[0], 15);
+    }
+
+    {
+        // Create a query where the reused expression is found a first time while the internal
+        // structure has not yet mutated to use a map, and another time when it is already using a
+        // map.
+        // Query will look like:
+        //
+        //  $and: [
+        //     {$or: [{x: 1}, {x: 1}]},
+        //     {y: 0},
+        //     {y: 1},
+        //     ....
+        //     {y: 25},
+        //     {$or: [{x: 1}, {x: 1}]},
+        //     {y: 26},
+        //     ....
+        //     {y: 49},
+        //     {$or: [{x: 1}, {x: 1}]}
+        //  ]
+        BSONArrayBuilder builder;
+        builder << query;
+        for (size_t i = 0; i < MatchExpressionParameterizationVisitorContext::kUseMapThreshold;
+             i++) {
+            builder << BSON("y" << static_cast<int>(i));
+            if (i == MatchExpressionParameterizationVisitorContext::kUseMapThreshold / 2) {
+                builder << query;
+            }
+        }
+        builder << query;
+        BSONObj longQuery = BSON("$and" << builder.arr());
+
+        auto expCtx = make_intrusive<ExpressionContextForTest>();
+        StatusWithMatchExpression result = MatchExpressionParser::parse(longQuery, expCtx);
+        ASSERT_TRUE(result.isOK());
+        MatchExpression* expression = result.getValue().get();
+
+        auto inputParamIdToExpressionMap =
+            MatchExpression::parameterize(expression, boost::none, 15);
+        // There should be kUseMapThreshold expressions plus 1.
+        ASSERT_EQ(MatchExpressionParameterizationVisitorContext::kUseMapThreshold + 1,
+                  inputParamIdToExpressionMap.size());
+        auto parameters = collectInputParams(expression);
+        // There should be kUseMapThreshold plus 3 x 2 references to input parameters.
+        ASSERT_EQ(MatchExpressionParameterizationVisitorContext::kUseMapThreshold + 6,
+                  parameters.size());
+        // The first two expressions and the last two should be the reused paramters.
+        ASSERT_EQ(parameters[0], parameters[1]);
+        ASSERT_EQ(parameters[0], parameters.back());
+        ASSERT_EQ(parameters[0], 15);
+        // Check that no parameter ID is lower than the one specified in the call to
+        // parameterize().
+        auto minIt = std::min_element(parameters.begin(), parameters.end());
+        ASSERT_EQ(*minIt, 15);
+        // Check that the span between lowest and highest parameter ID is equal to the number of
+        // unique parameters.
+        auto maxIt = std::max_element(parameters.begin(), parameters.end());
+        ASSERT_EQ(*maxIt, 15 + inputParamIdToExpressionMap.size() - 1);
+    }
+}
+
 }  // namespace mongo
