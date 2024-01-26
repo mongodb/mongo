@@ -21,9 +21,9 @@ build_variant_large_distro_exceptions:
   - enterprise-macos
   - enterprise-macos-arm64
   - enterprise-rhel-67-s390x
-  - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-71-ppc64le-inmem
+  - enterprise-rhel-79-64-bit
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-coverage
   - enterprise-rhel-81-ppc64le
@@ -39,11 +39,11 @@ build_variant_large_distro_exceptions:
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2204-arm64
-  - hot_backups-rhel-70-64-bit
+  - hot_backups-rhel-79-64-bit
   - macos
   - macos-arm64
   - macos-debug-suggested
-  - rhel70
+  - rhel7.9-small
   - rhel80
   - rhel80-debug-asan
   - rhel80-debug-asan-all-feature-flags

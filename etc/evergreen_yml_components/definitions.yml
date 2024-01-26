@@ -153,9 +153,9 @@ variables:
   - debian12
   - enterprise-debian11-64
   - enterprise-debian12-64
-  - rhel70
-  - rhel76_compile_rhel70
-  - enterprise-rhel-70-64-bit
+  - rhel79
+  - rhel76_compile_rhel79
+  - enterprise-rhel-79-64-bit
   - enterprise-rhel-81-ppc64le
   - ubi8
   - rhel80

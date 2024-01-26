@@ -100,14 +100,14 @@ evergreen_buildvariants:
     platform: rhel62
     architecture: x86_64
 
-  - name: rhel70
+  - name: rhel79
     edition: targeted
-    platform: rhel70
+    platform: rhel79
     architecture: x86_64
 
-  - name: enterprise-rhel-70-64-bit
+  - name: enterprise-rhel-79-64-bit
     edition: enterprise
-    platform: rhel70
+    platform: rhel79
     architecture: x86_64
 
   - name: rhel80

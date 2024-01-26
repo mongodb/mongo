@@ -146,7 +146,7 @@ variables:
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-arm64
-  - enterprise-rhel-70-64-bit
+  - enterprise-rhel-79-64-bit
   - enterprise-rhel-81-ppc64le
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-coverage
@@ -1387,9 +1387,9 @@ tasks:
       content_type: ${content_type|application/gzip}
       display_name: Source tarball
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/rhel80/windows.
-      # TODO(SERVER-80479): remove rhel70 when support for it has been dropped.
-      build_variants: [rhel70, rhel80, windows]
+      # because it should be the same everywhere, so just use rhel79/rhel80/windows.
+      # TODO(SERVER-80479): remove rhel79 when support for it has been dropped.
+      build_variants: [rhel79, rhel80, windows]
   - command: s3.put
     params:
       optional: true
@@ -1562,9 +1562,9 @@ tasks:
       bucket: mciuploads
       local_file: src/distsrc.${ext|tgz}
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/rhel80/windows.
-      # TODO(SERVER-80479): remove rhel70 when support for it has been dropped.
-      build_variants: [rhel70, rhel80, windows]
+      # because it should be the same everywhere, so just use rhel79/rhel80/windows.
+      # TODO(SERVER-80479): remove rhel79 when support for it has been dropped.
+      build_variants: [rhel79, rhel80, windows]
   - func: "generate compile expansions"
   - func: "apply compile expansions"
   - func: "fetch dist debugsymbols"
@@ -1628,9 +1628,9 @@ tasks:
       content_type: ${content_type|application/gzip}
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/rhel80/windows.
-      # TODO(SERVER-80479): remove rhel70 when support for it has been dropped.
-      build_variants: [rhel70, rhel80, windows]
+      # because it should be the same everywhere, so just use rhel79/rhel80/windows.
+      # TODO(SERVER-80479): remove rhel79 when support for it has been dropped.
+      build_variants: [rhel79, rhel80, windows]
 
   # Put the debug symbols
   # push directly to repo due to limitations in file size SERVER-63432
@@ -1679,9 +1679,9 @@ tasks:
       content_type: ${content_type|application/gzip}
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/rhel80/windows.
-      # TODO(SERVER-80479): remove rhel70 when support for it has been dropped.
-      build_variants: [rhel70, rhel80, windows]
+      # because it should be the same everywhere, so just use rhel79/rhel80/windows.
+      # TODO(SERVER-80479): remove rhel79 when support for it has been dropped.
+      build_variants: [rhel79, rhel80, windows]
 
   # Put the debug symbols signature
   - command: s3.put
@@ -1741,9 +1741,9 @@ tasks:
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/rhel80/windows.
-      # TODO(SERVER-80479): remove rhel70 when support for it has been dropped.
-      build_variants: [rhel70, rhel80, windows]
+      # because it should be the same everywhere, so just use rhel79/rhel80/windows.
+      # TODO(SERVER-80479): remove rhel79 when support for it has been dropped.
+      build_variants: [rhel79, rhel80, windows]
 
   # Put the debug symbols sha1
   - command: s3.put
@@ -1803,9 +1803,9 @@ tasks:
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/rhel80/windows.
-      # TODO(SERVER-80479): remove rhel70 when support for it has been dropped.
-      build_variants: [rhel70, rhel80, windows]
+      # because it should be the same everywhere, so just use rhel79/rhel80/windows.
+      # TODO(SERVER-80479): remove rhel79 when support for it has been dropped.
+      build_variants: [rhel79, rhel80, windows]
 
   # Put the debug symbols sha256
   - command: s3.put
@@ -1865,9 +1865,9 @@ tasks:
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/rhel80/windows.
-      # TODO(SERVER-80479): remove rhel70 when support for it has been dropped.
-      build_variants: [rhel70, rhel80, windows]
+      # because it should be the same everywhere, so just use rhel79/rhel80/windows.
+      # TODO(SERVER-80479): remove rhel79 when support for it has been dropped.
+      build_variants: [rhel79, rhel80, windows]
 
   # Put the debug symbols md5
   - command: s3.put
@@ -1972,7 +1972,7 @@ tasks:
       #Source tarball
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
          'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
-         'build_variants': ['rhel70', 'windows']}
+         'build_variants': ['rhel79', 'windows']}
 
       #MSI (Windows only)
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
@@ -1991,7 +1991,7 @@ tasks:
       #Source tarball signature
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
          'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
-         'build_variants': ['rhel70', 'windows']}
+         'build_variants': ['rhel79', 'windows']}
 
       #SHA1 for binaries
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
@@ -2005,7 +2005,7 @@ tasks:
       #SHA1 for source tarball
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
          'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
-         'build_variants': ['rhel70', 'windows']}
+         'build_variants': ['rhel79', 'windows']}
 
       #SHA1 for MSI
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
@@ -2024,7 +2024,7 @@ tasks:
       #SHA256 for source tarball
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
          'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
-         'build_variants': ['rhel70', 'windows']}
+         'build_variants': ['rhel79', 'windows']}
 
       #SHA256 for MSI files
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
@@ -2043,7 +2043,7 @@ tasks:
       #MD5 for source tarball
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
          'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
-         'build_variants': ['rhel70', 'windows']}
+         'build_variants': ['rhel79', 'windows']}
 
       #MD5 for MSIs
       - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
