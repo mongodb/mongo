@@ -77,6 +77,10 @@ public:
         return _explainBSON;
     }
 
+    BSONObj explainQueryPlannerDebug() const override final {
+        return {};
+    }
+
     std::string getPlanSummary() const override final {
         return "COLLSCAN";
     }

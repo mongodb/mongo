@@ -379,7 +379,8 @@ Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const
         //  $limit stage after the $unionWith which results in only reading from the base collection
         //  branch and not the sub-pipeline.
         Pipeline* pipeCopy = nullptr;
-        if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner) {
+        if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner ||
+            *opts.verbosity == ExplainOptions::Verbosity::kQueryPlannerDebug) {
             pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
         } else if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
                    _executionState > ExecutionProgress::kIteratingSource) {

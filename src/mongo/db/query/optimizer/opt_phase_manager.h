@@ -46,6 +46,7 @@
 #include "mongo/db/query/optimizer/cascades/physical_rewriter.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
@@ -133,7 +134,8 @@ public:
                     DebugInfo debugInfo,
                     QueryHints queryHints,
                     QueryParameterMap queryParameters,
-                    OptimizerCounterInfo& optCounterInfo);
+                    OptimizerCounterInfo& optCounterInfo,
+                    boost::optional<ExplainOptions::Verbosity> explain = {});
 
     // We only allow moving.
     OptPhaseManager(const OptPhaseManager& /*other*/) = delete;
@@ -180,6 +182,8 @@ public:
     const QueryParameterMap& getQueryParameters() const;
 
     QueryParameterMap& getQueryParameters();
+
+    QueryPlannerOptimizationStagesForDebugExplain& getQueryPlannerOptimizationStages();
 
     bool hasPhase(OptPhase phase) const;
 
@@ -270,8 +274,9 @@ private:
     MemoPhysicalNodeId _physicalNodeId;
 
     /**
-     * Best post-memo exploration phase plan (set if '_supportExplain' is set and if we have
-     * performed memo rewrites).
+     * Stores the best physical plan ABT (with corresponding properties) after performing memo
+     * logical substitution, memo logical exploration and physical rewrite phases.
+     * Populated for explain purposes.
      */
     boost::optional<PlanAndProps> _postMemoPlan;
 
@@ -286,16 +291,32 @@ private:
      */
     RIDProjectionsMap _ridProjections;
 
-    // We don't own this.
+    /**
+     * We don't own this.
+     */
     PrefixId& _prefixId;
 
-    // Map from parameter ID to constant for the query we are optimizing. This is used by the CE
-    // module to estimate selectivities of query parameters.
+    /**
+     * Map from parameter ID to constant for the query we are optimizing. This is used by the CE
+     * module to estimate selectivities of query parameters.
+     */
     QueryParameterMap _queryParameters;
 
-    // This tracks notable events during optimization. It is used for explain purposes. We don't own
-    // this.
+    /**
+     * This tracks notable events during optimization. It is used for explain purposes. We don't own
+     * this.
+     */
     OptimizerCounterInfo& _optCounterInfo;
+
+    /**
+     * Query explain verbosity
+     */
+    boost::optional<ExplainOptions::Verbosity> _explain;
+
+    /**
+     * Track query planner optimization stages for explain using queryPlannerDebug verbosity.
+     */
+    QueryPlannerOptimizationStagesForDebugExplain _queryPlannerOptimizationStages;
 };
 
 }  // namespace mongo::optimizer

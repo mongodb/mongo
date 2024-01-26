@@ -3,7 +3,10 @@
  */
 
 import {
+    explainHasOptimizerPhases,
     getAllPlanStages,
+    getExplainOptimizerPhases,
+    getOptimizer,
     getShardQueryPlans,
     getWinningPlanFromExplain,
     runOnAllTopLevelExplains
@@ -191,6 +194,30 @@ function analyzeTopLevelExplain(
     }
 
     runOnAllTopLevelExplains(explain, nodeAssertions);
+}
+
+// Asserts on the existence of the queryPlannerDebug verbosity in the explain output and its
+// corresponding subelements.
+function analyzeExistenceOfQueryPlannerDebugVerbosity(explain, isSharded) {
+    assert(usedBonsaiOptimizer(explain), tojson(explain));
+
+    if (!isSharded) {
+        let optimizerPhases = getExplainOptimizerPhases(explain);
+
+        let phases = [
+            "logicalTranslated",
+            "logicalStructuralRewrites",
+            "logicalMemoSubstitution",
+            "physical",
+            "physicalLowered"
+        ];
+
+        let arrayOfOptimizerPhases = optimizerPhases.map(x => x.name);
+        const diff = phases.filter(x => !arrayOfOptimizerPhases.includes(x));
+        assert(diff.length === 0,
+               "Missing optimizerPhases verbosity phases: " + diff +
+                   ".\nThe full explain is: " + tojson(explain));
+    }
 }
 
 function analyzeExplain(
@@ -490,6 +517,11 @@ function runTest(db, coll, isSharded) {
         false /* expectedMaxPSRCountReached */,
         {"pipeline": [{$match: {a: 5}}, {$project: {_id: true, a: true}}]},
     );
+
+    // Ensure that, if requested, the queryPlannerDebug verbosity is present correctly in the
+    // explain output.
+    explain = coll.find({$or: [{a: 1}, {a: 2}]}).explain("queryPlannerDebug");
+    analyzeExistenceOfQueryPlannerDebugVerbosity(explain, isSharded);
 }
 
 function setup(conn, db, isSharded) {

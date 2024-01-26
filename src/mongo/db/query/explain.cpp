@@ -90,7 +90,8 @@ void generatePlannerInfo(PlanExecutor* exec,
                          const MultipleCollectionAccessor& collections,
                          BSONObj extraInfo,
                          const SerializationContext& serializationContext,
-                         BSONObjBuilder* out) {
+                         BSONObjBuilder* out,
+                         ExplainOptions::Verbosity verbosity) {
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
 
     plannerBob.append("namespace",
@@ -213,6 +214,11 @@ void generatePlannerInfo(PlanExecutor* exec,
         bab.append(rejectedStats);
     }
     bab.doneFast();
+
+    if (verbosity == ExplainOptions::Verbosity::kQueryPlannerDebug) {
+        plannerBob.appendArray("optimizerPhases", explainer.getOptimizerDebugInfo());
+    }
+
     plannerBob.doneFast();
 }
 
@@ -410,7 +416,8 @@ void Explain::explainStages(PlanExecutor* exec,
     out->appendElements(explainVersionToBson(explainer.getVersion()));
 
     if (verbosity >= ExplainOptions::Verbosity::kQueryPlanner) {
-        generatePlannerInfo(exec, command, collections, extraInfo, serializationContext, out);
+        generatePlannerInfo(
+            exec, command, collections, extraInfo, serializationContext, out, verbosity);
     }
 
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {

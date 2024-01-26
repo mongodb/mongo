@@ -63,14 +63,16 @@ using namespace properties;
  */
 class MemoLatestPlanExtractor {
 public:
-    explicit MemoLatestPlanExtractor(const cascades::Memo& memo) : _memo(memo) {}
+    explicit MemoLatestPlanExtractor(const cascades::Memo& memo, bool collectProperties = false)
+        : _memo(memo), _collectProperties(collectProperties) {}
 
     /**
      * Logical delegator node.
      */
     void transport(ABT& n,
                    const MemoLogicalDelegatorNode& node,
-                   opt::unordered_set<GroupIdType>& visitedGroups) {
+                   opt::unordered_set<GroupIdType>& visitedGroups,
+                   bool collectProperties) {
         n = extractLatest(node.getGroupId(), visitedGroups);
     }
 
@@ -95,12 +97,27 @@ public:
         }
 
         ABT rootNode = _memo.getLogicalNodes(groupId).back();
-        algebra::transport<true>(rootNode, *this, visitedGroups);
+        algebra::transport<true>(rootNode, *this, visitedGroups, _collectProperties);
+
+        if (_collectProperties) {
+            NodeProps entry;
+            entry._logicalProps = _memo.getLogicalProps(groupId);
+            _properties.emplace(rootNode.cast<Node>(), std::move(entry));
+        }
+
         return rootNode;
+    }
+
+    const NodeToGroupPropsMap& getProperties() const {
+        return _properties;
     }
 
 private:
     const cascades::Memo& _memo;
+
+    const bool _collectProperties;
+
+    NodeToGroupPropsMap _properties;
 };
 
 ABT extractLatestPlan(const cascades::Memo& memo, const GroupIdType rootGroupId) {
@@ -108,6 +125,17 @@ ABT extractLatestPlan(const cascades::Memo& memo, const GroupIdType rootGroupId)
     opt::unordered_set<GroupIdType> visitedGroups;
     return extractor.extractLatest(rootGroupId, visitedGroups);
 }
+
+PlanAndProps extractLatestPlanAndProps(const cascades::Memo& memo, const GroupIdType rootGroupId) {
+    MemoLatestPlanExtractor extractor(memo, true /*collecProperties*/);
+    opt::unordered_set<GroupIdType> visitedGroups;
+
+    ABT plan = extractor.extractLatest(rootGroupId, visitedGroups);
+    NodeToGroupPropsMap properties = extractor.getProperties();
+    PlanAndProps result(std::move(plan), std::move(properties));
+    return result;
+}
+
 
 template <class T, class Accessor = DefaultChildAccessor<T>>
 static void mergeNodeAndProps(const bool aggregateCost,

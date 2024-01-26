@@ -515,10 +515,12 @@ static ExecParams createExecutor(
         MONGO_UNREACHABLE;
     }
 
-    abtPrinter = std::make_unique<ABTPrinter>(phaseManager.getMetadata(),
-                                              std::move(toExplain),
-                                              explainVersion,
-                                              std::move(phaseManager.getQueryParameters()));
+    abtPrinter =
+        std::make_unique<ABTPrinter>(phaseManager.getMetadata(),
+                                     std::move(toExplain),
+                                     explainVersion,
+                                     std::move(phaseManager.getQueryParameters()),
+                                     std::move(phaseManager.getQueryPlannerOptimizationStages()));
 
     // (Possibly) cache the SBE plan.
     if (planCacheKey && shouldCachePlan(*sbePlan)) {
@@ -1103,7 +1105,8 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                  DebugInfo::kDefaultForProd,
                                  std::move(queryHints),
                                  std::move(queryParameters),
-                                 optCounterInfo};
+                                 optCounterInfo,
+                                 expCtx->explain};
 
     auto resultPlans = phaseManager.optimizeNoAssert(std::move(abt), false /*includeRejected*/);
     if (resultPlans.empty()) {

@@ -97,6 +97,7 @@ public:
     void getSecondarySummaryStats(const NamespaceString& secondaryColl,
                                   PlanSummaryStats* statsOut) const override;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
+    BSONObj getOptimizerDebugInfo() const final;
     PlanStatsDetails getWinningPlanTrialStats() const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;

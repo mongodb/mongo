@@ -96,7 +96,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhasesAndRewrites phasesAndRew
                                  DebugInfo debugInfo,
                                  QueryHints queryHints,
                                  QueryParameterMap queryParameters,
-                                 OptimizerCounterInfo& optCounterInfo)
+                                 OptimizerCounterInfo& optCounterInfo,
+                                 boost::optional<ExplainOptions::Verbosity> explain)
     : _phasesAndRewrites(std::move(phasesAndRewrites)),
       _debugInfo(std::move(debugInfo)),
       _hints(std::move(queryHints)),
@@ -114,7 +115,8 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhasesAndRewrites phasesAndRew
       _ridProjections(),
       _prefixId(prefixId),
       _queryParameters(std::move(queryParameters)),
-      _optCounterInfo(optCounterInfo) {
+      _optCounterInfo(optCounterInfo),
+      _explain(explain) {
     uassert(6624093, "Cost derivation is null", _costEstimator);
     uassert(7088900, "Exploration CE is null", _explorationCE);
     uassert(7088901, "Substitution CE is null", _substitutionCE);
@@ -223,6 +225,12 @@ void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                           _optCounterInfo);
     rootGroupId = logicalRewriter->addRootNode(input);
 
+    // Extract logical plan and props after updating CE values for explain purposes.
+    if (_explain && phase == OptPhase::MemoExplorationPhase) {
+        _queryPlannerOptimizationStages._logicalMemoSub =
+            extractLatestPlanAndProps(_memo, rootGroupId);
+    }
+
     if (runStandalone) {
         const bool fixPointRewritten = logicalRewriter->rewriteToFixPoint();
         tassert(6808702, "Logical writer failed to rewrite fix point.", fixPointRewritten);
@@ -306,6 +314,13 @@ PlanExtractorResult OptPhaseManager::runMemoPhysicalRewrite(
     if (!result.empty()) {
         _memo.setStatsEstimatedCost(result.front().getRootAnnotation()._cost);
         _memo.setStatsCE(result.front().getRootAnnotation()._adjustedCE);
+
+        // Retain first post-memo plan for explain purposes.
+        _postMemoPlan = result.front();
+
+        if (_explain) {
+            _queryPlannerOptimizationStages._physical = result.front();
+        }
     }
     return result;
 }
@@ -332,7 +347,6 @@ PlanExtractorResult OptPhaseManager::runMemoRewritePhases(const bool includeReje
                           logicalRewriter,
                           input);
 
-
     return runMemoPhysicalRewrite(OptPhase::MemoImplementationPhase,
                                   env,
                                   rootGroupId,
@@ -358,16 +372,19 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
             node.getProjection(), false /*isFilterContext*/, _pathToInterval);
     };
 
+    if (_explain) {
+        _queryPlannerOptimizationStages._logicalTranslated = input;
+    }
+
     runStructuralPhases<OptPhase::ConstEvalPre, OptPhase::PathFuse, ConstEval, PathFusion>(
         ConstEval{env, canInlineEvalPre}, PathFusion{env}, env, input);
 
+    if (_explain) {
+        _queryPlannerOptimizationStages._logicalStructuralRewrites = input;
+    }
+
     auto planExtractionResult = runMemoRewritePhases(includeRejected, env, input);
     // At this point "input" has been siphoned out.
-
-    if (!planExtractionResult.empty()) {
-        // Retain first post-memo plan for explain purposes.
-        _postMemoPlan = planExtractionResult.front();
-    }
 
     for (auto& planEntry : planExtractionResult) {
         runStructuralPhase<OptPhase::PathLower, PathLowering>(
@@ -434,6 +451,11 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
     tassert(6624174,
             "Returning more than one plan without including rejected.",
             planExtractionResult.size() <= 1 || includeRejected);
+
+    if (_explain && !planExtractionResult.empty()) {
+        _queryPlannerOptimizationStages._physicalLowered = planExtractionResult.front();
+    }
+
     return planExtractionResult;
 }
 
@@ -494,6 +516,11 @@ const QueryParameterMap& OptPhaseManager::getQueryParameters() const {
 
 QueryParameterMap& OptPhaseManager::getQueryParameters() {
     return _queryParameters;
+}
+
+QueryPlannerOptimizationStagesForDebugExplain&
+OptPhaseManager::getQueryPlannerOptimizationStages() {
+    return _queryPlannerOptimizationStages;
 }
 
 }  // namespace mongo::optimizer

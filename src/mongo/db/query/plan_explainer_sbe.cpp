@@ -620,6 +620,13 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
 
+BSONObj PlanExplainerSBE::getOptimizerDebugInfo() const {
+    if (_optimizerData) {
+        return _optimizerData->explainQueryPlannerDebug();
+    }
+    return {};
+}
+
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
     if (_rejectedCandidates.empty()) {

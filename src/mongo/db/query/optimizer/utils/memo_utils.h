@@ -67,6 +67,14 @@ static void addProjectionsToProperties(properties::PhysProps& properties, const 
  */
 ABT extractLatestPlan(const cascades::Memo& memo, GroupIdType rootGroupId);
 
+/**
+ * This method will extract the latest plan from the memo, and also collect the logical
+ * properties corresponding to each node. It will create a PlanAndProps object with the
+ * extracted plan and the collected properties. The created ABT is a copy extracted from the
+ * memo. The properties will contain ONLY the logical properties.
+ */
+PlanAndProps extractLatestPlanAndProps(const cascades::Memo& memo, GroupIdType rootGroupId);
+
 using PlanExtractorResult = std::vector<PlanAndProps>;
 
 /**
