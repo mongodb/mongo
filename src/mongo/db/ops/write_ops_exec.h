@@ -154,11 +154,24 @@ long long performDelete(OperationContext* opCtx,
 
 /**
  * Generates a WriteError for a given Status.
+ *
+ * This function may throw.
  */
 boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,
                                                      const Status& status,
                                                      int index,
                                                      size_t numErrors);
+
+/**
+ * Generates a WriteError for a given Status. Does not handle tenant migration errors.
+ *
+ * Marked as 'noexcept' as we need to safely be able to call this function during exception
+ * handling.
+ */
+boost::optional<write_ops::WriteError> generateErrorNoTenantMigration(OperationContext* opCtx,
+                                                                      const Status& status,
+                                                                      int index,
+                                                                      size_t numErrors) noexcept;
 
 /**
  * Updates the retryable write stats if the write op contains retry.
