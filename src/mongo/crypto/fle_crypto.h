@@ -867,16 +867,20 @@ public:
  *
  * struct {
  *    uint8_t[32] esc;
+ *    uint8_t isLeaf; // Optional: 0 or 1 for range operations, absent for equality.
  * }
  */
 struct EncryptedStateCollectionTokensV2 {
 public:
-    EncryptedStateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken s) : esc(s) {}
+    EncryptedStateCollectionTokensV2(ESCDerivedFromDataTokenAndContentionFactorToken s,
+                                     boost::optional<bool> leaf)
+        : esc(s), isLeaf(std::move(leaf)) {}
     static StatusWith<EncryptedStateCollectionTokensV2> decryptAndParse(ECOCToken token,
                                                                         ConstDataRange cdr);
     StatusWith<std::vector<uint8_t>> serialize(ECOCToken token);
 
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
+    boost::optional<bool> isLeaf;
 };
 
 struct ECOCCompactionDocumentV2 {
@@ -1488,6 +1492,9 @@ class Edges {
 public:
     Edges(std::string leaf, int sparsity);
     std::vector<StringData> get();
+    const std::string& getLeaf() const {
+        return _leaf;
+    }
 
 private:
     std::string _leaf;

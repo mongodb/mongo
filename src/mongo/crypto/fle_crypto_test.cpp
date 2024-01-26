@@ -65,6 +65,7 @@
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -1667,6 +1668,7 @@ TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
 }
 
 TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
     TestKeyVault keyVault;
 
     auto doc = BSON("sample" << 123456);
@@ -1707,8 +1709,9 @@ TEST(FLE_EDC, ServerSide_Equality_Payloads_V2) {
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
 
     auto swEncryptedTokens =
-        EncryptedStateCollectionTokensV2(escDataCounterkey).serialize(ecocToken);
+        EncryptedStateCollectionTokensV2(escDataCounterkey, boost::none).serialize(ecocToken);
     uassertStatusOK(swEncryptedTokens);
+    ASSERT_EQ(swEncryptedTokens.getValue().size(), crypto::aesCTRIVSize + sizeof(PrfBlock));
     iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
     iupayload.setIndexKeyId(indexKeyId);
 
@@ -1948,6 +1951,7 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_IsValidZerosBlob) {
 
 
 TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
     TestKeyVault keyVault;
 
     auto doc = BSON("sample" << 3);
@@ -1989,9 +1993,10 @@ TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
     iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
 
-    auto swEncryptedTokens =
-        EncryptedStateCollectionTokensV2(escDataCounterkey).serialize(ecocToken);
+    auto swEncryptedTokens = EncryptedStateCollectionTokensV2(escDataCounterkey, false /* isLeaf */)
+                                 .serialize(ecocToken);
     uassertStatusOK(swEncryptedTokens);
+    ASSERT_EQ(swEncryptedTokens.getValue().size(), crypto::aesCTRIVSize + sizeof(PrfBlock) + 1);
     iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
     iupayload.setIndexKeyId(indexKeyId);
 
@@ -2135,6 +2140,7 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
 }
 
 TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
     std::vector<uint8_t> value(4);
 
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
@@ -2145,15 +2151,27 @@ TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
     auto escContentionToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
         generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, 1);
 
-    EncryptedStateCollectionTokensV2 encryptor{escContentionToken};
-    auto swEncryptedTokens = encryptor.serialize(ecocToken);
-    ASSERT_OK(swEncryptedTokens.getStatus());
+    std::vector<boost::optional<bool>> isLeafValues({boost::none, true, false});
+    for (auto optIsLeaf : isLeafValues) {
+        EncryptedStateCollectionTokensV2 encryptor{escContentionToken, optIsLeaf};
+        auto swEncryptedTokens = encryptor.serialize(ecocToken);
+        ASSERT_OK(swEncryptedTokens.getStatus());
+        ASSERT_EQ(swEncryptedTokens.getValue().size(),
+                  crypto::aesCTRIVSize + sizeof(PrfBlock) + (optIsLeaf ? 1 : 0));
 
-    auto rawEcocDoc = ECOCCollection::generateDocument("foo", swEncryptedTokens.getValue());
+        auto decoded = uassertStatusOK(EncryptedStateCollectionTokensV2::decryptAndParse(
+            ecocToken, swEncryptedTokens.getValue()));
+        ASSERT_EQ(encryptor.esc, decoded.esc);
+        ASSERT_EQ(encryptor.isLeaf, decoded.isLeaf);
 
-    auto ecocDoc = ECOCCollection::parseAndDecryptV2(rawEcocDoc, ecocToken);
-    ASSERT_EQ(ecocDoc.fieldName, "foo");
-    ASSERT_EQ(ecocDoc.esc, escContentionToken);
+        auto rawEcocDoc = ECOCCollection::generateDocument("foo", swEncryptedTokens.getValue());
+
+        auto ecocDoc = ECOCCollection::parseAndDecryptV2(rawEcocDoc, ecocToken);
+        ASSERT_EQ(ecocDoc.fieldName, "foo");
+        ASSERT_EQ(ecocDoc.esc, escContentionToken);
+        // TODO (SERVER-85747) Extend compaction to take new token and adjust algorithm
+        // ASSERT_EQ(ecocDoc.isLeaf, optIsLeaf);
+    }
 }
 
 template <typename T, typename Func>
@@ -3215,6 +3233,35 @@ TEST(EdgeCalcTest, SparsityConstraints) {
     ASSERT_THROWS_CODE(getEdgesInt64(1, 0, 8, -1), AssertionException, 6775101);
     ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, 5, 0), AssertionException, 6775101);
     ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, 5, -1), AssertionException, 6775101);
+}
+
+void doEdgeCalcTestIdentifyLeaf(std::unique_ptr<Edges> edges, StringData expectLeaf) {
+    ASSERT_EQ(edges->getLeaf(), expectLeaf);
+    auto edgeSet = edges->get();
+    ASSERT_EQ(std::count_if(edgeSet.cbegin(),
+                            edgeSet.cend(),
+                            [expectLeaf](const auto& leaf) { return leaf == expectLeaf; }),
+              1);
+}
+
+TEST(EdgeCalcTest, IdentifyLeaf) {
+    constexpr auto k42Leaf64 =
+        "1000000000000000000000000000000000000000000000000000000000101010"_sd;
+    doEdgeCalcTestIdentifyLeaf(getEdgesInt64(42, {}, {}, 1), k42Leaf64);
+    doEdgeCalcTestIdentifyLeaf(getEdgesInt64(42, {}, {}, 7), k42Leaf64);
+    constexpr auto k42Leaf32 = "10000000000000000000000000101010"_sd;
+    doEdgeCalcTestIdentifyLeaf(getEdgesInt32(42, {}, {}, 2), k42Leaf32);
+    doEdgeCalcTestIdentifyLeaf(getEdgesInt32(42, {}, {}, 11), k42Leaf32);
+    constexpr auto k42LeafDouble =
+        "1100000001000101000000000000000000000000000000000000000000000000"_sd;
+    doEdgeCalcTestIdentifyLeaf(getEdgesDouble(42, {}, {}, {}, 3), k42LeafDouble);
+    doEdgeCalcTestIdentifyLeaf(getEdgesDouble(42, {}, {}, {}, 13), k42LeafDouble);
+    constexpr auto k42LeafDecimal128 =
+        "10101110001110011011100011110011101110001010011010111110001110010011001110111000101010110010100111111111111111111110100000000000"_sd;
+    doEdgeCalcTestIdentifyLeaf(getEdgesDecimal128(Decimal128(42), {}, {}, {}, 5),
+                               k42LeafDecimal128);
+    doEdgeCalcTestIdentifyLeaf(getEdgesDecimal128(Decimal128(42), {}, {}, {}, 17),
+                               k42LeafDecimal128);
 }
 
 TEST(MinCoverCalcTest, MinCoverConstraints) {

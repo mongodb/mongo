@@ -96,6 +96,7 @@ extern "C" {
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -123,6 +124,8 @@ extern "C" {
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
 static_assert(kDebugBuild == 1, "Only use in debug builds");
 #endif
+
+using namespace fmt::literals;
 
 namespace mongo {
 
@@ -904,7 +907,7 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2(
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
 
     auto swEncryptedTokens =
-        EncryptedStateCollectionTokensV2(escDataCounterToken).serialize(ecocToken);
+        EncryptedStateCollectionTokensV2(escDataCounterToken, boost::none).serialize(ecocToken);
     uassertStatusOK(swEncryptedTokens);
     iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
 
@@ -1032,8 +1035,9 @@ std::vector<EdgeTokenSetV2> getEdgeTokenSet(
         ets.setEscDerivedToken(escDataCounterkey.toCDR());
         ets.setServerDerivedFromDataToken(serverDatakey.toCDR());
 
+        const bool isLeaf = edge == edges->getLeaf();
         auto swEncryptedTokens =
-            EncryptedStateCollectionTokensV2(escDataCounterkey).serialize(ecocToken);
+            EncryptedStateCollectionTokensV2(escDataCounterkey, isLeaf).serialize(ecocToken);
         uassertStatusOK(swEncryptedTokens);
         ets.setEncryptedTokens(swEncryptedTokens.getValue());
 
@@ -1085,8 +1089,8 @@ FLE2InsertUpdatePayloadV2 EDCClientPayload::serializeInsertUpdatePayloadV2ForRan
     iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
     iupayload.setServerDerivedFromDataToken(serverDerivedFromDataToken.toCDR());
 
-    auto swEncryptedTokens =
-        EncryptedStateCollectionTokensV2(escDataCounterkey).serialize(ecocToken);
+    auto swEncryptedTokens = EncryptedStateCollectionTokensV2(escDataCounterkey, false /* isLeaf */)
+                                 .serialize(ecocToken);
     uassertStatusOK(swEncryptedTokens);
     iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
 
@@ -2293,6 +2297,17 @@ StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokens::serialize(ECOCT
 StatusWith<EncryptedStateCollectionTokensV2> EncryptedStateCollectionTokensV2::decryptAndParse(
     ECOCToken token, ConstDataRange cdr) {
 
+    // Ciphertext encodes precisely one PrfBlock (ESC) plus an optional octet for isLeaf.
+    constexpr std::size_t kCipherLengthESCOnly = crypto::aesCTRIVSize + sizeof(PrfBlock);
+    constexpr std::size_t kCipherLengthESCAndLeafFlag = kCipherLengthESCOnly + 1;
+    const bool expectLeaf = cdr.length() == kCipherLengthESCAndLeafFlag;
+    if (!expectLeaf && (cdr.length() != kCipherLengthESCOnly)) {
+        return Status(
+            ErrorCodes::BadValue,
+            "Invalid ciphertext for ESCTokensV2, length should be {} or {}, got {}"_format(
+                kCipherLengthESCOnly, kCipherLengthESCAndLeafFlag, cdr.length()));
+    }
+
     auto swVec = FLEUtil::decryptData(token.toCDR(), cdr);
     if (!swVec.isOK()) {
         return swVec.getStatus();
@@ -2305,13 +2320,40 @@ StatusWith<EncryptedStateCollectionTokensV2> EncryptedStateCollectionTokensV2::d
     if (!swToken.isOK()) {
         return swToken.getStatus();
     }
-
     auto escToken = ESCDerivedFromDataTokenAndContentionFactorToken(swToken.getValue());
-    return EncryptedStateCollectionTokensV2(std::move(escToken));
+
+    boost::optional<bool> isLeaf;
+    if (expectLeaf) {
+        auto swLeaf = cdrc.readAndAdvanceNoThrow<uint8_t>();
+        if (!swLeaf.isOK()) {
+            // Should be impossible given expectLeaf length check above.
+            return swLeaf.getStatus().withContext("Unable to read ESCTokensV2::isLeaf");
+        }
+        auto leafVal = std::move(swLeaf.getValue());
+        if ((leafVal != 0) && (leafVal != 1)) {
+            return Status(ErrorCodes::BadValue,
+                          "Invalid value for ESCTokensV2 leaf tag {}"_format(leafVal));
+        }
+
+        isLeaf = !!leafVal;
+    }
+
+    return EncryptedStateCollectionTokensV2(std::move(escToken), isLeaf);
 }
 
 StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokensV2::serialize(ECOCToken token) {
-    return encryptData(token.toCDR(), esc.toCDR());
+    const bool encodeLeaf = isLeaf &&
+        gFeatureFlagQERangeV2.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+    if (encodeLeaf) {
+        auto escCDR = esc.toCDR();
+        DataBuilder builder(escCDR.length() + 1);
+        uassertStatusOK(builder.writeAndAdvance(escCDR));
+        uassertStatusOK(builder.writeAndAdvance(*isLeaf));
+        return encryptData(token.toCDR(), builder.getCursor());
+    } else {
+        return encryptData(token.toCDR(), esc.toCDR());
+    }
 }
 
 FLEKeyVault::~FLEKeyVault() {}
@@ -3078,6 +3120,7 @@ ECOCCompactionDocumentV2 ECOCCollection::parseAndDecryptV2(const BSONObj& doc, E
     ECOCCompactionDocumentV2 ret;
     ret.fieldName = ecocDoc.getFieldName().toString();
     ret.esc = keys.esc;
+    // TODO (SERVER-85747) Add isLeaf to ECOCCompactionDocumentV2: ret.isLeaf = keys.isLeaf
     return ret;
 }
 
