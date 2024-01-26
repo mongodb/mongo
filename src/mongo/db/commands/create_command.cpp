@@ -491,7 +491,7 @@ public:
                 unsafeCreateCollection(opCtx);
 
             preImagesEnabledOnAllCollectionsByDefault.execute([&](const auto&) {
-                if (!cmd.getViewOn() &&
+                if (!cmd.getViewOn() && !cmd.getTimeseries() &&
                     validateChangeStreamPreAndPostImagesOptionIsPermitted(cmd.getNamespace())
                         .isOK()) {
                     cmd.getCreateCollectionRequest().setChangeStreamPreAndPostImages(
