@@ -1721,28 +1721,6 @@ buildvariants:
     - name: initialsync-large-fcbis
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
-  name: perf-3-node-replSet-cpu-cycle-metrics.arm.aws.2023-11
-  display_name: PERF 3-Node ReplSet CPU Cycle Metrics ARM AWS 2023-11
-  cron: "0 0 * * 4"  # 00:00 on Thursday
-  modules: *perf_modules
-  expansions:
-    mongodb_setup_release: 2022-11
-    mongodb_setup: replica-ipc-counters.2023-06
-    infrastructure_provisioning_release: 2023-09
-    infrastructure_provisioning: replica
-    workload_setup: 2022-11
-    platform: linux
-    authentication: disabled
-    storageEngine: wiredTiger
-    compile_variant: amazon2-arm64-compile
-    project_dir: *perf_project_dir
-  run_on:
-    - "rhel70-perf-replset"
-  tasks:
-    - *schedule_patch_auto_tasks_task
-    - *schedule_variant_auto_tasks_task
-
-- <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-replSet-initialsync-logkeeper.arm.aws.2023-11
   display_name: PERF ReplSet Initial Sync LogKeeper ARM AWS 2023-11
   cron: "0 0 * * 4"  # 00:00 on Thursday

@@ -3213,28 +3213,6 @@ buildvariants:
   #     - name: initialsync-large
   #     - name: initialsync-large-fcbis
 
-  # - name: linux-3-node-replSet-cpu-cycle-metrics.2023-06
-  #   display_name: Linux 3-Node ReplSet CPU Cycle Metrics 2023-06
-  #   cron: "0 0 * * 4" # 00:00 on Thursday
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup_release: 2022-11
-  #     mongodb_setup: replica-ipc-counters.2023-06
-  #     infrastructure_provisioning_release: 2022-11
-  #     infrastructure_provisioning: replica
-  #     workload_setup: 2022-11
-  #     platform: linux
-  #     authentication: disabled
-  #     storageEngine: wiredTiger
-  #     compile_variant: "-arm64"
-  #     project_dir: *project_dir
-  #   depends_on: *_compile_amazon_linux2_arm64
-  #   run_on:
-  #     - "rhel70-perf-replset"
-  #   tasks:
-  #     - *schedule_patch_auto_tasks_task
-  #     - *schedule_variant_auto_tasks_task
-
   # - name: linux-replSet-initialsync-logkeeper.2022-11
   #   display_name: Linux ReplSet Initial Sync LogKeeper 2022-11
   #   cron: "0 0 * * 4" # 00:00 on Thursday
