@@ -125,16 +125,6 @@ VariableTypes buildVariableTypes(const PlanStageSlots& outputs) {
     return varTypes;
 }
 
-bool hasBlockOutput(const PlanStageSlots& outputs) {
-    for (const TypedSlot& slot : outputs.getAllSlotsInOrder()) {
-        if (TypeSignature::kBlockType.isSubset(slot.typeSignature) ||
-            TypeSignature::kCellType.isSubset(slot.typeSignature)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 TypeSignature constantFold(optimizer::VariableEnvironment& env,
                            optimizer::ABT& abt,
                            StageBuilderState& state,

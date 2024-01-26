@@ -216,6 +216,10 @@ public:
         // If this PlanStageSlots has a ResultInfo then 'resultInfoChanges' will hold the recorded
         // changes for the ResultInfo, otherwise it will be set to boost::none.
         boost::optional<ProjectionEffects> resultInfoChanges;
+
+        // When engaged, this stores a slot which is guaranteed to hold a block. If not engaged, we
+        // are not currently in a block portion of the stage tree.
+        boost::optional<std::pair<OwnedSlotName, TypedSlot>> blockSlot;
     };
 
     static std::unique_ptr<Data> cloneData(const std::unique_ptr<Data>& other) {
@@ -405,6 +409,10 @@ public:
         return has(kResult) && !_data->resultInfoChanges.has_value();
     }
 
+    bool hasBlockOutput() const {
+        return _data->blockSlot.has_value();
+    }
+
     // Returns the slot that holds the materialized result object. This method will tassert
     // if 'hasResultObj()' is false.
     TypedSlot getResultObj() const {
@@ -480,6 +488,21 @@ public:
     }
     void setResultInfoBaseObj(sbe::value::SlotId slot) {
         setResultInfoBaseObj(TypedSlot{slot, TypeSignature::kAnyScalarType});
+    }
+
+    void setBlockSlot(OwnedSlotName name, TypedSlot slot) {
+        tassert(8542200, "Cannot override an initialized blockSlot", !_data->blockSlot);
+        _data->blockSlot = std::make_pair(name, slot);
+    }
+
+    const boost::optional<std::pair<OwnedSlotName, TypedSlot>>& getBlockSlot() const {
+        return _data->blockSlot;
+    }
+
+    // Should be called after creating a block_to_row stage.
+    void clearBlockSlot() {
+        tassert(8542201, "Cannot clear an already cleared blockSlot", _data->blockSlot);
+        _data->blockSlot = boost::none;
     }
 
     // Returns the list of changed fields stored in 'resultInfoChanges'. This method will tassert

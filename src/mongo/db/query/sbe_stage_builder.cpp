@@ -3656,7 +3656,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     StringMap<TypedSlot> updatedPathsSlotMap;
     sbe::SlotExprPairVector projects;
 
-    if (hasBlockOutput(outputs)) {
+    if (outputs.hasBlockOutput()) {
         // Process the expressions that can work on top of the block values.
         auto projectExpressionToSlot = [&](const Expression* expr) -> boost::optional<TypedSlot> {
             auto result =

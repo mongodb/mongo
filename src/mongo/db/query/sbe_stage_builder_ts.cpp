@@ -172,7 +172,12 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildBlockToRow(
             outputsToRemove.push_back(slot.first);
         }
     }
-    tassert(7953900, "The list of block-value slots must not be empty", !blockSlots.empty());
+    // If there aren't any required block slots, use the default block slot as a fallback.
+    if (blockSlots.empty()) {
+        invariant(outputs.getBlockSlot());
+        auto [_, slot] = *outputs.getBlockSlot();
+        blockSlots.push_back(slot.slotId);
+    }
     auto unpackedSlots = _slotIdGenerator.generateMultiple(blockSlots.size());
     // Adds the BlockToRowStage.
     PlanNodeId nodeId = stage->getCommonStats()->nodeId;
@@ -198,6 +203,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildBlockToRow(
                                   .typeSignature.exclude(TypeSignature::kBlockType)
                                   .exclude(TypeSignature::kCellType)});
     }
+
+    outputs.clearBlockSlot();
 
     return stage;
 }
@@ -324,14 +331,19 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     for (size_t i = 0; i < topLevelReqs.size(); ++i) {
         auto field = getTopLevelField(topLevelReqs[i]);
         auto key = std::make_pair(PlanStageSlots::kField, field);
+        TypedSlot slot;
         if (field == unpackNode->bucketSpec.timeField()) {
-            outputs.set(key,
-                        TypedSlot{allCellSlots[i],
-                                  TypeSignature::kCellType.include(TypeSignature::kDateTimeType)});
+            slot = TypedSlot{allCellSlots[i],
+                             TypeSignature::kCellType.include(TypeSignature::kDateTimeType)};
+            outputs.set(key, slot);
         } else {
-            outputs.set(key,
-                        TypedSlot{allCellSlots[i],
-                                  TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)});
+            slot = TypedSlot{allCellSlots[i],
+                             TypeSignature::kCellType.include(TypeSignature::kAnyScalarType)};
+            outputs.set(key, slot);
+        }
+        if (!outputs.hasBlockOutput()) {
+            // Initalize the fallback block slot id.
+            outputs.setBlockSlot(key, slot);
         }
     }
     // Declare the traversed fields which can be used for evaluating $match.
@@ -440,7 +452,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
     }
 
-    // If the parent wants us to produce a result objectt, create an object with all published
+    // If the parent wants us to produce a result object, create an object with all published
     // fields.
     if (reqs.hasResult()) {
         std::vector<std::string> fieldNames;
