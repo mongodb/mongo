@@ -1464,13 +1464,20 @@ function appendSetParameterArgs(argArray) {
             // New mongod-specific option in 4.9.x.
             if (programMajorMinorVersion >= 490) {
                 const parameters = jsTest.options().setParameters;
-                if ((parameters === undefined ||
-                     parameters['reshardingMinimumOperationDurationMillis'] === undefined) &&
-                    !argArrayContainsSetParameterValue(
-                        'reshardingMinimumOperationDurationMillis=')) {
-                    argArray.push(
-                        ...['--setParameter', "reshardingMinimumOperationDurationMillis=5000"]);
-                }
+                const reshardingDefaults = {
+                    'reshardingMinimumOperationDurationMillis': '5000',
+                    'reshardingCriticalSectionTimeoutMillis': 24 * 60 * 60 * 1000  // 24 hours
+                };
+
+                Object.entries(reshardingDefaults).forEach(([key, value]) => {
+                    const keyIsNotParameter =
+                        (parameters === undefined || parameters[key] === undefined);
+                    const keyIsNotArgument = !argArrayContainsSetParameterValue(`${key}=`);
+
+                    if (keyIsNotParameter && keyIsNotArgument) {
+                        argArray.push('--setParameter', `${key}=${value}`);
+                    }
+                });
             }
 
             // New mongod-specific option in 4.5.x.

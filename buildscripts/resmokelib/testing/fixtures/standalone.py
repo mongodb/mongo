@@ -366,7 +366,7 @@ class MongodLauncher(object):
         if "configsvr" in mongod_options:
             suite_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
             suite_set_parameters.setdefault("reshardingCriticalSectionTimeoutMillis",
-                                            24 * 60 * 60)  # 24 hours
+                                            24 * 60 * 60 * 1000)  # 24 hours
 
         # Command line options override the YAML configuration.
         for opt_name in shortcut_opts:
