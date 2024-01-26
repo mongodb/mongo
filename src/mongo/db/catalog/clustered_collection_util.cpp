@@ -102,19 +102,6 @@ boost::optional<ClusteredCollectionInfo> parseClusteredInfo(const BSONElement& e
     return makeCanonicalClusteredInfo(std::move(indexSpec));
 }
 
-boost::optional<ClusteredCollectionInfo> createClusteredInfoForNewCollection(
-    const BSONObj& indexSpec) {
-    if (!indexSpec["clustered"]) {
-        return boost::none;
-    }
-
-    auto filteredIndexSpec = indexSpec.removeField("clustered"_sd);
-    auto clusteredIndexSpec = ClusteredIndexSpec::parse(
-        IDLParserContext{"ClusteredUtil::createClusteredInfoForNewCollection"}, filteredIndexSpec);
-    ensureClusteredIndexName(clusteredIndexSpec);
-    return makeCanonicalClusteredInfo(std::move(clusteredIndexSpec));
-};
-
 bool requiresLegacyFormat(const NamespaceString& nss) {
     return nss.isTimeseriesBucketsCollection() || nss.isChangeStreamPreImagesCollection();
 }
