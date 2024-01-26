@@ -192,7 +192,16 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
             {updated: 1, updateShardField: "manyShards"},
             session.getSessionId(),
             NumberLong(12));
+    } else {
+        // To get the same documents on Repl and Mongos for next test.
+        metricChecker.executeCommand({insert: collName, documents: [{timestamp: key4, x: 2}]});
     }
+
+    metricChecker.checkMetrics(
+        "Simple update with multi: true",
+        [{update: 0, filter: {timestamp: key4}, updateMods: {$set: {x: 3}}, multi: true}],
+        [{update: collName, updates: [{q: {timestamp: key4}, u: {$set: {x: 3}}, multi: true}]}],
+        {updated: 2, updateCount: 1, updateShardField: "oneShard"});
 
     coll.drop();
 }

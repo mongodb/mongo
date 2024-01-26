@@ -61,7 +61,7 @@ export class BulkWriteMetricChecker {
 
     // Metrics corresponding to
     // Top::get(opCtx->getClient()->getServiceContext()).record(...).
-    _checkTopMetrics(top0, top1, inserted, retriedInsert, updated, deleted) {
+    _checkTopMetrics(top0, top1, inserted, retriedInsert, updateCount, deleted) {
         if (this.fle) {
             // FLE do not set those in Top due to redaction.
             assert.eq(top0.update, undefined);
@@ -73,7 +73,7 @@ export class BulkWriteMetricChecker {
             assert.eq(top0.insert, undefined);
             assert.eq(top1.insert, undefined);
         } else {
-            checkEqual(top0.update.count, updated, top1.update.count, "update.count mismatch");
+            checkEqual(top0.update.count, updateCount, top1.update.count, "update.count mismatch");
             checkEqual(top0.remove.count, deleted, top1.remove.count, "remove.count mismatch");
             checkEqual(top0.insert.count,
                        inserted + retriedInsert,
@@ -101,7 +101,7 @@ export class BulkWriteMetricChecker {
                               status1,
                               inserted,
                               actualInserts,
-                              updated,
+                              updateCount,
                               fleSafeContentUpdates,
                               deleted,
                               retryCount) {
@@ -123,7 +123,8 @@ export class BulkWriteMetricChecker {
             // All calls are done with {writeConcern: {w: "majority"}} so "none" count should be
             // unchanged, except for timeseries.
             // TODO SERVER-84799 timeseries condition below and comment above.
-            const [uNone, uMaj] = (this.timeseries && retryCount > 1) ? [updated, 0] : [0, updated];
+            const [uNone, uMaj] =
+                (this.timeseries && retryCount > 1) ? [updateCount, 0] : [0, updateCount];
             checkEqual(
                 wC0.update.wmajority, uMaj, wC1.update.wmajority, "update.wmajority mismatch");
             checkEqual(
@@ -169,15 +170,22 @@ export class BulkWriteMetricChecker {
     }
 
     // Metrics corresponding to globalOpCounters.gotInsert() / gotDelete() / gotUpdate()
-    _checkOpCounters(
-        op0, op1, inserted, actualInserts, updated, fleSafeContentUpdates, deleted, retryCount) {
+    _checkOpCounters(op0,
+                     op1,
+                     inserted,
+                     actualInserts,
+                     updateCount,
+                     opcounterFactor,
+                     fleSafeContentUpdates,
+                     deleted,
+                     retryCount) {
         // For BulkWrite, each statement is always a single insert/update so `inserted` and
         // `updated` also are the number of statements. Also BulkWrite FLE does not support mixing
         // updates with inserts.
         let numberOfInsertStatements = inserted;
-        let numberOfUpdateStatements = updated;
+        let numberOfUpdateStatements = updateCount;
 
-        let opUpdated = updated;
+        let opUpdated = updateCount;
         let opDeleted = deleted;
         let opInserted = actualInserts;
 
@@ -204,7 +212,8 @@ export class BulkWriteMetricChecker {
             opUpdated = fleSafeContentUpdates;
         }
 
-        checkEqual(op0.update, opUpdated, op1.update, "opcounters.update mismatch");
+        checkEqual(
+            op0.update, opUpdated * opcounterFactor, op1.update, "opcounters.update mismatch");
         checkEqual(op0.delete, opDeleted, op1.delete, "opcounters.delete mismatch");
         checkEqual(op0.insert, opInserted, op1.insert, "opcounters.insert mismatch");
     }
@@ -214,6 +223,7 @@ export class BulkWriteMetricChecker {
                             status1,
                             top1,
                             updated,
+                            updateCount,
                             inserted,
                             deleted,
                             retriedInsert,
@@ -230,20 +240,20 @@ export class BulkWriteMetricChecker {
         // metrics.queryExecutor.scanned is stable but the FLE logic for it is very complicated
         // to maintain here.
 
-        this._checkTopMetrics(top0, top1, inserted, retriedInsert, updated, deleted);
+        this._checkTopMetrics(top0, top1, inserted, retriedInsert, updateCount, deleted);
 
         this._checkWriteConcernMetrics(status0,
                                        status1,
                                        inserted,
                                        actualInserts,
-                                       updated,
+                                       updateCount,
                                        fleSafeContentUpdates,
                                        deleted,
                                        retryCount);
 
         // Metrics corresponding to
-        // RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount and
-        // incrementRetriedStatementsCount.
+        // RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount
+        // and incrementRetriedStatementsCount.
         let t0 = status0.transactions;
         let t1 = status1.transactions;
         checkEqual(t0.retriedCommandsCount,
@@ -258,7 +268,7 @@ export class BulkWriteMetricChecker {
 
     _checkMongosOnlyMetrics(status0,
                             status1,
-                            updated,
+                            updateCount,
                             inserted,
                             deleted,
                             eqIndexedEncryptedFields,
@@ -273,7 +283,7 @@ export class BulkWriteMetricChecker {
         const targeted0 = status0.shardingStatistics.numHostsTargeted;
         const targeted1 = status1.shardingStatistics.numHostsTargeted;
 
-        let targetedUpdate = updated * retryCount;
+        let targetedUpdate = updateCount * retryCount;
         let targetedInsert = actualInserts;
         let unshardedInsert = 0;
 
@@ -281,7 +291,7 @@ export class BulkWriteMetricChecker {
             targetedUpdate = fleSafeContentUpdates;
             // BulkWrite FLE does not allow mixing insert and update so updated != 0 means
             // it is an FLE update.
-            if (updated != 0) {
+            if (updateCount != 0) {
                 targetedInsert = 0;
             } else {
                 targetedInsert = inserted;
@@ -289,7 +299,7 @@ export class BulkWriteMetricChecker {
             // The FLE inserts in the state collection are batched in a single command so they count
             // as 1 here, unlike for opcounters. eqIndexedEncryptedFields is per insert/update and
             // we don't allow mixing insert and update for FLE bulkWrite.
-            unshardedInsert = 2 * (inserted + updated) * (eqIndexedEncryptedFields > 0 ? 1 : 0);
+            unshardedInsert = 2 * (inserted + updateCount) * (eqIndexedEncryptedFields > 0 ? 1 : 0);
             unshardedInsert *= retryCount;
         }
 
@@ -332,6 +342,7 @@ export class BulkWriteMetricChecker {
     // eqIndexedEncryptedFields is per insert/update in the command.
     _checkMetricsImpl(status0, top0, {
         updated = 0,
+        updateCount = undefined,
         inserted = 0,
         deleted = 0,
         eqIndexedEncryptedFields = 0,
@@ -343,8 +354,14 @@ export class BulkWriteMetricChecker {
         insertShardField = "oneShard",
         updateShardField = this.timeseries ? "manyShards" : "allShards",
         deleteShardField = this.timeseries ? "oneShard" : "allShards",
-        retryCount = 0
+        retryCount = 0,
+        opcounterFactor = 1
     }) {
+        // updateCount is the number of update commands, it is different from updated when
+        // multi: true.
+        if (updateCount == undefined) {
+            updateCount = updated;
+        }
         const status1 = this.testDB.serverStatus();
 
         // An FLE update causes one findAndModify followed by an optional (absent if
@@ -365,7 +382,7 @@ export class BulkWriteMetricChecker {
         if (this.isMongos) {
             this._checkMongosOnlyMetrics(status0,
                                          status1,
-                                         updated,
+                                         updateCount,
                                          inserted,
                                          deleted,
                                          eqIndexedEncryptedFields,
@@ -389,6 +406,7 @@ export class BulkWriteMetricChecker {
                                          status1,
                                          top1,
                                          updated,
+                                         updateCount,
                                          inserted,
                                          deleted,
                                          retriedInsert,
@@ -403,7 +421,8 @@ export class BulkWriteMetricChecker {
                               status1.opcounters,
                               inserted,
                               actualInserts,
-                              updated,
+                              updateCount,
+                              opcounterFactor,
                               fleSafeContentUpdates,
                               deleted,
                               retryCount);
@@ -492,14 +511,13 @@ export class BulkWriteMetricChecker {
         let statusBefore = this.testDB.serverStatus();
         let topBefore =
             this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals[this.namespace];
-
         if (this.bulkWrite) {
             if (this.timeseries) {
                 this._addTimestamp(bulkWriteOps);
             }
 
             for (let i = 0; i < this.retryCount; ++i) {
-                assert.commandWorked(this.testDB.adminCommand({
+                let res = assert.commandWorked(this.testDB.adminCommand({
                     bulkWrite: 1,
                     ops: bulkWriteOps,
                     nsInfo: [{ns: this.namespace}],
@@ -507,6 +525,7 @@ export class BulkWriteMetricChecker {
                     txnNumber: txnNumber,
                     writeConcern: {w: "majority"}
                 }));
+                assert.eq(res.cursor.firstBatch[0].ok, 1);
             }
         } else {
             normalCommand.writeConcern = {w: "majority"};
