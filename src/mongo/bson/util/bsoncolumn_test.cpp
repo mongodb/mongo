@@ -578,6 +578,20 @@ public:
                 }
             }
         }
+        // Verify we can decompress the entire column using the block-based API using the
+        // BSONElementMaterializer.
+        {
+            bsoncolumn::BSONColumnBlockBased col(columnBinary);
+            boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+            std::vector<BSONElement> container;
+            col.decompressIterative<BSONElementMaterializer>(container, allocator);
+            ASSERT_EQ(container.size(), expected.size());
+            auto actual = container.begin();
+            for (auto&& elem : expected) {
+                elem.binaryEqualValues(*actual);
+                ++actual;
+            }
+        }
     }
 
     /**
@@ -6912,7 +6926,7 @@ TestMaterializer::Element TestMaterializer::materialize<BSONCode>(ElementStorage
 }
 
 TEST_F(BSONColumnTest, TestCollector) {
-    ElementStorage allocator;
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<TestMaterializer::Element> collection;
     Collector<TestMaterializer, std::vector<TestMaterializer::Element>> collector(collection,
                                                                                   allocator);

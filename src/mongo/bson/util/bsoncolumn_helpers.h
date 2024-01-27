@@ -411,5 +411,84 @@ private:
                                        StringData val);
 };
 
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<bool>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == Bool, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, val.boolean());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<int32_t>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == NumberInt, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, (int32_t)val._numberInt());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<int64_t>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == NumberLong, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, (int64_t)val._numberLong());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<double>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == NumberDouble, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, val._numberDouble());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<Decimal128>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == NumberDecimal, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, val._numberDecimal());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<Date_t>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == Date, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, val.date());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<Timestamp>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == bsonTimestamp, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, val.timestamp());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<StringData>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == String, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, val.valueStringData());
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<BSONBinData>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == BinData, "materialize invoked with incorrect BSONElement type");
+    int len = 0;
+    const char* data = val.binData(len);
+    return materialize(allocator, BSONBinData(data, len, val.binDataType()));
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<BSONCode>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == Code, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, BSONCode(val.valueStringData()));
+}
+
+template <>
+inline BSONElementMaterializer::Element BSONElementMaterializer::materialize<OID>(
+    ElementStorage& allocator, BSONElement val) {
+    dassert(val.type() == jstOID, "materialize invoked with incorrect BSONElement type");
+    return materialize(allocator, val.OID());
+}
+
 }  // namespace bsoncolumn
 }  // namespace mongo

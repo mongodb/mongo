@@ -61,7 +61,7 @@ void verifyDecompressionIterative(BSONObj& obj, Element expected) {
 
     mongo::bsoncolumn::BSONColumnBlockBased col{static_cast<const char*>(binData.data),
                                                 (size_t)binData.length};
-    ElementStorage allocator;
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<Element> container{{}};
     col.decompressIterative<SBEColumnMaterializer>(container, allocator);
     assertSbeValueEquals(container.back(), expected);
@@ -69,7 +69,7 @@ void verifyDecompressionIterative(BSONObj& obj, Element expected) {
 
 template <typename T>
 void assertMaterializedValue(const T& value, Element expected) {
-    ElementStorage allocator{};
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<Element> vec;
     mongo::bsoncolumn::Collector<SBEColumnMaterializer, decltype(vec)> collector{vec, allocator};
 
@@ -144,7 +144,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializer) {
 }
 
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
-    ElementStorage allocator{};
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<Element> vec;
     mongo::bsoncolumn::Collector<SBEColumnMaterializer, decltype(vec)> collector{vec, allocator};
 
@@ -161,7 +161,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
 }
 
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerMissing) {
-    ElementStorage allocator{};
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<Element> vec;
     mongo::bsoncolumn::Collector<SBEColumnMaterializer, decltype(vec)> collector{vec, allocator};
 
@@ -275,7 +275,7 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerPath) {
 
     mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
 
-    ElementStorage allocator;
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<std::pair<TestPath, std::vector<Element>>> paths{{TestPath{}, {}}};
 
     // Decompress only the values of "a" to the vector.

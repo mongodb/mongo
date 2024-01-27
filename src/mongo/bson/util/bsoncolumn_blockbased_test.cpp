@@ -55,7 +55,8 @@ void assertEquals(const T& lhs, const T& rhs);
  * Asserts that we can create a BSONElement from the given value.
  */
 template <typename T>
-void assertRoundtrip(ElementStorage& allocator, T value) {
+void assertRoundtrip(T value) {
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<BSONElement> vec;
     Collector<BSONElementMaterializer, decltype(vec)> collector{vec, allocator};
     collector.append(value);
@@ -75,27 +76,25 @@ void assertRoundtrip(ElementStorage& allocator, T value) {
 }
 
 TEST_F(BSONColumnBlockBasedTest, BSONMaterializer) {
-    ElementStorage allocator{};
-
     auto date = Date_t::fromMillisSinceEpoch(1701718344564);
     uint8_t binData[] = {100, 101, 102, 103, 104};
 
-    assertRoundtrip(allocator, true);
-    assertRoundtrip(allocator, false);
-    assertRoundtrip(allocator, (int32_t)100);
-    assertRoundtrip(allocator, (int64_t)1000);
-    assertRoundtrip(allocator, Decimal128{128.25});
-    assertRoundtrip(allocator, (double)32.125);
-    assertRoundtrip(allocator, Timestamp{date});
-    assertRoundtrip(allocator, date);
-    assertRoundtrip(allocator, OID::gen());
-    assertRoundtrip(allocator, StringData{"foo/bar"});
-    assertRoundtrip(allocator, BSONBinData{binData, sizeof(binData), BinDataGeneral});
-    assertRoundtrip(allocator, BSONCode{StringData{"x = 0"}});
+    assertRoundtrip(true);
+    assertRoundtrip(false);
+    assertRoundtrip((int32_t)100);
+    assertRoundtrip((int64_t)1000);
+    assertRoundtrip(Decimal128{128.25});
+    assertRoundtrip((double)32.125);
+    assertRoundtrip(Timestamp{date});
+    assertRoundtrip(date);
+    assertRoundtrip(OID::gen());
+    assertRoundtrip(StringData{"foo/bar"});
+    assertRoundtrip(BSONBinData{binData, sizeof(binData), BinDataGeneral});
+    assertRoundtrip(BSONCode{StringData{"x = 0"}});
 }
 
 TEST_F(BSONColumnBlockBasedTest, BSONMaterializerMissing) {
-    ElementStorage allocator{};
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<BSONElement> vec;
     Collector<BSONElementMaterializer, decltype(vec)> collector{vec, allocator};
     collector.appendMissing();
@@ -217,7 +216,7 @@ TEST_F(BSONColumnBlockBasedTest, DecompressPath) {
 
     BSONColumnBlockBased col{cb.finalize()};
 
-    ElementStorage allocator;
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
         {TestPath{{"a"}}, {}},
         {TestPath{{"b", "c"}}, {}},
