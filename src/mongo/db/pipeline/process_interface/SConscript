@@ -104,6 +104,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/shard_role_api',
         'mongod_process_interfaces',
+        'mongos_process_interface',
         'shardsvr_process_interface',
     ],
 )

@@ -250,6 +250,18 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
+- <<: *gen_task_template
+  name: aggregation_embedded_router_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_servicearch"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_servicearch"]
+  commands:
+  - func: "generate resmoke tasks"
+
 - <<: *task_template
   name: failpoints
   tags: ["assigned_to_jira_team_server_servicearch", "misc_js"]

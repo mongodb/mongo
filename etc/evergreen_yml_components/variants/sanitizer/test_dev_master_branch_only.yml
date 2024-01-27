@@ -544,6 +544,8 @@ buildvariants:
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
   # - name: disk_wiredtiger
+  - name: aggregation_embedded_router_jscore_passthrough_gen
+  - name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
   - name: embedded_router_jscore_passthrough_gen
   - name: embedded_router_jscore_passthrough_with_config_shard_gen
   - name: external_auth
