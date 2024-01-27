@@ -109,7 +109,7 @@
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
-#include "mongo/db/query/classic_runtime_planner_for_sbe.h"
+#include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"

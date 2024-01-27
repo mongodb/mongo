@@ -27,17 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/classic_runtime_planner_for_sbe.h"
+#include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
-#include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/stage_builder_util.h"
-#include "mongo/logv2/log.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::classic_runtime_planner_for_sbe {
 
@@ -87,46 +80,4 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                     std::move(remoteCursors),
                                     std::move(remoteExplains)));
 }
-
-SingleSolutionPassthroughPlanner::SingleSolutionPassthroughPlanner(
-    OperationContext* opCtx, PlannerData plannerData, std::unique_ptr<QuerySolution> solution)
-    : PlannerBase(opCtx, std::move(plannerData)), _solution(std::move(solution)) {}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SingleSolutionPassthroughPlanner::plan() {
-    LOGV2_DEBUG(8523405, 5, "Using SBE single solution planner");
-
-    if (!cq()->cqPipeline().empty()) {
-        _solution = QueryPlanner::extendWithAggPipeline(
-            *cq(),
-            std::move(_solution),
-            fillOutSecondaryCollectionsInformation(opCtx(), collections(), cq()));
-    }
-
-    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
-        opCtx(), collections(), *cq(), *_solution, sbeYieldPolicy());
-
-    // Create a pinned plan cache entry.
-    plan_cache_util::updatePlanCache(
-        opCtx(), collections(), *cq(), *_solution, *sbePlanAndData.first, sbePlanAndData.second);
-
-    return prepareSbePlanExecutor(std::move(_solution),
-                                  std::move(sbePlanAndData),
-                                  false /*isFromPlanCache*/,
-                                  cachedPlanHash());
-}
-
-CachedPlanner::CachedPlanner(OperationContext* opCtx,
-                             PlannerData plannerData,
-                             std::unique_ptr<sbe::CachedPlanHolder> cachedPlanHolder)
-    : PlannerBase(opCtx, std::move(plannerData)), _cachedPlanHolder(std::move(cachedPlanHolder)) {}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
-    LOGV2_DEBUG(8523404, 5, "Recovering SBE plan from the cache");
-    return prepareSbePlanExecutor(nullptr /*solution*/,
-                                  {std::move(_cachedPlanHolder->cachedPlan->root),
-                                   std::move(_cachedPlanHolder->cachedPlan->planStageData)},
-                                  true /*isFromPlanCache*/,
-                                  boost::none /*cachedPlanHash*/);
-}
-
 }  // namespace mongo::classic_runtime_planner_for_sbe
