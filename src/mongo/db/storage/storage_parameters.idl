@@ -240,7 +240,7 @@ feature_flags:
             updating, or removing data into new, existing, or re-opened buckets.
         cpp_varname: feature_flags::gTimeseriesAlwaysUseCompressedBuckets
         default: false
-        shouldBeFCVGated: false
+        shouldBeFCVGated: true
     featureFlagTSBucketingParametersUnchanged:
         description: "Enable storing the 'timeseriesBucketingParametersHaveChanged' parameter on disk"
         cpp_varname: feature_flags::gTSBucketingParametersUnchanged
