@@ -1,5 +1,10 @@
 /**
  * Tests that load-balanced connections are reported correctly in server status metrics.
+ * @tags: [
+ *   requires_fcv_80,
+ *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ * ]
  */
 
 const kProxyIngressPort = 22064;

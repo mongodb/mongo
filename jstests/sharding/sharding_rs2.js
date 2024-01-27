@@ -8,6 +8,9 @@
 // storage engines which do not support the command.
 // @tags: [
 //    requires_fsync,
+//    # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
+//    DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+//    requires_fcv_80
 // ]
 
 // The mongod secondaries are set to priority 0 to prevent the primaries from stepping down during

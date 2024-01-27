@@ -5,7 +5,10 @@
  *   # This test requires the fix from SERVER-73032.
  *   requires_fcv_63,
  *   # TODO SERVER-85380: Remove tag once indexed queries are M4-eligible for the plan cache
- *   cqf_incompatible
+ *   cqf_incompatible,
+ *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   requires_fcv_80
  * ]
  */
 import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";

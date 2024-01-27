@@ -1,4 +1,13 @@
-// Tests that mongos and the shard discover changes to the shard's replica set membership.
+/**
+ * Tests that mongos and the shard discover changes to the shard's replica set membership.
+ *
+ * @tags: [
+ *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   requires_fcv_80
+ * ]
+ */
+
 import {reconfig} from "jstests/replsets/rslib.js";
 
 var five_minutes = 5 * 60 * 1000;

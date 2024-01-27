@@ -8,6 +8,9 @@
  *  # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
  *   featureFlagSbeFull,
+ *   # TODO (SERVER-85629): Re-enable this test once redness is resolved in multiversion suites.
+ *   DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE,
+ *   requires_fcv_80
  * ]
  */
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
