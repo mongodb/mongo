@@ -1584,22 +1584,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line('break;')
 
         if field.type.variant_struct_types:
-            self._writer.write_line('case Object:')
-            self._writer.indent()
-
-            is_multiple_structs = len(field.type.variant_struct_types) > 1
-            if is_multiple_structs:
-                self._writer.write_line('{')
-                self._writer.indent()
-                self._writer.write_line(
-                    'auto firstElement = %s.Obj().firstElement();' % bson_element)
-            self._gen_variant_deserializer_helper(field, field_name=_get_field_member_name(field),
-                                                  bson_element='%s.Obj()' % bson_element)
-            self._writer.write_line('break;')
-            if is_multiple_structs:
-                self._writer.unindent()
-                self._writer.write_line('}')
-            self._writer.unindent()
+            with self._block('case Object: {', '} break;'):
+                self._gen_variant_deserializer_from_obj(field,
+                                                        field_name=_get_field_member_name(field),
+                                                        bson_element='%s.Obj()' % bson_element)
 
         self._writer.write_line('default:')
         self._writer.indent()
@@ -1617,36 +1605,35 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # Used by _gen_array_deserializer for arrays of variant.
         return _get_field_member_name(field)
 
-    def _gen_variant_deserializer_helper(self, field, field_name, bson_element):
-        beginning_str = ''
-        is_multiple_structs = len(field.type.variant_struct_types) > 1
-
-        for variant_type in field.type.variant_struct_types:
-            if is_multiple_structs:
-                struct_type = variant_type.first_element_field_name
-                self._writer.write_line('%sif (firstElement.fieldNameStringData() == "%s") {' %
-                                        (beginning_str, struct_type))
-                beginning_str = '} else '
-                self._writer.indent()
-            object_value = '%s::parse(ctxt, %s)' % (variant_type.cpp_type, bson_element)
+    def _gen_variant_deserializer_from_obj(self, field, field_name, bson_element):
+        def on_variant_alternative_match(variant_type):
+            value_expr = f'{variant_type.cpp_type}::parse(ctxt, {bson_element})'
             if field.optional:
                 cpp_type_info = cpp_types.get_cpp_type(field)
-                object_value = '%s(%s)' % (cpp_type_info.get_getter_setter_type(), object_value)
-
+                value_expr = f'{cpp_type_info.get_getter_setter_type()}({value_expr})'
             if field.chained_struct_field:
-                self._writer.write_line(
-                    '%s.%s(%s);' % (_get_field_member_name(field.chained_struct_field),
-                                    _get_field_member_setter_name(field), object_value))
+                chain_source = _get_field_member_name(field.chained_struct_field)
+                setter = _get_field_member_setter_name(field)
+                self._writer.write_line(f'{chain_source}.{setter}({value_expr});')
             else:
-                self._writer.write_line('%s = %s;' % (field_name, object_value))
-            if is_multiple_structs:
-                self._writer.unindent()
-        if is_multiple_structs:
-            self._writer.write_line('} else {')
-            self._writer.indent()
-            self._writer.write_line('ctxt.throwUnknownField(firstElement.fieldNameStringData());')
-            self._writer.unindent()
-            self._writer.write_line('}')
+                self._writer.write_line(f'{field_name} = {value_expr};')
+
+        struct_types_list = field.type.variant_struct_types
+        if len(struct_types_list) == 1:
+            on_variant_alternative_match(struct_types_list[0])
+        else:
+            key = f'{bson_element}.firstElement().fieldNameStringData()'
+            with self._block('[&](StringData s) {', f'}}({key});'):
+                with self._block('auto onMatch = [&](int found) {', '};'):
+                    with self._block('switch (found) {', '}'):
+                        for idx, variant_type in enumerate(struct_types_list):
+                            with self._block(f'case {idx}: {{', '} break;'):
+                                on_variant_alternative_match(variant_type)
+                with self._block('auto onFail = [&] {', '};'):
+                    self._writer.write_line('ctxt.throwUnknownField(s);')
+                writer.gen_string_table_find_function_block(
+                    self._writer, 's', 'onMatch({})', 'onFail()',
+                    [f.first_element_field_name for f in struct_types_list])
 
     def _gen_usage_check(self, field, bson_element, field_usage_check):
         # type: (ast.Field, str, _FieldUsageCheckerBase) -> None
@@ -1772,9 +1759,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 array_value = '%s::parse(tempContext, sequenceObject)' % (field.type.cpp_type, )
             elif field.type.is_variant:
                 self._writer.write_line('%s _tmp;' % field.type.cpp_type)
-                self._writer.write_line('auto firstElement = sequenceObject.firstElement();')
-                self._gen_variant_deserializer_helper(field, field_name='_tmp',
-                                                      bson_element='sequenceObject')
+                self._gen_variant_deserializer_from_obj(field, field_name='_tmp',
+                                                        bson_element='sequenceObject')
                 array_value = '_tmp'
             else:
                 for serialization_type in field.type.bson_serialization_type:
