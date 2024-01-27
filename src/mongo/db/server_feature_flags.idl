@@ -148,3 +148,8 @@ feature_flags:
         cpp_varname: gFeatureFlagLogSlowOpsBasedOnTimeWorking
         default: false
         shouldBeFCVGated: false
+    featureFlagQERangeV2:
+        description: "Queryable Encryption Range V2"
+        cpp_varname: gFeatureFlagQERangeV2
+        default: false
+        shouldBeFCVGated: true
