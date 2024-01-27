@@ -1846,6 +1846,7 @@ buildvariants:
   display_name: PERF Mongo-Perf Standalone Template (Don't Use)
   cron: &linux-mongo-perf-cron "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
   modules: *perf_modules
+  activate: false
   expansions: &standalone-arm-expansions
     mongodb_setup_release: 2022-11
     mongodb_setup: mongo-perf-standalone.2023-02
@@ -2344,3 +2345,88 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: genny_resharding_withIndexes
+
+- name: perf-3-node-replSet-query-settings.arm.aws.2023-11
+  display_name: PERF 3-Node ReplSet (QuerySettings) ARM AWS 2023-11
+  cron: *linux-3-node-cron
+  modules: *perf_modules
+  expansions:
+    mongodb_setup_release: 2022-11
+    mongodb_setup: replica-query-settings
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: replica
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: amazon2-arm64-compile
+  run_on:
+    - "rhel70-perf-replset"
+  tasks:
+    - *schedule_patch_auto_tasks_task
+    - name: schedule_variant_auto_tasks
+    - name: ycsb.2023-09
+      cron: *high-value-workload-cron
+    - name: ycsb_60GB.2023-09
+    - name: ycsb_60GB.long.2023-09
+      cron: *high-value-workload-cron
+    - name: tpcc_majority
+      cron: *high-value-workload-cron
+    - name: linkbench2
+      cron: *high-value-workload-cron
+    - name: mixed_workloads_genny_rate_limited_high_value
+      cron: *high-value-workload-cron
+    - name: majority_reads10_k_threads_high_value
+      cron: *high-value-workload-cron
+    - name: bestbuy_agg
+      cron: *high-value-workload-cron
+    - name: large_indexed_ins_high_value
+      cron: *high-value-workload-cron
+    - name: expressive_queries_high_value
+      cron: *high-value-workload-cron
+    - name: time_series_sort_high_value
+      cron: *high-value-workload-cron
+    - name: tsbs_query
+      cron: *high-value-workload-cron
+    - name: array_traversal_high_value
+      cron: *high-value-workload-cron
+    - name: filter_with_complex_logical_expression_high_value
+    - name: tsbs_query
+      cron: *high-value-workload-cron
+
+
+- <<: *shard-baseline
+  name: perf-3-shard-query-settings.arm.aws.2023-11
+  display_name: PERF 3-Shard Cluster (QuerySettings) ARM AWS 2023-11
+  cron: *linux-3-shard-cron
+  modules: *perf_modules
+  expansions:
+    <<: *shard-baseline-expansions
+    mongodb_setup: shard-query-settings
+  tasks:
+    - *schedule_patch_auto_tasks_task
+    - name: schedule_variant_auto_tasks
+    - name: ycsb.2023-09
+      cron: *high-value-workload-cron
+    - name: tpcc_majority
+      cron: *high-value-workload-cron
+    - name: mixed_workloads_genny_rate_limited_high_value
+      cron: *high-value-workload-cron
+    - name: bestbuy_agg
+      cron: *high-value-workload-cron
+    - name: large_indexed_ins_high_value
+      cron: *high-value-workload-cron
+    - name: expressive_queries_high_value
+      cron: *high-value-workload-cron
+    - name: time_series_sort_high_value
+      cron: *high-value-workload-cron
+    - name: tsbs_query
+      cron: *high-value-workload-cron
+    - name: array_traversal_high_value
+      cron: *high-value-workload-cron
+    - name: filter_with_complex_logical_expression_high_value
+    - name: tsbs_query
+      cron: *high-value-workload-cron
+    - name: mongos_workloads
+      cron: *high-value-workload-cron
