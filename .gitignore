@@ -273,6 +273,7 @@ bazel-mongo*
 bazel-out
 bazel-testlogs
 bazelisk
+buildifier
 .bazelrc.local
 .bazel_info_for_ninja.txt
 .ninja_last_command_line_targets.txt
