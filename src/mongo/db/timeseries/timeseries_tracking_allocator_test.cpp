@@ -177,8 +177,10 @@ TEST_F(TrackingAllocatorTest, STLContainerNested) {
         timeseries::tracked_map<Key, Value> map(
             timeseries::make_tracked_map<Key, Value>(trackingContext));
 
-        const timeseries::tracked_string str =
-            timeseries::make_tracked_string(trackingContext, "mystring", 9);
+        // Use a long string to avoid small-string optimization which would have no allocation.
+        const timeseries::tracked_string str = timeseries::make_tracked_string(
+            trackingContext,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         map[str].emplace_back(str);
         ASSERT_GT(trackingContext.allocated(),
                   sizeof(std::pair<const Key, Value>) + 2 * str.capacity());
