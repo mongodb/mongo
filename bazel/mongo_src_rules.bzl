@@ -6,7 +6,7 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
-load("//bazel:separate_debug.bzl", "extract_debuginfo" , "WITH_DEBUG_SUFFIX")
+load("//bazel:separate_debug.bzl", "extract_debuginfo", "WITH_DEBUG_SUFFIX", "CC_SHARED_LIBRARY_SUFFIX")
 # === Windows-specific compilation settings ===
 
 # /RTC1              Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized (implies /Od: no optimizations)
@@ -438,12 +438,12 @@ def mongo_cc_library(
     fincludes_copt = force_includes_copt(native.package_name(), name)
     fincludes_hdr = force_includes_hdr(native.package_name(), name)
 
-    all_deps = deps
     if name != "tcmalloc_minimal":
-        all_deps += TCMALLOC_DEPS
+        deps += TCMALLOC_DEPS
 
     linux_rpath_flags = ['-Wl,-z,origin', '-Wl,--enable-new-dtags', '-Wl,-rpath,\\$$ORIGIN/../lib', "-Wl,-h,lib" + name + ".so"]
     macos_rpath_flags = ['-Wl,-rpath,\\$$ORIGIN/../lib', "-Wl,-install_name,@rpath/lib" + name + ".so"]
+
     rpath_flags = select({
         "//bazel/config:linux_aarch64": linux_rpath_flags,
         "//bazel/config:linux_x86_64": linux_rpath_flags,
@@ -459,7 +459,7 @@ def mongo_cc_library(
         name = name + ".so",
         srcs = srcs,
         hdrs = hdrs + fincludes_hdr,
-        deps = all_deps,
+        deps = deps,
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
@@ -476,7 +476,7 @@ def mongo_cc_library(
         }),
     )
 
-    all_deps += select({
+    deps_with_shared_archive = deps + select({
         "//bazel/config:shared_archive_enabled": [":" + name + ".so"],
         "//conditions:default": [],
     })
@@ -485,14 +485,14 @@ def mongo_cc_library(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs,
         hdrs = hdrs + fincludes_hdr,
-        deps = all_deps,
+        deps = deps_with_shared_archive,
         visibility = visibility,
         testonly = testonly,
         copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
-        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags,
-        linkstatic = LINKSTATIC_ENABLED,
+        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
+        linkstatic = True,
         local_defines = MONGO_GLOBAL_DEFINES + local_defines,
         includes = [],
         features = select({
@@ -502,12 +502,32 @@ def mongo_cc_library(
         }),
     )
 
+    # Creates a shared library version of our target only if //bazel/config:linkstatic_disabled is true.
+    # This uses the CcSharedLibraryInfo provided from extract_debuginfo to allow it to declare all dependencies in
+    # dynamic_deps.
+    native.cc_shared_library(
+        name = name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
+        deps = [name + WITH_DEBUG_SUFFIX],
+        visibility = visibility,
+        tags = tags,
+        user_link_flags = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags,
+        target_compatible_with = select({
+            "//bazel/config:linkstatic_disabled": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+        dynamic_deps = deps,
+    )
+
     extract_debuginfo(
         name=name,
         binary_with_debug=":" + name + WITH_DEBUG_SUFFIX,
         type="library",
         enabled = SEPARATE_DEBUG_ENABLED,
-        deps = all_deps)
+        cc_shared_library = select({
+            "//bazel/config:linkstatic_disabled": ":" + name + CC_SHARED_LIBRARY_SUFFIX + WITH_DEBUG_SUFFIX,
+            "//conditions:default": None,
+        }),
+        deps = deps)
 
 
 def mongo_cc_binary(
@@ -550,6 +570,19 @@ def mongo_cc_binary(
 
     all_deps = deps + LIBUNWIND_DEPS + TCMALLOC_DEPS
 
+    linux_rpath_flags = ['-Wl,-z,origin', '-Wl,--enable-new-dtags', '-Wl,-rpath,\\$$ORIGIN/../lib']
+    macos_rpath_flags = ['-Wl,-rpath,\\$$ORIGIN/../lib']
+
+    rpath_flags = select({
+        "//bazel/config:linux_aarch64": linux_rpath_flags,
+        "//bazel/config:linux_x86_64": linux_rpath_flags,
+        "//bazel/config:linux_ppc64le":linux_rpath_flags,
+        "//bazel/config:linux_s390x": linux_rpath_flags,
+        "//bazel/config:windows_x86_64": [],
+        "//bazel/config:macos_x86_64": macos_rpath_flags,
+        "//bazel/config:macos_aarch64": macos_rpath_flags,
+    })
+
     native.cc_binary(
         name = name + WITH_DEBUG_SUFFIX,
         srcs = srcs + fincludes_hdr,
@@ -559,11 +592,15 @@ def mongo_cc_binary(
         copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
         data = data,
         tags = tags,
-        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
+        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts + rpath_flags,
         linkstatic = LINKSTATIC_ENABLED,
         local_defines = MONGO_GLOBAL_DEFINES + LIBUNWIND_DEFINES + local_defines,
         includes = [],
         features = ["pie"],
+        dynamic_deps = select({
+            "//bazel/config:linkstatic_disabled": deps,
+            "//conditions:default": [],
+        }),
     )
 
     extract_debuginfo(

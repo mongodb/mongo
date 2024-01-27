@@ -43,9 +43,9 @@ mongo_cc_binary(
     name="visibility_test1",
     deps=[
         ":visibility_test_lib1",
-        "//src/mongo/util:exit_code",
     ],
     srcs=[
         "visibility_test1.cpp",
+        "//src/mongo/util:exit_code"
     ],
 )

@@ -1,6 +1,7 @@
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
 
 WITH_DEBUG_SUFFIX = "_with_debug"
+CC_SHARED_LIBRARY_SUFFIX = "_shared"
 
 def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     """
@@ -19,13 +20,16 @@ def get_inputs_and_outputs(ctx, shared_ext, static_ext, debug_ext):
     static_lib = None
     if ctx.attr.type == "library":
         for file in ctx.attr.binary_with_debug.files.to_list():
-            if file.path.endswith(WITH_DEBUG_SUFFIX + shared_ext):
-                shared_lib = file
             if file.path.endswith(WITH_DEBUG_SUFFIX + static_ext):
                 static_lib = file
 
+        if ctx.attr.cc_shared_library != None:
+            for file in ctx.attr.cc_shared_library.files.to_list():
+                if file.path.endswith(WITH_DEBUG_SUFFIX + shared_ext):
+                    shared_lib = file
+
         if shared_lib:
-            basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext)]
+            basename = shared_lib.basename[:-len(WITH_DEBUG_SUFFIX + shared_ext + CC_SHARED_LIBRARY_SUFFIX)]
             if ctx.attr.enabled:
                 debug_info = ctx.actions.declare_file(basename + shared_ext + debug_ext)
             else:
@@ -65,12 +69,13 @@ def propgate_static_lib(ctx, static_lib, static_ext, inputs):
 
     return unstripped_static_lib
 
-def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib):
+def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shared_library=None):
     """
     We need to create new CcInfo with the new target names, this will take in the newly
     named library files and construct a new CcInfo basically stripping out the "_with_debug"
     name.
     """
+
     if ctx.attr.type == "library":
         feature_configuration = cc_common.configure_features(
             ctx = ctx,
@@ -78,7 +83,7 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib):
             requested_features = ctx.features,
             unsupported_features = ctx.disabled_features,
         )
-        
+
         linker_input = cc_common.create_linker_input(
             owner = ctx.label,
             libraries = depset(direct = [
@@ -105,6 +110,52 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib):
     return CcInfo(
         compilation_context=ctx.attr.binary_with_debug[CcInfo].compilation_context,
         linking_context=linking_context,
+    )
+
+def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, original_info, static_lib=None):
+    """
+    We need to create a CcSharedLibraryInfo to pass to the cc_binary and cc_library that depend on it
+    so they know to link the cc_shared_library instead of the associated cc_library.
+    name.
+    """
+    feature_configuration = cc_common.configure_features(
+        ctx = ctx,
+        cc_toolchain = cc_toolchain,
+        requested_features = ctx.features,
+        unsupported_features = ctx.disabled_features,
+    )
+
+    # Loop through all dependencies to include their resulting (shared/debug decorator stripped) shared library files
+    # as inputs.
+    # TODO(SERVER-85819): Investigate to see if it's possible to merge the depset without looping over all transitive
+    # dependencies.
+    dep_libraries = []
+    for dep in ctx.attr.deps:
+        for input in dep[CcInfo].linking_context.linker_inputs.to_list():
+            for library in input.libraries:
+                dep_libraries.append(library.dynamic_library)
+
+    linker_input = cc_common.create_linker_input(
+        owner = ctx.label,
+        libraries = depset(direct = [
+            cc_common.create_library_to_link(
+                actions = ctx.actions,
+                feature_configuration = feature_configuration,
+                cc_toolchain = cc_toolchain,
+                # Replace reference to dynamic library with final name
+                dynamic_library = output_shared_lib,
+                # Omit reference to static library
+            ),
+        ]),
+        user_link_flags = original_info.linker_input.user_link_flags,
+        additional_inputs = depset(original_info.linker_input.additional_inputs + dep_libraries),
+    )
+
+    return CcSharedLibraryInfo(
+        dynamic_deps = original_info.dynamic_deps,
+        exports = original_info.exports,
+        link_once_static_libs = original_info.link_once_static_libs,
+        linker_input = linker_input,
     )
 
 def noop_extraction(ctx):
@@ -154,19 +205,25 @@ def linux_extraction(ctx, cc_toolchain, inputs):
                 target_file = input_bin,
             )
             outputs += [output_bin]
-       
 
     unstripped_static_bin = None
     if static_lib:
         unstripped_static_bin = propgate_static_lib(ctx, static_lib, ".a", inputs)
         outputs.append(unstripped_static_bin)
-        
-    return [
+
+    provided_info = [
         DefaultInfo(
             files = depset(outputs),
         ),
-        create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin),
+        create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin, ctx.attr.cc_shared_library),
     ]
+
+    if ctx.attr.cc_shared_library != None:
+        provided_info.append(
+            create_new_cc_shared_library_info(ctx, cc_toolchain, output_bin, ctx.attr.cc_shared_library[CcSharedLibraryInfo], static_lib)
+        )
+
+    return provided_info
 
 def macos_extraction(ctx, cc_toolchain, inputs):
     
@@ -210,13 +267,20 @@ def macos_extraction(ctx, cc_toolchain, inputs):
     if static_lib:
         unstripped_static_bin = propgate_static_lib(ctx, static_lib, ".a", inputs)
         outputs.append(unstripped_static_bin)
-        
-    return [
+
+    provided_info = [
         DefaultInfo(
             files = depset(outputs),
         ),
-        create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin),
+        create_new_ccinfo_library(ctx, cc_toolchain, output_bin, unstripped_static_bin, ctx.attr.cc_shared_library),
     ]
+
+    if ctx.attr.cc_shared_library != None:
+        provided_info.append(
+            create_new_cc_shared_library_info(ctx, cc_toolchain, output_bin, ctx.attr.cc_shared_library[CcSharedLibraryInfo])
+        )
+
+    return provided_info
 
 def windows_extraction(ctx, cc_toolchain, inputs):
 
@@ -250,13 +314,20 @@ def windows_extraction(ctx, cc_toolchain, inputs):
             output = output,
             target_file = input,
         )
-        
-    return [
+
+    provided_info = [
         DefaultInfo(
             files = depset(outputs),
         ),
-        create_new_ccinfo_library(ctx, cc_toolchain, output_dynamic_library, output_library),
+        create_new_ccinfo_library(ctx, cc_toolchain, output_dynamic_library, output_library, ctx.attr.cc_shared_library),
     ]
+
+    if ctx.attr.cc_shared_library != None:
+        provided_info.append(
+            create_new_cc_shared_library_info(ctx, cc_toolchain, output_dynamic_library, ctx.attr.cc_shared_library[CcSharedLibraryInfo])
+        )
+
+    return provided_info
  
 def extract_debuginfo_impl(ctx):
     
@@ -267,7 +338,8 @@ def extract_debuginfo_impl(ctx):
 
     cc_toolchain = find_cpp_toolchain(ctx)
     inputs = depset(transitive=[
-        ctx.attr.binary_with_debug.files, 
+        ctx.attr.binary_with_debug.files,
+        ctx.attr.cc_shared_library.files if ctx.attr.cc_shared_library != None else depset([]),
         cc_toolchain.all_files])
 
     linux_constraint = ctx.attr._linux_constraint[platform_common.ConstraintValueInfo]
@@ -293,6 +365,10 @@ extract_debuginfo = rule(
         ),
         "enabled": attr.bool(default=False, doc="Flag to enable/disable separate debug generation."),
         "deps": attr.label_list(providers = [CcInfo]),
+        "cc_shared_library":  attr.label(
+            doc = "If extracting from a shared library, the target of the cc_shared_library. Otherwise empty.",
+            allow_files=True,
+        ),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
