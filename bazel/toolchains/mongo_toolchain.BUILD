@@ -24,45 +24,46 @@ COMMON_LINK_FLAGS = [
     # Make sure that our toolchain libraries are used for linking
     "-Lexternal/mongo_toolchain/v4/lib",
     "-Lexternal/mongo_toolchain/v4/lib64",
-    "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
-    "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
-    "-Bexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0",
+    "-Lexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
+    "-Bexternal/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
+    "-Bexternal/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0",
     "-Bexternal/mongo_toolchain/stow/llvm-v4/bin",
     # Use the host system's glibc dynamic libraries
-    "-B/lib/aarch64-linux-gnu",
+    "-B/lib/{arch}-linux-gnu",
+    "-B/usr/lib/{arch}-linux-gnu",
 ]
 
 COMMON_INCLUDE_DIRECTORIES = [
     "/usr/include",
     # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
     "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0)%",
-    "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux)%",
+    "%package(@mongo_toolchain//stow/gcc-v4/include/c++/11.3.0/{arch}-mongodb-linux)%",
 ]
 
 mongo_cc_toolchain_config(
     name = "cc_gcc_toolchain_config",
     toolchain_identifier = "gcc_v4_toolchain",
     compiler = "gcc",
-    cpu = "arm64",
+    cpu = "{platforms_arch}",
     verbose = True,
     includes = [
         # These isystems make sure that toolchain includes are used in place of any remote system
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0",
-        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux",
-        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include",
-        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include-fixed",
+        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/{arch}-mongodb-linux",
+        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include",
+        "external/mongo_toolchain/stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include-fixed",
         # Use the host system's glibc headers
-        "/usr/include/aarch64-linux-gnu",
+        "/usr/include/{arch}-linux-gnu",
     ],
     bin_dirs = [
         # Make sure that the toolchain binaries are available
         "external/mongo_toolchain/v4/bin",
-        "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
+        "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
     ],
     cxx_builtin_include_directories = COMMON_INCLUDE_DIRECTORIES + [
         # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
-        "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include)%",
-        "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/aarch64-mongodb-linux/11.3.0/include-fixed)%",
+        "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include)%",
+        "%package(@mongo_toolchain//stow/gcc-v4/lib/gcc/{arch}-mongodb-linux/11.3.0/include-fixed)%",
     ],
     extra_ldflags = COMMON_LINK_FLAGS,
     tool_paths = {
@@ -88,21 +89,21 @@ mongo_cc_toolchain_config(
     name = "cc_clang_toolchain_config",
     toolchain_identifier = "clang_v4_toolchain",
     compiler = "clang",
-    cpu = "arm64",
+    cpu = "{platforms_arch}",
     verbose = True,
     includes = [
         # These isystems make sure that toolchain includes are used in place of any remote system
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0",
-        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/aarch64-mongodb-linux",
+        "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/{arch}-mongodb-linux",
         "external/mongo_toolchain/stow/gcc-v4/include/c++/11.3.0/backward",
         "external/mongo_toolchain/stow/llvm-v4/lib/clang/12.0.1/include",
         # Use the host system's glibc headers
-        "/usr/include/aarch64-linux-gnu",
+        "/usr/include/{arch}-linux-gnu",
     ],
     bin_dirs = [
         # Make sure that the toolchain binaries are available
         "external/mongo_toolchain/v4/bin",
-        "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/aarch64-mongodb-linux/11.3.0",
+        "external/mongo_toolchain/stow/gcc-v4/libexec/gcc/{arch}-mongodb-linux/11.3.0",
     ],
     cxx_builtin_include_directories = COMMON_INCLUDE_DIRECTORIES + [
         # See undocumented %package() syntax: https://cs.opensource.google/bazel/bazel/+/6d448136d13ddab92da8bb29ea6e8387821369d9:src/main/java/com/google/devtools/build/lib/rules/cpp/CcToolchainProviderHelper.java;l=309-329
@@ -153,19 +154,18 @@ toolchain(
     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
     exec_compatible_with = [
         "@platforms//os:linux",
-        "@platforms//cpu:arm64",
+        "@platforms//cpu:{platforms_arch}",
         "@bazel_tools//tools/cpp:gcc",
     ],
     target_compatible_with = [
         "@platforms//os:linux",
-        "@platforms//cpu:arm64",
+        "@platforms//cpu:{platforms_arch}",
     ],
 )
 
 cc_toolchain_suite(
     name = "toolchain_suite",
     toolchains = {
-        "k8": ":cc_mongo_toolchain",
-        "aarch64": ":cc_mongo_toolchain",
+        "{bazel_toolchain_cpu}": ":cc_mongo_toolchain",
     },
 )

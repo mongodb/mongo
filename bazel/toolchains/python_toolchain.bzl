@@ -38,7 +38,6 @@ URLS_MAP = {
             "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-apple-darwin-install_only.tar.gz",
             "interpreter_path": "bin/python3",
         }
-
     }
 
 def _py_download(ctx):

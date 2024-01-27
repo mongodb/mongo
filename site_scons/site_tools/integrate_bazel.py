@@ -22,6 +22,8 @@ import mongo.generators as mongo_generators
 _SUPPORTED_PLATFORM_MATRIX = [
     "linux:arm64:gcc",
     "linux:arm64:clang",
+    "linux:amd64:gcc",
+    "linux:amd64:clang",
     "windows:amd64:msvc",
     "macos:amd64:clang",
     "macos:arm64:clang",
@@ -480,7 +482,8 @@ def generate(env: SCons.Environment.Environment) -> None:
             formatted_options = [f'--//bazel/config:{_SANITIZER_MAP[opt]}=True' for opt in options]
             bazel_internal_flags.extend(formatted_options)
 
-        if normalized_os != "linux" or normalized_arch not in ["arm64", 'amd64']:
+        # TODO SERVER-85806 enable RE for amd64
+        if normalized_os != "linux" or normalized_arch not in ["arm64"]:
             bazel_internal_flags.append('--config=local')
 
         # Disable remote execution for public release builds.
@@ -508,6 +511,11 @@ def generate(env: SCons.Environment.Environment) -> None:
             out_dir_platform = "darwin_arm64" if normalized_arch == "arm64" else "darwin"
         elif normalized_os == "windows":
             out_dir_platform = "x64_windows"
+        elif normalized_os == "linux" and normalized_arch == "amd64":
+            # For c++ toolchains, bazel has some wierd behaviour where it thinks the default
+            # cpu is "k8" which is another name for x86_64 cpus, so its not wrong, but abnormal
+            out_dir_platform = "k8"
+
         env["BAZEL_OUT_DIR"] = env.Dir(f"#/bazel-out/{out_dir_platform}-dbg/bin/")
 
         # === Builders ===
