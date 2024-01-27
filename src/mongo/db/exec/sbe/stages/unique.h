@@ -92,7 +92,7 @@ private:
     std::vector<value::SlotAccessor*> _inKeyAccessors;
 
     // Table of keys that have been seen.
-    stdx::unordered_set<value::MaterializedRow,
+    absl::flat_hash_set<value::MaterializedRow,
                         value::MaterializedRowHasher,
                         value::MaterializedRowEq>
         _seen;

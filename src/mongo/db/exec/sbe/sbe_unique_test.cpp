@@ -120,4 +120,32 @@ TEST_F(UniqueStageTest, ResetsStateAfterClose) {
     // The same result is seen again after closing and re-opening the plan tree.
     ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
 }
+
+TEST_F(UniqueStageTest, ResetsStateAfterReopen) {
+    auto [tag, val] = stage_builder::makeValue(BSON_ARRAY(
+        BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3)));
+    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
+    value::ValueGuard expectedGuard{expectedTag, expectedVal};
+
+    auto unique = makeS<UniqueStage>(std::move(scanStage), sbe::makeSV(scanSlot), kEmptyPlanNodeId);
+    auto ctx = makeCompileCtx();
+    auto resultAccessor = prepareTree(ctx.get(), unique.get(), scanSlot);
+
+    auto [resultsTag, resultsVal] = getAllResults(unique.get(), resultAccessor);
+    value::ValueGuard resultGuard{resultsTag, resultsVal};
+
+    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+
+    // Calling open with reOpen set to 'true' should have the effect of clearing the values that
+    // 'unique' has seen.
+    unique->open(/* reOpen */ true);
+    auto [resetResultsTag, resetResultsVal] = getAllResults(unique.get(), resultAccessor);
+    value::ValueGuard resetResultGuard{resetResultsTag, resetResultsVal};
+
+    // The same result is seen after re-opening the plan tree.
+    ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
+}
 }  // namespace mongo::sbe

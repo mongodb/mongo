@@ -66,8 +66,11 @@ value::SlotAccessor* UniqueStage::getAccessor(CompileCtx& ctx, value::SlotId slo
 
 void UniqueStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
-
     ++_commonStats.opens;
+
+    if (reOpen) {
+        _seen.clear();
+    }
     _children[0]->open(reOpen);
 }
 
