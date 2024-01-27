@@ -114,6 +114,7 @@ struct DeblockedHomogeneousVals {
 /**
  * Tokens representing unique values in a block and indexes that represent the location of these
  * values in the original block.
+ * 'idxs' maps index in the original block to index in tokens.
  */
 struct TokenizedBlock {
     std::unique_ptr<ValueBlock> tokens;

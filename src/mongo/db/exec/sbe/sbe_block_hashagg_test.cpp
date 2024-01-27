@@ -142,111 +142,101 @@ public:
         ASSERT(expectedMap.empty());
     }
 
+    template <typename... BlockData>
+    static std::pair<value::TypeTags, value::Value> makeInputArray(
+        std::vector<std::pair<value::TypeTags, value::Value>> id,
+        std::vector<bool> bitset,
+        BlockData... blockData) {
+        auto [arrTag, arrVal] = value::makeNewArray();
+        value::Array* arr = value::getArrayView(arrVal);
+
+        // Append groupby keys.
+        arr->push_back(makeHeterogeneousBlockTagVal(id));
+        // Append corresponding bitset.
+        auto bitsetBlock = makeBoolBlock(bitset);
+        arr->push_back({sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(bitsetBlock.release())});
+        // Append data.
+        (arr->push_back(makeHeterogeneousBlockTagVal(blockData)), ...);
+        return {arrTag, arrVal};
+    }
+
+    // Given the data input, the number of slots the stage requires, accumulators used, and expected
+    // output, runs the BlockHashAgg stage and asserts that we get correct results.
+    void runBlockHashAggTest(std::pair<value::TypeTags, value::Value> inputData,
+                             size_t numScanSlots,
+                             std::vector<std::pair<std::string, std::string>> accNames,
+                             TestResultType expected) {
+        auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
+            auto idSlot = scanSlots[0];
+            auto bitsetInSlot = scanSlots[1];
+            value::SlotVector outputSlots{idSlot};
+
+            auto accumulatorBitset = generateSlotId();
+            auto internalSlot = generateSlotId();
+            BlockHashAggStage::BlockAndRowAggs aggs;
+            size_t scanSlotIdx = 2;
+            for (const auto& [blockAcc, rowAcc] : accNames) {
+                auto outputSlot = generateSlotId();
+                std::unique_ptr<sbe::EExpression> blockAccFunc;
+                if (blockAcc == "valueBlockCount") {
+                    // valueBlockCount is the exception - it takes just the bitset.
+                    blockAccFunc =
+                        stage_builder::makeFunction(blockAcc, makeE<EVariable>(accumulatorBitset));
+                } else {
+                    blockAccFunc =
+                        stage_builder::makeFunction(blockAcc,
+                                                    makeE<EVariable>(accumulatorBitset),
+                                                    makeE<EVariable>(scanSlots[scanSlotIdx]));
+                    scanSlotIdx++;
+                }
+                aggs.emplace(
+                    outputSlot,
+                    BlockHashAggStage::BlockRowAccumulators{
+                        std::move(blockAccFunc),
+                        stage_builder::makeFunction(rowAcc, makeE<EVariable>(internalSlot))});
+                outputSlots.push_back(outputSlot);
+            }
+
+            auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
+                                                     idSlot,
+                                                     bitsetInSlot,
+                                                     internalSlot,
+                                                     accumulatorBitset,
+                                                     std::move(aggs),
+                                                     kEmptyPlanNodeId,
+                                                     true);
+            return std::make_pair(outputSlots, std::move(outStage));
+        };
+
+        auto result = runTestMulti(numScanSlots, inputData.first, inputData.second, makeFn);
+        value::ValueGuard resultGuard{result};
+        assertResultMatchesMap(result, expected);
+    }
+
 private:
     std::unique_ptr<Lock::GlobalLock> _globalLock;
 };
 
 TEST_F(BlockHashAggStageTest, NoData) {
-    auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
-        auto idSlot = scanSlots[0];
-        auto bitsetSlot = scanSlots[1];
-        auto blockSlot = scanSlots[2];
-
-        auto internalSlot = generateSlotId();
-        auto outputSlot = generateSlotId();
-
-        BlockHashAggStage::BlockAndRowAggs aggs;
-        aggs.emplace(outputSlot,
-                     BlockHashAggStage::BlockRowAccumulators{
-                         stage_builder::makeFunction("valueBlockMin",
-                                                     makeE<EVariable>(bitsetSlot),
-                                                     makeE<EVariable>(blockSlot)),
-                         stage_builder::makeFunction("min", makeE<EVariable>(internalSlot))});
-
-        auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
-                                                 idSlot,
-                                                 bitsetSlot,
-                                                 internalSlot,
-                                                 std::move(aggs),
-                                                 kEmptyPlanNodeId,
-                                                 true);
-        return std::make_pair(value::SlotVector{idSlot, outputSlot}, std::move(outStage));
-    };
-
     auto [inputTag, inputVal] = makeArray({});
-
     // We should have an empty block with no data.
     TestResultType expected = {};
-    auto result = runTestMulti(3, inputTag, inputVal, makeFn);
-    value::ValueGuard resultGuard{result};
-    assertResultMatchesMap(result, expected);
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected);
 }
 
 TEST_F(BlockHashAggStageTest, AllDataFiltered) {
-    auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
-        auto idSlot = scanSlots[0];
-        auto bitsetSlot = scanSlots[1];
-        auto blockSlot = scanSlots[2];
-
-        auto internalSlot = generateSlotId();
-        auto outputSlot = generateSlotId();
-
-        BlockHashAggStage::BlockAndRowAggs aggs;
-        aggs.emplace(outputSlot,
-                     BlockHashAggStage::BlockRowAccumulators{
-                         stage_builder::makeFunction("valueBlockMin",
-                                                     makeE<EVariable>(bitsetSlot),
-                                                     makeE<EVariable>(blockSlot)),
-                         stage_builder::makeFunction("min", makeE<EVariable>(internalSlot))});
-
-        auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
-                                                 idSlot,
-                                                 bitsetSlot,
-                                                 internalSlot,
-                                                 std::move(aggs),
-                                                 kEmptyPlanNodeId,
-                                                 true);
-        return std::make_pair(value::SlotVector{idSlot, outputSlot}, std::move(outStage));
-    };
-
     // All data has "false" for bitset.
     auto [inputTag, inputVal] =
         makeArray({makeInputArray(0, {false, false, false}, makeInt32s({50, 20, 30}))});
-
     // We should have an empty block with no data.
     TestResultType expected = {};
-    auto result = runTestMulti(3, inputTag, inputVal, makeFn);
-    value::ValueGuard resultGuard{result};
-    assertResultMatchesMap(result, expected);
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected);
 }
 
 TEST_F(BlockHashAggStageTest, SingleAccumulatorMin) {
-    auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
-        auto idSlot = scanSlots[0];
-        auto bitsetSlot = scanSlots[1];
-        auto blockSlot = scanSlots[2];
-
-        auto internalSlot = generateSlotId();
-        auto outputSlot = generateSlotId();
-
-        BlockHashAggStage::BlockAndRowAggs aggs;
-        aggs.emplace(outputSlot,
-                     BlockHashAggStage::BlockRowAccumulators{
-                         stage_builder::makeFunction("valueBlockMin",
-                                                     makeE<EVariable>(bitsetSlot),
-                                                     makeE<EVariable>(blockSlot)),
-                         stage_builder::makeFunction("min", makeE<EVariable>(internalSlot))});
-
-        auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
-                                                 idSlot,
-                                                 bitsetSlot,
-                                                 internalSlot,
-                                                 std::move(aggs),
-                                                 kEmptyPlanNodeId,
-                                                 true);
-        return std::make_pair(value::SlotVector{idSlot, outputSlot}, std::move(outStage));
-    };
-
     // Each entry is ID followed by bitset followed by a block of data. For example
     // [groupid, [block bitset values], [block data values]]
     auto [inputTag, inputVal] =
@@ -261,74 +251,22 @@ TEST_F(BlockHashAggStageTest, SingleAccumulatorMin) {
      * 2 -> min(30, 60, 30, 50) = 30
      */
     TestResultType expected = {{0, {20}}, {1, {10}}, {2, {30}}};
-    auto result = runTestMulti(3, inputTag, inputVal, makeFn);
-    value::ValueGuard resultGuard{result};
-    assertResultMatchesMap(result, expected);
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected);
 }
 
 TEST_F(BlockHashAggStageTest, Count1) {
-    auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
-        auto idSlot = scanSlots[0];
-        auto bitsetSlot = scanSlots[1];
-
-        auto outputSlot = generateSlotId();
-        auto internalSlot = generateSlotId();
-
-        BlockHashAggStage::BlockAndRowAggs aggs;
-        aggs.emplace(
-            outputSlot,
-            BlockHashAggStage::BlockRowAccumulators{
-                stage_builder::makeFunction("valueBlockCount", makeE<EVariable>(bitsetSlot)),
-                stage_builder::makeFunction("sum", makeE<EVariable>(internalSlot))});
-
-        auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
-                                                 idSlot,
-                                                 bitsetSlot,
-                                                 internalSlot,
-                                                 std::move(aggs),
-                                                 kEmptyPlanNodeId,
-                                                 true);
-        return std::make_pair(value::SlotVector{idSlot, outputSlot}, std::move(outStage));
-    };
-
     // Each entry is ID followed by a bitset.
     auto [inputTag, inputVal] = makeArray({makeInputArray(0, {true, true, true}),
                                            makeInputArray(0, {true, false, true}),
                                            makeInputArray(1, {true, false, true}),
                                            makeInputArray(1, {true, true, false})});
     TestResultType expected = {{0, {5}}, {1, {4}}};
-    auto result = runTestMulti(2, inputTag, inputVal, makeFn);
-    value::ValueGuard resultGuard{result};
-    assertResultMatchesMap(result, expected);
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockCount", "sum"}}, expected);
 }
 
 TEST_F(BlockHashAggStageTest, Sum1) {
-    auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
-        auto idSlot = scanSlots[0];
-        auto bitsetSlot = scanSlots[1];
-        auto blockSlot = scanSlots[2];
-
-        auto internalSlot = generateSlotId();
-        auto outputSlot = generateSlotId();
-
-        BlockHashAggStage::BlockAndRowAggs aggs;
-        aggs.emplace(outputSlot,
-                     BlockHashAggStage::BlockRowAccumulators{
-                         stage_builder::makeFunction("valueBlockSum",
-                                                     makeE<EVariable>(bitsetSlot),
-                                                     makeE<EVariable>(blockSlot)),
-                         stage_builder::makeFunction("sum", makeE<EVariable>(internalSlot))});
-
-        auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
-                                                 idSlot,
-                                                 bitsetSlot,
-                                                 internalSlot,
-                                                 std::move(aggs),
-                                                 kEmptyPlanNodeId,
-                                                 true);
-        return std::make_pair(value::SlotVector{idSlot, outputSlot}, std::move(outStage));
-    };
-
     // Each entry is ID followed by bitset followed by a block of data.
     auto [inputTag, inputVal] =
         makeArray({makeInputArray(0, {true, true, false}, makeInt32s({1, 2, 3})),
@@ -342,58 +280,11 @@ TEST_F(BlockHashAggStageTest, Sum1) {
      * 2 -> 5+6+13+15 = 39
      */
     TestResultType expected = {{0, {3}}, {1, {24}}, {2, {39}}};
-    auto result = runTestMulti(3, inputTag, inputVal, makeFn);
-    value::ValueGuard resultGuard{result};
-    assertResultMatchesMap(result, expected);
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulators) {
-    auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
-        // Calculate min(a), count, min(b)
-        auto idSlot = scanSlots[0];
-        auto bitsetSlot = scanSlots[1];
-        auto blockSlotA = scanSlots[2];
-        auto blockSlotB = scanSlots[3];
-
-        auto internalSlot = generateSlotId();
-        auto outputSlotA = generateSlotId();
-        auto outputSlotCount = generateSlotId();
-        auto outputSlotB = generateSlotId();
-
-        BlockHashAggStage::BlockAndRowAggs aggs;
-        // Aggregators for min(a).
-        aggs.emplace(outputSlotA,
-                     BlockHashAggStage::BlockRowAccumulators{
-                         stage_builder::makeFunction("valueBlockMin",
-                                                     makeE<EVariable>(bitsetSlot),
-                                                     makeE<EVariable>(blockSlotA)),
-                         stage_builder::makeFunction("min", makeE<EVariable>(internalSlot))});
-        // Aggregators for count.
-        aggs.emplace(
-            outputSlotCount,
-            BlockHashAggStage::BlockRowAccumulators{
-                stage_builder::makeFunction("valueBlockCount", makeE<EVariable>(bitsetSlot)),
-                stage_builder::makeFunction("sum", makeE<EVariable>(internalSlot))});
-        // Aggregators for min(b).
-        aggs.emplace(outputSlotB,
-                     BlockHashAggStage::BlockRowAccumulators{
-                         stage_builder::makeFunction("valueBlockMin",
-                                                     makeE<EVariable>(bitsetSlot),
-                                                     makeE<EVariable>(blockSlotB)),
-                         stage_builder::makeFunction("min", makeE<EVariable>(internalSlot))});
-
-
-        auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
-                                                 idSlot,
-                                                 bitsetSlot,
-                                                 internalSlot,
-                                                 std::move(aggs),
-                                                 kEmptyPlanNodeId,
-                                                 true);
-        return std::make_pair(value::SlotVector{idSlot, outputSlotA, outputSlotCount, outputSlotB},
-                              std::move(outStage));
-    };
-
     // Each entry is ID followed by bitset followed by block A and block B.
     auto [inputTag, inputVal] = makeArray(
         {makeInputArray(
@@ -412,8 +303,114 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulators) {
      * 100 -> min(200, 100, 90, 60) = 60, count = 4, min(2, 4, 20, 3) = 2
      */
     TestResultType expected = {{25, {20, 1, 0}}, {50, {75, 5, -150}}, {100, {60, 4, 2}}};
-    auto result = runTestMulti(4, inputTag, inputVal, makeFn);
-    value::ValueGuard resultGuard{result};
-    assertResultMatchesMap(result, expected);
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal),
+        4,
+        {{"valueBlockMin", "min"}, {"valueBlockCount", "sum"}, {"valueBlockMin", "min"}},
+        expected);
+}
+
+
+// --- Tests with block groupby key inputs ---
+
+TEST_F(BlockHashAggStageTest, SumBlockGroupByKey1) {
+    // Each entry is ID followed by bitset followed by a block of data.
+    auto [inputTag, inputVal] = makeArray(
+        {makeInputArray(makeInt32s({0, 0, 0}), {true, true, false}, makeInt32s({1, 2, 3})),
+         makeInputArray(makeInt32s({2, 2, 2}), {false, true, true}, makeInt32s({4, 5, 6})),
+         makeInputArray(makeInt32s({1, 1, 1}), {true, true, true}, makeInt32s({7, 8, 9})),
+         makeInputArray(makeInt32s({2, 2, 2}), {false, false, false}, makeInt32s({10, 11, 12})),
+         makeInputArray(makeInt32s({2, 2, 2}), {true, false, true}, makeInt32s({13, 14, 15}))});
+
+    /*
+     * 0 -> 1+2 = 3
+     * 1 -> 7+8+9 = 24
+     * 2 -> 5+6+13+15 = 39
+     */
+    TestResultType expected = {{0, {3}}, {1, {24}}, {2, {39}}};
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
+}
+
+// Similar to the test above, but we change the groupby keys so they are different within each
+// block.
+TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys2) {
+    // Each entry is ID followed by bitset followed by a block of data.
+    auto [inputTag, inputVal] = makeArray(
+        {makeInputArray(makeInt32s({1, 2, 3}), {true, true, false}, makeInt32s({1, 2, 3})),
+         makeInputArray(makeInt32s({2, 2, 2}), {false, true, true}, makeInt32s({4, 5, 6})),
+         makeInputArray(makeInt32s({3, 2, 1}), {true, true, true}, makeInt32s({7, 8, 9})),
+         makeInputArray(makeInt32s({2, 3, 4}), {false, true, true}, makeInt32s({10, 11, 12})),
+         makeInputArray(makeInt32s({2, 3, 4}), {false, false, false}, makeInt32s({0, 5, 4})),
+         makeInputArray(makeInt32s({1, 1, 2}), {true, true, true}, makeInt32s({13, 14, 15}))});
+
+    /*
+     * 1 -> 1+9+13+14  = 37
+     * 2 -> 2+5+6+8+15 = 36
+     * 3 -> 7+11       = 18
+     * 4 -> 12         = 12
+     */
+    TestResultType expected = {{1, {37}}, {2, {36}}, {3, {18}}, {4, {12}}};
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
+}
+
+// Similar test as above but the "2" key appears in every block but is always false, so we make sure
+// it's missing.
+TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
+    // Each entry is ID followed by bitset followed by a block of data.
+    auto [inputTag, inputVal] = makeArray(
+        {makeInputArray(makeInt32s({1, 2, 3}), {true, false, false}, makeInt32s({1, 2, 3})),
+         makeInputArray(makeInt32s({2, 2, 2}), {false, false, false}, makeInt32s({4, 5, 6})),
+         makeInputArray(makeInt32s({3, 2, 1}), {true, false, true}, makeInt32s({7, 8, 9})),
+         makeInputArray(makeInt32s({2, 3, 4}), {false, true, true}, makeInt32s({10, 11, 12})),
+         makeInputArray(makeInt32s({2, 3, 4}), {false, false, false}, makeInt32s({0, 5, 4})),
+         makeInputArray(makeInt32s({1, 1, 2}), {true, true, false}, makeInt32s({13, 14, 15}))});
+
+    /*
+     * 1 -> 1+9+13+14  = 37
+     * 2 -> missing
+     * 3 -> 7+11       = 18
+     * 4 -> 12         = 12
+     */
+    TestResultType expected = {{1, {37}}, {3, {18}}, {4, {12}}};
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
+}
+
+TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
+    // Each entry is ID followed by bitset followed by block A and block B.
+    auto [inputTag, inputVal] = makeArray({makeInputArray(makeInt32s({25, 50, 100}),
+                                                          {true, true, false},
+                                                          makeInt32s({200, 100, 150}),
+                                                          makeInt32s({2, 4, 7})),
+                                           makeInputArray(makeInt32s({50, 50, 50}),
+                                                          {false, true, true},
+                                                          makeInt32s({50, 90, 60}),
+                                                          makeInt32s({-100, 20, 3})),
+                                           makeInputArray(makeInt32s({25, 25, 100}),
+                                                          {true, true, true},
+                                                          makeInt32s({200, 100, 150}),
+                                                          makeInt32s({-150, 150, 2})),
+                                           makeInputArray(makeInt32s({100, 50, 25}),
+                                                          {true, false, false},
+                                                          makeInt32s({20, 75, 10}),
+                                                          makeInt32s({0, 20, -20})),
+                                           makeInputArray(makeInt32s({100, 25, 50}),
+                                                          {true, false, true},
+                                                          makeInt32s({75, 75, 75}),
+                                                          makeInt32s({-2, 5, 8}))});
+
+    /*
+     * 25  -> min(200, 200, 100) = 100, count = 3, min(2, -150, 150) = -150
+     * 50  -> min(100, 90, 60, 75) = 60, count = 4, min(4, 20, 3, 8) = 3
+     * 100 -> min(150, 20, 75) = 20, count = 3, min(20, 0, -2) = -2
+     */
+    TestResultType expected = {{25, {100, 3, -150}}, {50, {60, 4, 3}}, {100, {20, 3, -2}}};
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal),
+        4,
+        {{"valueBlockMin", "min"}, {"valueBlockCount", "sum"}, {"valueBlockMin", "min"}},
+        expected);
 }
 }  // namespace mongo::sbe

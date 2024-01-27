@@ -64,8 +64,9 @@ public:
 
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotId groupSlotId,
-                      value::SlotId blockBitsetSlotId,
+                      value::SlotId blockBitsetInSlotId,
                       value::SlotId rowAccSlotId,
+                      value::SlotId accumulatorBitsetSlotId,
                       BlockAndRowAggs aggs,
                       PlanNodeId planNodeId,
                       bool participateInTrialRunTracking = true);
@@ -103,12 +104,19 @@ private:
 
     // Groupby key slot.
     const value::SlotId _groupSlot;
-    // Slot for the bitset corresponding to accumulator input.
-    const value::SlotId _blockBitsetSlotId;
+    value::SlotAccessor* _idAccessorIn = nullptr;
+
+    // Input slot for bitset corresponding to data input.
+    const value::SlotId _blockBitsetInSlotId;
+    value::SlotAccessor* _blockBitsetInAccessor = nullptr;
+
+    // Slot for bitset used by block accumulators.
+    const value::SlotId _accumulatorBitsetSlotId;
+    value::OwnedValueAccessor _accumulatorBitsetAccessor;
 
     // Used for accumulation after block-level accumulators are run.
     const value::SlotId _rowAccSlotId;
-    value::OwnedValueAccessor _internalAccessor;
+    value::OwnedValueAccessor _rowAccAccessor;
 
     /*
      * A map from SlotId to a pair of {blockAccumulator, rowAccumulator}. This SlotId is the
@@ -128,9 +136,6 @@ private:
 
     value::OwnedValueAccessor _outIdBlockAccessor;
     value::HeterogeneousBlock _outIdBlock;
-
-    value::SlotAccessor* _idAccessorIn = nullptr;
-    value::SlotAccessor* _blockBitsetAccessorIn = nullptr;
 
     // Hash table where we'll map groupby key to the accumulators.
     TableType _ht;
