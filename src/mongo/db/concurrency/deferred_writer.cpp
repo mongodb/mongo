@@ -149,13 +149,17 @@ Status DeferredWriter::_worker(BSONObj doc) noexcept try {
     return e.toStatus();
 }
 
-DeferredWriter::DeferredWriter(NamespaceString nss, CollectionOptions opts, int64_t maxSize)
+DeferredWriter::DeferredWriter(NamespaceString nss,
+                               CollectionOptions opts,
+                               int64_t maxSize,
+                               bool retryOnReplStateChangeInterruption)
     : _collectionOptions(opts),
       _maxNumBytes(maxSize),
       _nss(nss),
       _numBytes(0),
       _droppedEntries(0),
-      _lastLogged(TimePoint::clock::now() - kLogInterval) {}
+      _lastLogged(TimePoint::clock::now() - kLogInterval),
+      _retryOnReplStateChangeInterruption(retryOnReplStateChangeInterruption) {}
 
 DeferredWriter::~DeferredWriter() {}
 
@@ -203,11 +207,19 @@ bool DeferredWriter::insertDocument(BSONObj obj) {
     _numBytes += obj.objsize();
     _pool->schedule([this, obj](auto status) {
         fassert(40588, status);
+        bool retryable;
+        int numRetries = 5;
+        do {
+            retryable = false;
+            auto workerStatus = _worker(obj.getOwned());
+            if (workerStatus.isOK()) {
+                break;
+            }
 
-        auto workerStatus = _worker(obj.getOwned());
-        if (!workerStatus.isOK()) {
             _logFailure(workerStatus);
-        }
+            retryable = _retryOnReplStateChangeInterruption &&
+                workerStatus.code() == ErrorCodes::InterruptedDueToReplStateChange;
+        } while (retryable && numRetries-- > 0);
     });
     return true;
 }

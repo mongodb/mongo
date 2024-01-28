@@ -53,7 +53,11 @@ CollectionOptions getOptions(void) {
 }  // namespace
 
 HealthLog::HealthLog()
-    : _writer(NamespaceString::kLocalHealthLogNamespace, getOptions(), kMaxBufferSize) {}
+    : _writer(NamespaceString::kLocalHealthLogNamespace,
+              getOptions(),
+              kMaxBufferSize,
+              // Writing to the 'local' database is permitted on all nodes, not just the primary.
+              true /*retryOnReplStateChangeInterruption*/) {}
 
 void HealthLog::startup() {
     _writer.startup(std::string("healthlog writer"));
