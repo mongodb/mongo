@@ -125,9 +125,9 @@ using FLEUserKeyAndId = FLEKeyAndId<FLEKeyType::User>;
  * CollectionsLevel1Token = HMAC(IndexKey, 1) = K_{f,1}
  * ServerDataEncryptionLevel1Token = HMAC(IndexKey, 3) = K_{f,3} = Fs[f,3]
  *
- * EDCToken = HMAC(CollectionsLevel1Token, 1) = K^{edc}_f
- * ESCToken = HMAC(CollectionsLevel1Token, 2) = K^{esc}_f
- * ECCToken = HMAC(CollectionsLevel1Token, 3) = K^{ecc}_f
+ * EDCToken = HMAC(CollectionsLevel1Token, 1) = K^{edc}_f = Fs[f,1,1]
+ * ESCToken = HMAC(CollectionsLevel1Token, 2) = K^{esc}_f = Fs[f,1,2]
+ * ECCToken = HMAC(CollectionsLevel1Token, 3) = K^{ecc}_f = Fs[f,1,3]
  * ECOCToken = HMAC(CollectionsLevel1Token, 4) = K^{ecoc}_f = Fs[f,1,4]
  *
  * EDCDerivedFromDataToken = HMAC(EDCToken, v) = K^{edc}_{f,v} = Fs[f,1,1,v]
@@ -149,6 +149,12 @@ using FLEUserKeyAndId = FLEKeyAndId<FLEKeyType::User>;
  * ServerDerivedFromDataToken = HMAC(ServerTokenDerivationLevel1Token, v) = K_{f,2,v} = Fs[f,2,v]
  * ServerCountAndContentionFactorEncryptionToken = HMAC(ServerDerivedFromDataToken, 1) = Fs[f,2,v,1]
  * ServerZerosEncryptionToken = HMAC(ServerDerivedFromDataToken, 2) = Fs[f,2,v,2]
+ *
+ * Range Protocol V2
+ * AnchorPaddingRootToken = HMAC(ESCToken, d) = S^esc_f_d = Fs[f,1,2,d]
+ *  d = 136 bit blob of zero = 17 octets of 0
+ * AnchorPaddingKeyToken = HMAC(AnchorPaddingRootToken, 1) = S1_d = F^(S^esc_fd)(1)
+ * AnchorPaddingValueToken = HMAC(AnchorPaddingRootToken, 2) =  S2_d = F^(S^esc_fd)(2)
  */
 enum class FLETokenType {
     CollectionsLevel1Token,
@@ -178,6 +184,11 @@ enum class FLETokenType {
     ServerDerivedFromDataToken,
     ServerCountAndContentionFactorEncryptionToken,
     ServerZerosEncryptionToken,
+
+    // range protocol v2 tokens
+    AnchorPaddingRootToken,
+    AnchorPaddingKeyToken,
+    AnchorPaddingValueToken,
 };
 
 /**
@@ -238,6 +249,10 @@ using ServerDerivedFromDataToken = FLEToken<FLETokenType::ServerDerivedFromDataT
 using ServerCountAndContentionFactorEncryptionToken =
     FLEToken<FLETokenType::ServerCountAndContentionFactorEncryptionToken>;
 using ServerZerosEncryptionToken = FLEToken<FLETokenType::ServerZerosEncryptionToken>;
+
+using AnchorPaddingRootToken = FLEToken<FLETokenType::AnchorPaddingRootToken>;
+using AnchorPaddingKeyToken = FLEToken<FLETokenType::AnchorPaddingKeyToken>;
+using AnchorPaddingValueToken = FLEToken<FLETokenType::AnchorPaddingValueToken>;
 
 /**
  * A pair of a (ESCDerivedFromDataTokenAndContentionFactorToken, optional

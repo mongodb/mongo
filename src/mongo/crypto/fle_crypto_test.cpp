@@ -368,6 +368,26 @@ TEST(FLETokens, TestVectors) {
     ASSERT_EQUALS(ECCTwiceDerivedValueToken(decodePrf(
                       "EFA5746DB796DAC6FAACB7E5F28DB53B333588A43131F0C026B19D2B1215EAE2"_sd)),
                   eccTwiceValueToken);
+
+
+    // Anchor Padding
+    auto anchorPaddingTokenRoot =
+        FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(escToken);
+    ASSERT_EQUALS(AnchorPaddingRootToken(decodePrf(
+                      "4312890F621FE3CA7497C3405DFD8AAF46A578C77F7404D28C12BA853A4D3327"_sd)),
+                  anchorPaddingTokenRoot);
+
+    auto anchorPaddingTokenKey =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(anchorPaddingTokenRoot);
+    ASSERT_EQUALS(AnchorPaddingKeyToken(decodePrf(
+                      "EF6D80379C462FC724CE8C245DC177ED507154B4EBB04DED780FA0DDAF1A2247"_sd)),
+                  anchorPaddingTokenKey);
+
+    auto anchorPaddingTokenValue =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(anchorPaddingTokenRoot);
+    ASSERT_EQUALS(AnchorPaddingValueToken(decodePrf(
+                      "A3308597F3C5271D5BAB640F749E619E9272A2C33F4CD372680F55F84CC4DF7F"_sd)),
+                  anchorPaddingTokenValue);
 }
 
 TEST(FLETokens, TestVectorUnindexedValueDecryption) {

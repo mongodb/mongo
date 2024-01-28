@@ -151,6 +151,13 @@ constexpr uint64_t kTwiceDerivedTokenFromECCValue = 2;
 constexpr uint64_t kServerCountAndContentionFactorEncryption = 1;
 constexpr uint64_t kServerZerosEncryption = 2;
 
+// "d" value in: S^esc_f_d = Fs[f,1,2,d]; where d = 17 octets of 0
+constexpr char kAnchorPaddingTokenDVal[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static_assert(sizeof(kAnchorPaddingTokenDVal) == 17);
+
+constexpr uint64_t kAnchorPaddingKeyToken = 1;
+constexpr uint64_t kAnchorPaddingValueToken = 2;
+
 constexpr int32_t kEncryptionInformationSchemaVersion = 1;
 
 constexpr auto kECCNullId = 0;
@@ -2273,6 +2280,20 @@ ServerZerosEncryptionToken
 FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
     ServerDerivedFromDataToken token) {
     return FLEUtil::prf(token.data, kServerZerosEncryption);
+}
+
+AnchorPaddingRootToken FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(ESCToken token) {
+    return FLEUtil::prf(token.data, ConstDataRange(kAnchorPaddingTokenDVal));
+}
+
+AnchorPaddingKeyToken FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(
+    AnchorPaddingRootToken token) {
+    return FLEUtil::prf(token.data, kAnchorPaddingKeyToken);
+}
+
+AnchorPaddingValueToken FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(
+    AnchorPaddingRootToken token) {
+    return FLEUtil::prf(token.data, kAnchorPaddingValueToken);
 }
 
 StatusWith<EncryptedStateCollectionTokens> EncryptedStateCollectionTokens::decryptAndParse(
