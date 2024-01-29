@@ -42,9 +42,6 @@ selector:
   # TODO (SERVER-75855): Support running the find command via mongos by specifying a UUID
   # (instead of a collection name).
   - jstests/core/txns/banned_collection_reads_in_txn.js
-  # TODO (SERVER-84263): ServiceEntryPointCommon may try to verify contract for a command before
-  # clearing access and privilege checks from the previous command in the same auth session.
-  - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
   # TODO (SERVER-85410): Investigate why timeseries_reads_in_txns.js sometimes fail with
   # ShardCannotRefreshDueToLocksHeld.
   - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
