@@ -333,5 +333,33 @@ void BM_CHECK_AND_ASSERT_TYPES(benchmark::State& state) {
 
 BENCHMARK(BM_CHECK_AND_ASSERT_TYPES);
 
+void BM_ArrayOfStringEnum10(benchmark::State& state) {
+    namespace t = idl::test;
+    auto nEntries = state.range();
+    auto doc = [&] {
+        std::vector<t::HasStringEnum10> vec;
+        for (int i = 0; i < nEntries; i++) {
+            idl::test::HasStringEnum10 has;
+            has.setE(static_cast<t::StringEnum10Enum>(i % 10));
+            vec.push_back(has);
+        }
+        t::ArrayOfHasStringEnum10 arrStruct;
+        arrStruct.setValue(vec);
+
+        BSONObjBuilder bob;
+        arrStruct.serialize(&bob);
+        return bob.done();
+    }();
+
+    size_t totalBytes = 0;
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(t::ArrayOfHasStringEnum10::parse(IDLParserContext("test"), doc));
+        totalBytes += doc.objsize();
+    }
+    state.SetBytesProcessed(totalBytes);
+}
+
+BENCHMARK(BM_ArrayOfStringEnum10)->Arg(10)->Arg(100)->Arg(1000);
+
 }  // namespace
 }  // namespace mongo

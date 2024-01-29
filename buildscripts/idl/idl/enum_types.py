@@ -259,13 +259,6 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
                 indented_writer.write_template('return static_cast<std::int32_t>(value);')
 
 
-def _get_constant_enum_name(idl_enum, enum_value):
-    # type: (Union[syntax.Enum,ast.Enum], Union[syntax.EnumValue,ast.EnumValue]) -> str
-    """Return the C++ name for a string constant of string enum value."""
-    return common.template_args('k${enum_name}_${name}', enum_name=common.title_case(idl_enum.name),
-                                name=enum_value.name)
-
-
 def _get_constant_enum_extra_data_name(idl_enum, enum_value):
     # type: (Union[syntax.Enum,ast.Enum], Union[syntax.EnumValue,ast.EnumValue]) -> str
     """Return the C++ name for a string constant of enum extra data value."""
@@ -291,65 +284,53 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
 
     def get_deserializer_declaration(self):
         # type: () -> str
-        return common.template_args(
-            "${enum_name} ${function_name}(const IDLParserContext& ctxt, StringData value)",
-            enum_name=self.get_cpp_type_name(), function_name=self._get_enum_deserializer_name())
+        cpp_type = self.get_cpp_type_name()
+        func = self._get_enum_deserializer_name()
+        return f'{cpp_type} {func}(const IDLParserContext& ctxt, StringData value)'
 
     def gen_deserializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        template_params = {
-            'enum_name': self.get_cpp_type_name(),
-            'function_name': self.get_deserializer_declaration(),
-        }
-
-        # Generate an anonymous namespace full of string constants
-        #
+        cpp_type = self.get_cpp_type_name()
+        func = self._get_enum_deserializer_name()
         with writer.NamespaceScopeBlock(indented_writer, ['']):
-            for enum_value in self._enum.values:
-                indented_writer.write_line(
-                    common.template_args(
-                        'constexpr StringData ${constant_name} = "${value}"_sd;',
-                        constant_name=_get_constant_enum_name(self._enum,
-                                                              enum_value), value=enum_value.value))
+            with writer.IndentedScopedBlock(indented_writer,
+                                            f'constexpr std::array {cpp_type}_values{{', '};'):
+                for e in self._enum.values:
+                    indented_writer.write_line(f'{cpp_type}::{e.name},')
+            with writer.IndentedScopedBlock(indented_writer,
+                                            f'constexpr std::array {cpp_type}_names{{', '};'):
+                for e in self._enum.values:
+                    indented_writer.write_line(f'"{e.value}"_sd,')
         indented_writer.write_empty_line()
 
-        with writer.TemplateContext(indented_writer, template_params):
-            with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
-                for enum_value in self._enum.values:
-                    predicate = 'if (value == %s) {' % (_get_constant_enum_name(
-                        self._enum, enum_value))
-                    with writer.IndentedScopedBlock(indented_writer, predicate, "}"):
-                        indented_writer.write_template(
-                            'return ${enum_name}::%s;' % (enum_value.name))
-
-                indented_writer.write_line("ctxt.throwBadEnumValue(value);")
+        with writer.IndentedScopedBlock(
+                indented_writer,
+                f'{cpp_type} {func}(const IDLParserContext& ctxt, StringData value) {{', '}'):
+            indented_writer.write_line(
+                f'static constexpr auto onMatch = [](int i) {{ return {cpp_type}_values[i]; }};')
+            indented_writer.write_line(
+                f'auto onFail = [&] {{ ctxt.throwBadEnumValue(value); return {cpp_type}{{}}; }};')
+            writer.gen_string_table_find_function_block(indented_writer, 'value', 'onMatch({})',
+                                                        'onFail()',
+                                                        [e.value for e in self._enum.values])
 
     def get_serializer_declaration(self):
         # type: () -> str
         """Get the serializer function declaration minus trailing semicolon."""
-        return common.template_args("StringData ${function_name}(${enum_name} value)",
-                                    enum_name=self.get_cpp_type_name(),
-                                    function_name=self._get_enum_serializer_name())
+        cpp_type = self.get_cpp_type_name()
+        func = self._get_enum_serializer_name()
+        return f'StringData {func}({cpp_type} value)'
 
     def gen_serializer_definition(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         """Generate the serializer function definition."""
-        template_params = {
-            'enum_name': self.get_cpp_type_name(),
-            'function_name': self.get_serializer_declaration(),
-        }
-
-        with writer.TemplateContext(indented_writer, template_params):
-            with writer.IndentedScopedBlock(indented_writer, "${function_name} {", "}"):
-                for enum_value in self._enum.values:
-                    with writer.IndentedScopedBlock(
-                            indented_writer, 'if (value == ${enum_name}::%s) {' % (enum_value.name),
-                            "}"):
-                        indented_writer.write_line(
-                            'return %s;' % (_get_constant_enum_name(self._enum, enum_value)))
-
-                indented_writer.write_line('MONGO_UNREACHABLE;')
-                indented_writer.write_line('return StringData();')
+        func = self._get_enum_serializer_name()
+        cpp_type = self.get_cpp_type_name()
+        with writer.IndentedScopedBlock(indented_writer, f'StringData {func}({cpp_type} value) {{',
+                                        '}'):
+            indented_writer.write_line('auto idx = static_cast<size_t>(value);')
+            indented_writer.write_line(f'invariant(idx < {cpp_type}_names.size());')
+            indented_writer.write_line(f'return {cpp_type}_names[idx];')
 
 
 def get_type_info(idl_enum):
