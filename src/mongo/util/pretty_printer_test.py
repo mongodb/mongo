@@ -7,8 +7,8 @@ import re
 expected_patterns = [
     r'Decorable<MyDecorable\> with 3 elems',
     r'vector of length 3.*\{ *123, *213, *312 *\}',
-    r'basic_string.* \=.*"hello"',
-    r'basic_string.* \=.*"world"',
+    r'basic_string.* \= *"hello"',
+    r'basic_string.* \= *"world"',
 ]
 up_pattern = r'std::unique_ptr<int\> = \{get\(\) \= 0x[0-9a-fA-F]+\}'
 set_pattern = r'std::[__debug::]*set with 4 elements'

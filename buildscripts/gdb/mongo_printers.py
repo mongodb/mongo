@@ -394,33 +394,6 @@ class DecorablePrinter(object):
                 print("Failed to look up decoration type: " + deco_type_name + ": " + str(err))
 
 
-class LazyInitPrinter(object):
-    """Pretty printer for mongo::decorable_detail::LazyInit<T>."""
-
-    def __init__(self, val):
-        """Initialize DecorablePrinter."""
-        self.val = val
-
-    def to_string(self):
-        """Return LazyInit for printing."""
-        state = str(self.val["_flag"]["_state"])
-        state_type = 'mongo::decorable_detail::LazyInitFlag::State'
-        if f'{state_type}::empty' in state:
-            return "[[disengaged]]"
-        if f'{state_type}::busy' in state:
-            return "[[busy]]"
-        if not f'{state_type}::done' in state:
-            return f"[[unknown: {state}]]"
-        buf = self.val["_buf"]
-        try:
-            value_type = self.val.type.template_argument(0)
-            obj = buf.cast(value_type)
-        except Exception as err:
-            obj = f'[[Err:{err}]]'
-        obj = f'{state}: {obj}'
-        return obj
-
-
 def _get_flags(flag_val, flags):
     """
     Return a list of flag name strings.
@@ -1045,7 +1018,6 @@ def build_pretty_printer():
     pp.add('boost::optional', 'boost::optional', True, BoostOptionalPrinter)
     pp.add('immutable::map', 'mongo::immutable::map', True, ImmutableMapPrinter)
     pp.add('immutable::set', 'mongo::immutable::set', True, ImmutableSetPrinter)
-    pp.add('LazyInit', 'mongo::decorable_detail::LazyInit', True, LazyInitPrinter)
 
     # Optimizer/ABT related pretty printers that can be used only with a running process.
     register_optimizer_printers(pp)

@@ -61,241 +61,41 @@
 #pragma once
 
 #include <algorithm>
-#include <atomic>  // NOLINT
 #include <boost/optional.hpp>
 #include <cstdint>
 #include <fmt/format.h>
 #include <iostream>
-#include <list>
-#include <map>
 #include <memory>
-#include <mutex>
-#include <new>
 #include <sstream>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
 #include <vector>
 
-#include "mongo/platform/pause.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {
 
-class BSONObj;
-
 namespace decorable_detail {
 
-/**
- * The allowLazy trait should be specialized to true for types known to have
- * no side-effects in their nullary value-initialization. This knowledge allows
- * some decorations to be initialized only on first use.
- *
- * About half of the decorations we use can be detected as allowLazy=true types.
- * Anything that can be trivially initialized by a zero representation should
- * not be lazy. They use a a different and faster optimization.
- */
+struct LifecycleOperations {
+    using CtorFn = void(void*);
+    using DtorFn = void(void*);
+    using CopyFn = void(void*, const void*);
+    using AssignFn = void(void*, const void*);
 
-template <typename T, typename = void>
-constexpr inline bool allowLazy = false;
-
-// Types with the 'is_lazy_decoration` typedef are lazy by default.
-template <typename T>
-using HasIsLazyDecorationOp = typename T::is_lazy_decoration;
-template <typename T>
-constexpr inline bool
-    allowLazy<T, std::enable_if_t<stdx::is_detected_v<HasIsLazyDecorationOp, T>>> = true;
-
-/** Zero-initializables are not lazy */
-template <typename T>
-constexpr inline bool allowLazy<T, std::enable_if_t<std::is_arithmetic_v<T>>> = false;
-template <typename T>
-constexpr inline bool allowLazy<T*> = false;
-
-template <typename... Ts>
-constexpr inline bool allowLazy<std::basic_string<Ts...>> = true;
-template <typename... Ts>
-constexpr inline bool allowLazy<std::list<Ts...>> = true;
-template <typename... Ts>
-constexpr inline bool allowLazy<std::vector<Ts...>> = true;
-template <typename... Ts>
-constexpr inline bool allowLazy<std::map<Ts...>> = true;
-template <typename... Ts>
-constexpr inline bool allowLazy<std::unique_ptr<Ts...>> = true;
-template <typename T>
-constexpr inline bool allowLazy<std::shared_ptr<T>> = true;
-template <typename T>
-constexpr inline bool allowLazy<boost::optional<T>> = true;
-
-/** These wrappers are lazy if their wrapped type is. */
-template <typename T>
-constexpr inline bool allowLazy<AtomicWord<T>> = allowLazy<T>;
-template <typename T>
-constexpr inline bool allowLazy<std::atomic<T>> = allowLazy<T>;  // NOLINT
-
-/** BSONObj is lazy */
-template <>
-constexpr inline bool allowLazy<BSONObj> = true;
-
-
-/**
- * Can't use the usual mongo::SpinLock as we can't rely on the usual
- * std::atomic_flag init being ok with all-zeros.
- */
-class LazyInitFlag {
-private:
-    // zero fill == disengaged
-    enum class State { empty, busy, done };
-
-public:
-    /**
-     * Compete for the right to initialize the guarded object.
-     *
-     * - If true is returned, the caller has entered the "critical section". It
-     *   must initialize the guarded object and call `initFinish()`.
-     *
-     * - Otherwise, another caller has won, and false is returned. In that case,
-     *   this call doesn't return until the winning caller calls `initFinish()`.
-     */
-    bool tryInitStart() {
-        auto state = _state.load(std::memory_order_acquire);
-        while (true) {
-            if (state == State::done)
-                return false;
-            if (state == State::empty) {
-                if (!_state.compare_exchange_strong(state, State::busy, std::memory_order_acq_rel))
-                    continue;  // Lost. Reconsider from new state.
-                return true;
-            }
-            if (state == State::busy) {
-                // Lost. Wait for the winner. This kind of race should be
-                // extremely unlikely in the first place. We're default
-                // constructing, so a quick spin should be sufficient most of
-                // the time. If we are still busy after this short number
-                // of spins, the loop becomes a core yield.
-                int spins = 1000;
-                do {
-                    if (!spins)
-                        _spinSlow();
-                    else
-                        --spins;
-                    state = _state.load(std::memory_order_acquire);
-                } while (state == State::busy);
-                return false;
-            }
-        }
-    }
-
-    void initFinish() {
-        _state.store(State::done, std::memory_order_release);
-    }
-
-    static void _spinSlow() {
-#ifndef _MSC_VER
-        MONGO_YIELD_CORE_FOR_SMT();
-#else
-        std::this_thread::yield();  // Punt: macro broken on Windows.
-#endif
-    }
-
-    bool hasValue() const {
-        return _state.load(std::memory_order_acquire) == State::done;
-    }
-
-    bool relaxedHasValue() const {
-        return _state.load(std::memory_order_relaxed) == State::done;
-    }
-
-private:
-    std::atomic<State> _state;  // NOLINT
-};
-
-/**
- * A wrapper that defers construction of its `value` until first access.
- * Unlike `optional`, it is known to be empty if represented by all zeros.
- * Like an "autovivifying" `optional`.
- *
- * The default constructor of `T` must not throw. For simplicity's sake, it
- * should also have no side effects, as the lazy initialization time can be
- * difficult to reason about.
- */
-template <typename T>
-class LazyInit {
-public:
-    using value_type = T;
-
-    LazyInit() = default;
-
-    ~LazyInit() {
-        if constexpr (!std::is_trivially_destructible_v<value_type>)
-            if (_flag.relaxedHasValue())
-                value().~T();
-    }
-
-    LazyInit(const LazyInit& o) {
-        if (o._flag.hasValue())
-            value() = o.value();
-    }
-
-    LazyInit& operator=(const LazyInit& o) {
-        if (this != &o)
-            if (_flag.hasValue() || o._flag.hasValue())
-                value() = o.value();
-        return *this;
-    }
-
-    const value_type& value() const noexcept {
-        if constexpr (!std::is_trivially_default_constructible_v<value_type>)
-            _ensureValue();
-        return *_ptr();
-    }
-    value_type& value() noexcept {
-        return const_cast<T&>(std::as_const(*this).value());
-    }
-
-    static constexpr ptrdiff_t offsetOfValue() noexcept {
-        return offsetof(LazyInit, _buf);
-    }
-
-private:
-    /** Emplaces the value on first use. Optimized for happy path. */
-    void _ensureValue() const noexcept {
-        if (_flag.tryInitStart()) {
-            new (const_cast<value_type*>(_ptr())) value_type{};
-            _flag.initFinish();
-        }
-    }
-
-    const value_type* _ptr() const {
-        return reinterpret_cast<const value_type*>(_buf.data());
-    }
-    value_type* _ptr() {
-        return const_cast<value_type*>(std::as_const(*this)._ptr());
-    }
-
-    mutable LazyInitFlag _flag;
-    alignas(value_type) mutable std::array<char, sizeof(value_type)> _buf;
-};
-
-using CtorFn = void(void*);
-using DtorFn = void(void*);
-using CopyFn = void(void*, const void*);
-using AssignFn = void(void*, const void*);
-
-template <typename T>
-struct BasicBoxingTraits {
-    constexpr CtorFn* getConstructorFn() const {
+    template <typename T>
+    static constexpr CtorFn* getCtor() {
         if constexpr (!std::is_trivially_constructible_v<T>)
             return +[](void* p) {
-                new (p) T{};
+                new (p) T;
             };
         return nullptr;
     }
 
-    constexpr DtorFn* getDestructorFn() const {
+    template <typename T>
+    static constexpr DtorFn* getDtor() {
         if constexpr (!std::is_trivially_destructible_v<T>)
             return +[](void* p) {
                 static_cast<T*>(p)->~T();
@@ -303,8 +103,8 @@ struct BasicBoxingTraits {
         return nullptr;
     }
 
-    template <bool needCopy>
-    static constexpr CopyFn* getCopyFn() {
+    template <typename T, bool needCopy>
+    static constexpr CopyFn* getCopy() {
         if constexpr (needCopy)
             return +[](void* p, const void* src) {
                 new (p) T(*static_cast<const T*>(src));
@@ -312,8 +112,8 @@ struct BasicBoxingTraits {
         return nullptr;
     }
 
-    template <bool needCopy>
-    static constexpr AssignFn* getAssignFn() {
+    template <typename T, bool needCopy>
+    static constexpr AssignFn* getAssign() {
         if constexpr (needCopy)
             return +[](void* p, const void* src) {
                 *static_cast<T*>(p) = *static_cast<const T*>(src);
@@ -321,145 +121,38 @@ struct BasicBoxingTraits {
         return nullptr;
     }
 
-    static constexpr size_t boxAlignment() {
-        return alignof(T);
-    }
+    template <typename T, bool needCopy>
+    static constexpr LifecycleOperations make() {
+        return {getCtor<T>(), getDtor<T>(), getCopy<T, needCopy>(), getAssign<T, needCopy>()};
+    };
 
-    static constexpr size_t boxSize() {
-        return sizeof(T);
-    }
-
-    static constexpr const std::type_info* boxTypeInfo() {
-        return &typeid(T);
-    }
-
-    const T* unbox(const void* boxAddress) const {
-        return static_cast<const T*>(boxAddress);
-    }
-
-    static constexpr ptrdiff_t offsetOfValue() {
-        return 0;
-    }
-};
-
-// If a type <T> has the allowLazy=true trait, then it's boxed in a
-// LazyInit<T>.
-template <typename T>
-constexpr auto decorationBoxingTraitsFor(std::type_identity<T>) {
-    if constexpr (allowLazy<T>) {
-        struct Traits : BasicBoxingTraits<LazyInit<T>> {
-            constexpr CtorFn* getConstructorFn() {
-                // Exploit the LazyInit property that doing nothing is a valid construction.
-                return nullptr;
-            }
-            const T* unbox(const void* boxAddress) const {
-                return &static_cast<const LazyInit<T>*>(boxAddress)->value();
-            }
-            constexpr ptrdiff_t offsetOfValue() {
-                return LazyInit<T>::offsetOfValue();
-            }
-        };
-        return Traits{};
-    } else {
-        struct Traits : BasicBoxingTraits<T> {};
-        return Traits{};
-    }
-}
-
-// Adl hook to make specializations easier to find.
-template <typename T>
-constexpr auto decorationBoxingTraitsFor() {
-    return decorationBoxingTraitsFor(std::type_identity<T>{});
-}
-
-struct LifecycleOperations {
-    CtorFn* ctorFn;     /** null if trivial */
-    DtorFn* dtorFn;     /** null if trivial */
-    CopyFn* copyFn;     /** null if no copy */
-    AssignFn* assignFn; /** null if no assignment */
+    CtorFn* ctor;     /** null if trivial */
+    DtorFn* dtor;     /** null if trivial */
+    CopyFn* copy;     /** null if no copy */
+    AssignFn* assign; /** null if no assignment */
 };
 
 template <typename T, bool needCopy>
-constexpr inline LifecycleOperations lifecycleOperations = [] {
-    auto traits = decorationBoxingTraitsFor<T>();
-    return LifecycleOperations{traits.getConstructorFn(),
-                               traits.getDestructorFn(),
-                               traits.template getCopyFn<needCopy>(),
-                               traits.template getAssignFn<needCopy>()};
-}();
-
-/**
- * Encodes all of the properties and type-erased operations needed to work with
- * a value in a DecorationBufffer.
- */
-class RegistryEntry {
-public:
-    RegistryEntry(const std::type_info* typeInfo,
-                  ptrdiff_t offset,
-                  const LifecycleOperations* ops,
-                  size_t size,
-                  size_t align)
-        : _typeInfo{typeInfo}, _offset{offset}, _ops{ops}, _size{size}, _align{align} {}
-
-    void construct(void* buf) const {
-        if (const auto& ctor = _ops->ctorFn)
-            ctor(_addOffset(buf));
-    }
-
-    void destroy(void* buf) const {
-        if (const auto& dtor = _ops->dtorFn)
-            dtor(_addOffset(buf));
-    }
-
-    void copy(void* buf, const void* srcBuf) const {
-        invariant(_ops->copyFn);
-        _ops->copyFn(_addOffset(buf), _addOffset(srcBuf));
-    }
-
-    void assign(void* buf, const void* srcBuf) const {
-        invariant(_ops->assignFn);
-        _ops->assignFn(_addOffset(buf), _addOffset(srcBuf));
-    }
-
-    ptrdiff_t offset() const {
-        return _offset;
-    }
-
-    size_t size() const {
-        return _size;
-    }
-
-    size_t align() const {
-        return _align;
-    }
-
-private:
-    const void* _addOffset(const void* buf) const {
-        return static_cast<const char*>(buf) + _offset;
-    }
-
-    void* _addOffset(void* buf) const {
-        return const_cast<void*>(_addOffset(const_cast<const void*>(buf)));
-    }
-
-    const std::type_info* _typeInfo;  // for gdb
-    ptrdiff_t _offset;
-    const LifecycleOperations* _ops;
-    size_t _size;
-    size_t _align;
-};
+constexpr inline LifecycleOperations lifecycleOperations = LifecycleOperations::make<T, needCopy>();
 
 class Registry {
 public:
+    struct Entry {
+        const std::type_info* typeInfo;
+        ptrdiff_t offset;
+        const LifecycleOperations* ops;
+        size_t size;
+        size_t align;
+    };
+
     /** Return registry position of new entry. */
     template <typename T>
     size_t declare(const LifecycleOperations* ops) {
-        auto traits = decorationBoxingTraitsFor<T>();
-        static constexpr auto al = traits.boxAlignment();
-        static constexpr auto sz = traits.boxSize();
+        static constexpr auto al = alignof(T);
+        static constexpr auto sz = sizeof(T);
         static_assert(al <= alignof(std::max_align_t), "over-aligned decoration");
         ptrdiff_t offset = (_bufferSize + al - 1) / al * al;  // pad to alignment
-        _entries.push_back({traits.boxTypeInfo(), offset, ops, sz, al});
+        _entries.push_back({&typeid(T), offset, ops, sz, al});
         _bufferSize = offset + sz;
         return _entries.size() - 1;
     }
@@ -483,7 +176,7 @@ public:
     }
 
 private:
-    std::vector<RegistryEntry> _entries;
+    std::vector<Entry> _entries;
     size_t _bufferSize = sizeof(void*);  // The owner pointer is always present.
 };
 
@@ -508,11 +201,6 @@ Registry& getRegistry() {
  */
 template <typename D, typename T>
 class DecorationToken {
-private:
-    static constexpr auto _boxingTraits() {
-        return decorationBoxingTraitsFor<T>();
-    }
-
 public:
     using DecoratedType = D;
     using DecorationType = T;
@@ -537,12 +225,9 @@ public:
      */
     const DecoratedType& owner(const DecorationType& t) const {
         // The decoration block starts with a backlink to the decorable.
-        const void* boxAddress = _decorationToBoxAddress(&t);
-        const void* blockAddress = static_cast<const char*>(boxAddress) - _offsetInBlock();
-        auto op =
-            DecoratedType::downcastBackLink(*reinterpret_cast<const void* const*>(blockAddress));
-        invariant(&(*op)[*this] == &t, "Inconsistent deco => owner => deco round trip");
-        return *op;
+        const void* p = &t;
+        const void* block = static_cast<const char*>(p) - _offset;
+        return *DecoratedType::downcastBackLink(*reinterpret_cast<const void* const*>(block));
     }
     DecoratedType& owner(DecorationType& t) const {
         return const_cast<DecoratedType&>(owner(std::as_const(t)));
@@ -575,29 +260,13 @@ public:
         return _registryPosition;
     }
 
-    /**
-     * Translate the whole decorations buffer address into a `T*`.
-     * This means finding out where in `buf` the "box" is, and
-     * then where in the "box" the value `T*` is. A DecorationToken
-     * has access to all necessary information to do this.
-     */
-    const T* getValue(const void* buf) const {
-        // The decoration value is in a "box", and that box
-        // address needs to be converted into a `T*`.
-        return _boxingTraits().unbox(static_cast<const char*>(buf) + _offsetInBlock());
+    ptrdiff_t offsetInBlock() const {
+        return _offset;
     }
 
 private:
-    ptrdiff_t _offsetInBlock() const {
-        return (*_registry)[_registryPosition].offset();
-    }
-
-    const void* _decorationToBoxAddress(const void* p) const {
-        return static_cast<const char*>(p) - _boxingTraits().offsetOfValue();
-    }
-
-    const Registry* _registry = &decorable_detail::getRegistry<DecoratedType>();
     size_t _registryPosition;
+    ptrdiff_t _offset = decorable_detail::getRegistry<DecoratedType>()[_registryPosition].offset;
 };
 
 template <typename D>
@@ -628,8 +297,10 @@ public:
         size_t n = reg.size();
         size_t i = 0;
         try {
-            for (; i != n; ++i)
-                reg[i].copy(_data, other._data);
+            for (; i != n; ++i) {
+                const auto& e = reg[i];
+                e.ops->copy(getAtOffset(e.offset), other.getAtOffset(e.offset));
+            }
         } catch (...) {
             _tearDownParts(i);
             throw;
@@ -644,14 +315,18 @@ public:
     DecorationBuffer& operator=(const DecorationBuffer& other) {
         auto& reg = _reg();
         size_t n = reg.size();
-        for (size_t i = 0; i != n; ++i)
-            reg[i].assign(_data, other._data);
+        for (size_t i = 0; i != n; ++i) {
+            const auto& e = reg[i];
+            e.ops->assign(getAtOffset(e.offset), other.getAtOffset(e.offset));
+        }
         return *this;
     }
 
-    template <typename T>
-    const T* getAtDecorationToken(const DecorationToken<DecoratedType, T>& deco) const {
-        return deco.getValue(_data);
+    const void* getAtOffset(ptrdiff_t offset) const {
+        return _data + offset;
+    }
+    void* getAtOffset(ptrdiff_t offset) {
+        return const_cast<void*>(std::as_const(*this).getAtOffset(offset));
     }
 
 private:
@@ -664,8 +339,11 @@ private:
         size_t n = reg.size();
         size_t i = 0;
         try {
-            for (; i != n; ++i)
-                reg[i].construct(_data);
+            for (; i != n; ++i) {
+                const auto& e = reg[i];
+                if (const auto& ctor = e.ops->ctor)
+                    ctor(getAtOffset(e.offset));
+            }
         } catch (...) {
             _tearDownParts(i);
             throw;
@@ -674,8 +352,11 @@ private:
 
     void _tearDownParts(size_t count) noexcept {
         auto& reg = _reg();
-        while (count--)
-            reg[count].destroy(_data);
+        while (count--) {
+            const auto& e = reg[count];
+            if (const auto& dtor = e.ops->dtor)
+                dtor(getAtOffset(e.offset));
+        }
     }
 
     template <typename DecoratedBase>
@@ -731,7 +412,7 @@ public:
 
     template <typename T>
     const T& decoration(const Decoration<T>& deco) const {
-        return *_decorations.getAtDecorationToken(deco);
+        return *static_cast<const T*>(_decorations.getAtOffset(deco.offsetInBlock()));
     }
     template <typename T>
     T& decoration(const Decoration<T>& deco) {
