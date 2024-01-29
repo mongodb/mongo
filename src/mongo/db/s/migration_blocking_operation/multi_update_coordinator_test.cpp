@@ -63,9 +63,27 @@ BSONObj updateFailedResponseBSONObj() {
     return bodyBob.obj();
 }
 
-struct MultiUpdateOpCounters {
-    int startBlockingMigrationsCount = 0;
-    int stopBlockingMigrationsCount = 0;
+class MultiUpdateOpCounters {
+public:
+    int getStartBlockingMigrationsCount() const {
+        return _startBlockingMigrationsCount.load();
+    }
+
+    int getStopBlockingMigrationsCount() const {
+        return _stopBlockingMigrationsCount.load();
+    }
+
+    void onStartBlockingMigrations() {
+        _startBlockingMigrationsCount.fetchAndAdd(1);
+    }
+
+    void onStopBlockingMigrations() {
+        _stopBlockingMigrationsCount.fetchAndAdd(1);
+    }
+
+private:
+    AtomicWord<int> _startBlockingMigrationsCount{0};
+    AtomicWord<int> _stopBlockingMigrationsCount{0};
 };
 
 class MultiUpdateCoordinatorExternalStateForTest : public MultiUpdateCoordinatorExternalState {
@@ -95,11 +113,11 @@ public:
     }
 
     void startBlockingMigrations() const override {
-        _counters->startBlockingMigrationsCount++;
+        _counters->onStartBlockingMigrations();
     }
 
     void stopBlockingMigrations() const override {
-        _counters->stopBlockingMigrationsCount++;
+        _counters->onStopBlockingMigrations();
     }
 
 private:
@@ -324,18 +342,16 @@ protected:
 
     void testFailOverBeforeStateTransition(State state, bool expectFailureResponse = false) {
         auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kBefore, state);
-        auto initialStartBlockingMigrationsCount = getCounters().startBlockingMigrationsCount;
-        auto initialStopBlockingMigrationsCount = getCounters().stopBlockingMigrationsCount;
+        auto initialStartCount = getCounters().getStartBlockingMigrationsCount();
+        auto initialStopCount = getCounters().getStopBlockingMigrationsCount();
 
         fp->setMode(FailPoint::off);
         auto status = instance->getCompletionFuture().getNoThrow();
 
         if (state <= State::kPerformUpdate) {
-            ASSERT_GT(getCounters().startBlockingMigrationsCount,
-                      initialStartBlockingMigrationsCount);
+            ASSERT_GT(getCounters().getStartBlockingMigrationsCount(), initialStartCount);
         } else if (state <= State::kDone) {
-            ASSERT_GT(getCounters().stopBlockingMigrationsCount,
-                      initialStopBlockingMigrationsCount);
+            ASSERT_GT(getCounters().getStopBlockingMigrationsCount(), initialStopCount);
         }
 
         assertStatusAndUpdateResponse(status, expectFailureResponse);
