@@ -184,17 +184,17 @@ public:
     template <typename Container>
     InMemIterator(const Container& input) : _data(input.begin(), input.end()) {}
 
-    InMemIterator(std::deque<Data> data) : _data(std::move(data)) {}
+    InMemIterator(std::vector<Data> data) : _data(std::move(data)) {}
 
     void openSource() {}
     void closeSource() {}
 
     bool more() {
-        return !_data.empty();
+        return _index < _data.size();
     }
     Data next() {
-        Data out = std::move(_data.front());
-        _data.pop_front();
+        Data out = std::move(_data[_index]);
+        _index++;
         return out;
     }
 
@@ -211,13 +211,14 @@ public:
     }
 
 private:
-    std::deque<Data> _data;
+    std::vector<Data> _data;
+    uint32_t _index{0};
 };
 
 /**
  * This class is used to return the in-memory state from the sorter in read-only mode.
  * This is used by streams checkpoint use case mainly to save in-memory state on persistent
- * storage."
+ * storage.
  */
 template <typename Key, typename Value, typename Container>
 class InMemReadOnlyIterator : public SortIteratorInterface<Key, Value> {
@@ -889,7 +890,7 @@ public:
 
         _paused = true;
         if (this->_iters.empty()) {
-            return new InMemReadOnlyIterator<Key, Value, std::deque<Data>>(_data);
+            return new InMemReadOnlyIterator<Key, Value, std::vector<Data>>(_data);
         }
         tassert(8248300, "Spilled sort cannot be paused", this->_iters.empty());
         return nullptr;
@@ -944,9 +945,13 @@ private:
         sort();
 
         SortedFileWriter<Key, Value> writer(this->_opts, this->_file, this->_settings);
-        for (; !_data.empty(); _data.pop_front()) {
-            writer.addAlreadySorted(_data.front().first, _data.front().second);
+        for (auto& data : _data) {
+            writer.addAlreadySorted(data.first, data.second);
         }
+        _data.clear();
+        // _data may have grown very large. Even though it's clear()ed, we need to
+        // free the excess memory.
+        _data.shrink_to_fit();
         Iterator* iteratorPtr = writer.done();
 
         this->_iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
@@ -964,7 +969,7 @@ private:
     }
 
     bool _done = false;
-    std::deque<Data> _data;  // Data that has not been spilled.
+    std::vector<Data> _data;  // Data that has not been spilled.
     bool _paused = false;
 };
 
@@ -1298,8 +1303,10 @@ private:
             writer.addAlreadySorted(_data[i].first, _data[i].second);
         }
 
-        // clear _data and release backing array's memory
-        std::vector<Data>().swap(_data);
+        _data.clear();
+        // _data may have grown very large. Even though it's clear()ed, we need to
+        // free the excess memory.
+        _data.shrink_to_fit();
 
         Iterator* iteratorPtr = writer.done();
         this->_iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));

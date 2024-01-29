@@ -116,6 +116,7 @@ struct SortOptions {
 
     // When in-memory memory usage exceeds this value, we try to spill to disk. This is approximate.
     size_t maxMemoryUsageBytes;
+    static const size_t DefaultMaxMemoryUsageBytes = 64 * 1024 * 1024;
 
     // Whether we are allowed to spill to disk. If this is false and in-memory exceeds
     // maxMemoryUsageBytes, we will uassert.
@@ -148,7 +149,7 @@ struct SortOptions {
 
     SortOptions()
         : limit(0),
-          maxMemoryUsageBytes(64 * 1024 * 1024),
+          maxMemoryUsageBytes(DefaultMaxMemoryUsageBytes),
           extSortAllowed(false),
           sorterFileStats(nullptr),
           sorterTracker(nullptr),
