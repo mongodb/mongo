@@ -936,7 +936,7 @@ buildvariants:
   <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-and-cqf-enabled
   display_name: "Shared Library Enterprise RHEL 8.0 Query (all feature flags and CQF enabled)"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter.
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-expansions
     test_flags: >-
