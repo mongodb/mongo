@@ -817,7 +817,7 @@ std::unique_ptr<DBClientBase> BenchRunConfig::createConnectionImpl(
 
 std::unique_ptr<DBClientBase> BenchRunConfig::createConnection() const {
     auto conn = BenchRunConfig::createConnectionImpl(*this);
-    conn->setAlwaysAppendDollarTenant_forTest();
+    conn->setAttachSecurityToken_forTest();
     return conn;
 }
 

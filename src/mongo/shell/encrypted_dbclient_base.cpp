@@ -137,7 +137,7 @@ EncryptedDBClientBase::EncryptedDBClientBase(std::shared_ptr<DBClientBase> conn,
     : _conn(std::move(conn)), _encryptionOptions(std::move(encryptionOptions)), _cx(cx) {
     validateCollection(cx, collection);
     _collection = JS::Heap<JS::Value>(collection);
-    _conn->setAlwaysAppendDollarTenant_forTest();
+    _conn->setAttachSecurityToken_forTest();
 };
 
 std::string EncryptedDBClientBase::getServerAddress() const {

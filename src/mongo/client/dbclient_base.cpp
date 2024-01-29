@@ -938,10 +938,11 @@ OpMsgRequest DBClientBase::_upconvertRequest(const DatabaseName& dbName,
                                              BSONObj legacyCmdObj,
                                              int options,
                                              boost::optional<auth::ValidatedTenancyScope> vts) {
-    if (isAlwaysAppendDollarTenant_forTest() && dbName.tenantId()) {
-        BSONObjBuilder bob = BSONObjBuilder(std::move(legacyCmdObj));
-        dbName.tenantId()->serializeToBSON("$tenant", &bob);
-        legacyCmdObj = bob.obj();
+    if (isAttachSecurityToken_forTest() && dbName.tenantId()) {
+        vts = auth::ValidatedTenancyScopeFactory::create(
+            dbName.tenantId().get(),
+            auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+            auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     }
 
     return rpc::upconvertRequest(dbName, std::move(legacyCmdObj), options, vts);

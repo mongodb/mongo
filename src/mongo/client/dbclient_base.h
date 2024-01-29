@@ -701,12 +701,12 @@ public:
         return _apiParameters;
     }
 
-    void setAlwaysAppendDollarTenant_forTest() {
-        _alwaysAppendDollarTenant = true;
+    void setAttachSecurityToken_forTest() {
+        _attachSecurityToken = true;
     }
 
-    bool isAlwaysAppendDollarTenant_forTest() const {
-        return _alwaysAppendDollarTenant;
+    bool isAttachSecurityToken_forTest() const {
+        return _attachSecurityToken;
     }
 
     void setShouldThrowOnStaleConfigError(bool value) {
@@ -765,7 +765,7 @@ private:
     // right away.
     bool _shouldThrowOnStaleConfigError = true;
 
-    bool _alwaysAppendDollarTenant = false;
+    bool _attachSecurityToken = false;
 
     rpc::RequestMetadataWriter _metadataWriter;
     rpc::ReplyMetadataReader _metadataReader;
