@@ -59,8 +59,8 @@ function runFindUsingSecurityToken(conn, db, collName, token, expectedDocsReturn
 function runFindUsingSecurityTokenAndPrefix(
     conn, prefixedDb, collName, token, expectedDocsReturned) {
     conn._setSecurityToken(token);
-    const res = assert.commandWorked(
-        conn.getDB(prefixedDb).runCommand({find: collName, filter: {}, expectPrefix: true}));
+    const res =
+        assert.commandWorked(conn.getDB(prefixedDb).runCommand({find: collName, filter: {}}));
     assert(arrayEq(expectedDocsReturned, res.cursor.firstBatch), tojson(res));
     const prefixedNamespace = prefixedDb + "." + collName;
     assert.eq(res.cursor.ns, prefixedNamespace);
@@ -106,6 +106,9 @@ const kCollName = "foo";
 const kToken1 = _createTenantToken({tenant: kTenant1});
 const kToken2 = _createTenantToken({tenant: kTenant2});
 
+const kExpectPrefixToken1 = _createTenantToken({tenant: kTenant1, expectPrefix: true});
+const kExpectPrefixToken2 = _createTenantToken({tenant: kTenant2, expectPrefix: true});
+
 // Create a root user and login on both the primary and secondary.
 const primaryAdminDb = originalPrimary.getDB('admin');
 let secondaryAdminDb = originalSecondary.getDB('admin');
@@ -139,6 +142,11 @@ originalSecondary = rst.restart(originalSecondary,
 originalSecondary.setSecondaryOk();
 assert(originalSecondary.getDB("admin").auth('admin', 'pwd'));
 
+// Get another connecton of secondary as connection protocol cannot change once set.
+let prefixedOriginalSecondary = new Mongo(originalSecondary.host);
+prefixedOriginalSecondary.setSecondaryOk();
+assert(prefixedOriginalSecondary.getDB("admin").auth('admin', 'pwd'));
+
 // Check that we can still find the docs when using a prefixed db on both the primary and
 // secondary.
 assertFindBothTenantsPrefixedDb(
@@ -154,9 +162,9 @@ assertFindBothTenantsUsingSecurityToken(
 
 // Also assert both tenants find the new doc on the secondary using token and a prefixed db.
 runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant1DbPrefixed, kCollName, kToken1, tenant1Docs);
+    prefixedOriginalSecondary, tenant1DbPrefixed, kCollName, kExpectPrefixToken1, tenant1Docs);
 runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant2DbPrefixed, kCollName, kToken2, tenant2Docs);
+    prefixedOriginalSecondary, tenant2DbPrefixed, kCollName, kExpectPrefixToken2, tenant2Docs);
 
 // Now insert a new doc for both tenants using the prefixed db, and assert that we can find it
 // on both the primary and secondary.
@@ -191,9 +199,9 @@ assertFindBothTenantsUsingSecurityToken(
 
 // Assert both tenants find the new doc on the secondary using token and a prefixed db.
 runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant1DbPrefixed, kCollName, kToken1, allTenant1Docs);
+    prefixedOriginalSecondary, tenant1DbPrefixed, kCollName, kExpectPrefixToken1, allTenant1Docs);
 runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant2DbPrefixed, kCollName, kToken2, allTenant2Docs);
+    prefixedOriginalSecondary, tenant2DbPrefixed, kCollName, kExpectPrefixToken2, allTenant2Docs);
 
 // Now run findAndModify on one doc using a prefixed db and check that we can read from the
 // secondary using just token and a prefix.
@@ -220,10 +228,16 @@ assertFindBothTenantsUsingSecurityToken(originalSecondary,
                                         modifiedTenant1Docs,
                                         modifiedTenant2Docs);
 
-runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant1DbPrefixed, kCollName, kToken1, modifiedTenant1Docs);
-runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant2DbPrefixed, kCollName, kToken2, modifiedTenant2Docs);
+runFindUsingSecurityTokenAndPrefix(prefixedOriginalSecondary,
+                                   tenant1DbPrefixed,
+                                   kCollName,
+                                   kExpectPrefixToken1,
+                                   modifiedTenant1Docs);
+runFindUsingSecurityTokenAndPrefix(prefixedOriginalSecondary,
+                                   tenant2DbPrefixed,
+                                   kCollName,
+                                   kExpectPrefixToken2,
+                                   modifiedTenant2Docs);
 
 // Now, restart the primary and enable multitenancySupport. The secondary will step up to
 // become primary.
@@ -233,6 +247,11 @@ assert(originalPrimary.getDB("admin").auth('admin', 'pwd'));
 waitForState(originalSecondary, ReplSetTest.State.PRIMARY);
 waitForState(originalPrimary, ReplSetTest.State.SECONDARY);
 originalPrimary.setSecondaryOk();
+
+// Get another connecton of original primary as connection protocol cannot change once set.
+let prefixedOriginalPrimary = new Mongo(originalPrimary.host);
+prefixedOriginalPrimary.setSecondaryOk();
+assert(prefixedOriginalPrimary.getDB("admin").auth('admin', 'pwd'));
 
 // Check that we can still find the docs when using a prefixed db on both the primary and
 // secondary.
@@ -268,15 +287,29 @@ assertFindBothTenantsUsingSecurityToken(originalSecondary,
 
 // Also check that both tenants find the new doc on the primary and secondary using token and a
 // prefixed db.
-runFindUsingSecurityTokenAndPrefix(
-    originalPrimary, tenant1DbPrefixed, kCollName, kToken1, modifiedTenant1Docs);
-runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant2DbPrefixed, kCollName, kToken2, modifiedTenant2Docs);
-runFindUsingSecurityTokenAndPrefix(
-    originalPrimary, tenant1DbPrefixed, kCollName, kToken1, modifiedTenant1Docs);
-runFindUsingSecurityTokenAndPrefix(
-    originalSecondary, tenant2DbPrefixed, kCollName, kToken2, modifiedTenant2Docs);
+runFindUsingSecurityTokenAndPrefix(prefixedOriginalPrimary,
+                                   tenant1DbPrefixed,
+                                   kCollName,
+                                   kExpectPrefixToken1,
+                                   modifiedTenant1Docs);
+runFindUsingSecurityTokenAndPrefix(prefixedOriginalSecondary,
+                                   tenant2DbPrefixed,
+                                   kCollName,
+                                   kExpectPrefixToken2,
+                                   modifiedTenant2Docs);
+runFindUsingSecurityTokenAndPrefix(prefixedOriginalPrimary,
+                                   tenant1DbPrefixed,
+                                   kCollName,
+                                   kExpectPrefixToken1,
+                                   modifiedTenant1Docs);
+runFindUsingSecurityTokenAndPrefix(prefixedOriginalSecondary,
+                                   tenant2DbPrefixed,
+                                   kCollName,
+                                   kExpectPrefixToken2,
+                                   modifiedTenant2Docs);
 
 originalPrimary._setSecurityToken(undefined);
 originalSecondary._setSecurityToken(undefined);
+prefixedOriginalPrimary._setSecurityToken(undefined);
+prefixedOriginalSecondary._setSecurityToken(undefined);
 rst.stopSet();
