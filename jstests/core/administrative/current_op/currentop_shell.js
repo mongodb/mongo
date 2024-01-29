@@ -98,11 +98,22 @@ res = db.adminCommand({
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     // Assert currentOp truncation behavior for each shard in the cluster.
-    assert(res.inprog.length >= 1, res);
-    res.inprog.forEach((result) => {
-        assert.eq(result.op, "getmore", res);
-        assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
-    });
+    try {
+        assert(res.inprog.length >= 1, res);
+        res.inprog.forEach((result) => {
+            assert.eq(result.op, "getmore", res);
+            assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
+        });
+    } catch (e) {
+        const chunksInfo =
+            coll.getDB().getSiblingDB("config").chunks.find({uuid: collInfo.uuid}).toArray();
+        const collInfo =
+            coll.getDB().getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
+        jsTestLog(res);
+        jsTestLog(collInfo);
+        jsTestLog(chunksInfo);
+        throw e;
+    }
 } else {
     // Assert currentOp truncation behavior for unsharded collections.
     assert.eq(res.inprog.length, 1, res);
