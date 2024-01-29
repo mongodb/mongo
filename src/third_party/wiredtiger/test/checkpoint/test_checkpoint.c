@@ -420,6 +420,9 @@ wt_shutdown(void)
     if (g.conn == NULL)
         return (0);
 
+    if (g.opts.tiered_storage)
+        testutil_tiered_end(&g.opts);
+
     printf("Closing connection\n");
     fflush(stdout);
     ret = g.conn->close(g.conn, NULL);

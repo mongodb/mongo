@@ -54,6 +54,17 @@ testutil_tiered_begin(TEST_OPTS *opts)
 }
 
 /*
+ * testutil_tiered_end --
+ *     Clear tiered storage test state for a program that supports tiered storage.
+ */
+void
+testutil_tiered_end(TEST_OPTS *opts)
+{
+    testutil_assert(opts->tiered_begun);
+    opts->tiered_begun = false;
+}
+
+/*
  * testutil_tiered_sleep --
  *     Sleep for a number of seconds, or until it is time to flush_tier, or the process wants to
  *     exit.
