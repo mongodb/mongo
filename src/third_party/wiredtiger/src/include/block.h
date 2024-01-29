@@ -290,6 +290,7 @@ struct __wt_block {
     WT_CKPT *final_ckpt; /* Final live checkpoint write */
 
     /* Compaction support */
+    bool compact_estimated;                    /* If compaction work has been estimated */
     int compact_pct_tenths;                    /* Percent to compact */
     uint64_t compact_bytes_reviewed;           /* Bytes reviewed */
     uint64_t compact_bytes_rewritten;          /* Bytes rewritten */

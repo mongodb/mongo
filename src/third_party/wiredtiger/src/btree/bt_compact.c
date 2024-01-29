@@ -215,9 +215,8 @@ __compact_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
      * application's worker threads: we could release the lock, but then we'd have to acquire a
      * hazard pointer to ensure eviction didn't select the page.
      */
-    if (previous_state == WT_REF_MEM) {
+    if (previous_state == WT_REF_MEM)
         WT_ERR(__compact_page_inmem(session, ref, skipp));
-    }
 
 err:
     WT_REF_UNLOCK(ref, previous_state);

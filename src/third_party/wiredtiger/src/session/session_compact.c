@@ -325,7 +325,6 @@ __compact_worker(WT_SESSION_IMPL *session)
 
             session->compact_state = WT_COMPACT_RUNNING;
             WT_WITH_DHANDLE(session, session->op_handle[i], ret = __wt_compact(session));
-            WT_ERR_ERROR_OK(ret, EBUSY, true);
             /*
              * If successful and we did work, schedule another pass. If successful and we did no
              * work, skip this file in the future.
@@ -346,7 +345,7 @@ __compact_worker(WT_SESSION_IMPL *session)
              *
              * Just quit if eviction is the problem.
              */
-            if (ret == EBUSY) {
+            else if (ret == EBUSY) {
                 if (__wt_cache_stuck(session)) {
                     WT_STAT_CONN_INCR(session, session_table_compact_fail_cache_pressure);
                     WT_ERR_MSG(session, EBUSY,
@@ -361,6 +360,11 @@ __compact_worker(WT_SESSION_IMPL *session)
                   "conflicting checkpoint. Compaction of this data handle will be retried.",
                   session->op_handle[i]->name);
             }
+
+            /* Compaction was interrupted internally. */
+            else if (ret == ECANCELED)
+                ret = 0;
+            WT_ERR(ret);
         }
         if (!another_pass)
             break;
