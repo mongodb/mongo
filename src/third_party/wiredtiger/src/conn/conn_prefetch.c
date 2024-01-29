@@ -158,6 +158,31 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
 
     conn = S2C(session);
 
+    /*
+     * We want to avoid the scenario of requesting pre-fetch on one particular ref many times (e.g
+     * when reading along a single page). We can identify this by checking if the previous pre-fetch
+     * was performed using the same home ref.
+     *
+     * In the event that we find this to be true, we perform pre-fetch for approximately the number
+     * of pages that were added to the queue (WT_PREFETCH_QUEUE_PER_TRIGGER). We then want to ensure
+     * that we will not pre-fetch from this ref for a while, and this is done by checking a counter.
+     *
+     * The counter variable prefetch_skipped_with_parent tracks the number of skips we have
+     * performed on a particular ref. If the number of skips surpasses the number of pages that have
+     * been queued for pre-fetch, we are okay to pre-fetch from this ref again. This condition will
+     * evaluate to false and the counter will be reset, effectively marking the ref as available to
+     * pre-fetch from.
+     */
+    if (session->pf.prefetch_prev_ref->page == ref->home)
+        if (session->pf.prefetch_skipped_with_parent < WT_PREFETCH_QUEUE_PER_TRIGGER) {
+            ++session->pf.prefetch_skipped_with_parent;
+            WT_STAT_CONN_INCR(session, block_prefetch_skipped_same_ref);
+            WT_STAT_CONN_INCR(session, block_prefetch_skipped);
+            return (0);
+        }
+
+    session->pf.prefetch_skipped_with_parent = 0;
+
     WT_RET(__wt_calloc_one(session, &pe));
     pe->ref = ref;
     pe->first_home = ref->home;
@@ -213,6 +238,7 @@ __wt_conn_prefetch_clear_tree(WT_SESSION_IMPL *session, bool all)
     }
     if (all)
         WT_ASSERT(session, conn->prefetch_queue_count == 0);
+
     __wt_spin_unlock(session, &conn->prefetch_lock);
 
     return (0);
