@@ -139,7 +139,6 @@ public:
     }
 
     const std::vector<BSONElement>& getElements() {
-        sortAndDedupElements();
         return _elements;
     }
 
@@ -152,8 +151,6 @@ public:
         if (!(getBSONTypeMask(e.type()) & _typeMask)) {
             return false;
         }
-
-        sortAndDedupElements();
 
         // Use binary search.
         auto elemLt = InListElemLessThan(_collator);
@@ -260,14 +257,6 @@ public:
         return _prepared;
     }
 
-    // This method will sort and de-dup the BSONElements in '_elements' if they haven't already
-    // been sorted and de-duped.
-    inline void sortAndDedupElements() {
-        if (!_sortedAndDeduped) {
-            sortAndDedupElementsImpl();
-        }
-    }
-
     // If '_arr.has_value() && !_arr->isOwned()' is true, this method will make a copy of the BSON
     // and then update update '_arr' and '_elements' to point to the copied BSON instead of the
     // original BSON. If '_arr.has_value() && !_arr->isOwned()' is false, this method does nothing.
@@ -290,7 +279,9 @@ private:
 
     void updateSbeTagMasks();
 
-    void sortAndDedupElementsImpl();
+    // This method will sort and de-dup the BSONElements in '_elements' if they haven't already
+    // been sorted and de-duped.
+    void sortAndDedupElements();
 
     void buildHashSet();
 
