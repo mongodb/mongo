@@ -164,6 +164,11 @@ def generate_mongod_parameters(rng, mode):
         ["nearest", "primary", "primaryPreferred", "secondaryPreferred"])
     ret["initialSyncMethod"] = rng.choice(["fileCopyBased", "logical"])
 
+    # Query parameters
+    ret["internalQueryExecYieldIterations"] = rng.choices([1, rng.randint(1, 1000)],
+                                                          weights=[1, 10])[0]
+    ret["internalQueryExecYieldPeriodMS"] = rng.randint(1, 100)
+
     # We need a higher timeout to account for test slowness
     ret["receiveChunkWaitForRangeDeleterTimeoutMS"] = 300000
     ret["defaultConfigCommandTimeoutMS"] = 90000
