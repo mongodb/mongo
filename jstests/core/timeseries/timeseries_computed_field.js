@@ -109,9 +109,22 @@ TimeseriesTest.run((insert) => {
     }
 
     {
-        // Include an uneccessary computed field before counting the number of documents.
+        // Include an unnecessary computed field before counting the number of documents.
         const res = coll.aggregate([{$addFields: {"a": 1}}, {$count: "count"}]).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 3, res);
+    }
+
+    {
+        // Try a project stage which adds and remove subfields.
+        const res = coll.aggregate([
+                            {$project: {"obj.newField": "$topLevelScalar"}},
+                            {$project: {"_id": 0, "obj.a": 0}}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 3, res);
+        assert.eq(res[0], {"obj": {"newField": 123}}, res);
+        assert.eq(res[1], {"obj": {"newField": 456}}, res);
+        assert.eq(res[2], {"obj": {}}, res);
     }
 });

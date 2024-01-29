@@ -3654,7 +3654,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         nodes = std::move(newNodes);
     }
 
-    StringMap<TypedSlot> updatedPathsSlotMap;
     sbe::SlotExprPairVector projects;
 
     if (outputs.hasBlockOutput()) {
@@ -3681,8 +3680,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             }
         };
 
-        // We evaluate all the MQL Expressions in advance here, and update the corresponding
-        // ProjectNodes in 'nodes' accordingly.
+        // Keep the paths that we can compute in a vectorized way in a separate map, and update the
+        // state of the variables after we decided whether to transition to scalar processing.
+        StringSet vectorizedPaths;
         for (size_t i = 0; i < nodes.size(); ++i) {
             auto& node = nodes[i];
             auto& path = paths[i];
@@ -3693,26 +3693,25 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
             auto slot = projectExpressionToSlot(node.getExpr());
             if (slot.has_value()) {
-                node = ProjectNode(SbExpr{slot->slotId});
-
-                auto it = plan->updatedPathsExprMap.find(path);
-
-                if (it != plan->updatedPathsExprMap.end()) {
-                    updatedPathsSlotMap.emplace(path, *slot);
-                    plan->updatedPathsExprMap.erase(it);
-                }
+                vectorizedPaths.insert(path);
+                // Declare in which slot our projection is going to publish this path.
+                outputs.set(std::make_pair(PlanStageSlots::kField, path), *slot);
             }
         }
 
         if (!plan->updatedPathsExprMap.empty()) {
-            for (auto&& path : plan->updatedPaths) {
-                auto it = plan->updatedPathsExprMap.find(path);
+            for (auto& path : plan->updatedPaths) {
+                if (vectorizedPaths.contains(path)) {
+                    continue;
+                }
 
+                auto it = plan->updatedPathsExprMap.find(path);
                 if (it != plan->updatedPathsExprMap.end()) {
                     auto slot = projectExpressionToSlot(it->second);
                     if (slot.has_value()) {
-                        updatedPathsSlotMap.emplace(path, *slot);
-                        plan->updatedPathsExprMap.erase(it);
+                        vectorizedPaths.insert(path);
+                        // Declare in which slot our projection is going to publish this path.
+                        outputs.set(std::make_pair(PlanStageSlots::kField, path), *slot);
                     }
                 }
             }
@@ -3730,19 +3729,27 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // we need to build a scalar result document.
         if (!plan->updatedPathsExprMap.empty() || !reqs.getCanProcessBlockValues() ||
             planType != BuildProjectionPlan::kDoNotMakeResult) {
-            // Include the output of the ProjectStage so that it gets converted to scalar values.
-            for (auto& entry : updatedPathsSlotMap) {
-                outputs.set(std::make_pair(PlanStageSlots::kField, entry.first), entry.second);
+            stage = buildBlockToRow(std::move(stage), outputs);
+        }
+
+        // Retrieve the type of the slot associated with each projected path and update the state
+        // variables of this method.
+        for (size_t i = 0; i < nodes.size(); ++i) {
+            auto& node = nodes[i];
+            auto& path = paths[i];
+
+            if (!node.isExpr() || !vectorizedPaths.contains(path)) {
+                continue;
             }
 
-            stage = buildBlockToRow(std::move(stage), outputs);
-
-            // Update the info stored in local maps to avoid restoring an out-of-date information
-            // later.
-            for (auto& entry : updatedPathsSlotMap) {
-                if (TypeSignature::kBlockType.isSubset(entry.second.typeSignature) ||
-                    TypeSignature::kCellType.isSubset(entry.second.typeSignature)) {
-                    entry.second = outputs.get(std::make_pair(PlanStageSlots::kField, entry.first));
+            auto slot = outputs.get(std::make_pair(PlanStageSlots::kField, path));
+            node = ProjectNode(SbExpr{slot.slotId});
+            plan->updatedPathsExprMap.erase(path);
+        }
+        if (!plan->updatedPathsExprMap.empty()) {
+            for (auto& path : plan->updatedPaths) {
+                if (vectorizedPaths.contains(path)) {
+                    plan->updatedPathsExprMap.erase(path);
                 }
             }
         }
@@ -3778,7 +3785,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto it = plan->updatedPathsExprMap.find(path);
 
             if (it != plan->updatedPathsExprMap.end()) {
-                updatedPathsSlotMap.emplace(path, slot);
+                // Declare in which slot our projection is going to publish this path.
+                outputs.set(std::make_pair(PlanStageSlots::kField, path), slot);
                 plan->updatedPathsExprMap.erase(it);
             }
         }
@@ -3789,7 +3797,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
                 if (it != plan->updatedPathsExprMap.end()) {
                     auto slot = projectExpressionToSlot(it->second);
-                    updatedPathsSlotMap.emplace(path, slot);
+                    // Declare in which slot our projection is going to publish this path.
+                    outputs.set(std::make_pair(PlanStageSlots::kField, path), slot);
                     plan->updatedPathsExprMap.erase(it);
                 }
             }
@@ -3869,12 +3878,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (!projects.empty()) {
         stage =
             sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), root->nodeId());
-    }
-
-    // Update kField slots in 'outputs' as appropriate.
-    for (auto&& updatedPath : plan->updatedPaths) {
-        auto slot = updatedPathsSlotMap[updatedPath];
-        outputs.set(std::make_pair(PlanStageSlots::kField, std::move(updatedPath)), slot);
     }
 
     // Set kField slots to Nothing as appropriate.
