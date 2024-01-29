@@ -20,9 +20,10 @@
 
 import {assertTopDiffEq, getTop} from "jstests/libs/stats.js";
 
-const dbName = "toptest";
+const dbName = jsTestName();
 
-// Skipping the collection from dbcheck during the test.
+// Skipping the collection from dbcheck during the test. See 'collNamesIgnoredFromDBCheck' in
+// dbcheck_utils.js for more info.
 const collName = dbName + "_coll_temp";
 const afterTestCollName = dbName + "_coll";
 

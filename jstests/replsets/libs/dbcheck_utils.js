@@ -162,7 +162,7 @@ function getIndexNames(db, collName, allowedErrorCodes) {
 // List of collection names that are ignored from dbcheck.
 const collNamesIgnoredFromDBCheck = [
     "operationalLatencyHistogramTest_coll_temp",
-    "toptest_coll_temp",
+    "top_coll_temp",
 ];
 
 // Run dbCheck for all collections in the database with given parameters and potentially wait for
