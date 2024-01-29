@@ -154,7 +154,9 @@ static StringSet toStringSet(const NamespaceStringContainer& namespaces) {
 /**
  * Searches for a client matching the name and mark the operation context as killed.
  */
-void killClientOpCtx(ServiceContext* service, const std::string& clientName) {
+void killClientOpCtx(ServiceContext* service,
+                     const std::string& clientName,
+                     ErrorCodes::Error error) {
     for (int retries = 0; retries < 20; retries++) {
         for (ServiceContext::LockedClientsCursor cursor(service); auto client = cursor.next();) {
             invariant(client);
@@ -162,8 +164,7 @@ void killClientOpCtx(ServiceContext* service, const std::string& clientName) {
             stdx::lock_guard lk(*client);
             if (client->desc() == clientName) {
                 if (auto opCtx = client->getOperationContext()) {
-                    opCtx->getServiceContext()->killOperation(
-                        lk, opCtx, ErrorCodes::InterruptedAtShutdown);
+                    opCtx->getServiceContext()->killOperation(lk, opCtx, error);
                     return;
                 }
             }
@@ -1712,13 +1713,15 @@ TEST_F(TransactionCoordinatorMetricsTest, SingleCoordinatorStatsSimpleTwoPhaseCo
 
     size_t startIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
     size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+    TransactionCoordinator::Step previousStep = TransactionCoordinator::Step::kInactive;
     for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
         auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
 
         // Stats are updated on step start
         expectedStats.stepStartTimes[stepIndex] = advanceClockSourceAndReturnNewNow();
         expectedStats.stepDurations[stepIndex] = Microseconds(0);
-        coordinatorObserver.onStartStep(step, metrics(), tickSource(), clockSource()->now());
+        coordinatorObserver.onStartStep(
+            step, previousStep, metrics(), tickSource(), clockSource()->now());
         checkStats(stats, expectedStats);
 
         // Advancing the time causes the total duration, two-phase commit duration, and duration
@@ -1730,6 +1733,8 @@ TEST_F(TransactionCoordinatorMetricsTest, SingleCoordinatorStatsSimpleTwoPhaseCo
         expectedStats.stepDurations[stepIndex] =
             *expectedStats.stepDurations[stepIndex] + Microseconds(100);
         checkStats(stats, expectedStats);
+
+        previousStep = step;
     }
 
     // Stats are updated on onEnd.
@@ -1759,6 +1764,7 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommit)
     // Metrics are updated on start of each step.
     size_t startIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
     size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+    TransactionCoordinator::Step previousStep = TransactionCoordinator::Step::kInactive;
     expectedMetrics.totalStartedTwoPhaseCommit++;
     for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
         auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
@@ -1766,8 +1772,11 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommit)
         if (stepIndex - 1 >= startIndex) {
             expectedMetrics.currentInSteps[stepIndex - 1]--;
         }
-        coordinatorObserver.onStartStep(step, metrics(), tickSource(), clockSource()->now());
+        coordinatorObserver.onStartStep(
+            step, previousStep, metrics(), tickSource(), clockSource()->now());
         checkMetrics(expectedMetrics);
+
+        previousStep = step;
     }
 
     // Metrics are updated on onEnd.
@@ -1796,6 +1805,7 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommitT
 
     size_t startIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
     size_t lastIndex = static_cast<size_t>(TransactionCoordinator::Step::kLastStep);
+    TransactionCoordinator::Step previousStep = TransactionCoordinator::Step::kInactive;
     for (size_t stepIndex = startIndex; stepIndex <= lastIndex; ++stepIndex) {
         auto step = static_cast<TransactionCoordinator::Step>(stepIndex);
         for (auto& observer : coordinatorObservers) {
@@ -1805,9 +1815,11 @@ TEST_F(TransactionCoordinatorMetricsTest, ServerWideMetricsSimpleTwoPhaseCommitT
             } else {
                 expectedMetrics.totalStartedTwoPhaseCommit++;
             }
-            observer.onStartStep(step, metrics(), tickSource(), clockSource()->now());
+            observer.onStartStep(step, previousStep, metrics(), tickSource(), clockSource()->now());
             checkMetrics(expectedMetrics);
         }
+
+        previousStep = step;
     }
 
     for (auto& observer : coordinatorObservers) {
@@ -2149,7 +2161,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
         *expectedStats.stepDurations[stepIndex] + Microseconds(100);
     expectedMetrics.currentInSteps[stepIndex]--;
 
-    killClientOpCtx(getServiceContext(), "hangBeforeWaitingForParticipantListWriteConcern");
+    killClientOpCtx(getServiceContext(),
+                    "hangBeforeWaitingForParticipantListWriteConcern",
+                    ErrorCodes::InterruptedAtShutdown);
     ASSERT_THROWS_CODE(
         coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
 
@@ -2289,7 +2303,9 @@ TEST_F(TransactionCoordinatorMetricsTest,
         *expectedStats.stepDurations[stepIndex] + Microseconds(100);
     expectedMetrics.currentInSteps[stepIndex]--;
 
-    killClientOpCtx(getServiceContext(), "hangBeforeWaitingForDecisionWriteConcern");
+    killClientOpCtx(getServiceContext(),
+                    "hangBeforeWaitingForDecisionWriteConcern",
+                    ErrorCodes::InterruptedAtShutdown);
     ASSERT_THROWS_CODE(
         coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
 
@@ -2459,6 +2475,64 @@ TEST_F(TransactionCoordinatorMetricsTest, CoordinatorsAWSIsShutDownWhileCoordina
 
     // Slow log line is not logged since the coordination did not complete successfully.
     ASSERT_EQUALS(0, countTextFormatLogLinesContaining("two-phase commit"));
+}
+
+TEST_F(TransactionCoordinatorMetricsTest,
+       MetricsCorrectlyUpdatedWhenAbortDecisionErrorWhenWritingParticipantsList) {
+    Stats expectedStats;
+    Metrics expectedMetrics;
+    checkMetrics(expectedMetrics);
+
+    // Create the coordinator.
+    expectedMetrics.totalCreated++;
+
+    TransactionCoordinator coordinator(
+        operationContext(),
+        _lsid,
+        _txnNumberAndRetryCounter,
+        std::make_unique<txn::AsyncWorkScheduler>(getServiceContext()),
+        Date_t::now() + Seconds(1),
+        _cancelToken);
+
+    // Wait until the coordinator is writing the participant list.
+    auto participantListFp =
+        globalFailPointRegistry().find("hangBeforeWaitingForParticipantListWriteConcern");
+    auto initTimesEntered = participantListFp->setMode(FailPoint::alwaysOn);
+    coordinator.runCommit(operationContext(), kTwoShardIdList);
+    participantListFp->waitForTimesEntered(initTimesEntered + 1);
+
+    // We expect the "currentInSteps" metric for the kWritingParticipantList to be 1. All other step
+    // metrics should be 0 (default).
+    size_t stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingParticipantList);
+    expectedMetrics.currentInSteps[stepIndex]++;
+    expectedMetrics.totalStartedTwoPhaseCommit++;
+    checkMetrics(expectedMetrics);
+    checkServerStatus();
+
+    // Force a "TransactionCoordinatorReachedAbortDecision" error while writing the participant
+    // list. The coordinator should skip the "waitingForVotes" phase, and jump straight to the
+    // "writingDecision" phase.
+    FailPointEnableBlock decisionFp("hangBeforeWaitingForDecisionWriteConcern");
+    killClientOpCtx(getServiceContext(),
+                    "hangBeforeWaitingForParticipantListWriteConcern",
+                    ErrorCodes::TransactionCoordinatorReachedAbortDecision);
+    participantListFp->setMode(FailPoint::off);
+    decisionFp->waitForTimesEntered(decisionFp.initialTimesEntered() + 1);
+
+    // We now expect the "currentInSteps" metric for kWritingParticipantList to be 0, and for it to
+    // be 1 for "kWritingDecision". All other steps, including "kWaitingForVotes" should be 0.
+    expectedMetrics.currentInSteps[stepIndex]--;
+    stepIndex = static_cast<size_t>(TransactionCoordinator::Step::kWritingDecision);
+    expectedMetrics.currentInSteps[stepIndex]++;
+    checkMetrics(expectedMetrics);
+    checkServerStatus();
+
+    // Force the coordinator to stop.
+    killClientOpCtx(getServiceContext(),
+                    "hangBeforeWaitingForDecisionWriteConcern",
+                    ErrorCodes::InterruptedAtShutdown);
+    ASSERT_THROWS_CODE(
+        coordinator.onCompletion().get(), DBException, ErrorCodes::InterruptedAtShutdown);
 }
 
 TEST_F(TransactionCoordinatorMetricsTest, LogsTransactionAtLogLevelOne) {

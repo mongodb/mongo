@@ -62,6 +62,7 @@ void TransactionCoordinatorMetricsObserver::onRecoveryFromFailover() {
 
 void TransactionCoordinatorMetricsObserver::onStartStep(
     TransactionCoordinator::Step step,
+    TransactionCoordinator::Step previousStep,
     ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorsMetrics,
     TickSource* tickSource,
     Date_t curWallClockTime) {
@@ -79,8 +80,6 @@ void TransactionCoordinatorMetricsObserver::onStartStep(
     if (step == TransactionCoordinator::Step::kWritingParticipantList) {
         serverTransactionCoordinatorsMetrics->incrementTotalStartedTwoPhaseCommit();
     } else {
-        auto previousStep =
-            static_cast<TransactionCoordinator::Step>(static_cast<size_t>(step) - 1);
         serverTransactionCoordinatorsMetrics->decrementCurrentInStep(previousStep);
     }
 }

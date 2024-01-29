@@ -64,6 +64,7 @@ public:
      * Updates relevant metrics when a transaction coordinator is about to start a new step.
      */
     void onStartStep(TransactionCoordinator::Step step,
+                     TransactionCoordinator::Step previousStep,
                      ServerTransactionCoordinatorsMetrics* serverTransactionCoordinatorMetrics,
                      TickSource* tickSource,
                      Date_t curWallClockTime);
