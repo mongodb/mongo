@@ -35,7 +35,6 @@ from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
 
 # Smoke test bulk-load.
-@wttest.skip_for_hook("tiered", "FIXME-WT-9809 - Triggers WT-9954")
 class test_bulk_load(wttest.WiredTigerTestCase):
     name = 'test_bulk'
 

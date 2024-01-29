@@ -80,12 +80,14 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     WT_DECL_RET;
     uint64_t ckpt_time;
     const char *key, *value;
+    bool release;
 
     __wt_verbose(session, WT_VERB_TIERED, "CKPT_FLUSH_TIER: Called force %d", force);
 
     WT_STAT_CONN_INCR(session, flush_tier);
     conn = S2C(session);
     cursor = NULL;
+    release = false;
 
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
     WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_CHECKPOINT));
@@ -138,18 +140,28 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
                 }
             }
             /* Only instantiate the handle if we need to flush. */
-            WT_ERR(__wt_session_get_dhandle(session, key, NULL, NULL, 0));
+            WT_ERR_ERROR_OK(__wt_session_get_dhandle(session, key, NULL, NULL, 0), EBUSY, true);
+
+            /*
+             * If we get back EBUSY, this handle may be open with bulk or other special flags. We
+             * need to skip this tree. We fake checkpoints for such trees, i.e. we never really
+             * write a checkpoint to the disk and we cannot get the dhandle now.
+             */
+            if (ret == EBUSY) {
+                WT_STAT_CONN_INCR(session, flush_tier_skipped);
+                continue;
+            }
+            release = true;
             /*
              * When we call wt_tiered_switch the session->dhandle points to the tiered: entry and
              * the arg is the config string that is currently in the metadata. Also, mark the tree
-             * dirty to ensure it participates in the checkpoint process, even if clean. Skip the
-             * trees still open for bulk insertion, we fake checkpoints for them, i.e. we never
-             * really write a checkpoint to the disk - so no point switching just yet.
+             * dirty to ensure it participates in the checkpoint process, even if clean.
              */
             btree = S2BT(session);
             if (btree->original) {
                 WT_STAT_CONN_INCR(session, flush_tier_skipped);
                 WT_ERR(__wt_session_release_dhandle(session));
+                release = false;
                 continue;
             }
             WT_ERR(__wt_tiered_switch(session, value));
@@ -158,6 +170,7 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
             btree->flush_most_recent_secs = session->current_ckpt_sec;
             btree->flush_most_recent_ts = conn->txn_global.last_ckpt_timestamp;
             WT_ERR(__wt_session_release_dhandle(session));
+            release = false;
         }
     }
     WT_ERR(__wt_metadata_cursor_release(session, &cursor));
@@ -167,7 +180,8 @@ __checkpoint_flush_tier(WT_SESSION_IMPL *session, bool force)
     return (0);
 
 err:
-    WT_TRET(__wt_session_release_dhandle(session));
+    if (release)
+        WT_TRET(__wt_session_release_dhandle(session));
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     WT_STAT_CONN_INCR(session, flush_tier_fail);
     return (ret);
