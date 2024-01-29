@@ -10,7 +10,6 @@ import subprocess
 import sys
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Set, Tuple, List, Dict, NamedTuple
 
 import click
@@ -57,10 +56,6 @@ SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
                         "multi_stmt_txn_passthrough", "parallel_fsm_workload_test",
                         "all_versions_js_test")
 RUN_ALL_FEATURE_FLAG_TESTS = "--runAllFeatureFlagTests"
-
-JSTESTS_DIRS = ["jstests", "src/mongo/db/modules/enterprise/jstests"]
-JS_COMMENT_START = ["//", "/*", "*"]
-JS_COMMENT_END = ["*/"]
 
 
 class RepeatConfig(object):
@@ -142,54 +137,6 @@ def is_file_a_test_file(file_path: str) -> bool:
         return False
 
     return True
-
-
-def find_dependants(file_path: str, dirs: List[str]) -> List[str]:
-    """
-    Find all test files that have references to the given file.
-
-    :param file_path: Path to file.
-    :param dirs: Directories to look in.
-    :return: List of files that have references including the file itself.
-    """
-    # Filters out JS comment lines and matches relative from repo root file path
-    regex = f"^[[:space:]]*[^({'|'.join(JS_COMMENT_START)})[:space:]].*{file_path}.*[^({'|'.join(JS_COMMENT_END)})]$"
-
-    grep = subprocess.run(["grep", "-E", "-l", regex, "-r", *dirs], capture_output=True, text=True)
-
-    positive_exit_codes = [
-        0,  # exit status is 0 if a line is selected, i.e. dependants are found
-        1,  # exit status is 1 if no lines were selected, i.e. dependants not found
-    ]
-
-    if grep.returncode not in positive_exit_codes:
-        raise subprocess.CalledProcessError(grep.returncode, grep.args, grep.stdout, grep.stderr)
-
-    return grep.stdout.strip().split()
-
-
-def find_all_references(file_paths: Set[str]) -> Set[str]:
-    """
-    Find all test files that have references to the given set of files.
-
-    :param file_paths: List of file paths.
-    :return: Set of files that have references including files themselves.
-    """
-    found_files = set(file_paths)
-    dirs = [d for d in JSTESTS_DIRS if os.path.isdir(d)]
-
-    next_iteration_check = {file for file in found_files}
-    while len(next_iteration_check):
-        with ThreadPoolExecutor() as executor:
-            jobs = [executor.submit(find_dependants, file, dirs) for file in next_iteration_check]
-            found_refs = []
-            for job in jobs:
-                found_refs.extend(job.result())
-
-        next_iteration_check = {ref for ref in found_refs if ref not in found_files}
-        found_files.update(next_iteration_check)
-
-    return found_files
 
 
 def find_excludes(selector_file: str) -> Tuple[List, List, List]:
@@ -666,12 +613,9 @@ class BurnInOrchestrator:
         :param build_variant: Build variant to use for task definitions.
         """
         changed_tests = self.change_detector.find_changed_tests(repos)
-        LOGGER.info("Found changed test files", files=changed_tests)
+        LOGGER.info("Found changed tests", files=changed_tests)
 
-        references = find_all_references(changed_tests)
-        LOGGER.info("Found tests that reference changed test files", files=references)
-
-        tests_by_task = create_tests_by_task(build_variant, self.evg_conf, references,
+        tests_by_task = create_tests_by_task(build_variant, self.evg_conf, changed_tests,
                                              self.install_dir)
         LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
