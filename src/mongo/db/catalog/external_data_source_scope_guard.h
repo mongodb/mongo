@@ -58,8 +58,6 @@ public:
         }
     }
 
-    ExternalDataSourceScopeGuard() : _opCtx(nullptr), _toBeDroppedVirtualCollections() {}
-
     ExternalDataSourceScopeGuard(
         OperationContext* opCtx,
         const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
