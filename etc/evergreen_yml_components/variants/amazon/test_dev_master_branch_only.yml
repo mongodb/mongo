@@ -157,6 +157,10 @@ buildvariants:
   - name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
   - name: embedded_router_jscore_passthrough_gen
   - name: embedded_router_jscore_passthrough_with_config_shard_gen
+  - name: embedded_router_jscore_txns_gen
+  - name: embedded_router_jscore_txns_with_config_shard_gen
+  - name: embedded_router_sharded_collections_jscore_txns_gen
+  - name: embedded_router_sharded_collections_jscore_txns_with_config_shard_gen
   - name: .encrypt
   - name: feature_flag_multiversion_gen
   - name: idl_tests

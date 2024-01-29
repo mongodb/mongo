@@ -257,7 +257,31 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: embedded_router_jscore_txns_gen
+  tags: ["assigned_to_jira_team_server_servicearch"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: embedded_router_jscore_txns_with_config_shard_gen
+  tags: ["assigned_to_jira_team_server_servicearch"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: embedded_router_sharded_collections_jscore_txns_gen
+  tags: ["assigned_to_jira_team_server_servicearch"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: aggregation_sharded_collections_embedded_router_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_servicearch"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: embedded_router_sharded_collections_jscore_txns_with_config_shard_gen
   tags: ["assigned_to_jira_team_server_servicearch"]
   commands:
   - func: "generate resmoke tasks"

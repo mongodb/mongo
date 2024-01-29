@@ -6,7 +6,7 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
-  # These tests are run in sharded_jscore_txns.
+  # These tests are run in embedded_router_jscore_txns.
   - jstests/core/txns/**/*.js
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
