@@ -626,7 +626,7 @@ var ReplSetTest = function ReplSetTest(opts) {
      *
      * @param options - The options passed to {@link MongoRunner.runMongod}
      */
-    ReplSetTest.prototype.startSet = function(options, restart) {
+    ReplSetTest.prototype.startSet = function(options, restart, isMixedVersionCluster) {
         // If the caller has explicitly specified 'waitForConnect:false', then we will start up all
         // replica set nodes and return without waiting to connect to any of them.
         const skipWaitingForAllConnections = (options && options.waitForConnect === false);
@@ -635,7 +635,7 @@ var ReplSetTest = function ReplSetTest(opts) {
         this.startSetOptions = options;
 
         // Start up without waiting for connections.
-        this.startSetAsync(options, restart);
+        this.startSetAsync(options, restart, isMixedVersionCluster);
 
         // Avoid waiting for connections to each node.
         if (skipWaitingForAllConnections) {
@@ -653,7 +653,7 @@ var ReplSetTest = function ReplSetTest(opts) {
      *
      * @param options - The options passed to {@link MongoRunner.runMongod}
      */
-    ReplSetTest.prototype.startSetAsync = function(options, restart) {
+    ReplSetTest.prototype.startSetAsync = function(options, restart, isMixedVersionCluster) {
         print("ReplSetTest starting set '" + this.name + "'");
         this.startSetStartTime = new Date();  // Measure the execution time of node startup.
 
@@ -689,7 +689,7 @@ var ReplSetTest = function ReplSetTest(opts) {
                 options.waitForConnect = true;
             }
 
-            this.start(n, options, restart);
+            this.start(n, options, restart, false, isMixedVersionCluster);
         }
         return this.nodes;
     };
@@ -3191,9 +3191,12 @@ var ReplSetTest = function ReplSetTest(opts) {
      *   before the server starts.  Default: false.
      * @param {boolean} [waitForHealth] If true, wait for the health indicator of the replica set
      *     node after waiting for a connection. Default: false.
+     * @param {boolean} [isMixedVersionCluster] If true, it tells mongorunner that this node is part
+     *     of a mixed version cluster, and will add --upgradeBackCompat when appropriate.
+     *     Default: false.
      */
     ReplSetTest.prototype.start = _nodeParamToSingleNode(_nodeParamToId(function(
-        n, options, restart, waitForHealth) {
+        n, options, restart, waitForHealth, isMixedVersionCluster) {
         print("ReplSetTest n is : " + n);
 
         var defaults = {
@@ -3265,10 +3268,17 @@ var ReplSetTest = function ReplSetTest(opts) {
                 // Our documented upgrade/downgrade paths for a sharded cluster lets us assume that
                 // config server nodes will always be fully upgraded before the shard nodes.
                 options.binVersion = "latest";
+                options.upgradeBackCompat = '';
             } else {
-                const rand = Random.rand();
-                options.binVersion =
-                    rand < 0.5 ? "latest" : jsTest.options().useRandomBinVersionsWithinReplicaSet;
+                if (Random.rand() < 0.5) {
+                    options.binVersion = "latest";
+                    options.upgradeBackCompat = '';
+                } else {
+                    options.binVersion = jsTest.options().useRandomBinVersionsWithinReplicaSet;
+                    options.removeOptions = (options.removeOptions ? options.removeOptions : [])
+                                                .concat("upgradeBackCompat");
+                    delete options.upgradeBackCompat;
+                }
             }
             print("Randomly assigned binary version: " + options.binVersion + " to node: " + n);
         }
@@ -3363,7 +3373,7 @@ var ReplSetTest = function ReplSetTest(opts) {
 
         // Never wait for a connection inside runMongod. We will do so below if needed.
         options.waitForConnect = false;
-        var conn = MongoRunner.runMongod(options);
+        var conn = MongoRunner.runMongod(options, isMixedVersionCluster === true);
         if (!conn) {
             throw new Error("Failed to start node " + n);
         }
