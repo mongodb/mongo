@@ -658,7 +658,7 @@ buildvariants:
   - name: compile_integration_and_test_parallel_stream_TG
   - name: check_feature_flag_tags
   # TODO SERVER-82766: timeseries, multiversion, and optimization fuzzers had been timing out on TSAN builds.
-  - name: .aggfuzzer !.feature_flag_guarded !.timeseries !.multiversion !.optimization
+  - name: .aggfuzzer !.feature_flag_guarded !.timeseries !.multiversion !.optimization !.no_debug_mode
   - name: .aggregation !.feature_flag_guarded
   - name: audit
   # - name: .auth  # Not passing

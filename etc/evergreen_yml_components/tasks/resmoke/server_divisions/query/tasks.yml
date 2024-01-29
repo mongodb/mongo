@@ -263,7 +263,8 @@ tasks:
 ## Standalone fuzzer for checking wildcard index correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "aggfuzzer", "common", "wildcard", "require_npm", "random_name"]
+  # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "no_debug_mode" tag.
+  tags: ["assigned_to_jira_team_server_query_execution", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:

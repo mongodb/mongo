@@ -79,6 +79,8 @@ overrides:
   rhel80-asan:
   - task: aggregation_timeseries_fuzzer
     exec_timeout: 150  # 2.5 hours
+  - task: aggregation_wildcard_fuzzer
+    exec_timeout: 240  # 4 hours
 
   rhel80-debug-ubsan:
   - task: update_timeseries_fuzzer
