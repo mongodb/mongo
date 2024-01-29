@@ -44,6 +44,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -198,6 +199,13 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         WT_ITEM catalogValue;
         uassertWTOK(mdbCatalogCursor->get_value(mdbCatalogCursor, &catalogValue), session);
         BSONObj rawCatalogEntry(static_cast<const char*>(catalogValue.data));
+
+        // Skip over the version document, which doesn't correspond to a namespace entry, for
+        // backwards compatibility with older versions that have a written feature document.
+        if (DurableCatalog::isFeatureDocument(rawCatalogEntry)) {
+            continue;
+        }
+
         NamespaceString ns(NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
             rawCatalogEntry.getStringField("ns")));
         if (!shouldImport(ns, migrationId)) {
