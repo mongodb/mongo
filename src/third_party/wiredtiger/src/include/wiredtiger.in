@@ -1680,11 +1680,14 @@ struct __wt_session {
      * @config{dump_address, Display page addresses\, time windows\, and page types as pages are
      * verified\, using the application's message handler\, intended for debugging., a boolean flag;
      * default \c false.}
-     * @config{dump_app_data, Display application data as pages or blocks are verified\, using the
+     * @config{dump_all_data, Display application data as pages or blocks are verified\, using the
      * application's message handler\, intended for debugging.  Disabling this does not guarantee
      * that no user data will be output., a boolean flag; default \c false.}
      * @config{dump_blocks, Display the contents of on-disk blocks as they are verified\, using the
      * application's message handler\, intended for debugging., a boolean flag; default \c false.}
+     * @config{dump_key_data, Display application data keys as pages or blocks are verified\, using
+     * the application's message handler\, intended for debugging.  Disabling this does not
+     * guarantee that no user data will be output., a boolean flag; default \c false.}
      * @config{dump_layout, Display the layout of the files as they are verified\, using the
      * application's message handler\, intended for debugging; requires optional support from the
      * block manager., a boolean flag; default \c false.}
