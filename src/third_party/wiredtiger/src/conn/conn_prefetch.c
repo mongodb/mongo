@@ -43,7 +43,7 @@ __wt_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
 
     F_SET(conn, WT_CONN_PREFETCH_RUN);
 
-    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL;
+    session_flags = WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL | WT_SESSION_PREFETCH_THREAD;
     WT_ERR(__wt_thread_group_create(session, &conn->prefetch_threads, "prefetch-server", 8, 8,
       session_flags, __wt_prefetch_thread_chk, __wt_prefetch_thread_run, NULL));
 
