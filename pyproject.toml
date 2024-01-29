@@ -79,6 +79,7 @@ service_identity = "18.1.0"
 twisted = "21.2.0"
 'zope.interface' = "5.0.0"
 ldaptor = "19.0.0"
+google-cloud-compute = "^1.15.0"
 
 [tool.poetry.group.idl.dependencies]
 unittest-xml-reporting = "3.0.4" # Pinned because newer versions require lxml which fails to install

@@ -2428,3 +2428,10 @@ functions:
       binary: bash
       args:
       - "./src/evergreen/antithesis_image_build_and_push.sh"
+
+  "cleanup external auth OIDC resources":
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/external_auth_gcp_teardown.sh"

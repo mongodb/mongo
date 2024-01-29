@@ -186,7 +186,6 @@ variables:
   - func: "run hang analyzer"
   - func: "wait for resmoke to shutdown"
 
-
 ################################################
 #                    Tasks                     #
 ################################################
@@ -781,6 +780,20 @@ tasks:
       binary: bash
       args:
       - "src/evergreen/external_auth_azure_teardown.sh"
+
+- <<: *task_template
+  name: external_auth_oidc_gcp
+  tags: ["assigned_to_jira_team_server_security"]
+  commands:
+  - func: "f_expansions_write"
+  - func: "do setup"
+  - func: "f_expansions_write"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/external_auth_gcp_setup.sh"
+  - func: "run tests"
 
 - <<: *task_template
   name: external_auth_windows

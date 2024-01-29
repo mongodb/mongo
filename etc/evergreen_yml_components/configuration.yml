@@ -125,6 +125,7 @@ pre:
 # Post task steps
 post:
 - func: "f_expansions_write"
+- func: "cleanup external auth OIDC resources"
 - func: "upload npm logs"
 - func: "attach local resmoke invocation"
 - func: "attach multiversion exclude tags"

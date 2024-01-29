@@ -187,6 +187,7 @@ buildvariants:
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_oidc_azure
+  - name: external_auth_oidc_gcp
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_auth
   - name: .jstestfuzz .common !.feature_flag_guarded
