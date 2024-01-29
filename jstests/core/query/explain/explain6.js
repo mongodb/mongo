@@ -1,6 +1,7 @@
 // @tags: [
 //   assumes_balancer_off,
 //   requires_non_retryable_writes,
+//   requires_fcv_73,
 // ]
 
 // Basic test which checks the number of documents returned, keys examined, and documents
@@ -36,4 +37,4 @@ t.save({a: '0', b: '1'});
 t.save({a: '1', b: '0'});
 explain = t.find({a: /0/, b: /1/}).explain(true);
 assert.eq(1, explain.executionStats.nReturned);
-assert.eq(2, explain.executionStats.totalKeysExamined);
+assert.eq(2, explain.executionStats.totalDocsExamined);

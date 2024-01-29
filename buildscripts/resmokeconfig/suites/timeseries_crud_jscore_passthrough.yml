@@ -85,6 +85,7 @@ selector:
   - jstests/core/record_store_count.js
   - jstests/core/write/batched_multi_deletes.js
   - jstests/core/write/bulk/bulk_write_profile.js
+  - jstests/core/query/regex/regex_collations.js
   - jstests/core/write/delete/delete_hint.js
   - jstests/core/write/find_and_modify/find_and_modify_hint.js
   - jstests/core/write/find_and_modify/find_and_modify_pipeline_update.js

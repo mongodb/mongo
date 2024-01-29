@@ -462,10 +462,7 @@ TEST_F(QueryPlannerWildcardTest, NonPrefixRegex) {
     runQuery(fromjson("{a: /foo/}"));
 
     assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: {filter: {a: /foo/}, pattern: {'$_path': 1, a: 1},"
-        "bounds: {'$_path': [['a','a',true,true]],"
-        "a: [['',{},true,false], [/foo/,/foo/,true,true]]}}}}}");
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: /foo/}}}}}");
 }
 
 TEST_F(QueryPlannerWildcardTest, GreaterThan) {

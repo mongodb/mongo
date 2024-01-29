@@ -229,23 +229,18 @@ TEST_F(QueryPlannerTest, MinMaxWithStringBoundsCannotBeCoveredWithCollator) {
         "{locale: 'reverse'}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
-TEST_F(QueryPlannerTest, SimpleRegexCanUseAnIndexWithACollatorWithLooseBounds) {
+TEST_F(QueryPlannerTest, PrefixOnlyRegexCannotUseAnIndexWithACollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(fromjson("{a: 1}"), &collator);
 
-    // Since the index has a collation, the regex must be applied after fetching the documents
-    // (INEXACT_FETCH tightness).
     runQueryAsCommand(
         fromjson("{find: 'testns', filter: {a: /^simple/}, collation: {locale: 'reverse'}}"));
 
-    assertNumSolutions(2U);
+    assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");
-    assertSolutionExists(
-        "{fetch: {filter: {a: /^simple/}, node: {ixscan: {pattern: {a: 1}, filter: null, bounds: "
-        "{a: [['', {}, true, false], [/^simple/, /^simple/, true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, SimpleRegexCanUseAnIndexWithoutACollatorWithTightBounds) {
+TEST_F(QueryPlannerTest, PrefixOnlyRegexCanUseAnIndexWithoutACollatorWithTightBounds) {
     addIndex(fromjson("{a: 1}"));
 
     runQueryAsCommand(
@@ -258,17 +253,13 @@ TEST_F(QueryPlannerTest, SimpleRegexCanUseAnIndexWithoutACollatorWithTightBounds
         "{a: [['simple', 'simplf', true, false], [/^simple/, /^simple/, true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, NonSimpleRegexCanUseAnIndexWithoutACollatorAsInexactCovered) {
+TEST_F(QueryPlannerTest, NonSimpleRegexCanNotUseAnIndexWithoutACollator) {
     addIndex(fromjson("{a: 1}"));
 
-    runQueryAsCommand(
-        fromjson("{find: 'testns', filter: {a: /nonsimple/}, collation: {locale: 'reverse'}}"));
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {a: /nonsimple/}}"));
 
-    assertNumSolutions(2U);
+    assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1}, filter: {a: /nonsimple/}, bounds: "
-        "{a: [['', {}, true, false], [/nonsimple/, /nonsimple/, true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, AccessPlannerCorrectlyCombinesComparisonKeyBounds) {

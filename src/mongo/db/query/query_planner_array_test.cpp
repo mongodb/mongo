@@ -281,24 +281,24 @@ TEST_F(QueryPlannerTest, ElemMatchEmbeddedOr) {
 // SERVER-13664
 TEST_F(QueryPlannerTest, ElemMatchEmbeddedRegex) {
     addIndex(BSON("a.b" << 1));
-    runQuery(fromjson("{a: {$elemMatch: {b: /foo/}}}"));
+    runQuery(fromjson("{a: {$elemMatch: {b: /^foo/}}}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {a:{$elemMatch:{b:/foo/}}}, node: "
+        "{fetch: {filter: {a:{$elemMatch:{b:/^foo/}}}, node: "
         "{ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
 }
 
 // SERVER-14180
 TEST_F(QueryPlannerTest, ElemMatchEmbeddedRegexAnd) {
     addIndex(BSON("a.b" << 1));
-    runQuery(fromjson("{a: {$elemMatch: {b: /foo/}}, z: 1}"));
+    runQuery(fromjson("{a: {$elemMatch: {b: /^foo/}}, z: 1}"));
 
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {a:{$elemMatch:{b:/foo/}}, z:1}, node: "
+        "{fetch: {filter: {a:{$elemMatch:{b:/^foo/}}, z:1}, node: "
         "{ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
 }
 

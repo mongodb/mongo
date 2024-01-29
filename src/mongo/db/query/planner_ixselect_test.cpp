@@ -77,8 +77,6 @@ using namespace mongo;
 
 namespace {
 
-constexpr CollatorInterface* kSimpleCollator = nullptr;
-
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -271,13 +269,18 @@ void testRateIndices(const char* query,
                      const CollatorInterface* collator,
                      const vector<IndexEntry>& indices,
                      const char* expectedPathsStr,
-                     const std::set<size_t>& expectedIndices) {
+                     const std::set<size_t>& expectedIndices,
+                     bool mustUseIndexedPlan = false) {
     // Parse and rate query. Some of the nodes in the rated tree
     // will be tagged after the rating process.
     BSONObj obj = fromjson(query);
     unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
 
-    QueryPlannerIXSelect::rateIndices(expr.get(), prefix, indices, collator);
+    QueryPlannerIXSelect::QueryContext queryContext;
+    queryContext.collator = collator;
+    queryContext.elemMatchContext = QueryPlannerIXSelect::ElemMatchContext{};
+    queryContext.mustUseIndexedPlan = mustUseIndexedPlan;
+    QueryPlannerIXSelect::rateIndices(expr.get(), prefix, indices, queryContext);
 
     // Retrieve a list of paths and a set of indices embedded in
     // tagged nodes.
@@ -1361,6 +1364,75 @@ TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldBeRelevantForExistsTrue) {
     testRateIndices("{a: {$exists: true}}", "", kSimpleCollator, {entry}, "a", expectedIndices);
 }
 
+TEST(QueryPlannerIXSelectTest,
+     CannotUseIndexWithNotSimpleCollatorForRegexFilterWithSimpleCollator) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    CollatorInterfaceMock notSimpleCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &notSimpleCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {};
+    testRateIndices(
+        "{a: { $regex: \"^John\"}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest,
+     CannotUseIndexWithNotSimpleCollatorForRegexFilterWithNotSimpleCollator) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    CollatorInterfaceMock notSimpleCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &notSimpleCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {};
+    testRateIndices(
+        "{a: { $regex: \"^John\"}}", "", &notSimpleCollator, indices, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, CanUseIndexWithSimpleCollatorForRegexFilterWithSimpleCollator) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    index.collator = kSimpleCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: { $regex: \"^John\"}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, CanUseIndexWithSimpleCollatorForRegexFilterWithNotSimpleCollator) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    CollatorInterfaceMock notSimpleCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = kSimpleCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices(
+        "{a: { $regex: \"^John\"}}", "", &notSimpleCollator, indices, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, UsesIndexIfRequiredByTheQuery) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    CollatorInterfaceMock notSimpleCollator(CollatorInterfaceMock::MockType::kReverseString);
+    index.collator = &notSimpleCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: { $regex: \"^John\"}}",
+                    "",
+                    &notSimpleCollator,
+                    indices,
+                    "a",
+                    expectedIndices,
+                    true /* must use index */);
+}
+
+TEST(QueryPlannerIXSelectTest, CannotUseIndexWithSimpleCollatorForNonPrefixRegexFilter) {
+    auto index = buildSimpleIndexEntry(BSON("a" << 1));
+    index.collator = kSimpleCollator;
+    std::vector<IndexEntry> indices;
+    indices.push_back(index);
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: { $regex: \"John\"}}", "", kSimpleCollator, indices, "a", expectedIndices);
+}
 /*
  * Will compare 'keyPatterns' with 'entries'. As part of comparing, it will sort both of them.
  */

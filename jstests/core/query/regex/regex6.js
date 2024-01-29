@@ -3,6 +3,7 @@
 // change depending on whether/how many documents are filtered out by the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_fcv_73,
 // ]
 let t = db.regex6;
 t.drop();
@@ -25,7 +26,7 @@ assert.eq(
 assert.eq(
     1, t.find({name: /^\./}).explain(true).executionStats.totalKeysExamined, "index explain 4");
 assert.eq(
-    5, t.find({name: /^./}).explain(true).executionStats.totalKeysExamined, "index explain 5");
+    5, t.find({name: /^./}).explain(true).executionStats.totalDocsExamined, "index explain 5");
 
 // SERVER-2862
 assert.eq(0, t.find({name: /^\Qblah\E/}).count(), "index explain 6");

@@ -3,6 +3,7 @@
  * non-escaped pipe '|' characters.
  * @tags: [
  *   assumes_read_concern_local,
+ *   requires_fcv_73,
  * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
@@ -72,11 +73,8 @@ assertIndexBoundsAndResult(
     {regex: /^\\/, bounds: ['["\\", "]")', '[/^\\\\/, /^\\\\/]'], results: [{_id: '\\|'}]});
 
 // An anchored regex using the alternation operator cannot use tight index bounds.
-assertIndexBoundsAndResult({
-    regex: /^a|b/,
-    bounds: ['["", {})', '[/^a|b/, /^a|b/]'],
-    results: [{_id: 'a'}, {_id: 'a|b'}, {_id: 'b'}]
-});
+assertIndexBoundsAndResult(
+    {regex: /^a|b/, bounds: ['[MinKey, MaxKey]'], results: [{_id: 'a'}, {_id: 'a|b'}, {_id: 'b'}]});
 
 // An anchored regex that uses an escaped pipe character can use tight index bounds.
 assertIndexBoundsAndResult(
@@ -88,22 +86,17 @@ assertIndexBoundsAndResult(
 // alternation operator and cannot use tight index bounds.
 assertIndexBoundsAndResult({
     regex: /^\\|b/,
-    bounds: ['["", {})', '[/^\\\\|b/, /^\\\\|b/]'],
+    bounds: ['[MinKey, MaxKey]'],
     results: [{_id: '\\|'}, {_id: 'a|b'}, {_id: 'b'}]
 });
-assertIndexBoundsAndResult({
-    regex: /^\\|^b/,
-    bounds: ['["", {})', '[/^\\\\|^b/, /^\\\\|^b/]'],
-    results: [{_id: '\\|'}, {_id: 'b'}]
-});
+assertIndexBoundsAndResult(
+    {regex: /^\\|^b/, bounds: ['[MinKey, MaxKey]'], results: [{_id: '\\|'}, {_id: 'b'}]});
 
 // An escaped backslash immediately followed by an escaped pipe does not use tight index bounds.
-assertIndexBoundsAndResult(
-    {regex: /^\\\|/, bounds: ['["", {})', '[/^\\\\\\|/, /^\\\\\\|/]'], results: [{_id: '\\|'}]});
+assertIndexBoundsAndResult({regex: /^\\\|/, bounds: ['[MinKey, MaxKey]'], results: [{_id: '\\|'}]});
 
 // A pipe escaped with the \Q...\E escape sequence does not use tight index bounds.
-assertIndexBoundsAndResult(
-    {regex: /^\Q|\E/, bounds: ['["", {})', '[/^\\Q|\\E/, /^\\Q|\\E/]'], results: [{_id: '|'}]});
+assertIndexBoundsAndResult({regex: /^\Q|\E/, bounds: ['[MinKey, MaxKey]'], results: [{_id: '|'}]});
 
 // An escaped pipe within \Q...\E can use tight index bounds.
 assertIndexBoundsAndResult({

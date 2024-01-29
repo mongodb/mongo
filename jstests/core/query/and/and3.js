@@ -4,6 +4,7 @@
 //   # Uses $where operator
 //   requires_scripting,
 //   assumes_read_concern_local,
+//   requires_fcv_73,
 // ]
 
 let t = db.jstests_and3;
@@ -20,28 +21,38 @@ function checkScanMatch(query, docsExamined, n) {
     assert.eq(n, e.executionStats.nReturned);
 }
 
-checkScanMatch({a: /o/}, 1, 1);
-checkScanMatch({a: /a/}, 0, 0);
+if (!TestData.isCursorHintsToQuerySettings) {
+    checkScanMatch({a: /o/}, 1, 1);
+    checkScanMatch({a: /a/}, 0, 0);
+}
 checkScanMatch({a: {$not: /o/}}, 2, 1);
 checkScanMatch({a: {$not: /a/}}, 2, 2);
 
-checkScanMatch({$and: [{a: /o/}]}, 1, 1);
-checkScanMatch({$and: [{a: /a/}]}, 0, 0);
+if (!TestData.isCursorHintsToQuerySettings) {
+    checkScanMatch({$and: [{a: /o/}]}, 1, 1);
+    checkScanMatch({$and: [{a: /a/}]}, 0, 0);
+}
 checkScanMatch({$and: [{a: {$not: /o/}}]}, 2, 1);
 checkScanMatch({$and: [{a: {$not: /a/}}]}, 2, 2);
-checkScanMatch({$and: [{a: /oo/}, {a: {$not: /o/}}]}, 1, 0);
-checkScanMatch({$and: [{a: /o/}, {a: {$not: /a/}}]}, 1, 1);
-checkScanMatch({$or: [{a: /o/}]}, 1, 1);
-checkScanMatch({$or: [{a: /a/}]}, 0, 0);
+if (!TestData.isCursorHintsToQuerySettings) {
+    checkScanMatch({$and: [{a: /oo/}, {a: {$not: /o/}}]}, 1, 0);
+    checkScanMatch({$and: [{a: /o/}, {a: {$not: /a/}}]}, 1, 1);
+    checkScanMatch({$or: [{a: /o/}]}, 1, 1);
+    checkScanMatch({$or: [{a: /a/}]}, 0, 0);
+}
 checkScanMatch({$nor: [{a: /o/}]}, 2, 1);
 checkScanMatch({$nor: [{a: /a/}]}, 2, 2);
 
-checkScanMatch({$and: [{$and: [{a: /o/}]}]}, 1, 1);
-checkScanMatch({$and: [{$and: [{a: /a/}]}]}, 0, 0);
+if (!TestData.isCursorHintsToQuerySettings) {
+    checkScanMatch({$and: [{$and: [{a: /o/}]}]}, 1, 1);
+    checkScanMatch({$and: [{$and: [{a: /a/}]}]}, 0, 0);
+}
 checkScanMatch({$and: [{$and: [{a: {$not: /o/}}]}]}, 2, 1);
 checkScanMatch({$and: [{$and: [{a: {$not: /a/}}]}]}, 2, 2);
-checkScanMatch({$and: [{$or: [{a: /o/}]}]}, 1, 1);
-checkScanMatch({$and: [{$or: [{a: /a/}]}]}, 0, 0);
+if (!TestData.isCursorHintsToQuerySettings) {
+    checkScanMatch({$and: [{$or: [{a: /o/}]}]}, 1, 1);
+    checkScanMatch({$and: [{$or: [{a: /a/}]}]}, 0, 0);
+}
 checkScanMatch({$or: [{a: {$not: /o/}}]}, 2, 1);
 checkScanMatch({$and: [{$or: [{a: {$not: /o/}}]}]}, 2, 1);
 checkScanMatch({$and: [{$or: [{a: {$not: /a/}}]}]}, 2, 2);

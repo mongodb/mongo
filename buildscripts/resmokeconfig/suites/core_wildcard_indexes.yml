@@ -22,6 +22,7 @@ selector:
   - jstests/core/timeseries/timeseries_index_use.js
   - jstests/core/timeseries/timeseries_lastpoint.js
   - jstests/core/query/find/finda.js
+  - jstests/core/query/regex/regex_collations.js
   # The following tests check $indexStats and are not expecting to see implicitly created indexes.
   - jstests/core/timeseries/timeseries_index_stats.js
   # The following tests already create some of the indexes we would create implicitly, and may

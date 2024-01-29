@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
+#include "mongo/db/query/analyze_regex.h"
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <boost/container/flat_set.hpp>
@@ -378,12 +379,11 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                                        std::size_t keyPatternIdx,
                                        MatchExpression* node,
                                        StringData fullPathToNode,
-                                       const CollatorInterface* collator,
-                                       const ElemMatchContext& elemMatchContext) {
+                                       const QueryContext& queryContext) {
     if ((boundsGeneratingNodeContainsComparisonToType(node, BSONType::String) ||
          boundsGeneratingNodeContainsComparisonToType(node, BSONType::Array) ||
          boundsGeneratingNodeContainsComparisonToType(node, BSONType::Object)) &&
-        !CollatorInterface::collatorsMatch(collator, index.collator)) {
+        !CollatorInterface::collatorsMatch(queryContext.collator, index.collator)) {
         return false;
     }
 
@@ -420,8 +420,9 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         indexedFieldType = keyPatternElt.String();
     }
 
-    const bool isChildOfElemMatchValue = elemMatchContext.innermostParentElemMatch &&
-        elemMatchContext.innermostParentElemMatch->matchType() == MatchExpression::ELEM_MATCH_VALUE;
+    const bool isChildOfElemMatchValue = queryContext.elemMatchContext.innermostParentElemMatch &&
+        queryContext.elemMatchContext.innermostParentElemMatch->matchType() ==
+            MatchExpression::ELEM_MATCH_VALUE;
 
     // We know keyPatternElt.fieldname() == node->path().
     MatchExpression::MatchType exprtype = node->matchType();
@@ -489,8 +490,8 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             // Most of the time we can't use a multikey index for a $ne: null query, however there
             // are a few exceptions around $elemMatch.
             const bool isNotEqualsNull = isQueryNegatingEqualToNull(node);
-            const bool canUseIndexForNeNull =
-                notEqualsNullCanUseIndex(index, keyPatternElt, keyPatternIdx, elemMatchContext);
+            const bool canUseIndexForNeNull = notEqualsNullCanUseIndex(
+                index, keyPatternElt, keyPatternIdx, queryContext.elemMatchContext);
             if (isNotEqualsNull && !canUseIndexForNeNull) {
                 return false;
             }
@@ -525,9 +526,13 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
         // If this is an $elemMatch value, make sure _all_ of the children can use the index.
         if (node->matchType() == MatchExpression::ELEM_MATCH_VALUE) {
-            ElemMatchContext newContext;
-            newContext.fullPathToParentElemMatch = fullPathToNode;
-            newContext.innermostParentElemMatch = static_cast<ElemMatchValueMatchExpression*>(node);
+            ElemMatchContext newEMContext;
+            newEMContext.fullPathToParentElemMatch = fullPathToNode;
+            newEMContext.innermostParentElemMatch =
+                static_cast<ElemMatchValueMatchExpression*>(node);
+            QueryContext newContext;
+            newContext.elemMatchContext = newEMContext;
+            newContext.collator = queryContext.collator;
 
             FieldRef path(fullPathToNode);
             // If the index path has at least two components, and the last component of the path is
@@ -542,13 +547,8 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             auto&& children = node->getChildVector();
             if (!std::all_of(children->begin(), children->end(), [&](auto&& child) {
                     const auto newPath = fullPathToNode.toString() + child->path();
-                    return _compatible(keyPatternElt,
-                                       index,
-                                       keyPatternIdx,
-                                       child.get(),
-                                       newPath,
-                                       collator,
-                                       newContext);
+                    return _compatible(
+                        keyPatternElt, index, keyPatternIdx, child.get(), newPath, newContext);
                 })) {
                 return false;
             }
@@ -556,6 +556,23 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
         if (index.type == IndexType::INDEX_WILDCARD && !nodeIsSupportedByWildcardIndex(node)) {
             return false;
+        }
+
+        if (MatchExpression::REGEX == exprtype) {
+            RegexMatchExpression* rme = static_cast<RegexMatchExpression*>(node);
+            auto [_, isPrefixOnlyRegex] = analyze_regex::getRegexPrefixMatch(
+                rme->getString().c_str(), rme->getFlags().c_str());
+
+            // Indexes are only useful if:
+            // 1. have no collator since otherwise it'd be ICU encoded and neither PCRE nor PCRE2
+            // support such encoding and
+            // 2. If applied over prefix only regexes since other regexes would need to do a full
+            // IXScan, which is worst than a COLLSCAN
+            //
+            // However, it may happen that the query must use an indexed plan, in which case we'll
+            // need to use it, even if a COLLSCAN would be better
+            return queryContext.mustUseIndexedPlan ||
+                (isPrefixOnlyRegex && CollatorInterface::isSimpleCollator(index.collator));
         }
 
         // We can only index EQ using text indices.  This is an artificial limitation imposed by
@@ -762,20 +779,10 @@ bool QueryPlannerIXSelect::nodeIsSupportedByHashedIndex(const MatchExpression* q
 }
 
 // static
-// This is the public method which does not accept an ElemMatchContext.
 void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
                                        string prefix,
                                        const vector<IndexEntry>& indices,
-                                       const CollatorInterface* collator) {
-    return _rateIndices(node, prefix, indices, collator, ElemMatchContext{});
-}
-
-// static
-void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
-                                        string prefix,
-                                        const vector<IndexEntry>& indices,
-                                        const CollatorInterface* collator,
-                                        const ElemMatchContext& elemMatchCtx) {
+                                       const QueryContext& queryContext) {
     // Do not traverse tree beyond logical NOR node
     MatchExpression::MatchType exprtype = node->matchType();
     if (exprtype == MatchExpression::NOR) {
@@ -801,13 +808,8 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
             std::size_t keyPatternIndex = 0;
             for (auto&& keyPatternElt : index.keyPattern) {
                 if (keyPatternElt.fieldNameStringData() == fullPath &&
-                    _compatible(keyPatternElt,
-                                index,
-                                keyPatternIndex,
-                                node,
-                                fullPath,
-                                collator,
-                                elemMatchCtx)) {
+                    _compatible(
+                        keyPatternElt, index, keyPatternIndex, node, fullPath, queryContext)) {
                     if (keyPatternIndex == 0) {
                         rt->first.push_back(i);
                     } else {
@@ -827,22 +829,27 @@ void QueryPlannerIXSelect::_rateIndices(MatchExpression* node,
     } else if (Indexability::arrayUsesIndexOnChildren(node) && !node->path().empty()) {
         // Note we skip empty path components since they are not allowed in index key patterns.
         const auto newPath = prefix + node->path().toString();
-        ElemMatchContext newContext;
+        ElemMatchContext newEMContext;
         // Note this StringData is unowned and references the string declared on the stack here.
         // This should be fine since we are only ever reading from this in recursive calls as
         // context to help make planning decisions.
-        newContext.fullPathToParentElemMatch = newPath;
-        newContext.innermostParentElemMatch = static_cast<ElemMatchObjectMatchExpression*>(node);
+        newEMContext.fullPathToParentElemMatch = newPath;
+        newEMContext.innermostParentElemMatch = static_cast<ElemMatchObjectMatchExpression*>(node);
+        QueryContext newContext;
+        newContext.elemMatchContext = newEMContext;
+        newContext.collator = queryContext.collator;
 
         // If the array uses an index on its children, it's something like
         // {foo: {$elemMatch: {bar: 1}}}, in which case the predicate is really over foo.bar.
         prefix += node->path().toString() + ".";
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            _rateIndices(node->getChild(i), prefix, indices, collator, newContext);
+            rateIndices(node->getChild(i), prefix, indices, newContext);
         }
-    } else if (node->getCategory() == MatchExpression::MatchCategory::kLogical) {
+    } else if (node->getCategory() ==
+               MatchExpression::MatchCategory::kLogical) {  // Por aqui deberia entrar en IN, no por
+                                                            // boundsGenerating arriba
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            _rateIndices(node->getChild(i), prefix, indices, collator, elemMatchCtx);
+            rateIndices(node->getChild(i), prefix, indices, queryContext);
         }
     }
 }

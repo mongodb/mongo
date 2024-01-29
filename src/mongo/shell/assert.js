@@ -304,6 +304,19 @@ assert = (function() {
         }
     };
 
+    assert.doesNotContain = function(o, arr, msg) {
+        if (!Array.isArray(arr)) {
+            throw new Error("The second argument to assert.doesNotContain must be an array.");
+        }
+
+        for (var i = 0; i < arr.length; i++) {
+            const isIn = arr[i] == o || ((arr[i] != null && o != null) && friendlyEqual(arr[i], o));
+            if (isIn) {
+                doassert(_buildAssertionMessage(msg, tojson(o) + " is in " + tojson(arr)));
+            }
+        }
+    };
+
     assert.containsPrefix = function(prefix, arr, msg) {
         var wasIn = false;
         if (typeof (prefix) !== "string") {

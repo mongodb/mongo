@@ -529,13 +529,8 @@ TEST_F(QueryPlannerTest, OrInexactWithExact2) {
     addIndex(BSON("b" << 1));
     runQuery(fromjson("{$or: [{a: 'foo'}, {a: /bar/}, {b: 'foo'}, {b: /bar/}]}"));
 
-    assertNumSolutions(2U);
+    assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");
-    assertSolutionExists(
-        "{fetch: {node: {or: {nodes: ["
-        "{ixscan: {filter: {$or: [{b:'foo'},{b:/bar/}]},      pattern: {b: 1}}},"
-        "{ixscan: {filter: {$or: [{a: {$in:['foo',/bar/]}}]}, pattern: {a: 1}}}"
-        "]}}}}");
 }
 
 // SERVER-13960: an exact, inexact covered, and inexact fetch predicate.
@@ -1056,7 +1051,7 @@ TEST_F(QueryPlannerTest, TooManyToExplodeOr) {
 TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
     addIndex(BSON("a" << 1 << "b" << 1));
 
-    runQuerySortProj(fromjson("{$and: [{b: {$regex: 'foo', $options: 'i'}},"
+    runQuerySortProj(fromjson("{$and: [{b: { $in: [/0/, /1/]}},"
                               "{a: {$in: [1, 2]}}]}"),
                      BSON("b" << 1),
                      BSONObj());
@@ -1068,9 +1063,9 @@ TEST_F(QueryPlannerTest, ExplodeIxscanWithFilter) {
     assertSolutionExists(
         "{fetch: {node: {mergeSort: {nodes: "
         "[{ixscan: {pattern: {a:1, b:1},"
-        "filter: {b: {$regex: 'foo', $options: 'i'}}}},"
+        "filter: {b: {$in:[/0/, /1/]}}}},"
         "{ixscan: {pattern: {a:1, b:1},"
-        "filter: {b: {$regex: 'foo', $options: 'i'}}}}]}}}}");
+        "filter: {b: {$in:[/0/, /1/]}}}}]}}}}");
 }
 
 // Verifies that a OR > FETCH > IXSCAN plan is exploded for sort.

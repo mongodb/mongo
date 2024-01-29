@@ -1232,6 +1232,13 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
     }
 
+    // geoNear and text queries *require* an index.
+    // Also, if a hint is specified it indicates that we MUST use it.
+    bool mustUseIndexedPlan =
+        QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::GEO_NEAR) ||
+        QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::TEXT) ||
+        hintedIndexBson;
+
     if (hintedIndexBson) {
         // If we have a hint, check if it matches any "special" index before proceeding.
         const auto& hintObj = *hintedIndexBson;
@@ -1366,8 +1373,12 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // Figure out how useful each index is to each predicate.
+    QueryPlannerIXSelect::QueryContext queryContext;
+    queryContext.collator = query.getCollator();
+    queryContext.elemMatchContext = QueryPlannerIXSelect::ElemMatchContext{};
+    queryContext.mustUseIndexedPlan = mustUseIndexedPlan;
     QueryPlannerIXSelect::rateIndices(
-        query.getPrimaryMatchExpression(), "", relevantIndices, query.getCollator());
+        query.getPrimaryMatchExpression(), "", relevantIndices, queryContext);
     QueryPlannerIXSelect::stripInvalidAssignments(query.getPrimaryMatchExpression(),
                                                   relevantIndices);
 
@@ -1730,18 +1741,13 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     bool clusteredCollection = params.clusteredInfo.has_value();
 
-    // geoNear and text queries *require* an index.
-    // Also, if a hint is specified it indicates that we MUST use it.
-    bool possibleToCollscan = !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(),
-                                                           MatchExpression::GEO_NEAR) &&
-        !QueryPlannerCommon::hasNode(query.getPrimaryMatchExpression(), MatchExpression::TEXT) &&
-        !hintedIndexBson;
-    if (collScanRequired && !possibleToCollscan) {
+
+    if (collScanRequired && mustUseIndexedPlan) {
         return Status(ErrorCodes::NoQueryExecutionPlans, "No query solutions");
     }
 
     bool isClusteredIDXScan = false;
-    if (possibleToCollscan && (collscanRequested || collScanRequired || clusteredCollection)) {
+    if (!mustUseIndexedPlan && (collscanRequested || collScanRequired || clusteredCollection)) {
         boost::optional<int> clusteredScanDirection =
             QueryPlannerCommon::determineClusteredScanDirection(query, params);
         int direction = clusteredScanDirection.value_or(1);

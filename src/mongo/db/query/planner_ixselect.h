@@ -62,6 +62,29 @@ using RelevantFieldIndexMap = stdx::unordered_map<std::string, IndexProperties>;
 class QueryPlannerIXSelect {
 public:
     /**
+     * Used to keep track of if any $elemMatch predicates were encountered when walking a
+     * MatchExpression tree. The presence of an outer $elemMatch can impact whether an index is
+     * applicable for an inner MatchExpression. For example, the NOT expression in
+     * {a: {$elemMatch: {b: {$ne: null}}} can only use an "a.b" index if that path is not multikey
+     * on "a.b". Because of the $elemMatch, it's okay to use the "a.b" index if the path is multikey
+     * on "a".
+     */
+    struct ElemMatchContext {
+        ArrayMatchingMatchExpression* innermostParentElemMatch{nullptr};
+        StringData fullPathToParentElemMatch{""_sd};
+    };
+
+    /**
+     * This struct works as a container to hold all the query contextual information needed to make
+     * the right indexing decisions.
+     */
+    struct QueryContext {
+        ElemMatchContext elemMatchContext;
+        const CollatorInterface* collator;
+        // Query will require an indexed plan if contains TEXT or GEO predicates
+        bool mustUseIndexedPlan = false;
+    };
+    /**
      * Return all the fields in the tree rooted at 'node' that we can use an index to answer the
      * query. The output, 'RelevantFieldIndexMap', contains the requirements of the index that can
      * answer the field. e.g. Some fields can be supported only by a non-sparse index.
@@ -108,7 +131,7 @@ public:
     static void rateIndices(MatchExpression* node,
                             std::string prefix,
                             const std::vector<IndexEntry>& indices,
-                            const CollatorInterface* collator);
+                            const QueryContext& queryContex);
 
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
@@ -195,19 +218,6 @@ public:
 
 private:
     /**
-     * Used to keep track of if any $elemMatch predicates were encountered when walking a
-     * MatchExpression tree. The presence of an outer $elemMatch can impact whether an index is
-     * applicable for an inner MatchExpression. For example, the NOT expression in
-     * {a: {$elemMatch: {b: {$ne: null}}} can only use an "a.b" index if that path is not multikey
-     * on "a.b". Because of the $elemMatch, it's okay to use the "a.b" index if the path is multikey
-     * on "a".
-     */
-    struct ElemMatchContext {
-        ArrayMatchingMatchExpression* innermostParentElemMatch{nullptr};
-        StringData fullPathToParentElemMatch{""_sd};
-    };
-
-    /**
      * Return true if the index key pattern field 'keyPatternElt' (which belongs to 'index' and is
      * at position 'keyPatternIndex' in the index's keyPattern) can be used to answer the predicate
      * 'node'. When 'node' is a sub-tree of a larger MatchExpression, 'fullPathToNode' is the path
@@ -222,14 +232,7 @@ private:
                             std::size_t keyPatternIndex,
                             MatchExpression* node,
                             StringData fullPathToNode,
-                            const CollatorInterface* collator,
-                            const ElemMatchContext& elemMatchContext);
-
-    static void _rateIndices(MatchExpression* node,
-                             std::string prefix,
-                             const std::vector<IndexEntry>& indices,
-                             const CollatorInterface* collator,
-                             const ElemMatchContext& elemMatchContext);
+                            const QueryContext& queryContex);
 
     /**
      * Amend the RelevantTag lists for all predicates in the subtree rooted at 'node' to remove
