@@ -1617,6 +1617,7 @@ execEnv.Library(
         'query/bind_input_params.cpp',
         'query/classic_stage_builder.cpp',
         'query/classic_runtime_planner_for_sbe/cached_planner.cpp',
+        'query/classic_runtime_planner_for_sbe/multi_planner.cpp',
         'query/classic_runtime_planner_for_sbe/planner_interface.cpp',
         'query/classic_runtime_planner_for_sbe/single_solution_passthrough_planner.cpp',
         'query/cost_model/on_coefficients_change_updater_impl.cpp',

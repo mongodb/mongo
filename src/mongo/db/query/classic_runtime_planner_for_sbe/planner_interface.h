@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/plan_executor.h"
@@ -107,6 +109,14 @@ protected:
         return _plannerData.cachedPlanHash;
     }
 
+    WorkingSet* ws() {
+        return _plannerData.workingSet.get();
+    }
+
+    std::unique_ptr<WorkingSet> extractWs() {
+        return std::move(_plannerData.workingSet);
+    }
+
 private:
     OperationContext* _opCtx;
     PlannerData _plannerData;
@@ -144,6 +154,27 @@ public:
 
 private:
     std::unique_ptr<sbe::CachedPlanHolder> _cachedPlanHolder;
+};
+
+class MultiPlanner final : public PlannerBase {
+public:
+    MultiPlanner(OperationContext* opCtx,
+                 PlannerData plannerData,
+                 PlanYieldPolicy::YieldPolicy yieldPolicy,
+                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
+                 PlanCachingMode cachingMode);
+
+    /**
+     * Picks the best plan given by the classic engine multiplanner and returns a plan executor. If
+     * the planner finished running the best solution during multiplanning, we return the documents
+     * and exit, otherwise we pick the best plan and return the SBE plan executor.
+     */
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
+
+private:
+    PlanYieldPolicy::YieldPolicy _yieldPolicy;
+    std::unique_ptr<MultiPlanStage> _multiPlanStage;
+    PlanCachingMode _cachingMode;
 };
 
 }  // namespace mongo::classic_runtime_planner_for_sbe

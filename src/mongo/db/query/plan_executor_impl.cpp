@@ -94,37 +94,6 @@ const OperationContext::Decoration<boost::optional<repl::OpTime>> clientsLastKno
 // namespace.
 MONGO_FAIL_POINT_DEFINE(planExecutorHangBeforeShouldWaitForInserts);
 
-namespace {
-
-/**
- * Constructs a PlanYieldPolicy based on 'policy'.
- */
-std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(
-    PlanExecutorImpl* exec,
-    PlanYieldPolicy::YieldPolicy policy,
-    std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable) {
-    switch (policy) {
-        case PlanYieldPolicy::YieldPolicy::YIELD_AUTO:
-        case PlanYieldPolicy::YieldPolicy::YIELD_MANUAL:
-        case PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY:
-        case PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY: {
-            return std::make_unique<PlanYieldPolicyImpl>(
-                exec, policy, yieldable, std::make_unique<YieldPolicyCallbacksImpl>(exec->nss()));
-        }
-        case PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT: {
-            return std::make_unique<AlwaysTimeOutYieldPolicy>(
-                exec->getOpCtx(), exec->getOpCtx()->getServiceContext()->getFastClockSource());
-        }
-        case PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED: {
-            return std::make_unique<AlwaysPlanKilledYieldPolicy>(
-                exec->getOpCtx(), exec->getOpCtx()->getServiceContext()->getFastClockSource());
-        }
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-}  // namespace
-
 PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    unique_ptr<WorkingSet> ws,
                                    unique_ptr<PlanStage> rt,
@@ -179,10 +148,12 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                 }},
               collection.get());
 
-    _yieldPolicy = makeYieldPolicy(this,
-                                   collectionExists ? yieldPolicy
-                                                    : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                   yieldable);
+    _yieldPolicy = makeClassicYieldPolicy(
+        _opCtx,
+        _nss,
+        this,
+        collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+        yieldable);
 
     uassertStatusOK(_pickBestPlan());
 

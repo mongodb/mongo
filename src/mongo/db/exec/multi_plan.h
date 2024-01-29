@@ -65,6 +65,8 @@ namespace mongo {
  */
 class MultiPlanStage final : public RequiresCollectionStage {
 public:
+    static const char* kStageType;
+
     /**
      * Takes no ownership.
      *
@@ -131,7 +133,13 @@ public:
      * The MultiPlanStage does not retain ownership of the winning QuerySolution and returns
      * a unique pointer.
      */
-    std::unique_ptr<QuerySolution> bestSolution();
+    std::unique_ptr<QuerySolution> extractBestSolution();
+
+    /**
+     * Returns true if the winning plan reached EOF during its trial period and false otherwise.
+     * Illegal to call if the best plan has not yet been selected.
+     */
+    bool bestSolutionEof() const;
 
     /**
      * Returns true if a backup plan was picked.
@@ -139,12 +147,6 @@ public:
      * Exposed for testing.
      */
     bool hasBackupPlan() const;
-
-    //
-    // Used by explain.
-    //
-
-    static const char* kStageType;
 
 protected:
     void doSaveStateRequiresCollection() final {}

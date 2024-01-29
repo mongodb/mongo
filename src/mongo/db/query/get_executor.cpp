@@ -1655,11 +1655,17 @@ private:
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildMultiPlan(
         std::vector<std::unique_ptr<QuerySolution>> solutions) final {
-        // This is a stub implementation that just returns the first solution.
-        // TODO SERVER-85235 Use classic multi-planner to select best solution.
+        for (auto&& solution : solutions) {
+            solution->indexFilterApplied = _plannerParams.indexFiltersApplied;
+        }
+
         auto result = releaseResult();
-        result->runtimePlanner = std::make_unique<crp_sbe::SingleSolutionPassthroughPlanner>(
-            _opCtx, makePlannerData(), std::move(solutions[0]));
+        result->runtimePlanner =
+            std::make_unique<crp_sbe::MultiPlanner>(_opCtx,
+                                                    makePlannerData(),
+                                                    _yieldPolicy,
+                                                    std::move(solutions),
+                                                    PlanCachingMode::NeverCache);
         return result;
     }
 

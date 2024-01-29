@@ -39,13 +39,14 @@
 namespace mongo {
 
 PlanYieldPolicyImpl::PlanYieldPolicyImpl(
+    OperationContext* opCtx,
     PlanExecutorImpl* exec,
     PlanYieldPolicy::YieldPolicy policy,
     std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
     std::unique_ptr<YieldPolicyCallbacks> callbacks)
-    : PlanYieldPolicy(exec->getOpCtx(),
+    : PlanYieldPolicy(opCtx,
                       policy,
-                      exec->getOpCtx()->getServiceContext()->getFastClockSource(),
+                      opCtx->getServiceContext()->getFastClockSource(),
                       internalQueryExecYieldIterations.load(),
                       Milliseconds{internalQueryExecYieldPeriodMS.load()},
                       yieldable,
@@ -59,6 +60,35 @@ void PlanYieldPolicyImpl::saveState(OperationContext* opCtx) {
 void PlanYieldPolicyImpl::restoreState(OperationContext* opCtx, const Yieldable* yieldable) {
     _planYielding->restoreStateWithoutRetrying({RestoreContext::RestoreType::kYield, nullptr},
                                                yieldable);
+}
+
+
+PlanYieldPolicyClassicTrialPeriod::PlanYieldPolicyClassicTrialPeriod(
+    OperationContext* opCtx,
+    PlanStage* root,
+    PlanYieldPolicy::YieldPolicy policy,
+    std::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+    std::unique_ptr<YieldPolicyCallbacks> callbacks)
+    : PlanYieldPolicy(opCtx,
+                      policy,
+                      opCtx->getServiceContext()->getFastClockSource(),
+                      internalQueryExecYieldIterations.load(),
+                      Milliseconds{internalQueryExecYieldPeriodMS.load()},
+                      yieldable,
+                      std::move(callbacks)),
+      _root(root) {}
+
+void PlanYieldPolicyClassicTrialPeriod::saveState(OperationContext* opCtx) {
+    _root->saveState();
+}
+
+void PlanYieldPolicyClassicTrialPeriod::restoreState(OperationContext* opCtx,
+                                                     const Yieldable* yieldable) {
+    if (!usesCollectionAcquisitions()) {
+        setYieldable(yieldable);
+    }
+
+    _root->restoreState({RestoreContext::RestoreType::kYield, nullptr});
 }
 
 }  // namespace mongo

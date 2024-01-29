@@ -444,11 +444,17 @@ const QuerySolution* MultiPlanStage::bestSolution() const {
     return _candidates[_bestPlanIdx].solution.get();
 }
 
-std::unique_ptr<QuerySolution> MultiPlanStage::bestSolution() {
+std::unique_ptr<QuerySolution> MultiPlanStage::extractBestSolution() {
     if (_bestPlanIdx == kNoSuchPlan)
         return nullptr;
 
     return std::move(_candidates[_bestPlanIdx].solution);
+}
+
+bool MultiPlanStage::bestSolutionEof() const {
+    tassert(8523500, "The best plan is not chosen by the multi-planner", bestPlanChosen());
+    auto& bestPlan = _candidates[_bestPlanIdx];
+    return bestPlan.root->isEOF();
 }
 
 unique_ptr<PlanStageStats> MultiPlanStage::getStats() {

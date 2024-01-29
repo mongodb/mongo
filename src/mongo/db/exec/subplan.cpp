@@ -247,7 +247,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             ss << "Failed to pick best plan for subchild " << cq->toStringForErrorMsg();
             return Status(ErrorCodes::NoQueryExecutionPlans, ss);
         }
-        return multiPlanStage->bestSolution();
+        return multiPlanStage->extractBestSolution();
     };
     auto subplanSelectStat = QueryPlanner::choosePlanForSubqueries(
         *_query, _plannerParams, std::move(subplanningResult), multiplanCallback);
