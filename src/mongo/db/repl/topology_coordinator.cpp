@@ -3468,6 +3468,7 @@ rpc::ReplSetMetadata TopologyCoordinator::prepareReplSetMetadata(
 rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid) const {
     return rpc::OplogQueryMetadata(_lastCommittedOpTimeAndWallTime,
                                    getMyLastAppliedOpTime(),
+                                   getMyLastWrittenOpTime(),
                                    rbid,
                                    _currentPrimaryIndex,
                                    _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()),

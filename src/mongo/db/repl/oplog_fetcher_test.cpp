@@ -423,6 +423,7 @@ const std::string OplogFetcherTest::syncSourceHost = "";
 const rpc::OplogQueryMetadata OplogFetcherTest::oqMetadata =
     rpc::OplogQueryMetadata({staleOpTime, staleWallTime},
                             remoteNewerOpTime,
+                            remoteNewerOpTime,
                             remoteRBID,
                             primaryIndex,
                             syncSourceIndex,
@@ -432,6 +433,7 @@ const OpTime OplogFetcherTest::staleOpTime = OpTime(Timestamp(1, 1), 0);
 const Date_t OplogFetcherTest::staleWallTime = Date_t() + Seconds(staleOpTime.getSecs());
 const rpc::OplogQueryMetadata OplogFetcherTest::staleOqMetadata =
     rpc::OplogQueryMetadata({staleOpTime, staleWallTime},
+                            staleOpTime,
                             staleOpTime,
                             remoteRBID,
                             primaryIndex,
@@ -1006,6 +1008,7 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceRollsBack)
 
     rpc::OplogQueryMetadata oplogQueryMetadata({staleOpTime, staleWallTime},
                                                remoteNewerOpTime,
+                                               remoteNewerOpTime,
                                                remoteRBID + 1,
                                                primaryIndex,
                                                syncSourceIndex,
@@ -1042,6 +1045,7 @@ TEST_F(OplogFetcherTest, MetadataAndBatchAreNotProcessedWhenSyncSourceIsNotAhead
     auto entry = makeNoopOplogEntry(lastFetched);
 
     rpc::OplogQueryMetadata oplogQueryMetadata({staleOpTime, staleWallTime},
+                                               lastFetched,
                                                lastFetched,
                                                remoteRBID,
                                                primaryIndex,
@@ -1092,6 +1096,7 @@ TEST_F(OplogFetcherTest,
        MetadataAndBatchAreProcessedWhenSyncSourceIsNotAheadWithoutRequiringFresherSyncSource) {
     CursorId cursorId = 0LL;
     rpc::OplogQueryMetadata oplogQueryMetadata({staleOpTime, staleWallTime},
+                                               lastFetched,
                                                lastFetched,
                                                remoteRBID,
                                                primaryIndex,
@@ -2110,6 +2115,7 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithBothMetadatasStopsTheOplogFetc
 TEST_F(OplogFetcherTest,
        FailedSyncSourceCheckWithSyncSourceHavingNoSyncSourceStopsTheOplogFetcher) {
     rpc::OplogQueryMetadata oplogQueryMetadata({staleOpTime, staleWallTime},
+                                               remoteNewerOpTime,
                                                remoteNewerOpTime,
                                                remoteRBID,
                                                primaryIndex,

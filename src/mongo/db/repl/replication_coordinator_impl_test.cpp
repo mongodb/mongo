@@ -2478,14 +2478,16 @@ TEST_F(ReplCoordTest, CancelElectionTimeoutIfSyncSourceKnowsThePrimary) {
     // If currentPrimaryIndex is -1, don't reschedule.
     state.processMetadata(
         rsMeta,
-        OplogQueryMetadata(OpTimeAndWallTime(), OpTime(), 1, -1 /* currentPrimaryIndex */, 1, ""));
+        OplogQueryMetadata(
+            OpTimeAndWallTime(), OpTime(), OpTime(), 1, -1 /* currentPrimaryIndex */, 1, ""));
 
     ASSERT_EQUALS(getReplCoord()->getElectionTimeout_forTest(), electionTimeout);
 
     // If currentPrimaryIndex is NOT -1, reschedule.
     state.processMetadata(
         rsMeta,
-        OplogQueryMetadata(OpTimeAndWallTime(), OpTime(), 1, 1 /* currentPrimaryIndex */, 1, ""));
+        OplogQueryMetadata(
+            OpTimeAndWallTime(), OpTime(), OpTime(), 1, 1 /* currentPrimaryIndex */, 1, ""));
 
     // Since we advanced the clock, the new election timeout is after the old one.
     ASSERT_GREATER_THAN(getReplCoord()->getElectionTimeout_forTest(), electionTimeout);
@@ -2511,8 +2513,13 @@ TEST_F(ReplCoordTest, ShouldChangeSyncSource) {
 
     getTopoCoord().updateConfig(config, 1, getNet()->now());
 
-    OplogQueryMetadata opMetaData(
-        OpTimeAndWallTime(), OpTime(Timestamp(1, 1), 1), 1, 0 /* currentPrimaryIndex */, 1, "");
+    OplogQueryMetadata opMetaData(OpTimeAndWallTime(),
+                                  OpTime(Timestamp(1, 1), 1),
+                                  OpTime(Timestamp(1, 1), 1),
+                                  1,
+                                  0 /* currentPrimaryIndex */,
+                                  1,
+                                  "");
     ReplSetMetadata rsMeta(
         0, OpTimeAndWallTime(), OpTime(), 1, 0, replicaSetId, 1, true /* isPrimary */);
 
@@ -2551,8 +2558,13 @@ TEST_F(ReplCoordTest, ServerlessNodeShouldChangeSyncSourceAfterSplit) {
 
     getTopoCoord().updateConfig(config, 1, getNet()->now());
 
-    OplogQueryMetadata opMetaData(
-        OpTimeAndWallTime(), OpTime(Timestamp(1, 1), 1), 1, 0 /* currentPrimaryIndex */, 1, "");
+    OplogQueryMetadata opMetaData(OpTimeAndWallTime(),
+                                  OpTime(Timestamp(1, 1), 1),
+                                  OpTime(Timestamp(1, 1), 1),
+                                  1,
+                                  0 /* currentPrimaryIndex */,
+                                  1,
+                                  "");
     ReplSetMetadata rsMeta(
         0, OpTimeAndWallTime(), OpTime(), 1, 0, replicaSetId, 1, true /* isPrimary */);
 

@@ -54,6 +54,7 @@ namespace {
 const char kLastOpCommittedFieldName[] = "lastOpCommitted";
 const char kLastCommittedWallFieldName[] = "lastCommittedWall";
 const char kLastOpAppliedFieldName[] = "lastOpApplied";
+const char kLastOpWrittenFieldName[] = "lastOpWritten";
 const char kPrimaryIndexFieldName[] = "primaryIndex";
 const char kSyncSourceIndexFieldName[] = "syncSourceIndex";
 const char kSyncSourceHostFieldName[] = "syncSourceHost";
@@ -65,12 +66,14 @@ const int OplogQueryMetadata::kNoPrimary;
 
 OplogQueryMetadata::OplogQueryMetadata(OpTimeAndWallTime lastOpCommitted,
                                        OpTime lastOpApplied,
+                                       OpTime lastOpWritten,
                                        int rbid,
                                        int currentPrimaryIndex,
                                        int currentSyncSourceIndex,
                                        std::string currentSyncSourceHost)
     : _lastOpCommitted(std::move(lastOpCommitted)),
       _lastOpApplied(std::move(lastOpApplied)),
+      _lastOpWritten(std::move(lastOpWritten)),
       _rbid(rbid),
       _currentPrimaryIndex(currentPrimaryIndex),
       _currentSyncSourceIndex(currentSyncSourceIndex),
@@ -124,8 +127,23 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
     if (!status.isOK())
         return status;
 
-    return OplogQueryMetadata(
-        lastOpCommitted, lastOpApplied, rbid, primaryIndex, syncSourceIndex, syncSourceHost);
+    repl::OpTime lastOpWritten;
+    status = bsonExtractOpTimeField(oqMetadataObj, kLastOpWrittenFieldName, &lastOpWritten);
+    if (!status.isOK()) {
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            lastOpWritten = lastOpApplied;
+        } else {
+            return status;
+        }
+    }
+
+    return OplogQueryMetadata(lastOpCommitted,
+                              lastOpApplied,
+                              lastOpWritten,
+                              rbid,
+                              primaryIndex,
+                              syncSourceIndex,
+                              syncSourceHost);
 }
 
 Status OplogQueryMetadata::writeToMetadata(BSONObjBuilder* builder) const {
@@ -133,6 +151,7 @@ Status OplogQueryMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     _lastOpCommitted.opTime.append(&oqMetadataBuilder, kLastOpCommittedFieldName);
     oqMetadataBuilder.appendDate(kLastCommittedWallFieldName, _lastOpCommitted.wallTime);
     _lastOpApplied.append(&oqMetadataBuilder, kLastOpAppliedFieldName);
+    _lastOpWritten.append(&oqMetadataBuilder, kLastOpWrittenFieldName);
     oqMetadataBuilder.append(kRBIDFieldName, _rbid);
     oqMetadataBuilder.append(kPrimaryIndexFieldName, _currentPrimaryIndex);
     oqMetadataBuilder.append(kSyncSourceIndexFieldName, _currentSyncSourceIndex);
@@ -151,6 +170,7 @@ std::string OplogQueryMetadata::toString() const {
     output << " RBID: " << _rbid;
     output << " Last Op Committed: " << _lastOpCommitted.toString();
     output << " Last Op Applied: " << _lastOpApplied.toString();
+    output << " Last Op Written: " << _lastOpWritten.toString();
     return output;
 }
 
