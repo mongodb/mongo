@@ -584,7 +584,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-sampling-bonsai.arm.aws.2023-11
   display_name: PERF Standalone (Bonsai with Sampling CE) ARM AWS 2023-11
-  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0"  # Run it only on Sunday.
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -626,7 +626,7 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone-heuristic-bonsai.arm.aws.2023-11
   display_name: PERF Standalone (Bonsai with Heuristic CE) ARM AWS 2023-11
-  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0"  # Run it only on Sunday.
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
@@ -2096,7 +2096,7 @@ buildvariants:
 - <<: *linux-mongo-perf-standalone-arm
   name: perf-mongo-perf-standalone-heuristic-bonsai.arm.aws.2023-11
   display_name: PERF Mongo-Perf Standalone inMemory (Bonsai with Heuristic CE) ARM AWS 2023-11
-  cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+  cron: "0 0 * * 0"  # Run it only on Sunday.
   expansions:
     <<: *standalone-arm-expansions
     mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
