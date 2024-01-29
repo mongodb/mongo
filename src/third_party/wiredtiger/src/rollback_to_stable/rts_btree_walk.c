@@ -136,7 +136,7 @@ __rts_btree_walk(WT_SESSION_IMPL *session, wt_timestamp_t rollback_timestamp)
          &rollback_timestamp,
          WT_READ_NO_EVICT | WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED | WT_READ_SEE_DELETED)) == 0 &&
       ref != NULL) {
-        __wt_rts_progress_msg(session, &timer, 0, &msg_count, true);
+        __wt_rts_progress_msg(session, &timer, 0, 0, &msg_count, true);
 
         if (F_ISSET(ref, WT_REF_FLAG_LEAF))
             WT_RET(__wt_rts_btree_abort_updates(session, ref, rollback_timestamp));
