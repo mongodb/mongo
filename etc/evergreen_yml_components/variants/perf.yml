@@ -2346,7 +2346,8 @@ buildvariants:
     - *schedule_variant_auto_tasks_task
     - name: genny_resharding_withIndexes
 
-- name: perf-3-node-replSet-query-settings.arm.aws.2023-11
+- <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: perf-3-node-replSet-query-settings.arm.aws.2023-11
   display_name: PERF 3-Node ReplSet (QuerySettings) ARM AWS 2023-11
   cron: *linux-3-node-cron
   modules: *perf_modules
