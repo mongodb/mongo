@@ -35,7 +35,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
 
     const metricChecker =
         new BulkWriteMetricChecker(testDB,
-                                   namespace,
+                                   [namespace],
                                    bulkWrite,
                                    isMongos,
                                    false /*fle*/,

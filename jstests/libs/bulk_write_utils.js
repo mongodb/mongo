@@ -40,7 +40,7 @@ const checkEqual = function(before, expectedDiff, after, errorMessage) {
 // Helper class for the bulkwrite_metrics tests.
 export class BulkWriteMetricChecker {
     constructor(testDB,
-                namespace,
+                namespaces,
                 bulkWrite,
                 isMongos,
                 fle,
@@ -49,7 +49,7 @@ export class BulkWriteMetricChecker {
                 timeseries = false,
                 defaultTimestamp = undefined) {
         this.testDB = testDB;
-        this.namespace = namespace;
+        this.namespaces = namespaces;
         this.bulkWrite = bulkWrite;
         this.isMongos = isMongos;
         this.fle = fle;
@@ -61,24 +61,46 @@ export class BulkWriteMetricChecker {
 
     // Metrics corresponding to
     // Top::get(opCtx->getClient()->getServiceContext()).record(...).
-    _checkTopMetrics(top0, top1, inserted, retriedInsert, updateCount, deleted) {
+    _checkTopMetrics(top0,
+                     top1,
+                     inserted,
+                     retriedInsert,
+                     updateCount,
+                     deleted,
+                     perNamespaceMetrics,
+                     nsIndicesInRequest) {
         if (this.fle) {
             // FLE do not set those in Top due to redaction.
-            assert.eq(top0.update, undefined);
-            assert.eq(top1.update, undefined);
+            for (const ns of this.namespaces) {
+                assert.eq(top0[ns].update, undefined);
+                assert.eq(top1[ns].update, undefined);
 
-            assert.eq(top0.remove, undefined);
-            assert.eq(top1.remove, undefined);
+                assert.eq(top0[ns].remove, undefined);
+                assert.eq(top1[ns].remove, undefined);
 
-            assert.eq(top0.insert, undefined);
-            assert.eq(top1.insert, undefined);
+                assert.eq(top0[ns].insert, undefined);
+                assert.eq(top1[ns].insert, undefined);
+            }
         } else {
-            checkEqual(top0.update.count, updateCount, top1.update.count, "update.count mismatch");
-            checkEqual(top0.remove.count, deleted, top1.remove.count, "remove.count mismatch");
-            checkEqual(top0.insert.count,
-                       inserted + retriedInsert,
-                       top1.insert.count,
-                       "insert.count mismatch");
+            for (const idx of nsIndicesInRequest) {
+                const ns = this.namespaces[idx];
+                if (perNamespaceMetrics != undefined) {
+                    inserted = perNamespaceMetrics[ns].inserted ?? 0;
+                    updateCount = perNamespaceMetrics[ns].updateCount ?? 0;
+                    deleted = perNamespaceMetrics[ns].deleted ?? 0;
+                    retriedInsert = perNamespaceMetrics[ns].retriedInsert ?? 0;
+                }
+                checkEqual(top0[ns].update.count,
+                           updateCount,
+                           top1[ns].update.count,
+                           `update.count mismatch for ${ns}`);
+                checkEqual(
+                    top0[ns].remove.count, deleted, top1[ns].remove.count, "remove.count mismatch");
+                checkEqual(top0[ns].insert.count,
+                           inserted + retriedInsert,
+                           top1[ns].insert.count,
+                           `insert.count mismatch for ${ns}`);
+            }
         }
     }
 
@@ -231,7 +253,9 @@ export class BulkWriteMetricChecker {
                             retriedStatementsCount,
                             fleSafeContentUpdates,
                             actualInserts,
-                            retryCount) {
+                            retryCount,
+                            perNamespaceMetrics,
+                            nsIndicesInRequest) {
         this._checkAdditiveMetrics(
             status0, status1, actualInserts, updated, fleSafeContentUpdates, deleted);
 
@@ -240,7 +264,14 @@ export class BulkWriteMetricChecker {
         // metrics.queryExecutor.scanned is stable but the FLE logic for it is very complicated
         // to maintain here.
 
-        this._checkTopMetrics(top0, top1, inserted, retriedInsert, updateCount, deleted);
+        this._checkTopMetrics(top0,
+                              top1,
+                              inserted,
+                              retriedInsert,
+                              updateCount,
+                              deleted,
+                              perNamespaceMetrics,
+                              nsIndicesInRequest);
 
         this._checkWriteConcernMetrics(status0,
                                        status1,
@@ -340,7 +371,7 @@ export class BulkWriteMetricChecker {
     }
 
     // eqIndexedEncryptedFields is per insert/update in the command.
-    _checkMetricsImpl(status0, top0, {
+    _checkMetricsImpl(status0, top0, nsIndicesInRequest, {
         updated = 0,
         updateCount = undefined,
         inserted = 0,
@@ -355,7 +386,8 @@ export class BulkWriteMetricChecker {
         updateShardField = this.timeseries ? "manyShards" : "allShards",
         deleteShardField = this.timeseries ? "oneShard" : "allShards",
         retryCount = 0,
-        opcounterFactor = 1
+        opcounterFactor = 1,
+        perNamespaceMetrics = undefined
     }) {
         // updateCount is the number of update commands, it is different from updated when
         // multi: true.
@@ -395,7 +427,7 @@ export class BulkWriteMetricChecker {
                                          retryCount,
                                          actualInserts);
         } else {
-            const top1 = this.testDB.adminCommand({top: 1}).totals[this.namespace];
+            const top1 = this.testDB.adminCommand({top: 1}).totals;
             // See comment on unshardedInsert for the ternary.
             const retriedCommandsCount =
                 (1 + 2 * (eqIndexedEncryptedFields > 0 ? 1 : 0) + (this.bulkWrite && this.fle)) *
@@ -414,7 +446,9 @@ export class BulkWriteMetricChecker {
                                          retriedStatementsCount,
                                          fleSafeContentUpdates,
                                          actualInserts,
-                                         retryCount);
+                                         retryCount,
+                                         perNamespaceMetrics,
+                                         nsIndicesInRequest);
         }
 
         this._checkOpCounters(status0.opcounters,
@@ -471,24 +505,42 @@ export class BulkWriteMetricChecker {
         }
     }
 
+    _findNsIndicesInRequest(bulkWriteOps) {
+        const nsIndicesInRequest = new Set();
+        for (const op of bulkWriteOps) {
+            var idx = op.insert;
+            if (op.update != undefined) {
+                idx = op.update;
+            } else if (op.delete != undefined) {
+                idx = op.delete;
+            }
+
+            nsIndicesInRequest.add(idx);
+        }
+        return nsIndicesInRequest;
+    }
+
     checkMetrics(testcaseName, bulkWriteOps, normalCommands, expectedMetrics) {
         print(`Testcase: ${testcaseName} (on a ${
             this.isMongos ? "ShardingTest"
                           : "ReplSetTest"} with bulkWrite = ${this.bulkWrite}, errorsOnly = ${
             this.errorsOnly} and timeseries = ${this.timeseries}).`);
         const statusBefore = this.testDB.serverStatus();
-        const topBefore =
-            this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals[this.namespace];
+        const topBefore = this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals;
 
         if (this.bulkWrite) {
             if (this.timeseries) {
                 this._addTimestamp(bulkWriteOps);
             }
 
+            const namespaces = this.namespaces.map(namespace => {
+                return {ns: namespace};
+            });
+
             assert.commandWorked(this.testDB.adminCommand({
                 bulkWrite: 1,
                 ops: bulkWriteOps,
-                nsInfo: [{ns: this.namespace}],
+                nsInfo: namespaces,
                 writeConcern: {w: 'majority'},
                 errorsOnly: this.errorsOnly
             }));
@@ -498,7 +550,8 @@ export class BulkWriteMetricChecker {
             }
         }
         expectedMetrics.retryCount = 1;
-        this._checkMetricsImpl(statusBefore, topBefore, expectedMetrics);
+        this._checkMetricsImpl(
+            statusBefore, topBefore, this._findNsIndicesInRequest(bulkWriteOps), expectedMetrics);
     }
 
     checkMetricsWithRetries(
@@ -509,18 +562,21 @@ export class BulkWriteMetricChecker {
             this.errorsOnly} and timeseries = ${this.timeseries}).`);
 
         let statusBefore = this.testDB.serverStatus();
-        let topBefore =
-            this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals[this.namespace];
+        let topBefore = this.isMongos ? undefined : this.testDB.adminCommand({top: 1}).totals;
         if (this.bulkWrite) {
             if (this.timeseries) {
                 this._addTimestamp(bulkWriteOps);
             }
 
+            const namespaces = this.namespaces.map(namespace => {
+                return {ns: namespace};
+            });
+
             for (let i = 0; i < this.retryCount; ++i) {
                 let res = assert.commandWorked(this.testDB.adminCommand({
                     bulkWrite: 1,
                     ops: bulkWriteOps,
-                    nsInfo: [{ns: this.namespace}],
+                    nsInfo: namespaces,
                     lsid: lsid,
                     txnNumber: txnNumber,
                     writeConcern: {w: "majority"}
@@ -537,6 +593,7 @@ export class BulkWriteMetricChecker {
             }
         }
         expectedMetrics.retryCount = this.retryCount;
-        this._checkMetricsImpl(statusBefore, topBefore, expectedMetrics);
+        this._checkMetricsImpl(
+            statusBefore, topBefore, this._findNsIndicesInRequest(bulkWriteOps), expectedMetrics);
     }
 }
