@@ -75,15 +75,15 @@ boost::intrusive_ptr<Expression> parseGroupByExpression(
         groupByField.embeddedObject().firstElementFieldName()[0] == '$') {
         return Expression::parseObject(expCtx.get(), groupByField.embeddedObject(), vps);
     } else if (groupByField.type() == BSONType::String &&
-               groupByField.valueStringData()[0] == '$') {
+               // Lager than 2 because we need a '$', at least one char for the field name and
+               // the final terminating 0.
+               groupByField.valuestrsize() > 2 && groupByField.valueStringData()[0] == '$') {
         return ExpressionFieldPath::parse(expCtx.get(), groupByField.str(), vps);
-    } else {
-        uasserted(
-            40239,
-            str::stream() << "The $bucketAuto 'groupBy' field must be defined as a $-prefixed "
-                             "path or an expression object, but found: "
-                          << groupByField.toString(false, false));
     }
+    uasserted(40239,
+              str::stream() << "The $bucketAuto 'groupBy' field must be defined as a $-prefixed "
+                               "path or an expression object, but found: "
+                            << groupByField.toString(false, false));
 }
 
 /**
