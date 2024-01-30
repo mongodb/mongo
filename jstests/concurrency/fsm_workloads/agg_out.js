@@ -36,10 +36,11 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
 
     $config.transitions = {
         query: {
-            query: 0.68,
+            query: 0.63,
             createIndexes: 0.1,
             dropIndex: 0.1,
             collMod: 0.1,
+            movePrimary: 0.05,
             // Converting the target collection to a capped collection or a sharded collection will
             // cause all subsequent aggregations to fail, so give these a low probability to make
             // sure they don't happen too early in the test.
@@ -47,6 +48,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             shardCollection: 0.01,
         },
         createIndexes: {query: 1},
+        movePrimary: {query: 1},
         dropIndex: {query: 1},
         collMod: {query: 1},
         convertToCapped: {query: 1},
@@ -57,6 +59,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Runs an aggregate with a $out into '$config.data.outputCollName'.
      */
     $config.states.query = function query(db, collName) {
+        jsTestLog(`Running query: coll=${collName} out=${this.outputCollName}`);
         const res = db[collName].runCommand({
             aggregate: collName,
             pipeline: [{$match: {flag: true}}, {$out: this.outputCollName}],
@@ -64,19 +67,29 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
 
         const allowedErrorCodes = [
-            ErrorCodes.CommandFailed,     // indexes of target collection changed during processing.
-            ErrorCodes.IllegalOperation,  // $out is not supported to an existing *sharded* output
-                                          // collection.
-            17152,                        // namespace is capped so it can't be used for $out.
-            28769,                        // $out collection cannot be sharded.
+            // Indexes of target collection changed during processing.
+            ErrorCodes.CommandFailed,
+            // $out is not supported to an existing *sharded* output collection.
+            ErrorCodes.IllegalOperation,
+            // Namespace is capped so it can't be used for $out.
+            17152,
+            // $out collection cannot be sharded.
+            ErrorCodes.NamespaceCannotBeSharded,
+            // $out can't be executed while there is a move primary in progress.
+            ErrorCodes.MovePrimaryInProgress,
+            // (SERVER-78850) Move primary coordinator drops donor collections when it is done.
+            // This invalidates non - snapshot cursors, which causes $out to fail.
+            // Locally it fails with explicit collection dropped error. When doing remote reads,
+            // it fails with cursor not found error.
+            ErrorCodes.CursorNotFound,
         ];
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
 
         if (res.ok) {
+            // No matter how many documents were in the original input stream, $out should never
+            // return any results.
             const cursor = new DBCommandCursor(db, res);
-            assert.eq(0, cursor.itcount());  // No matter how many documents were in the
-                                             // original input stream, $out should never
-                                             // return any results.
+            assert.eq(0, cursor.itcount());
         }
     };
 
@@ -86,7 +99,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.createIndexes = function createIndexes(db, unusedCollName) {
         for (var i = 0; i < this.indexSpecs; ++i) {
-            assert.commandWorked(db[this.outputCollName].createIndex(this.indexSpecs[i]));
+            const indexSpecs = this.indexSpecs[i];
+            jsTestLog(`Running createIndex: coll=${this.outputCollName} indexSpec=${indexSpecs}`);
+            assert.commandWorkedOrFailedWithCode(db[this.outputCollName].createIndex(indexSpecs),
+                                                 ErrorCodes.MovePrimaryInProgress);
         }
     };
 
@@ -95,6 +111,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.dropIndex = function dropIndex(db, unusedCollName) {
         const indexSpec = this.indexSpecs[Random.randInt(this.indexSpecs.length)];
+        jsTestLog(`Running dropIndex: coll=${this.outputCollName} indexSpec=${indexSpec}`);
         db[this.outputCollName].dropIndex(indexSpec);
     };
 
@@ -106,17 +123,40 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Change the validation level.
             const validationLevels = ['off', 'strict', 'moderate'];
             const newValidationLevel = validationLevels[Random.randInt(validationLevels.length)];
+            jsTestLog(`Running collMod: coll=${this.outputCollName} validationLevel=${
+                newValidationLevel}`);
+
             assert.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: this.outputCollName, validationLevel: newValidationLevel}),
-                ErrorCodes.ConflictingOperationInProgress);
+                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.MovePrimaryInProgress]);
         } else {
             // Change the validation action.
-            assert.commandWorkedOrFailedWithCode(db.runCommand({
-                collMod: this.outputCollName,
-                validationAction: Random.rand() > 0.5 ? 'warn' : 'error'
-            }),
-                                                 ErrorCodes.ConflictingOperationInProgress);
+            const validationAction = Random.rand() > 0.5 ? 'warn' : 'error';
+            jsTestLog(`Running collMod: coll=${this.outputCollName} validationAction=${
+                validationAction}`);
+
+            assert.commandWorkedOrFailedWithCode(
+                db.runCommand({collMod: this.outputCollName, validationAction: validationAction}),
+                [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.MovePrimaryInProgress]);
         }
+    };
+
+    $config.states.movePrimary = function movePrimary(db, collName) {
+        if (!isMongos(db)) {
+            return;
+        }
+        const toShard = this.shards[Random.randInt(this.shards.length)];
+        jsTestLog(`Running movePrimary: db=${db} to=${toShard}`);
+
+        assert.commandWorkedOrFailedWithCode(
+            db.adminCommand({movePrimary: db.getName(), to: toShard}), [
+                // Caused by a concurrent movePrimary operation on the same database but a different
+                // destination shard.
+                ErrorCodes.ConflictingOperationInProgress,
+                // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
+                // occurs at this phase, the movePrimary operation does not recover.
+                7120202,
+            ]);
     };
 
     /**
@@ -127,8 +167,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (isMongos(db)) {
             return;  // convertToCapped can't be run against a mongos.
         }
-
-        assert.commandWorked(db.runCommand({convertToCapped: this.outputCollName, size: 100000}));
+        jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
+        assert.commandWorkedOrFailedWithCode(
+            db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
+            ErrorCodes.MovePrimaryInProgress);
     };
 
     /**
@@ -139,6 +181,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      */
     $config.states.shardCollection = function shardCollection(db, unusedCollName) {
         if (isMongos(db) && this.tid === 0) {
+            jsTestLog(`Running shardCollection: coll=${this.outputCollName} key=${this.shardKey}`);
             assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
             assert.commandWorked(db.adminCommand(
                 {shardCollection: db[this.outputCollName].getFullName(), key: this.shardKey}));
@@ -154,6 +197,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         // `shardCollection()` requires a shard key index to be in place on the output collection,
         // as we may be sharding a non-empty collection.
         assert.commandWorked(db[this.outputCollName].createIndex({_id: 'hashed'}));
+
+        if (isMongos(db)) {
+            this.shards = Object.keys(cluster.getSerializedCluster().shards);
+        }
     };
 
     return $config;
