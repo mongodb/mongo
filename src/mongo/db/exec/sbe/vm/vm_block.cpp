@@ -857,11 +857,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
     auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
 
     auto valsExtracted = valueBlock->extract();
-    tassert(7953533, "Expected all bool inputs", allBools(valsExtracted.tags, valsExtracted.count));
     tassert(7953535, "Unsupported empty block", valsExtracted.count > 0);
 
     const auto& positionInfo = cellBlock->filterPositionInfo();
-    if (emptyPositionInfo(positionInfo)) {
+    if (emptyPositionInfo(positionInfo) && allBools(valsExtracted.tags, valsExtracted.count)) {
         // Return the input unchanged.
         return moveFromStack(0);
     }
@@ -881,7 +880,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
     for (size_t i = 0; i < valsExtracted.count; ++i) {
         dassert(positionInfo[i] == 1 || positionInfo[i] == 0);
         runsSeen += positionInfo[i];
-        foldCounts[runsSeen] += static_cast<int>(value::bitcastTo<bool>(valsExtracted[i].second));
+        foldCounts[runsSeen] +=
+            static_cast<int>(valsExtracted[i].first == sbe::value::TypeTags::Boolean &&
+                             value::bitcastTo<bool>(valsExtracted[i].second));
     }
 
     // The last run is implicitly ended.

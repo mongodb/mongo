@@ -129,7 +129,13 @@ TimeseriesTest.run((insert) => {
 
         // Equality to array does not use block processing.
         {pred: {"topLevelArray": {$eq: [101, 102]}}, ids: [3], usesBlockProcessing: false},
-        {pred: {"topLevelScalar": {$eq: [999, 999]}}, ids: [], usesBlockProcessing: false}
+        {pred: {"topLevelScalar": {$eq: [999, 999]}}, ids: [], usesBlockProcessing: false},
+
+        {
+            pred: {"time": {$in: [[new Date("2019-09-27T21:14:45.654Z")]]}},
+            ids: [],
+            usesBlockProcessing: true
+        }
     ];
 
     // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
@@ -180,6 +186,6 @@ TimeseriesTest.run((insert) => {
             {$project: {_id: 1}}
         ];
         const res = coll.aggregate(pipe).toArray()
-        assert.eq(res.length, coll.count());
+        assert.eq(res.length, coll.count(), res);
     }
 });
