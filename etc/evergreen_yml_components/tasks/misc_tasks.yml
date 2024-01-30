@@ -327,7 +327,6 @@ tasks:
   - command: subprocess.exec
     params:
       binary: bash
-      add_expansions_to_env: true
       args:
       - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
 

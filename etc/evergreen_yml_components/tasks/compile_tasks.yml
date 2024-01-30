@@ -189,7 +189,6 @@ tasks:
   - command: subprocess.exec
     params:
       binary: bash
-      add_expansions_to_env: true
       args:
       - "./src/evergreen/record_mongodb_server_version.sh"
       - "./build/install/dist-test/bin/mongod"
