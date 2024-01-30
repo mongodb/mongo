@@ -2246,6 +2246,10 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                        "Rolling back to the stable timestamp",
                        "stableTimestamp"_attr = stableTimestamp,
                        "initialDataTimestamp"_attr = initialDataTimestamp);
+
+    // Shut down the cache before rollback and restart afterwards.
+    _sessionCache->shuttingDown();
+
     int ret = _conn->rollback_to_stable(_conn, nullptr);
     if (ret) {
         return {ErrorCodes::UnrecoverableRollbackError,
@@ -2259,6 +2263,9 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     }
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri, _readOnly);
+
+    // SERVER-85167: restart the cache after resetting the size storer.
+    _sessionCache->restart();
 
     return {stableTimestamp};
 }
