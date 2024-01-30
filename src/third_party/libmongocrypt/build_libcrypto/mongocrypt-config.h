@@ -22,7 +22,7 @@
  * @brief The version string describing libmongocrypt.
  * Has the form x.y.z-<pre>+<date>+git<sha>.
  */
-#define MONGOCRYPT_VERSION "unknown"
+#define MONGOCRYPT_VERSION "1.8.4"
 
 
 /*

@@ -180,7 +180,7 @@ bool mc_FLE2IndexedEncryptedValueV2_add_S_Key(_mongocrypt_crypto_t *crypto,
         CLIENT_ERR("Invalid ServerEncryptedValue length, got %" PRIu32 ", expected more than %d",
                    DecryptedServerEncryptedValueLen,
                    UUID_LEN);
-        return false;
+        goto fail;
     }
     _mongocrypt_buffer_resize(&iev->DecryptedServerEncryptedValue, DecryptedServerEncryptedValueLen);
     uint32_t bytes_written = 0;

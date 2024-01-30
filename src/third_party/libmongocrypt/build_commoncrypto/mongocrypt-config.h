@@ -24,7 +24,7 @@
  * @brief The version string describing libmongocrypt.
  * Has the form x.y.z-<pre>+<date>+git<sha>.
  */
-#define MONGOCRYPT_VERSION "1.2.1-dev+20210818gitbc95b5171e"
+#define MONGOCRYPT_VERSION "1.8.4"
 
 /*
  * MONGOCRYPT_ENABLE_CRYPTO_CNG is set from configure to determine if we are

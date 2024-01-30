@@ -37,7 +37,7 @@ a notice will be included in
 | [JSON-Schema-Test-Suite]   | MIT               | 728066f9c5        |                      |                                 |
 | [libstemmer]               | BSD-3-Clause      | Unknown           |          ✗           |                ✗                |
 | [librdkafka]               | BSD-2-Clause      | 2.0.2             |                      |                                 |
-| [libmongocrypt]            | Apache-2.0        | e656245b7e        |          ✗           |                ✗                |
+| [libmongocrypt]            | Apache-2.0        | 1.8.4             |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      | Unknown + changes |                      |                ✗                |
 | [mongo-c-driver]           | Apache-2.0        | 1.23.0            |          ✗           |                ✗                |
 | [MozJS]                    | MPL-2.0           | ESR 91.3.0        |                      |                ✗                |

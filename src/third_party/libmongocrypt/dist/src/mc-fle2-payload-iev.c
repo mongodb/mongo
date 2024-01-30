@@ -207,7 +207,7 @@ static bool mc_fle2IndexedEncryptedValue_encrypt(_mongocrypt_crypto_t *crypto,
     uint32_t ciphertext_len = fle2alg->get_ciphertext_len(expected_buf_size, status);
 
     if (ciphertext_len == 0) {
-        return false;
+        goto cleanup;
     }
 
     _mongocrypt_buffer_resize(out, ciphertext_len);
