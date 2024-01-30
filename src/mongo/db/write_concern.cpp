@@ -328,7 +328,22 @@ Status waitForWriteConcern(OperationContext* opCtx,
             }
             case WriteConcernOptions::SyncMode::JOURNAL:
                 waitForNoOplogHolesIfNeeded(opCtx);
-                JournalFlusher::get(opCtx)->waitForJournalFlush(opCtx);
+                // In most cases we only need to trigger a journal flush without waiting for it
+                // to complete because waiting for replication with j:true already tracks the
+                // durable point for all data-bearing nodes and thus is sufficient to guarantee
+                // durability.
+                //
+                // One exception is for w:1 writes where we need to wait for the journal flush
+                // to complete because we skip waiting for replication for w:1 writes. In fact
+                // for multi-voter replica sets, durability of w:1 writes could be meaningless
+                // because they may still be rolled back if the primary crashes. Single-voter
+                // replica sets, however, can never rollback confirmed writes, thus durability
+                // does matter in this case.
+                if (!writeConcernWithPopulatedSyncMode.needToWaitForOtherNodes()) {
+                    JournalFlusher::get(opCtx)->waitForJournalFlush(opCtx);
+                } else {
+                    JournalFlusher::get(opCtx)->triggerJournalFlush();
+                }
                 break;
         }
     } catch (const DBException& ex) {

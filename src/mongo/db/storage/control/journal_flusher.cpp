@@ -244,7 +244,19 @@ void JournalFlusher::resume() {
 }
 
 void JournalFlusher::waitForJournalFlush(Interruptible* interruptible) {
-    _waitForJournalFlushNoRetry(interruptible);
+    auto myFuture = [&]() {
+        stdx::lock_guard<Latch> lk(_stateMutex);
+        _triggerJournalFlush(lk);
+        return _nextSharedPromise->getFuture();
+    }();
+
+    // Throws on error if the flusher thread is shutdown.
+    myFuture.get(interruptible);
+}
+
+void JournalFlusher::triggerJournalFlush() {
+    stdx::unique_lock<Latch> lk(_stateMutex);
+    _triggerJournalFlush(lk);
 }
 
 void JournalFlusher::interruptJournalFlusherForReplStateChange() {
@@ -255,17 +267,11 @@ void JournalFlusher::interruptJournalFlusherForReplStateChange() {
     }
 }
 
-void JournalFlusher::_waitForJournalFlushNoRetry(Interruptible* interruptible) {
-    auto myFuture = [&]() {
-        stdx::unique_lock<Latch> lk(_stateMutex);
-        if (!_flushJournalNow) {
-            _flushJournalNow = true;
-            _flushJournalNowCV.notify_one();
-        }
-        return _nextSharedPromise->getFuture();
-    }();
-    // Throws on error if the flusher thread is shutdown.
-    myFuture.get(interruptible);
+void JournalFlusher::_triggerJournalFlush(WithLock lk) {
+    if (!_flushJournalNow) {
+        _flushJournalNow = true;
+        _flushJournalNowCV.notify_one();
+    }
 }
 
 }  // namespace mongo
