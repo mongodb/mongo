@@ -439,6 +439,13 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
 
     // Initialize the remaining member variables from the bucket document.
     if (isCompressed) {
+        if (!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // Re-opening compressed buckets is only supported when the always use compressed
+            // buckets feature flag is enabled.
+            return {ErrorCodes::BadValue, "Bucket is compressed and cannot be reopened"};
+        }
+
         auto decompressed = decompressBucket(bucketDoc);
         if (!decompressed.has_value()) {
             return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};

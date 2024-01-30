@@ -1596,6 +1596,9 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1653,6 +1656,9 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
 }
 
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+
     // Bucket document to reopen.
     BSONObj bucketDoc = ::mongo::fromjson(
         R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
@@ -1688,8 +1694,9 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
                                                      "a":{},"b":{}})"),
                          CombineWithInsertsFromOtherClients::kAllow);
 
-    // The reopened bucket gets closed as the schema is incompatible.
-    ASSERT_EQ(1, get<SuccessfulInsertion>(result.getValue()).closedBuckets.size());
+    // The reopened bucket does not get closed even though the schema is incompatible as we can have
+    // multiple buckets open.
+    ASSERT_EQ(0, get<SuccessfulInsertion>(result.getValue()).closedBuckets.size());
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumSchemaChanges));
 
     auto batch = get<SuccessfulInsertion>(result.getValue()).batch;
@@ -1701,6 +1708,32 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements, 0);
 
     finish(_opCtx, *_bucketCatalog, batch, {});
+}
+
+TEST_F(BucketCatalogTest, ReopenCompressedBucketFails) {
+    // Reopening compressed buckets is not supported without the always use compressed buckets
+    // feature flag.
+
+    // Bucket document to reopen.
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+
+    CompressionResult compressionResult = compressBucket(bucketDoc,
+                                                         _timeField,
+                                                         _ns1,
+                                                         /*validateDecompression*/ true);
+    const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    Status status = _reopenBucket(autoColl.getCollection(), compressedBucketDoc);
+    ASSERT_EQ(ErrorCodes::BadValue, status);
 }
 
 TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {

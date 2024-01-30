@@ -681,6 +681,9 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
+    invariant(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
+
     // Generate the diff and apply it against the previously decompressed bucket document.
     auto updateMod = makeTimeseriesUpdateOpEntry(opCtx, batch, metadata).getU();
     auto diff = updateMod.getDiff();
@@ -691,61 +694,18 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
     // running.
     auto before = std::move(*batch->compressed);
 
-    CompressionResult compressionResult;
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        // TODO SERVER-80653: Handle bucket compression failure.
-        compressionResult = timeseries::compressBucket(
-            updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
-        batch->uncompressed = updated;
-        if (compressionResult.compressedBucket) {
-            batch->compressed = *compressionResult.compressedBucket;
-        } else {
-            // Clear the previous compression state if we're inserting an uncompressed bucket due to
-            // compression failure.
-            batch->compressed = boost::none;
-        }
-    }
-
-    // Holds the bucket document with the operations from the write batch applied when the always
-    // use compressed buckets feature flag is disabled. When enabled, holds the compressed version
-    // of the bucket document mentioned earlier.
-    auto after = compressionResult.compressedBucket ? *compressionResult.compressedBucket : updated;
+    CompressionResult compressionResult = timeseries::compressBucket(
+        updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
+    // TODO SERVER-80653: convert to uassert.
+    invariant(compressionResult.compressedBucket);
+    batch->uncompressed = updated;
+    batch->compressed = *compressionResult.compressedBucket;
 
     // Generates a delta update request using the before and after compressed bucket documents.
-    // (Generic FCV reference): Only do this when running in the latest FCV version as older
-    // binaries cannot interpret the binary diff format.
-    // TODO SERVER-80653: Remove compressed bucket check. The operation should retry if compression
-    // fails before we get here.
-    auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    if (compressionResult.compressedBucket &&
-        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(fcvSnapshot) &&
-        fcvSnapshot.getVersion() == multiversion::GenericFCV::kLatest) {
-        const auto updateEntry =
-            makeTimeseriesCompressedDiffEntry(opCtx, batch, before, after, metadata);
-
-        write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
-        op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
-        return op;
-    }
-
-    auto bucketTransformationFunc = [before = std::move(before), after = std::move(after)](
-                                        const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
-        // Make sure the document hasn't changed since we read it into the BucketCatalog.
-        // This should not happen, but since we can double-check it here, we can guard
-        // against the missed update that would result from simply replacing with 'after'.
-        if (!bucketDoc.binaryEqual(before)) {
-            throwWriteConflictException("Bucket document changed between initial read and update");
-        }
-        return after;
-    };
-
-    auto updates = makeTimeseriesTransformationOpEntry(
-        opCtx,
-        /*bucketId=*/batch->bucketHandle.bucketId.oid,
-        /*transformationFunc=*/std::move(bucketTransformationFunc));
-
-    write_ops::UpdateCommandRequest op(bucketsNs, {updates});
+    auto after = *compressionResult.compressedBucket;
+    const auto updateEntry =
+        makeTimeseriesCompressedDiffEntry(opCtx, batch, before, after, metadata);
+    write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
 }
