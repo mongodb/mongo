@@ -69,6 +69,7 @@ const StringDataSet kTargetedCmdNames = {
     "splitVector",   // TODO (SERVER-84090): Investigate whether to change or deprecate router's
                      // splitVector command.
     "validate",
+    "waitForFailPoint",
     "_flushRoutingTableCacheUpdates"};
 
 /**
