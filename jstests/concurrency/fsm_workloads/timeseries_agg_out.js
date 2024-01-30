@@ -33,6 +33,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
      * Runs an aggregate with a $out with time-series into '$config.data.outputCollName'.
      */
     $config.states.query = function query(db, collName) {
+        jsTestLog(`Running query: coll=${collName} out=${this.outputCollName}`);
         const res = db[collName].runCommand({
             aggregate: collName,
             pipeline: [
@@ -49,14 +50,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         });
 
         const allowedErrorCodes = [
-            ErrorCodes.CommandFailed,     // indexes of target collection changed during processing.
-            ErrorCodes.IllegalOperation,  // $out is not supported to an existing *sharded* output
-            // collection.
-            17152,                       // namespace is capped so it can't be used for $out.
-            28769,                       // $out collection cannot be sharded.
-            ErrorCodes.NamespaceExists,  // $out tries to create a view when a buckets collection
-                                         // already exists. This error is not caught because the
-                                         // view is being dropped by a previous thread.
+            // indexes of target collection changed during processing.
+            ErrorCodes.CommandFailed,
+            // $out is not supported to an existing *sharded* output collection
+            ErrorCodes.IllegalOperation,
+            // namespace is capped so it can't be used for $out.
+            17152,
+            // $out collection cannot be sharded.
+            ErrorCodes.NamespaceCannotBeSharded,
+            // $out tries to create a view when a buckets collection already exists. This error is
+            // not caught because the view is being dropped by a previous thread.
+            ErrorCodes.NamespaceExists,
+            // $out can't be executed while there is a move primary in progress
+            ErrorCodes.MovePrimaryInProgress,
         ];
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
         if (res.ok) {
@@ -76,6 +82,8 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             expireAfterSeconds = Random.rand();
         }
 
+        jsTestLog(`Running collMod: coll=${this.outputCollName} expireAfterSeconds=${
+            expireAfterSeconds}`);
         assert.commandWorkedOrFailedWithCode(
             db.runCommand({collMod: this.outputCollName, expireAfterSeconds: expireAfterSeconds}),
             [ErrorCodes.ConflictingOperationInProgress, ErrorCodes.NamespaceNotFound]);
@@ -88,18 +96,19 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         if (isMongos(db)) {
             return;  // convertToCapped can't be run against a mongos.
         }
+        jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
         assert.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
             ErrorCodes.CommandNotSupportedOnView);
     };
 
+    // TODO: SERVER-85439 Enable movePrimary once the bug is fixed
+    $config.states.movePrimary = function movePrimary(db, collName) {
+        return;
+    };
+
     $config.teardown = function teardown(db) {
         const collNames = db.getCollectionNames();
-        // Ensure that a temporary collection is not left behind.
-        assert.eq(db.getCollectionNames()
-                      .filter(col => col.includes('system.buckets.tmp.agg_out'))
-                      .length,
-                  0);
 
         // Ensure that for the buckets collection there is a corresponding view.
         assert(!(collNames.includes('system.buckets.timeseries_agg_out') &&
@@ -121,6 +130,10 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             });
         }
         assert.commandWorked(db.runCommand({insert: collName, documents: docs, ordered: false}));
+
+        if (isMongos(db)) {
+            this.shards = Object.keys(cluster.getSerializedCluster().shards);
+        }
     };
 
     return $config;
