@@ -52,13 +52,7 @@ void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debu
 
 BSONObj InternalSchemaNumArrayItemsMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    BSONObjBuilder objBuilder;
-    if (opts.replacementForLiteralArgs) {
-        objBuilder.append(_name, opts.replacementForLiteralArgs.get());
-    } else {
-        objBuilder.append(_name, _numItems);
-    }
-    return objBuilder.obj();
+    return BSON(_name << opts.serializeLiteral(_numItems));
 }
 
 bool InternalSchemaNumArrayItemsMatchExpression::equivalent(const MatchExpression* other) const {

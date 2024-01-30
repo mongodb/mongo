@@ -153,26 +153,14 @@ TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch)
     auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
 
-    SerializationOptions options;
-    options.replacementForLiteralArgs = "?";
-    options.identifierRedactionPolicy = [](StringData s) -> std::string {
-        return str::stream() << "HASH<" << s << ">";
-    };
-    options.redactIdentifiers = true;
-
     pipeline->optimizePipeline();
     ASSERT_EQ(1u, pipeline->getSources().size());
-    std::vector<Value> serialized;
-    pipeline->getSources().front()->serializeToArray(serialized, options);
+    auto serialized = redactToArray(*pipeline->getSources().front());
     ASSERT_EQ(2u, serialized.size());
 
     ASSERT_BSONOBJ_EQ(specObj, serialized[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$match": {
-                "HASH<foo>": { "$eq": "?" }
-            }
-        })",
+        R"({"$match":{"HASH<foo>":{"$eq":"?string"}}})",
         serialized[1].getDocument().toBson().getOwned());
 }
 

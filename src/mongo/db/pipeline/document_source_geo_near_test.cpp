@@ -130,15 +130,13 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONPoint) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$geoNear": {
-                "near": {
-                    "$const": "?"
-                },
+                "near": "?object",
                 "distanceField": "HASH<a>",
                 "maxDistance": "?",
                 "minDistance": "?",
                 "query": {
                     "HASH<foo>": {
-                        "$eq": "?"
+                        "$eq": "?string"
                     }
                 },
                 "spherical": "?"
@@ -162,9 +160,7 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONLineString) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$geoNear": {
-                "near": {
-                    "$const": "?"
-                },
+                "near": "?object",
                 "distanceField": "HASH<a>",
                 "minDistance": "?",
                 "query": {},
@@ -193,13 +189,11 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithLegacyCoordinates) {
         R"({
             "$geoNear": {
                 "key": "HASH<z>",
-                "near": {
-                    "$const": "?"
-                },
+                "near": "?array<?number>",
                 "distanceField": "HASH<foo>",
                 "query": {
                     "HASH<a>": {
-                        "$gt": "?"
+                        "$gt": "?number"
                     }
                 },
                 "spherical": "?",

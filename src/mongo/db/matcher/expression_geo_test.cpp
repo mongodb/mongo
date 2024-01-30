@@ -159,14 +159,13 @@ TEST(ExpressionGeoTest, GeoNearEquivalent) {
 TEST(ExpressionGeoTest, SerializeGeoExpressions) {
     SerializationOptions opts = {};
     opts.redactIdentifiers = true;
-    opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     {
         BSONObj query = fromjson("{$within: {$box: [{x: 4, y: 4}, [6, 6]]}}");
         std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
 
-        ASSERT_VALUE_EQ_AUTO(                // NOLINT
-            "{ $within: { $box: \"?\" } }",  // NOLINT (test
-                                             // auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$within":{"$box":"?array<>"}})",
             ge->getSerializedRightHandSide(opts));
     }
     {
@@ -174,32 +173,56 @@ TEST(ExpressionGeoTest, SerializeGeoExpressions) {
             "{$geoWithin: {$geometry: {type: \"MultiPolygon\", coordinates: [[[[20.0, 70.0],[30.0, "
             "70.0],[30.0, 50.0],[20.0, 50.0],[20.0, 70.0]]]]}}}");
         std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(  // NOLINT
-            "{ $geoWithin: { $geometry: { type: \"MultiPolygon\", coordinates: \"?\" } } }",  // NOLINT
-                                                                                              // (test
-                                                                                              // auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "$geoWithin": {
+                    "$geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": "?array<?array>"
+                    }
+                }
+            })",
             ge->getSerializedRightHandSide(opts));
     }
     {
         BSONObj query = fromjson(
-            "{$geoIntersects: {$geometry: {type: \"MultiPolygon\",coordinates: [[[[-20.0, "
-            "-70.0],[-30.0, -70.0],[-30.0, -50.0],[-20.0, -50.0],[-20.0, -70.0]]]]}}}");
+            R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": [[[
+                            [-20.0, -70.0],
+                            [-30.0, -70.0],
+                            [-30.0, -50.0],
+                            [-20.0, -50.0],
+                            [-20.0, -70.0]
+                        ]]]
+                    }
+                }
+            })");
         std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(  // NOLINT
-            "{ $geoIntersects: { $geometry: { type: \"MultiPolygon\", coordinates: \"?\" } } }",  // NOLINT
-                                                                                                  // (test
-                                                                                                  // auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "$geoIntersects": {
+                    "$geometry": {
+                        "type": "MultiPolygon",
+                        "coordinates": "?array<?array>"
+                    }
+                }
+            })",
             ge->getSerializedRightHandSide(opts));
     }
     {
         BSONObj query1 = fromjson(
-            "{$within: {$geometry: {type: 'Polygon',"
-            "coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]}}}");
+            R"({$within: {
+                    $geometry: {
+                        type: 'Polygon',
+                        coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]]
+                    }
+            }})");
         std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query1));
-        ASSERT_VALUE_EQ_AUTO(                                                         // NOLINT
-            "{ $within: { $geometry: { type: \"Polygon\", coordinates: \"?\" } } }",  // NOLINT
-                                                                                      // (test
-                                                                                      // auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$within":{"$geometry":{"type":"Polygon","coordinates":"?array<?array>"}}})",
             ge->getSerializedRightHandSide(opts));
     }
     {
@@ -207,47 +230,65 @@ TEST(ExpressionGeoTest, SerializeGeoExpressions) {
             "{$near: {$maxDistance: 100, "
             "$geometry: {type: 'Point', coordinates: [0, 0]}}}");
         std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(  // NOLINT
-            "{ $near: { $maxDistance: \"?\", $geometry: { type: \"Point\", coordinates: \"?\" } } "
-            "}",  // NOLINT (test auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "$near": {
+                    "$maxDistance": "?number",
+                    "$geometry": {
+                        "type": "Point",
+                        "coordinates": "?array<?number>"
+                    }
+                }
+            })",
             gne->getSerializedRightHandSide(opts));
     }
     {
         BSONObj query = fromjson("{ $nearSphere: [0,0], $minDistance: 1, $maxDistance: 3 }");
         std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(                                                    // NOLINT
-            "{ $nearSphere: \"?\", $minDistance: \"?\", $maxDistance: \"?\" }",  // NOLINT (test
-                                                                                 // auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({
+                "$nearSphere": "?array<?number>",
+                "$minDistance": "?number",
+                "$maxDistance": "?number"
+            })",
             gne->getSerializedRightHandSide(opts));
     }
 
     {
-        BSONObj query = fromjson("{$near : [0, 0, 1] } }");
+        BSONObj query = fromjson("{$near : [0, 0, 1] }");
         std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(    // NOLINT
-            "{ $near: \"?\" }",  // NOLINT (test auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$near":"?array<?number>"})",
             gne->getSerializedRightHandSide(opts));
     }
     {
         BSONObj query = fromjson("{$geoNear: [0, 0, 100]}");
         std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(       // NOLINT
-            "{ $geoNear: \"?\" }",  // NOLINT (test auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoNear":"?array<?number>"})",
             gne->getSerializedRightHandSide(opts));
     }
     {
         BSONObj query = fromjson("{$geoNear: [0, 10], $maxDistance: 80 }");
         std::unique_ptr<GeoNearMatchExpression> gne(makeGeoNearMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(                            // NOLINT
-            "{ $geoNear: \"?\", $maxDistance: \"?\" }",  // NOLINT (test auto-update)
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoNear":"?array<?number>","$maxDistance":"?number"})",
             gne->getSerializedRightHandSide(opts));
     }
     {
         BSONObj query = fromjson("{$geoIntersects: {$geometry: [0, 0]}}");
         std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
-        ASSERT_VALUE_EQ_AUTO(  // NOLINT
-            "{ $geoIntersects: { $geometry: { coordinates: \"?\" } } }",
+        ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+            R"({"$geoIntersects":{"$geometry":["?number","?number"]}})",
             ge->getSerializedRightHandSide(opts));
+    }
+    {
+        // Make sure we reject arrays with <2 or >2 elements.
+        BSONObj query = fromjson("{$geoIntersects: {$geometry: [0, 0, 1]}}");
+        std::unique_ptr<GeoExpression> gq(new GeoExpression);
+        ASSERT_NOT_OK(gq->parseFrom(query));
+        query = fromjson("{$geoIntersects: {$geometry: [0]}}");
+        ASSERT_NOT_OK(gq->parseFrom(query));
     }
 }
 

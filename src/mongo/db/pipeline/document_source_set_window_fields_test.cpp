@@ -322,9 +322,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnExpressionNOperator) {
                 "output": {
                     "HASH<b>": {
                         "$minN": {
-                            "n": {
-                                "$const": "?"
-                            },
+                            "n": "?number",
                             "input": "$HASH<y>"
                         },
                         "window": {

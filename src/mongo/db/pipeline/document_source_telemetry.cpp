@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/document_source_telemetry.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
@@ -43,59 +44,99 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagTelemetry);
 
-bool parseTelemetryEmbeddedObject(BSONObj embeddedObj) {
-    auto fieldNameRedaction = false;
-    if (!embeddedObj.isEmpty()) {
-        uassert(ErrorCodes::FailedToParse,
-                str::stream()
-                    << DocumentSourceTelemetry::kStageName
-                    << " parameters object may only contain one field, 'redactIdentifiers'. Found: "
-                    << embeddedObj.toString(),
-                embeddedObj.nFields() == 1);
-
-        uassert(ErrorCodes::FailedToParse,
-                str::stream()
-                    << DocumentSourceTelemetry::kStageName
-                    << " parameters object may only contain 'redactIdentifiers' option. Found: "
-                    << embeddedObj.firstElementFieldName(),
-                embeddedObj.hasField("redactIdentifiers"));
-
+namespace {
+/**
+ * Try to parse the redactIdentifiers property from the element.
+ */
+boost::optional<bool> parseRedactIdentifiers(const BSONElement& el) {
+    if (el.fieldNameStringData() == "redactIdentifiers"_sd) {
+        auto type = el.type();
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << DocumentSourceTelemetry::kStageName
                               << " redactIdentifiers parameter must be boolean. Found type: "
-                              << typeName(embeddedObj.firstElementType()),
-                embeddedObj.firstElementType() == BSONType::Bool);
-        fieldNameRedaction = embeddedObj["redactIdentifiers"].trueValue();
+                              << typeName(type),
+                type == BSONType::Bool);
+        return el.trueValue();
     }
-    return fieldNameRedaction;
+    return boost::none;
 }
 
-std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::LiteParsed::parse(
-    const NamespaceString& nss, const BSONElement& spec) {
+/**
+ * Try to parse the `redactionKey' property from the element.
+ */
+boost::optional<std::string> parseRedactionKey(const BSONElement& el) {
+    if (el.fieldNameStringData() == "redactionKey"_sd) {
+        auto type = el.type();
+        if (el.isBinData(BinDataType::BinDataGeneral)) {
+            int len;
+            auto data = el.binData(len);
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << DocumentSourceTelemetry::kStageName
+                                  << "redactionKey must be greater than or equal to 32 bytes",
+                    len >= 32);
+            return {{data, (size_t)len}};
+        }
+        uasserted(
+            ErrorCodes::FailedToParse,
+            str::stream()
+                << DocumentSourceTelemetry::kStageName
+                << " redactionKey parameter must be bindata of length 32 or greater. Found type: "
+                << typeName(type));
+    }
+    return boost::none;
+}
+
+/**
+ * Parse the spec object calling the `ctor` with the bool redactIdentifiers and std::string
+ * redactionKey arguments.
+ */
+template <typename Ctor>
+auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << kStageName
+            str::stream() << DocumentSourceTelemetry::kStageName
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
-    return std::make_unique<DocumentSourceTelemetry::LiteParsed>(
-        spec.fieldName(), parseTelemetryEmbeddedObject(spec.embeddedObject()));
+    bool redactIdentifiers = false;
+    std::string redactionKey;
+    for (auto&& el : spec.embeddedObject()) {
+        if (auto maybeRedactIdentifiers = parseRedactIdentifiers(el); maybeRedactIdentifiers) {
+            redactIdentifiers = *maybeRedactIdentifiers;
+        } else if (auto maybeRedactionKey = parseRedactionKey(el); maybeRedactionKey) {
+            redactionKey = *maybeRedactionKey;
+        } else {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << DocumentSourceTelemetry::kStageName
+                                    << " parameters object may only contain 'redactIdentifiers' or "
+                                       "'redactionKey' options. Found: "
+                                    << el.fieldName());
+        }
+    }
+
+    return ctor(redactIdentifiers, redactionKey);
+}
+
+}  // namespace
+
+std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::LiteParsed::parse(
+    const NamespaceString& nss, const BSONElement& spec) {
+    return parseSpec(spec, [&](bool redactIdentifiers, std::string redactionKey) {
+        return std::make_unique<DocumentSourceTelemetry::LiteParsed>(
+            spec.fieldName(), redactIdentifiers, redactionKey);
+    });
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << kStageName
-                          << " value must be an object. Found: " << typeName(spec.type()),
-            spec.type() == BSONType::Object);
-
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
             "$telemetry must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
-    return new DocumentSourceTelemetry(pExpCtx,
-                                       parseTelemetryEmbeddedObject(spec.embeddedObject()));
+    return parseSpec(spec, [&](bool redactIdentifiers, std::string redactionKey) {
+        return new DocumentSourceTelemetry(pExpCtx, redactIdentifiers, redactionKey);
+    });
 }
 
 Value DocumentSourceTelemetry::serialize(SerializationOptions opts) const {
@@ -144,7 +185,7 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
-            auto swKey = metrics->redactKey(key, _redactIdentifiers, pExpCtx->opCtx);
+            auto swKey = metrics->redactKey(key, _redactIdentifiers, _redactionKey, pExpCtx->opCtx);
             if (!swKey.isOK()) {
                 LOGV2_DEBUG(7349403,
                             3,

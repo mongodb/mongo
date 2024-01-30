@@ -1,4 +1,4 @@
-# Copyright (C) 2022-present MongoDB, Inc.
+# Copyright (C) 2023-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -28,22 +28,56 @@
 
 global:
   cpp_namespace: "mongo"
-  cpp_includes:
-    - "mongo/db/pipeline/document_source_parsing_validators.h"
 
 imports:
   - "mongo/db/basic_types.idl"
-  - "mongo/db/pipeline/storage_stats_spec.idl"
-  - "mongo/db/pipeline/document_source_coll_stats.idl"
+
+enums:
+    ExampleEnum:
+        description: ""
+        type: string
+        values:
+            Value1: "EnumValue1"
+            Value2: "EnumValue2"
 
 structs:
-  DocumentSourceInternalAllCollectionStatsSpec:
-    description: Specification for an $_internalAllCollectionStats stage.
-    strict: true
-    query_shape_component: true
-    fields:
-      stats:
-        description: Specification for a $collStats stage.
-        type: DocumentSourceCollStatsSpec
-        optional: true
-        query_shape_literal: true
+    NestedStruct:
+        query_shape_component: true
+        strict: true
+        description: ""
+        fields: 
+            stringField:
+                query_shape_literal: true
+                type: string
+            enumField:
+                query_shape_literal: false
+                type: ExampleEnum
+            stringIntVariant:
+                query_shape_literal: true
+                type:
+                    variant: [string, int]
+            stringIntVariantEnum:
+                query_shape_literal: false
+                type:
+                    variant: [string, int]
+            arrayOfInts:
+                query_shape_literal: true
+                type: array<int>
+            fieldpath:
+                query_shape_anonymize: true
+                type: string
+            fieldpathList:
+                query_shape_anonymize: true
+                type: array<string>
+
+    ParentStruct:
+        query_shape_component: true
+        strict: true
+        description: ""
+        fields:
+            nested_shape:
+                query_shape_literal: true
+                type: NestedStruct
+            nested_no_shape:
+                query_shape_literal: false
+                type: NestedStruct

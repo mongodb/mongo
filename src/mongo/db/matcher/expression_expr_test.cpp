@@ -812,9 +812,9 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
     createMatcher(fromjson("{$expr: {$sum: [\"$a\", \"$b\"]}}"));
 
     SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.redactIdentifiers = true;
-    opts.replacementForLiteralArgs = "?";
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$expr":{"$sum":["$HASH<a>","$HASH<b>"]}})",
@@ -822,7 +822,7 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
 
     createMatcher(fromjson("{$expr: {$sum: [\"$a\", \"b\"]}}"));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$expr":{"$sum":["$HASH<a>",{"$const":"?"}]}})",
+        R"({"$expr":{"$sum":["$HASH<a>","?string"]}})",
         serialize(opts));
 
     createMatcher(fromjson("{$expr: {$sum: [\"$a.b\", \"$b\"]}}"));
@@ -842,7 +842,7 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
 
     createMatcher(fromjson("{$expr: {$getField: {field: \"b\", input: {a: 1, b: 2}}}}"));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$expr":{"$getField":{"field":"HASH<b>","input":{"$const":"?"}}}})",
+        R"({"$expr":{"$getField":{"field":"HASH<b>","input":"?object"}}})",
         serialize(opts));
 
     createMatcher(fromjson("{$expr: {$getField: {field: \"b\", input: \"$a\"}}}"));
@@ -857,9 +857,7 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
                 "$getField": {
                     "field": "HASH<b>",
                     "input": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
                         "HASH<b>": "$HASH<c>"
                     }
                 }
@@ -874,9 +872,7 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
                 "$getField": {
                     "field": "HASH<b>.HASH<c>",
                     "input": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
                         "HASH<b>": "$HASH<c>"
                     }
                 }
@@ -892,14 +888,10 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
                 "$setField": {
                     "field": "HASH<b>",
                     "input": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
                         "HASH<b>": "$HASH<c>"
                     },
-                    "value": {
-                        "$const": "?"
-                    }
+                    "value": "?number"
                 }
             }
         })",
@@ -913,9 +905,7 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
                 "$setField": {
                     "field": "HASH<b>.HASH<c>",
                     "input": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
                         "HASH<b>": "$HASH<c>"
                     },
                     "value": "$HASH<d>"
@@ -932,9 +922,7 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
                 "$setField": {
                     "field": "HASH<b>.HASH<c>",
                     "input": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
                         "HASH<b>": "$HASH<c>"
                     },
                     "value": "$HASH<d>.HASH<e>"
@@ -952,14 +940,10 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
                 "$setField": {
                     "field": "HASH<b>",
                     "input": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
                         "HASH<b>": "$HASH<c>"
                     },
-                    "value": {
-                        "$const": "?"
-                    }
+                    "value": "?object"
                 }
             }
         })",
@@ -974,18 +958,12 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
                 "$setField": {
                     "field": "HASH<b>",
                     "input": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
                         "HASH<b>": "$HASH<c>"
                     },
                     "value": {
-                        "HASH<a>": {
-                            "$const": "?"
-                        },
-                        "HASH<b>": {
-                            "$const": "?"
-                        },
+                        "HASH<a>": "?number",
+                        "HASH<b>": "?number",
                         "HASH<c>": "$HASH<d>"
                     }
                 }

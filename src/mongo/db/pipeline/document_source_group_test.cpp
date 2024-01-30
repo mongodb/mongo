@@ -254,18 +254,7 @@ TEST_F(DocumentSourceGroupTest, GroupRedactsCorrectWithIdNull) {
     })");
     auto docSource = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$group": {
-                "_id": {
-                    "$const": "?"
-                },
-                "HASH<foo>": {
-                    "$sum": {
-                        "$const": "?"
-                    }
-                }
-            }
-        })",
+        R"({"$group":{"_id":"?null","HASH<foo>":{"$sum":"?number"}}})",
         redact(*docSource));
 }
 

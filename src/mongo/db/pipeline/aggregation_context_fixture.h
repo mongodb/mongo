@@ -83,6 +83,8 @@ public:
         SerializationOptions options;
         options.verbosity = verbosity;
         if (performRedaction) {
+            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+            // TODO SERVER-75399 Use only 'literalPolicy.'
             options.replacementForLiteralArgs = "?";
             options.identifierRedactionPolicy = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
@@ -93,6 +95,23 @@ public:
         docSource.serializeToArray(serialized, options);
         ASSERT_EQ(1, serialized.size());
         return serialized[0].getDocument().toBson().getOwned();
+    }
+
+    std::vector<Value> redactToArray(const DocumentSource& docSource,
+                                     bool performRedaction = true) {
+        SerializationOptions options;
+        if (performRedaction) {
+            // TODO SERVER-75399 Use only 'literalPolicy.'
+            options.replacementForLiteralArgs = "?";
+            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+            options.identifierRedactionPolicy = [](StringData s) -> std::string {
+                return str::stream() << "HASH<" << s << ">";
+            };
+            options.redactIdentifiers = true;
+        }
+        std::vector<Value> serialized;
+        docSource.serializeToArray(serialized, options);
+        return serialized;
     }
 
 private:

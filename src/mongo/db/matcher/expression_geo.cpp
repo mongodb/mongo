@@ -104,8 +104,7 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
     return Status::OK();
 }
 
-BSONObj redactGeoExpression(const BSONObj& obj,
-                            boost::optional<StringData> literalArgsReplacement) {
+BSONObj customSerialization(const BSONObj& obj, SerializationOptions opts) {
 
     // Ideally each sub operator ($minDistance, $maxDistance, $geometry, $box) would serialize
     // itself, rather than GeoExpression reparse the query during serialization. However GeoMatch
@@ -127,8 +126,7 @@ BSONObj redactGeoExpression(const BSONObj& obj,
             // Alternatively, a legacy query can have a $maxDistance suboperator to make it more
             // explicit. None of these values are enums so it is fine to treat them as literals
             // during redaction.
-            outerElem = it.next();
-            bob.append(outerElem.fieldNameStringData(), *literalArgsReplacement);
+            opts.appendLiteral(&bob, it.next());
         }
         return bob.obj();
     }
@@ -141,18 +139,30 @@ BSONObj redactGeoExpression(const BSONObj& obj,
         while (embedded_it.more()) {
             BSONElement argElem = embedded_it.next();
             fieldName = argElem.fieldNameStringData();
-            if (fieldName == "$geometry") {
-                BSONObjBuilder nestedSubObj = BSONObjBuilder(subObj.subobjStart(fieldName));
-                BSONElement typeElt = argElem.Obj().getField("type");
-                if (!typeElt.eoo()) {
-                    nestedSubObj.append(typeElt);
+            if (fieldName == "$geometry"_sd) {
+                if (argElem.type() == BSONType::Array) {
+                    // This would be like {$geometry: [0, 0]} which must be a point.
+                    auto asArray = argElem.Array();
+                    tassert(7539807,
+                            "Expected the point to have exactly 2 elements: an x and y.",
+                            asArray.size() == 2UL);
+                    subObj.appendArray(fieldName,
+                                       BSON_ARRAY(opts.serializeLiteral(asArray[0])
+                                                  << opts.serializeLiteral(asArray[1])));
+                } else {
+                    BSONObjBuilder nestedSubObj = BSONObjBuilder(subObj.subobjStart(fieldName));
+                    auto geometryObj = argElem.Obj();
+                    if (auto typeElt = geometryObj["type"]) {
+                        nestedSubObj.append(typeElt);
+                    }
+                    tassert(7539800, "always expect coordinates", geometryObj["coordinates"]);
+                    opts.appendLiteral(&nestedSubObj, geometryObj["coordinates"]);
+                    nestedSubObj.doneFast();
                 }
-                nestedSubObj.append("coordinates", *literalArgsReplacement);
-                nestedSubObj.doneFast();
             }
-            if (fieldName == "$maxDistance" || fieldName == "$box" || fieldName == "$nearSphere" ||
-                fieldName == "$minDistance") {
-                subObj.append(fieldName, *literalArgsReplacement);
+            if (fieldName == "$maxDistance"_sd || fieldName == "$box"_sd ||
+                fieldName == "$nearSphere"_sd || fieldName == "$minDistance"_sd) {
+                opts.appendLiteral(&subObj, argElem);
             }
         }
         subObj.doneFast();
@@ -499,8 +509,8 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 }
 
 BSONObj GeoMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    if (opts.replacementForLiteralArgs) {
-        return redactGeoExpression(_rawObj, opts.replacementForLiteralArgs);
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        return customSerialization(_rawObj, opts);
     }
     BSONObjBuilder subobj;
     subobj.appendElements(_rawObj);
@@ -555,8 +565,8 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
 }
 
 BSONObj GeoNearMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    if (opts.replacementForLiteralArgs) {
-        return redactGeoExpression(_rawObj, opts.replacementForLiteralArgs);
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        return customSerialization(_rawObj, opts);
     }
     BSONObjBuilder objBuilder;
     objBuilder.appendElements(_rawObj);

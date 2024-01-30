@@ -129,6 +129,7 @@ public:
      */
     StatusWith<BSONObj> redactKey(const BSONObj& key,
                                   bool redactIdentifiers,
+                                  std::string redactionKey,
                                   OperationContext* opCtx) const;
 
     /**

@@ -127,6 +127,16 @@ public:
     };
 
     /**
+     * Constructs an ExpressionContext to be used for find command parsing and evaluation.
+     */
+    ExpressionContext(OperationContext* opCtx,
+                      const FindCommandRequest& findCmd,
+                      std::unique_ptr<CollatorInterface> collator,
+                      bool mayDbProfile,
+                      boost::optional<ExplainOptions::Verbosity> verbosity = boost::none,
+                      bool allowDiskUseByDefault = false);
+
+    /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */

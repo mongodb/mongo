@@ -122,7 +122,7 @@ const fooNeBatchSize = 3;
     // This filters to just the telemetry for query coll.find({foo: {$eq:
     // 1}}).limit(query2Limit).batchSize(2).
     telemetryResults = testDB.getSiblingDB("admin")
-                           .aggregate([{$telemetry: {}}, {$match: {"key.limit": '?'}}])
+                           .aggregate([{$telemetry: {}}, {$match: {"key.limit": '?number'}}])
                            .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
     assert.eq(telemetryResults[0].key.cmdNs.db, "test");
@@ -137,7 +137,7 @@ const fooNeBatchSize = 3;
                                {$telemetry: {}},
                                {
                                    $match: {
-                                       "key.filter.foo": {$eq: {$eq: "?"}},
+                                       "key.filter.foo": {$eq: {$eq: "?number"}},
                                        "key.limit": {$exists: false},
                                        "key.sort": {$exists: false}
                                    }

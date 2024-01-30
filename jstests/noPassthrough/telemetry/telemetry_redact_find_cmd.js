@@ -5,6 +5,9 @@ load("jstests/libs/telemetry_utils.js");
 (function() {
 "use strict";
 
+const kHashedCollName = "w6Ax20mVkbJu4wQWAMjL8Sl+DfXAr2Zqdc3kJRB7Oo0=";
+const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
+
 function runTest(conn) {
     const db = conn.getDB("test");
     const admin = conn.getDB("admin");
@@ -17,8 +20,8 @@ function runTest(conn) {
     let telemetry = getTelemetryRedacted(admin);
 
     assert.eq(1, telemetry.length);
-    assert.eq("n4bQgYhMfWWa", telemetry[0].key.find);
-    assert.eq({"TJRIXgwhrmxB": {$eq: "?"}}, telemetry[0].key.filter);
+    assert.eq(kHashedCollName, telemetry[0].key.find);
+    assert.eq({[kHashedFieldName]: {$eq: "?number"}}, telemetry[0].key.filter);
 
     db.test.insert({v: 2});
 
@@ -32,8 +35,10 @@ function runTest(conn) {
 
     telemetry = getTelemetryRedacted(admin);
     assert.eq(2, telemetry.length);
-    assert.eq("n4bQgYhMfWWa", telemetry[1].key.find);
-    assert.eq({"$and": [{"TJRIXgwhrmxB": {"$gt": "?"}}, {"TJRIXgwhrmxB": {"$lt": "?"}}]},
+    assert.eq(kHashedCollName, telemetry[1].key.find);
+    assert.eq({
+        "$and": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$lt": "?number"}}]
+    },
               telemetry[1].key.filter);
 }
 

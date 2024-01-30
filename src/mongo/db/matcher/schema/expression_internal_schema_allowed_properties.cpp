@@ -128,26 +128,14 @@ void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* b
 
     std::vector<StringData> sortedProperties(_properties.begin(), _properties.end());
     std::sort(sortedProperties.begin(), sortedProperties.end());
-    if (opts.replacementForLiteralArgs) {
-        expressionBuilder.append("properties", opts.replacementForLiteralArgs.get());
-        expressionBuilder.append("namePlaceholder", opts.replacementForLiteralArgs.get());
-    } else {
-        expressionBuilder.append("properties", sortedProperties);
-        expressionBuilder.append("namePlaceholder", _namePlaceholder);
-    }
+    opts.appendLiteral(&expressionBuilder, "properties", sortedProperties);
+    opts.appendLiteral(&expressionBuilder, "namePlaceholder", _namePlaceholder);
 
     BSONArrayBuilder patternPropertiesBuilder(expressionBuilder.subarrayStart("patternProperties"));
-    for (auto&& item : _patternProperties) {
-        BSONObjBuilder itemBuilder(patternPropertiesBuilder.subobjStart());
-        if (opts.replacementForLiteralArgs) {
-            itemBuilder.appendRegex("regex", opts.replacementForLiteralArgs.get());
-        } else {
-            itemBuilder.appendRegex("regex", item.first.rawRegex);
-        }
-
-        BSONObjBuilder subexpressionBuilder(itemBuilder.subobjStart("expression"));
-        item.second->getFilter()->serialize(&subexpressionBuilder, opts);
-        subexpressionBuilder.doneFast();
+    for (auto&& [pattern, expression] : _patternProperties) {
+        patternPropertiesBuilder << BSON(
+            "regex" << opts.serializeLiteral(BSONRegEx(pattern.rawRegex)) << "expression"
+                    << expression->getFilter()->serialize(opts));
     }
     patternPropertiesBuilder.doneFast();
 

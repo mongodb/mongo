@@ -81,15 +81,12 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
 }
 
 Value DocumentSourceQueue::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484319);
-    }
-
     ValueArrayStream vals;
     for (const auto& elem : _queue) {
         vals << elem.getDocument().getOwned();
     }
-    return Value(DOC(kStageName << vals.done()));
+    // We treat the queue's documents as one literal in the context of redaction.
+    return Value(DOC(kStageName << opts.serializeLiteralValue(vals.done())));
 }
 
 }  // namespace mongo

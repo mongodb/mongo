@@ -34,11 +34,7 @@ env.Library(
 
 env.Library(
     target='canonical_query',
-    source=[
-        'canonical_query.cpp',
-        'canonical_query_encoder.cpp',
-        'query_shape.cpp',
-    ],
+    source=['canonical_query.cpp', 'canonical_query_encoder.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/cst/cst',
@@ -377,6 +373,7 @@ env.Library(
 env.Library(
     target='op_metrics',
     source=[
+        'query_shape.cpp',
         'telemetry.cpp',
     ],
     LIBDEPS=[
@@ -458,6 +455,7 @@ env.CppUnitTest(
         "query_request_test.cpp",
         "query_settings_test.cpp",
         "query_shape_test.cpp",
+        "query_shape_test.idl",
         "query_solution_test.cpp",
         "rate_limiting_test.cpp",
         "sbe_and_hash_test.cpp",
@@ -490,6 +488,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/repl/storage_interface_impl",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/dbtests/mocklib",
+        "$BUILD_DIR/mongo/idl/idl_parser",
         "$BUILD_DIR/mongo/rpc/rpc",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "collation/collator_factory_mock",

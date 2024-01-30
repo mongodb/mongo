@@ -75,14 +75,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
 }
 
 Value DocumentSourceListSessions::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484327);
-    }
     ListSessionsSpec spec;
     spec.setAllUsers(_allUsers);
     spec.setUsers(_users);
     spec.setPredicate(_predicate);
-    return Value(Document{{getSourceName(), spec.toBSON()}});
+    return Value(Document{{getSourceName(), spec.toBSON(opts)}});
 }
 
 }  // namespace mongo

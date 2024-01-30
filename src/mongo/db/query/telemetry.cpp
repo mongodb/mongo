@@ -37,6 +37,7 @@
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/projection_ast_util.h"
@@ -53,6 +54,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
+#include "query_shape.h"
 #include <optional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -67,46 +69,29 @@ namespace telemetry {
  */
 namespace {
 static std::string hintSpecialField = "$hint";
-void addLiteralFieldsWithRedaction(BSONObjBuilder* bob,
-                                   const FindCommandRequest& findCommand,
-                                   StringData newLiteral) {
+void addLiteralFields(BSONObjBuilder* bob,
+                      const FindCommandRequest& findCommand,
+                      const SerializationOptions& opts) {
 
-    if (findCommand.getLimit()) {
-        bob->append(FindCommandRequest::kLimitFieldName, newLiteral);
+    if (auto limit = findCommand.getLimit()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kLimitFieldName, static_cast<long long>(*limit));
     }
-    if (findCommand.getSkip()) {
-        bob->append(FindCommandRequest::kSkipFieldName, newLiteral);
+    if (auto skip = findCommand.getSkip()) {
+        opts.appendLiteral(bob, FindCommandRequest::kSkipFieldName, static_cast<long long>(*skip));
     }
-    if (findCommand.getBatchSize()) {
-        bob->append(FindCommandRequest::kBatchSizeFieldName, newLiteral);
+    if (auto batchSize = findCommand.getBatchSize()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
     }
-    if (findCommand.getMaxTimeMS()) {
-        bob->append(FindCommandRequest::kMaxTimeMSFieldName, newLiteral);
+    if (auto maxTimeMs = findCommand.getMaxTimeMS()) {
+        opts.appendLiteral(bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
     }
-    if (findCommand.getNoCursorTimeout()) {
-        bob->append(FindCommandRequest::kNoCursorTimeoutFieldName, newLiteral);
+    if (auto noCursorTimeout = findCommand.getNoCursorTimeout()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kNoCursorTimeoutFieldName, bool(noCursorTimeout));
     }
 }
-
-void addLiteralFieldsWithoutRedaction(BSONObjBuilder* bob, const FindCommandRequest& findCommand) {
-    if (auto param = findCommand.getLimit()) {
-        bob->append(FindCommandRequest::kLimitFieldName, param.get());
-    }
-    if (auto param = findCommand.getSkip()) {
-        bob->append(FindCommandRequest::kSkipFieldName, param.get());
-    }
-    if (auto param = findCommand.getBatchSize()) {
-        bob->append(FindCommandRequest::kBatchSizeFieldName, param.get());
-    }
-    if (auto param = findCommand.getMaxTimeMS()) {
-        bob->append(FindCommandRequest::kMaxTimeMSFieldName, param.get());
-    }
-    if (findCommand.getNoCursorTimeout().has_value()) {
-        bob->append(FindCommandRequest::kNoCursorTimeoutFieldName,
-                    findCommand.getNoCursorTimeout().value_or(false));
-    }
-}
-
 
 static std::vector<
     std::pair<StringData, std::function<const OptionalBool(const FindCommandRequest&)>>>
@@ -121,27 +106,32 @@ static std::vector<
          &FindCommandRequest::getAllowPartialResults},
         {FindCommandRequest::kMirroredFieldName, &FindCommandRequest::getMirrored},
 };
+
 std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandRequest&)>>>
     objArgMap = {
         {FindCommandRequest::kCollationFieldName, &FindCommandRequest::getCollation},
 
 };
 
-void addRemainingFindCommandFields(BSONObjBuilder* bob, const FindCommandRequest& findCommand) {
+void addRemainingFindCommandFields(BSONObjBuilder* bob,
+                                   const FindCommandRequest& findCommand,
+                                   const SerializationOptions& opts) {
     for (auto [fieldName, getterFunction] : boolArgMap) {
         auto optBool = getterFunction(findCommand);
         if (optBool.has_value()) {
-            bob->append(fieldName, optBool.value_or(false));
+            opts.appendLiteral(bob, fieldName, optBool.value_or(false));
         }
     }
     if (auto optObj = findCommand.getReadConcern()) {
+        // Read concern should not be considered a literal.
         bob->append(FindCommandRequest::kReadConcernFieldName, optObj.get());
     }
     auto collation = findCommand.getCollation();
     if (!collation.isEmpty()) {
-        bob->append(FindCommandRequest::kCollationFieldName, collation);
+        opts.appendLiteral(bob, FindCommandRequest::kCollationFieldName, collation);
     }
 }
+
 boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
     if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
         return metadata->getApplicationName().toString();
@@ -157,6 +147,12 @@ BSONObj redactHintComponent(BSONObj obj, const SerializationOptions& opts, bool 
                     "Hinted field must be a string with $hint operator",
                     elem.type() == BSONType::String);
             bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            continue;
+        }
+
+        // $natural doesn't need to be redacted.
+        if (elem.fieldNameStringData().compare(query_request_helper::kNaturalSortField) == 0) {
+            bob.append(elem);
             continue;
         }
 
@@ -292,27 +288,16 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     }
 
     // Sort.
-    {
-        auto sortSpec = findCommand.getSort();
-        if (!sortSpec.isEmpty()) {
-            auto sort = SortPattern(sortSpec, expCtx);
-            bob.append(
-                FindCommandRequest::kSortFieldName,
-                sort.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
-                    .toBson());
-        }
+    if (!findCommand.getSort().isEmpty()) {
+        bob.append(FindCommandRequest::kSortFieldName,
+                   query_shape::sortShape(findCommand.getSort(), expCtx, opts));
     }
 
     // Fields for literal redaction. Adds limit, skip, batchSize, maxTimeMS, and noCursorTimeOut
-    if (opts.replacementForLiteralArgs) {
-        addLiteralFieldsWithRedaction(&bob, findCommand, opts.replacementForLiteralArgs.get());
-    } else {
-        addLiteralFieldsWithoutRedaction(&bob, findCommand);
-    }
+    addLiteralFields(&bob, findCommand, opts);
 
     // Add the fields that require no redaction.
-    addRemainingFindCommandFields(&bob, findCommand);
-
+    addRemainingFindCommandFields(&bob, findCommand, opts);
 
     auto appName = [&]() -> boost::optional<std::string> {
         if (existingMetrics.has_value()) {
@@ -548,14 +533,15 @@ void throwIfEncounteringFLEPayload(const BSONElement& e) {
  */
 const stdx::unordered_set<std::string> kKeysToRedact = {"pipeline", "find"};
 
-std::string sha256StringDataHasher(const StringData& fieldName) {
-    auto hash = SHA256Block::computeHash({ConstDataRange(fieldName.rawData(), fieldName.size())});
-    return hash.toString().substr(0, 12);
+std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
+    auto hashed = SHA256Block::computeHmac(
+        (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
+    return hashed.toString();
 }
 
-std::string sha256FieldNameHasher(const BSONElement& e) {
+std::string sha256HmacFieldNameHasher(std::string key, const BSONElement& e) {
     auto&& fieldName = e.fieldNameStringData();
-    return sha256StringDataHasher(fieldName);
+    return sha256HmacStringDataHasher(key, fieldName);
 }
 
 std::string constantFieldNameHasher(const BSONElement& e) {
@@ -597,6 +583,7 @@ static const StringData replacementForLiteralArgs = "?"_sd;
 
 StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
                                                 bool redactIdentifiers,
+                                                std::string redactionKey,
                                                 OperationContext* opCtx) const {
     // The redacted key for each entry is cached on first computation. However, if the redaction
     // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
@@ -614,16 +601,21 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
             7198600, "Find command must have a namespace string.", this->nss.isNamespaceString());
         auto findCommand =
             query_request_helper::makeFromFindCommand(cmdObj, this->nss.nss(), false);
-
-        SerializationOptions options(sha256StringDataHasher, replacementForLiteralArgs);
         uassert(7349400,
                 "Namespace must be defined",
                 findCommand->getNamespaceOrUUID().isNamespaceString());
-        auto expCtx = make_intrusive<ExpressionContext>(
-            opCtx, nullptr, findCommand->getNamespaceOrUUID().nss());
-        expCtx->variables.setDefaultRuntimeConstants(opCtx);
+
+        SerializationOptions options(
+            [&](StringData sd) { return sha256HmacStringDataHasher(redactionKey, sd); },
+            LiteralSerializationPolicy::kToDebugTypeString);
+
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                        *findCommand,
+                                                        nullptr /* collator doesn't matter here.*/,
+                                                        false /* mayDbProfile */);
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         expCtx->stopExpressionCounters();
+
         auto swRedactedKey = makeTelemetryKey(*findCommand, options, expCtx, *this);
         if (!swRedactedKey.isOK()) {
             return swRedactedKey.getStatus();
@@ -652,9 +644,10 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
             auto redactor = [&](BSONObjBuilder subObj, const BSONObj& obj) {
                 for (BSONElement e2 : obj) {
                     if (e2.type() == Object) {
-                        // Sha256 redaction strategy.
                         subObj.append(e2.fieldNameStringData(),
-                                      e2.Obj().redact(false, sha256FieldNameHasher));
+                                      e2.Obj().redact(false, [&](const BSONElement& e) {
+                                          return sha256HmacFieldNameHasher(redactionKey, e);
+                                      }));
                     } else {
                         subObj.append(e2);
                     }
@@ -749,6 +742,7 @@ void registerFindRequest(const FindCommandRequest& request,
     }
 
     SerializationOptions options;
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
     auto swTelemetryKey = makeTelemetryKey(request, options, expCtx);
     tassert(7349402,

@@ -109,6 +109,9 @@ class Type(common.SourceLocation):
         self.first_element_field_name = None  # type: str
         self.deserialize_with_tenant = False  # type: bool
         self.internal_only = False  # type: bool
+        # Marks whether this type is a query shape component.
+        # Can only be true if is_struct is true.
+        self.is_query_shape_component = False  # type: bool
         super(Type, self).__init__(file_name, line, column)
 
 
@@ -143,6 +146,8 @@ class Struct(common.SourceLocation):
         # pylint: disable=invalid-name
         self.unsafe_dangerous_disable_extra_field_duplicate_checks = None  # type: bool
 
+        # Determines whether or not this IDL struct can be a component of a query shape. See WRITING-13831.
+        self.query_shape_component = False  # type: bool
         super(Struct, self).__init__(file_name, line, column)
 
 
@@ -248,7 +253,18 @@ class Field(common.SourceLocation):
         # Extra info for generic fields.
         self.generic_field_info = None  # type: Optional[GenericFieldInfo]
 
+        # Determines whether or not this field represents a literal value that should be abstracted when serializing a query shape.
+        # See WRITING-13831 for details on query shape.
+        self.query_shape_literal = None  # type: Optional[bool]
+        # Determines whether or not this field represents a fieldpath that should be anonymized.
+        self.query_shape_anonymize = None  # type: Optional[bool]
+
         super(Field, self).__init__(file_name, line, column)
+
+    @property
+    def should_serialize_query_shape(self):
+        # type: () -> bool
+        return self.query_shape_anonymize or self.query_shape_literal
 
 
 class Privilege(common.SourceLocation):

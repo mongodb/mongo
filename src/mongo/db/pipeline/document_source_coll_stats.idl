@@ -39,36 +39,46 @@ structs:
   LatencyStatsSpec:
     description: Represents the 'latencyStats' argument to the $collStats stage.
     strict: true
-    fields:
+    query_shape_component: true
+    fields: 
       histograms:
         description: Adds latency histogram information to the embedded documents in latencyStats if true.
         type: optionalBool
+        # Do not abstract this literal, since it is parameterizing the stage like an enum rather than representing
+        # real user input.
+        query_shape_literal: false  
   DocumentSourceCollStatsSpec:
     description: Specification for a $collStats stage.
     strict: true
+    query_shape_component: true
     fields:
       latencyStats:
         description: A request to include latency stats in the $collStats output.
         type: LatencyStatsSpec
         optional: true
+        query_shape_literal: true
       storageStats:
         description: Adds storage statistics to the return document.
         type: StorageStatsSpec
         optional: true
+        query_shape_literal: true
       count:
         description: Adds the total number of documents in the collection to the return document.
         type: object
         validator:
           callback: validateObjectIsEmpty
         optional: true
+        query_shape_literal: true
       queryExecStats:
         description: Adds query execution statistics to the return document.
         type: object
         validator:
             callback: validateObjectIsEmpty
         optional: true
+        query_shape_literal: true
       $_requestOnTimeseriesView:
         description: When set to true, $collStats stage requests statistics from the view namespace.
           When set to false, $collStats stage requests statistics from the underlying collection.
         cpp_name: requestOnTimeseriesView
         type: optionalBool
+        query_shape_literal: false

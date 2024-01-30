@@ -780,6 +780,7 @@ std::string redactFieldNameForTest(StringData s) {
 TEST_F(ProjectionASTTest, TestASTRedaction) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.redactIdentifiers = true;
     options.identifierRedactionPolicy = redactFieldNameForTest;
 
@@ -806,7 +807,7 @@ TEST_F(ProjectionASTTest, TestASTRedaction) {
     proj = fromjson("{f: {$elemMatch: {foo: 'bar'}}}");
     output = projection_ast::serialize(*parseWithFindFeaturesEnabled(proj).root(), options);
     ASSERT_BSONOBJ_EQ_AUTO(  //
-        R"({"HASH<f>":{"$elemMatch":{"HASH<foo>":{"$eq":"?"}}},"HASH<_id>":true})",
+        R"({"HASH<f>":{"$elemMatch":{"HASH<foo>":{"$eq":"?string"}}},"HASH<_id>":true})",
         output);
 
     // Positional projection

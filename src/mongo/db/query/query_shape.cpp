@@ -28,22 +28,71 @@
  */
 
 #include "mongo/db/query/query_shape.h"
+#include "query_request_helper.h"
+#include "sort_pattern.h"
 
 namespace mongo::query_shape {
 
-BSONObj predicateShape(const MatchExpression* predicate) {
+BSONObj debugPredicateShape(const MatchExpression* predicate) {
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = kLiteralArgString;
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    return predicate->serialize(opts);
+}
+BSONObj representativePredicateShape(const MatchExpression* predicate) {
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
     return predicate->serialize(opts);
 }
 
-BSONObj predicateShape(const MatchExpression* predicate,
-                       std::function<std::string(StringData)> identifierRedactionPolicy) {
+BSONObj debugPredicateShape(const MatchExpression* predicate,
+                            std::function<std::string(StringData)> identifierRedactionPolicy) {
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = kLiteralArgString;
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.identifierRedactionPolicy = identifierRedactionPolicy;
     opts.redactIdentifiers = true;
     return predicate->serialize(opts);
+}
+
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> identifierRedactionPolicy) {
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    opts.identifierRedactionPolicy = identifierRedactionPolicy;
+    opts.redactIdentifiers = true;
+    return predicate->serialize(opts);
+}
+
+BSONObj sortShape(const BSONObj& sortSpec,
+                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                  const SerializationOptions& opts) {
+    if (sortSpec.isEmpty()) {
+        return sortSpec;
+    }
+    auto natural = sortSpec[query_request_helper::kNaturalSortField];
+
+    if (!natural) {
+        return SortPattern{sortSpec, expCtx}
+            .serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
+            .toBson();
+    }
+    // This '$natural' will fail to parse as a valid SortPattern since it is not a valid field
+    // path - it is usually considered and converted into a hint. For the query shape, we'll
+    // keep it unmodified.
+    BSONObjBuilder bob;
+    for (auto&& elem : sortSpec) {
+        if (elem.isABSONObj()) {
+            // We expect this won't work or parse on the main command path, but for shapification we
+            // don't really care, just treat it as a literal and don't bother parsing.
+            bob << opts.serializeFieldPathFromString(elem.fieldNameStringData())
+                << kLiteralArgString;
+        } else if (elem.fieldNameStringData() == natural.fieldNameStringData()) {
+            bob.append(elem);
+        } else {
+            bob.appendAs(elem, opts.serializeFieldPathFromString(elem.fieldNameStringData()));
+        }
+    }
+    return bob.obj();
 }
 
 }  // namespace mongo::query_shape

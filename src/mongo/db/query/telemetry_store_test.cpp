@@ -129,7 +129,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
     fcr.setFilter(BSON("a" << 1));
     SerializationOptions opts;
+    // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
@@ -144,7 +146,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             }
         })",
@@ -162,7 +164,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "sort": {
@@ -184,7 +186,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "projection": {
@@ -214,14 +216,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -249,14 +249,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -297,14 +295,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -325,10 +321,10 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "HASH<sortVal>": 1,
                 "HASH<otherSort>": -1
             },
-            "limit": "?",
-            "skip": "?",
-            "batchSize": "?",
-            "maxTimeMS": "?"
+            "limit": "?number",
+            "skip": "?number",
+            "batchSize": "?number",
+            "maxTimeMS": "?number"
         })",
         redacted);
 
@@ -349,14 +345,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -377,10 +371,10 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "HASH<sortVal>": 1,
                 "HASH<otherSort>": -1
             },
-            "limit": "?",
-            "skip": "?",
-            "batchSize": "?",
-            "maxTimeMS": "?"
+            "limit": "?number",
+            "skip": "?number",
+            "batchSize": "?number",
+            "maxTimeMS": "?number"
         })",
         redacted);
 }
@@ -391,7 +385,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     fcr.setSort(BSONObj());
     fcr.setProjection(BSONObj());
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
@@ -413,7 +407,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
     fcr.setFilter(BSON("b" << 1));
     SerializationOptions opts;
+    // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
@@ -429,7 +425,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "testColl",
             "filter": {
                 "b": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {
@@ -459,7 +455,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "testColl",
             "filter": {
                 "b": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {
@@ -478,6 +474,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = boost::none;
+    opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
     redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -504,33 +501,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         })",
         redacted);
 
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": 1
-                }
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": 25
-            },
-            "min": {
-                "HASH<z>": 80
-            }
-        })",
-        redacted);
-
+    // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -541,7 +514,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<b>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {
@@ -557,6 +530,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         })",
         redacted);
 
+    // Test that $natural comes through unmodified.
+    fcr.setHint(BSON("$natural" << -1));
     redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -567,12 +542,11 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<b>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
+                "$natural": -1
             },
             "max": {
                 "HASH<z>": "?"
@@ -584,4 +558,79 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         redacted);
 }
 
+TEST_F(TelemetryStoreTest, DefinesLetVariables) {
+    // Test that the expression context we use to redact will understand the 'let' part of the find
+    // command while parsing the other pieces of the command.
+
+    // Note that this ExpressionContext will not have the let variables defined - we expect the
+    // 'makeTelemetryKey' call to do that.
+    auto opCtx = makeOperationContext();
+    FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    fcr.setLet(BSON("var" << 2));
+    fcr.setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
+    fcr.setProjection(fromjson("{varIs: '$$var'}"));
+
+    const auto cmdObj = fcr.toBSON(BSON("$db"
+                                        << "testDB"));
+    TelemetryMetrics testMetrics{cmdObj, boost::none, fcr.getNamespaceOrUUID()};
+
+    bool redactIdentifiers = false;
+    auto redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
+    ASSERT_OK(redacted.getStatus());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "testColl",
+            "filter": {
+                "$expr": [
+                    {
+                        "$eq": [
+                            "$a",
+                            "$$var"
+                        ]
+                    }
+                ]
+            },
+            "projection": {
+                "varIs": "$$var"
+            },
+            "let": {
+                "var": 2
+            },
+            "$db": "testDB"
+        })",
+        redacted.getValue());
+
+    // Now be sure the variable names are redacted. We don't currently expose a different way to do
+    // the hashing, so we'll just stick with the big long strings here for now.
+    redactIdentifiers = true;
+    redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
+    ASSERT_OK(redacted.getStatus());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "cmdNs": {
+                "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
+                "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
+            },
+            "find": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c=",
+            "filter": {
+                "$expr": [
+                    {
+                        "$eq": [
+                            "$lhWpXUozYRjENbnNVMXoZEq5VrVzqikmJ0oSgLZnRxM=",
+                            "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8="
+                        ]
+                    }
+                ]
+            },
+            "let": {
+                "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
+            },
+            "projection": {
+                "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
+                "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
+            }
+        })",
+        redacted.getValue());
+}
 }  // namespace mongo::telemetry

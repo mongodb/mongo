@@ -132,10 +132,7 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
 }
 
 Value DocumentSourceCollStats::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484352);
-    }
-    return Value(Document{{getSourceName(), _collStatsSpec.toBSON()}});
+    return Value(Document{{getSourceName(), _collStatsSpec.toBSON(opts)}});
 }
 
 }  // namespace mongo
