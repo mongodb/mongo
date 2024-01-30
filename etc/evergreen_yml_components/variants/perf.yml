@@ -311,12 +311,12 @@ buildvariants:
     - name: tpcc_majority
     - name: linkbench
     - name: linkbench2
-    - name: genny_query_TenMDocCollection_IntId
-    - name: genny_query_TenMDocCollection_ObjectId
-    - name: genny_query_TenMDocCollection_SubDocId
-    - name: genny_query_TenMDocCollection_IntId_Agg
-    - name: genny_query_TenMDocCollection_IntId_IdentityView
-    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
+    # - name: genny_query_TenMDocCollection_IntId
+    # - name: genny_query_TenMDocCollection_ObjectId
+    # - name: genny_query_TenMDocCollection_SubDocId
+    # - name: genny_query_TenMDocCollection_IntId_Agg
+    # - name: genny_query_TenMDocCollection_IntId_IdentityView
+    # - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M30-real.arm.aws.2023-11
