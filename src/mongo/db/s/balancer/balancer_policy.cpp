@@ -483,14 +483,14 @@ MigrateInfosWithReason BalancerPolicy::balance(
                             shardStats, collDataSizeInfo, zoneName, *availableShards);
                         if (!to.isValid()) {
                             if (migrations.empty()) {
-                                LOGV2_WARNING(
-                                    21889,
-                                    "Chunk is on a draining shard, but no appropriate "
-                                    "recipient found",
-                                    "chunk"_attr =
-                                        redact(makeChunkType(
-                                                   distribution.getChunkManager().getUUID(), chunk)
-                                                   .toString()));
+                                LOGV2_DEBUG(21889,
+                                            3,
+                                            "Chunk is on a draining shard, but no appropriate "
+                                            "recipient found",
+                                            "chunk"_attr = redact(
+                                                makeChunkType(
+                                                    distribution.getChunkManager().getUUID(), chunk)
+                                                    .toString()));
                             }
                             return true;  // continue
                         }
@@ -569,8 +569,9 @@ MigrateInfosWithReason BalancerPolicy::balance(
                             shardStats, collDataSizeInfo, zoneName, *availableShards);
                         if (!to.isValid()) {
                             if (migrations.empty()) {
-                                LOGV2_WARNING(
+                                LOGV2_DEBUG(
                                     21892,
+                                    3,
                                     "Chunk violates zone, but no appropriate recipient found",
                                     "chunk"_attr =
                                         redact(makeChunkType(
