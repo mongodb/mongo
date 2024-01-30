@@ -2954,6 +2954,10 @@ size_t performOrderedTimeseriesWrites(OperationContext* opCtx,
                                       const write_ops::InsertCommandRequest& request) {
     if (performOrderedTimeseriesWritesAtomically(
             opCtx, errors, opTime, electionId, containsRetry, request)) {
+        if (!errors->empty()) {
+            invariant(errors->size() == 1);
+            return errors->front().getIndex();
+        }
         return request.getDocuments().size();
     }
 

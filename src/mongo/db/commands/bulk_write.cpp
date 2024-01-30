@@ -597,12 +597,6 @@ void populateWriteResultWithInsertReply(size_t nDocsToInsert,
     SingleWriteResult result;
     result.setN(1);
 
-    // TODO(SERVER-79787): Remove this if block.
-    if (nDocsToInsert == inserted && insertReply.getWriteErrors().has_value() && isOrdered) {
-        // A temporary "fix" to work around the invariant below.
-        inserted = insertReply.getWriteErrors()->at(0).getIndex();
-    }
-
     if (nDocsToInsert == inserted) {
         invariant(!insertReply.getWriteErrors().has_value());
         out.results.reserve(inserted);
