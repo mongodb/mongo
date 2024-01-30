@@ -2398,6 +2398,9 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
                        "initialDataTimestamp"_attr = initialDataTimestamp);
     int ret = 0;
 
+    // Shut down the cache before rollback and restart afterwards.
+    _sessionCache->shuttingDown();
+
     // The rollback_to_stable operation requires all open cursors to be closed or reset before the
     // call, otherwise EBUSY will be returned. Occasionally, there could be an operation that hasn't
     // been killed yet, such as the CappedInsertNotifier for a yielded oplog getMore. We will retry
@@ -2427,6 +2430,9 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     }
 
     _sizeStorer = std::make_unique<WiredTigerSizeStorer>(_conn, _sizeStorerUri);
+
+    // SERVER-85167: restart the cache after resetting the size storer.
+    _sessionCache->restart();
 
     return {stableTimestamp};
 }
