@@ -1022,7 +1022,7 @@ MongoRunner.runningChildPids = function() {
  *
  * @see MongoRunner.arrOptions
  */
-MongoRunner.runMongod = function(opts, isMixedVersionCluster = false) {
+MongoRunner.runMongod = function(opts) {
     opts = opts || {};
     var env = undefined;
     var useHostName = true;
@@ -1033,11 +1033,6 @@ MongoRunner.runMongod = function(opts, isMixedVersionCluster = false) {
     if (isObject(opts)) {
         opts = MongoRunner.mongodOptions(opts);
         fullOptions = opts;
-
-        if (isMixedVersionCluster &&
-            (!opts.binVersion || opts.binVersion == '' || opts.binVersion == shellVersion())) {
-            opts.upgradeBackCompat = '';
-        }
 
         if (opts.useHostName != undefined) {
             useHostName = opts.useHostName;
@@ -1092,7 +1087,7 @@ MongoRunner.runMongod = function(opts, isMixedVersionCluster = false) {
     return mongod;
 };
 
-MongoRunner.runMongos = function(opts, isMixedVersionCluster = false) {
+MongoRunner.runMongos = function(opts) {
     opts = opts || {};
 
     var env = undefined;
@@ -1109,10 +1104,6 @@ MongoRunner.runMongos = function(opts, isMixedVersionCluster = false) {
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
         env = opts.env;
-        if (isMixedVersionCluster &&
-            (!opts.binVersion || opts.binVersion == '' || opts.binVersion == shellVersion())) {
-            opts.upgradeBackCompat = '';
-        }
         opts = MongoRunner.arrOptions("mongos", opts);
     }
 

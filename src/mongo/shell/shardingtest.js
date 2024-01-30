@@ -1067,21 +1067,13 @@ var ShardingTest = function ShardingTest(params) {
 
             // Must check shardMixedBinVersion because it causes shardOptions.binVersion to be an
             // object (versionIterator) rather than a version string. Must check mongosBinVersion,
-            // as well, because it does not update mongosOptions.binVersion. Also check
-            // useRandomBinVersionsWithinReplicaSet, as it may cause some nodes within a replica set
-            // to be downgraded.
+            // as well, because it does not update mongosOptions.binVersion.
             const isMixedVersionShard = jsTestOptions().shardMixedBinVersions &&
                 MongoRunner.areBinVersionsTheSame(binVersion,
                                                   jsTestOptions().shardMixedBinVersions);
-
             const isMixedVersionMongos = jsTestOptions().mongosBinVersion &&
                 MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion);
-
-            const isMixedVersionReplicaSet = jsTestOptions().useRandomBinVersionsWithinReplicaSet &&
-                MongoRunner.areBinVersionsTheSame(
-                    binVersion, jsTestOptions().useRandomBinVersionsWithinReplicaSet);
-
-            if (isMixedVersionShard || isMixedVersionMongos || isMixedVersionReplicaSet) {
+            if (isMixedVersionShard || isMixedVersionMongos) {
                 return true;
             }
 
@@ -1362,8 +1354,6 @@ var ShardingTest = function ShardingTest(params) {
     }
 
     try {
-        const clusterVersionInfo = this.getClusterVersionInfo();
-
         //
         // Start each shard replica set.
         //
@@ -1473,12 +1463,8 @@ var ShardingTest = function ShardingTest(params) {
 
             // Start up the replica set but don't wait for it to complete. This allows the startup
             // of each shard to proceed in parallel.
-            this._rs[i] = {
-                setName: setName,
-                test: rs,
-                nodes: rs.startSetAsync(rsDefaults, false, clusterVersionInfo.isMixedVersion),
-                url: rs.getURL()
-            };
+            this._rs[i] =
+                {setName: setName, test: rs, nodes: rs.startSetAsync(rsDefaults), url: rs.getURL()};
         }
 
         if (isConfigShardMode) {
@@ -1526,7 +1512,7 @@ var ShardingTest = function ShardingTest(params) {
             // Start the config server's replica set without waiting for it to complete. This allows
             // it to proceed in parallel with the startup of each shard.
             this.configRS = new ReplSetTest(rstOptions);
-            this.configRS.startSetAsync(startOptions, false, clusterVersionInfo.isMixedVersion);
+            this.configRS.startSetAsync(startOptions);
         }
 
         //
@@ -1747,6 +1733,7 @@ var ShardingTest = function ShardingTest(params) {
         }
 
         const configRS = this.configRS;
+        const clusterVersionInfo = this.getClusterVersionInfo();
         if (_hasNewFeatureCompatibilityVersion() && clusterVersionInfo.isMixedVersion) {
             const fcv = binVersionToFCV(clusterVersionInfo.oldestBinVersion);
             function setFeatureCompatibilityVersion() {
@@ -1817,7 +1804,7 @@ var ShardingTest = function ShardingTest(params) {
                 var bridge = new MongoBridge(bridgeOptions);
             }
 
-            var conn = MongoRunner.runMongos(options, clusterVersionInfo.isMixedVersion);
+            var conn = MongoRunner.runMongos(options);
             if (!conn) {
                 throw new Error("Failed to start mongos " + i);
             }
