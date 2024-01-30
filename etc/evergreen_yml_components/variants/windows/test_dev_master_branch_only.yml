@@ -15,8 +15,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: generate_buildid_to_debug_symbols_mapping
-    variant: windows-compile-required
+  # - name: generate_buildid_to_debug_symbols_mapping
+  #   variant: windows-compile-required
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/windows/test_dev_master_branch_only.yml

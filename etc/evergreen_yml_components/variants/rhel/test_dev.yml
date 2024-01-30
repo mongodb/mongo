@@ -44,8 +44,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: generate_buildid_to_debug_symbols_mapping
-    variant: linux-x86-dynamic-compile
+  # - name: generate_buildid_to_debug_symbols_mapping
+  #   variant: linux-x86-dynamic-compile
 
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/rhel/test_dev_master_branch_only.yml
@@ -93,8 +93,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
-  - name: generate_buildid_to_debug_symbols_mapping
-    variant: linux-debug-aubsan-compile-required
+  # - name: generate_buildid_to_debug_symbols_mapping
+  #   variant: linux-debug-aubsan-compile-required
 
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
