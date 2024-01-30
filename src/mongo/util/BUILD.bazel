@@ -3,8 +3,8 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name="exit_code",
-    srcs=[
+    name = "exit_code",
+    srcs = [
         "exit_code.h",
-    ]
+    ],
 )

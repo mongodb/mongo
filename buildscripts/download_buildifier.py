@@ -5,7 +5,7 @@ import stat
 import urllib.request
 
 BUILDIFIER_VERSION = "v6.4.0"
-RELEASE_URL = f"https://mdb-build-public.s3.amazonaws.com/bazel-buildifier-binaries/v6.4.0/{BUILDIFIER_VERSION}/"
+RELEASE_URL = f"https://mdb-build-public.s3.amazonaws.com/bazel-buildifier-binaries/{BUILDIFIER_VERSION}/"
 
 
 def determine_platform():

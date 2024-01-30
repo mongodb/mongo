@@ -1,36 +1,35 @@
 load(
     "//bazel/config:configs.bzl",
+    "allocator",
+    "asan",
+    "build_enterprise",
+    "build_grpc",
     "build_mode",
     "compiler_type",
-    "libunwind",
-    "use_gdbserver",
-    "spider_monkey_dbg",
-    "allocator",
-    "use_lldbserver",
-    "use_wait_for_debugger",
-    "use_disable_ref_track",
-    "use_ocsp_stapling",
-    "asan",
+    "detect_odr_violations",
     "fsan",
+    "http_client",
+    "libunwind",
+    "linker",
+    "linkstatic",
     "lsan",
     "msan",
+    "separate_debug",
+    "shared_archive",
+    "spider_monkey_dbg",
+    "streams_release_build",
     "tsan",
     "ubsan",
-    "use_wiredtiger",
+    "use_diagnostic_latches",
+    "use_disable_ref_track",
+    "use_gdbserver",
     "use_glibcxx_debug",
     "use_libcxx",
-    "build_grpc",
-    "separate_debug",
-    "http_client",
-    "linkstatic",
-    "use_diagnostic_latches",
-    "shared_archive",
-    "linker",
-    "detect_odr_violations",
-    "build_enterprise",
-    "streams_release_build",
+    "use_lldbserver",
+    "use_ocsp_stapling",
+    "use_wait_for_debugger",
+    "use_wiredtiger",
 )
-
 load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = ["//visibility:public"])
@@ -127,7 +126,10 @@ config_setting(
 
 selects.config_setting_group(
     name = "not_windows",
-    match_any = ["@platforms//os:macos", "@platforms//os:linux"],
+    match_any = [
+        "@platforms//os:macos",
+        "@platforms//os:linux",
+    ],
 )
 
 # ==========
@@ -326,19 +328,28 @@ config_setting(
 
 selects.config_setting_group(
     name = "_libunwind_enabled_by_auto",
-    match_all = [":_libunwind_auto", "@platforms//os:linux"],
+    match_all = [
+        ":_libunwind_auto",
+        "@platforms//os:linux",
+    ],
 )
 
 selects.config_setting_group(
     name = "_libunwind_enabled_by_on",
-    match_all = [":_libunwind_on", "@platforms//os:linux"],
+    match_all = [
+        ":_libunwind_on",
+        "@platforms//os:linux",
+    ],
 )
 
 # Final setting intended for external use.
 #   (libunwind == on && os == linux) || (libunwind == auto && os == linux)
 selects.config_setting_group(
     name = "libunwind_enabled",
-    match_any = [":_libunwind_enabled_by_on", ":_libunwind_enabled_by_auto"],
+    match_any = [
+        ":_libunwind_enabled_by_on",
+        ":_libunwind_enabled_by_auto",
+    ],
 )
 
 # --------------------------------------
@@ -354,7 +365,7 @@ config_setting(
     name = "use_gdbserver_enabled",
     flag_values = {
         "//bazel/config:use_gdbserver": "True",
-    }
+    },
 )
 
 # --------------------------------------
@@ -372,7 +383,7 @@ config_setting(
     name = "spider_monkey_dbg_enabled",
     flag_values = {
         "//bazel/config:spider_monkey_dbg": "True",
-    }
+    },
 )
 
 # --------------------------------------
@@ -438,7 +449,7 @@ config_setting(
     name = "use_lldbserver_enabled",
     flag_values = {
         "//bazel/config:use_lldbserver": "True",
-    }
+    },
 )
 
 # --------------------------------------
@@ -454,9 +465,8 @@ config_setting(
     name = "use_wait_for_debugger_enabled",
     flag_values = {
         "//bazel/config:use_wait_for_debugger": "True",
-    }
+    },
 )
-
 
 # --------------------------------------
 # ocsp-stapling options
@@ -471,7 +481,7 @@ config_setting(
     name = "use_ocsp_stapling_enabled",
     flag_values = {
         "//bazel/config:use_ocsp_stapling": "True",
-    }
+    },
 )
 
 # --------------------------------------
@@ -537,9 +547,12 @@ config_setting(
 selects.config_setting_group(
     name = "use_glibcxx_debug_required_settings",
     #TODO SERVER-84714 add check to ensure we are using the toolchain version of C++ libs
-    match_all = [":use_glibcxx_debug_enabled", ":dbg", ":use_libcxx_disabled"],
+    match_all = [
+        ":use_glibcxx_debug_enabled",
+        ":dbg",
+        ":use_libcxx_disabled",
+    ],
 )
-
 
 # --------------------------------------
 # libc++ options
@@ -553,12 +566,12 @@ use_libcxx(
 # TODO SERVER-85340 when libc++ is readded remove the macos constraint
 config_setting(
     name = "use_libcxx_enabled",
-    flag_values = {
-        "//bazel/config:use_libcxx": "True",
-    },
     constraint_values = [
         "@platforms//os:macos",
     ],
+    flag_values = {
+        "//bazel/config:use_libcxx": "True",
+    },
 )
 
 config_setting(
@@ -572,7 +585,10 @@ config_setting(
 # ----------- computed libc++ flags ----------
 selects.config_setting_group(
     name = "use_libcxx_required_settings",
-    match_all = [":use_libcxx_enabled", ":compiler_type_clang"],
+    match_all = [
+        ":use_libcxx_enabled",
+        ":compiler_type_clang",
+    ],
 )
 
 # --------------------------------------
@@ -619,7 +635,10 @@ config_setting(
 
 selects.config_setting_group(
     name = "linkdynamic_required_settings",
-    match_all = [":linkstatic_disabled", ":not_windows"],
+    match_all = [
+        ":linkstatic_disabled",
+        ":not_windows",
+    ],
 )
 
 # --------------------------------------
@@ -757,37 +776,66 @@ config_setting(
 
 selects.config_setting_group(
     name = "sanitize_build_mode",
-    match_any = [":opt_on", ":opt_debug"],
+    match_any = [
+        ":opt_on",
+        ":opt_debug",
+    ],
 )
 
 selects.config_setting_group(
     name = "all_sanitizer_required_settings",
-    match_all = [":sanitize_build_mode", ":compiler_type_clang"]
+    match_all = [
+        ":sanitize_build_mode",
+        ":compiler_type_clang",
+    ],
 )
 
 selects.config_setting_group(
     name = "any_enabled_sanitizer",
-    match_any = [":asan_enabled", ":fsan_enabled", ":msan_enabled", ":lsan_enabled", ":tsan_enabled", ":ubsan_enabled"],
+    match_any = [
+        ":asan_enabled",
+        ":fsan_enabled",
+        ":msan_enabled",
+        ":lsan_enabled",
+        ":tsan_enabled",
+        ":ubsan_enabled",
+    ],
 )
 
 selects.config_setting_group(
     name = "no_enabled_sanitizer",
-    match_all = [":asan_disabled", ":fsan_disabled", ":msan_disabled", ":lsan_disabled", ":tsan_disabled", ":ubsan_disabled"],
+    match_all = [
+        ":asan_disabled",
+        ":fsan_disabled",
+        ":msan_disabled",
+        ":lsan_disabled",
+        ":tsan_disabled",
+        ":ubsan_disabled",
+    ],
 )
 
 selects.config_setting_group(
     name = "any_sanitizer_required_setting",
-    match_all = [":any_enabled_sanitizer", ":all_sanitizer_required_settings"],
+    match_all = [
+        ":any_enabled_sanitizer",
+        ":all_sanitizer_required_settings",
+    ],
 )
 
 selects.config_setting_group(
     name = "sanitize_address_required_settings",
-    match_all = [":asan_enabled", ":system_allocator"],
+    match_all = [
+        ":asan_enabled",
+        ":system_allocator",
+    ],
 )
 
 selects.config_setting_group(
     name = "sanitize_memory_required_settings",
-    match_all = [":msan_enabled", ":system_allocator"],
+    match_all = [
+        ":msan_enabled",
+        ":system_allocator",
+    ],
 )
 
 selects.config_setting_group(
@@ -797,17 +845,27 @@ selects.config_setting_group(
 
 selects.config_setting_group(
     name = "sanitize_thread_required_settings",
-    match_all = [":tsan_enabled", ":use_libunwind_disabled", ":linkdynamic_required_settings"],
+    match_all = [
+        ":tsan_enabled",
+        ":use_libunwind_disabled",
+        ":linkdynamic_required_settings",
+    ],
 )
 
 selects.config_setting_group(
     name = "sanitize_undefined_without_fuzzer_settings",
-    match_all = [":ubsan_enabled", ":fsan_disabled"],
+    match_all = [
+        ":ubsan_enabled",
+        ":fsan_disabled",
+    ],
 )
 
 selects.config_setting_group(
     name = "sanitize_undefined_dynamic_link_settings",
-    match_all = [":ubsan_enabled", ":linkdynamic_required_settings"],
+    match_all = [
+        ":ubsan_enabled",
+        ":linkdynamic_required_settings",
+    ],
 )
 
 # --------------------------------------
@@ -832,14 +890,14 @@ config_setting(
 
 http_client(
     name = "http_client",
-    build_setting_default = True
+    build_setting_default = True,
 )
 
 config_setting(
     name = "http_client_enabled",
     flag_values = {
         "//bazel/config:http_client": "True",
-    }
+    },
 )
 
 config_setting(
@@ -855,14 +913,14 @@ config_setting(
 
 use_diagnostic_latches(
     name = "use_diagnostic_latches",
-    build_setting_default = True
+    build_setting_default = True,
 )
 
 config_setting(
     name = "use_diagnostic_latches_enabled",
     flag_values = {
         "//bazel/config:use_diagnostic_latches": "True",
-    }
+    },
 )
 
 config_setting(
@@ -913,7 +971,11 @@ config_setting(
 
 selects.config_setting_group(
     name = "detect_odr_violations_required_settings",
-    match_all = [":opt_off", ":detect_odr_violations_enabled", ":linker_gold"],
+    match_all = [
+        ":opt_off",
+        ":detect_odr_violations_enabled",
+        ":linker_gold",
+    ],
 )
 
 # --------------------------------------
@@ -964,7 +1026,10 @@ config_setting(
 
 selects.config_setting_group(
     name = "platform_for_streaming_build",
-    match_any = [":linux_aarch64", ":linux_x86_64"],
+    match_any = [
+        ":linux_aarch64",
+        ":linux_x86_64",
+    ],
 )
 
 # TODO: another conditional check for openssl is required to be ported from -
@@ -972,5 +1037,9 @@ selects.config_setting_group(
 # Depends on: https://jira.mongodb.org/browse/SERVER-80599
 selects.config_setting_group(
     name = "streams_release_build_required_setting",
-    match_all = [":release", ":streams_release_build_enabled", ":platform_for_streaming_build"],
+    match_all = [
+        ":release",
+        ":streams_release_build_enabled",
+        ":platform_for_streaming_build",
+    ],
 )

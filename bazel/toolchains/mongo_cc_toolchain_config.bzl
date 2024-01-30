@@ -64,9 +64,9 @@ lto_index_actions = [
 
 def _impl(ctx):
     action_configs = [
-        action_config(action_name = "objcopy_embed_data", tools = [tool(path = ctx.attr.tool_paths["objcopy"])])
+        action_config(action_name = "objcopy_embed_data", tools = [tool(path = ctx.attr.tool_paths["objcopy"])]),
     ] + [
-        action_config(action_name = ACTION_NAMES.llvm_cov, tools = [tool(path = ctx.attr.tool_paths["llvm-cov"])])
+        action_config(action_name = ACTION_NAMES.llvm_cov, tools = [tool(path = ctx.attr.tool_paths["llvm-cov"])]),
     ] + [
         action_config(action_name = name, enabled = True, tools = [tool(path = ctx.attr.tool_paths["gcc"])])
         for name in all_c_compile_actions
@@ -147,7 +147,7 @@ def _impl(ctx):
                     flag_group(
                         flags = [
                             "-std=c11",
-                        ]
+                        ],
                     ),
                 ],
             ),
@@ -158,7 +158,7 @@ def _impl(ctx):
                         flags = [
                             "-std=c++20",
                             "-nostdinc++",
-                        ]
+                        ],
                     ),
                 ],
             ),
@@ -510,7 +510,7 @@ def _impl(ctx):
             tool_paths = [
                 tool_path(name = name, path = path)
                 for name, path in ctx.attr.tool_paths.items()
-            ]
+            ],
         ),
     ]
 

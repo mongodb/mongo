@@ -679,6 +679,39 @@ tasks:
       - "src/evergreen/run_python_script.sh"
       - "evergreen/functions/poetry_lock_check.py"
 
+- name: lint_bazel
+  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/download_buildifier.py"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/buildifier.py"
+      - "--generate-report"
+      - "--binary-dir=./"
+      - "lint-all"
+
 - name: lint_pylinters
   tags: ["assigned_to_jira_team_devprod_build", "lint"]
   commands:

@@ -16,13 +16,11 @@ core.workflow(
         push = "master",
     ),
     # Change path to the folder you want to publish publicly
-    origin_files = glob(["**"], exclude=["src/mongo/db/modules/**"]),
-
+    origin_files = glob(["**"], exclude = ["src/mongo/db/modules/**"]),
     authoring = authoring.pass_thru("MongoDB <mongodb@mongodb.com>"),
-
     mode = "ITERATIVE",
     # Change the path here to the folder you want to publish publicly
     # transformations = [
-	#     core.move("path/to/folder/you/want/exported", ""),
-	# ],
+    #     core.move("path/to/folder/you/want/exported", ""),
+    # ],
 )

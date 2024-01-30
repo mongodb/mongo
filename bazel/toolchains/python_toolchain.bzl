@@ -13,32 +13,32 @@ _ARCH_MAP = {
 }
 
 URLS_MAP = {
-        "linux_aarch64":{
-            "sha": "3e26a672df17708c4dc928475a5974c3fb3a34a9b45c65fb4bd1e50504cc84ec",
-            "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-unknown-linux-gnu-install_only.tar.gz",
-            "interpreter_path": "bin/python3",
-        },
-        "linux_amd64":{
-            "sha": "ee37a7eae6e80148c7e3abc56e48a397c1664f044920463ad0df0fc706eacea8",
-            "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz",
-            "interpreter_path": "bin/python3",
-        },
-        "windows_amd64":{
-            "sha": "35458ef3163a2705cd0952ba1df6012acb42b043349dcb31ab49afec341369cf",
-            "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-pc-windows-msvc-static-install_only.tar.gz",
-            "interpreter_path": "python3.exe",
-        },
-        "macos_aarch64":{
-            "sha": "916c35125b5d8323a21526d7a9154ca626453f63d0878e95b9f613a95006c990",
-            "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-apple-darwin-install_only.tar.gz",
-            "interpreter_path": "bin/python3",
-        },
-        "macos_x86_64":{
-            "sha": "178cb1716c2abc25cb56ae915096c1a083e60abeba57af001996e8bc6ce1a371",
-            "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-apple-darwin-install_only.tar.gz",
-            "interpreter_path": "bin/python3",
-        }
-    }
+    "linux_aarch64": {
+        "sha": "3e26a672df17708c4dc928475a5974c3fb3a34a9b45c65fb4bd1e50504cc84ec",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-unknown-linux-gnu-install_only.tar.gz",
+        "interpreter_path": "bin/python3",
+    },
+    "linux_amd64": {
+        "sha": "ee37a7eae6e80148c7e3abc56e48a397c1664f044920463ad0df0fc706eacea8",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz",
+        "interpreter_path": "bin/python3",
+    },
+    "windows_amd64": {
+        "sha": "35458ef3163a2705cd0952ba1df6012acb42b043349dcb31ab49afec341369cf",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-pc-windows-msvc-static-install_only.tar.gz",
+        "interpreter_path": "python3.exe",
+    },
+    "macos_aarch64": {
+        "sha": "916c35125b5d8323a21526d7a9154ca626453f63d0878e95b9f613a95006c990",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-aarch64-apple-darwin-install_only.tar.gz",
+        "interpreter_path": "bin/python3",
+    },
+    "macos_x86_64": {
+        "sha": "178cb1716c2abc25cb56ae915096c1a083e60abeba57af001996e8bc6ce1a371",
+        "url": "https://github.com/indygreg/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-apple-darwin-install_only.tar.gz",
+        "interpreter_path": "bin/python3",
+    },
+}
 
 def _py_download(ctx):
     """
@@ -48,16 +48,14 @@ def _py_download(ctx):
         ctx: Repository context.
     """
 
-
     if ctx.attr.os:
         os = ctx.attr.os
+    elif "win" in ctx.os.name:
+        os = "windows"
+    elif "mac" in ctx.os.name:
+        os = "macos"
     else:
-        if "win" in ctx.os.name:
-            os = "windows"
-        elif "mac" in ctx.os.name:
-            os = "macos"
-        else:
-            os = "linux"
+        os = "linux"
 
     if ctx.attr.arch:
         arch = ctx.attr.arch
@@ -69,10 +67,10 @@ def _py_download(ctx):
         sha = ctx.attr.sha256
         interpreter_path = ctx.attr.interpreter_path
     else:
-        platform_info = URLS_MAP["{os}_{arch}".format(os=os, arch=arch)]
-        urls = platform_info['url']
-        sha = platform_info['sha']
-        interpreter_path = platform_info['interpreter_path']
+        platform_info = URLS_MAP["{os}_{arch}".format(os = os, arch = arch)]
+        urls = platform_info["url"]
+        sha = platform_info["sha"]
+        interpreter_path = platform_info["interpreter_path"]
 
     ctx.report_progress("downloading python")
     ctx.download_and_extract(
@@ -95,7 +93,7 @@ def _py_download(ctx):
         "{constraints}": constraints_str,
         "{interpreter_path}": interpreter_path,
     }
-    
+
     ctx.template(
         "BUILD.bazel",
         ctx.attr.build_tpl,
@@ -133,10 +131,9 @@ py_download = repository_rule(
 )
 
 def setup_mongo_python_toolchains():
-
     # This will autoselect a toolchain that matches the host environment
     # this toolchain is intended be used only for local repository exectutions,
-    # and will not be registered as a bazel toolchain by omitting from the return 
+    # and will not be registered as a bazel toolchain by omitting from the return
     # value below.
     py_download(
         name = "py_host",
@@ -189,10 +186,9 @@ def setup_mongo_python_toolchains():
     )
 
     return (
-        "@py_linux_arm64//:python_toolchain", 
+        "@py_linux_arm64//:python_toolchain",
         "@py_linux_x86_64//:python_toolchain",
         "@py_windows_x86_64//:python_toolchain",
-        "@py_macos_arm64//:python_toolchain", 
+        "@py_macos_arm64//:python_toolchain",
         "@py_macos_x86_64//:python_toolchain",
     )
-    

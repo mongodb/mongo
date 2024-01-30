@@ -17,10 +17,6 @@ config_setting(
 
 mongo_cc_library(
     name = "tcmalloc_minimal",
-    hdrs = glob(["**/*.h"]) + [
-        # debugallocation.cc sources this as an include.
-        "dist/src/tcmalloc.cc"
-    ],
     srcs = [
         "dist/src/base/dynamic_annotations.c",
         "dist/src/base/elf_mem_image.cc",
@@ -45,9 +41,9 @@ mongo_cc_library(
         "dist/src/thread_cache.cc",
     ] + select({
         "@platforms//os:windows": [
+            "dist/src/fake_stacktrace_scope.cc",
             "dist/src/windows/port.cc",
             "dist/src/windows/system-alloc.cc",
-            "dist/src/fake_stacktrace_scope.cc",
         ],
         "//conditions:default": [
             "dist/src/emergency_malloc_for_stacktrace.cc",
@@ -59,58 +55,62 @@ mongo_cc_library(
         "@platforms//os:linux": ["dist/src/tcmalloc.cc"],
         "//conditions:default": [],
     }),
+    hdrs = glob(["**/*.h"]) + [
+        # debugallocation.cc sources this as an include.
+        "dist/src/tcmalloc.cc",
+    ],
     copts = ["-Isrc/third_party/gperftools/dist/src"] + select({
-            "@//bazel/config:linux_aarch64": [
-                "-Isrc/third_party/gperftools/platform/linux_aarch64/internal/src",
-            ],
-            "@//bazel/config:linux_x86_64": [
-                "-Isrc/third_party/gperftools/platform/linux_x86_64/internal/src",
-            ],
-            "@//bazel/config:linux_ppc64le": [
-                "-Isrc/third_party/gperftools/platform/linux_ppc64le/internal/src",
-            ],
-            "@//bazel/config:linux_s390x": [
-                "-Isrc/third_party/gperftools/platform/linux_s390x/internal/src",
-            ],
-            "@//bazel/config:windows_x86_64": [
-                "-Isrc/third_party/gperftools/platform/windows_x86_64/internal/src",
-            ],
-        }) + select({
-            "@platforms//os:windows": [
-                "/wd4141",
-                "/wd4305",
-                "/wd4003",
-            ],
-            "//conditions:default": ["-Wno-unused-result"]
-        }) + select({
-            ":gcc_windows": ["-Wno-attribute-alias"],
-            "//conditions:default": []
-        }),
+        "@//bazel/config:linux_aarch64": [
+            "-Isrc/third_party/gperftools/platform/linux_aarch64/internal/src",
+        ],
+        "@//bazel/config:linux_x86_64": [
+            "-Isrc/third_party/gperftools/platform/linux_x86_64/internal/src",
+        ],
+        "@//bazel/config:linux_ppc64le": [
+            "-Isrc/third_party/gperftools/platform/linux_ppc64le/internal/src",
+        ],
+        "@//bazel/config:linux_s390x": [
+            "-Isrc/third_party/gperftools/platform/linux_s390x/internal/src",
+        ],
+        "@//bazel/config:windows_x86_64": [
+            "-Isrc/third_party/gperftools/platform/windows_x86_64/internal/src",
+        ],
+    }) + select({
+        "@platforms//os:windows": [
+            "/wd4141",
+            "/wd4305",
+            "/wd4003",
+        ],
+        "//conditions:default": ["-Wno-unused-result"],
+    }) + select({
+        ":gcc_windows": ["-Wno-attribute-alias"],
+        "//conditions:default": [],
+    }),
     local_defines = [
-            "NO_HEAP_CHECK",
-        ] + select({
-            "@//bazel/config:dbg": [],
-            "//conditions:default": [
-                # For debug builds we want to capture stacks during (de)allocations,
-                # but we don't want to pay that cost for release builds.
-                "NO_TCMALLOC_SAMPLES",
-            ]
-        }) + select({
-            "@platforms//cpu:x86_64": [],
-            "//conditions:default": [
-                # For debug builds we enable stack capture, but only on
-                # intel targets, since tcmalloc's unwinder is very slow on other
-                # platforms (see SERVER-28502).
-                "NO_TCMALLOC_SAMPLES"
-            ]
-        }) + select({
-            # GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on
-            "@platforms//cpu:ppc": ["__linux"],
-            "//conditions:default": []
-        }) + select({
-            "@//bazel/config:dbg": [],
-            "//conditions:default": ["NDEBUG"]
-        }),
+        "NO_HEAP_CHECK",
+    ] + select({
+        "@//bazel/config:dbg": [],
+        "//conditions:default": [
+            # For debug builds we want to capture stacks during (de)allocations,
+            # but we don't want to pay that cost for release builds.
+            "NO_TCMALLOC_SAMPLES",
+        ],
+    }) + select({
+        "@platforms//cpu:x86_64": [],
+        "//conditions:default": [
+            # For debug builds we enable stack capture, but only on
+            # intel targets, since tcmalloc's unwinder is very slow on other
+            # platforms (see SERVER-28502).
+            "NO_TCMALLOC_SAMPLES",
+        ],
+    }) + select({
+        # GCC on PowerPC under C++11 mode does not define __linux which gperftools depends on
+        "@platforms//cpu:ppc": ["__linux"],
+        "//conditions:default": [],
+    }) + select({
+        "@//bazel/config:dbg": [],
+        "//conditions:default": ["NDEBUG"],
+    }),
 )
 
 # TODO(SERVER-80619): conditionally inject gperftools/platform/$os_$arch/include to dependents.

@@ -1,14 +1,15 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
 load("//bazel/platforms:local_config_platform.bzl", "setup_local_config_platform")
 load("//bazel/toolchains:mongo_toolchain.bzl", "toolchain_download")
 
-setup_local_config_platform(name="local_config_platform")
+setup_local_config_platform(name = "local_config_platform")
 
-toolchain_download(name="mongo_toolchain")
+toolchain_download(name = "mongo_toolchain")
+
 register_toolchains("@mongo_toolchain//:mongo_toolchain")
 
 load("//bazel/toolchains:python_toolchain.bzl", "setup_mongo_python_toolchains")
+
 [register_toolchains(toolchain) for toolchain in setup_mongo_python_toolchains()]
 
 http_archive(
@@ -19,13 +20,14 @@ http_archive(
 )
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
 http_archive(
     name = "platforms",
+    sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
     urls = [
         "https://mirror.bazel.build/github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
         "https://github.com/bazelbuild/platforms/releases/download/0.0.8/platforms-0.0.8.tar.gz",
     ],
-    sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
 )
 
 # We need skylib to be able to use config_setting_group in rule_poetry below
@@ -57,7 +59,7 @@ poetry(
     name = "poetry",
     lockfile = "//:poetry.lock",
     pyproject = "//:pyproject.toml",
-    python_interpreter_target_default="@py_host//:bin/python3",
-    python_interpreter_target_mac="@py_host//:bin/python3",
-    python_interpreter_target_win="@py_host//:python.exe",
+    python_interpreter_target_default = "@py_host//:bin/python3",
+    python_interpreter_target_mac = "@py_host//:bin/python3",
+    python_interpreter_target_win = "@py_host//:python.exe",
 )

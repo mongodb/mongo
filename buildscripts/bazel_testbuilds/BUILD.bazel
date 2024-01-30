@@ -6,5 +6,5 @@ package(default_visibility = ["//visibility:public"])
 
 mongo_cc_binary(
     name = "unit_test",
-    srcs = ["unit_test.cpp"]
+    srcs = ["unit_test.cpp"],
 )

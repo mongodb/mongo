@@ -1,4 +1,3 @@
-
 _OS_MAP = {
     "macos": "@platforms//os:osx",
     "linux": "@platforms//os:linux",
@@ -18,18 +17,17 @@ _ARCH_NORMALIZE_MAP = {
 }
 
 URLS_MAP = {
-        "linux_x86_64":{
-            "sha": "e2bf59dacb789bd3ed708bafb7bf4e432f611f19d6b888340e3b73eee6949b31",
-            "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
-        },
-        "linux_aarch64":{
-            "sha": "269e54f97d9049d24d934f549a8963c15c954a5cb6fc0d75bbbcfb78df3c3647",
-            "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
-        },
-    }
+    "linux_x86_64": {
+        "sha": "e2bf59dacb789bd3ed708bafb7bf4e432f611f19d6b888340e3b73eee6949b31",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+    },
+    "linux_aarch64": {
+        "sha": "269e54f97d9049d24d934f549a8963c15c954a5cb6fc0d75bbbcfb78df3c3647",
+        "url": "https://mciuploads.s3.amazonaws.com/toolchain-builder/amazon2-arm64/11bae3c145a48dd7be9ee8aa44e5591783f787aa/bazel_v4_toolchain_builder_amazon2_arm64_11bae3c145a48dd7be9ee8aa44e5591783f787aa_24_01_09_16_10_07.tar.gz",
+    },
+}
 
 def _toolchain_download(ctx):
-   
     if ctx.attr.os:
         os = ctx.attr.os
     else:
@@ -54,13 +52,13 @@ def _toolchain_download(ctx):
             "{bazel_toolchain_cpu}": "k8",
             "{arch}": arch,
         }
-   
-    os_arch = "{os}_{arch}".format(os=os, arch=arch)
+
+    os_arch = "{os}_{arch}".format(os = os, arch = arch)
 
     if os_arch in URLS_MAP:
         platform_info = URLS_MAP[os_arch]
-        urls = platform_info['url']
-        sha = platform_info['sha']
+        urls = platform_info["url"]
+        sha = platform_info["sha"]
 
         ctx.report_progress("downloading mongo toolchain")
         ctx.download_and_extract(
@@ -69,7 +67,7 @@ def _toolchain_download(ctx):
         )
 
         ctx.report_progress("generating toolchain build file")
-        
+
         ctx.template(
             "BUILD.bazel",
             ctx.attr.build_tpl,

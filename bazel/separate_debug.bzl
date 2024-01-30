@@ -69,7 +69,7 @@ def propgate_static_lib(ctx, static_lib, static_ext, inputs):
 
     return unstripped_static_lib
 
-def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shared_library=None):
+def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shared_library = None):
     """
     We need to create new CcInfo with the new target names, this will take in the newly
     named library files and construct a new CcInfo basically stripping out the "_with_debug"
@@ -92,10 +92,10 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
                     feature_configuration = feature_configuration,
                     cc_toolchain = cc_toolchain,
                     dynamic_library = shared_lib,
-                    static_library = static_lib
+                    static_library = static_lib,
                 ),
             ]),
-            user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags
+            user_link_flags = ctx.attr.binary_with_debug[CcInfo].linking_context.linker_inputs.to_list()[0].user_link_flags,
         )
 
         linker_input_deps = []
@@ -108,11 +108,11 @@ def create_new_ccinfo_library(ctx, cc_toolchain, shared_lib, static_lib, cc_shar
         linking_context = ctx.attr.binary_with_debug[CcInfo].linking_context
 
     return CcInfo(
-        compilation_context=ctx.attr.binary_with_debug[CcInfo].compilation_context,
-        linking_context=linking_context,
+        compilation_context = ctx.attr.binary_with_debug[CcInfo].compilation_context,
+        linking_context = linking_context,
     )
 
-def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, original_info, static_lib=None):
+def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, original_info, static_lib = None):
     """
     We need to create a CcSharedLibraryInfo to pass to the cc_binary and cc_library that depend on it
     so they know to link the cc_shared_library instead of the associated cc_library.
@@ -159,16 +159,14 @@ def create_new_cc_shared_library_info(ctx, cc_toolchain, output_shared_lib, orig
     )
 
 def noop_extraction(ctx):
-    
     return [
         DefaultInfo(
-            files = depset(transitive=[ctx.attr.binary_with_debug.files]),
+            files = depset(transitive = [ctx.attr.binary_with_debug.files]),
         ),
         ctx.attr.binary_with_debug[CcInfo],
     ]
 
 def linux_extraction(ctx, cc_toolchain, inputs):
-
     outputs = []
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".so", ".a", ".debug")
 
@@ -178,25 +176,26 @@ def linux_extraction(ctx, cc_toolchain, inputs):
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [debug_info],
                 inputs = inputs,
-                arguments = [ 
-                    '--only-keep-debug',
-                    input_bin.path, 
-                    debug_info.path
+                arguments = [
+                    "--only-keep-debug",
+                    input_bin.path,
+                    debug_info.path,
                 ],
-                mnemonic = "ExtractDebuginfo", 
+                mnemonic = "ExtractDebuginfo",
             )
 
             ctx.actions.run(
                 executable = cc_toolchain.objcopy_executable,
                 outputs = [output_bin],
-                inputs = depset([debug_info], transitive=[inputs]),
-                arguments = [ 
-                    "--strip-debug", 
-                    "--add-gnu-debuglink", debug_info.path, 
+                inputs = depset([debug_info], transitive = [inputs]),
+                arguments = [
+                    "--strip-debug",
+                    "--add-gnu-debuglink",
+                    debug_info.path,
                     input_bin.path,
                     output_bin.path,
                 ],
-                mnemonic = "StripDebuginfo", 
+                mnemonic = "StripDebuginfo",
             )
             outputs += [output_bin, debug_info]
         else:
@@ -220,40 +219,42 @@ def linux_extraction(ctx, cc_toolchain, inputs):
 
     if ctx.attr.cc_shared_library != None:
         provided_info.append(
-            create_new_cc_shared_library_info(ctx, cc_toolchain, output_bin, ctx.attr.cc_shared_library[CcSharedLibraryInfo], static_lib)
+            create_new_cc_shared_library_info(ctx, cc_toolchain, output_bin, ctx.attr.cc_shared_library[CcSharedLibraryInfo], static_lib),
         )
 
     return provided_info
 
 def macos_extraction(ctx, cc_toolchain, inputs):
-    
     outputs = []
     input_bin, output_bin, debug_info, static_lib = get_inputs_and_outputs(ctx, ".dylib", ".a", ".dSYM")
-    
+
     if input_bin:
         if ctx.attr.enabled:
             ctx.actions.run(
                 executable = "dsymutil",
                 outputs = [debug_info],
                 inputs = inputs,
-                arguments = [ 
-                    '-num-threads', '1',
-                    input_bin.path, 
-                    '-o', debug_info.path
+                arguments = [
+                    "-num-threads",
+                    "1",
+                    input_bin.path,
+                    "-o",
+                    debug_info.path,
                 ],
-                mnemonic = "ExtractDebuginfo", 
+                mnemonic = "ExtractDebuginfo",
             )
 
             ctx.actions.run(
                 executable = cc_toolchain.strip_executable,
                 outputs = [output_bin],
-                inputs = depset([debug_info], transitive=[inputs]),
-                arguments = [ 
-                    "-S", 
-                    "-o", output_bin.path, 
-                    input_bin.path
+                inputs = depset([debug_info], transitive = [inputs]),
+                arguments = [
+                    "-S",
+                    "-o",
+                    output_bin.path,
+                    input_bin.path,
                 ],
-                mnemonic = "StripDebuginfo", 
+                mnemonic = "StripDebuginfo",
             )
             outputs += [output_bin, debug_info]
         else:
@@ -277,13 +278,12 @@ def macos_extraction(ctx, cc_toolchain, inputs):
 
     if ctx.attr.cc_shared_library != None:
         provided_info.append(
-            create_new_cc_shared_library_info(ctx, cc_toolchain, output_bin, ctx.attr.cc_shared_library[CcSharedLibraryInfo])
+            create_new_cc_shared_library_info(ctx, cc_toolchain, output_bin, ctx.attr.cc_shared_library[CcSharedLibraryInfo]),
         )
 
     return provided_info
 
 def windows_extraction(ctx, cc_toolchain, inputs):
-
     if ctx.attr.type == "library":
         ext = ".lib"
     elif ctx.attr.type == "program":
@@ -298,13 +298,12 @@ def windows_extraction(ctx, cc_toolchain, inputs):
     output_library = None
     output_dynamic_library = None
     for input in ctx.attr.binary_with_debug.files.to_list():
+        ext = "." + input.extension
 
-        ext = '.' + input.extension
-   
         basename = input.basename[:-len(WITH_DEBUG_SUFFIX + ext)]
         output = ctx.actions.declare_file(basename + ext)
         outputs.append(output)
-        
+
         if ext == ".lib":
             output_library = output
         if ext == ".dll":
@@ -324,23 +323,23 @@ def windows_extraction(ctx, cc_toolchain, inputs):
 
     if ctx.attr.cc_shared_library != None:
         provided_info.append(
-            create_new_cc_shared_library_info(ctx, cc_toolchain, output_dynamic_library, ctx.attr.cc_shared_library[CcSharedLibraryInfo])
+            create_new_cc_shared_library_info(ctx, cc_toolchain, output_dynamic_library, ctx.attr.cc_shared_library[CcSharedLibraryInfo]),
         )
 
     return provided_info
- 
+
 def extract_debuginfo_impl(ctx):
-    
     # some cases (header file groups) there is no input files to do
     # anything with, besides forward things along.
     if not ctx.attr.binary_with_debug.files.to_list():
         return noop_extraction(ctx)
 
     cc_toolchain = find_cpp_toolchain(ctx)
-    inputs = depset(transitive=[
+    inputs = depset(transitive = [
         ctx.attr.binary_with_debug.files,
         ctx.attr.cc_shared_library.files if ctx.attr.cc_shared_library != None else depset([]),
-        cc_toolchain.all_files])
+        cc_toolchain.all_files,
+    ])
 
     linux_constraint = ctx.attr._linux_constraint[platform_common.ConstraintValueInfo]
     macos_constraint = ctx.attr._macos_constraint[platform_common.ConstraintValueInfo]
@@ -358,24 +357,23 @@ extract_debuginfo = rule(
     attrs = {
         "binary_with_debug": attr.label(
             doc = "The the binary to extract debuginfo from.",
-            allow_files=True,
+            allow_files = True,
         ),
         "type": attr.string(
-            doc = "Set to either 'library' or 'program' to discern how to extract the info."
+            doc = "Set to either 'library' or 'program' to discern how to extract the info.",
         ),
-        "enabled": attr.bool(default=False, doc="Flag to enable/disable separate debug generation."),
+        "enabled": attr.bool(default = False, doc = "Flag to enable/disable separate debug generation."),
         "deps": attr.label_list(providers = [CcInfo]),
-        "cc_shared_library":  attr.label(
+        "cc_shared_library": attr.label(
             doc = "If extracting from a shared library, the target of the cc_shared_library. Otherwise empty.",
-            allow_files=True,
+            allow_files = True,
         ),
         "_cc_toolchain": attr.label(default = "@bazel_tools//tools/cpp:current_cc_toolchain"),
         "_linux_constraint": attr.label(default = "@platforms//os:linux"),
         "_macos_constraint": attr.label(default = "@platforms//os:macos"),
         "_windows_constraint": attr.label(default = "@platforms//os:windows"),
-        
     },
     doc = "Extract debuginfo into a separate file",
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
-    fragments = ["cpp"]
+    fragments = ["cpp"],
 )

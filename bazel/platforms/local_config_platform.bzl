@@ -17,7 +17,7 @@ def _setup_local_config_platform(ctx):
     Generates our own local_config_platform, overriding bazel's built in generation.
 
     This allows is to setup the exec_properties on this platform so a user can use remote execution
-    without need to specify a specific platform. 
+    without need to specify a specific platform.
     """
 
     if "win" in ctx.os.name:
@@ -37,20 +37,20 @@ def _setup_local_config_platform(ctx):
     # So Starlark doesn't throw an indentation error when this gets injected.
     constraints_str = ",\n        ".join(['"%s"' % c for c in constraints])
 
-    if os == "linux" and arch in ['aarch64']:
+    if os == "linux" and arch in ["aarch64"]:
         exec_props = """
     exec_properties = {
         "container-image": "%s",
         "dockerNetwork": "standard"
     },
-""" % REMOTE_EXECUTION_CONTAINERS["linux_arm64"]['container-image']
-    elif os == "linux" and arch in ['amd64', 'x86_64']:
+""" % REMOTE_EXECUTION_CONTAINERS["linux_arm64"]["container-image"]
+    elif os == "linux" and arch in ["amd64", "x86_64"]:
         exec_props = """
     exec_properties = {
         "container-image": "%s",
         "dockerNetwork": "standard"
     },
-""" % REMOTE_EXECUTION_CONTAINERS["linux_amd64"]['container-image']
+""" % REMOTE_EXECUTION_CONTAINERS["linux_amd64"]["container-image"]
     else:
         exec_props = ""
 
@@ -58,7 +58,7 @@ def _setup_local_config_platform(ctx):
         "{constraints}": constraints_str,
         "{exec_props}": exec_props,
     }
-    
+
     ctx.template(
         "BUILD.bazel",
         ctx.attr.build_tpl,

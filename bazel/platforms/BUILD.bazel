@@ -1,5 +1,6 @@
 # Define supported build platforms.
 load("//bazel/platforms:remote_execution_containers.bzl", "REMOTE_EXECUTION_CONTAINERS")
+
 package(default_visibility = ["//visibility:public"])
 
 [
@@ -11,11 +12,14 @@ package(default_visibility = ["//visibility:public"])
             "@bazel_tools//tools/cpp:" + compiler,
         ],
         exec_properties = {
-            "container-image": REMOTE_EXECUTION_CONTAINERS["linux_arm64"]['container-image'],
-            "dockerNetwork": "standard"
-        }
+            "container-image": REMOTE_EXECUTION_CONTAINERS["linux_arm64"]["container-image"],
+            "dockerNetwork": "standard",
+        },
     )
-    for compiler in ["clang", "gcc"]
+    for compiler in [
+        "clang",
+        "gcc",
+    ]
 ]
 
 [
@@ -27,11 +31,14 @@ package(default_visibility = ["//visibility:public"])
             "@bazel_tools//tools/cpp:" + compiler,
         ],
         exec_properties = {
-            "container-image": REMOTE_EXECUTION_CONTAINERS["linux_amd64"]['container-image'],
-            "dockerNetwork": "standard"
-        }
+            "container-image": REMOTE_EXECUTION_CONTAINERS["linux_amd64"]["container-image"],
+            "dockerNetwork": "standard",
+        },
     )
-    for compiler in ["clang", "gcc"]
+    for compiler in [
+        "clang",
+        "gcc",
+    ]
 ]
 
 platform(
@@ -40,7 +47,7 @@ platform(
         "@platforms//cpu:x86_64",
         "@platforms//os:windows",
         "@bazel_tools//tools/cpp:msvc",
-    ]
+    ],
 )
 
 platform(
@@ -49,7 +56,7 @@ platform(
         "@platforms//cpu:arm64",
         "@platforms//os:macos",
         "@bazel_tools//tools/cpp:clang",
-    ]
+    ],
 )
 
 platform(
@@ -58,5 +65,5 @@ platform(
         "@platforms//cpu:x86_64",
         "@platforms//os:macos",
         "@bazel_tools//tools/cpp:clang",
-    ]
+    ],
 )
