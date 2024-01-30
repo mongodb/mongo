@@ -896,7 +896,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
     } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
         // If this mongod has a router service, it needs to run stepdown
         // hooks even if the shard-role isn't initialized yet.
-        // TODO SERVER-82588: Update this code once CatalogCacheLoader is split between
+        // TODO SERVER-84243: Update this code once CatalogCacheLoader is split between
         // router and shard roles.
         if (Grid::get(_service)->isShardingInitialized()) {
             CatalogCacheLoader::get(_service).onStepDown();
@@ -1032,7 +1032,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
             // If this mongod has a router service, it needs to run stepdown
             // hooks even if the shard-role isn't initialized yet.
-            // TODO SERVER-82588: Update this code once CatalogCacheLoader is split between
+            // TODO SERVER-84243: Update this code once CatalogCacheLoader is split between
             // router and shard roles.
             if (Grid::get(_service)->isShardingInitialized()) {
                 CatalogCacheLoader::get(_service).onStepUp();
