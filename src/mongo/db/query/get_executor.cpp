@@ -1034,10 +1034,25 @@ public:
         _plannerParams = plannerOptions;
     }
 
+    /**
+     * When the instance of this class goes out of scope the trials for multiplanner are completed.
+     */
+    virtual ~PrepareExecutionHelper() {
+        if (_opCtx) {
+            if (auto curOp = CurOp::get(_opCtx)) {
+
+                LOGV2_DEBUG(8276400,
+                            4,
+                            "Stopping the planningTime timer",
+                            "query"_attr = redact(_cq->toStringShort()));
+                curOp->stopQueryPlanningTimer();
+            }
+        }
+    }
+
     StatusWith<std::unique_ptr<ResultType>> prepare() {
         const auto& mainColl = getMainCollection();
 
-        ON_BLOCK_EXIT([&] { CurOp::get(_opCtx)->stopQueryPlanningTimer(); });
         if (!mainColl) {
             LOGV2_DEBUG(20921,
                         2,
