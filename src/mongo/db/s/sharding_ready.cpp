@@ -120,10 +120,6 @@ bool ShardingReady::isReady() {
     return _isReady.getFuture().isReady();
 }
 
-SharedSemiFuture<void> ShardingReady::isReadyFuture() const {
-    return _isReady.getFuture();
-}
-
 void ShardingReady::setIsReady() {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_isReady.getFuture().isReady()) {

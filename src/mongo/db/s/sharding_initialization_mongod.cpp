@@ -81,7 +81,6 @@
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
@@ -566,13 +565,8 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
     _isPrimary.store(true);
     if (Grid::get(opCtx)->isInitialized()) {
-        auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-        // Update the replica set on the config server after sharding is ready to fix a race where a
-        // new node finishes auto-bootstrapping after the update finishes (resulting in no updates).
-        (void)ShardingReady::get(opCtx)->isReadyFuture().thenRunOn(executor).then([&]() {
-            ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-                opCtx, [&]() -> bool { return _isPrimary.load(); });
-        });
+        ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
+            opCtx, [&]() -> bool { return _isPrimary.load(); });
     }
 }
 

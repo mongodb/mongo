@@ -62,7 +62,6 @@ public:
     void scheduleTransitionToConfigShard(OperationContext* opCtx);
     void waitUntilReady(OperationContext* opCtx);
     bool isReady();
-    SharedSemiFuture<void> isReadyFuture() const;
 
     /**
      * Sets a value for the _isReady promise indicating that the sharding system is ready to start
