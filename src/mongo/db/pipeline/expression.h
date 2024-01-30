@@ -453,7 +453,10 @@ public:
     static bool isConstant(boost::intrusive_ptr<Expression> expression) {
         return dynamic_cast<ExpressionConstant*>(expression.get());
     }
-    static Value serializeConstant(const SerializationOptions& opts, Value val);
+
+    static Value serializeConstant(const SerializationOptions& opts,
+                                   Value val,
+                                   bool wrapRepresentativeValue = false);
 
     bool selfAndChildrenAreConstant() const override final {
         return true;
