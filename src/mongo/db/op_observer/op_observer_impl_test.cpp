@@ -149,7 +149,7 @@ void beginRetryableWriteWithTxnNumber(
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
                                    boost::none /* autocommit */,
-                                   boost::none /* startTransaction */);
+                                   TransactionParticipant::TransactionActions::kNone);
 }
 
 void beginNonRetryableTransactionWithTxnNumber(
@@ -163,8 +163,10 @@ void beginNonRetryableTransactionWithTxnNumber(
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     contextSession = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.beginOrContinue(
-        opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx,
+                                   {*opCtx->getTxnNumber()},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart);
 }
 
 void beginRetryableInternalTransactionWithTxnNumber(
@@ -178,8 +180,10 @@ void beginRetryableInternalTransactionWithTxnNumber(
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     contextSession = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.beginOrContinue(
-        opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx,
+                                   {*opCtx->getTxnNumber()},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart);
 }
 
 template <typename OpObserverType>
@@ -1154,8 +1158,10 @@ public:
                               NamespaceString nss,
                               TxnNumber txnNum,
                               StmtId stmtId) {
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNum},
+                                       boost::none /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kNone);
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);

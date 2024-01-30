@@ -790,22 +790,12 @@ bool TransactionParticipant::Participant::_verifyCanBeginMultiDocumentTransactio
                        o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ||
                    o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ==
                        kUninitializedTxnRetryCounter) {
-            // Servers in a sharded cluster can start a new transaction at the active transaction
-            // number to allow internal retries by routers on re-targeting errors, like
-            // StaleShard/DatabaseVersion or SnapshotTooOld.
-            uassert(ErrorCodes::ConflictingOperationInProgress,
-                    "Only servers in a sharded cluster can start a new transaction at the active "
-                    "transaction number",
-                    !serverGlobalParams.clusterRole.has(ClusterRole::None));
-
             if (_isInternalSessionForRetryableWrite() &&
                 o().txnState.isInSet(TransactionState::kCommitted)) {
                 // This is a retry of a committed internal transaction for retryable writes so
                 // skip resetting the state and updating the metrics.
                 return true;
             }
-
-            _uassertCanReuseActiveTxnNumberForTransaction(opCtx);
         } else {
             const auto restartableStates = TransactionState::kNone | TransactionState::kInProgress |
                 TransactionState::kAbortedWithoutPrepare | TransactionState::kAbortedWithPrepare;
@@ -828,8 +818,35 @@ bool TransactionParticipant::Participant::_verifyCanBeginMultiDocumentTransactio
     return false;
 }
 
-void TransactionParticipant::Participant::_uassertCanReuseActiveTxnNumberForTransaction(
-    OperationContext* opCtx) {
+bool TransactionParticipant::Participant::_shouldRestartTransactionOnReuseActiveTxnNumber(
+    OperationContext* opCtx,
+    TransactionActions action,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    // We should never restart on kContinue
+    if (action == TransactionActions::kContinue)
+        return false;
+
+    // We should only call this function if the request is attempting to reuse the active txnNumber
+    // and retryCounter
+    invariant(
+        txnNumberAndRetryCounter.getTxnNumber() ==
+            o().activeTxnNumberAndRetryCounter.getTxnNumber() &&
+        (txnNumberAndRetryCounter.getTxnRetryCounter() ==
+             o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ||
+         o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() == kUninitializedTxnRetryCounter));
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+        // Servers in a sharded cluster can start a new transaction at the active transaction
+        // number to allow internal retries by routers on re-targeting errors, like
+        // StaleShard/DatabaseVersion or SnapshotTooOld.
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Only servers in a sharded cluster can start a new transaction at the active "
+                "transaction number",
+                action != TransactionActions::kStart);
+
+        return false;
+    }
+
     if (o().txnState.isInSet(TransactionState::kNone)) {
         const auto& retryableWriteTxnParticipantCatalog =
             getRetryableWriteTransactionParticipantCatalog(opCtx);
@@ -856,6 +873,15 @@ void TransactionParticipant::Participant::_uassertCanReuseActiveTxnNumberForTran
                               << " in state " << txnParticipant.o().txnState,
                 txnParticipant.transactionIsAbortedWithoutPrepare());
         }
+
+        return true;
+    } else if (o().txnState.isInSet(TransactionState::kAbortedWithoutPrepare)) {
+        return true;
+    } else if (_isInternalSessionForRetryableWrite() &&
+               o().txnState.isInSet(TransactionState::kCommitted)) {
+        // We won't actually restart the transaction, we'll early return later on and skip resetting
+        // any state and metrics
+        return true;
     } else {
         uassert(
             50911,
@@ -864,7 +890,9 @@ void TransactionParticipant::Participant::_uassertCanReuseActiveTxnNumberForTran
                           << o().activeTxnNumberAndRetryCounter.toBSON()
                           << " because a transaction with the same transaction number is in state "
                           << o().txnState,
-            o().txnState.isInSet(TransactionState::kAbortedWithoutPrepare));
+            action != TransactionActions::kStart);
+
+        return false;
     }
 }
 
@@ -1006,12 +1034,14 @@ void TransactionParticipant::Participant::beginOrContinue(
     OperationContext* opCtx,
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
-    boost::optional<bool> startTransaction) {
+    TransactionActions action) {
     if (_isInternalSessionForRetryableWrite()) {
         auto parentTxnParticipant =
             TransactionParticipant::get(opCtx, _session()->getParentSession());
-        parentTxnParticipant.beginOrContinue(
-            opCtx, {*_sessionId().getTxnNumber(), boost::none}, boost::none, boost::none);
+        parentTxnParticipant.beginOrContinue(opCtx,
+                                             {*_sessionId().getTxnNumber(), boost::none},
+                                             boost::none,
+                                             TransactionActions::kNone);
     }
 
     // Make sure we are still a primary. We need to hold on to the RSTL through the end of this
@@ -1060,7 +1090,7 @@ void TransactionParticipant::Participant::beginOrContinue(
     // Requests without an autocommit field are interpreted as retryable writes. They cannot specify
     // startTransaction, which is verified earlier when parsing the request.
     if (!autocommit) {
-        invariant(!startTransaction);
+        invariant(action == TransactionActions::kNone);
         invariant(!txnNumberAndRetryCounter.getTxnRetryCounter(),
                   "Cannot specify a txnRetryCounter for retryable write");
         _beginOrContinueRetryableWrite(opCtx, txnNumberAndRetryCounter);
@@ -1071,6 +1101,7 @@ void TransactionParticipant::Participant::beginOrContinue(
     // autocommit be given as an argument on the request, and currently it can only be false, which
     // is verified earlier when parsing the request.
     invariant(*autocommit == false);
+    invariant(action != TransactionActions::kNone);
     invariant(opCtx->inMultiDocumentTransaction());
     if (txnNumberAndRetryCounter.getTxnRetryCounter()) {
         uassert(ErrorCodes::InvalidOptions,
@@ -1082,15 +1113,32 @@ void TransactionParticipant::Participant::beginOrContinue(
         txnNumberAndRetryCounter.setTxnRetryCounter(0);
     }
 
+    // If the request conatined startTransaction, we should always choose to start the transaction.
+    // If the request contained startOrContinueTransaction, we should always choose to start the
+    // transaction unless the txnNumber and retryCounter are equal to the active txnNumber and
+    // retryCounter. In this case, we must decide whether we should start or continue the
+    // transaction depending on the active transaction state.
+    bool startTransaction =
+        action == TransactionActions::kStart || action == TransactionActions::kStartOrContinue;
+    if (txnNumberAndRetryCounter.getTxnNumber() ==
+            o().activeTxnNumberAndRetryCounter.getTxnNumber() &&
+        (txnNumberAndRetryCounter.getTxnRetryCounter() ==
+             o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ||
+         o().activeTxnNumberAndRetryCounter.getTxnRetryCounter() ==
+             kUninitializedTxnRetryCounter)) {
+        startTransaction = _shouldRestartTransactionOnReuseActiveTxnNumber(
+            opCtx, action, txnNumberAndRetryCounter);
+
+        if (action == TransactionActions::kStart) {
+            // If a caller passed kStart, we should always choose to start the transaction
+            invariant(startTransaction);
+        }
+    }
+
     if (!startTransaction) {
         _continueMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
         return;
     }
-
-    // Attempt to start a multi-statement transaction, which requires startTransaction be given as
-    // an argument on the request. The 'startTransaction' argument currently can only be specified
-    // as true, which is verified earlier, when parsing the request.
-    invariant(*startTransaction);
 
     auto isRetry = _verifyCanBeginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
     if (isRetry) {
@@ -1098,6 +1146,7 @@ void TransactionParticipant::Participant::beginOrContinue(
         // start the transaction since that already happened.
         return;
     }
+
     _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
 }
 

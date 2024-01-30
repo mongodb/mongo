@@ -327,11 +327,15 @@ protected:
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT(txnParticipant);
         if (multiDocTxn) {
-            txnParticipant.beginOrContinue(
-                opCtx, {txnNum}, false /* autocommit */, true /* startTransaction */);
+            txnParticipant.beginOrContinue(opCtx,
+                                           {txnNum},
+                                           false /* autocommit */,
+                                           TransactionParticipant::TransactionActions::kStart);
         } else {
-            txnParticipant.beginOrContinue(
-                opCtx, {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+            txnParticipant.beginOrContinue(opCtx,
+                                           {txnNum},
+                                           boost::none /* autocommit */,
+                                           TransactionParticipant::TransactionActions::kNone);
         }
     }
 
@@ -469,8 +473,10 @@ protected:
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "insert");
         txnParticipant.stashTransactionResources(opCtx);
@@ -486,8 +492,10 @@ protected:
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kStart);
 
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
 
@@ -519,8 +527,10 @@ protected:
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        txnParticipant.beginOrContinue(
-            opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx,
+                                       {txnNumber},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kContinue);
 
         txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
         txnParticipant.abortTransaction(opCtx);

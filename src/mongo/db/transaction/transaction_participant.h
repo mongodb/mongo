@@ -207,6 +207,8 @@ public:
 
     ~TransactionParticipant();
 
+    enum class TransactionActions { kNone, kStart, kContinue, kStartOrContinue };
+
     /**
      * Holds state for a snapshot read or multi-statement transaction in between network
      * operations.
@@ -502,22 +504,37 @@ public:
          * valid values are boost::none (meaning no autocommit was specified) and false (meaning
          * that this is the beginning of a multi-statement transaction).
          *
-         * 'startTransaction' comes from the 'startTransaction' field in the original client
-         * request. See below for the acceptable values and the meaning of the combinations of
-         * autocommit, startTransaction and txnRetryCounter.
+         * 'action' comes from one of the 'startTransaction' (kStart) or
+         * 'startOrContinueTransaction' (kStartOrContinue) fields in the original client request. If
+         * neither 'startTransaction' nor 'startOrContinueTransaction' was specified in the original
+         * request, the caller is responsible for passing either kNone or kContinue depending on if
+         * the partipant should execute a retryable write or transaction statement. See below for
+         * the acceptable values and the meaning of the combinations of autocommit, action and
+         * txnRetryCounter.
          *
-         * autocommit = boost::none, startTransaction = boost::none and txnRetryCounter =
+         * autocommit = boost::none, action = kNone and txnRetryCounter =
          * boost::none means retryable write.
          *
-         * autocommit = false, startTransaction = boost::none and txnRetryCounter = last seen
+         * autocommit = false, action = kContinue and txnRetryCounter = last seen
          * txnRetryCounter means continuation of a multi-statement transaction.
          *
-         * autocommit = false, startTransaction = true, txnNumber = active txnNumber and
+         * autocommit = false, action = kStart, txnNumber = active txnNumber and
          * txnRetryCounter > last seen txnRetryCounter (defaults to 0) means restart the existing
          * transaction as long as it has not been committed or prepared.
          *
-         * autocommit = false, startTransaction = true, txnNumber > active txnNumber means abort
+         * autocommit = false, action = kStart, txnNumber > active txnNumber means abort
          * whatever transaction is in progress on the session and starts a new transaction.
+         *
+         * autocommit = false, action = kStartOrContinue, txnNumber = active txnNumber and
+         * txnRetryCounter > last seen txnRetryCounter (defaults to 0) means restart the existing
+         * transaction as long as it has not been committed or prepared.
+         *
+         * autocommit = false, action = kStartOrContinue, txnNumber > active txnNumber means abort
+         * whatever transaction is in progress on the session and starts a new transaction.
+         *
+         * autocommit = false, action = kStartOrContinue, txnNumber = active txnNumber and
+         * txnRetryCounter = last seen txnRetryCounter (defaults to 0) means continue the existing
+         * transaction.
          *
          * Any combination other than the ones listed above will invariant since it is expected that
          * the caller has performed the necessary customer input validations.
@@ -541,7 +558,7 @@ public:
         void beginOrContinue(OperationContext* opCtx,
                              TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                              boost::optional<bool> autocommit,
-                             boost::optional<bool> startTransaction);
+                             TransactionActions action);
 
         /**
          * Used only by the secondary oplog application logic. Similar to 'beginOrContinue' without
@@ -986,8 +1003,10 @@ public:
         void _uassertNoConflictingInternalTransactionForRetryableWrite(
             OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
-        // Asserts that the active transaction number can be reused. Below are the two cases where
-        // an active transaction number is allowed to be reused:
+        // Returns true if the transaction can and should be restarted at the active transaction
+        // number, or if it should be continued. Throws if the active transaction number cannot be
+        // reused with the action specified. Below are the two cases where a transaction can be
+        // restarted with the active transaction number:
         // 1. The transaction participant is in transaction mode and the transaction has been
         //    aborted and not been involved in a two phase commit. This corresponds to the case
         //    where a transaction is internally retried after failing with a transient error such a
@@ -999,8 +1018,11 @@ public:
         //    transactions, there is an additional requirement that all the internal transactions
         //    have been aborted and have not been involved in a two phase commit.
         // Assuming routers target primaries in increasing order of term and in the absence of
-        // byzantine messages, this check should never fail.
-        void _uassertCanReuseActiveTxnNumberForTransaction(OperationContext* opCtx);
+        // byzantine messages, this should never throw.
+        bool _shouldRestartTransactionOnReuseActiveTxnNumber(
+            OperationContext* opCtx,
+            TransactionActions action,
+            const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
 
         // Verifies we can begin a multi document transaction with the given txnNumber and
         // txnRetryCounter. Throws if we cannot. Returns true if this is a retry of the active

@@ -280,8 +280,10 @@ protected:
                                 boost::optional<DurableTxnStateEnum> txnState) {
         const auto session = OperationContextSession::get(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
-        txnParticipant.beginOrContinue(
-            opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+        txnParticipant.beginOrContinue(opCtx(),
+                                       {txnNum},
+                                       boost::none /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kNone);
 
         const auto uuid = UUID::gen();
 
@@ -362,8 +364,10 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryNotWrittenOnBegin)
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
 
     DBDirectClient client(opCtx());
@@ -380,8 +384,10 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionEntryWrittenAtFirstWrit
 
     const auto& sessionId = *opCtx()->getLogicalSessionId();
     const TxnNumber txnNum = 21;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     const auto opTime = writeTxnRecord(txnNum, {0}, {}, boost::none);
 
@@ -468,15 +474,18 @@ TEST_F(TransactionParticipantRetryableWritesTest, StartingOldTxnShouldAssert) {
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
-    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
-                                                      {txnNum - 1},
-                                                      boost::none /* autocommit */,
-                                                      boost::none /* startTransaction */),
-                       AssertionException,
-                       ErrorCodes::TransactionTooOld);
+    ASSERT_THROWS_CODE(
+        txnParticipant.beginOrContinue(opCtx(),
+                                       {txnNum - 1},
+                                       boost::none /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kNone),
+        AssertionException,
+        ErrorCodes::TransactionTooOld);
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
 }
 
@@ -490,14 +499,17 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     StringBuilder sb;
     sb << "Retryable write with txnNumber 21 is prohibited on session " << sessionId
        << " because a newer retryable write with txnNumber 22 has already started on this session.";
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
-    ASSERT_THROWS_WHAT(txnParticipant.beginOrContinue(opCtx(),
-                                                      {txnNum - 1},
-                                                      boost::none /* autocommit */,
-                                                      boost::none /* startTransaction */),
-                       AssertionException,
-                       sb.str());
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
+    ASSERT_THROWS_WHAT(
+        txnParticipant.beginOrContinue(opCtx(),
+                                       {txnNum - 1},
+                                       boost::none /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kNone),
+        AssertionException,
+        sb.str());
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
 }
 
@@ -518,10 +530,12 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     txnParticipant.beginOrContinue(opCtx(),
                                    txnNumberAndRetryCounter2,
                                    boost::none /* autocommit */,
-                                   boost::none /* startTransaction */);
+                                   TransactionParticipant::TransactionActions::kNone);
     ASSERT_THROWS_WHAT(
-        txnParticipant.beginOrContinue(
-            opCtx(), txnNumberAndRetryCounter1, autocommit, boost::none /* startTransaction */),
+        txnParticipant.beginOrContinue(opCtx(),
+                                       txnNumberAndRetryCounter1,
+                                       autocommit,
+                                       TransactionParticipant::TransactionActions::kContinue),
         AssertionException,
         sb.str());
     ASSERT(txnParticipant.getLastWriteOpTime().isNull());
@@ -540,8 +554,10 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionN
     ASSERT(client.runCommand(nss.dbName(), BSON("drop" << nss.coll()), dropResult));
 
     const TxnNumber txnNum = 21;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
@@ -563,8 +579,10 @@ TEST_F(TransactionParticipantRetryableWritesTest,
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     ASSERT(!txnParticipant.checkStatementExecuted(opCtx(), 1000));
     ASSERT(!txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
@@ -602,7 +620,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
     parentTxnParticipant.beginOrContinue(opCtx(),
                                          {parentTxnNumber},
                                          boost::none /* autocommit */,
-                                         boost::none /* startTransaction */);
+                                         TransactionParticipant::TransactionActions::kNone);
     ASSERT(!parentTxnParticipant.checkStatementExecuted(opCtx(), 1000));
     ASSERT(!parentTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 1000));
     writeTxnRecord(parentTxnNumber, {1000}, {}, boost::none);
@@ -619,7 +637,7 @@ TEST_F(ShardTransactionParticipantRetryableWritesTest,
     childTxnParticipant.beginOrContinue(opCtx(),
                                         {childTxnNumber},
                                         boost::none /* autocommit */,
-                                        boost::none /* startTransaction */);
+                                        TransactionParticipant::TransactionActions::kNone);
     ASSERT(!childTxnParticipant.checkStatementExecuted(opCtx(), 2000));
     ASSERT(!childTxnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx(), 2000));
     writeTxnRecord(childTxnNumber, {2000}, {}, DurableTxnStateEnum::kCommitted);
@@ -675,7 +693,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
     childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
     opCtx()->setInMultiDocumentTransaction();
     childTxnParticipant.beginOrContinue(
-        opCtx(), {0}, false /* autocommit */, true /* startTransaction */);
+        opCtx(), {0}, false /* autocommit */, TransactionParticipant::TransactionActions::kStart);
 
     parentTxnParticipant.invalidate(opCtx());
     childTxnParticipant.checkStatementExecuted(opCtx(), 0);
@@ -699,7 +717,7 @@ DEATH_TEST_REGEX_F(ShardTransactionParticipantRetryableWritesTest,
     childTxnParticipant.refreshFromStorageIfNeeded(opCtx());
     opCtx()->setInMultiDocumentTransaction();
     childTxnParticipant.beginOrContinue(
-        opCtx(), {0}, false /* autocommit */, true /* startTransaction */);
+        opCtx(), {0}, false /* autocommit */, TransactionParticipant::TransactionActions::kStart);
 
     childTxnParticipant.invalidate(opCtx());
     parentTxnParticipant.checkStatementExecuted(opCtx(), 0);
@@ -714,8 +732,10 @@ DEATH_TEST_REGEX_F(
 
     const auto& sessionId = *opCtx()->getLogicalSessionId();
     const TxnNumber txnNum = 100;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     const auto uuid = UUID::gen();
 
@@ -756,8 +776,10 @@ DEATH_TEST_REGEX_F(
 
     const auto& sessionId = *opCtx()->getLogicalSessionId();
     const TxnNumber txnNum = 100;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     const auto uuid = UUID::gen();
 
@@ -797,8 +819,10 @@ DEATH_TEST_REGEX_F(
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
@@ -969,8 +993,10 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.refreshFromStorageIfNeeded(opCtx());
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     repl::MutableOplogEntry oplogEntry;
     oplogEntry.setSessionId(sessionId);
@@ -1082,8 +1108,10 @@ TEST_F(ShardTxnParticipantRetryableWritesTest,
     opCtx()->setTxnNumber(txnNum);
     const auto uuid = UUID::gen();
 
-    txnParticipant.beginOrContinue(
-        opCtx(), {txnNum}, boost::none /* autocommit */, boost::none /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {txnNum},
+                                   boost::none /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kNone);
 
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -1100,7 +1128,7 @@ TEST_F(ShardTxnParticipantRetryableWritesTest,
     }
 
     auto autocommit = false;
-    auto startTransaction = true;
+    auto startTransaction = TransactionParticipant::TransactionActions::kStart;
     opCtx()->setInMultiDocumentTransaction();
 
     ASSERT_THROWS_CODE(

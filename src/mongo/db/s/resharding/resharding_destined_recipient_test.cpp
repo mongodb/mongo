@@ -130,8 +130,10 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     ASSERT(txnParticipant);
-    txnParticipant.beginOrContinue(
-        opCtx, {txnNum}, false /* autocommit */, true /* startTransaction */);
+    txnParticipant.beginOrContinue(opCtx,
+                                   {txnNum},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStart);
     txnParticipant.unstashTransactionResources(opCtx, "SetDestinedRecipient");
 
     func();

@@ -130,7 +130,8 @@ void setUpTxnParticipant(OperationContext* opCtx, std::vector<int> executedStmtI
     opCtx->setTxnNumber(txnNumber);
     auto txnPart = TransactionParticipant::get(opCtx);
     txnPart.refreshFromStorageIfNeeded(opCtx);
-    txnPart.beginOrContinue(opCtx, {txnNumber}, boost::none, boost::none);
+    txnPart.beginOrContinue(
+        opCtx, {txnNumber}, boost::none, TransactionParticipant::TransactionActions::kNone);
     txnPart.addCommittedStmtIds(opCtx, std::move(executedStmtIds), repl::OpTime());
 }
 

@@ -484,7 +484,7 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
         txnParticipant.beginOrContinue(opCtx,
                                        {result.txnNum},
                                        boost::none /* autocommit */,
-                                       boost::none /* startTransaction */);
+                                       TransactionParticipant::TransactionActions::kNone);
         if (txnParticipant.checkStatementExecuted(opCtx, stmtIds.front())) {
             // Skip the incoming statement because it has already been logged locally
             return lastResult;

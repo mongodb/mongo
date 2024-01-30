@@ -572,7 +572,7 @@ void TenantOplogApplier::_writeRetryableWriteEntryNoOp(
         txnParticipant.beginOrContinue(opCtx,
                                        txnNumberAndRetryCounter,
                                        boost::none /* autocommit */,
-                                       boost::none /* startTransaction */);
+                                       TransactionParticipant::TransactionActions::kNone);
         noopEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
     } else {
         // We can end up here under the following circumstances:
@@ -600,7 +600,7 @@ void TenantOplogApplier::_writeRetryableWriteEntryNoOp(
         txnParticipant.beginOrContinue(opCtx,
                                        txnNumberAndRetryCounter,
                                        boost::none /* autocommit */,
-                                       boost::none /* startTransaction */);
+                                       TransactionParticipant::TransactionActions::kNone);
 
         // Reset the retryable write history chain.
         noopEntry.setPrevWriteOpTimeInTransaction(OpTime());

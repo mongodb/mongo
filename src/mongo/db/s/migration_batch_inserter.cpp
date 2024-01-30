@@ -78,10 +78,11 @@ namespace {
 void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     mongoDSessionCatalog->checkOutUnscopedSession(opCtx);
-    TransactionParticipant::get(opCtx).beginOrContinue(opCtx,
-                                                       {*opCtx->getTxnNumber()},
-                                                       boost::none /* autocommit */,
-                                                       boost::none /* startTransaction */);
+    TransactionParticipant::get(opCtx).beginOrContinue(
+        opCtx,
+        {*opCtx->getTxnNumber()},
+        boost::none /* autocommit */,
+        TransactionParticipant::TransactionActions::kNone);
 }
 
 template <typename Callable>

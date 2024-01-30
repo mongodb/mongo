@@ -163,10 +163,11 @@ BSONObj makeLocalReadConcernWithAfterClusterTime(Timestamp afterClusterTime) {
 void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     mongoDSessionCatalog->checkOutUnscopedSession(opCtx);
-    TransactionParticipant::get(opCtx).beginOrContinue(opCtx,
-                                                       {*opCtx->getTxnNumber()},
-                                                       boost::none /* autocommit */,
-                                                       boost::none /* startTransaction */);
+    TransactionParticipant::get(opCtx).beginOrContinue(
+        opCtx,
+        {*opCtx->getTxnNumber()},
+        boost::none /* autocommit */,
+        TransactionParticipant::TransactionActions::kNone);
 }
 
 template <typename Callable>
@@ -1202,7 +1203,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
             txnParticipant.beginOrContinue(opCtx,
                                            {*opCtx->getTxnNumber()},
                                            boost::none /* autocommit */,
-                                           boost::none /* startTransaction */);
+                                           TransactionParticipant::TransactionActions::kNone);
             _migrateDriver(opCtx, skipToCritSecTaken || recovering);
         } catch (...) {
             _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));

@@ -398,10 +398,11 @@ public:
             {
                 auto sessionTxnState = mongoDSessionCatalog->checkOutSession(opCtx);
                 auto txnParticipant = TransactionParticipant::get(opCtx);
-                txnParticipant.beginOrContinue(opCtx,
-                                               txnNumberAndRetryCounter,
-                                               false /* autocommit */,
-                                               boost::none /* startTransaction */);
+                txnParticipant.beginOrContinue(
+                    opCtx,
+                    txnNumberAndRetryCounter,
+                    false /* autocommit */,
+                    TransactionParticipant::TransactionActions::kContinue);
 
                 if (txnParticipant.transactionIsCommitted())
                     return;
@@ -420,10 +421,11 @@ public:
                 auto txnParticipant = TransactionParticipant::get(opCtx);
 
                 // Call beginOrContinue again in case the transaction number has changed.
-                txnParticipant.beginOrContinue(opCtx,
-                                               txnNumberAndRetryCounter,
-                                               false /* autocommit */,
-                                               boost::none /* startTransaction */);
+                txnParticipant.beginOrContinue(
+                    opCtx,
+                    txnNumberAndRetryCounter,
+                    false /* autocommit */,
+                    TransactionParticipant::TransactionActions::kContinue);
 
                 invariant(!txnParticipant.transactionIsOpen(),
                           "The participant should not be in progress after we waited for the "

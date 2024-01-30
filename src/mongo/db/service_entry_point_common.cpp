@@ -1077,11 +1077,16 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
             try {
                 auto opObserver = opCtx->getServiceContext()->getOpObserver();
                 opObserver->onTransactionStart(opCtx);
+                auto transactionAction = sessionOptions.getStartTransaction()
+                    ? TransactionParticipant::TransactionActions::kStart
+                    : (sessionOptions.getAutocommit()
+                           ? TransactionParticipant::TransactionActions::kContinue
+                           : TransactionParticipant::TransactionActions::kNone);
                 txnParticipant.beginOrContinue(
                     opCtx,
                     {*sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter()},
                     sessionOptions.getAutocommit(),
-                    sessionOptions.getStartTransaction());
+                    transactionAction);
                 beganOrContinuedTxn = true;
             } catch (const ExceptionFor<ErrorCodes::PreparedTransactionInProgress>&) {
                 auto prevTxnExitedPrepare = txnParticipant.onExitPrepare();
