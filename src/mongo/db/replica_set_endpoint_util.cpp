@@ -138,11 +138,6 @@ bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
         return false;
     }
 
-    if (gMultitenancySupport) {
-        // Currently, serverless does not support sharding.
-        return false;
-    }
-
     if (!Grid::get(opCtx)->isShardingInitialized()) {
         return false;
     }

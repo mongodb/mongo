@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 
@@ -73,10 +74,21 @@ bool ReplicaSetEndpointShardingState::isConfigShardForTest() {
 }
 
 bool ReplicaSetEndpointShardingState::supportsReplicaSetEndpoint() {
+    if (!isFeatureFlagEnabled()) {
+        return false;
+    }
+    if (gMultitenancySupport) {
+        return false;
+    }
+    if (!serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+        return false;
+    }
+    if (clusterHasTwoOrMoreShards()) {
+        return false;
+    }
+
     std::shared_lock rLock(_mutex);  // NOLINT
-    return isFeatureFlagEnabled() &&
-        serverGlobalParams.clusterRole.has(ClusterRole::RouterServer) && _isConfigShard &&
-        !clusterHasTwoOrMoreShards();
+    return _isConfigShard;
 }
 
 bool isFeatureFlagEnabled() {
