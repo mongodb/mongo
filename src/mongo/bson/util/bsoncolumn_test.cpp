@@ -472,17 +472,22 @@ public:
         }
     }
 
+    // testBlockBased is a temporary option; it will be removed once all
+    // functionality for block based decompression is in place and all
+    // relevant tests are onboarded
     static void verifyDecompression(const BufBuilder& columnBinary,
-                                    const std::vector<BSONElement>& expected) {
+                                    const std::vector<BSONElement>& expected,
+                                    bool testBlockBased = false) {
         BSONBinData bsonBinData;
         bsonBinData.data = columnBinary.buf();
         bsonBinData.length = columnBinary.len();
         bsonBinData.type = Column;
-        verifyDecompression(bsonBinData, expected);
+        verifyDecompression(bsonBinData, expected, testBlockBased);
     }
 
     static void verifyDecompression(BSONBinData columnBinary,
-                                    const std::vector<BSONElement>& expected) {
+                                    const std::vector<BSONElement>& expected,
+                                    bool testBlockBased = false) {
         BSONObjBuilder obj;
         obj.append(""_sd, columnBinary);
         BSONElement columnElement = obj.done().firstElement();
@@ -592,6 +597,19 @@ public:
                 ++actual;
             }
         }
+
+        // This gate will be removed once all types are onboarded to decompress all interface
+        if (testBlockBased) {
+            boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+            std::vector<BSONElement> collection;
+            BSONColumnBlockBased c((const char*)columnBinary.data, columnBinary.length);
+
+            c.decompress<BSONElementMaterializer, std::vector<BSONElement>>(collection, allocator);
+            ASSERT_EQ(collection.size(), expected.size());
+            for (size_t i = 0; i < collection.size(); ++i) {
+                ASSERT(expected[i].binaryEqualValues(collection[i]));
+            }
+        }
     }
 
     /**
@@ -625,7 +643,7 @@ TEST_F(BSONColumnTest, Empty) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {});
+    verifyDecompression(binData, {}, true);
 }
 
 TEST_F(BSONColumnTest, ContainsScalarInt32SimpleCompressed) {
@@ -900,7 +918,7 @@ TEST_F(BSONColumnTest, BasicValue) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elem, elem});
+    verifyDecompression(binData, {elem, elem}, true);
 }
 
 TEST_F(BSONColumnTest, BasicSkip) {
@@ -984,7 +1002,7 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteral) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second});
+    verifyDecompression(binData, {first, second}, true);
 }
 
 TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
@@ -1009,7 +1027,7 @@ TEST_F(BSONColumnTest, LargeDeltaIsLiteralAfterSimple8b) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {zero, zero, large, large});
+    verifyDecompression(binData, {zero, zero, large, large}, true);
 }
 
 TEST_F(BSONColumnTest, OverBlockCount) {
@@ -1061,7 +1079,7 @@ TEST_F(BSONColumnTest, TypeChangeAfterLiteral) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elemInt32, elemInt64});
+    verifyDecompression(binData, {elemInt32, elemInt64}, true);
 }
 
 TEST_F(BSONColumnTest, TypeChangeAfterSimple8b) {
@@ -1083,7 +1101,7 @@ TEST_F(BSONColumnTest, TypeChangeAfterSimple8b) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elemInt32, elemInt32, elemInt64});
+    verifyDecompression(binData, {elemInt32, elemInt32, elemInt64}, true);
 }
 
 TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
@@ -1105,7 +1123,7 @@ TEST_F(BSONColumnTest, Simple8bAfterTypeChange) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elemInt32, elemInt64, elemInt64});
+    verifyDecompression(binData, {elemInt32, elemInt64, elemInt64}, true);
 }
 
 TEST_F(BSONColumnTest, BasicDouble) {
@@ -1124,7 +1142,7 @@ TEST_F(BSONColumnTest, BasicDouble) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {d1, d2});
+    verifyDecompression(binData, {d1, d2}, true);
 }
 
 TEST_F(BSONColumnTest, DoubleSameScale) {
@@ -1148,7 +1166,7 @@ TEST_F(BSONColumnTest, DoubleSameScale) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteral) {
@@ -1167,7 +1185,7 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromLiteral) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {d1, d2});
+    verifyDecompression(binData, {d1, d2}, true);
 }
 
 TEST_F(BSONColumnTest, DoubleLiteralAndScaleAfterSkip) {
@@ -1238,7 +1256,7 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaWithRescale) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
@@ -1270,7 +1288,7 @@ TEST_F(BSONColumnTest, DoubleIncreaseScaleFromDeltaNoRescale) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
@@ -1301,7 +1319,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlock) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockContinueAppend) {
@@ -1341,7 +1359,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockContinueAppend) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkip) {
@@ -1399,7 +1417,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockThenScaleBackUp) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
@@ -1425,7 +1443,7 @@ TEST_F(BSONColumnTest, DoubleDecreaseScaleAfterBlockUsingSkipThenScaleBackUp) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleUnscalable) {
@@ -1452,7 +1470,7 @@ TEST_F(BSONColumnTest, DoubleUnscalable) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleMultiplePendingAfterWritingBlock) {
@@ -1488,7 +1506,7 @@ TEST_F(BSONColumnTest, DoubleMultiplePendingAfterWritingBlock) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, elems);
+    verifyDecompression(binData, elems, true);
 }
 
 TEST_F(BSONColumnTest, DoubleSignalingNaN) {
@@ -1514,7 +1532,7 @@ TEST_F(BSONColumnTest, DoubleSignalingNaN) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elem, nan});
+    verifyDecompression(binData, {elem, nan}, true);
 }
 
 TEST_F(BSONColumnTest, DoubleQuietNaN) {
@@ -1538,7 +1556,7 @@ TEST_F(BSONColumnTest, DoubleQuietNaN) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elem, nan});
+    verifyDecompression(binData, {elem, nan}, true);
 }
 
 TEST_F(BSONColumnTest, DoubleInfinity) {
@@ -1562,7 +1580,7 @@ TEST_F(BSONColumnTest, DoubleInfinity) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elem, inf});
+    verifyDecompression(binData, {elem, inf}, true);
 }
 
 TEST_F(BSONColumnTest, DoubleDenorm) {
@@ -1586,7 +1604,7 @@ TEST_F(BSONColumnTest, DoubleDenorm) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elem, denorm});
+    verifyDecompression(binData, {elem, denorm}, true);
 }
 
 TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
@@ -1610,7 +1628,7 @@ TEST_F(BSONColumnTest, DoubleIntegerOverflow) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {e1, e2});
+    verifyDecompression(binData, {e1, e2}, true);
 }
 
 TEST_F(BSONColumnTest, DoubleZerosSignDifference) {
@@ -1634,7 +1652,7 @@ TEST_F(BSONColumnTest, DoubleZerosSignDifference) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {d1, d2});
+    verifyDecompression(binData, {d1, d2}, true);
 }
 
 TEST_F(BSONColumnTest, Decimal128Base) {
@@ -1876,7 +1894,7 @@ TEST_F(BSONColumnTest, Simple8bTimestamp) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second, second});
+    verifyDecompression(binData, {first, second, second}, true);
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
@@ -1900,7 +1918,7 @@ TEST_F(BSONColumnTest, Simple8bTimestampNegativeDeltaOfDelta) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second, third});
+    verifyDecompression(binData, {first, second, third}, true);
 }
 
 TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
@@ -1931,7 +1949,7 @@ TEST_F(BSONColumnTest, Simple8bTimestampAfterChangeBack) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second, elemInt32, first, second});
+    verifyDecompression(binData, {first, second, elemInt32, first, second}, true);
 }
 
 TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
@@ -1950,7 +1968,7 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaTimestamp) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second});
+    verifyDecompression(binData, {first, second}, true);
 }
 
 TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
@@ -1981,7 +1999,7 @@ TEST_F(BSONColumnTest, LargeDeltaOfDeltaIsLiteralAfterSimple8bTimestamp) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {zero, zero, large, large, semiLarge});
+    verifyDecompression(binData, {zero, zero, large, large, semiLarge}, true);
 }
 
 TEST_F(BSONColumnTest, DateBasic) {
@@ -2003,7 +2021,7 @@ TEST_F(BSONColumnTest, DateBasic) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second, second});
+    verifyDecompression(binData, {first, second, second}, true);
 }
 
 TEST_F(BSONColumnTest, DateAfterChangeBack) {
@@ -2026,7 +2044,7 @@ TEST_F(BSONColumnTest, DateAfterChangeBack) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elemInt32, date, date});
+    verifyDecompression(binData, {elemInt32, date, date}, true);
 }
 
 TEST_F(BSONColumnTest, DateLargeDelta) {
@@ -2045,7 +2063,7 @@ TEST_F(BSONColumnTest, DateLargeDelta) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {first, second});
+    verifyDecompression(binData, {first, second}, true);
 }
 
 TEST_F(BSONColumnTest, BoolBasic) {
@@ -2069,7 +2087,7 @@ TEST_F(BSONColumnTest, BoolBasic) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {trueBson, trueBson, falseBson, trueBson});
+    verifyDecompression(binData, {trueBson, trueBson, falseBson, trueBson}, true);
 }
 
 TEST_F(BSONColumnTest, BoolAfterChangeBack) {
@@ -2092,7 +2110,7 @@ TEST_F(BSONColumnTest, BoolAfterChangeBack) {
 
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
-    verifyDecompression(binData, {elemInt32, trueBson, trueBson});
+    verifyDecompression(binData, {elemInt32, trueBson, trueBson}, true);
 }
 
 TEST_F(BSONColumnTest, UndefinedBasic) {

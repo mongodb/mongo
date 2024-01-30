@@ -811,6 +811,30 @@ public:
 private:
     const char* _binary;
     size_t _size;
+
+    // Helpers for block decompress-all functions
+    template <typename T, class Buffer, typename Materialize>
+    requires Appendable<Buffer>
+    static const char* decompressAllDelta(const char* ptr,
+                                          const char* end,
+                                          Buffer& buffer,
+                                          int64_t reference,
+                                          const Materialize& materialize);
+
+    template <typename T, class Buffer, typename Materialize>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaOfDelta(const char* ptr,
+                                                 const char* end,
+                                                 Buffer& buffer,
+                                                 int64_t reference,
+                                                 const Materialize& materialize);
+
+    template <class Buffer>
+    requires Appendable<Buffer>
+    static const char* decompressAllDouble(const char* ptr,
+                                           const char* end,
+                                           Buffer& buffer,
+                                           double reference);
 };
 
 /**
