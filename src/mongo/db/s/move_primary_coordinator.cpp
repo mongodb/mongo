@@ -379,6 +379,18 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             const auto& failedPhase = _doc.getPhase();
             const auto& toShardId = _doc.getToShardId();
 
+            unblockReadsAndWrites(opCtx);
+            try {
+                // Even if the error is `ShardNotFound`, the recipient may still be in draining
+                // mode, so try to exit the critical section anyway.
+                exitCriticalSectionOnRecipient(opCtx);
+            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
+                LOGV2_INFO(7392902,
+                           "Failed to exit critical section on recipient as it has been removed",
+                           logAttrs(_dbName),
+                           "to"_attr = toShardId);
+            }
+
             if (failedPhase <= Phase::kCommit) {
                 // A non-retryable error occurred before the new primary shard was actually
                 // committed, so any cloned data on the recipient must be dropped.
@@ -393,18 +405,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
                                logAttrs(_dbName),
                                "to"_attr = toShardId);
                 }
-            }
-
-            unblockReadsAndWrites(opCtx);
-            try {
-                // Even if the error is `ShardNotFound`, the recipient may still be in draining
-                // mode, so try to exit the critical section anyway.
-                exitCriticalSectionOnRecipient(opCtx);
-            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
-                LOGV2_INFO(7392902,
-                           "Failed to exit critical section on recipient as it has been removed",
-                           logAttrs(_dbName),
-                           "to"_attr = toShardId);
             }
 
             LOGV2_ERROR(7392903,
