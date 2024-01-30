@@ -151,6 +151,15 @@ server_parameters:
       gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+  internalQueryPlanTieBreakingWithIndexHeuristics:
+    description: "Tie-breaking rules which choose the plan that fetches the smallest number of
+    documents or examines fewest index keys, as well as one that can be assigned the longest 
+    contiguous prefix of equality predicates in any index."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryPlanTieBreakingWithIndexHeuristics"
+    cpp_vartype: AtomicWord<bool>
+    default: true
+
   internalQueryForceIntersectionPlans:
     description: "Gives a large ranking bonus to index intersection plans, forcing intersection
     plans to be chosen when possible."
