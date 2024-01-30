@@ -133,14 +133,16 @@ TEST_F(OpIdPoolTest, OpIdMapIsCorrect) {
     auto opCtx2 = getServiceContext()->makeOperationContext(client2.get());
     auto opId2 = client2->getOperationContext()->getOpID();
 
-    auto clientFromMap1 = manager.findAndLockClient(opId1);
-    auto clientFromMap2 = manager.findAndLockClient(opId2);
-
-    ASSERT(clientFromMap1);
-    ASSERT(clientFromMap2);
-
-    ASSERT_EQ(client->getUUID(), clientFromMap1->getUUID());
-    ASSERT_EQ(client2->getUUID(), clientFromMap2->getUUID());
+    {
+        auto clientFromMap1 = manager.findAndLockClient(opId1);
+        ASSERT(clientFromMap1);
+        ASSERT_EQ(client->getUUID(), clientFromMap1->getUUID());
+    }
+    {
+        auto clientFromMap2 = manager.findAndLockClient(opId2);
+        ASSERT(clientFromMap2);
+        ASSERT_EQ(client2->getUUID(), clientFromMap2->getUUID());
+    }
 }
 
 TEST_F(OpIdPoolTest, OpIdMapCorrectlyErasesClients) {
