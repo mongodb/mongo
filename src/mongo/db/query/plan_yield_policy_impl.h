@@ -90,7 +90,20 @@ std::unique_ptr<PlanYieldPolicy> makeClassicYieldPolicy(
     NamespaceString nss,
     PlanType* plan,
     PlanYieldPolicy::YieldPolicy policy,
-    std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable) {
+    VariantCollectionPtrOrAcquisition collection) {
+    const std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable =
+        visit(OverloadedVisitor{[](const CollectionPtr* coll) {
+                                    return std::variant<const Yieldable*,
+                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
+                                        *coll ? coll : nullptr);
+                                },
+                                [](const CollectionAcquisition& coll) {
+                                    return std::variant<const Yieldable*,
+                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
+                                        PlanYieldPolicy::YieldThroughAcquisitions{});
+                                }},
+              collection.get());
+
     using PolicyType = std::conditional_t<std::is_same_v<PlanType, PlanStage>,
                                           PlanYieldPolicyClassicTrialPeriod,
                                           PlanYieldPolicyImpl>;

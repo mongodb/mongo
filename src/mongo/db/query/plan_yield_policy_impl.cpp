@@ -80,6 +80,10 @@ PlanYieldPolicyClassicTrialPeriod::PlanYieldPolicyClassicTrialPeriod(
 
 void PlanYieldPolicyClassicTrialPeriod::saveState(OperationContext* opCtx) {
     _root->saveState();
+
+    if (!usesCollectionAcquisitions()) {
+        setYieldable(nullptr);
+    }
 }
 
 void PlanYieldPolicyClassicTrialPeriod::restoreState(OperationContext* opCtx,

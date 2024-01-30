@@ -134,26 +134,12 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         }
     }
 
-    // There's no point in yielding if the collection doesn't exist.
-    const std::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable =
-        visit(OverloadedVisitor{[](const CollectionPtr* coll) {
-                                    return std::variant<const Yieldable*,
-                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
-                                        *coll ? coll : nullptr);
-                                },
-                                [](const CollectionAcquisition& coll) {
-                                    return std::variant<const Yieldable*,
-                                                        PlanYieldPolicy::YieldThroughAcquisitions>(
-                                        PlanYieldPolicy::YieldThroughAcquisitions{});
-                                }},
-              collection.get());
-
     _yieldPolicy = makeClassicYieldPolicy(
         _opCtx,
         _nss,
         this,
         collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-        yieldable);
+        collection);
 
     uassertStatusOK(_pickBestPlan());
 

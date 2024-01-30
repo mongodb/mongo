@@ -46,13 +46,14 @@ MultiPlanner::MultiPlanner(OperationContext* opCtx,
     : PlannerBase(opCtx, std::move(plannerData)),
       _yieldPolicy(yieldPolicy),
       _cachingMode(cachingMode) {
-    _multiPlanStage = std::make_unique<MultiPlanStage>(cq()->getExpCtxRaw(),
-                                                       collections().getMainAcquisition(),
-                                                       cq(),
-                                                       PlanCachingMode::NeverCache);
+    _multiPlanStage =
+        std::make_unique<MultiPlanStage>(cq()->getExpCtxRaw(),
+                                         collections().getMainCollectionPtrOrAcquisition(),
+                                         cq(),
+                                         PlanCachingMode::NeverCache);
     for (auto&& solution : candidatePlans) {
         auto nextPlanRoot = stage_builder::buildClassicExecutableTree(
-            opCtx, collections().getMainAcquisition(), *cq(), *solution, ws());
+            opCtx, collections().getMainCollectionPtrOrAcquisition(), *cq(), *solution, ws());
         _multiPlanStage->addPlan(std::move(solution), std::move(nextPlanRoot), ws());
     }
 }
@@ -65,7 +66,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
                                cq()->nss(),
                                static_cast<PlanStage*>(_multiPlanStage.get()),
                                _yieldPolicy,
-                               PlanYieldPolicy::YieldThroughAcquisitions{});
+                               collections().getMainCollectionPtrOrAcquisition());
 
     // TODO SERVER-85248: Update the sbe plan cache after best plan is chosen.
     uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
@@ -74,15 +75,16 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
 
     auto nss = cq()->nss();
     if (_multiPlanStage->bestSolutionEof()) {
-        return uassertStatusOK(plan_executor_factory::make(extractCq(),
-                                                           extractWs(),
-                                                           std::move(_multiPlanStage),
-                                                           collections().getMainAcquisition(),
-                                                           _yieldPolicy,
-                                                           plannerOptions(),
-                                                           std::move(nss),
-                                                           nullptr, /* querySolution */
-                                                           cachedPlanHash()));
+        return uassertStatusOK(
+            plan_executor_factory::make(extractCq(),
+                                        extractWs(),
+                                        std::move(_multiPlanStage),
+                                        collections().getMainCollectionPtrOrAcquisition(),
+                                        _yieldPolicy,
+                                        plannerOptions(),
+                                        std::move(nss),
+                                        nullptr, /* querySolution */
+                                        cachedPlanHash()));
     } else {
         std::unique_ptr<QuerySolution> winningSolution = _multiPlanStage->extractBestSolution();
         return prepareSbePlanExecutor(std::move(winningSolution),
