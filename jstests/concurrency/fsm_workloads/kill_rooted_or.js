@@ -70,11 +70,13 @@ export const $config = (function() {
                                                     ErrorCodes.IndexBuildAborted,
                                                     ErrorCodes.IndexBuildAlreadyInProgress,
                                                     ErrorCodes.NoMatchingDocument,
+                                                    ErrorCodes.StaleConfig
                                                 ],
                                                 [
                                                     ErrorCodes.CannotImplicitlyCreateCollection,
                                                     ErrorCodes.IndexBuildAborted,
                                                     ErrorCodes.NoMatchingDocument,
+                                                    ErrorCodes.StaleConfig
                                                 ]);
         }
     };
@@ -99,11 +101,13 @@ export const $config = (function() {
                                                     ErrorCodes.IndexBuildAborted,
                                                     ErrorCodes.IndexBuildAlreadyInProgress,
                                                     ErrorCodes.NoMatchingDocument,
+                                                    ErrorCodes.StaleConfig
                                                 ],
                                                 [
                                                     ErrorCodes.CannotImplicitlyCreateCollection,
                                                     ErrorCodes.IndexBuildAborted,
                                                     ErrorCodes.NoMatchingDocument,
+                                                    ErrorCodes.StaleConfig
                                                 ]);
         });
     }
@@ -115,8 +119,11 @@ export const $config = (function() {
         const bulkInsertResult = coll.insert(Array(numDocs).fill({a: 0, b: 0, c: 0}));
         assert(!bulkInsertResult.hasWriteConcernError(), bulkInsertResult);
         bulkInsertResult.getWriteErrors().forEach(err => {
-            assert.contains(
-                err.code, [ErrorCodes.CannotImplicitlyCreateCollection, ErrorCodes.NoProgressMade]);
+            assert.contains(err.code, [
+                ErrorCodes.CannotImplicitlyCreateCollection,
+                ErrorCodes.NoProgressMade,
+                ErrorCodes.StaleConfig
+            ]);
         }, bulkInsertResult);
     }
 
