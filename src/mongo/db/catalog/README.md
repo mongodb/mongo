@@ -1306,12 +1306,15 @@ secondary unique indexes may have a mix of the old and new representations descr
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
 | `_id` index                  | (`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)                                                              | index V1: 6<br />index V2: 8   |
 | non-unique index             | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                | index V1: 6<br />index V2: 8   |
-| unique secondary index (new) | (`KeyString` with `RecordId`, optionally `TypeBits`)                                                                                | index V1: 13<br />index V2: 14 |
-| unique secondary index (old) | (`KeyString` with `RecordId`, optionally `TypeBits`) or<br />(`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`) | index V1: 11<br />index V2: 12 |
+| unique secondary index created before 4.2 | (`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`)                                                 | index V1: 6<br />index V2: 8   | 
+| unique secondary index created in 4.2 OR after upgrading to 4.2 | New keys: (`KeyString` with `RecordId`, optionally `TypeBits`) <br /> Old keys:(`KeyString` without `RecordId`, `RecordId` and optionally `TypeBits`) | index V1: 11<br />index V2: 12 |
+| unique secondary index created in 6.0 or later | (`KeyString` with `RecordId`, optionally `TypeBits`) | index V1: 13<br />index V2: 14 |
 
 The reason for the change in index format is that the secondary key uniqueness property can be
 temporarily violated during oplog application (because operations may be applied out of order).
 With prepared transactions, out-of-order commits would conflict with prepared transactions.
+Instead of forcing users to rebuild secondary unique indexes, new keys are inserted in the new
+format and old keys stay in the old format.
 
 For `_id` indexes and non-unique indexes, the index data formats will be 6 and 8 for index version
 V1 and V2, respectively. For unique secondary indexes, if they are of formats 13 or 14, it is
