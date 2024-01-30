@@ -571,8 +571,9 @@ MigrateInfosWithReason BalancerPolicy::balance(
                             shardStats, distribution, collDataSizeInfo, zoneName, *availableShards);
                         if (!to.isValid()) {
                             if (migrations.empty()) {
-                                LOGV2_WARNING(
+                                LOGV2_DEBUG(
                                     21889,
+                                    3,
                                     "Chunk {chunk} is on a draining shard, but no appropriate "
                                     "recipient found",
                                     "Chunk is on a draining shard, but no appropriate "
@@ -680,8 +681,9 @@ MigrateInfosWithReason BalancerPolicy::balance(
                             shardStats, distribution, collDataSizeInfo, zoneName, *availableShards);
                         if (!to.isValid()) {
                             if (migrations.empty()) {
-                                LOGV2_WARNING(
+                                LOGV2_DEBUG(
                                     21892,
+                                    3,
                                     "Chunk {chunk} violates zone {zone}, but no appropriate "
                                     "recipient found",
                                     "Chunk violates zone, but no appropriate recipient found",
