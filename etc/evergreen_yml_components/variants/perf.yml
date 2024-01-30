@@ -26,6 +26,13 @@ variables:
   - name: package_new_compile
     variant: al2023-arm64-compile
 
+- &al2023_al2_arm64_compile_variant_dependency
+  depends_on:
+  - name: package_new_compile
+    variant: al2023-arm64-compile
+  - name: package_new_compile
+    variant: amazon2-arm64-compile
+
 - &amazon2_x86_expansions
   multiversion_platform: amazon2
   multiversion_edition: enterprise
@@ -275,7 +282,7 @@ buildvariants:
     - name: column_store_tpch_10_denormalized_unindexed
     - name: ssb_column_store_comparison
 
-- <<: *al2023_arm64_compile_variant_dependency
+- <<: *al2023_al2_arm64_compile_variant_dependency
   name: atlas-like-replica.2023-09
   display_name: PERF M60-like-replica.2023-09 3-Node ReplSet
   cron: &atlas-like-repl-cron "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
@@ -291,6 +298,7 @@ buildvariants:
     authentication: enabled
     storageEngine: wiredTiger
     compile_variant: al2023-arm64-compile
+    client_compile_variant: amazon2-arm64-compile
   run_on:
     - "rhel70-perf-M60-like"
   tasks:
@@ -303,13 +311,12 @@ buildvariants:
     - name: tpcc_majority
     - name: linkbench
     - name: linkbench2
-    # TODO DEVPROD-3247 Renable once Genny supports AL2023
-    #- name: genny_query_TenMDocCollection_IntId
-    #- name: genny_query_TenMDocCollection_ObjectId
-    #- name: genny_query_TenMDocCollection_SubDocId
-    #- name: genny_query_TenMDocCollection_IntId_Agg
-    #- name: genny_query_TenMDocCollection_IntId_IdentityView
-    #- name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
+    - name: genny_query_TenMDocCollection_IntId
+    - name: genny_query_TenMDocCollection_ObjectId
+    - name: genny_query_TenMDocCollection_SubDocId
+    - name: genny_query_TenMDocCollection_IntId_Agg
+    - name: genny_query_TenMDocCollection_IntId_IdentityView
+    - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M30-real.arm.aws.2023-11
