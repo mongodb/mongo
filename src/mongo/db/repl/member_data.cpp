@@ -175,6 +175,18 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
     _lastDurableWallTime = opTime.wallTime;
 }
 
+
+bool MemberData::advanceLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
+    invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
+    _lastUpdate = now;
+    _lastUpdateStale = false;
+    if (_lastWrittenOpTime < opTime.opTime) {
+        setLastWrittenOpTimeAndWallTime(opTime, now);
+        return true;
+    }
+    return false;
+}
+
 bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
     invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;

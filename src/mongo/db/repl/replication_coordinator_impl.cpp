@@ -2039,7 +2039,8 @@ StatusWith<OpTime> ReplicationCoordinatorImpl::_setLastOptimeForMember(
         return result.getStatus();
     const bool advancedOpTime = result.getValue();
     _rescheduleLivenessUpdate_inlock(args.memberId);
-    return advancedOpTime ? std::max(args.appliedOpTime, args.durableOpTime) : OpTime();
+    return advancedOpTime ? std::max({args.writtenOpTime, args.appliedOpTime, args.durableOpTime})
+                          : OpTime();
 }
 
 void ReplicationCoordinatorImpl::_updateStateAfterRemoteOpTimeUpdates(

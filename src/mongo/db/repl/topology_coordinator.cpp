@@ -1498,13 +1498,19 @@ StatusWith<bool> TopologyCoordinator::setLastOptimeForMember(
                 3,
                 "Updating member data due to replSetUpdatePosition",
                 "memberId"_attr = memberId,
+                "oldLastWrittenOpTime"_attr = memberData->getLastWrittenOpTime(),
                 "oldLastAppliedOpTime"_attr = memberData->getLastAppliedOpTime(),
                 "oldLastDurableOpTime"_attr = memberData->getLastDurableOpTime(),
+                "newWrittenOpTime"_attr = args.writtenOpTime,
                 "newAppliedOpTime"_attr = args.appliedOpTime,
                 "newDurableOpTime"_attr = durableOpTime);
 
-    bool advancedOpTime = memberData->advanceLastAppliedOpTimeAndWallTime(
-        {args.appliedOpTime, args.appliedWallTime}, now);
+
+    bool advancedOpTime = memberData->advanceLastWrittenOpTimeAndWallTime(
+        {args.writtenOpTime, args.writtenWallTime}, now);
+    advancedOpTime = memberData->advanceLastAppliedOpTimeAndWallTime(
+                         {args.appliedOpTime, args.appliedWallTime}, now) ||
+        advancedOpTime;
     advancedOpTime =
         memberData->advanceLastDurableOpTimeAndWallTime({durableOpTime, durableWallTime}, now) ||
         advancedOpTime;

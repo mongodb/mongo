@@ -1190,8 +1190,8 @@ private:
      * "configVersion" will be populated with our config version if it and the configVersion
      * of "args" differ.
      *
-     * If either applied or durable optime has changed, returns the later of the two (even if
-     * that's not the one which changed).  Otherwise returns a null optime.
+     * If either written, applied or durable optime has changed, returns the later of the three
+     * (even if that's not the one which changed).  Otherwise returns a null optime.
      */
     StatusWith<OpTime> _setLastOptimeForMember(WithLock lk,
                                                const UpdatePositionArgs::UpdateInfo& args);
