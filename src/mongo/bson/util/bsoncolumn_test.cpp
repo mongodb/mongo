@@ -451,6 +451,70 @@ public:
         }
         ASSERT_EQ(memcmp(columnBinary.data, buf, columnBinary.length), 0);
 
+        // Verify BSONColumnBuilder::intermediate
+        {
+            BufBuilder buffer;
+            size_t num = BSONColumn(columnBinary).size();
+            // This test has quadratic complexity, limit it to binaries with a limited number of
+            // elements.
+            if (num > 0 && num < 100) {
+                // Iterate over all elements and validate intermediate in all combinations
+                for (size_t i = 1; i < num; ++i) {
+                    BSONColumnBuilder cb;
+
+                    // Append initial data to our builder
+                    BSONColumn c(columnBinary);
+                    auto it = c.begin();
+                    for (size_t j = 0; j < i; ++j, ++it) {
+                        cb.append(*it);
+                    }
+
+                    // Call intermediate and obtain our anchor points
+                    auto [anchor1, anchor2] = cb.intermediate(buffer);
+                    ASSERT_GTE(anchor1, 0);
+                    ASSERT_LTE(anchor1, buffer.len());
+                    ASSERT_GTE(anchor2, 0);
+                    ASSERT_LTE(anchor2, buffer.len());
+                    ASSERT_LTE(anchor1, anchor2);
+
+                    // Append the rest of the data and verify that the anchor points from before.
+                    BufBuilder buffer2;
+                    for (size_t j = i; j < num; ++j, ++it) {
+                        cb.append(*it);
+
+                        // Validate anchor points when we've appended more data.
+                        cb.intermediate(buffer2);
+                        ASSERT(memcmp(buffer.buf(), buffer2.buf(), anchor1) == 0);
+                        if (*(buffer.buf() + anchor1) == *(buffer2.buf() + anchor1)) {
+                            ASSERT(memcmp(buffer.buf(), buffer2.buf(), anchor2) == 0);
+                        }
+                    }
+
+                    // We should now have added all our data.
+                    ASSERT(it == c.end());
+
+                    // Finalize the binary, we are now done. Perform one last validation of the
+                    // anchor points
+                    BSONBinData binary = cb.finalize();
+                    ASSERT_GTE(binary.length, anchor1);
+                    auto data = buffer.buf();
+                    auto res = memcmp(binary.data, data, anchor1);
+                    ASSERT(res == 0);
+
+                    if (*(data + anchor1) == *((const char*)binary.data + anchor1)) {
+                        auto res = memcmp(binary.data, data, anchor2);
+                        ASSERT(res == 0);
+                    }
+
+                    // Last verify that the final binary is exactly the same as-if intermediate was
+                    // never called.
+                    ASSERT_EQ(binary.length, columnBinary.length);
+                    res = memcmp(binary.data, columnBinary.data, binary.length);
+                    ASSERT(res == 0);
+                }
+            }
+        }
+
         if (testReopen) {
             BSONColumn c(columnBinary);
             size_t num = c.size();
@@ -6741,9 +6805,11 @@ TEST_F(BSONColumnTest, Intermediate) {
 
     int prevAnchor = 0;
     {
-        BSONBinData binData = cb.intermediate(&prevAnchor);
-        ASSERT_EQ(binData.length, 1);
-        ASSERT_EQ(*static_cast<const char*>(binData.data), '\0');
+        int a;
+        BufBuilder buffer;
+        std::tie(prevAnchor, a) = cb.intermediate(buffer);
+        ASSERT_EQ(buffer.len(), 1);
+        ASSERT_EQ(*buffer.buf(), '\0');
         ASSERT_EQ(prevAnchor, 0);
     }
 
@@ -6752,12 +6818,12 @@ TEST_F(BSONColumnTest, Intermediate) {
         cb.append(elem);
         cb2.append(elem);
 
-        int anchor = 0;
-        BSONBinData binData = cb.intermediate(&anchor);
+        BufBuilder buffer;
+        auto [anchor, anchor2] = cb.intermediate(buffer);
         anchors.emplace_back();
-        anchors.back().appendBuf(binData.data, anchor);
+        anchors.back().appendBuf(buffer.buf(), anchor);
         // Anchor is always less than the final buffer because of the EOO at the end
-        ASSERT_LT(anchor, binData.length);
+        ASSERT_LT(anchor, buffer.len());
         // Anchor should increase or stay the same when appending
         ASSERT_GTE(anchor, prevAnchor);
         prevAnchor = anchor;

@@ -1074,25 +1074,40 @@ BSONColumnBuilder& BSONColumnBuilder::skip() {
     return *this;
 }
 
-BSONBinData BSONColumnBuilder::intermediate(int* anchor) {
+std::pair<int, int> BSONColumnBuilder::intermediate(BufBuilder& buffer) {
     // Save internal state before finalizing
     InternalState stateCopy = _is;
     int length = _bufBuilder.len();
+    ptrdiff_t offset = _is.regular._controlByteOffset;
+    char lastControlByte = offset != kNoSimple8bControl ? *(_bufBuilder.buf() + offset) : 0;
 
     // Finalize binary
     auto binData = finalize();
     _finalized = false;
 
+    // Copy finalized state to the provided buffer
+    buffer.setlen(0);
+    buffer.appendBuf(binData.data, binData.length);
+
     // Restore previous state.
     _is = std::move(stateCopy);
+
+    // Re-init any substates, required after move
+    for (auto&& sub : _is.subobjStates) {
+        sub.state.init(&sub.buffer, sub.controlBlockWriter());
+    }
+
     // Does not modify the buffer, just sets the point where future writes should occur.
     _bufBuilder.setlen(length);
 
-    if (anchor) {
-        *anchor = length;
+    // Return anchor points
+    if (offset == kNoSimple8bControl) {
+        return std::make_pair(length, length);
+    } else {
+        // Restore last control byte
+        *(_bufBuilder.buf() + offset) = lastControlByte;
+        return std::make_pair(offset, length);
     }
-
-    return binData;
 }
 
 BSONBinData BSONColumnBuilder::finalize() {

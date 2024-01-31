@@ -100,13 +100,23 @@ public:
 
     /**
      * Returns a BSON Column binary and leaves the BSONColumnBuilder in a state where it is allowed
-     * to continue append data to it. Less efficient than 'finalize'. Anchor is the point in the
-     * returned binary that will not change when more data is appended to the BSONColumnBuilder.
+     * to continue append data to it. Less efficient than 'finalize'.
      *
-     * The BSONColumnBuilder must remain in scope for the returned buffer to be valid. Any call to
-     * 'append' or 'skip' will invalidate the returned buffer.
+     * Two anchor points are returned. These are relevant to comparing the buffer returned from this
+     * call with the buffer returned from a subsequent call to intermediate()/finalize(). The first
+     * anchor is the stable anchor point where there is a guarantee that no bytes prior to that
+     * index change in the buffer.
+     *
+     * The second anchor point is potentially stable, but the second caller of
+     * intermediate()/finalize() needs to determine this by comparing that the byte at the first
+     * (stable) is unchanged in the second output buffer compared to the first.
+     *
+     * Bytes after the anchor point(s) may remain unchanged depending on what data is appended
+     * afterwards.
+     *
+     * Overwrites data into the provided buffer.
      */
-    BSONBinData intermediate(int* anchor = nullptr);
+    std::pair<int, int> intermediate(BufBuilder& buffer);
 
     /**
      * Finalizes the BSON Column and returns the BinData binary. Further data append is not allowed.
