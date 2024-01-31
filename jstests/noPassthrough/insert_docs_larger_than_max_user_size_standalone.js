@@ -1,6 +1,7 @@
 // Test that by enabling the undocumented 'allowDocumentsGreaterThanMaxUserSize' server parameter,
 // users can insert documents larger than the 16mb BSON user maximum size. Note that the node must
 // be in standalone mode, and the document must not exceed the 16mb + 16kb internal maximum size.
+// @tags: [requires_persistence, requires_replication]
 
 (function() {
 "use strict";
