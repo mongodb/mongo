@@ -2167,12 +2167,11 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
                 if (kDebugBuild) {
                     // At this stage all the tagged nodes should have reached the opTime, except
                     // after the reconfig(see SERVER-47205). If the OpTime is greater than
-                    // _committedSnapshotAfterReconfig, check for that.
-                    if (!_committedSnapshotAfterReconfig ||
-                        (_committedSnapshotAfterReconfig < opTime)) {
+                    // LastCommittedInPrevConfig, check for that.
+                    if (_topCoord->getLastCommittedInPrevConfig() < opTime) {
                         auto tagPattern = uassertStatusOK(_rsConfig.findCustomWriteMode(
                             ReplSetConfig::kMajorityWriteConcernModeName));
-                        dassert(_topCoord->haveTaggedNodesReachedOpTime(
+                        invariant(_topCoord->haveTaggedNodesReachedOpTime(
                             opTime, tagPattern, useDurableOpTime));
                     }
                 }
@@ -4261,8 +4260,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
                 member.getHostAndPort(), now, newConfig.getReplSetName().toString());
         }
     }
-
-    _committedSnapshotAfterReconfig = _getCurrentCommittedSnapshotOpTime_inlock();
     lk.unlock();
     ReplicaSetAwareServiceRegistry::get(_service).onSetCurrentConfig(opCtx);
     _performPostMemberStateUpdateAction(action);
