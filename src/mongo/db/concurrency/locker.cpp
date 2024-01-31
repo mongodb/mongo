@@ -1047,6 +1047,8 @@ void Locker::_setWaitingResource(ResourceId resId) {
 bool Locker::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
     switch (resId.getType()) {
         case RESOURCE_MUTEX:
+        case RESOURCE_DDL_DATABASE:
+        case RESOURCE_DDL_COLLECTION:
             return false;
 
         case RESOURCE_GLOBAL:
@@ -1054,8 +1056,6 @@ bool Locker::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
         case RESOURCE_DATABASE:
         case RESOURCE_COLLECTION:
         case RESOURCE_METADATA:
-        case RESOURCE_DDL_DATABASE:
-        case RESOURCE_DDL_COLLECTION:
             break;
 
         default:
