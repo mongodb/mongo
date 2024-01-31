@@ -46,3 +46,13 @@ let addFieldsEmptySpecPipe = [{$addFields: {}}];
 
 assert(arrayEq(coll.aggregate(addFieldsEmptySpecPipe).toArray(), coll.aggregate().toArray()),
        "$addFields with empty spec did not result in no-op");
+
+// Checks that new fields don't attempt to read slots yet to be produced by the same stage.
+let addFieldResult1 =
+    coll.aggregate([
+            {$addFields: {"obj": "$2i", "result": {"$multiply": ["$obj", "$3i"]}}},
+            {$sort: {obj: 1}},
+            {$limit: 2}
+        ])
+        .toArray();
+assert.eq(2, addFieldResult1.length, addFieldResult1);

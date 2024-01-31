@@ -3682,7 +3682,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         // Keep the paths that we can compute in a vectorized way in a separate map, and update the
         // state of the variables after we decided whether to transition to scalar processing.
-        StringSet vectorizedPaths;
+        StringMap<TypedSlot> vectorizedPaths;
         for (size_t i = 0; i < nodes.size(); ++i) {
             auto& node = nodes[i];
             auto& path = paths[i];
@@ -3693,9 +3693,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
             auto slot = projectExpressionToSlot(node.getExpr());
             if (slot.has_value()) {
-                vectorizedPaths.insert(path);
-                // Declare in which slot our projection is going to publish this path.
-                outputs.set(std::make_pair(PlanStageSlots::kField, path), *slot);
+                vectorizedPaths.emplace(path, *slot);
             }
         }
 
@@ -3709,9 +3707,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 if (it != plan->updatedPathsExprMap.end()) {
                     auto slot = projectExpressionToSlot(it->second);
                     if (slot.has_value()) {
-                        vectorizedPaths.insert(path);
-                        // Declare in which slot our projection is going to publish this path.
-                        outputs.set(std::make_pair(PlanStageSlots::kField, path), *slot);
+                        vectorizedPaths.emplace(path, *slot);
                     }
                 }
             }
@@ -3724,6 +3720,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         projects.clear();
 
+        // Declare in which slot our projection has published each path. In case we have to insert a
+        // BlockToRow stage, they will be updated properly.
+        for (auto& entry : vectorizedPaths) {
+            outputs.set(std::make_pair(PlanStageSlots::kField, entry.first), entry.second);
+            plan->updatedPathsExprMap.erase(entry.first);
+        }
         // Terminate the block processing section of the pipeline if there are expressions that are
         // not compatible with block processing, the parent stage doesn't support block values or if
         // we need to build a scalar result document.
@@ -3744,7 +3746,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
             auto slot = outputs.get(std::make_pair(PlanStageSlots::kField, path));
             node = ProjectNode(SbExpr{slot.slotId});
-            plan->updatedPathsExprMap.erase(path);
         }
         if (!plan->updatedPathsExprMap.empty()) {
             for (auto& path : plan->updatedPaths) {
@@ -3771,6 +3772,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             }
         };
 
+        // Keep the paths that we compute in a separate map, and update the state of the variables
+        // after we have compiled all of them to avoid circular references in the stage.
+        StringMap<TypedSlot> processedPaths;
         for (size_t i = 0; i < nodes.size(); ++i) {
             auto& node = nodes[i];
             auto& path = paths[i];
@@ -3785,8 +3789,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto it = plan->updatedPathsExprMap.find(path);
 
             if (it != plan->updatedPathsExprMap.end()) {
-                // Declare in which slot our projection is going to publish this path.
-                outputs.set(std::make_pair(PlanStageSlots::kField, path), slot);
+                processedPaths.emplace(path, slot);
                 plan->updatedPathsExprMap.erase(it);
             }
         }
@@ -3797,11 +3800,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
                 if (it != plan->updatedPathsExprMap.end()) {
                     auto slot = projectExpressionToSlot(it->second);
-                    // Declare in which slot our projection is going to publish this path.
-                    outputs.set(std::make_pair(PlanStageSlots::kField, path), slot);
+                    processedPaths.emplace(path, slot);
                     plan->updatedPathsExprMap.erase(it);
                 }
             }
+        }
+        for (auto& entry : processedPaths) {
+            outputs.set(std::make_pair(PlanStageSlots::kField, entry.first), entry.second);
         }
     }
 
