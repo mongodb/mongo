@@ -145,14 +145,6 @@ public:
                              const boost::optional<DatabaseVersion>& dbVersion);
 
     /**
-     * Used to clear the shard role from the opCtx for ddl operations which are not required to send
-     * the index version (ex. split, merge). These operations will do their own metadata checks
-     * rather than us the collection sharding runtime checks.
-     */
-    static void unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(
-        OperationContext* opCtx, const NamespaceString& nss);
-
-    /**
      * Returns the shard version (i.e. maximum chunk version) of a namespace being used by the
      * operation. Documents in chunks which did not belong on this shard at this shard version
      * will be filtered out.

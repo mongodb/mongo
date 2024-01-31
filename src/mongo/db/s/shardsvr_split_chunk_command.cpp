@@ -179,8 +179,6 @@ public:
         // otherwise.
         {
             onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
-            OperationShardingState::
-                unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(opCtx, nss);
             const auto [metadata, indexInfo] = checkCollectionIdentity(
                 opCtx, nss, expectedCollectionEpoch, expectedCollectionTimestamp);
             checkShardKeyPattern(opCtx, nss, metadata, indexInfo, chunkRange);
