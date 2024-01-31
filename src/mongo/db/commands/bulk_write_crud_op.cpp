@@ -51,19 +51,24 @@ unsigned int BulkWriteCRUDOp::getNsInfoIdx() const {
 
 ActionSet BulkWriteCRUDOp::getActions() const {
     ActionSet newActions;
-    visit(OverloadedVisitor{[&newActions](const mongo::BulkWriteInsertOp& value) {
-                                newActions.addAction(ActionType::insert);
-                            },
-                            [&newActions](const mongo::BulkWriteUpdateOp& value) {
-                                if (value.getUpsert()) {
-                                    newActions.addAction(ActionType::insert);
-                                }
-                                newActions.addAction(ActionType::update);
-                            },
-                            [&newActions](const mongo::BulkWriteDeleteOp& value) {
-                                newActions.addAction(ActionType::remove);
-                            }},
-          _op);
+    switch (_type) {
+        case kInsert:
+            newActions.addAction(ActionType::insert);
+            break;
+        case kUpdate: {
+            if (getUpdate()->getUpsert()) {
+                newActions.addAction(ActionType::insert);
+            }
+            newActions.addAction(ActionType::update);
+            break;
+        }
+        case kDelete:
+            newActions.addAction(ActionType::remove);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+            break;
+    }
 
     return newActions;
 }
