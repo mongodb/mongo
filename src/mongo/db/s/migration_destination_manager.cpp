@@ -1169,7 +1169,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
             CancelableOperationContext(client->makeOperationContext(), cancellationToken, executor);
         auto opCtx = uniqueOpCtx.get();
 
-        if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled()) {
+        if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
             AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization(opCtx);
         }
 

@@ -197,4 +197,8 @@ StringData ClusterAuthMode::toString() const {
     MONGO_UNREACHABLE;
 }
 
+bool ClusterAuthMode::equals(ClusterAuthMode& rhs) const {
+    return _value == rhs._value;
+}
+
 }  // namespace mongo

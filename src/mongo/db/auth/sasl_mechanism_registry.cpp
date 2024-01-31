@@ -58,23 +58,23 @@ namespace mongo {
 
 namespace {
 const auto getSASLServerMechanismRegistry =
-    ServiceContext::declareDecoration<std::unique_ptr<SASLServerMechanismRegistry>>();
+    Service::declareDecoration<std::unique_ptr<SASLServerMechanismRegistry>>();
 }  // namespace
 
-SASLServerMechanismRegistry& SASLServerMechanismRegistry::get(ServiceContext* serviceContext) {
-    auto& uptr = getSASLServerMechanismRegistry(serviceContext);
+SASLServerMechanismRegistry& SASLServerMechanismRegistry::get(Service* service) {
+    auto& uptr = getSASLServerMechanismRegistry(service);
     invariant(uptr);
     return *uptr;
 }
 
-void SASLServerMechanismRegistry::set(ServiceContext* service,
+void SASLServerMechanismRegistry::set(Service* service,
                                       std::unique_ptr<SASLServerMechanismRegistry> registry) {
     getSASLServerMechanismRegistry(service) = std::move(registry);
 }
 
-SASLServerMechanismRegistry::SASLServerMechanismRegistry(ServiceContext* svcCtx,
+SASLServerMechanismRegistry::SASLServerMechanismRegistry(Service* service,
                                                          std::vector<std::string> enabledMechanisms)
-    : _svcCtx(svcCtx), _enabledMechanisms(std::move(enabledMechanisms)) {}
+    : _service(service), _enabledMechanisms(std::move(enabledMechanisms)) {}
 
 void SASLServerMechanismRegistry::setEnabledMechanisms(std::vector<std::string> enabledMechanisms) {
     _enabledMechanisms = std::move(enabledMechanisms);
@@ -108,7 +108,7 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
         userName = (*systemUser)->getName();
     }
 
-    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
+    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getService());
     const auto swUser = authManager->acquireUser(opCtx, UserRequest(userName, boost::none));
 
     if (!swUser.isOK()) {
@@ -185,15 +185,15 @@ StringData ServerMechanismBase::getAuthenticationDatabase() const {
 }
 
 namespace {
-ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
-    "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](ServiceContext* service) {
+Service::ConstructorActionRegisterer SASLServerMechanismRegistryInitializer{
+    "CreateSASLServerMechanismRegistry", {"EndStartupOptionStorage"}, [](Service* service) {
         SASLServerMechanismRegistry::set(service,
                                          std::make_unique<SASLServerMechanismRegistry>(
                                              service, saslGlobalParams.authenticationMechanisms));
     }};
 
-ServiceContext::ConstructorActionRegisterer SASLServerMechanismRegistryValidationInitializer{
-    "ValidateSASLServerMechanismRegistry", [](ServiceContext* service) {
+Service::ConstructorActionRegisterer SASLServerMechanismRegistryValidationInitializer{
+    "ValidateSASLServerMechanismRegistry", [](Service* service) {
         auto supportedMechanisms = SASLServerMechanismRegistry::get(service).getMechanismNames();
 
         // Manually include MONGODB-X509 since there is no factory for it since it not a SASL

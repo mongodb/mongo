@@ -61,9 +61,13 @@ void AuthOpObserver::onInserts(OperationContext* opCtx,
                                std::vector<bool> fromMigrate,
                                bool defaultFromMigrate,
                                OpStateAccumulator* opAccumulator) {
+    // This and all below accesses to AuthOpObserver should only happen
+    // from a shard context.
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+
     for (auto it = first; it != last; it++) {
         audit::logInsertOperation(opCtx->getClient(), coll->ns(), it->doc);
-        AuthorizationManager::get(opCtx->getServiceContext())
+        AuthorizationManager::get(opCtx->getService())
             ->logOp(opCtx, "i", coll->ns(), it->doc, nullptr);
     }
 }
@@ -77,7 +81,8 @@ void AuthOpObserver::onUpdate(OperationContext* opCtx,
 
     audit::logUpdateOperation(opCtx->getClient(), args.coll->ns(), args.updateArgs->updatedDoc);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
         ->logOp(opCtx, "u", args.coll->ns(), args.updateArgs->update, &args.updateArgs->criteria);
 }
 
@@ -99,7 +104,8 @@ void AuthOpObserver::onDelete(OperationContext* opCtx,
     // document itself as the _id.
     auto documentId = doc["_id"] ? doc["_id"].wrap() : doc;
     invariant(!documentId.isEmpty());
-    AuthorizationManager::get(opCtx->getServiceContext())
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
         ->logOp(opCtx, "d", coll->ns(), documentId, nullptr);
 }
 
@@ -115,8 +121,8 @@ void AuthOpObserver::onCreateCollection(OperationContext* opCtx,
     const auto cmdObj =
         repl::MutableOplogEntry::makeCreateCollCmdObj(collectionName, options, idIndex);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onCollMod(OperationContext* opCtx,
@@ -130,16 +136,16 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
     // Create the 'o' field object.
     const auto cmdObj = makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     const NamespaceString cmdNss(NamespaceString::makeCommandNamespace(dbName));
     const auto cmdObj = BSON("dropDatabase" << 1);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    invariant(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
@@ -151,8 +157,8 @@ repl::OpTime AuthOpObserver::onDropCollection(OperationContext* opCtx,
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("drop" << collectionName.coll());
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     return {};
 }
@@ -165,8 +171,8 @@ void AuthOpObserver::onDropIndex(OperationContext* opCtx,
     const auto cmdNss = nss.getCommandNS();
     const auto cmdObj = BSON("dropIndexes" << nss.coll() << "index" << indexName);
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, &indexInfo);
 }
 
 void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
@@ -187,8 +193,8 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
 
     const auto cmdObj = builder.done();
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
@@ -210,7 +216,9 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
                                         const BSONObj& catalogEntry,
                                         const BSONObj& storageMetadata,
                                         bool isDryRun) {
-    AuthorizationManager::get(opCtx->getServiceContext())
+
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())
         ->logOp(opCtx, "m", nss, catalogEntry, &storageMetadata);
 }
 
@@ -221,8 +229,8 @@ void AuthOpObserver::onEmptyCapped(OperationContext* opCtx,
     const auto cmdNss = collectionName.getCommandNS();
     const auto cmdObj = BSON("emptycapped" << collectionName.coll());
 
-    AuthorizationManager::get(opCtx->getServiceContext())
-        ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
+    dassert(opCtx->getService()->role().has(ClusterRole::ShardServer));
+    AuthorizationManager::get(opCtx->getService())->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
 void AuthOpObserver::onReplicationRollback(OperationContext* opCtx,
@@ -232,7 +240,7 @@ void AuthOpObserver::onReplicationRollback(OperationContext* opCtx,
     if (rollbackNamespaces.count(NamespaceString::kServerConfigurationNamespace) == 1 ||
         rollbackNamespaces.count(NamespaceString::kAdminUsersNamespace) == 1 ||
         rollbackNamespaces.count(NamespaceString::kAdminRolesNamespace) == 1) {
-        AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache(opCtx);
+        AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
     }
 }
 

@@ -104,14 +104,12 @@ SaslConversation::SaslConversation(std::string mech)
     : opCtx(makeOperationContext()),
       authManagerExternalState(new AuthzManagerExternalStateMock),
       authManager(new AuthorizationManagerImpl(
-          getServiceContext(),
-          std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState))),
+          getService(), std::unique_ptr<AuthzManagerExternalState>(authManagerExternalState))),
       authSession(authManager->makeAuthorizationSession()),
-      registry(getServiceContext(), {"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"}),
+      registry(getService(), {"SCRAM-SHA-1", "SCRAM-SHA-256", "PLAIN"}),
       mechanism(mech) {
 
-    AuthorizationManager::set(getServiceContext(),
-                              std::unique_ptr<AuthorizationManager>(authManager));
+    AuthorizationManager::set(getService(), std::unique_ptr<AuthorizationManager>(authManager));
 
     client.reset(SaslClientSession::create(mechanism));
 

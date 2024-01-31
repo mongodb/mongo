@@ -36,13 +36,13 @@
 namespace mongo {
 
 std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryMock::createRouter(
-    ServiceContext* service) {
+    Service* service) {
     return std::make_unique<AuthorizationManagerImpl>(
         service, std::make_unique<AuthzManagerExternalStateMock>());
 }
 
 std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryMock::createShard(
-    ServiceContext* service) {
+    Service* service) {
     return std::make_unique<AuthorizationManagerImpl>(
         service, std::make_unique<AuthzManagerExternalStateMock>());
 }

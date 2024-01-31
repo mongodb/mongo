@@ -758,12 +758,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     HealthLogInterface::set(serviceContext, std::make_unique<HealthLog>());
     HealthLogInterface::get(startupOpCtx.get())->startup();
 
-    auto const globalAuthzManager = AuthorizationManager::get(serviceContext);
+    auto const authzManagerShard =
+        AuthorizationManager::get(serviceContext->getService(ClusterRole::ShardServer));
     {
         TimeElapsedBuilderScopedTimer scopedTimer(serviceContext->getFastClockSource(),
                                                   "Build user and roles graph",
                                                   &startupTimeElapsedBuilder);
-        uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
+        uassertStatusOK(authzManagerShard->initialize(startupOpCtx.get()));
     }
 
     if (audit::initializeManager) {
@@ -773,7 +774,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // This is for security on certain platforms (nonce generation)
     srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&startupOpCtx))));  // NOLINT
 
-    if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
+    if (authzManagerShard->shouldValidateAuthSchemaOnStartup()) {
         Status status = verifySystemIndexes(startupOpCtx.get(), &startupTimeElapsedBuilder);
         if (!status.isOK()) {
             LOGV2_WARNING(20538, "Unable to verify system indexes", "error"_attr = redact(status));
@@ -790,7 +791,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
         int foundSchemaVersion;
         status =
-            globalAuthzManager->getAuthorizationVersion(startupOpCtx.get(), &foundSchemaVersion);
+            authzManagerShard->getAuthorizationVersion(startupOpCtx.get(), &foundSchemaVersion);
         if (!status.isOK()) {
             LOGV2_ERROR(20539,
                         "Failed to verify auth schema version",
@@ -812,7 +813,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 "http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1");
             exitCleanly(ExitCode::needUpgrade);
         }
-    } else if (globalAuthzManager->isAuthEnabled()) {
+    } else if (authzManagerShard->isAuthEnabled()) {
         LOGV2_ERROR(20569, "Auth must be disabled when starting without auth schema validation");
         exitCleanly(ExitCode::badOptions);
     } else {

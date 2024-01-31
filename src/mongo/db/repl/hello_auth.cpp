@@ -60,8 +60,7 @@ void handleHelloAuth(OperationContext* opCtx,
             opCtx, AuthenticationSession::StepType::kSaslSupportedMechanisms, [&](auto session) {
                 session->setUserNameForSaslSupportedMechanisms(userName);
 
-                auto& saslMechanismRegistry =
-                    SASLServerMechanismRegistry::get(opCtx->getServiceContext());
+                auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getService());
                 saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, userName, result);
             });
     }

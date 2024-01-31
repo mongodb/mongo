@@ -250,10 +250,10 @@ public:
             auto* opCtx = opCtxHolder.get();
             _managerState->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
         }
-        auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
-            getServiceContext(), std::move(localManagerState));
+        auto uniqueAuthzManager =
+            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(localManagerState));
         _authzManager = uniqueAuthzManager.get();
-        AuthorizationManager::set(getServiceContext(), std::move(uniqueAuthzManager));
+        AuthorizationManager::set(getService(), std::move(uniqueAuthzManager));
         _authzManager->setAuthEnabled(true);
 
         _session = _transportLayer.createSession();

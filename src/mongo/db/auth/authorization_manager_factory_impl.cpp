@@ -37,13 +37,13 @@
 namespace mongo {
 
 std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryImpl::createRouter(
-    ServiceContext* service) {
+    Service* service) {
     return std::make_unique<AuthorizationManagerImpl>(
         service, std::make_unique<AuthzManagerExternalStateMongos>());
 }
 
 std::unique_ptr<AuthorizationManager> AuthorizationManagerFactoryImpl::createShard(
-    ServiceContext* service) {
+    Service* service) {
     return std::make_unique<AuthorizationManagerImpl>(
         service, std::make_unique<AuthzManagerExternalStateMongod>());
 }

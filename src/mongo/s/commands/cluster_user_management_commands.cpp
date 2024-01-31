@@ -108,20 +108,19 @@ struct UserCacheInvalidatorNOOP {
 struct UserCacheInvalidatorUser {
     static constexpr bool kRequireUserName = true;
     static void invalidate(OperationContext* opCtx, const UserName& userName) {
-        AuthorizationManager::get(opCtx->getServiceContext())
-            ->invalidateUserByName(opCtx, userName);
+        AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     }
 };
 struct UserCacheInvalidatorDB {
     static constexpr bool kRequireUserName = false;
     static void invalidate(OperationContext* opCtx, const DatabaseName& dbname) {
-        AuthorizationManager::get(opCtx->getServiceContext())->invalidateUsersFromDB(opCtx, dbname);
+        AuthorizationManager::get(opCtx->getService())->invalidateUsersFromDB(dbname);
     }
 };
 struct UserCacheInvalidatorAll {
     static constexpr bool kRequireUserName = false;
     static void invalidate(OperationContext* opCtx, const DatabaseName&) {
-        AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache(opCtx);
+        AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
     }
 };
 
@@ -309,8 +308,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-            authzManager->invalidateUserCache(opCtx);
+            AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
         }
 
     private:

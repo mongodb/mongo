@@ -356,7 +356,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
     ASSERT_OK(createUser(kSpencerTest, {{"read", "test"}}));
 
     // Make sure that invalidating the user causes the session to reload its privileges.
-    authzManager->invalidateUserByName(_opCtx.get(), user->getName());
+    AuthorizationManager::get(_opCtx->getService())->invalidateUserByName(user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -369,7 +369,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
     ASSERT_OK(managerState->remove(
         _opCtx.get(), NamespaceString::kAdminUsersNamespace, BSONObj(), BSONObj(), &ignored));
     // Make sure that invalidating the user causes the session to reload its privileges.
-    authzManager->invalidateUserByName(_opCtx.get(), user->getName());
+    AuthorizationManager::get(_opCtx->getService())->invalidateUserByName(user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));
@@ -401,7 +401,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
     // Even though the user's privileges have been reduced, since we've configured user
     // document lookup to fail, the authz session should continue to use its known out-of-date
     // privilege data.
-    authzManager->invalidateUserByName(_opCtx.get(), user->getName());
+    AuthorizationManager::get(_opCtx->getService())->invalidateUserByName(user->getName());
     authzSession->startRequest(_opCtx.get());  // Refreshes cached data for invalid users
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::find));

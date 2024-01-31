@@ -66,11 +66,10 @@ namespace {
 
 KillAllSessionsByPatternSet patternsForLoggedInUser(OperationContext* opCtx) {
     auto client = opCtx->getClient();
-    ServiceContext* serviceContext = client->getServiceContext();
 
     KillAllSessionsByPatternSet patterns;
 
-    if (AuthorizationManager::get(serviceContext)->isAuthEnabled()) {
+    if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled()) {
         auto* as = AuthorizationSession::get(client);
         if (auto user = as->getAuthenticatedUser()) {
             auto item = makeKillAllSessionsByPattern(opCtx);

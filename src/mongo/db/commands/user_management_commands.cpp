@@ -576,7 +576,7 @@ public:
 
     AuthzLockGuard(OperationContext* opCtx, InvalidationMode mode)
         : _opCtx(opCtx),
-          _authzManager(AuthorizationManager::get(_opCtx->getServiceContext())),
+          _authzManager(AuthorizationManager::get(opCtx->getService())),
           _lock(_UMCMutexDecoration(opCtx->getServiceContext())),
           _mode(mode),
           _cacheGeneration(_authzManager->getCacheGeneration()) {}
@@ -588,7 +588,7 @@ public:
 
         if (_authzManager->getCacheGeneration() == _cacheGeneration) {
             LOGV2_DEBUG(20509, 1, "User management command did not invalidate the user cache");
-            _authzManager->invalidateUserCache(_opCtx);
+            AuthorizationManager::get(_opCtx->getService())->invalidateUserCache();
         }
     }
 
@@ -737,7 +737,7 @@ void trimCredentials(OperationContext* opCtx,
                      BSONObjBuilder* queryBuilder,
                      BSONObjBuilder* unsetBuilder,
                      const std::vector<StringData>& mechanisms) {
-    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto* authzManager = AuthorizationManager::get(opCtx->getService());
 
     BSONObj userObj;
     uassertStatusOK(authzManager->getUserDescription(opCtx, userName, &userObj));
@@ -1176,8 +1176,8 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     UUID::gen().appendToBuilder(&userObjBuilder, AuthorizationManager::USERID_FIELD_NAME);
     userName.appendToBSON(&userObjBuilder);
 
-    auto* serviceContext = opCtx->getClient()->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
 
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
@@ -1221,7 +1221,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
 
     // Must invalidate even on bad status
     auto status = insertPrivilegeDocument(opCtx, userObj, userName.getTenant());
-    authzManager->invalidateUserByName(opCtx, userName);
+    AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     uassertStatusOK(status);
 }
 
@@ -1300,8 +1300,8 @@ void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCt
         updateDocumentBuilder.append("$unset", updateUnset);
     }
 
-    auto* serviceContext = opCtx->getClient()->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
 
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
@@ -1328,7 +1328,7 @@ void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCt
         updatePrivilegeDocument(opCtx, userName, queryBuilder.done(), updateDocumentBuilder.done());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserByName(opCtx, userName);
+    AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     uassertStatusOK(status);
 }
 
@@ -1339,8 +1339,8 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
     auto dbname = cmd.getDbName();
     UserName userName(cmd.getCommandParameter(), dbname);
 
-    auto* serviceContext = opCtx->getClient()->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     audit::logDropUser(Client::getCurrent(), userName);
@@ -1352,7 +1352,7 @@ void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx)
         userName.getTenant());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserByName(opCtx, userName);
+    AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     auto numMatched = uassertStatusOK(swNumMatched);
 
     uassert(ErrorCodes::UserNotFound,
@@ -1368,8 +1368,8 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
     auto dbname = cmd.getDbName();
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     audit::logDropAllUsersFromDatabase(client, dbname);
@@ -1381,7 +1381,7 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
                                  dbname.tenantId());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUsersFromDB(opCtx, dbname);
+    AuthorizationManager::get(opCtx->getService())->invalidateUsersFromDB(dbname);
 
     DropAllUsersFromDatabaseReply reply;
     reply.setCount(uassertStatusOK(swNumRemoved));
@@ -1400,8 +1400,8 @@ void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext
             !cmd.getRoles().empty());
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     stdx::unordered_set<RoleName> userRoles;
@@ -1419,7 +1419,7 @@ void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext
         opCtx, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)));
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserByName(opCtx, userName);
+    AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     uassertStatusOK(status);
 }
 
@@ -1435,8 +1435,8 @@ void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationCont
             !cmd.getRoles().empty());
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     stdx::unordered_set<RoleName> userRoles;
@@ -1454,7 +1454,7 @@ void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationCont
         opCtx, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)));
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUserByName(opCtx, userName);
+    AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     uassertStatusOK(status);
 }
 
@@ -1466,7 +1466,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
     const auto& arg = cmd.getCommandParameter();
     auto dbname = cmd.getDbName();
 
-    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto* authzManager = AuthorizationManager::get(opCtx->getService());
     auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
 
     std::vector<BSONObj> users;
@@ -1662,8 +1662,8 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     }
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = client->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // Role existence has to be checked after acquiring the update lock
@@ -1720,8 +1720,8 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
     }
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // Role existence has to be checked after acquiring the update lock
@@ -1753,7 +1753,7 @@ void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCt
 
     auto status = updateRoleDocument(opCtx, roleName, updateDocumentBuilder.obj());
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
+    AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1773,8 +1773,8 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     std::vector<std::string> unrecognizedActions;
@@ -1806,7 +1806,7 @@ void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationCo
 
     auto status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
+    AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1826,8 +1826,8 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     std::vector<std::string> unrecognizedActions;
@@ -1864,7 +1864,7 @@ void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(Operatio
 
     auto status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
+    AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1886,8 +1886,8 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
     auto rolesToAdd = auth::resolveRoleNames(cmd.getRoles(), dbname);
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // Check for cycles
@@ -1904,7 +1904,7 @@ void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext
     auto status = updateRoleDocument(
         opCtx, roleName, BSON("$set" << BSON("roles" << containerToBSONArray(directRoles))));
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
+    AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -1926,8 +1926,8 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
     auto rolesToRemove = auth::resolveRoleNames(cmd.getRoles(), dbname);
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // Remove roles from existing set.
@@ -1943,7 +1943,7 @@ void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationCont
     auto status = updateRoleDocument(
         opCtx, roleName, BSON("$set" << BSON("roles" << containerToBSONArray(roles))));
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-    authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
+    AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(dbname.tenantId());
     uassertStatusOK(status);
 }
 
@@ -2025,8 +2025,8 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
             !auth::isBuiltinRole(roleName));
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     uassertStatusOK(authzManager->rolesExist(opCtx, {roleName}));
@@ -2034,7 +2034,8 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([&] {
         try {
-            authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
+            AuthorizationManager::get(opCtx->getService())
+                ->invalidateUsersByTenant(dbname.tenantId());
         } catch (const AssertionException& ex) {
             LOGV2_WARNING(4907701, "Failed invalidating user cache", "exception"_attr = ex);
         }
@@ -2088,14 +2089,15 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
     auto dbname = cmd.getDbName();
 
     auto* client = opCtx->getClient();
-    auto* serviceContext = client->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(serviceContext);
+    auto* service = client->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // From here on, we always want to invalidate the user cache before returning.
     ScopeGuard invalidateGuard([opCtx, authzManager, &dbname] {
         try {
-            authzManager->invalidateUsersByTenant(opCtx, dbname.tenantId());
+            AuthorizationManager::get(opCtx->getService())
+                ->invalidateUsersByTenant(dbname.tenantId());
         } catch (const AssertionException& ex) {
             LOGV2_WARNING(4907700, "Failed invalidating user cache", "exception"_attr = ex);
         }
@@ -2183,7 +2185,7 @@ RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRu
     const auto& arg = cmd.getCommandParameter();
     auto dbname = cmd.getDbName();
 
-    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto* authzManager = AuthorizationManager::get(opCtx->getService());
     auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
 
     // Only usersInfo actually supports {forAllDBs: 1} mode.
@@ -2230,9 +2232,10 @@ MONGO_REGISTER_COMMAND(CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUser
 template <>
 void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invocation::typedRun(
     OperationContext* opCtx) {
-    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto* authzManager = AuthorizationManager::get(opCtx->getService());
     auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
-    authzManager->invalidateUsersByTenant(opCtx, request().getDbName().tenantId());
+    AuthorizationManager::get(opCtx->getService())
+        ->invalidateUsersByTenant(request().getDbName().tenantId());
 }
 
 MONGO_REGISTER_COMMAND(CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams>)
@@ -2247,7 +2250,7 @@ CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams>::Invocation
 
     definition()->skipApiVersionCheck();
     GetUserCacheGenerationReply reply;
-    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto* authzManager = AuthorizationManager::get(opCtx->getService());
     reply.setCacheGeneration(authzManager->getCacheGeneration());
     return reply;
 }
@@ -2626,12 +2629,13 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
             "Must provide at least one of \"tempUsersCollection\" and \"tempRolescollection\"",
             !tempUsersColl.empty() || !tempRolesColl.empty());
 
-    auto* svcCtx = opCtx->getClient()->getServiceContext();
-    auto* authzManager = AuthorizationManager::get(svcCtx);
+    auto* service = opCtx->getClient()->getService();
+    auto* authzManager = AuthorizationManager::get(service);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
     // From here on, we always want to invalidate the user cache before returning.
-    ScopeGuard invalidateGuard([&] { authzManager->invalidateUserCache(opCtx); });
+    ScopeGuard invalidateGuard(
+        [&] { AuthorizationManager::get(opCtx->getService())->invalidateUserCache(); });
     const auto db = cmd.getDb();
     const bool drop = cmd.getDrop();
     const auto tenantId = cmd.getDollarTenant();

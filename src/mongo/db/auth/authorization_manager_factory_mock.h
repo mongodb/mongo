@@ -44,8 +44,8 @@ namespace mongo {
 class AuthorizationManagerFactoryMock : public AuthorizationManagerFactory {
 
 public:
-    std::unique_ptr<AuthorizationManager> createRouter(ServiceContext* service) override;
-    std::unique_ptr<AuthorizationManager> createShard(ServiceContext* service) override;
+    std::unique_ptr<AuthorizationManager> createRouter(Service* service) override;
+    std::unique_ptr<AuthorizationManager> createShard(Service* service) override;
 };
 
 

@@ -218,12 +218,12 @@ protected:
             std::make_unique<AuthzManagerExternalStateMock>();
         authzManagerExternalState = uniqueAuthzManagerExternalStateMock.get();
         auto newManager = std::make_unique<AuthorizationManagerImpl>(
-            serviceContext, std::move(uniqueAuthzManagerExternalStateMock));
+            serviceContext->getService(), std::move(uniqueAuthzManagerExternalStateMock));
         authzSession = std::make_unique<AuthorizationSessionImpl>(
             std::make_unique<AuthzSessionExternalStateMock>(newManager.get()),
             AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
         authzManager = newManager.get();
-        AuthorizationManager::set(serviceContext, std::move(newManager));
+        AuthorizationManager::set(serviceContext->getService(), std::move(newManager));
 
         saslClientSession = std::make_unique<NativeSaslClientSession>();
         saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism,

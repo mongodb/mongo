@@ -61,7 +61,7 @@ namespace {
  * and a handle to this user will be returned.
  */
 boost::optional<UserHandle> getAuthenticatedUser(Client* client) {
-    if (!AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
+    if (!AuthorizationManager::get(client->getService())->isAuthEnabled()) {
         return boost::none;
     }
 

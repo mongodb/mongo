@@ -87,24 +87,6 @@ env.Library(
 )
 
 env.Library(
-    target='auth_op_observer',
-    source=[
-        'auth_op_observer.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer_util',
-        '$BUILD_DIR/mongo/db/repl/oplog_entry',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-        'auth',
-    ],
-)
-
-env.Library(
     target='user',
     source=[
         'user.cpp',
@@ -114,21 +96,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         'auth',
         'authprivilege',
-    ],
-)
-
-env.Library(
-    target='auth_impl_internal_local',
-    source=[
-        'authz_manager_external_state_local.cpp',
-    ],
-    LIBDEPS=[
-        'auth_impl_internal',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
     ],
 )
 
@@ -261,6 +228,23 @@ env.Library(
 )
 
 env.Library(
+    target='user_cache_invalidator',
+    source=[
+        'user_cache_invalidator_job.cpp',
+        'user_cache_invalidator_job_parameters.idl',
+    ],
+    LIBDEPS=[
+        'auth',
+        'authorization_manager_global',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/s/grid',
+        'auth_impl_internal_local',
+    ],
+)
+
+env.Library(
     target='authserver',
     source=[
         'authorization_manager_factory_impl.cpp',
@@ -270,14 +254,13 @@ env.Library(
         'authz_session_external_state_d.cpp',
         'authz_session_external_state_s.cpp',
         'enable_localhost_auth_bypass_parameter.idl',
-        'user_cache_invalidator_job.cpp',
-        'user_cache_invalidator_job_parameters.idl',
     ],
     LIBDEPS=[
         'auth',
         'authorization_manager_global',
         'sasl_commands',
         'saslauth',
+        'user_cache_invalidator',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/authentication_commands',
@@ -288,6 +271,24 @@ env.Library(
         '$BUILD_DIR/mongo/s/grid',
         'auth_impl_internal_local',
         'sasl_options_init',
+    ],
+)
+
+env.Library(
+    target='auth_op_observer',
+    source=[
+        'auth_op_observer.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer_util',
+        '$BUILD_DIR/mongo/db/repl/oplog_entry',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'auth',
     ],
 )
 

@@ -100,11 +100,11 @@ class AuthorizationManager {
     AuthorizationManager& operator=(const AuthorizationManager&) = delete;
 
 public:
-    static AuthorizationManager* get(ServiceContext* service);
-    static AuthorizationManager* get(ServiceContext& service);
-    static void set(ServiceContext* service, std::unique_ptr<AuthorizationManager> authzManager);
+    static AuthorizationManager* get(Service* service);
+    static AuthorizationManager* get(Service& service);
+    static void set(Service* service, std::unique_ptr<AuthorizationManager> authzManager);
 
-    static std::unique_ptr<AuthorizationManager> create(ServiceContext* serviceContext);
+    static std::unique_ptr<AuthorizationManager> create(Service* service);
 
     AuthorizationManager() = default;
 
@@ -339,19 +339,23 @@ public:
     /**
      * Marks the given user as invalid and removes it from the user cache.
      */
-    virtual void invalidateUserByName(OperationContext* opCtx, const UserName& user) = 0;
+    virtual void invalidateUserByName(const UserName& user) = 0;
 
     /**
      * Invalidates all users whose source is "dbname" and removes them from the user cache.
      */
-    virtual void invalidateUsersFromDB(OperationContext* opCtx, const DatabaseName& dbname) = 0;
+    virtual void invalidateUsersFromDB(const DatabaseName& dbname) = 0;
 
     /**
      * Invalidate all users associated with a given tenant,
      * or entire cache if tenant == boost::none.
      */
-    virtual void invalidateUsersByTenant(OperationContext* opCtx,
-                                         const boost::optional<TenantId>& tenant) = 0;
+    virtual void invalidateUsersByTenant(const boost::optional<TenantId>& tenant) = 0;
+
+    /**
+     * Invalidates all of the contents of the user cache.
+     */
+    virtual void invalidateUserCache() = 0;
 
     /**
      * Retrieves all users whose source is "$external" and checks if the corresponding user in the
@@ -366,11 +370,6 @@ public:
      * Call this function at startup and after resynchronizing a secondary.
      */
     virtual Status initialize(OperationContext* opCtx) = 0;
-
-    /**
-     * Invalidates all of the contents of the user cache.
-     */
-    virtual void invalidateUserCache(OperationContext* opCtx) = 0;
 
     /**
      * Hook called by replication code to let the AuthorizationManager observe changes

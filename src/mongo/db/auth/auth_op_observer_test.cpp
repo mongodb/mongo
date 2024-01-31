@@ -121,7 +121,7 @@ private:
 TEST_F(AuthOpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolledBack) {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto authMgr = AuthorizationManager::get(getServiceContext());
+    auto authMgr = AuthorizationManager::get(opCtx->getService());
     auto initCacheGen = authMgr->getCacheGeneration();
 
     // Verify that the rollback op observer invalidates the user cache for each auth namespace by
@@ -145,7 +145,7 @@ TEST_F(AuthOpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolled
 TEST_F(AuthOpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespaceRolledBack) {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
-    auto authMgr = AuthorizationManager::get(getServiceContext());
+    auto authMgr = AuthorizationManager::get(opCtx->getService());
     auto initCacheGen = authMgr->getCacheGeneration();
 
     // Verify that the rollback op observer doesn't invalidate the user cache.

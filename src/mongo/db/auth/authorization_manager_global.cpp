@@ -56,25 +56,31 @@
 namespace mongo {
 namespace {
 
-ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
+ServiceContext::ConstructorActionRegisterer setClusterAuthMode(
+    "SetClusterAuthMode", [](ServiceContext* serviceContext) {
+        // Officially set the ClusterAuthMode for this ServiceContext
+        if (!ClusterAuthMode::get(serviceContext)
+                 .equals(serverGlobalParams.startupClusterAuthMode)) {
+            ClusterAuthMode::set(serviceContext, serverGlobalParams.startupClusterAuthMode);
+        }
+    });
+
+Service::ConstructorActionRegisterer createAuthorizationManager(
     "CreateAuthorizationManager",
     {"OIDGeneration", "EndStartupOptionStorage"},
-    [](ServiceContext* service) {
-        // Officially set the ClusterAuthMode for this ServiceContext
-        ClusterAuthMode::set(service, serverGlobalParams.startupClusterAuthMode);
-
+    [](Service* service) {
         const auto clusterAuthMode = serverGlobalParams.startupClusterAuthMode;
         const auto authIsEnabled =
             serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled;
 
-        const auto clusterRole = serverGlobalParams.clusterRole;
-
         std::unique_ptr<AuthorizationManager> authzManager;
-        if (clusterRole.hasExclusively(ClusterRole::RouterServer)) {
+
+        if (service->role().hasExclusively(ClusterRole::RouterServer)) {
             authzManager = globalAuthzManagerFactory->createRouter(service);
         } else {
             authzManager = globalAuthzManagerFactory->createShard(service);
         }
+
         authzManager->setAuthEnabled(authIsEnabled);
         authzManager->setShouldValidateAuthSchemaOnStartup(gStartupAuthSchemaValidation);
 
@@ -101,7 +107,8 @@ ServiceContext::ConstructorActionRegisterer createAuthorizationManager(
                                                 .clientSubjectName.toString()}));
 #endif
         }
-    });
+    },
+    [](Service* service) { AuthorizationManager::set(service, nullptr); });
 
 }  // namespace
 
@@ -110,7 +117,7 @@ void AuthzVersionParameter::append(OperationContext* opCtx,
                                    StringData name,
                                    const boost::optional<TenantId>&) {
     int authzVersion;
-    uassertStatusOK(AuthorizationManager::get(opCtx->getServiceContext())
+    uassertStatusOK(AuthorizationManager::get(opCtx->getService())
                         ->getAuthorizationVersion(opCtx, &authzVersion));
     b->append(name, authzVersion);
 }

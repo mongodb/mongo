@@ -224,7 +224,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     }
 
     // The authentication database is also the source database for the user.
-    auto authManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto authManager = AuthorizationManager::get(opCtx->getService());
 
     auto swUser = [&]() {
         if (gEnableDetailedConnectionHealthMetricLogLines.load()) {

@@ -225,7 +225,7 @@ SaslReply doSaslStart(OperationContext* opCtx,
                       AuthenticationSession* session,
                       const SaslStartCommand& request) {
     auto mechanism = uassertStatusOK(
-        SASLServerMechanismRegistry::get(opCtx->getServiceContext())
+        SASLServerMechanismRegistry::get(opCtx->getService())
             .getServerMechanism(request.getMechanism(),
                                 DatabaseNameUtil::serialize(request.getDbName(),
                                                             request.getSerializationContext())));

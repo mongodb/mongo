@@ -52,6 +52,7 @@
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
@@ -671,6 +672,11 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx) {
     }
 
     Grid::get(opCtx)->setShardingInitialized();
+
+    if (auto routerService = service->getService(ClusterRole::RouterServer); routerService) {
+        uassertStatusOK(AuthorizationManager::get(routerService)->initialize(opCtx));
+        UserCacheInvalidator::start(service, opCtx);
+    }
 }
 
 void ShardingInitializationMongoD::installReplicaSetChangeListener(ServiceContext* service) {

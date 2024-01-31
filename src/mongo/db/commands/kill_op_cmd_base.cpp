@@ -61,7 +61,7 @@ void KillOpCmdBase::reportSuccessfulCompletion(OperationContext* opCtx,
 
     auto client = opCtx->getClient();
     if (client) {
-        if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
+        if (AuthorizationManager::get(client->getService())->isAuthEnabled()) {
             if (auto user = AuthorizationSession::get(client)->getAuthenticatedUserName()) {
                 attr.add("user", BSON_ARRAY(user->toBSON()));
             } else {

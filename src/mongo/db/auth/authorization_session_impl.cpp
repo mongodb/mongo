@@ -268,7 +268,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
         }
     }
 
-    AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getService());
     auto user = uassertStatusOK(authzManager->acquireUser(opCtx, userRequest));
 
     auto restrictionStatus = user->validateRestrictions(opCtx);

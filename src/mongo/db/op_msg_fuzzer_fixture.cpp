@@ -82,13 +82,13 @@ void OpMsgFuzzerFixture::_setAuthorizationManager() {
     auto localExternalState = std::make_unique<AuthzManagerExternalStateMock>();
     _externalState = localExternalState.get();
 
-    auto localAuthzManager =
-        std::make_unique<AuthorizationManagerImpl>(_serviceContext, std::move(localExternalState));
+    auto localAuthzManager = std::make_unique<AuthorizationManagerImpl>(
+        _serviceContext->getService(), std::move(localExternalState));
     _authzManager = localAuthzManager.get();
     _externalState->setAuthorizationManager(_authzManager);
     _authzManager->setAuthEnabled(true);
 
-    AuthorizationManager::set(_serviceContext, std::move(localAuthzManager));
+    AuthorizationManager::set(_serviceContext->getService(), std::move(localAuthzManager));
 }
 
 OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)

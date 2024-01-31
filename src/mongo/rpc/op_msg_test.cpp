@@ -828,9 +828,9 @@ protected:
     void setUp() final {
         auto authzManagerState = std::make_unique<AuthzManagerExternalStateMock>();
         auto authzManager = std::make_unique<AuthorizationManagerImpl>(
-            getServiceContext(), std::move(authzManagerState));
+            getServiceContext()->getService(), std::move(authzManagerState));
         authzManager->setAuthEnabled(true);
-        AuthorizationManager::set(getServiceContext(), std::move(authzManager));
+        AuthorizationManager::set(getService(), std::move(authzManager));
 
         client = getServiceContext()->getService()->makeClient("test");
     }

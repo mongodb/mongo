@@ -109,6 +109,39 @@ std::string oidOrTimestampToString(const OIDorTimestamp& oidOrTimestamp) {
     MONGO_UNREACHABLE;
 }
 
+/**
+ * TODO: SERVER-82227 - remove.
+ *
+ * RAII type for making the OperationContext it is instantiated with use the router service util it
+ * goes out of scope.
+ */
+class ScopedSetRouterService {
+public:
+    ScopedSetRouterService(OperationContext* opCtx);
+    ~ScopedSetRouterService();
+
+private:
+    OperationContext* const _opCtx;
+    Service* const _originalService;
+};
+
+ScopedSetRouterService::ScopedSetRouterService(OperationContext* opCtx)
+    : _opCtx(opCtx), _originalService(opCtx->getService()) {
+    // Verify that the opCtx is not using the router service already.
+    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+
+    auto service = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
+    invariant(service);
+    _opCtx->getClient()->setService(service);
+}
+
+ScopedSetRouterService::~ScopedSetRouterService() {
+    // Verify that the opCtx is still using the router service.
+    stdx::lock_guard<Client> lk(*_opCtx->getClient());
+    invariant(_opCtx->getService()->role().has(ClusterRole::RouterServer));
+    _opCtx->getClient()->setService(_originalService);
+}
+
 }  // namespace
 
 Status userCacheInvalidationIntervalSecsNotify(const int& value) {
@@ -144,8 +177,11 @@ void UserCacheInvalidator::initialize(OperationContext* opCtx) {
 }
 
 void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* opCtx) {
+    // UserCacheInvalidator should only run on a router.
+    invariant(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
+    ScopedSetRouterService guard(opCtx);
     auto invalidator =
-        std::make_unique<UserCacheInvalidator>(AuthorizationManager::get(serviceCtx));
+        std::make_unique<UserCacheInvalidator>(AuthorizationManager::get(opCtx->getService()));
     invalidator->initialize(opCtx);
 
     auto periodicRunner = serviceCtx->getPeriodicRunner();
@@ -169,6 +205,7 @@ void UserCacheInvalidator::start(ServiceContext* serviceCtx, OperationContext* o
 
 void UserCacheInvalidator::run() try {
     auto opCtx = cc().makeOperationContext();
+    ScopedSetRouterService guard(opCtx.get());
     auto swCurrentGeneration = getCurrentCacheGeneration(opCtx.get());
     if (!swCurrentGeneration.isOK()) {
         LOGV2_WARNING(20266,
@@ -178,7 +215,7 @@ void UserCacheInvalidator::run() try {
 
         // When in doubt, invalidate the cache
         try {
-            _authzManager->invalidateUserCache(opCtx.get());
+            AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
         } catch (const DBException& e) {
             LOGV2_WARNING(20267, "Error invalidating user cache", "error"_attr = e.toStatus());
         }
@@ -191,7 +228,7 @@ void UserCacheInvalidator::run() try {
               "previousGeneration"_attr = oidOrTimestampToString(_previousGeneration),
               "currentGeneration"_attr = oidOrTimestampToString(swCurrentGeneration.getValue()));
         try {
-            _authzManager->invalidateUserCache(opCtx.get());
+            AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
         } catch (const DBException& e) {
             LOGV2_WARNING(20268, "Error invalidating user cache", "error"_attr = e.toStatus());
         }
@@ -207,7 +244,8 @@ void UserCacheInvalidator::run() try {
                           "users in cache",
                           "error"_attr = refreshStatus);
             try {
-                _authzManager->invalidateUsersFromDB(opCtx.get(), DatabaseName::kExternal);
+                AuthorizationManager::get(opCtx->getService())
+                    ->invalidateUsersFromDB(DatabaseName::kExternal);
             } catch (const DBException& e) {
                 LOGV2_WARNING(5914805,
                               "Error invalidating $external users from user cache",

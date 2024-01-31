@@ -269,7 +269,7 @@ protected:
 /** Base class for server mechanism factories. */
 class ServerFactoryBase : public SaslServerCommonBase {
 public:
-    explicit ServerFactoryBase(ServiceContext*) {}
+    explicit ServerFactoryBase(Service*) {}
     ServerFactoryBase() = default;
 
     /**
@@ -329,7 +329,7 @@ public:
     using mechanism_type = ServerMechanism;
     using policy_type = typename ServerMechanism::policy_type;
 
-    explicit MakeServerFactory(ServiceContext*) {}
+    explicit MakeServerFactory(Service*) {}
     MakeServerFactory() = default;
 
     virtual ServerMechanism* createImpl(std::string authenticationDatabase) override {
@@ -361,13 +361,13 @@ public:
  */
 class SASLServerMechanismRegistry {
 public:
-    static SASLServerMechanismRegistry& get(ServiceContext* serviceContext);
-    static void set(ServiceContext* service, std::unique_ptr<SASLServerMechanismRegistry> registry);
+    static SASLServerMechanismRegistry& get(Service* service);
+    static void set(Service* service, std::unique_ptr<SASLServerMechanismRegistry> registry);
 
     /**
      * Intialize the registry with a list of enabled mechanisms.
      */
-    explicit SASLServerMechanismRegistry(ServiceContext* svcCtx,
+    explicit SASLServerMechanismRegistry(Service* service,
                                          std::vector<std::string> enabledMechanisms);
 
     /**
@@ -415,7 +415,7 @@ public:
         }
 
         auto& list = _getMapRef(T::isInternal);
-        list.emplace_back(std::make_unique<T>(_svcCtx));
+        list.emplace_back(std::make_unique<T>(_service));
         std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) {
             return (a->securityLevel() > b->securityLevel());
         });
@@ -441,7 +441,7 @@ private:
 
     bool _mechanismSupportedByConfig(StringData mechName) const;
 
-    ServiceContext* _svcCtx = nullptr;
+    Service* _service = nullptr;
 
     // Stores factories which make mechanisms for all databases other than $external
     MechList _internalMechs;
@@ -454,14 +454,14 @@ private:
 template <typename Factory>
 class GlobalSASLMechanismRegisterer {
 private:
-    boost::optional<ServiceContext::ConstructorActionRegisterer> registerer;
+    boost::optional<Service::ConstructorActionRegisterer> registerer;
 
 public:
     GlobalSASLMechanismRegisterer() {
         registerer.emplace(std::string(typeid(Factory).name()),
                            std::vector<std::string>{"CreateSASLServerMechanismRegistry"},
                            std::vector<std::string>{"ValidateSASLServerMechanismRegistry"},
-                           [](ServiceContext* service) {
+                           [](Service* service) {
                                SASLServerMechanismRegistry::get(service).registerFactory<Factory>();
                            });
     }

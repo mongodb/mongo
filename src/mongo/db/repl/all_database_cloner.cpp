@@ -316,7 +316,7 @@ void AllDatabaseCloner::postStage() {
                     opCtxPtr = cc().makeOperationContext();
                     opCtx = opCtxPtr.get();
                 }
-                auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+                auto authzManager = AuthorizationManager::get(opCtx->getService());
 
                 // Check if global admin has a valid auth schema version document.
                 if (!dbName.tenantId() && !foundAuthSchemaDoc) {

@@ -247,7 +247,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
     auto authorizeExternalUser = [&] {
         uassert(ErrorCodes::BadValue,
                 kX509AuthenticationDisabledMessage,
-                !isX509AuthDisabled(opCtx->getServiceContext()));
+                !isX509AuthDisabled(opCtx->getService()));
         uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, request, boost::none));
     };
 
@@ -270,7 +270,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
             }
 
             if (gEnforceUserClusterSeparation && sslConfiguration.isClusterExtensionSet()) {
-                auto* am = AuthorizationManager::get(opCtx->getServiceContext());
+                auto* am = AuthorizationManager::get(opCtx->getService());
                 BSONObj ignored;
                 const bool userExists =
                     am->getUserDescription(opCtx, request.name, &ignored).isOK();

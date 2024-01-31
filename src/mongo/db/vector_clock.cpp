@@ -277,7 +277,8 @@ public:
         }
 
         // Validate the signature.
-        if (couldBeUnauthenticated && AuthorizationManager::get(service)->isAuthEnabled() &&
+        if (couldBeUnauthenticated &&
+            AuthorizationManager::get(opCtx->getService())->isAuthEnabled() &&
             (!signedTime.getProof() || *signedTime.getProof() == TimeProofService::TimeProof())) {
 
             AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());

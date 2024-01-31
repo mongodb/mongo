@@ -1831,8 +1831,8 @@ void ExecCommandDatabase::_initiateCommand() {
             return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
         }();
         if (clusterHasTwoOrMoreShards && !command->shouldSkipDirectConnectionChecks()) {
-            const bool authIsEnabled = AuthorizationManager::get(opCtx->getServiceContext()) &&
-                AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled();
+            const bool authIsEnabled = AuthorizationManager::get(opCtx->getService()) &&
+                AuthorizationManager::get(opCtx->getService())->isAuthEnabled();
 
             const bool hasDirectShardOperations = !authIsEnabled ||
                 ((AuthorizationSession::get(opCtx->getClient()) != nullptr &&

@@ -580,7 +580,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     // On subsequent transitions to primary the indexes will have already been created.
     static std::once_flag verifySystemIndexesOnce;
     std::call_once(verifySystemIndexesOnce, [opCtx] {
-        const auto globalAuthzManager = AuthorizationManager::get(opCtx->getServiceContext());
+        const auto globalAuthzManager = AuthorizationManager::get(opCtx->getService());
         if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
             fassert(50877, verifySystemIndexes(opCtx));
         }

@@ -104,10 +104,10 @@ public:
             auto* opCtx = opCtxHolder.get();
             managerState->setAuthzVersion(opCtx, AuthorizationManager::schemaVersion26Final);
         }
-        auto authzManager = std::make_unique<AuthorizationManagerImpl>(
-            getServiceContext(), std::move(localManagerState));
+        auto authzManager =
+            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(localManagerState));
         authzManager->setAuthEnabled(true);
-        AuthorizationManager::set(getServiceContext(), std::move(authzManager));
+        AuthorizationManager::set(getService(), std::move(authzManager));
         Client::releaseCurrent();
         Client::initThread(getThreadName(), getServiceContext()->getService(), session);
         authzSession = AuthorizationSession::get(getClient());

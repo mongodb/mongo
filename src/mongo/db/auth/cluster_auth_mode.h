@@ -140,6 +140,11 @@ public:
      */
     StringData toString() const;
 
+    /**
+     * Returns if two separate ClusterAuthModes are equivalent.
+     */
+    bool equals(ClusterAuthMode& rhs) const;
+
 private:
     // For now, we can require that static functions are used to make modes.
     ClusterAuthMode(Value value) : _value(value) {}

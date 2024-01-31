@@ -90,7 +90,7 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(
 
         // Do not initialize lsid when auth is enabled and no user is logged in since
         // there is no sensible uid that can be assigned to it.
-        if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled() &&
+        if (AuthorizationManager::get(opCtx->getService())->isAuthEnabled() &&
             !authSession->isAuthenticated() && !requiresAuth) {
             return OperationSessionInfoFromClient();
         }

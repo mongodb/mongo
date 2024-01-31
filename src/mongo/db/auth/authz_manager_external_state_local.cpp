@@ -859,15 +859,15 @@ void _invalidateUserCache(OperationContext* opCtx,
                                      str::stream() << "_id entries for user documents must be of "
                                                       "the form <dbname>.<username>.  Found: "
                                                    << id));
-            authzManager->invalidateUserCache(opCtx);
+            AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
             return;
         }
         UserName userName(id.substr(splitPoint + 1), id.substr(0, splitPoint), coll.getTenant());
-        authzManager->invalidateUserByName(opCtx, userName);
+        AuthorizationManager::get(opCtx->getService())->invalidateUserByName(userName);
     } else if (const auto& tenant = coll.getTenant()) {
-        authzManager->invalidateUsersByTenant(opCtx, tenant.value());
+        AuthorizationManager::get(opCtx->getService())->invalidateUsersByTenant(tenant.value());
     } else {
-        authzManager->invalidateUserCache(opCtx);
+        AuthorizationManager::get(opCtx->getService())->invalidateUserCache();
     }
 }
 }  // namespace

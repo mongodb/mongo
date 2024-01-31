@@ -143,15 +143,15 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUserByName(OperationContext*, const UserName& user) override {
+    void invalidateUserByName(const UserName& user) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUsersFromDB(OperationContext*, const DatabaseName& dbname) override {
+    void invalidateUsersFromDB(const DatabaseName& dbname) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUsersByTenant(OperationContext*, const boost::optional<TenantId>&) override {
+    void invalidateUsersByTenant(const boost::optional<TenantId>&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
@@ -163,7 +163,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void invalidateUserCache(OperationContext*) override {
+    void invalidateUserCache() override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

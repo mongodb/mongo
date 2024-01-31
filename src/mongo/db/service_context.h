@@ -469,6 +469,21 @@ public:
     void setStorageEngine(std::unique_ptr<StorageEngine> engine);
 
     /**
+     * Takes a function and applies it to all service objects associated with the service context.
+     * The function must accept a service as an argument.
+     */
+    template <typename F>
+    void applyToAllServices(F fn) {
+        if (auto service = getService(ClusterRole::RouterServer); service) {
+            fn(service);
+        }
+
+        if (auto service = getService(ClusterRole::ShardServer); service) {
+            fn(service);
+        }
+    }
+
+    /**
      * Return the storage engine instance we're using.
      */
     StorageEngine* getStorageEngine() {

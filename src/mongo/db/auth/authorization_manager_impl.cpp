@@ -251,10 +251,10 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
 int authorizationManagerCacheSize;
 
 AuthorizationManagerImpl::AuthorizationManagerImpl(
-    ServiceContext* service, std::unique_ptr<AuthzManagerExternalState> externalState)
+    Service* service, std::unique_ptr<AuthzManagerExternalState> externalState)
     : _externalState(std::move(externalState)),
-      _authSchemaVersionCache(service->getService(), _threadPool, _externalState.get()),
-      _userCache(service->getService(),
+      _authSchemaVersionCache(service, _threadPool, _externalState.get()),
+      _userCache(service,
                  _threadPool,
                  authorizationManagerCacheSize,
                  &_authSchemaVersionCache,
@@ -502,8 +502,7 @@ void AuthorizationManagerImpl::_updateCacheGeneration() {
     _cacheGeneration = OID::gen();
 }
 
-void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
-                                                    const UserName& userName) {
+void AuthorizationManagerImpl::invalidateUserByName(const UserName& userName) {
     LOGV2_DEBUG(20235, 2, "Invalidating user", "user"_attr = userName);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
@@ -512,8 +511,7 @@ void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
     _userCache.invalidateKey(UserRequest(userName, boost::none));
 }
 
-void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx,
-                                                     const DatabaseName& dbname) {
+void AuthorizationManagerImpl::invalidateUsersFromDB(const DatabaseName& dbname) {
     LOGV2_DEBUG(20236, 2, "Invalidating all users from database", "database"_attr = dbname);
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
@@ -522,10 +520,9 @@ void AuthorizationManagerImpl::invalidateUsersFromDB(OperationContext* opCtx,
     });
 }
 
-void AuthorizationManagerImpl::invalidateUsersByTenant(OperationContext* opCtx,
-                                                       const boost::optional<TenantId>& tenant) {
+void AuthorizationManagerImpl::invalidateUsersByTenant(const boost::optional<TenantId>& tenant) {
     if (!tenant) {
-        invalidateUserCache(opCtx);
+        invalidateUserCache();
         return;
     }
 
@@ -536,7 +533,7 @@ void AuthorizationManagerImpl::invalidateUsersByTenant(OperationContext* opCtx,
         [&](const UserRequest& userRequest) { return userRequest.name.getTenant() == tenant; });
 }
 
-void AuthorizationManagerImpl::invalidateUserCache(OperationContext* opCtx) {
+void AuthorizationManagerImpl::invalidateUserCache() {
     LOGV2_DEBUG(20237, 2, "Invalidating user cache");
     _updateCacheGeneration();
     _authSchemaVersionCache.invalidateAll();
@@ -590,7 +587,7 @@ Status AuthorizationManagerImpl::initialize(OperationContext* opCtx) {
         return status;
     }
 
-    invalidateUserCache(opCtx);
+    invalidateUserCache();
     return Status::OK();
 }
 

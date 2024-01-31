@@ -202,12 +202,11 @@ public:
         : opCtx(makeOperationContext()),
           authManagerExternalState(new AuthzManagerExternalStateMock()),
           authManager(new AuthorizationManagerImpl(
-              getServiceContext(),
+              getService(),
               std::unique_ptr<AuthzManagerExternalStateMock>(authManagerExternalState))),
           // By default the registry is initialized with all mechanisms enabled.
-          registry(opCtx->getServiceContext(), {"FOO", "BAR", "InternalAuth"}) {
-        AuthorizationManager::set(getServiceContext(),
-                                  std::unique_ptr<AuthorizationManager>(authManager));
+          registry(opCtx->getService(), {"FOO", "BAR", "InternalAuth"}) {
+        AuthorizationManager::set(getService(), std::unique_ptr<AuthorizationManager>(authManager));
 
         ASSERT_OK(authManagerExternalState->updateOne(
             opCtx.get(),

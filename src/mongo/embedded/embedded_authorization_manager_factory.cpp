@@ -38,11 +38,11 @@ namespace embedded {
 
 class AuthorizationManagerFactoryEmbedded : public AuthorizationManagerFactory {
 
-    std::unique_ptr<mongo::AuthorizationManager> createRouter(ServiceContext* service) override {
+    std::unique_ptr<mongo::AuthorizationManager> createRouter(Service* service) override {
         return std::make_unique<embedded::AuthorizationManager>();
     }
 
-    std::unique_ptr<mongo::AuthorizationManager> createShard(ServiceContext* service) override {
+    std::unique_ptr<mongo::AuthorizationManager> createShard(Service* service) override {
         return std::make_unique<embedded::AuthorizationManager>();
     }
 };

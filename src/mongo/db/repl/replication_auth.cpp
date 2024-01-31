@@ -40,7 +40,11 @@ namespace {
 
 // Gets the singleton AuthorizationManager object for this server process
 AuthorizationManager* getGlobalAuthorizationManager() {
-    AuthorizationManager* globalAuthManager = AuthorizationManager::get(getGlobalServiceContext());
+    auto shardService = getGlobalServiceContext()->getService(ClusterRole::ShardServer);
+    // We can assert here that a shard Service exists since this
+    // should only be called in a replication context.
+    invariant(shardService != nullptr);
+    AuthorizationManager* globalAuthManager = AuthorizationManager::get(shardService);
     fassert(16842, globalAuthManager != nullptr);
     return globalAuthManager;
 }

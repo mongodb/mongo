@@ -67,7 +67,7 @@ void initSessionAndSetMech(OperationContext* opCtx) {
     auto session = guard.getSession();
 
     // Arbitrarily set the mechanism to SCRAM-SHA-1 so that the session's mechanism has a value.
-    auto mechanism = SASLServerMechanismRegistry::get(opCtx->getServiceContext())
+    auto mechanism = SASLServerMechanismRegistry::get(opCtx->getService())
                          .getServerMechanism("SCRAM-SHA-1", "testDB");
     session->setMechanism(std::move(mechanism.getValue()), boost::none);
 };

@@ -47,8 +47,8 @@ class AuthorizationManagerFactory {
 public:
     virtual ~AuthorizationManagerFactory() = default;
 
-    virtual std::unique_ptr<AuthorizationManager> createRouter(ServiceContext* service) = 0;
-    virtual std::unique_ptr<AuthorizationManager> createShard(ServiceContext* service) = 0;
+    virtual std::unique_ptr<AuthorizationManager> createRouter(Service* service) = 0;
+    virtual std::unique_ptr<AuthorizationManager> createShard(Service* service) = 0;
 };
 
 extern std::unique_ptr<AuthorizationManagerFactory> globalAuthzManagerFactory;

@@ -93,7 +93,7 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
                       "PLAIN mechanism must be used with internal users");
     }
 
-    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
+    AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getService());
 
     // Expecting user input on the form: [authz-id]\0authn-id\0pwd
     std::string input = inputData.toString();

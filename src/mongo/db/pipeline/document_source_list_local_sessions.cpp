@@ -104,7 +104,7 @@ ListSessionsUser getUserNameForLoggedInUser(const OperationContext* opCtx) {
     auto* client = opCtx->getClient();
 
     ListSessionsUser user;
-    if (AuthorizationManager::get(client->getServiceContext())->isAuthEnabled()) {
+    if (AuthorizationManager::get(client->getService())->isAuthEnabled()) {
         const auto& userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
         uassert(ErrorCodes::Unauthorized, "There is no user authenticated", userName);
         user.setUser(userName->getUser());
@@ -172,7 +172,7 @@ mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
         31106,
         str::stream() << "The " << DocumentSourceListLocalSessions::kStageName
                       << " stage is not allowed in this context :: missing an AuthorizationManager",
-        AuthorizationManager::get(Client::getCurrent()->getServiceContext()));
+        AuthorizationManager::get(Client::getCurrent()->getService()));
     uassert(
         31111,
         str::stream() << "The " << DocumentSourceListLocalSessions::kStageName

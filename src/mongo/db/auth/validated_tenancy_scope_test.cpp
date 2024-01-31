@@ -92,10 +92,10 @@ class ValidatedTenancyScopeTestFixture : public mongo::ScopedGlobalServiceContex
 protected:
     void setUp() final {
         auto authzManagerState = std::make_unique<AuthzManagerExternalStateMock>();
-        auto authzManager = std::make_unique<AuthorizationManagerImpl>(
-            getServiceContext(), std::move(authzManagerState));
+        auto authzManager =
+            std::make_unique<AuthorizationManagerImpl>(getService(), std::move(authzManagerState));
         authzManager->setAuthEnabled(true);
-        AuthorizationManager::set(getServiceContext(), std::move(authzManager));
+        AuthorizationManager::set(getService(), std::move(authzManager));
 
         client = getServiceContext()->getService()->makeClient("test");
     }

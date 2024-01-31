@@ -50,8 +50,7 @@ ScopedGlobalServiceContextForTest::ScopedGlobalServiceContextForTest() {
     setGlobalServiceContext(std::move(serviceContext));
 
     auto globalAuthzManagerFactory = std::make_unique<AuthorizationManagerFactoryMock>();
-    AuthorizationManager::set(getGlobalServiceContext(),
-                              globalAuthzManagerFactory->createShard(getGlobalServiceContext()));
+    AuthorizationManager::set(getService(), globalAuthzManagerFactory->createShard(getService()));
 }
 
 ScopedGlobalServiceContextForTest::~ScopedGlobalServiceContextForTest() {
