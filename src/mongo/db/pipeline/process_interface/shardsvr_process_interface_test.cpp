@@ -47,6 +47,7 @@
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
@@ -140,17 +141,20 @@ TEST_F(ShardsvrProcessInterfaceTest, TestInsert) {
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
-    // Mock the response to $out's "createCollection" request.
+    // Mock the response to $out's "_shardsvrCreateCollection" request.
     NamespaceString tempNss;
     onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ("create", request.cmdObj.firstElement().fieldNameStringData());
+        ASSERT_EQ("_shardsvrCreateCollection", request.cmdObj.firstElement().fieldNameStringData());
         ASSERT_EQ(kOutNss.dbName(), request.dbname);
         ASSERT(request.cmdObj.hasField("writeConcern")) << request.cmdObj;
         ASSERT_EQ("moderate", request.cmdObj["validationLevel"].str());
+        ASSERT_EQ(true, request.cmdObj["unsplittable"].boolean());
 
         tempNss = NamespaceString::createNamespaceString_forTest(
             request.dbname, request.cmdObj.firstElement().valueStringDataSafe());
-        return BSON("ok" << 1);
+        CreateCollectionResponse res;
+        res.setCollectionVersion(ShardVersion{});
+        return res.toBSON();
     });
 
     // Mock the response to $out's "aggregate" request to config server, that is a part of

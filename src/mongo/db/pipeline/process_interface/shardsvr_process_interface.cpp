@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -359,33 +360,58 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
 void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
                                                    const DatabaseName& dbName,
                                                    const BSONObj& cmdObj) {
-    sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
-    router.route(opCtx,
-                 "ShardServerProcessInterface::createCollection",
-                 [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
-                     BSONObjBuilder finalCmdBuilder(cmdObj);
-                     finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                                            opCtx->getWriteConcern().toBSON());
-                     BSONObj finalCmdObj = finalCmdBuilder.obj();
-                     auto response = executeCommandAgainstDatabasePrimary(
-                         opCtx,
-                         dbName,
-                         cdb,
-                         finalCmdObj,
-                         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                         Shard::RetryPolicy::kIdempotent);
-                     uassertStatusOKWithContext(response.swResponse,
-                                                str::stream() << "failed while running command "
-                                                              << finalCmdObj);
-                     auto result = response.swResponse.getValue().data;
-                     uassertStatusOKWithContext(getStatusFromCommandResult(result),
-                                                str::stream() << "failed while running command "
-                                                              << finalCmdObj);
-                     uassertStatusOKWithContext(getWriteConcernStatusFromCommandResult(result),
-                                                str::stream()
-                                                    << "write concern failed while running command "
-                                                    << finalCmdObj);
-                 });
+    // TODO SERVER-85437: remove this check and keep only the 'else' branch.
+    if (serverGlobalParams.upgradeBackCompat || serverGlobalParams.downgradeBackCompat) {
+        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+        router.route(opCtx,
+                     "ShardServerProcessInterface::createCollection",
+                     [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                         BSONObjBuilder finalCmdBuilder(cmdObj);
+                         finalCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                                                opCtx->getWriteConcern().toBSON());
+                         BSONObj finalCmdObj = finalCmdBuilder.obj();
+                         auto response = executeCommandAgainstDatabasePrimary(
+                             opCtx,
+                             dbName,
+                             cdb,
+                             finalCmdObj,
+                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                             Shard::RetryPolicy::kIdempotent);
+                         uassertStatusOKWithContext(response.swResponse,
+                                                    str::stream() << "failed while running command "
+                                                                  << finalCmdObj);
+                         auto result = response.swResponse.getValue().data;
+                         uassertStatusOKWithContext(getStatusFromCommandResult(result),
+                                                    str::stream() << "failed while running command "
+                                                                  << finalCmdObj);
+                         uassertStatusOKWithContext(
+                             getWriteConcernStatusFromCommandResult(result),
+                             str::stream()
+                                 << "write concern failed while running command " << finalCmdObj);
+                     });
+    } else {
+        const auto collName = cmdObj.firstElement().String();
+        const auto nss = NamespaceStringUtil::deserialize(dbName, collName);
+
+        // Creating the ShardsvrCreateCollectionRequest by parsing the {create..} bsonObj
+        // guarantees to propagate the apiVersion and apiStrict paramers. Note that
+        // shardsvrCreateCollection as internal command will skip the apiVersionCheck.
+        // However in case of view, the create command might run an aggregation. Having those
+        // fields propagated guarantees the api version check will keep working within the
+        // aggregation framework
+        auto request = ShardsvrCreateCollectionRequest::parse(IDLParserContext("create"), cmdObj);
+
+        ShardsvrCreateCollection shardsvrCollCommand(nss);
+        request.setUnsplittable(true);
+        shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
+
+        sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
+        router.route(opCtx,
+                     "ShardServerProcessInterface::createCollection",
+                     [&](OperationContext* opCtx, const CachedDatabaseInfo& cdb) {
+                         cluster::createCollection(opCtx, shardsvrCollCommand);
+                     });
+    }
 }
 
 void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
