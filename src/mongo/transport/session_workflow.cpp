@@ -796,8 +796,12 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         }
 
         try {
-            _doOneIteration().get();
-            _scheduleIteration();
+            // All available service executors use dedicated threads, so it's okay to
+            // run eager futures in an ordinary loop to bypass scheduler overhead.
+            while (true) {
+                _doOneIteration().get();
+                _work = nullptr;
+            }
         } catch (const DBException& ex) {
             _onLoopError(ex.toStatus());
         }
