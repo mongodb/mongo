@@ -284,6 +284,99 @@ TEST_F(FindCmdShapeTest, SizeOfShapeWithAndWithoutCollation) {
     ASSERT_LT(shapeWithoutCollation->size(), shapeWithCollation->size());
 }
 
+TEST_F(FindCmdShapeTest, FindCommandShapeSHA256Hash) {
+    auto makeTemplateFindCommandRequest = []() {
+        auto findCommandRequest = std::make_unique<FindCommandRequest>(kDefaultTestNss);
+        findCommandRequest->setFilter(BSON("a" << 1));
+        findCommandRequest->setSort(BSON("b" << 1));
+        findCommandRequest->setProjection(BSON("c" << 1));
+        findCommandRequest->setCollation(BSON("locale"
+                                              << "en_US"));
+        findCommandRequest->setMin(BSON("d" << 1));
+        findCommandRequest->setMax(BSON("d" << 9));
+        findCommandRequest->setLet(BSON("e" << 1));
+        findCommandRequest->setSingleBatch(false);
+        findCommandRequest->setAllowDiskUse(true);
+        findCommandRequest->setReturnKey(true);
+        findCommandRequest->setShowRecordId(true);
+        findCommandRequest->setMirrored(true);
+        findCommandRequest->setOplogReplay(true);
+        findCommandRequest->setLimit(1);
+        findCommandRequest->setSkip(1);
+        return findCommandRequest;
+    };
+
+    // Hexadecimal form of the SHA256 hash value of the template "find" command produced by
+    // 'makeTemplateFindCommandRequest()'.
+    const std::string templateHashValue{
+        "01FDD9B676E40546066F183D0CDB74A0FE8CDF0C2CEE5FB7144CD14BCE8C5763"};
+
+    // Verify value of the SHA256 hash of the "find" command shape - it must not change over
+    // versions, and should not depend on the execution platform.
+    {
+        auto parsedFind = uassertStatusOK(
+            parsed_find_command::parse(_expCtx, {makeTemplateFindCommandRequest()}));
+        auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+        auto shapeHash = findCommandShape->sha256Hash(nullptr, SerializationContext{});
+        ASSERT_EQ(templateHashValue, shapeHash.toHexString());
+    }
+
+    // Functions that modify a single component of the "find" command shape.
+    using FindCommandRequestModificationFn = std::function<void(FindCommandRequest&)>;
+    FindCommandRequestModificationFn modifyFilterFn = [](FindCommandRequest& findCommandRequest) {
+        findCommandRequest.setFilter(BSONObj{});
+    };
+    FindCommandRequestModificationFn modifySortFn = [](FindCommandRequest& findCommandRequest) {
+        findCommandRequest.setSort(BSONObj{});
+    };
+    FindCommandRequestModificationFn modifyProjectionFn =
+        [](FindCommandRequest& findCommandRequest) {
+            findCommandRequest.setProjection(BSONObj{});
+        };
+    FindCommandRequestModificationFn modifyCollationFn =
+        [](FindCommandRequest& findCommandRequest) {
+            findCommandRequest.setCollation(BSONObj{});
+        };
+    FindCommandRequestModificationFn modifyMinFn = [](FindCommandRequest& findCommandRequest) {
+        findCommandRequest.setMin(BSONObj{});
+    };
+    FindCommandRequestModificationFn modifyMaxFn = [](FindCommandRequest& findCommandRequest) {
+        findCommandRequest.setMax(BSONObj{});
+    };
+    FindCommandRequestModificationFn modifyLetFn = [](FindCommandRequest& findCommandRequest) {
+        findCommandRequest.setLet(BSONObj{});
+    };
+    FindCommandRequestModificationFn modifyAttributesFn =
+        [](FindCommandRequest& findCommandRequest) {
+            // Modify one attribute - all boolean attributes are represented as one 32-bit word in
+            // the serialized for hashing "find" command shape.
+            findCommandRequest.setAllowDiskUse(false);
+        };
+
+    // Verify that all components of the "find" command shape are factored in when computing the
+    // hash value. Modify components of template "find" command request and verify that the
+    // resulting hash value differs.
+    for (auto&& findCommandRequestModificationFunc : {modifyFilterFn,
+                                                      modifySortFn,
+                                                      modifyProjectionFn,
+                                                      modifyCollationFn,
+                                                      modifyMinFn,
+                                                      modifyMaxFn,
+                                                      modifyLetFn,
+                                                      modifyAttributesFn}) {
+        auto findCommandRequest = makeTemplateFindCommandRequest();
+        findCommandRequestModificationFunc(*findCommandRequest);
+        auto parsedFind =
+            uassertStatusOK(parsed_find_command::parse(_expCtx, {std::move(findCommandRequest)}));
+        auto findCommandShape = std::make_unique<FindCmdShape>(*parsedFind, _expCtx);
+        auto shapeHash = findCommandShape->sha256Hash(nullptr, SerializationContext{});
+
+        // Verify that the hash value is different from the hash value of the template "find"
+        // command.
+        ASSERT_NE(templateHashValue, shapeHash.toHexString())
+            << findCommandShape->toFindCommandRequest()->toBSON(BSONObj{}).toString();
+    }
+}
 }  // namespace
 
 }  // namespace mongo::query_shape
