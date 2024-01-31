@@ -2525,17 +2525,7 @@ task_groups:
   - determine_patch_tests
   - archive_dist_test
   - archive_dist_test_debug
-  - compile_all
-
-- <<: *compile_task_group_template
-  name: compile_test_and_package_parallel_core_stream_TG
-  tasks:
-  - compile_dist_test
-  - determine_patch_tests
-  - archive_dist_test
-  - archive_dist_test_debug
-  - compile_all
-  - package
+  - compile_all_but_not_unittests
 
 - <<: *compile_task_group_template
   name: compile_test_parallel_dbtest_stream_TG
