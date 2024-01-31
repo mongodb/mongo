@@ -247,13 +247,13 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       # We have seen some common scenarios where the generated pipelines take a while to run and can
-      # hit some timeouts. We'll split 80000 pipelines across 80 files, compared to 80000 pipelines
+      # hit some timeouts. We'll split 70000 pipelines across 70 files, compared to 80000 pipelines
       # across 20 files in the other generational agg fuzzers. This approach can be considered if we
       # see similar timeouts elsewhere. It is not well understood whether/how we could pass
       # 'numPipelines' as an argument in the yaml here, but it works as part of the
       # 'jstestfuzz_vars' argument string. If a future reader better understands this evergreen
       # integration, please update this comment and/or move numPipelines to a yaml arg here.
-      num_files: 80
+      num_files: 70
       num_tasks: 20
       jstestfuzz_vars: --diffTestingMode timeseries --numPipelines=1000
       npm_command: agg-fuzzer

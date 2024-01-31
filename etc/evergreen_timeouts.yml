@@ -11,6 +11,12 @@
 
 overrides:
 
+  # We increased the timeout since comparison results speed were slowed down due to resolving
+  # Object.entries correctly.
+  enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers:
+  - task: aggregation_timeseries_fuzzer
+    exec_timeout: 150 # 2.5 hours
+
   enterprise-macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
