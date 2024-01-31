@@ -247,14 +247,16 @@ struct StrippedFields {
 public:
     boost::optional<repl::ReadConcernArgs> readConcern;
     boost::optional<ShardVersion> shardVersion;
+    boost::optional<DatabaseVersion> databaseVersion;
 };
 
 /**
- * Returns the readConcern setting from the cmdObj. If a BSONObjBuilder is provided, it will
- * append the original fields from the cmdObj except for the readConcern field.
+ * Returns the readConcern, shardVersion and databaseVersion settings from the cmdObj. If a
+ * BSONObjBuilder is provided, it will append the original fields from the cmdObj except for the
+ * aforementioned fields.
  */
-StrippedFields stripReadConcernAndShardVersion(const BSONObj& cmdObj,
-                                               BSONObjBuilder* cmdWithoutReadConcernBuilder) {
+StrippedFields stripReadConcernAndShardAndDbVersions(const BSONObj& cmdObj,
+                                                     BSONObjBuilder* cmdWithoutReadConcernBuilder) {
     BSONObjBuilder strippedCmdBuilder;
     StrippedFields strippedFields;
 
@@ -266,6 +268,9 @@ StrippedFields stripReadConcernAndShardVersion(const BSONObj& cmdObj,
         } else if (elem.fieldNameStringData() == ShardVersion::kShardVersionField) {
             strippedFields.shardVersion = ShardVersion::parse(elem);
             continue;
+        } else if (elem.fieldNameStringData() == DatabaseVersion::kDatabaseVersionField) {
+            strippedFields.databaseVersion = DatabaseVersion(elem.embeddedObject());
+            continue;
         }
 
         if (cmdWithoutReadConcernBuilder) {
@@ -274,6 +279,24 @@ StrippedFields stripReadConcernAndShardVersion(const BSONObj& cmdObj,
     }
 
     return strippedFields;
+}
+
+// Sets the placementConflictTime metadata on 'databaseVersion' if needed.
+void setPlacementConflictTimeToDatabaseVersionIfNeeded(
+    const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
+    bool hasTxnCreatedAnyDatabase,
+    DatabaseVersion& databaseVersion) {
+    if (hasTxnCreatedAnyDatabase) {
+        // If any database has been created within this transaction, ask the shards to avoid
+        // checking placement timestamp conflicts for this database
+        // (placementConflictTimestamp=Timestamp(0,0) conveys that). The reason is that the
+        // newly-created database will have a timestamp greater than this transaction's timestamp,
+        // so it would always conflict. This would prevent the transaction from reading its own
+        // writes.
+        databaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+    } else if (placementConflictTimeForNonSnapshotReadConcern) {
+        databaseVersion.setPlacementConflictTime(*placementConflictTimeForNonSnapshotReadConcern);
+    }
 }
 
 }  // namespace
@@ -436,7 +459,10 @@ const LogicalSessionId& TransactionRouter::Observer::_sessionId() const {
 }
 
 BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
-    OperationContext* opCtx, BSONObj cmd, bool isFirstStatementInThisParticipant) const {
+    OperationContext* opCtx,
+    BSONObj cmd,
+    bool isFirstStatementInThisParticipant,
+    bool hasTxnCreatedAnyDatabase) const {
     bool hasStartTxn = false;
     bool hasAutoCommit = false;
     bool hasTxnNum = false;
@@ -480,9 +506,12 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
               sharedOptions.readConcernArgs,
               sharedOptions.atClusterTimeForSnapshotReadConcern,
               sharedOptions.placementConflictTimeForNonSnapshotReadConcern,
-              !hasStartTxn)
+              !hasStartTxn,
+              hasTxnCreatedAnyDatabase)
         : appendFieldsForContinueTransaction(
-              std::move(cmd), sharedOptions.placementConflictTimeForNonSnapshotReadConcern);
+              std::move(cmd),
+              sharedOptions.placementConflictTimeForNonSnapshotReadConcern,
+              hasTxnCreatedAnyDatabase);
 
     if (isCoordinator) {
         newCmd.append(kCoordinatorField, true);
@@ -512,9 +541,10 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
 
 BSONObj TransactionRouter::appendFieldsForContinueTransaction(
     BSONObj cmdObj,
-    const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern) {
+    const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
+    bool hasTxnCreatedAnyDatabase) {
     BSONObjBuilder cmdBob;
-    const auto strippedFields = stripReadConcernAndShardVersion(cmdObj, &cmdBob);
+    const auto strippedFields = stripReadConcernAndShardAndDbVersions(cmdObj, &cmdBob);
 
     if (auto shardVersion = strippedFields.shardVersion) {
         if (placementConflictTimeForNonSnapshotReadConcern) {
@@ -522,6 +552,16 @@ BSONObj TransactionRouter::appendFieldsForContinueTransaction(
         }
 
         shardVersion->serialize(ShardVersion::kShardVersionField, &cmdBob);
+    }
+
+    if (auto databaseVersion = strippedFields.databaseVersion) {
+        setPlacementConflictTimeToDatabaseVersionIfNeeded(
+            placementConflictTimeForNonSnapshotReadConcern,
+            hasTxnCreatedAnyDatabase,
+            *databaseVersion);
+
+        BSONObjBuilder dbvBuilder(cmdBob.subobjStart(DatabaseVersion::kDatabaseVersionField));
+        databaseVersion->serialize(&dbvBuilder);
     }
 
     return cmdBob.obj();
@@ -659,6 +699,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
                                                            const ShardId& shardId,
                                                            const BSONObj& cmdObj) {
     RouterTransactionsMetrics::get(opCtx)->incrementTotalRequestsTargeted();
+    const bool hasTxnCreatedAnyDatabase = !p().createdDatabases.empty();
     if (auto txnPart = getParticipant(shardId)) {
         LOGV2_DEBUG(22883,
                     4,
@@ -668,7 +709,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
                     "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                     "shardId"_attr = shardId,
                     "request"_attr = redact(cmdObj));
-        return txnPart->attachTxnFieldsIfNeeded(opCtx, cmdObj, false);
+        return txnPart->attachTxnFieldsIfNeeded(opCtx, cmdObj, false, hasTxnCreatedAnyDatabase);
     }
 
     auto txnPart = _createParticipant(opCtx, shardId);
@@ -685,7 +726,7 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
         RouterTransactionsMetrics::get(opCtx)->incrementTotalContactedParticipants();
     }
 
-    return txnPart.attachTxnFieldsIfNeeded(opCtx, cmdObj, true);
+    return txnPart.attachTxnFieldsIfNeeded(opCtx, cmdObj, true, hasTxnCreatedAnyDatabase);
 }
 
 const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(
@@ -1544,6 +1585,7 @@ void TransactionRouter::Router::_resetRouterState(
         o(lk).abortCause = std::string();
         o(lk).metricsTracker.emplace(opCtx->getServiceContext());
         p().terminationInitiated = false;
+        p().createdDatabases.clear();
 
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());
@@ -2083,10 +2125,11 @@ BSONObj TransactionRouter::appendFieldsForStartTransaction(
     const repl::ReadConcernArgs& txnLevelReadConcern,
     const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
     const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
-    bool doAppendStartTransaction) {
+    bool doAppendStartTransaction,
+    bool hasTxnCreatedAnyDatabase) {
     BSONObjBuilder cmdBob;
 
-    const auto strippedFields = stripReadConcernAndShardVersion(cmdObj, &cmdBob);
+    const auto strippedFields = stripReadConcernAndShardAndDbVersions(cmdObj, &cmdBob);
     const auto finalReadConcern =
         reconcileReadConcern(strippedFields.readConcern,
                              txnLevelReadConcern,
@@ -2105,6 +2148,16 @@ BSONObj TransactionRouter::appendFieldsForStartTransaction(
         }
 
         shardVersion->serialize(ShardVersion::kShardVersionField, &cmdBob);
+    }
+
+    if (auto databaseVersion = strippedFields.databaseVersion) {
+        setPlacementConflictTimeToDatabaseVersionIfNeeded(
+            placementConflictTimeForNonSnapshotReadConcern,
+            hasTxnCreatedAnyDatabase,
+            *databaseVersion);
+
+        BSONObjBuilder dbvBuilder(cmdBob.subobjStart(DatabaseVersion::kDatabaseVersionField));
+        databaseVersion->serialize(&dbvBuilder);
     }
 
     if (doAppendStartTransaction) {

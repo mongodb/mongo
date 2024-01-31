@@ -52,7 +52,7 @@ function getLatestPlacementInfoFor(namespace) {
     return placementQueryResults[0];
 }
 
-function getValidatedPlacementInfoForDB(dbName, isInitialPlacement = true) {
+function getValidatedPlacementInfoForDB(dbName) {
     const configDBInfo = getInfoFromConfigDatabases(dbName);
     const dbPlacementInfo = getLatestPlacementInfoFor(dbName);
     assert.neq(null, configDBInfo);
@@ -61,14 +61,7 @@ function getValidatedPlacementInfoForDB(dbName, isInitialPlacement = true) {
     // config.databases.
     assert.sameMembers([configDBInfo.primary], dbPlacementInfo.shards);
 
-    if (isInitialPlacement) {
-        assert(timestampCmp(configDBInfo.version.timestamp, dbPlacementInfo.timestamp) === 0);
-    } else {
-        // after a movePrimary, the timestamp of the placementHistory document should be greater
-        // since the timestamp associated to the config.databases document does not change (only
-        // lastMod is updated).
-        assert(timestampCmp(configDBInfo.version.timestamp, dbPlacementInfo.timestamp) < 0);
-    }
+    assert(timestampCmp(configDBInfo.version.timestamp, dbPlacementInfo.timestamp) === 0);
 
     // No UUID field for DB namespaces
     assert.eq(undefined, dbPlacementInfo.uuid);
@@ -199,7 +192,7 @@ function testMovePrimary(dbName, fromPrimaryShardName, toPrimaryShardName) {
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: toPrimaryShardName}));
 
     // Verify that the new primary shard is the one specified in the command.
-    const newDbInfo = getValidatedPlacementInfoForDB(dbName, false /* isInitialPlacement */);
+    const newDbInfo = getValidatedPlacementInfoForDB(dbName);
     assert.sameMembers(newDbInfo.shards, [toPrimaryShardName]);
 }
 

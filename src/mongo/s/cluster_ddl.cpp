@@ -56,6 +56,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
@@ -116,6 +117,10 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         request.setDbName(DatabaseName::kAdmin);
         if (suggestedPrimaryId)
             request.setPrimaryShardId(*suggestedPrimaryId);
+
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter.annotateCreatedDatabase(dbName);
+        }
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(

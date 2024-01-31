@@ -266,6 +266,10 @@ protected:
         return version;
     }
 
+    DatabaseVersion exampleDatabaseVersion() const {
+        return DatabaseVersion(UUID::gen(), Timestamp(3, 1));
+    }
+
 private:
     // Enables the transaction router to retry within a transaction on stale version and snapshot
     // errors for the duration of each test.
@@ -1341,146 +1345,256 @@ TEST_F(TransactionRouterTestWithDefaultSession,
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRC) {
-    repl::ReadConcernArgs defaultRCArgs;
-    const auto shardVersion = exampleShardVersion();
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()),
-        defaultRCArgs,
-        boost::none,
-        LogicalTime{Timestamp(10, 1)},
-        true /* doAppendStartTransaction */);
+    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+        repl::ReadConcernArgs defaultRCArgs;
+        const auto shardVersion = exampleShardVersion();
+        const auto databaseVersion = exampleDatabaseVersion();
+        auto result = TransactionRouter::appendFieldsForStartTransaction(
+            BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
+                         << databaseVersion.toBSON()),
+            defaultRCArgs,
+            boost::none,
+            LogicalTime{Timestamp(10, 1)},
+            true /* doAppendStartTransaction */,
+            hasTxnCreatedAnyDatabase);
 
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
-    ASSERT_EQ(result["startTransaction"].boolean(), true);
+        ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+        repl::ReadConcernArgs resultArgs;
+        ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+        ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
+        ASSERT_EQ(result["startTransaction"].boolean(), true);
 
-    auto expectedShardVersion = shardVersion;
-    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
-    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+        auto expectedShardVersion = shardVersion;
+        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+
+        auto expectedDatabaseVersion = databaseVersion;
+        if (hasTxnCreatedAnyDatabase) {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+        } else {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        }
+        ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
+    };
+
+    test(false /* hasTxnCreatedAnyDatabase */);
+    test(true /* hasTxnCreatedAnyDatabase */);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCMajority) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kMajorityReadConcern);
-    const auto shardVersion = exampleShardVersion();
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()),
-        defaultRCArgs,
-        boost::none,
-        LogicalTime{Timestamp(10, 1)},
-        true /* doAppendStartTransaction */);
+    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+        repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+        const auto shardVersion = exampleShardVersion();
+        const auto databaseVersion = exampleDatabaseVersion();
+        auto result = TransactionRouter::appendFieldsForStartTransaction(
+            BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
+                         << databaseVersion.toBSON()),
+            defaultRCArgs,
+            boost::none,
+            LogicalTime{Timestamp(10, 1)},
+            true /* doAppendStartTransaction */,
+            hasTxnCreatedAnyDatabase);
 
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kMajorityReadConcern);
-    ASSERT(!resultArgs.getArgsAtClusterTime());
-    ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
-    ASSERT_EQ(result["startTransaction"].boolean(), true);
+        ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+        repl::ReadConcernArgs resultArgs;
+        ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+        ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kMajorityReadConcern);
+        ASSERT(!resultArgs.getArgsAtClusterTime());
+        ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
+        ASSERT_EQ(result["startTransaction"].boolean(), true);
 
-    auto expectedShardVersion = shardVersion;
-    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
-    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+        auto expectedShardVersion = shardVersion;
+        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+
+        auto expectedDatabaseVersion = databaseVersion;
+        if (hasTxnCreatedAnyDatabase) {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+        } else {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        }
+        ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
+    };
+
+    test(false /* hasTxnCreatedAnyDatabase */);
+    test(true /* hasTxnCreatedAnyDatabase */);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCLocal) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kLocalReadConcern);
-    const auto shardVersion = exampleShardVersion();
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "readConcern"
-                     << BSON("level"
-                             << "local")),
-        defaultRCArgs,
-        boost::none,
-        LogicalTime{Timestamp(10, 1)},
-        true /* doAppendStartTransaction */);
+    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+        repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kLocalReadConcern);
+        const auto shardVersion = exampleShardVersion();
+        const auto databaseVersion = exampleDatabaseVersion();
+        auto result = TransactionRouter::appendFieldsForStartTransaction(
+            BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
+                         << databaseVersion.toBSON() << "readConcern"
+                         << BSON("level"
+                                 << "local")),
+            defaultRCArgs,
+            boost::none,
+            LogicalTime{Timestamp(10, 1)},
+            true /* doAppendStartTransaction */,
+            hasTxnCreatedAnyDatabase);
 
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kLocalReadConcern);
-    ASSERT(!resultArgs.getArgsAtClusterTime());
-    ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
-    ASSERT_EQ(result["startTransaction"].boolean(), true);
+        ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+        repl::ReadConcernArgs resultArgs;
+        ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+        ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kLocalReadConcern);
+        ASSERT(!resultArgs.getArgsAtClusterTime());
+        ASSERT_EQ(resultArgs.getArgsAfterClusterTime()->asTimestamp(), Timestamp(10, 1));
+        ASSERT_EQ(result["startTransaction"].boolean(), true);
 
-    auto expectedShardVersion = shardVersion;
-    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
-    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+        auto expectedShardVersion = shardVersion;
+        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+
+        auto expectedDatabaseVersion = databaseVersion;
+        if (hasTxnCreatedAnyDatabase) {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+        } else {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        }
+        ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
+    };
+
+    test(false /* hasTxnCreatedAnyDatabase */);
+    test(true /* hasTxnCreatedAnyDatabase */);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshot) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    const auto shardVersion = exampleShardVersion();
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "readConcern"
-                     << BSON("level"
-                             << "snapshot")),
-        defaultRCArgs,
-        LogicalTime(Timestamp(1, 2)),
-        boost::none,
-        false /* doAppendStartTransaction */);
+    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+        repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+        const auto shardVersion = exampleShardVersion();
+        const auto databaseVersion = exampleDatabaseVersion();
+        auto result = TransactionRouter::appendFieldsForStartTransaction(
+            BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
+                         << databaseVersion.toBSON() << "readConcern"
+                         << BSON("level"
+                                 << "snapshot")),
+            defaultRCArgs,
+            LogicalTime(Timestamp(1, 2)),
+            boost::none,
+            false /* doAppendStartTransaction */,
+            hasTxnCreatedAnyDatabase);
 
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
-    ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
-    ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
-    ASSERT(!result["startTransaction"]);
+        ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+        repl::ReadConcernArgs resultArgs;
+        ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+        ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
+        ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
+        ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
+        if (hasTxnCreatedAnyDatabase) {
+            auto expectedDatabaseVersion = databaseVersion;
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), expectedDatabaseVersion.toBSON());
+
+        } else {
+            ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), databaseVersion.toBSON());
+        }
+        ASSERT(!result["startTransaction"]);
+    };
+
+    test(false /* hasTxnCreatedAnyDatabase */);
+    test(true /* hasTxnCreatedAnyDatabase */);
 }
 
 TEST_F(TransactionRouterTest,
        AppendFieldsForStartTransactionDefaultRCCommandSpecifiesRCSnapshotAndAtClusterTime) {
-    repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-    const auto shardVersion = exampleShardVersion();
+    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+        repl::ReadConcernArgs defaultRCArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+        const auto shardVersion = exampleShardVersion();
+        const auto databaseVersion = exampleDatabaseVersion();
 
-    auto result = TransactionRouter::appendFieldsForStartTransaction(
-        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "readConcern"
-                     << BSON("level"
-                             << "snapshot"
-                             << "atClusterTime" << Timestamp(1, 2))),
-        defaultRCArgs,
-        LogicalTime(Timestamp(1, 2)),
-        boost::none,
-        false /* doAppendStartTransaction */);
+        auto result = TransactionRouter::appendFieldsForStartTransaction(
+            BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
+                         << databaseVersion.toBSON() << "readConcern"
+                         << BSON("level"
+                                 << "snapshot"
+                                 << "atClusterTime" << Timestamp(1, 2))),
+            defaultRCArgs,
+            LogicalTime(Timestamp(1, 2)),
+            boost::none,
+            false /* doAppendStartTransaction */,
+            hasTxnCreatedAnyDatabase);
 
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    repl::ReadConcernArgs resultArgs;
-    ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
-    ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
-    ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
-    ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
-    ASSERT(!result["startTransaction"]);
+        ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+        repl::ReadConcernArgs resultArgs;
+        ASSERT_OK(resultArgs.parse(result["readConcern"].Obj()));
+        ASSERT_EQ(resultArgs.getLevel(), repl::ReadConcernLevel::kSnapshotReadConcern);
+        ASSERT_EQ(resultArgs.getArgsAtClusterTime()->asTimestamp(), Timestamp(1, 2));
+        ASSERT_BSONOBJ_EQ(result["shardVersion"].Obj(), shardVersion.toBSON());
+        if (hasTxnCreatedAnyDatabase) {
+            auto expectedDatabaseVersion = databaseVersion;
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+            ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), expectedDatabaseVersion.toBSON());
+
+        } else {
+            ASSERT_BSONOBJ_EQ(result["databaseVersion"].Obj(), databaseVersion.toBSON());
+        }
+        ASSERT(!result["startTransaction"]);
+    };
+
+    test(false /* hasTxnCreatedAnyDatabase */);
+    test(true /* hasTxnCreatedAnyDatabase */);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionNoShardVersion) {
     auto result = TransactionRouter::appendFieldsForContinueTransaction(
-        BSON("MyCmd" << 1), LogicalTime{Timestamp(10, 1)});
+        BSON("MyCmd" << 1), LogicalTime{Timestamp(10, 1)}, false /* hasTxnCreatedAnyDatabase */);
 
     ASSERT_BSONOBJ_EQ(BSON("MyCmd" << 1), result);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersion) {
-    const auto shardVersion = exampleShardVersion();
-    auto result = TransactionRouter::appendFieldsForContinueTransaction(
-        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()),
-        LogicalTime{Timestamp(10, 1)});
+    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+        const auto shardVersion = exampleShardVersion();
+        const auto databaseVersion = exampleDatabaseVersion();
+        auto result = TransactionRouter::appendFieldsForContinueTransaction(
+            BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
+                         << databaseVersion.toBSON()),
+            LogicalTime{Timestamp(10, 1)},
+            hasTxnCreatedAnyDatabase);
 
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+        ASSERT_EQ(result["MyCmd"].numberLong(), 1);
 
-    auto expectedShardVersion = shardVersion;
-    expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
-    ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+        auto expectedShardVersion = shardVersion;
+        expectedShardVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        ASSERT_BSONOBJ_EQ(expectedShardVersion.toBSON(), result["shardVersion"].Obj());
+
+        auto expectedDatabaseVersion = databaseVersion;
+        if (hasTxnCreatedAnyDatabase) {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+        } else {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(10, 1)));
+        }
+        ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
+    };
+
+    test(false /* hasTxnCreatedAnyDatabase */);
+    test(true /* hasTxnCreatedAnyDatabase */);
 }
 
 TEST_F(TransactionRouterTest, AppendFieldsForContinueTransactionWithShardVersionNoConflictTime) {
-    const auto shardVersion = exampleShardVersion();
-    auto result = TransactionRouter::appendFieldsForContinueTransaction(
-        BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON()), boost::none);
+    const auto test = [this](bool hasTxnCreatedAnyDatabase) {
+        const auto shardVersion = exampleShardVersion();
+        const auto databaseVersion = exampleDatabaseVersion();
+        auto result = TransactionRouter::appendFieldsForContinueTransaction(
+            BSON("MyCmd" << 1 << "shardVersion" << shardVersion.toBSON() << "databaseVersion"
+                         << databaseVersion.toBSON()),
+            boost::none,
+            hasTxnCreatedAnyDatabase);
 
-    ASSERT_EQ(result["MyCmd"].numberLong(), 1);
-    ASSERT_BSONOBJ_EQ(shardVersion.toBSON(), result["shardVersion"].Obj());
+        ASSERT_EQ(result["MyCmd"].numberLong(), 1);
+        ASSERT_BSONOBJ_EQ(shardVersion.toBSON(), result["shardVersion"].Obj());
+        auto expectedDatabaseVersion = databaseVersion;
+        if (hasTxnCreatedAnyDatabase) {
+            expectedDatabaseVersion.setPlacementConflictTime(LogicalTime(Timestamp(0, 0)));
+        }
+        ASSERT_BSONOBJ_EQ(expectedDatabaseVersion.toBSON(), result["databaseVersion"].Obj());
+    };
+
+    test(false /* hasTxnCreatedAnyDatabase */);
+    test(true /* hasTxnCreatedAnyDatabase */);
 }
 
 TEST_F(TransactionRouterTest, CommitWithRecoveryTokenWithNoParticipants) {
