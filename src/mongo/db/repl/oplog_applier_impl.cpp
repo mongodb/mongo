@@ -734,9 +734,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                                                       std::vector<OplogEntry> ops) {
     invariant(!ops.empty());
 
-    LOGV2_DEBUG(21230, 2, "Replication batch size", "size"_attr = ops.size());
+    LOGV2_DEBUG(21230, 2, "Oplog application batch size", "size"_attr = ops.size());
 
-    invariant(_replCoord);
     if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
         LOGV2_FATAL_CONTINUE(21234, "Attempting to replicate ops while primary");
         return {ErrorCodes::CannotApplyOplogWhilePrimary,

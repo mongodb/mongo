@@ -633,6 +633,37 @@ env.Benchmark(
 )
 
 env.Library(
+    target='oplog_write_interface',
+    source=[
+        'oplog_writer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='oplog_write',
+    source=[
+        'oplog_writer_impl.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_write_interface',
+        'repl_coordinator_interface',
+        'storage_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
+        '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/shard_role',
+    ],
+)
+
+env.Library(
     target='oplog_application_interface',
     source=[
         'oplog_applier.cpp',
@@ -1792,6 +1823,7 @@ if wiredtiger:
             'oplog_fetcher_mock.cpp',
             'oplog_fetcher_test.cpp',
             'oplog_test.cpp',
+            'oplog_writer_impl_test.cpp',
             'optime_extract_test.cpp',
             'primary_only_service_test.cpp',
             'primary_only_service_util_test.cpp',
@@ -1839,6 +1871,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
             '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
             '$BUILD_DIR/mongo/db/catalog/health_log',
+            '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
             '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
             '$BUILD_DIR/mongo/db/commands/create_command',
             '$BUILD_DIR/mongo/db/commands/mongod_fcv',
@@ -1897,6 +1930,7 @@ if wiredtiger:
             'oplog_interface_local',
             'oplog_interface_mock',
             'oplog_interface_remote',
+            'oplog_write',
             'optime',
             'primary_only_service_test_fixture',
             'repl_coordinator_impl',
