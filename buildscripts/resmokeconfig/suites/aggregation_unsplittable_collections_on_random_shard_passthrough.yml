@@ -29,9 +29,6 @@ selector:
   - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
   - jstests/aggregation/spill_to_disk.js
 
-  # TODO: SERVER-83443 Reenable:
-  - jstests/aggregation/sources/lookup/lookup_contains_text.js
-
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_no_implicit_index_creation
