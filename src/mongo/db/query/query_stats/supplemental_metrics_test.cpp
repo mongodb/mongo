@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/query/query_stats/supplemental_metrics_stats.h"
 #include <memory>
 
 #include "mongo/base/string_data.h"
@@ -75,6 +76,27 @@ TEST(SupplementalMetricsStats, ClassicMetrics) {
             }
         })",
         res2);
+}
+
+TEST(SupplementalMetricsStats, SbeMetrics) {
+    query_stats::SupplementalStatsMap metrics;
+    auto entry = std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(
+        1, query_stats::SupplementalMetricType::SBE);
+    metrics.update(std::move(entry));
+    BSONObj res1 = metrics.toBSON();
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "SBE": {
+                "updateCount": 1,
+                "optimizationTimeMicros": {
+                    "sum": 1,
+                    "max": 1,
+                    "min": 1,
+                    "sumOfSquares": 1
+                }
+            }
+        })",
+        res1);
 }
 
 TEST(SupplementalMetricsStats, BonsaiM2Metrics) {

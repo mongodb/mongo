@@ -419,30 +419,48 @@ void collectQueryStatsMongod(OperationContext* opCtx, std::unique_ptr<query_stat
         opDebug.additiveMetrics);
 
     std::unique_ptr<query_stats::SupplementalStatsEntry> supplementalMetrics(nullptr);
+
     if (internalQueryCollectOptimizerMetrics.load()) {
-        if (opDebug.estimatedCost && opDebug.estimatedCardinality) {
-            const auto frameworkControl =
-                QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+        auto metricType(query_stats::SupplementalMetricType::Unknown);
+        const auto frameworkControlKnob =
+            QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
 
-            auto bonsaiMetricType(query_stats::SupplementalMetricType::BonsaiM2);
+        switch (opDebug.queryFramework) {
+            case PlanExecutor::QueryFramework::kClassicOnly:
+            case PlanExecutor::QueryFramework::kClassicHybrid:
+                metricType = query_stats::SupplementalMetricType::Classic;
+                break;
+            case PlanExecutor::QueryFramework::kSBEOnly:
+            case PlanExecutor::QueryFramework::kSBEHybrid:
+                metricType = query_stats::SupplementalMetricType::SBE;
+                break;
+            case PlanExecutor::QueryFramework::kCQF:
+                if (frameworkControlKnob == QueryFrameworkControlEnum::kTryBonsai) {
+                    metricType = query_stats::SupplementalMetricType::BonsaiM2;
+                } else if (frameworkControlKnob ==
+                           QueryFrameworkControlEnum::kTryBonsaiExperimental) {
+                    metricType = query_stats::SupplementalMetricType::BonsaiM4;
+                } else if (frameworkControlKnob == QueryFrameworkControlEnum::kForceBonsai) {
+                    metricType = query_stats::SupplementalMetricType::ForceBonsai;
+                }
+                break;
+            case PlanExecutor::QueryFramework::kUnknown:
+                break;
+        }
 
-            if (frameworkControl == QueryFrameworkControlEnum::kTryBonsai) {
-                bonsaiMetricType = query_stats::SupplementalMetricType::BonsaiM2;
-            } else if (frameworkControl == QueryFrameworkControlEnum::kTryBonsaiExperimental) {
-                bonsaiMetricType = query_stats::SupplementalMetricType::BonsaiM4;
-            } else if (frameworkControl == QueryFrameworkControlEnum::kForceBonsai) {
-                bonsaiMetricType = query_stats::SupplementalMetricType::ForceBonsai;
+        if (metricType != query_stats::SupplementalMetricType::Unknown) {
+            if (opDebug.estimatedCost && opDebug.estimatedCardinality) {
+                supplementalMetrics =
+                    std::make_unique<query_stats::OptimizerMetricsBonsaiStatsEntry>(
+                        opDebug.planningTime.count(),
+                        *opDebug.estimatedCost,
+                        *opDebug.estimatedCardinality,
+                        metricType);
+            } else {
+                supplementalMetrics =
+                    std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(
+                        opDebug.planningTime.count(), metricType);
             }
-
-            supplementalMetrics = std::make_unique<query_stats::OptimizerMetricsBonsaiStatsEntry>(
-                opDebug.planningTime.count(),
-                *opDebug.estimatedCost,
-                *opDebug.estimatedCardinality,
-                bonsaiMetricType);
-        } else {  // TODO: The assumption that its Classic optimizer if no cardinality or cost is
-                  // estimated ignores fast paths.
-            supplementalMetrics = std::make_unique<query_stats::OptimizerMetricsClassicStatsEntry>(
-                opDebug.planningTime.count());
         }
     }
 

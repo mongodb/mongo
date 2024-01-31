@@ -54,6 +54,9 @@ assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 verifyOptimizerStats("Classic", false);
 assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+verifyOptimizerStats("SBE", false);
+assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 verifyOptimizerStats("BonsaiM2", true);
 assert.commandWorked(

@@ -44,9 +44,11 @@ namespace mongo::query_stats {
  * Defined an enum class that list all the optional metrics supported.
  */
 #define SUPPLEMENTAL_METRIC_STATS_TYPE(X) \
+    X(Unknown)                            \
     X(BonsaiM2)                           \
     X(BonsaiM4)                           \
     X(ForceBonsai)                        \
+    X(SBE)                                \
     X(Classic)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(SupplementalMetricType, SUPPLEMENTAL_METRIC_STATS_TYPE);

@@ -38,7 +38,7 @@
 namespace mongo::query_stats {
 
 void OptimizerMetricsClassicStatsEntry::appendTo(BSONObjBuilder& builder) const {
-    BSONObjBuilder metricsEntryBuilder = builder.subobjStart("Classic");
+    BSONObjBuilder metricsEntryBuilder = builder.subobjStart(toStringData(metricType));
     metricsEntryBuilder.append("updateCount", static_cast<long long>(updateCount));
     optimizationTimeMicros.appendTo(metricsEntryBuilder, "optimizationTimeMicros");
 }
