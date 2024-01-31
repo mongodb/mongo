@@ -664,7 +664,8 @@ let Explain = (function() {
         }
 
         const queryPlanner = explain.queryPlanner;
-        const isShardedFind = queryPlanner && queryPlanner.mongosPlannerVersion === 1;
+        const isShardedFind = queryPlanner && queryPlanner.winningPlan &&
+            queryPlanner.winningPlan.hasOwnProperty("shards");
         if (isShardedFind) {
             return doShardedFindReformatting(explain, fieldsToKeepSet);
         }

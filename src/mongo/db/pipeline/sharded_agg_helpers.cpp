@@ -1680,6 +1680,11 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         const auto& data = shardResult.swResponse.getValue().data;
         BSONObjBuilder explain(shardExplains.subobjStart(shardId));
         explain << "host" << shardResult.shardHostAndPort->toString();
+
+        // Add the per shard explainVersion to the final explain output.
+        auto explainVersion = data["explainVersion"];
+        explain << "explainVersion" << explainVersion;
+
         if (auto stagesElement = data["stages"]) {
             explain << "stages" << stagesElement;
         } else {

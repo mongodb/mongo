@@ -1,4 +1,9 @@
-// Tests for the mongos explain command.
+/* Tests for the mongos explain command.
+ * @tags: [
+ * requires_fcv_80
+ * ]
+ */
+
 import {
     WriteWithoutShardKeyTestUtil
 } from "jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js";
@@ -83,11 +88,16 @@ explain = db.runCommand({
 });
 assert.commandWorked(explain, tojson(explain));
 assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_WRITE");
-assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
-const stageShard0 = explain.queryPlanner.winningPlan.shards[0].winningPlan.stage;
-const stageShard1 = explain.queryPlanner.winningPlan.shards[1].winningPlan.stage;
-assert(stageShard0 === "DELETE" || stageShard0 === "BATCHED_DELETE");
-assert(stageShard1 === "DELETE" || stageShard1 === "BATCHED_DELETE");
+
+let shards = explain.queryPlanner.winningPlan.shards;
+assert.eq(shards.length, 2);
+
+for (let shard of shards) {
+    const shardStage = shard.winningPlan.stage;
+    assert(shardStage === "DELETE" || shardStage === "BATCHED_DELETE");
+    assert(shard.hasOwnProperty("explainVersion"));
+}
+
 // Check that the deletes didn't actually happen.
 assert.eq(3, collSharded.count({b: 1}));
 
@@ -118,9 +128,16 @@ explain = db.runCommand({
 assert.commandWorked(explain, tojson(explain));
 assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
 assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_WRITE");
-assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
-assert.eq(explain.queryPlanner.winningPlan.shards[0].winningPlan.stage, "UPDATE");
-assert.eq(explain.queryPlanner.winningPlan.shards[1].winningPlan.stage, "UPDATE");
+
+shards = explain.queryPlanner.winningPlan.shards;
+assert.eq(shards.length, 2);
+
+for (let shard of shards) {
+    const shardStage = shard.winningPlan.stage;
+    assert.eq(shardStage, "UPDATE");
+    assert(shard.hasOwnProperty("explainVersion"));
+}
+
 // Check that the update didn't actually happen.
 assert.eq(0, collSharded.count({b: 10}));
 

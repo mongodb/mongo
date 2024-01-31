@@ -98,8 +98,6 @@ public:
     static const char* kMergeSortFromShards;
     static const char* kWriteOnShards;
 
-    static constexpr int kPlannerVersion = 1;
-
 private:
     /**
      * Returns an OK status if all shards support the explain command and returned sensible

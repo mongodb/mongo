@@ -1,8 +1,7 @@
 /* This test ensures that explain of an aggregate through mongos has the intended format.
-
  * @tags: [
  * # $mergeCursors was added to explain output in 5.3.
- * requires_fcv_53
+ * requires_fcv_80
  * ]
  */
 
@@ -42,6 +41,7 @@ assert(explain.splitPipeline.hasOwnProperty("mergerPart"), explain.splitPipeline
 assert(explain.hasOwnProperty("shards"), explain);
 for (let shardId in explain.shards) {
     const shardExplain = explain.shards[shardId];
+    assert(shardExplain.hasOwnProperty("explainVersion"));
     assert(shardExplain.hasOwnProperty("host"), shardExplain);
     assert(shardExplain.hasOwnProperty("stages") || shardExplain.hasOwnProperty("queryPlanner"),
            shardExplain);
