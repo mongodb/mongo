@@ -148,7 +148,6 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
 }
 
 Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer::BinaryOp& op) {
-
     switch (op.op()) {
         case optimizer::Operations::FillEmpty: {
             Tree lhs = op.getLeftChild().visit(*this);
@@ -367,6 +366,61 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                     TypeSignature::kBooleanType.include(
                         lhs.typeSignature.include(rhs.typeSignature)
                             .intersect(TypeSignature::kNothingType)),
+                    {}};
+            }
+            break;
+        }
+        case optimizer::Operations::Add:
+        case optimizer::Operations::Sub:
+        case optimizer::Operations::Div:
+        case optimizer::Operations::Mult: {
+            Tree lhs = op.getLeftChild().visit(*this);
+            if (!lhs.expr.has_value()) {
+                return lhs;
+            }
+            Tree rhs = op.getRightChild().visit(*this);
+            if (!rhs.expr.has_value()) {
+                return rhs;
+            }
+
+            StringData fnName = [&]() {
+                switch (op.op()) {
+                    case optimizer::Operations::Add:
+                        return "valueBlockAdd"_sd;
+                    case optimizer::Operations::Sub:
+                        return "valueBlockSub"_sd;
+                    case optimizer::Operations::Div:
+                        return "valueBlockDiv"_sd;
+                    case optimizer::Operations::Mult:
+                        return "valueBlockMult"_sd;
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            }();
+
+            auto returnTS =
+                TypeSignature::kNumericType.include(getTypeSignature(sbe::value::TypeTags::Date));
+
+            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature) ||
+                TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                boost::optional<optimizer::ProjectionName> sameCell = lhs.sourceCell.has_value() &&
+                        rhs.sourceCell.has_value() && *lhs.sourceCell == *rhs.sourceCell
+                    ? lhs.sourceCell
+                    : boost::none;
+                // If we can't identify a single cell for both branches, fold them.
+                if (!sameCell.has_value()) {
+                    foldIfNecessary(lhs);
+                    foldIfNecessary(rhs);
+                }
+                return {makeABTFunction(
+                            fnName, generateMaskArg(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                        TypeSignature::kBlockType.include(returnTS),
+                        sameCell};
+            } else {
+                // Scalar version. Preserve scalar operation
+                return {
+                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                    returnTS,
                     {}};
             }
             break;
@@ -631,6 +685,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
         if (!elseBranch.expr.has_value()) {
             return elseBranch;
         }
+
         // If the branch produces a scalar value, blockify it.
         blockify(elseBranch, elseBranchBitmapVar);
 

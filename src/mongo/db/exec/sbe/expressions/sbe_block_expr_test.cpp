@@ -76,6 +76,17 @@ public:
                    std::vector<bool> expectedResult);
 
     void testCmpScalar(EPrimBinary::Op, StringData cmpFunctionName, value::ValueBlock* valBlock);
+    void testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp,
+                                    StringData blockFunctionName,
+                                    value::ValueBlock* bitsetBlock,
+                                    value::ValueBlock* leftBlock,
+                                    value::ValueBlock* rightBlock,
+                                    bool monoBlockExpected);
+    void testBlockScalarArithmeticOp(EPrimBinary::Op scalarOp,
+                                     StringData blockFunctionName,
+                                     value::ValueBlock* bitsetBlock,
+                                     value::ValueBlock* block,
+                                     std::pair<value::TypeTags, value::Value> scalar);
 
     std::pair<std::vector<bool>, std::vector<bool>> naiveLogicalAndOr(
         std::unique_ptr<value::ValueBlock> leftBlock,
@@ -1077,6 +1088,766 @@ TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarHomogeneousTest) {
         testCmpScalar(EPrimBinary::neq, "valueBlockNeqScalar", block.get());
     }
 }
+
+void SBEBlockExpressionTest::testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp,
+                                                        StringData blockFunctionName,
+                                                        value::ValueBlock* bitsetBlock,
+                                                        value::ValueBlock* leftBlock,
+                                                        value::ValueBlock* rightBlock,
+                                                        bool monoBlockExpected = false) {
+    value::ViewOfValueAccessor bitsetBlockAccessor;
+    value::ViewOfValueAccessor leftBlockAccessor;
+    value::ViewOfValueAccessor rightBlockAccessor;
+
+    auto bitsetSlot = bindAccessor(&bitsetBlockAccessor);
+    auto leftBlockSlot = bindAccessor(&leftBlockAccessor);
+    auto rightBlockSlot = bindAccessor(&rightBlockAccessor);
+
+    auto blockMathExpr = sbe::makeE<sbe::EFunction>(blockFunctionName,
+                                                    sbe::makeEs(makeE<EVariable>(bitsetSlot),
+                                                                makeE<EVariable>(leftBlockSlot),
+                                                                makeE<EVariable>(rightBlockSlot)));
+
+    auto blockCompiledExpr = compileExpression(*blockMathExpr);
+
+    if (bitsetBlock) {
+        bitsetBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                  value::bitcastFrom<value::ValueBlock*>(bitsetBlock));
+    } else {
+        bitsetBlockAccessor.reset(sbe::value::TypeTags::Nothing, 0);
+    }
+    leftBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(leftBlock));
+    rightBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                             value::bitcastFrom<value::ValueBlock*>(rightBlock));
+
+    // run the block operation
+    auto [resBlockTag, resBlockVal] = runCompiledExpression(blockCompiledExpr.get());
+    value::ValueGuard guard(resBlockTag, resBlockVal);
+    auto* resBlock = value::bitcastTo<value::ValueBlock*>(resBlockVal);
+    auto resBlockExtractedValues = resBlock->extract();
+
+    ASSERT_EQ(resBlockTag, value::TypeTags::valueBlock);
+    if (monoBlockExpected) {
+        ASSERT_TRUE(resBlock->as<value::MonoBlock>());
+    }
+
+    // run the same operations using the scalar version of the operation
+    auto leftExtractedValues = leftBlock->extract();
+    auto rightExtractedValues = rightBlock->extract();
+    auto resNum = leftExtractedValues.count;
+
+    ASSERT_EQ(resBlockExtractedValues.count, resNum);
+
+    value::ViewOfValueAccessor leftScalarAccessor;
+    value::ViewOfValueAccessor rightScalarAccessor;
+
+    auto leftScalarSlot = bindAccessor(&leftScalarAccessor);
+    auto rightScalarSlot = bindAccessor(&rightScalarAccessor);
+
+    auto scalarMathExpr = sbe::makeE<sbe::EPrimBinary>(
+        scalarOp, makeE<EVariable>(leftScalarSlot), makeE<EVariable>(rightScalarSlot));
+
+    auto scalarCompiledExpr = compileExpression(*scalarMathExpr);
+
+    if (bitsetBlock) {
+        auto bitsetExtractedValues = bitsetBlock->extract();
+        for (size_t i = 0; i < resNum; ++i) {
+            if (bitsetExtractedValues.tags[i] != value::TypeTags::Boolean ||
+                !value::bitcastTo<bool>(bitsetExtractedValues.vals[i])) {
+                // skip
+                continue;
+            }
+
+            leftScalarAccessor.reset(leftExtractedValues.tags[i], leftExtractedValues.vals[i]);
+            rightScalarAccessor.reset(rightExtractedValues.tags[i], rightExtractedValues.vals[i]);
+            auto [scalarTag, scalarVal] = runCompiledExpression(scalarCompiledExpr.get());
+
+            ASSERT_EQ(scalarTag, resBlockExtractedValues.tags[i]);
+            ASSERT_EQ(scalarVal, resBlockExtractedValues.vals[i]);
+        }
+    } else {
+        for (size_t i = 0; i < resNum; ++i) {
+            leftScalarAccessor.reset(leftExtractedValues.tags[i], leftExtractedValues.vals[i]);
+            rightScalarAccessor.reset(rightExtractedValues.tags[i], rightExtractedValues.vals[i]);
+            auto [scalarTag, scalarVal] = runCompiledExpression(scalarCompiledExpr.get());
+
+            ASSERT_EQ(scalarTag, resBlockExtractedValues.tags[i]);
+            ASSERT_EQ(scalarVal, resBlockExtractedValues.vals[i]);
+        }
+    }
+}
+
+void SBEBlockExpressionTest::testBlockScalarArithmeticOp(
+    EPrimBinary::Op scalarOp,
+    StringData blockFunctionName,
+    value::ValueBlock* bitsetBlock,
+    value::ValueBlock* block,
+    std::pair<value::TypeTags, value::Value> scalar) {
+    value::ViewOfValueAccessor bitsetBlockAccessor;
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor scalarAccessor;
+
+    auto bitsetSlot = bindAccessor(&bitsetBlockAccessor);
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto scalarSlot = bindAccessor(&scalarAccessor);
+
+    auto scalarBlockMathExpr = sbe::makeE<sbe::EFunction>(blockFunctionName,
+                                                          sbe::makeEs(makeE<EVariable>(bitsetSlot),
+                                                                      makeE<EVariable>(scalarSlot),
+                                                                      makeE<EVariable>(blockSlot)));
+
+    auto blockScalarMathExpr =
+        sbe::makeE<sbe::EFunction>(blockFunctionName,
+                                   sbe::makeEs(makeE<EVariable>(bitsetSlot),
+                                               makeE<EVariable>(blockSlot),
+                                               makeE<EVariable>(scalarSlot)));
+
+    auto scalarBlockCompiledExpr = compileExpression(*scalarBlockMathExpr);
+    auto blockScalarCompiledExpr = compileExpression(*blockScalarMathExpr);
+
+    if (bitsetBlock) {
+        bitsetBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                                  value::bitcastFrom<value::ValueBlock*>(bitsetBlock));
+    } else {
+        bitsetBlockAccessor.reset(sbe::value::TypeTags::Nothing, 0);
+    }
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(block));
+    scalarAccessor.reset(scalar.first, scalar.second);
+
+
+    // run the block operations
+    auto [resScalarBlockTag, resScalarBlockVal] =
+        runCompiledExpression(scalarBlockCompiledExpr.get());
+    value::ValueGuard scalarBlockGuard(resScalarBlockTag, resScalarBlockVal);
+    auto* resScalarBlock = value::bitcastTo<value::ValueBlock*>(resScalarBlockVal);
+    auto resScalarBlockExtractedValues = resScalarBlock->extract();
+
+    auto [resBlockScalarTag, resBlockScalarVal] =
+        runCompiledExpression(blockScalarCompiledExpr.get());
+    value::ValueGuard blockScalarGuard(resBlockScalarTag, resBlockScalarVal);
+    auto* resBlockScalar = value::bitcastTo<value::ValueBlock*>(resBlockScalarVal);
+    auto resBlockScalarExtractedValues = resBlockScalar->extract();
+
+    ASSERT_EQ(resScalarBlockTag, value::TypeTags::valueBlock);
+    ASSERT_EQ(resBlockScalarTag, value::TypeTags::valueBlock);
+
+    if (block->as<value::MonoBlock>()) {
+        ASSERT_TRUE(resScalarBlock->as<value::MonoBlock>());
+        ASSERT_TRUE(resBlockScalar->as<value::MonoBlock>());
+    }
+
+    // verify the results against the scalar operation
+    auto extractedValues = block->extract();
+    auto resNum = extractedValues.count;
+
+    ASSERT_EQ(resScalarBlockExtractedValues.count, resNum);
+    ASSERT_EQ(resBlockScalarExtractedValues.count, resNum);
+
+    value::ViewOfValueAccessor leftScalarAccessor;
+    value::ViewOfValueAccessor rightScalarAccessor;
+
+    auto leftScalarSlot = bindAccessor(&leftScalarAccessor);
+    auto rightScalarSlot = bindAccessor(&rightScalarAccessor);
+
+    auto scalarMathExpr = sbe::makeE<sbe::EPrimBinary>(
+        scalarOp, makeE<EVariable>(leftScalarSlot), makeE<EVariable>(rightScalarSlot));
+
+    auto scalarCompiledExpr = compileExpression(*scalarMathExpr);
+
+    if (bitsetBlock) {
+        auto bitsetExtractedValues = bitsetBlock->extract();
+        for (size_t i = 0; i < resNum; ++i) {
+            if (bitsetExtractedValues.tags[i] != value::TypeTags::Boolean ||
+                !value::bitcastTo<bool>(bitsetExtractedValues.vals[i])) {
+                // skip
+                continue;
+            }
+
+            // scalar - block
+            leftScalarAccessor.reset(scalar.first, scalar.second);
+            rightScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            auto [scalarSBTag, scalarSBVal] = runCompiledExpression(scalarCompiledExpr.get());
+
+            ASSERT_EQ(scalarSBTag, resScalarBlockExtractedValues.tags[i]);
+            ASSERT_EQ(scalarSBVal, resScalarBlockExtractedValues.vals[i]);
+
+            // block - scalar
+            leftScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            rightScalarAccessor.reset(scalar.first, scalar.second);
+            auto [scalarBSTag, scalarBSVal] = runCompiledExpression(scalarCompiledExpr.get());
+
+            ASSERT_EQ(scalarBSTag, resBlockScalarExtractedValues.tags[i]);
+            ASSERT_EQ(scalarBSVal, resBlockScalarExtractedValues.vals[i]);
+        }
+    } else {
+        for (size_t i = 0; i < resNum; ++i) {
+            // scalar - block
+            leftScalarAccessor.reset(scalar.first, scalar.second);
+            rightScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            auto [scalarSBTag, scalarSBVal] = runCompiledExpression(scalarCompiledExpr.get());
+
+            ASSERT_EQ(scalarSBTag, resScalarBlockExtractedValues.tags[i]);
+            ASSERT_EQ(scalarSBVal, resScalarBlockExtractedValues.vals[i]);
+
+            // block - scalar
+            leftScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            rightScalarAccessor.reset(scalar.first, scalar.second);
+            auto [scalarBSTag, scalarBSVal] = runCompiledExpression(scalarCompiledExpr.get());
+
+            ASSERT_EQ(scalarBSTag, resBlockScalarExtractedValues.tags[i]);
+            ASSERT_EQ(scalarBSVal, resBlockScalarExtractedValues.vals[i]);
+        }
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockAddHeterogeneousTest) {
+    StringData fnName{"valueBlockAdd"};
+    value::HeterogeneousBlock leftBlock;
+    value::HeterogeneousBlock rightBlock;
+
+    // 1 : Integer + Integer -> Integer
+    leftBlock.push_back(makeInt32(42));
+    rightBlock.push_back(makeInt32(8));
+    // 2 : Double + integer -> Double
+    leftBlock.push_back(makeDouble(42.5));
+    rightBlock.push_back(makeInt32(123));
+    // 3 : Overflow -> Promote to int64_t
+    leftBlock.push_back(makeInt32(43));
+    rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::max()));
+    // 4 : Nothing + Number -> Nothing
+    leftBlock.push_back(makeNothing());
+    rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    // 5 : String + Number -> Nothing
+    leftBlock.push_back(value::makeNewString("45"_sd));
+    rightBlock.push_back(makeDouble(12.5));
+    // 6 : Overflow -> Double
+    leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    rightBlock.push_back(makeInt64(10));
+    // 7 : Date + Number -> Date
+    leftBlock.push_back(
+        {value::TypeTags::Date,
+         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                         .toMillisSinceEpoch())});
+    rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::max()));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+
+    { testBlockBlockArithmeticOp(EPrimBinary::add, fnName, nullptr, &leftBlock, &rightBlock); }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockAddMonoBlockTest) {
+    StringData fnName{"valueBlockAdd"};
+
+    value::Int32Block block;
+    block.push_back(1);
+    block.push_back(2);
+    block.push_back(3);
+    block.push_back(4);
+    block.push_back(5);
+    block.push_back(6);
+    block.push_back(7);
+
+    value::MonoBlock monoBlock1(7, value::TypeTags::NumberInt32, value::bitcastFrom<int>(100));
+    value::MonoBlock monoBlock2(
+        7, value::TypeTags::NumberDouble, value::bitcastFrom<double>(98.67));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::add, fnName, nullptr, &block, &monoBlock2);
+        testBlockBlockArithmeticOp(EPrimBinary::add, fnName, nullptr, &monoBlock1, &block);
+        testBlockBlockArithmeticOp(EPrimBinary::add, fnName, nullptr, &monoBlock1, &monoBlock2);
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockAddScalarTest) {
+    StringData fnName{"valueBlockAdd"};
+
+    value::Int32Block block;
+    block.push_back(1);
+    block.push_back(2);
+    block.push_back(3);
+    block.push_back(4);
+    block.push_back(5);
+    block.push_back(6);
+    block.push_back(7);
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockScalarArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &block, makeInt32(100));
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockScalarArithmeticOp(
+            EPrimBinary::add, fnName, bitsetBlock.get(), &block, makeInt32(100));
+    }
+
+    { testBlockScalarArithmeticOp(EPrimBinary::add, fnName, nullptr, &block, makeInt32(100)); }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockSubHeterogeneousTest) {
+    StringData fnName{"valueBlockSub"};
+
+    value::HeterogeneousBlock leftBlock;
+    value::HeterogeneousBlock rightBlock;
+
+    // 1 : Integer - Integer -> Integer (>0)
+    leftBlock.push_back(makeInt32(42));
+    rightBlock.push_back(makeInt32(8));
+    // 2 : Double - integer -> Double (<0)
+    leftBlock.push_back(makeDouble(42.5));
+    rightBlock.push_back(makeInt32(123));
+    // 3 : Underflow -> promote to int64
+    leftBlock.push_back(makeInt32(std::numeric_limits<int32_t>::min()));
+    rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::max()));
+    // 4 : Nothing - Number -> Nothing
+    leftBlock.push_back(makeNothing());
+    rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    // 5 : Number - Nothing -> Nothing
+    leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    rightBlock.push_back(makeNothing());
+    // 6 : String - Number -> Nothing
+    leftBlock.push_back(value::makeNewString("45"_sd));
+    rightBlock.push_back(makeDouble(12.5));
+    // 7 : Number - String -> Nothing
+    leftBlock.push_back(makeDouble(12.5));
+    rightBlock.push_back(value::makeNewString("45"_sd));
+    // 8 : Underflow -> promote to Double
+    leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::min()));
+    rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    // 9 : Date - Number -> Date
+    leftBlock.push_back(
+        {value::TypeTags::Date,
+         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                         .toMillisSinceEpoch())});
+    rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::min()));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true, true, false});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+    { testBlockBlockArithmeticOp(EPrimBinary::sub, fnName, nullptr, &leftBlock, &rightBlock); }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockSubMonoBlockTest) {
+    StringData fnName{"valueBlockSub"};
+
+    value::Int32Block block;
+    block.push_back(1);
+    block.push_back(2);
+    block.push_back(3);
+    block.push_back(4);
+    block.push_back(5);
+    block.push_back(6);
+    block.push_back(7);
+
+    value::MonoBlock monoBlock1(7, value::TypeTags::NumberInt32, value::bitcastFrom<int>(100));
+    value::MonoBlock monoBlock2(
+        7, value::TypeTags::NumberDouble, value::bitcastFrom<double>(98.67));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::sub, fnName, nullptr, &block, &monoBlock2);
+        testBlockBlockArithmeticOp(EPrimBinary::sub, fnName, nullptr, &monoBlock1, &block);
+        testBlockBlockArithmeticOp(EPrimBinary::sub, fnName, nullptr, &monoBlock1, &monoBlock2);
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockSubScalarTest) {
+    StringData fnName{"valueBlockSub"};
+
+    value::Int32Block block;
+    block.push_back(1);
+    block.push_back(2);
+    block.push_back(3);
+    block.push_back(4);
+    block.push_back(5);
+    block.push_back(6);
+    block.push_back(7);
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockScalarArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &block, makeInt32(100));
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockScalarArithmeticOp(
+            EPrimBinary::sub, fnName, bitsetBlock.get(), &block, makeInt32(100));
+    }
+
+    { testBlockScalarArithmeticOp(EPrimBinary::sub, fnName, nullptr, &block, makeInt32(100)); }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockMultHeterogeneousTest) {
+    StringData fnName{"valueBlockMult"};
+
+    value::HeterogeneousBlock leftBlock;
+    value::HeterogeneousBlock rightBlock;
+
+    // 1 : Integer * Integer -> Integer
+    leftBlock.push_back(makeInt32(42));
+    rightBlock.push_back(makeInt32(8));
+    // 2 : Double * integer -> Double
+    leftBlock.push_back(makeDouble(42.5));
+    rightBlock.push_back(makeInt32(123));
+    // 3 : Overflow -> Promote to int64_t
+    leftBlock.push_back(makeInt32(43));
+    rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::max()));
+    // 4 : Nothing * Number -> Nothing
+    leftBlock.push_back(makeNothing());
+    rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    // 5 : String * Number -> Nothing
+    leftBlock.push_back(value::makeNewString("45"_sd));
+    rightBlock.push_back(makeDouble(12.5));
+    // 6 : Overflow -> Double
+    leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    rightBlock.push_back(makeInt64(10));
+    // 7 : Date * Number -> Date
+    leftBlock.push_back(
+        {value::TypeTags::Date,
+         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                         .toMillisSinceEpoch())});
+    rightBlock.push_back(makeInt32(5));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+
+    { testBlockBlockArithmeticOp(EPrimBinary::mul, fnName, nullptr, &leftBlock, &rightBlock); }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockMultMonoBlockTest) {
+    StringData fnName{"valueBlockMult"};
+
+    value::Int32Block block;
+    block.push_back(1);
+    block.push_back(2);
+    block.push_back(3);
+    block.push_back(4);
+    block.push_back(5);
+    block.push_back(6);
+    block.push_back(7);
+
+    value::MonoBlock monoBlock1(7, value::TypeTags::NumberInt32, value::bitcastFrom<int>(100));
+    value::MonoBlock monoBlock2(
+        7, value::TypeTags::NumberDouble, value::bitcastFrom<double>(98.67));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::mul, fnName, nullptr, &block, &monoBlock2);
+        testBlockBlockArithmeticOp(EPrimBinary::mul, fnName, nullptr, &monoBlock1, &block);
+        testBlockBlockArithmeticOp(EPrimBinary::mul, fnName, nullptr, &monoBlock1, &monoBlock2);
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockMultScalarTest) {
+    StringData fnName{"valueBlockMult"};
+
+    value::Int32Block block;
+    block.push_back(1);
+    block.push_back(2);
+    block.push_back(3);
+    block.push_back(4);
+    block.push_back(5);
+    block.push_back(6);
+    block.push_back(7);
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true});
+
+        testBlockScalarArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &block, makeInt32(100));
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true});
+
+        testBlockScalarArithmeticOp(
+            EPrimBinary::mul, fnName, bitsetBlock.get(), &block, makeInt32(100));
+    }
+
+    { testBlockScalarArithmeticOp(EPrimBinary::mul, fnName, nullptr, &block, makeInt32(100)); }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockDivHeterogeneousTest) {
+    StringData fnName{"valueBlockDiv"};
+
+    value::HeterogeneousBlock leftBlock;
+    value::HeterogeneousBlock rightBlock;
+
+    // 1 : Integer / Integer -> Double
+    leftBlock.push_back(makeInt32(32));
+    rightBlock.push_back(makeInt32(8));
+    // 2 : Double / Integer -> Double
+    leftBlock.push_back(makeDouble(42.5));
+    rightBlock.push_back(makeInt32(123));
+    // 3 : Underflow -> promote to Double -1
+    leftBlock.push_back(makeInt32(std::numeric_limits<int32_t>::min()));
+    rightBlock.push_back(makeInt32(std::numeric_limits<int32_t>::max()));
+    // 4 : Nothing / Number -> Nothing
+    leftBlock.push_back(makeNothing());
+    rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    // 5 : Number / Nothing -> Nothing
+    leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    rightBlock.push_back(makeNothing());
+    // 6 : String / Number -> Nothing
+    leftBlock.push_back(value::makeNewString("45"_sd));
+    rightBlock.push_back(makeDouble(12.5));
+    // 7 : Number / String -> Nothing
+    leftBlock.push_back(makeDouble(12.5));
+    rightBlock.push_back(value::makeNewString("45"_sd));
+    // 8 : Underflow -> promote to Double -1
+    leftBlock.push_back(makeInt64(std::numeric_limits<int64_t>::min()));
+    rightBlock.push_back(makeInt64(std::numeric_limits<int64_t>::max()));
+    // 9 : Date / Number -> Nothing
+    leftBlock.push_back(
+        {value::TypeTags::Date,
+         value::bitcastFrom<int64_t>(TimeZoneDatabase::utcZone()
+                                         .createFromDateParts(2023, 10, 20, 12, 30, 0, 0)
+                                         .toMillisSinceEpoch())});
+    rightBlock.push_back(makeInt32(2));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true, true, false});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &leftBlock, &rightBlock);
+    }
+
+    { testBlockBlockArithmeticOp(EPrimBinary::div, fnName, nullptr, &leftBlock, &rightBlock); }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockDivMonoBlockTest) {
+    StringData fnName{"valueBlockDiv"};
+
+    value::Int32Block block;
+    block.push_back(100);
+    block.push_back(200);
+    block.push_back(300);
+    block.push_back(400);
+    block.push_back(500);
+    block.push_back(600);
+    block.push_back(700);
+    block.push_back(0);
+
+    value::MonoBlock monoBlock1(8, value::TypeTags::NumberInt32, value::bitcastFrom<int>(10));
+    value::MonoBlock monoBlock2(8, value::TypeTags::NumberDouble, value::bitcastFrom<double>(9.67));
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true, true});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        ASSERT_THROWS_CODE(testBlockBlockArithmeticOp(
+                               EPrimBinary::div, fnName, bitsetBlock.get(), &monoBlock1, &block),
+                           DBException,
+                           4848401);  // division by zero
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true, false});
+
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &block, &monoBlock2);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &monoBlock1, &monoBlock2);
+    }
+
+    {
+        testBlockBlockArithmeticOp(EPrimBinary::div, fnName, nullptr, &block, &monoBlock2);
+        ASSERT_THROWS_CODE(
+            testBlockBlockArithmeticOp(EPrimBinary::div, fnName, nullptr, &monoBlock1, &block),
+            DBException,
+            4848401);  // division by zero
+        testBlockBlockArithmeticOp(EPrimBinary::div, fnName, nullptr, &monoBlock1, &monoBlock2);
+    }
+
+    {
+        value::HeterogeneousBlock bitsetBlock;
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeInt32(100));
+        bitsetBlock.push_back(makeNothing());
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeBool(false));
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeDouble(2.5));
+
+        testBlockBlockArithmeticOp(EPrimBinary::div, fnName, &bitsetBlock, &block, &monoBlock2);
+        testBlockBlockArithmeticOp(EPrimBinary::div, fnName, &bitsetBlock, &monoBlock1, &block);
+        testBlockBlockArithmeticOp(
+            EPrimBinary::div, fnName, &bitsetBlock, &monoBlock1, &monoBlock2);
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, ValueBlockDivScalarTest) {
+    StringData fnName{"valueBlockDiv"};
+
+    value::Int32Block block;
+    block.push_back(100);
+    block.push_back(200);
+    block.push_back(300);
+    block.push_back(400);
+    block.push_back(500);
+    block.push_back(600);
+    block.push_back(700);
+    block.push_back(0);
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, true, true, true, true, true, true});
+
+        ASSERT_THROWS_CODE(testBlockScalarArithmeticOp(
+                               EPrimBinary::div, fnName, bitsetBlock.get(), &block, makeInt32(100)),
+                           DBException,
+                           4848401);  // division by zero
+    }
+
+    {
+        auto bitsetBlock = makeBoolBlock({true, true, false, true, false, true, true, false});
+
+        testBlockScalarArithmeticOp(
+            EPrimBinary::div, fnName, bitsetBlock.get(), &block, makeInt32(100));
+    }
+
+    {
+        ASSERT_THROWS_CODE(
+            testBlockScalarArithmeticOp(EPrimBinary::div, fnName, nullptr, &block, makeInt32(100)),
+            DBException,
+            4848401);  // division by zero
+    }
+
+    {
+        value::HeterogeneousBlock bitsetBlock;
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeInt32(100));
+        bitsetBlock.push_back(makeNothing());
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeBool(false));
+        bitsetBlock.push_back(makeBool(true));
+        bitsetBlock.push_back(makeDouble(2.5));
+
+        testBlockScalarArithmeticOp(EPrimBinary::div, fnName, &bitsetBlock, &block, makeInt32(100));
+    }
+}
+
 
 TEST_F(SBEBlockExpressionTest, BlockNewTest) {
     auto expr = makeE<sbe::EFunction>("valueBlockNewFill",

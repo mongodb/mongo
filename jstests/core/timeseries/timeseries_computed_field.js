@@ -115,6 +115,141 @@ TimeseriesTest.run((insert) => {
         assert.eq(res[0].count, 3, res);
     }
 
+    // mathematical expressions
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$add: ["$topLevelScalar", 1]}}},
+            {$match: {"computedA": 457}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$subtract: ["$topLevelScalar", 1]}}},
+            {$match: {"computedA": 455}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$multiply: ["$topLevelScalar", 10]}}},
+            {$match: {"computedA": 4560}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$divide: ["$topLevelScalar", 2]}}},
+            {$match: {"computedA": 228}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$add: [1, "$topLevelScalar"]}}},
+            {$match: {"computedA": 457}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$subtract: [200, "$topLevelScalar"]}}},
+            {$match: {"computedA": 77}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$multiply: [10, "$topLevelScalar"]}}},
+            {$match: {"computedA": 4560}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$divide: [4560, "$topLevelScalar"]}}},
+            {$match: {"computedA": 10}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$add: ["$topLevelScalar", "$topLevelScalar"]}}},
+            {$match: {"computedA": 912}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$subtract: ["$topLevelScalar", "$topLevelScalar"]}}},
+            {$match: {"computedA": 0}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$multiply: ["$topLevelScalar", "$topLevelScalar"]}}},
+            {$match: {"computedA": 15129}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$divide: ["$topLevelScalar", "$topLevelScalar"]}}},
+            {$match: {"computedA": 1}},
+            {$count: "count"}
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
     {
         // Try a project stage which adds and remove subfields.
         const res = coll.aggregate([

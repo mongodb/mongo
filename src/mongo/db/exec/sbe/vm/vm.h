@@ -720,6 +720,10 @@ enum class Builtin : uint16_t {
     valueBlockDateDiff,
     valueBlockDateTrunc,
     valueBlockSum,
+    valueBlockAdd,
+    valueBlockSub,
+    valueBlockMult,
+    valueBlockDiv,
     valueBlockGtScalar,
     valueBlockGteScalar,
     valueBlockEqScalar,
@@ -1949,6 +1953,49 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSum(ArityType arity);
+
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinBlockBlockArithmeticOperation(
+        const value::TypeTags* bitsetTags,
+        const value::Value* bitsetVals,
+        value::ValueBlock* leftInputBlock,
+        value::ValueBlock* rightInputBlock,
+        size_t valsNum);
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinBlockBlockArithmeticOperation(
+        value::ValueBlock* leftInputBlock, value::ValueBlock* rightInputBlock, size_t valsNum);
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinScalarBlockArithmeticOperation(
+        const value::TypeTags* bitsetTags,
+        const value::Value* bitsetVals,
+        std::pair<value::TypeTags, value::Value> scalar,
+        value::ValueBlock* block,
+        size_t valsNum);
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinScalarBlockArithmeticOperation(
+        std::pair<value::TypeTags, value::Value> scalar, value::ValueBlock* block, size_t valsNum);
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinBlockScalarArithmeticOperation(
+        const value::TypeTags* bitsetTags,
+        const value::Value* bitsetVals,
+        value::ValueBlock* block,
+        std::pair<value::TypeTags, value::Value> scalar,
+        size_t valsNum);
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinBlockScalarArithmeticOperation(
+        value::ValueBlock* block, std::pair<value::TypeTags, value::Value> scalar, size_t valsNum);
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinScalarScalarArithmeticOperation(
+        std::pair<value::TypeTags, value::Value> leftInputScalar,
+        std::pair<value::TypeTags, value::Value> rightInputScalar,
+        size_t valsNum);
+    template <int operation>
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockArithmeticOperation(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAdd(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSub(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMult(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDiv(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateDiff(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateTrunc(ArityType arity);

@@ -293,6 +293,509 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSum(Ar
     return {true, resultTag, resultVal};
 }
 
+enum class ArithmeticOp { Addition, Subtraction, Multiplication, Division };
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithmeticOperation(
+    const value::TypeTags* bitsetTags,
+    const value::Value* bitsetVals,
+    value::ValueBlock* leftInputBlock,
+    value::ValueBlock* rightInputBlock,
+    size_t valsNum) {
+    auto leftBlock = leftInputBlock->extract();
+    auto rightBlock = rightInputBlock->extract();
+
+    std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
+    std::vector<value::Value> valuesOut(valsNum, 0);
+
+    for (size_t i = 0; i < valsNum; ++i) {
+        if (bitsetTags[i] != value::TypeTags::Boolean || !value::bitcastTo<bool>(bitsetVals[i])) {
+            continue;
+        }
+        if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
+            auto [_, resTag, resVal] = genericAdd(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
+            auto [_, resTag, resVal] = genericSub(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
+            auto [_, resTag, resVal] = genericMul(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
+            auto [_, resTag, resVal] = genericDiv(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        }
+    }
+
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(resBlock.release())};
+}
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockBlockArithmeticOperation(
+    value::ValueBlock* leftInputBlock, value::ValueBlock* rightInputBlock, size_t valsNum) {
+    auto leftBlock = leftInputBlock->extract();
+    auto rightBlock = rightInputBlock->extract();
+
+    std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
+    std::vector<value::Value> valuesOut(valsNum, 0);
+
+    for (size_t i = 0; i < valsNum; ++i) {
+        if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
+            auto [_, resTag, resVal] = genericAdd(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
+            auto [_, resTag, resVal] = genericSub(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
+            auto [_, resTag, resVal] = genericMul(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
+            auto [_, resTag, resVal] = genericDiv(
+                leftBlock[i].first, leftBlock[i].second, rightBlock[i].first, rightBlock[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        }
+    }
+
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(resBlock.release())};
+}
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArithmeticOperation(
+    const value::TypeTags* bitsetTags,
+    const value::Value* bitsetVals,
+    std::pair<value::TypeTags, value::Value> scalar,
+    value::ValueBlock* block,
+    size_t valsNum) {
+    auto extractedValues = block->extract();
+
+    std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
+    std::vector<value::Value> valuesOut(valsNum, 0);
+
+    for (size_t i = 0; i < valsNum; ++i) {
+        if (bitsetTags[i] != value::TypeTags::Boolean || !value::bitcastTo<bool>(bitsetVals[i])) {
+            continue;
+        }
+        if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
+            auto [_, resTag, resVal] = genericAdd(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
+            auto [_, resTag, resVal] = genericSub(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
+            auto [_, resTag, resVal] = genericMul(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
+            auto [_, resTag, resVal] = genericDiv(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        }
+    }
+
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(resBlock.release())};
+}
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarBlockArithmeticOperation(
+    std::pair<value::TypeTags, value::Value> scalar, value::ValueBlock* block, size_t valsNum) {
+    auto extractedValues = block->extract();
+
+    std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
+    std::vector<value::Value> valuesOut(valsNum, 0);
+
+    for (size_t i = 0; i < valsNum; ++i) {
+        if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
+            auto [_, resTag, resVal] = genericAdd(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
+            auto [_, resTag, resVal] = genericSub(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
+            auto [_, resTag, resVal] = genericMul(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
+            auto [_, resTag, resVal] = genericDiv(
+                scalar.first, scalar.second, extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        }
+    }
+
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(resBlock.release())};
+}
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArithmeticOperation(
+    const value::TypeTags* bitsetTags,
+    const value::Value* bitsetVals,
+    value::ValueBlock* block,
+    std::pair<value::TypeTags, value::Value> scalar,
+    size_t valsNum) {
+    auto extractedValues = block->extract();
+
+    std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
+    std::vector<value::Value> valuesOut(valsNum, 0);
+
+    for (size_t i = 0; i < valsNum; ++i) {
+        if (bitsetTags[i] != value::TypeTags::Boolean || !value::bitcastTo<bool>(bitsetVals[i])) {
+            continue;
+        }
+        if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
+            auto [_, resTag, resVal] = genericAdd(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
+            auto [_, resTag, resVal] = genericSub(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
+            auto [_, resTag, resVal] = genericMul(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
+            auto [_, resTag, resVal] = genericDiv(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        }
+    }
+
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(resBlock.release())};
+}
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBlockScalarArithmeticOperation(
+    value::ValueBlock* block, std::pair<value::TypeTags, value::Value> scalar, size_t valsNum) {
+    auto extractedValues = block->extract();
+
+    std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
+    std::vector<value::Value> valuesOut(valsNum, 0);
+
+    for (size_t i = 0; i < valsNum; ++i) {
+        if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
+            auto [_, resTag, resVal] = genericAdd(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
+            auto [_, resTag, resVal] = genericSub(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
+            auto [_, resTag, resVal] = genericMul(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
+            auto [_, resTag, resVal] = genericDiv(
+                extractedValues[i].first, extractedValues[i].second, scalar.first, scalar.second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        }
+    }
+
+    auto resBlock =
+        std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(resBlock.release())};
+}
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinScalarScalarArithmeticOperation(
+    std::pair<value::TypeTags, value::Value> leftInputScalar,
+    std::pair<value::TypeTags, value::Value> rightInputScalar,
+    size_t valsNum) {
+    std::unique_ptr<value::MonoBlock> resBlock;
+    if constexpr (static_cast<int>(ArithmeticOp::Addition) == op) {
+        auto [_, resultTag, resultValue] = genericAdd(leftInputScalar.first,
+                                                      leftInputScalar.second,
+                                                      rightInputScalar.first,
+                                                      rightInputScalar.second);
+        resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
+    } else if constexpr (static_cast<int>(ArithmeticOp::Subtraction) == op) {
+        auto [_, resultTag, resultValue] = genericSub(leftInputScalar.first,
+                                                      leftInputScalar.second,
+                                                      rightInputScalar.first,
+                                                      rightInputScalar.second);
+        resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
+    } else if constexpr (static_cast<int>(ArithmeticOp::Multiplication) == op) {
+        auto [_, resultTag, resultValue] = genericMul(leftInputScalar.first,
+                                                      leftInputScalar.second,
+                                                      rightInputScalar.first,
+                                                      rightInputScalar.second);
+        resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
+    } else if constexpr (static_cast<int>(ArithmeticOp::Division) == op) {
+        auto [_, resultTag, resultValue] = genericDiv(leftInputScalar.first,
+                                                      leftInputScalar.second,
+                                                      rightInputScalar.first,
+                                                      rightInputScalar.second);
+        resBlock = std::make_unique<value::MonoBlock>(valsNum, resultTag, resultValue);
+    } else {
+        resBlock = std::make_unique<value::MonoBlock>(valsNum, value::TypeTags::Nothing, 0);
+    }
+
+    return {true,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(resBlock.release())};
+}
+
+template <int op>
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithmeticOperation(
+    ArityType arity) {
+
+    static_assert(op >= 0 && op <= 3, "op should be between 0 and 3 inclusive");
+
+    invariant(arity == 3);
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    auto [lOwned, lTag, lVal] = getFromStack(1);
+    auto [rOwned, rTag, rVal] = getFromStack(2);
+
+    tassert(8332300,
+            "First argument of block arithmetic operation must be block of values representing a "
+            "bitmask orNothing",
+            bitsetTag == value::TypeTags::valueBlock || bitsetTag == value::TypeTags::Nothing);
+    value::Value* bitsetVals = nullptr;
+    value::TypeTags* bitsetTags = nullptr;
+    size_t valsNum = 0;
+    if (bitsetTag == value::TypeTags::valueBlock) {
+        auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+        auto bitset = bitsetBlock->extract();
+        bitsetVals = const_cast<value::Value*>(bitset.vals);
+        bitsetTags = const_cast<value::TypeTags*>(bitset.tags);
+        valsNum = bitset.count;
+    }
+
+    tassert(8332302,
+            "At least one of the second and third arguments of block arithmetic operation must be "
+            "block of values",
+            lTag == value::TypeTags::valueBlock || rTag == value::TypeTags::valueBlock);
+
+    if (lTag == value::TypeTags::valueBlock && rTag == value::TypeTags::valueBlock) {
+        // Block - Block
+
+        auto* leftInputBlock = value::bitcastTo<value::ValueBlock*>(lVal);
+        auto* rightInputBlock = value::bitcastTo<value::ValueBlock*>(rVal);
+
+        auto leftMonoBlock = leftInputBlock->as<value::MonoBlock>();
+        auto rightMonoBlock = rightInputBlock->as<value::MonoBlock>();
+
+        auto leftValsNum = leftInputBlock->tryCount().get_value_or(leftInputBlock->extract().count);
+        auto rightValsNum =
+            rightInputBlock->tryCount().get_value_or(rightInputBlock->extract().count);
+        tassert(8332303,
+                str::stream() << "Expected blocks to be the same size but they are leftBlock =  "
+                              << leftValsNum << " rightBlock = " << rightValsNum,
+                leftValsNum == rightValsNum);
+
+        if (bitsetVals) {
+            tassert(8332304,
+                    str::stream() << "Expected value blocks and bitset block to be the same size "
+                                     "but they are value block =  "
+                                  << leftValsNum << " bitset block = " << valsNum,
+                    leftValsNum == valsNum);
+        } else {
+            valsNum = leftValsNum;
+        }
+
+        if (!leftMonoBlock && !rightMonoBlock) {
+            if (bitsetVals) {
+                return builtinBlockBlockArithmeticOperation<op>(
+                    bitsetTags, bitsetVals, leftInputBlock, rightInputBlock, valsNum);
+            }
+            return builtinBlockBlockArithmeticOperation<op>(
+                leftInputBlock, rightInputBlock, valsNum);
+        } else if (leftMonoBlock && !rightMonoBlock) {
+            if (bitsetVals) {
+                return builtinScalarBlockArithmeticOperation<op>(
+                    bitsetTags,
+                    bitsetVals,
+                    std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
+                                                             leftMonoBlock->getValue()},
+                    rightInputBlock,
+                    valsNum);
+            }
+            return builtinScalarBlockArithmeticOperation<op>(
+                std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
+                                                         leftMonoBlock->getValue()},
+                rightInputBlock,
+                valsNum);
+        } else if (!leftMonoBlock && rightMonoBlock) {
+            if (bitsetVals) {
+                return builtinBlockScalarArithmeticOperation<op>(
+                    bitsetTags,
+                    bitsetVals,
+                    leftInputBlock,
+                    std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
+                                                             rightMonoBlock->getValue()},
+                    valsNum);
+            }
+            return builtinBlockScalarArithmeticOperation<op>(
+                leftInputBlock,
+                std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
+                                                         rightMonoBlock->getValue()},
+                valsNum);
+        } else {
+            if (bitsetVals) {
+                return builtinBlockBlockArithmeticOperation<op>(
+                    bitsetTags, bitsetVals, leftInputBlock, rightInputBlock, valsNum);
+            }
+
+            return builtinScalarScalarArithmeticOperation<op>(
+                std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
+                                                         leftMonoBlock->getValue()},
+                std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
+                                                         rightMonoBlock->getValue()},
+                valsNum);
+        }
+    } else if (lTag != value::TypeTags::valueBlock && rTag == value::TypeTags::valueBlock) {
+        // scalar - block
+        auto* rightInputBlock = value::bitcastTo<value::ValueBlock*>(rVal);
+        auto rightMonoBlock = rightInputBlock->as<value::MonoBlock>();
+        auto rightValsNum =
+            rightInputBlock->tryCount().get_value_or(rightInputBlock->extract().count);
+        if (valsNum == 0) {
+            valsNum = rightValsNum;
+        } else {
+            tassert(8332305,
+                    str::stream() << "Expected value blocks and bitset block to be the same size "
+                                     "but they are value block =  "
+                                  << rightValsNum << " bitset block = " << valsNum,
+                    rightValsNum == valsNum);
+        }
+
+        if (bitsetVals) {
+            return builtinScalarBlockArithmeticOperation<op>(
+                bitsetTags,
+                bitsetVals,
+                std::pair<value::TypeTags, value::Value>{lTag, lVal},
+                rightInputBlock,
+                valsNum);
+        } else if (rightMonoBlock) {
+            return builtinScalarScalarArithmeticOperation<op>(
+                std::pair<value::TypeTags, value::Value>{lTag, lVal},
+                std::pair<value::TypeTags, value::Value>{rightMonoBlock->getTag(),
+                                                         rightMonoBlock->getValue()},
+                valsNum);
+
+        } else {
+            return builtinScalarBlockArithmeticOperation<op>(
+                std::pair<value::TypeTags, value::Value>{lTag, lVal}, rightInputBlock, valsNum);
+        }
+
+    } else if (lTag == value::TypeTags::valueBlock && rTag != value::TypeTags::valueBlock) {
+        // block - scalar
+        auto* leftInputBlock = value::bitcastTo<value::ValueBlock*>(lVal);
+        auto leftMonoBlock = leftInputBlock->as<value::MonoBlock>();
+        auto leftValsNum = leftInputBlock->tryCount().get_value_or(leftInputBlock->extract().count);
+        if (valsNum == 0) {
+            valsNum = leftValsNum;
+        } else {
+            tassert(8332306,
+                    str::stream() << "Expected value blocks and bitset block to be the same size "
+                                     "but they are value block =  "
+                                  << leftValsNum << " bitset block = " << valsNum,
+                    leftValsNum == valsNum);
+        }
+
+        if (bitsetVals) {
+            return builtinBlockScalarArithmeticOperation<op>(
+                bitsetTags,
+                bitsetVals,
+                leftInputBlock,
+                std::pair<value::TypeTags, value::Value>{rTag, rVal},
+                valsNum);
+        } else if (leftMonoBlock) {
+            return builtinScalarScalarArithmeticOperation<op>(
+                std::pair<value::TypeTags, value::Value>{leftMonoBlock->getTag(),
+                                                         leftMonoBlock->getValue()},
+                std::pair<value::TypeTags, value::Value>{rTag, rVal},
+                valsNum);
+        } else {
+            return builtinBlockScalarArithmeticOperation<op>(
+                leftInputBlock, std::pair<value::TypeTags, value::Value>{rTag, rVal}, valsNum);
+        }
+
+    } else {
+        MONGO_UNREACHABLE
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAdd(ArityType arity) {
+    return builtinValueBlockArithmeticOperation<static_cast<int>(ArithmeticOp::Addition)>(arity);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSub(ArityType arity) {
+    return builtinValueBlockArithmeticOperation<static_cast<int>(ArithmeticOp::Subtraction)>(arity);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMult(ArityType arity) {
+    return builtinValueBlockArithmeticOperation<static_cast<int>(ArithmeticOp::Multiplication)>(
+        arity);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDiv(ArityType arity) {
+    return builtinValueBlockArithmeticOperation<static_cast<int>(ArithmeticOp::Division)>(arity);
+}
+
 namespace {
 template <class Cmp>
 FastTuple<bool, value::TypeTags, value::Value> homogeneousCmpScalar(
