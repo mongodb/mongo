@@ -832,7 +832,7 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
         // TODO SERVER-78399: Clean up this check once feature flag is removed.
         const boost::optional<SecondaryIndexCheckParameters> secondaryIndexCheckParameters =
             entry.getSecondaryIndexCheckParameters();
-        const IndexDescriptor* indexDescriptor = nullptr;
+        const IndexDescriptor* indexDescriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
         if (secondaryIndexCheckParameters) {
             mongo::DbCheckValidationModeEnum validateMode =
                 secondaryIndexCheckParameters.get().getValidateMode();
@@ -927,6 +927,16 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
                     "found"_attr = found,
                     "readTimestamp"_attr = entry.getReadTimestamp());
 
+        auto finalBatchEnd = hasher->lastKey();
+        if (indexDescriptor) {
+            // TODO (SERVER-61796): Handle cases where the _id index doesn't exist. We should still
+            // log with a rehydrated index key.
+            batchStart = key_string::rehydrateKey(indexDescriptor->keyPattern(), batchStart);
+            finalBatchEnd = key_string::rehydrateKey(indexDescriptor->keyPattern(), finalBatchEnd);
+        }
+        bool logIndexSpec = (secondaryIndexCheckParameters &&
+                             (secondaryIndexCheckParameters.get().getValidateMode() ==
+                              mongo::DbCheckValidationModeEnum::extraIndexKeysCheck));
         auto logEntry = dbCheckBatchEntry(
             entry.getBatchId(),
             entry.getNss(),
@@ -936,11 +946,11 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             expected,
             found,
             batchStart,
-            hasher->lastKey(),
+            finalBatchEnd,
             entry.getReadTimestamp(),
             optime,
             collection->getCollectionOptions(),
-            indexDescriptor ? boost::make_optional(indexDescriptor->infoObj()) : boost::none);
+            logIndexSpec ? boost::make_optional(indexDescriptor->infoObj()) : boost::none);
 
         // TODO(SERVER-78399): Remove 'batchesProcessed' logic and expect that
         // 'getLogBatchToHealthLog' from the enry always exists.

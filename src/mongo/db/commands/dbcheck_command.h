@@ -80,9 +80,8 @@ struct DbCheckCollectionBatchStats {
 struct DbCheckExtraIndexKeysBatchStats {
     int64_t nKeys;
     int64_t nBytes;
-    key_string::Value firstIndexKey;
-    key_string::Value lastIndexKey;
-    key_string::Value nextLookupStart;
+    key_string::Value lastKeyChecked;
+    key_string::Value nextKeyToBeChecked;
     bool finishedIndexBatch;
     bool finishedIndexCheck;
     std::string md5;
@@ -160,7 +159,7 @@ public:
     void doCollection(OperationContext* opCtx);
 
 private:
-    boost::optional<key_string::Value> getExtraIndexKeysCheckLookupStart(OperationContext* opCtx);
+    boost::optional<key_string::Value> getExtraIndexKeysCheckFirstKey(OperationContext* opCtx);
 
     void _extraIndexKeysCheck(OperationContext* opCtx);
 
@@ -180,7 +179,7 @@ private:
      */
     Status _getExtraIndexKeysBatchAndRunReverseLookup(OperationContext* opCtx,
                                                       const StringData& indexName,
-                                                      key_string::Value& lookupStart,
+                                                      key_string::Value batchFirst,
                                                       DbCheckExtraIndexKeysBatchStats& batchStats);
 
     /**
@@ -195,7 +194,7 @@ private:
      */
     Status _getCatalogSnapshotAndRunReverseLookup(OperationContext* opCtx,
                                                   const StringData& indexName,
-                                                  const key_string::Value& lookupStart,
+                                                  const key_string::Value& snapshotFirstKey,
                                                   DbCheckExtraIndexKeysBatchStats& batchStats);
 
     /**

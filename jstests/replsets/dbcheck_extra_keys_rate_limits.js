@@ -89,7 +89,7 @@ function checkNumBatchesAndSnapshots(
         }
         const actualNumSnapshots =
             rawMongoProgramOutput()
-                .split(/7844808.*Catalog snapshot for extra index keys check ending/)
+                .split(/7844808.*Catalog snapshot for reverse lookup check ending/)
                 .length -
             1;
         assert.eq(actualNumSnapshots,

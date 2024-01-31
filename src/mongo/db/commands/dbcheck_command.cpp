@@ -602,7 +602,7 @@ void DbChecker::doCollection(OperationContext* opCtx) {
     }
 }
 
-boost::optional<key_string::Value> DbChecker::getExtraIndexKeysCheckLookupStart(
+boost::optional<key_string::Value> DbChecker::getExtraIndexKeysCheckFirstKey(
     OperationContext* opCtx) {
     StringData indexName = _info.secondaryIndexCheckParameters.get().getSecondaryIndex();
     const auto acquisition = _acquireDBCheckLocks(opCtx, _info.nss);
@@ -704,13 +704,13 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
     // ProgressMeterHolder progress;
 
     // Get catalog snapshot to look up the firstKey in the index.
-    boost::optional<key_string::Value> maybeLookupStart = getExtraIndexKeysCheckLookupStart(opCtx);
+    boost::optional<key_string::Value> maybeBatchFirst = getExtraIndexKeysCheckFirstKey(opCtx);
     // If no first key was returned that means the index was not found, and we should exit the
     // dbCheck.
-    if (!maybeLookupStart) {
+    if (!maybeBatchFirst) {
         return;
     }
-    key_string::Value lookupStart = maybeLookupStart.get();
+    key_string::Value batchFirst = maybeBatchFirst.get();
 
     bool reachedEnd = false;
 
@@ -724,9 +724,8 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
         // skipLookupForExtraKeys is not set.
         // TODO SERVER-81592: Revisit case where skipLookupForExtraKeys is true, if we can
         // avoid doing two index walks (one for batching and one for hashing).
-        auto batchFirst = lookupStart;
         Status reverseLookupStatus =
-            _getExtraIndexKeysBatchAndRunReverseLookup(opCtx, indexName, lookupStart, batchStats);
+            _getExtraIndexKeysBatchAndRunReverseLookup(opCtx, indexName, batchFirst, batchStats);
         if (!reverseLookupStatus.isOK()) {
             LOGV2_DEBUG(7844901,
                         3,
@@ -744,9 +743,8 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
             break;
         }
 
-        // 2. Get the actual first and last keystrings processed from reverse lookup.
-        batchFirst = batchStats.firstIndexKey;
-        auto batchLast = batchStats.lastIndexKey;
+        // 2. Get the actual last keystring processed from reverse lookup.
+        auto batchLast = batchStats.lastKeyChecked;
 
         // If batchLast is not initialized, that means there was an error with batching.
         if (batchLast.isEmpty()) {
@@ -790,8 +788,8 @@ void DbChecker::_extraIndexKeysCheck(OperationContext* opCtx) {
         }
 
 
-        // 4. Update lookupStart to resume the next batch.
-        lookupStart = batchStats.nextLookupStart;
+        // 4. Update batchFirst to the index key after batchEnd.
+        batchFirst = batchStats.nextKeyToBeChecked;
 
         // TODO SERVER-79846: Add testing for progress meter
         // {
@@ -897,6 +895,12 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         auto lastBson = key_string::toBsonSafe(
             batchLast.getBuffer(), batchLast.getSize(), ordering, batchLast.getTypeBits());
 
+        LOGV2_DEBUG(8520000,
+                    3,
+                    "Beginning hash for extra keys batch",
+                    "firstKeyString"_attr = firstBson,
+                    "lastKeyString"_attr = lastBson);
+
         // Create hasher.
         boost::optional<DbCheckHasher> hasher;
         try {
@@ -918,7 +922,6 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         if (!status.isOK()) {
             return status;
         }
-
 
         // Send information on this batch over the oplog.
         std::string md5 = hasher->total();
@@ -952,8 +955,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
         builder.append("count", hasher->keysSeen());
         builder.append("bytes", hasher->bytesSeen());
         builder.append("md5", batchStats->md5);
-        builder.append("minKey", firstBson);
-        builder.append("maxKey", lastBson);
+        builder.append("batchStart", key_string::rehydrateKey(index->keyPattern(), firstBson));
+        builder.append("batchEnd", key_string::rehydrateKey(index->keyPattern(), lastBson));
         if (readTimestamp) {
             builder.append("readTimestamp", *readTimestamp);
         }
@@ -989,12 +992,13 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
 Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
     OperationContext* opCtx,
     const StringData& indexName,
-    key_string::Value& lookupStart,
+    key_string::Value batchFirst,
     DbCheckExtraIndexKeysBatchStats& batchStats) {
     bool reachedBatchEnd = false;
+    auto snapshotFirstKey = batchFirst;
     do {
         auto status =
-            _getCatalogSnapshotAndRunReverseLookup(opCtx, indexName, lookupStart, batchStats);
+            _getCatalogSnapshotAndRunReverseLookup(opCtx, indexName, snapshotFirstKey, batchStats);
         if (!status.isOK()) {
             LOGV2_DEBUG(7844807,
                         3,
@@ -1013,7 +1017,7 @@ Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
         }
 
         reachedBatchEnd = batchStats.finishedIndexBatch;
-        lookupStart = batchStats.nextLookupStart;
+        snapshotFirstKey = batchStats.nextKeyToBeChecked;
     } while (!reachedBatchEnd && !batchStats.finishedIndexCheck);
     return Status::OK();
 }
@@ -1031,7 +1035,7 @@ Status DbChecker::_getExtraIndexKeysBatchAndRunReverseLookup(
 Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     OperationContext* opCtx,
     const StringData& indexName,
-    const key_string::Value& lookupStart,
+    const key_string::Value& snapshotFirstKey,
     DbCheckExtraIndexKeysBatchStats& batchStats) {
     if (MONGO_unlikely(hangBeforeReverseLookupCatalogSnapshot.shouldFail())) {
         LOGV2_DEBUG(7844804, 3, "Hanging due to hangBeforeReverseLookupCatalogSnapshot failpoint");
@@ -1092,10 +1096,8 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     auto iam = indexCatalogEntry->accessMethod()->asSortedData();
     const auto ordering = iam->getSortedDataInterface()->getOrdering();
 
-
     auto indexCursor =
         std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_info.dataThrottle);
-
 
     // Set the index cursor's end position based on the inputted end parameter for when to stop
     // the dbcheck command.
@@ -1104,22 +1106,24 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     int64_t numKeys = 0;
     int64_t numBytes = 0;
 
-    auto lookupStartKeyStringBsonRehydrated = key_string::rehydrateKey(
-        index->keyPattern(),
-        key_string::toBsonSafe(
-            lookupStart.getBuffer(), lookupStart.getSize(), ordering, lookupStart.getTypeBits()));
+    auto snapshotFirstKeyStringBsonRehydrated =
+        key_string::rehydrateKey(index->keyPattern(),
+                                 key_string::toBsonSafe(snapshotFirstKey.getBuffer(),
+                                                        snapshotFirstKey.getSize(),
+                                                        ordering,
+                                                        snapshotFirstKey.getTypeBits()));
 
     LOGV2_DEBUG(7844800,
                 3,
-                "starting extra index keys batch at",
-                "lookupStartKeyStringBson"_attr = lookupStartKeyStringBsonRehydrated,
+                "starting extra index keys snapshot at",
+                "snapshotFirstKeyStringBson"_attr = snapshotFirstKeyStringBsonRehydrated,
                 "indexName"_attr = indexName,
                 logAttrs(_info.nss),
                 "uuid"_attr = _info.uuid);
 
-    auto currIndexKey = indexCursor->seekForKeyString(opCtx, lookupStart);
+    auto currIndexKey = indexCursor->seekForKeyString(opCtx, snapshotFirstKey);
 
-    // Note that if we can't find lookupStart (e.g. it was deleted in between snapshots),
+    // Note that if we can't find snapshotFirstKey (e.g. it was deleted in between snapshots),
     // seekForKeyString will automatically return the next adjacent keystring in the storage
     // engine. It will only return a null entry if there are no entries at all in the index.
     // Log for debug/testing purposes.
@@ -1130,7 +1134,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                     3,
                     "could not find any keys in index",
                     "endPosition"_attr = maxKey,
-                    "lookupStartKeyStringBson"_attr = lookupStartKeyStringBsonRehydrated,
+                    "snapshotFirstKeyStringBson"_attr = snapshotFirstKeyStringBsonRehydrated,
                     "indexName"_attr = indexName,
                     logAttrs(_info.nss),
                     "uuid"_attr = _info.uuid);
@@ -1155,11 +1159,6 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
         return status;
     }
 
-    // Track actual first key in batch, since it might not be the same as lookupStart if the
-    // index keys have changed between reverse lookup catalog snapshots.
-    const auto firstKeyString = currIndexKey.get().keyString;
-    batchStats.firstIndexKey = firstKeyString;
-
     while (currIndexKey) {
         iassert(opCtx->checkForInterruptNoAssert());
         const auto keyString = currIndexKey.get().keyString;
@@ -1180,7 +1179,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
             LOGV2_DEBUG(7971700, 3, "Skipping reverse lookup for extra index keys dbcheck");
         }
 
-        batchStats.lastIndexKey = keyString;
+        batchStats.lastKeyChecked = keyString;
         numBytes += keyString.getSize();
         numKeys++;
         batchStats.nBytes += keyString.getSize();
@@ -1188,9 +1187,9 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
 
         currIndexKey = indexCursor->nextKeyString(opCtx);
 
-        // Set nextLookupStart.
+        // Set the next key that should be checked.
         if (currIndexKey) {
-            batchStats.nextLookupStart = currIndexKey.get().keyString;
+            batchStats.nextKeyToBeChecked = currIndexKey.get().keyString;
         }
 
         // TODO SERVER-79800: Fix handling of identical index keys.
@@ -1227,7 +1226,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     batchStats.finishedIndexCheck = !currIndexKey.is_initialized();
     LOGV2_DEBUG(7844808,
                 3,
-                "Catalog snapshot for extra index keys check ending",
+                "Catalog snapshot for reverse lookup check ending",
                 "numKeys"_attr = numKeys,
                 "numBytes"_attr = numBytes,
                 "finishedIndexCheck"_attr = batchStats.finishedIndexCheck,
@@ -1535,8 +1534,8 @@ void DbChecker::_dataConsistencyCheck(OperationContext* opCtx) {
                                        stats.nBytes,
                                        stats.md5,
                                        stats.md5,
-                                       start,
-                                       stats.lastKey,
+                                       key_string::rehydrateKey(BSON("_id" << 1), start),
+                                       key_string::rehydrateKey(BSON("_id" << 1), stats.lastKey),
                                        stats.readTimestamp,
                                        stats.time);
         if (kDebugBuild || entry->getSeverity() != SeverityEnum::Info || stats.logToHealthLog) {
