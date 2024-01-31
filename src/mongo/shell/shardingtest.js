@@ -1701,7 +1701,7 @@ var ShardingTest = function ShardingTest(params) {
         this.configRS.awaitNodesAgreeOnPrimary();
         var csrsPrimary = this.configRS.getPrimary();
 
-        // TODO: SERVER-80100 Remove assert.soon.
+        // TODO: SERVER-80010 Remove assert.soon.
         if (useAutoBootstrapProcedure) {
             assert.soonNoExcept(() => {
                 function isShardingReady() {

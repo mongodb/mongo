@@ -196,7 +196,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         self.is_ready = True
 
-    # TODO: Remove with SERVER-80100.
+    # TODO: Remove with SERVER-80010.
     def _await_auto_bootstrapped_config_shard(self, config_shard_rs):
         deadline = time.time() + ShardedClusterFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
         timeout_occurred = lambda: deadline - time.time() <= 0.0
