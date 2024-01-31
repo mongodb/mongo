@@ -1358,5 +1358,34 @@ TEST(VectorizerTest, ConvertIsMemberFunction) {
         "}\n",
         *processed.expr);
 }
+
+TEST(VectorizerTest, ConvertCoerceToBoolFunction) {
+    auto tree = make<FunctionCall>("coerceToBool", makeSeq(make<Variable>("inputVar")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "inputVar"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"valueBlockCoerceToBool\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
 }  // namespace
 }  // namespace mongo::stage_builder

@@ -1295,4 +1295,51 @@ TEST_F(SBEBlockExpressionTest, BlockIsMemberOnNothingTest) {
                   std::vector<std::pair<value::TypeTags, value::Value>>{
                       makeNothing(), makeNothing(), makeNothing(), makeNothing(), makeNothing()});
 }
+
+TEST_F(SBEBlockExpressionTest, BlockCoerceToBool) {
+    value::ViewOfValueAccessor blockAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeNewString("teststring1"));
+    block.push_back(value::makeNewString(""));
+    block.push_back(makeInt32(-2));
+    block.push_back(makeInt32(0));
+    block.push_back(makeBool(false));
+    block.push_back(makeBool(true));
+    block.push_back(makeDouble(0.0));
+    block.push_back(makeDouble(-0.0));
+    block.push_back(makeDouble(10.0));
+    block.push_back(makeNothing());
+    block.push_back(makeNull());
+
+    blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(&block));
+
+    auto expr =
+        makeE<sbe::EFunction>("valueBlockCoerceToBool", sbe::makeEs(makeE<EVariable>(blockSlot)));
+
+    auto compiledExpr = compileExpression(*expr);
+
+    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+    value::ValueGuard guard(runTag, runVal);
+
+    assertBlockEq(runTag,
+                  runVal,
+                  std::vector<std::pair<value::TypeTags, value::Value>>{
+                      makeBool(true),   // "teststring1"
+                      makeBool(true),   // ""
+                      makeBool(true),   // -2
+                      makeBool(false),  // 0
+                      makeBool(false),  // false
+                      makeBool(true),   // true
+                      makeBool(false),  // 0.0
+                      makeBool(false),  // -0.0
+                      makeBool(true),   // 10.0
+                      makeNothing(),    // Nothing
+                      makeBool(false),  // Null
+                  });
+}
+
 }  // namespace mongo::sbe

@@ -1004,4 +1004,23 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockIsMemb
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCoerceToBool(
+    ArityType arity) {
+    auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(0);
+
+    invariant(valBlockTag == value::TypeTags::valueBlock);
+    auto valueBlockView = value::getValueBlock(valBlockVal);
+
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Boolean,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    auto res = valueBlockView->map(value::makeColumnOp<cmpOpType>(
+        [&](value::TypeTags tag, value::Value val) { return value::coerceToBool(tag, val); }));
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
 }  // namespace mongo::sbe::vm
