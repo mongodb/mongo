@@ -1601,6 +1601,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
 
