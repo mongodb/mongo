@@ -934,6 +934,37 @@ TEST_F(ShardRoleTest, WritesOnMultiDocTransactionsUseLatestCatalog) {
                        ErrorCodes::WriteConflict);
 }
 
+TEST_F(ShardRoleTest, ConflictIsThrownWhenShardVersionUnshardedButStashedCatalogDiffersFromLatest) {
+    opCtx()->setInMultiDocumentTransaction();
+    shard_role_details::getRecoveryUnit(opCtx())->preallocateSnapshot();
+    CollectionCatalog::stash(opCtx(), CollectionCatalog::get(opCtx()));
+
+    // Drop a collection
+    {
+        auto newClient =
+            opCtx()->getServiceContext()->getService()->makeClient("AlternativeClient");
+        AlternativeClientRegion acr(newClient);
+        auto newOpCtx = cc().makeOperationContext();
+        DBDirectClient directClient(newOpCtx.get());
+        ASSERT_TRUE(directClient.dropCollection(nssUnshardedCollection1));
+    }
+
+    // Try to acquire the now-dropped collection, with declared placement concern
+    // ShardVersion::UNSHARDED. Expect a conflict to be detected.
+    {
+        ScopedSetShardRole setShardRole(
+            opCtx(), nssUnshardedCollection1, ShardVersion::UNSHARDED(), boost::none);
+        ASSERT_THROWS_CODE(
+            acquireCollectionOrView(
+                opCtx(),
+                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                    opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead),
+                MODE_IX),
+            DBException,
+            ErrorCodes::SnapshotUnavailable);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // MaybeLockFree
 TEST_F(ShardRoleTest, AcquireCollectionMaybeLockFreeTakesLocksWhenInMultiDocTransaction) {

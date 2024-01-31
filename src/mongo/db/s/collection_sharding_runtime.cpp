@@ -118,6 +118,43 @@ ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
                                      boost::optional<CollectionIndexes>(boost::none));
 }
 
+// Checks that the overall collection 'timestamp' is valid for the current transaction (i.e. this
+// is, that the collection 'timestamp' is not greater than the transaction atClusterTime or
+// placementConflictTime).
+void checkShardingMetadataWasValidAtTxnClusterTime(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const boost::optional<LogicalTime>& placementConflictTime,
+    const CollectionMetadata& collectionMetadata) {
+    const auto& atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+    if (atClusterTime &&
+        atClusterTime->asTimestamp() <
+            collectionMetadata.getCollPlacementVersion().getTimestamp()) {
+        uasserted(ErrorCodes::SnapshotUnavailable,
+                  str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                << " has undergone a catalog change operation at time "
+                                << collectionMetadata.getCollPlacementVersion().getTimestamp()
+                                << " and no longer satisfies the requirements for the current "
+                                   "transaction which requires "
+                                << atClusterTime->asTimestamp()
+                                << ". Transaction will be aborted.");
+    }
+
+    if (placementConflictTime &&
+        placementConflictTime->asTimestamp() <
+            collectionMetadata.getCollPlacementVersion().getTimestamp()) {
+        uasserted(ErrorCodes::SnapshotUnavailable,
+                  str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                << " has undergone a catalog change operation at time "
+                                << collectionMetadata.getCollPlacementVersion().getTimestamp()
+                                << " and no longer satisfies the requirements for the current "
+                                   "transaction which requires "
+                                << placementConflictTime->asTimestamp()
+                                << ". Transaction will be aborted.");
+    }
+}
+
 }  // namespace
 
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime::
@@ -543,6 +580,9 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
                                     << placementConflictTime->asTimestamp()
                                     << ". Transaction will be aborted.");
         }
+
+        checkShardingMetadataWasValidAtTxnClusterTime(
+            opCtx, _nss, placementConflictTime, currentMetadata);
         return optCurrentMetadata;
     }
 

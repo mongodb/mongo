@@ -353,6 +353,9 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                               verifyWriteEligible);
     }
 
+    const auto receivedShardVersion{
+        OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
+
     if (_coll) {
         // Fetch and store the sharding collection description data needed for use during the
         // operation. The shardVersion will be checked later if the shard filtering metadata is
@@ -371,11 +374,18 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
         checkCollectionUUIDMismatch(opCtx, *catalog, _resolvedNss, _coll, options._expectedUUID);
 
+        if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNSHARDED()) {
+            shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+                opCtx, *catalog, _coll, _resolvedNss);
+        }
+
         return;
     }
 
-    const auto receivedShardVersion{
-        OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
+    if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNSHARDED()) {
+        shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+            opCtx, *catalog, _coll, _resolvedNss);
+    }
 
     if (!options._expectedUUID) {
         // We only need to look up a view if an expected collection UUID was not provided. If this
