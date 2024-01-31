@@ -134,6 +134,7 @@ public:
         result.append("host", prettyHostName());
         result.append("version", VersionInfoInterface::instance().version());
         result.append("process", serverGlobalParams.binaryName);
+        result.append("service", toBSON(opCtx->getService()->role()));
         result.append("pid", ProcessId::getCurrent().asLongLong());
         result.append("uptime", (double)(time(nullptr) - serverGlobalParams.started));
         auto uptime = clock->now() - _started;
