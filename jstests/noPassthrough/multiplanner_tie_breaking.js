@@ -16,7 +16,7 @@ function testTieBreaking(breakTies, expectedPlanCount, checkAgainstOriginal) {
     assert.commandWorked(db.adminCommand(
         {setParameter: 1, internalQueryPlanTieBreakingWithIndexHeuristics: breakTies}));
     const stats = assert.commandWorked(
-        coll.find({a: "mouse", b: /not rat/, c: "capybara", d: "degu"}).explain(true));
+        coll.find({a: "mouse", b: /not rat/, c: /capybara/, d: /degu/}).explain(true));
 
     // Check we're generating the expected number of plans.
     assert.eq(stats.executionStats.allPlansExecution.length, expectedPlanCount);

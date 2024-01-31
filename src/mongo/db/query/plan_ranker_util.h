@@ -58,28 +58,21 @@ inline std::vector<std::pair<double, size_t>>::iterator findTopTiedPlans(
 }
 
 /**
- * Tie breaking by documents examined, implementation of SERVER-79400.
- * Only try to modify score if we have a tie after existing bonuses.
- * Returns the number of previously tied plans.
+ * Apply docs examined tie breaking heuristic and apply bonuses to the winners.
  */
 template <typename PlanStageType, typename ResultType, typename Data>
-int addBonusToLeastDocsExamined(
+void addBonusToLeastDocsExamined(
     std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    size_t numberOfTiedPlans,
     const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
     const std::vector<size_t>& documentsExamined) {
 
-    // Find top tied plans, if there are any.
-    auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
-    int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
-
-    if (numberOfTiedPlans == 1) {
-        return numberOfTiedPlans;
-    }
-
     // The vector tiedPlans holds the number of documents and the plan's index.
     std::vector<std::pair<double, size_t>> tiedPlans{};
-    for (auto i = scoresAndCandidateIndices.begin(); i < tiedPlansEnd; ++i) {
-        tiedPlans.push_back(std::make_pair(documentsExamined[i->second], i->second));
+    tiedPlans.reserve(numberOfTiedPlans);
+    for (size_t i = 0; i < numberOfTiedPlans; ++i) {
+        const size_t candidateIndex = scoresAndCandidateIndices[i].second;
+        tiedPlans.emplace_back(std::make_pair(documentsExamined[candidateIndex], candidateIndex));
     }
 
     // Sort top plans by least documents examined, and allocate a bonus to each of the top plans.
@@ -90,7 +83,28 @@ int addBonusToLeastDocsExamined(
     for (auto topPlan = tiedPlans.begin(); topPlan < stillTiedPlansEnd; ++topPlan) {
         scoresAndCandidateIndices[topPlan->second].first += kBonusEpsilon;
     }
-    return numberOfTiedPlans;
+}
+
+/**
+ * Apply best index prefix tie breaking heuristic and apply bonuses to the winners.
+ */
+template <typename PlanStageType, typename ResultType, typename Data>
+void addBonusToBestIndexPrefix(
+    std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    size_t numberOfTiedPlans,
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates) {
+    std::vector<const QuerySolution*> solutions{};
+    solutions.reserve(numberOfTiedPlans);
+
+    for (size_t i = 0; i < numberOfTiedPlans; ++i) {
+        const size_t candidateIndex = scoresAndCandidateIndices[i].second;
+        solutions.emplace_back(candidates[candidateIndex].solution.get());
+    }
+
+    auto winIndices = applyIndexPrefixHeuristic(solutions);
+    for (auto winIndex : winIndices) {
+        scoresAndCandidateIndices[winIndex].first += 2 * kBonusEpsilon;
+    }
 }
 
 /**
@@ -197,8 +211,17 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     // Tie-breaking by number of documents examined, currently only activated by query knob
     // responsible for this tie-breaking heuristic.
     if (internalQueryPlanTieBreakingWithIndexHeuristics.load()) {
-        int numberOfTiedPlans =
-            addBonusToLeastDocsExamined(scoresAndCandidateIndices, candidates, documentsExamined);
+        // Find top tied plans, if there are any.
+        auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
+        int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
+
+        if (numberOfTiedPlans > 1) {
+            addBonusToLeastDocsExamined(
+                scoresAndCandidateIndices, numberOfTiedPlans, candidates, documentsExamined);
+
+            addBonusToBestIndexPrefix(scoresAndCandidateIndices, numberOfTiedPlans, candidates);
+        }
+
         // Re-sort top candidates.
         std::stable_sort(scoresAndCandidateIndices.begin(),
                          scoresAndCandidateIndices.begin() + numberOfTiedPlans,
