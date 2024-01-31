@@ -71,6 +71,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -3030,6 +3031,12 @@ write_ops::InsertCommandReply performTimeseriesWrites(
 
     write_ops::InsertCommandReply insertReply;
     auto& baseReply = insertReply.getWriteCommandReplyBase();
+
+    // Prevent FCV upgrade/downgrade while performing a time-series write. There are several feature
+    // flag checks in the layers below and they expect a consistent reading of the FCV to take the
+    // correct write path.
+    // TODO SERVER-70605: remove this FixedFCVRegion.
+    FixedFCVRegion fixedFcv(opCtx);
 
     if (request.getOrdered()) {
         baseReply.setN(performOrderedTimeseriesWrites(

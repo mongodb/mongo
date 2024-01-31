@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -62,7 +63,9 @@ Bucket::Bucket(
       timeField(tf.toString()),
       minTime(mt),
       bucketStateRegistry(bsr),
-      lastChecked(getCurrentEraAndIncrementBucketCount(bucketStateRegistry)) {}
+      lastChecked(getCurrentEraAndIncrementBucketCount(bucketStateRegistry)),
+      usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {}
 
 Bucket::~Bucket() {
     decrementBucketCountForEra(bucketStateRegistry, lastChecked);

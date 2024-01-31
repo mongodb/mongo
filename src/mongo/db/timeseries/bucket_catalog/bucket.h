@@ -155,6 +155,11 @@ public:
     // If set, bucket is compressed on disk, and first prepared batch will need to decompress it
     // before updating.
     boost::optional<BSONObj> compressed;
+
+    // Whether the bucket was created while the always used compressed buckets feature flag was
+    // enabled.
+    // TODO SERVER-70605: remove this boolean.
+    const bool usingAlwaysCompressedBuckets;
 };
 
 /**

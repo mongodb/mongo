@@ -1283,6 +1283,16 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
     // we want to soft close the bucket yet and should wait to update closure stats.
     const bool shouldUpdateStats = (mode == AllowBucketCreation::kYes);
 
+    if (bucket.usingAlwaysCompressedBuckets !=
+        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // The user operation is executing with the always use compressed buckets feature flag in
+        // the opposite mode from what the bucket was created with. We close the bucket as this
+        // makes the incoming measurement incompatible with this bucket.
+        // TODO SERVER-70605: remove this check.
+        return {RolloverAction::kHardClose, RolloverReason::kIncompatible};
+    }
+
     auto bucketTime = bucket.minTime;
     if (info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds())) {
         if (shouldUpdateStats) {
