@@ -567,6 +567,8 @@ last-continuous:
     ticket: SERVER-83119
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-84151
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   suites: null
 last-lts:
   all:
@@ -1192,4 +1194,6 @@ last-lts:
     ticket: SERVER-83119
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-84151
+  - test_file: jstests/core/timeseries/timeseries_collmod.js
+    ticket: SERVER-83370
   suites: null

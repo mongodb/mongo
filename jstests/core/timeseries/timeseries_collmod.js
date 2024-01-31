@@ -166,6 +166,20 @@ assert.commandWorked(db.runCommand({
     }
 }));
 
+// Setting prepareUnique should return an error on a time-series collection index.
+assert.commandWorked(coll.createIndex({"prepareUniqueIndex": 1}))
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "index": {"keyPattern": {"prepareUniqueIndex": 1}, "prepareUnique": true}
+}),
+                             ErrorCodes.InvalidOptions);
+
+assert.commandFailedWithCode(db.runCommand({
+    "collMod": collName,
+    "index": {"keyPattern": {"prepareUniqueIndex": 1}, "prepareUnique": false}
+}),
+                             ErrorCodes.InvalidOptions);
+
 // Verify seconds was correctly set on the collection and granularity removed since a custom
 // value was added.
 let collections = assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
