@@ -98,6 +98,15 @@ server_parameters:
         cpp_varname: "gTimeseriesInsertMaxRetriesOnDuplicates"
         default: 32
         validator: {gte: 1}
+    "timeseriesMaxOpenBucketsPerMetadata":
+        description: "The upper limit on the number of open buckets that can exist for the same
+                      metadata. When this limit is reached, when we try to open new buckets for
+                      this metdata older buckets will be closed."
+        set_at: [ startup ]
+        cpp_vartype: "std::int32_t"
+        cpp_varname: "gTimeseriesMaxOpenBucketsPerMetadata"
+        default: 5
+        validator: {gte: 1}
 
 enums:
     BucketGranularity:

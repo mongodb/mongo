@@ -2522,14 +2522,17 @@ TEST_F(BucketCatalogTest, InsertWithMultipleOpenBucketsPerMetadata) {
 }
 
 // This will test, when the timeSeriesAlwaysUseCompressedBuckets feature flag is on,
-// whether reopening a bucket will no longer check for existing open buckets with the same metadata
-// and close them.
+// that reopening a bucket will close an open bucket for that same metadata only
+// when the max number of buckets per metadata is reached.
 TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeatureFlagOn) {
     // Simplify test by restricting to a single stripe.
     FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
     // Turn on Feature Flag.
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+    // Set the max number of open buckets allowed for any single metadata.
+    RAIIServerParameterControllerForTest memoryLimit{"timeseriesMaxOpenBucketsPerMetadata", 3};
+
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     // Store the current time as a variable.
     auto currentTime = Date_t::now();
@@ -2554,7 +2557,7 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
 
     // Now create a bucket that we will reopen. Reopening should succeed without removing the other
     // open bucket for this metadata.
-    BSONObj bucketToReopen = ::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+    BSONObj firstBucketToReopen = ::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
                                    "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
                                    "meta":42,
@@ -2563,14 +2566,33 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
-    ASSERT_OK(_reopenBucket(autoColl.getCollection(), bucketToReopen));
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), firstBucketToReopen));
     // There should still be two open buckets for this key.
     ASSERT_EQ(stripe.openBucketsByKey[key].size(), 2);
+
+    // We allocate one more bucket, which puts us at our maximum of 3.
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    // Check that we only have one bucket allocated for this key - the one we just created.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
+
+    // Now, when we try reopening a second bucket, we should see that adding this bucket would set
+    // us over our limit; we should then close one of the existing open buckets.
+    BSONObj secondBucketToReopen = ::mongo::fromjson(R"({"_id":{"$oid":"734d2e673747f168ee18b420"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-07-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-07-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-07-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-07-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-07-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2},
+                    "b":{"0":1,"1":2}}})");
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), secondBucketToReopen));
+    // There should still be three open buckets for this key.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
 }
 
 // This will test, when the timeSeriesAlwaysUseCompressedBuckets feature flag is off,
-// whether reopening a bucket does indeed check for existing open buckets with the same metadata
-// and close them if any are found.
+// whether reopening a bucket closes any other open buckets for that same metadata.
 TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeatureFlagOff) {
     // Simplify test by restricting to a single stripe.
     FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
@@ -2612,6 +2634,48 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
     ASSERT_EQ(stripe.openBucketsByKey[key].size(), 1);
     auto bucket = *(stripe.openBucketsByKey[key].begin());
     ASSERT_EQ(bucket->bucketId.oid.compare(OID("629e1e680958e279dc29a517")), 0);
+}
+
+// Tests whether allocateBucket will close an existing open bucket when we are
+// allocating a new bucket while at the max number of open buckets allowed.
+TEST_F(BucketCatalogTest, AllocateBucketClosesExistingOpenBucketsWhenOverLimit) {
+    // Simplify test by restricting to a single stripe.
+    FailPointEnableBlock failPoint("alwaysUseSameBucketCatalogStripe");
+    // Set the max number of open buckets allowed for any single metadata.
+    RAIIServerParameterControllerForTest memoryLimit{"timeseriesMaxOpenBucketsPerMetadata", 3};
+    // Turn the feature flag for timeseriesAlwaysUseCompressed on.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagTimeseriesAlwaysUseCompressedBuckets", true);
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+    // Store the current time as a variable.
+    auto currentTime = Date_t::now();
+
+    // Initialize the values with which we will create our bucket.
+    auto& stripe = _bucketCatalog->stripes[0];
+    auto options = _getTimeseriesOptions(_ns1);
+    ClosedBuckets closedBuckets;
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);
+    // Extract a bucket key.
+    auto tempDoc = BSON(_metaField << 42 << _timeField << currentTime);
+    auto statusWithKeyAndTime = internal::extractBucketingParameters(
+        _ns1, autoColl->getDefaultCollator(), options, tempDoc);
+    ASSERT_OK(statusWithKeyAndTime);
+    auto key = statusWithKeyAndTime.getValue().first;
+    internal::CreationInfo info{key, 0, currentTime, options, stats, &closedBuckets};
+
+    // We allocate 3 buckets with the same metadata, which is the max number allowed under our
+    // current server parameter value.
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
+
+    // Now, when we try to allocate another bucket, we should close one of the existing ones.
+    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    // The number of buckets allocated for this metadata should still be 3, the max that we have
+    // set.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
 }
 
 

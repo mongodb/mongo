@@ -20,7 +20,6 @@ selector:
   - jstests/core/timeseries/partialFilterExpression_with_internalBucketGeoWithin.js
   - jstests/core/timeseries/timeseries_index_partial.js
   - jstests/core/timeseries/timeseries_index_use.js
-  - jstests/core/timeseries/timeseries_lastpoint.js
   - jstests/core/query/find/finda.js
   - jstests/core/query/regex/regex_collations.js
   # The following tests check $indexStats and are not expecting to see implicitly created indexes.

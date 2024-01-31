@@ -19,9 +19,25 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-const testDB = db.getSiblingDB(jsTestName());
-const coll = testDB.timeseries_reopened_bucket_insert;
-const bucketsColl = testDB["system.buckets." + coll.getName()];
+// If the timeseriesAlwaysUseCompressedBuckets feature flag is enabled, when searching through
+// candidate buckets useBucket also checks if the time range for the measurement that we are
+// trying to insert matches the candidate bucket - if it does not, we do not return it. Because
+// of this extra check, we do not attempt to insert a measurement into a bucket with an
+// incompatible time range, which prevents that bucket from being rolled over.
+// However, although buckets are not immediately rolled over due to time forward/backward, open
+// buckets are still rolled over when we have reached a max amount of open buckets for a
+// particular metadata, as determined by 'timeseriesMaxOpenBucketsPerMetadata'. The default value
+// would cause this test to fail. By setting this value to 1, when we need to open a new bucket
+// because an existing open bucket cannot take in a measurement (for example, in the case of
+// 'expectToReopenArchivedBuckets', due to a time related issue), the existing bucket will still be
+// rolled over same as before.
+const conn = MongoRunner.runMongod({setParameter: {timeseriesMaxOpenBucketsPerMetadata: 1}});
+
+const dbName = jsTestName();
+const collName = jsTestName();
+const testDB = conn.getDB(dbName);
+const coll = testDB.getCollection(collName);
+const bucketsColl = testDB.getCollection("system.buckets." + collName);
 const timeField = "time";
 const metaField = "mm";
 const metaTimeIndexName = [[metaField], "1", [timeField], "1"].join("_");
@@ -187,18 +203,6 @@ const checkIfBucketReopened = function(
 })();
 
 (function expectToReopenArchivedBuckets() {
-    // If the timeseriesAlwaysUseCompressedBuckets feature flag is enabled, when searching through
-    // candidate buckets useBucket also checks if the time range for the measurement that we are
-    // trying to insert matches the candidate bucket - if it does not, we do not return it. Because
-    // of this extra check, we do not attempt to insert a measurement into a bucket with an
-    // incompatible time range, which prevents that bucket from being rolled over. Because
-    // the bucket will not be rolled over in this case, it will not be a candidate for reopening.
-    // TODO SERVER-79481: Revisit this once we define an upper bound for the number of
-    // multiple open buckets per metadata, at which point buckets will rollover once again.
-    if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-        return;
-    }
-
     jsTestLog("Entering expectToReopenArchivedBuckets...");
     resetCollection();
 
@@ -739,3 +743,4 @@ const checkIfBucketReopened = function(
 })();
 
 coll.drop();
+MongoRunner.stopMongod(conn);

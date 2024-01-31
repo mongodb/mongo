@@ -13,7 +13,8 @@ const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
     setParameter: {
         timeseriesIdleBucketExpiryMemoryUsageThreshold: kIdleBucketExpiryMemoryUsageThreshold,
-        timeseriesBucketMinCount: 1
+        timeseriesBucketMinCount: 1,
+        timeseriesMaxOpenBucketsPerMetadata: 1
     }
 });
 
@@ -170,8 +171,12 @@ checkCollStats();
 // of this extra check, we do not attempt to insert a measurement into a bucket with an
 // incompatible time range, which prevents that bucket from being rolled over - in this case,
 // from being archived due to time backward.
-// TODO SERVER-79481: Revisit this once we define an upper bound for the number of
-// multiple open buckets per metadata, at which point buckets will rollover once again.
+// TODO SERVER-84680: Revisit this with updated stats. At the moment the stats for
+// 'numBucketsOpenedDueToMetadata' and 'numBucketsArchivedDueToTimeBackward' behave differently
+// than before when the timeseriesAlwaysUseCompressedBuckets feature flag is enabled,
+// so even when the max number of open buckets per metadata is set to one, this test will fail
+// due to those two stats being different (numBucketsArchivedDueToTimeBackward not being
+// incremented, numBucketsOpenedDueToMetadata being incremented).
 if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB)) {
     assert.commandWorked(
         coll.insert({[timeFieldName]: ISODate("2021-01-01T01:00:00Z"), [metaFieldName]: {a: 1}},
@@ -256,9 +261,13 @@ checkCollStats();
 // trying to insert matches the candidate bucket - if it does not, we do not return it. Because
 // of this extra check, we do not attempt to insert a measurement into a bucket with an
 // incompatible time range, which prevents that bucket from being rolled over - in this case,
-// from being closed due to time forward.
-// TODO SERVER-79481: Revisit this once we define an upper bound for the number of
-// multiple open buckets per metadata, at which point buckets will rollover once again.
+// from being archived due to time backward.
+// TODO SERVER-84680: Revisit this with updated stats. At the moment the stats for
+// 'numBucketsOpenedDueToMetadata' and 'numBucketsClosedDueToTimeForward' behave differently
+// than before when the timeseriesAlwaysUseCompressedBuckets feature flag is enabled,
+// so even when the max number of open buckets per metadata is set to one, this test will fail
+// due to those two stats being different (numBucketsClosedDueToTimeForward not being
+// incremented, numBucketsOpenedDueToMetadata being incremented).
 if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(testDB)) {
     // Assumes the measurements in each bucket span at most one hour (based on the time field).
     // This test leaves just one measurement per bucket which will cause compression to be

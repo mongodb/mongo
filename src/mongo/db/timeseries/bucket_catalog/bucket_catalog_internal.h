@@ -450,4 +450,20 @@ void runPostCommitDebugChecks(OperationContext* opCtx,
  */
 bool isDocumentWithinTimeRangeForBucket(Bucket* potentialBucket, const CreationInfo& info);
 
+/**
+ * Closes open buckets when there are too many open buckets for a particular metadata.
+ * If the TimeseriesAlwaysUseCompressedBuckets feature flag is enabled, this limit is
+ * determined by the gTimeseriesMaxOpenBucketsPerMetadata server parameter - we will close
+ * a bucket only if we are at this limit. If the feature flag is not enabled, then we can
+ * have only one open bucket per metadata, so we will close any other existing open bucket.
+ */
+void ensureSpaceToOpenNewBucket(OperationContext* opCtx,
+                                BucketCatalog& catalog,
+                                Stripe& stripe,
+                                WithLock stripeLock,
+                                ExecutionStatsController& stats,
+                                const BucketKey& key,
+                                ClosedBuckets& closedBuckets,
+                                bool isReopening);
+
 }  // namespace mongo::timeseries::bucket_catalog::internal
