@@ -2,8 +2,8 @@
  * Test that $rand in a command-level 'let' is evaluated only once.
  *
  * @tags: [
- *   # Before 7.3, $rand was evaluated more than once in sharded write commands (SERVER-82042).
- *   requires_fcv_73,
+ *   # The bulkWrite command is not enabled on versions below 8.0.
+ *   requires_fcv_80,
  * ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
