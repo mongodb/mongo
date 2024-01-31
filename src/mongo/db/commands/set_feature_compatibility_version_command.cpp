@@ -799,6 +799,7 @@ private:
         ON_BLOCK_EXIT([&] { WriteBlockBypass::get(opCtx).set(originalValue); });
         WriteBlockBypass::get(opCtx).set(true);
 
+        auto curop = CurOp::get(opCtx);
         for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
             Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
             catalog::forEachCollectionFromDb(
@@ -808,10 +809,36 @@ private:
                 [&](const Collection* collection) {
                     NamespaceStringOrUUID nsOrUUID(dbName, collection->uuid());
                     CollMod collModCmd(collection->ns());
+
+                    // Nested CurOp for collMod. Namespace should ideally be
+                    // the command namespace for 'dbName' but collMod internally
+                    // overrides the CurOp namespace (through OldClientContext)
+                    // with the namespace of the collection being modified.
+                    CurOp collModCurOp;
+                    collModCurOp.push(opCtx);
+                    collModCurOp.setGenericOpRequestDetails(collection->ns(),
+                                                            curop->getCommand(),
+                                                            collModCmd.toBSON({}),
+                                                            NetworkOp::dbMsg);
+
                     BSONObjBuilder unusedBuilder;
                     uassertStatusOK(
                         processCollModCommand(opCtx, nsOrUUID, collModCmd, &unusedBuilder));
 
+                    try {
+                        // Logs the collMod statistics if it took longer than the server
+                        // parameter `slowMs` to complete.
+                        collModCurOp.completeAndLogOperation(
+                            {MONGO_LOGV2_DEFAULT_COMPONENT, toLogService(opCtx->getService())},
+                            CollectionCatalog::get(opCtx)
+                                ->getDatabaseProfileSettings(dbName)
+                                .filter);
+                    } catch (const DBException& e) {
+                        LOGV2_WARNING(8592500,
+                                      "unable to log collMod operation during setFCV upgrade",
+                                      "dbName"_attr = dbName,
+                                      "error"_attr = e);
+                    }
                     return true;
                 },
                 [&](const Collection* coll) {
