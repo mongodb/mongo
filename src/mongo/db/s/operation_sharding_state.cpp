@@ -261,35 +261,59 @@ ScopedSetShardRole::~ScopedSetShardRole() {
     }
 }
 
-ScopedUnsetImplicitTimeSeriesBucketsShardRole::ScopedUnsetImplicitTimeSeriesBucketsShardRole(
-    OperationContext* opCtx, const NamespaceString& nss)
+ScopedStashShardRole::ScopedStashShardRole(OperationContext* opCtx, const NamespaceString& nss)
     : _opCtx(opCtx), _nss(nss) {
-    invariant(nss.isTimeseriesBucketsCollection());
-
     auto& oss = OperationShardingState::get(_opCtx);
 
-    auto it = oss._shardVersions.find(
+    const auto shardVersionIt = oss._shardVersions.find(
         NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
-    if (it != oss._shardVersions.end()) {
-        tassert(8123300,
-                "Cannot unset implicit timeseries buckets shard role if recursion level is greater "
-                "than 1",
-                it->second.recursion == 1);
-        _stashedShardVersion.emplace(it->second.v);
-        oss._shardVersions.erase(it);
+
+    const auto dbVersionIt = oss._databaseVersions.find(_nss.dbName());
+
+    // Check recursion preconditions first. Do the checks before modifying any
+    // OperationShardingState to ensure upholding the strong exception guarantee.
+    if (shardVersionIt != oss._shardVersions.end()) {
+        tassert(8541900,
+                "Cannot unset implicit views shard role if recursion level is greater than 1",
+                shardVersionIt->second.recursion == 1);
+    }
+
+    if (dbVersionIt != oss._databaseVersions.end()) {
+        tassert(8541901,
+                "Cannot unset implicit views shard role if recursion level is greater than 1",
+                dbVersionIt->second.recursion == 1);
+    }
+
+    // Stash shard/db versions.
+    if (shardVersionIt != oss._shardVersions.end()) {
+        _stashedShardVersion.emplace(shardVersionIt->second.v);
+        oss._shardVersions.erase(shardVersionIt);
+    }
+
+    if (dbVersionIt != oss._databaseVersions.end()) {
+        _stashedDatabaseVersion.emplace(dbVersionIt->second.v);
+        oss._databaseVersions.erase(dbVersionIt);
     }
 }
 
-ScopedUnsetImplicitTimeSeriesBucketsShardRole::~ScopedUnsetImplicitTimeSeriesBucketsShardRole() {
+ScopedStashShardRole::~ScopedStashShardRole() {
     auto& oss = OperationShardingState::get(_opCtx);
-    auto it = oss._shardVersions.find(
+    const auto shardVersionIt = oss._shardVersions.find(
         NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()));
-    invariant(it == oss._shardVersions.end());
+    invariant(shardVersionIt == oss._shardVersions.end());
 
     if (_stashedShardVersion) {
         auto emplaceResult = oss._shardVersions.emplace(
             NamespaceStringUtil::serialize(_nss, SerializationContext::stateDefault()),
             *_stashedShardVersion);
+        auto& tracker = emplaceResult.first->second;
+        tracker.recursion = 1;
+    }
+
+    const auto dbVersionIt = oss._databaseVersions.find(_nss.dbName());
+    invariant(dbVersionIt == oss._databaseVersions.end());
+    if (_stashedDatabaseVersion) {
+        auto emplaceResult = oss._databaseVersions.emplace(_nss.dbName(), *_stashedDatabaseVersion);
         auto& tracker = emplaceResult.first->second;
         tracker.recursion = 1;
     }

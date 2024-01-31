@@ -1031,6 +1031,11 @@ Status runAggregateOnView(OperationContext* opCtx,
                                request);
     } else {
         // Sharding-aware operation.
+
+        // Stash the shard role for the resolved view nss, in case it was set, as we are about to
+        // transition into the router role for it.
+        const ScopedStashShardRole scopedUnsetShardRole{opCtx, resolvedView.getNamespace()};
+
         sharding::router::CollectionRouter router(opCtx->getServiceContext(),
                                                   resolvedView.getNamespace());
         status = router.route(
@@ -1039,13 +1044,6 @@ Status runAggregateOnView(OperationContext* opCtx,
             [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                 const auto readUnderlyingCollectionLocally =
                     canReadUnderlyingCollectionLocally(opCtx, cri);
-
-                boost::optional<ScopedUnsetImplicitTimeSeriesBucketsShardRole>
-                    scopedUnsetImplicitTimeSeriesBucketsShardRole;
-                if (resolvedView.timeseries()) {
-                    scopedUnsetImplicitTimeSeriesBucketsShardRole.emplace(
-                        opCtx, resolvedView.getNamespace());
-                }
 
                 // Setup the opCtx's OperationShardingState with the expected placement versions for
                 // the underlying collection. Use the same 'placementConflictTime' from the original
