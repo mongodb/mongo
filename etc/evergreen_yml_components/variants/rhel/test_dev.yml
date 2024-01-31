@@ -497,4 +497,3 @@ buildvariants:
   - name: .serverless
   - name: unittest_shell_hang_analyzer_gen
   - name: .watchdog
-  - name: generate_buildid_to_debug_symbols_mapping

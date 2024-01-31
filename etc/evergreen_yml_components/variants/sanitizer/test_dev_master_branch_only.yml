@@ -556,7 +556,6 @@ buildvariants:
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: .encrypt
-  - name: generate_buildid_to_debug_symbols_mapping
   - name: initial_sync_fuzzer_gen
   - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen
