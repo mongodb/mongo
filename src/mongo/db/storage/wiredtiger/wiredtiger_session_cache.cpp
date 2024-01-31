@@ -241,6 +241,10 @@ void WiredTigerSessionCache::shuttingDown() {
     closeAll();
 }
 
+void WiredTigerSessionCache::restart() {
+    _shuttingDown.fetchAndBitAnd(~kShuttingDownMask);
+}
+
 bool WiredTigerSessionCache::isShuttingDown() {
     return _shuttingDown.load() & kShuttingDownMask;
 }

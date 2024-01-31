@@ -311,6 +311,11 @@ public:
      */
     bool isShuttingDown();
 
+    /**
+     * Restart a previously shut down cache.
+     */
+    void restart();
+
     bool isEphemeral();
 
     /**
