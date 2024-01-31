@@ -17,8 +17,6 @@ const st = new ShardingTest({
     rs: {
         setParameter: {
             TransactionRecordMinimumLifetimeMinutes: 0,
-            // TODO (SERVER-67620): Lower log verbosity in reap_sessions_with_active_yielders.js
-            logComponentVerbosity: tojson({transaction: {verbosity: 5}})
         }
     }
 });
