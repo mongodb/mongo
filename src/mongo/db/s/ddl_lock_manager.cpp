@@ -110,8 +110,9 @@ void DDLLockManager::_lock(OperationContext* opCtx,
         }
 
         tassert(7742100,
-                "None hierarchy lock (Global/DB/Coll) must be hold when acquiring a DDL lock",
-                !locker->isLocked());
+                "No hierarchy lock (Global/DB/Coll) must be held when acquiring a DDL lock outside"
+                "a transaction (transactions hold at least the global lock in IX mode)",
+                opCtx->inMultiDocumentTransaction() || !locker->isLocked());
 
         _registerResourceName(lock, resId, ns);
     }
@@ -200,7 +201,8 @@ DDLLockManager::ScopedDatabaseDDLLock::ScopedDatabaseDDLLock(OperationContext* o
     : _dbLock{
           opCtx, shard_role_details::getLocker(opCtx), db, reason, mode, true /*waitForRecovery*/} {
     // Check under the DDL dbLock if this is the primary shard for the database
-    Lock::DBLock dbLock(opCtx, db, MODE_IS);
+    const auto lockMode = opCtx->inMultiDocumentTransaction() ? MODE_IX : MODE_IS;
+    Lock::DBLock dbLock(opCtx, db, lockMode);
     const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, db);
     scopedDss->assertIsPrimaryShardForDb(opCtx);
 }
@@ -219,7 +221,8 @@ DDLLockManager::ScopedCollectionDDLLock::ScopedCollectionDDLLock(OperationContex
 
     // Check under the DDL db lock if this is the primary shard for the database
     {
-        Lock::DBLock dbLock(opCtx, ns.dbName(), MODE_IS);
+        const auto lockMode = opCtx->inMultiDocumentTransaction() ? MODE_IX : MODE_IS;
+        Lock::DBLock dbLock(opCtx, ns.dbName(), lockMode);
         const auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, ns.dbName());
         scopedDss->assertIsPrimaryShardForDb(opCtx);
