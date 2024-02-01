@@ -29,8 +29,9 @@
 
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
-#include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/logv2/log.h"
 
@@ -70,27 +71,23 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
 
     // TODO SERVER-85248: Update the sbe plan cache after best plan is chosen.
     uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
-    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
-        opCtx(), collections(), *cq(), *_multiPlanStage->bestSolution(), sbeYieldPolicy());
 
-    auto nss = cq()->nss();
-    if (_multiPlanStage->bestSolutionEof()) {
-        return uassertStatusOK(
-            plan_executor_factory::make(extractCq(),
-                                        extractWs(),
-                                        std::move(_multiPlanStage),
-                                        collections().getMainCollectionPtrOrAcquisition(),
-                                        _yieldPolicy,
-                                        plannerOptions(),
-                                        std::move(nss),
-                                        nullptr, /* querySolution */
-                                        cachedPlanHash()));
-    } else {
-        std::unique_ptr<QuerySolution> winningSolution = _multiPlanStage->extractBestSolution();
-        return prepareSbePlanExecutor(std::move(winningSolution),
-                                      std::move(sbePlanAndData),
-                                      false /*isFromPlanCache*/,
-                                      cachedPlanHash());
+    std::unique_ptr<QuerySolution> winningSolution = _multiPlanStage->extractBestSolution();
+
+    // Extend the winning solution with the agg pipeline and build the execution tree.
+    if (!cq()->cqPipeline().empty()) {
+        winningSolution = QueryPlanner::extendWithAggPipeline(
+            *cq(),
+            std::move(winningSolution),
+            fillOutSecondaryCollectionsInformation(opCtx(), collections(), cq()));
     }
+
+    auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
+        opCtx(), collections(), *cq(), *winningSolution, sbeYieldPolicy());
+
+    return prepareSbePlanExecutor(std::move(winningSolution),
+                                  std::move(sbePlanAndData),
+                                  false /*isFromPlanCache*/,
+                                  cachedPlanHash());
 }
 }  // namespace mongo::classic_runtime_planner_for_sbe
