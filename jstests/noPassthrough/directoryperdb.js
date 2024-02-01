@@ -2,9 +2,14 @@
  * Tests that a mongod started with --directoryperdb will write data for database x into a directory
  * named x inside the dbpath.
  *
- * This test does not make sense for in-memory storage engines, since they will not produce any data
- * files.
- * @tags: [requires_persistence]
+ * @tags: [
+ *   # This test uses the fsync command in order to force checkpoints and make the ident reaper run,
+ *   # but this behavior does not hold when running without journaling.
+ *   requires_journaling,
+ *   # This test does not make sense for in-memory storage engines, since they will not produce any
+ *   # data files.
+ *   requires_persistence,
+ * ]
  */
 
 (function() {
