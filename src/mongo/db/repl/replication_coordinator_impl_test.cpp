@@ -8878,6 +8878,46 @@ TEST_F(ReplCoordTest, LastWrittenInUpdatePositionArgs) {
     }
 }
 
+TEST_F(ReplCoordTest, GetLastWrittenDuringRollback) {
+    init("mySet/test1:1234,test2:1234,test3:1234");
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "protocolVersion" << 1 << "version" << 1 << "members"
+                            << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                     << "test1:1234")
+                                          << BSON("_id" << 1 << "host"
+                                                        << "test2:1234")
+                                          << BSON("_id" << 2 << "host"
+                                                        << "test3:1234"))),
+                       HostAndPort("test2", 1234));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    auto term = getTopoCoord().getTerm();
+    OpTime time1(Timestamp(100, 1), term);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time1, Date_t() + Seconds(100));
+
+    // getLastWritten should always return a valid opTime if the node is not in
+    // ROLLBACK.
+    ASSERT_EQUALS(time1,
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime(false /*rollbackSafe*/).opTime);
+    ASSERT_EQUALS(time1,
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime(true /*rollbackSafe*/).opTime);
+    const auto opCtx = makeOperationContext();
+
+    // Set the node to ROLLBACK state.
+    ASSERT_OK(getReplCoord()->setMaintenanceMode(opCtx.get(), true));
+    ASSERT_TRUE(getReplCoord()->getMemberState().recovering());
+    ReplicationStateTransitionLockGuard transitionGuard(opCtx.get(), MODE_X);
+    ASSERT_OK(getReplCoord()->setFollowerModeRollback(opCtx.get()));
+    ASSERT_TRUE(getReplCoord()->getMemberState().rollback());
+
+    // getLastWritten with rollbackSafe=true will return a null opTime if the node is in ROLLBACK.
+    ASSERT_EQUALS(time1,
+                  getReplCoord()->getMyLastWrittenOpTimeAndWallTime(false /*rollbackSafe*/).opTime);
+    ASSERT_TRUE(
+        getReplCoord()->getMyLastWrittenOpTimeAndWallTime(true /*rollbackSafe*/).opTime.isNull());
+    ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTimeAndWallTime().opTime);
+}
+
 // TODO(schwerin): Unit test election id updating
 }  // namespace
 }  // namespace repl

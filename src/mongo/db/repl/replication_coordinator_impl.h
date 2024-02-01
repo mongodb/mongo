@@ -245,11 +245,11 @@ public:
     virtual void setMyHeartbeatMessage(const std::string& msg);
 
     virtual OpTime getMyLastWrittenOpTime() const override;
-    virtual OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime() const override;
+    virtual OpTimeAndWallTime getMyLastWrittenOpTimeAndWallTime(
+        bool rollbackSafe = false) const override;
 
     virtual OpTime getMyLastAppliedOpTime() const override;
-    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(
-        bool rollbackSafe = false) const override;
+    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
 
     virtual OpTime getMyLastDurableOpTime() const override;
     virtual OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;

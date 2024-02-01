@@ -1676,8 +1676,12 @@ OpTime ReplicationCoordinatorImpl::getMyLastWrittenOpTime() const {
     return _getMyLastWrittenOpTime_inlock();
 }
 
-OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime() const {
+OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastWrittenOpTimeAndWallTime(
+    bool rollbackSafe) const {
     stdx::lock_guard<Latch> lock(_mutex);
+    if (rollbackSafe && _getMemberState_inlock().rollback()) {
+        return {};
+    }
     return _getMyLastWrittenOpTimeAndWallTime_inlock();
 }
 
@@ -1686,12 +1690,8 @@ OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
     return _getMyLastAppliedOpTime_inlock();
 }
 
-OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime(
-    bool rollbackSafe) const {
+OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime() const {
     stdx::lock_guard<Latch> lock(_mutex);
-    if (rollbackSafe && _getMemberState_inlock().rollback()) {
-        return {};
-    }
     return _getMyLastAppliedOpTimeAndWallTime_inlock();
 }
 
