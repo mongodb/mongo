@@ -100,7 +100,6 @@ buildvariants:
   - name: .sharding .txns !.csrs
   - name: slow1_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -250,7 +249,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: snmp
-  - name: .stitch
   - name: .crypt
     distros:
     - amazon2-arm64-large
@@ -361,7 +359,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -456,7 +453,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -691,7 +687,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: snmp
-  - name: .stitch
   - name: .crypt
     distros:
     - rhel80-large
@@ -801,7 +796,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
     distros:
     - rhel82-arm64-large
@@ -924,7 +918,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
@@ -1025,7 +1018,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
     distros:
     - rhel90-arm64-large
@@ -1122,7 +1114,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
     distros:
     - suse12-sp5-large
@@ -1165,7 +1156,6 @@ buildvariants:
   - name: sasl
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -1379,7 +1369,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .ssl
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -1652,7 +1641,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .ssl
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -1732,7 +1720,6 @@ buildvariants:
   - name: sharding_gen
   - name: sharding_jscore_passthrough
   - name: .ssl
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -1885,7 +1872,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common !.csrs
   - name: .ssl
-  - name: .stitch
   - name: .updatefuzzer
   - name: push
 

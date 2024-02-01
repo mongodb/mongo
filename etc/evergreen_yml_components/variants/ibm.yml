@@ -47,7 +47,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -99,7 +98,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -151,7 +149,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
@@ -203,7 +200,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: .publish

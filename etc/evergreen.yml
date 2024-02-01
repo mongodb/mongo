@@ -181,7 +181,6 @@ variables:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
@@ -410,7 +409,6 @@ buildvariants:
   - name: .sharding .txns !.multiversion
   - name: .sharding .common !.multiversion
   - name: snmp
-  - name: .stitch
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: .serverless !.multiversion
@@ -713,7 +711,6 @@ buildvariants:
   - name: search_ssl
   - name: session_jscore_passthrough
   - name: snmp
-  - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -1044,7 +1041,6 @@ buildvariants:
   - name: .sharding .txns !.multiversion
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
-  - name: .stitch
   - name: .updatefuzzer !.multiversion
 
 - name: enterprise-windows-debug-unoptimized
@@ -1369,7 +1365,6 @@ buildvariants:
   - name: .sharding .common
   - name: sharding_opportunistic_secondary_targeting_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
     distros:
     - rhel80-xlarge
@@ -1584,7 +1579,6 @@ buildvariants:
   - name: .sharding .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
-  - name: .stitch
   - name: .serverless
     distros:
     - rhel80-xlarge
@@ -1907,7 +1901,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1998,7 +1991,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -2256,7 +2248,6 @@ buildvariants:
   - name: snmp
   - name: .serverless
   - name: .watchdog
-  - name: .stitch
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks
 #  - name: unittest_shell_hang_analyzer_gen
@@ -2327,7 +2318,6 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: snmp
   - name: .watchdog
-  - name: .stitch
   - name: .serverless
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
@@ -2396,7 +2386,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: snmp
-  - name: .stitch
   - name: .serverless
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
@@ -2463,7 +2452,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: snmp
-  - name: .stitch
   - name: .updatefuzzer
   - name: .serverless
   - name: watchdog_wiredtiger

@@ -263,8 +263,8 @@ variables:
   - func: "run hang analyzer"
   - func: "wait for resmoke to shutdown"
 
-- &stitch_support_task_group_template
-  name: stitch_support_task_group_template
+- &stitch_support_task_group_template_community_only
+  name: stitch_support_task_group_template_community_only
   setup_task:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
@@ -3004,7 +3004,7 @@ tasks:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
 
-- name: stitch_support_create_lib
+- name: stitch_support_create_lib_community_only
   tags: []
   depends_on:
   - name: version_expansions_gen
@@ -3037,10 +3037,10 @@ tasks:
       content_type: application/tar
       display_name: "Stitch Support Library"
 
-- name: stitch_support_install_tests
+- name: stitch_support_install_tests_community_only
   tags: []
   depends_on:
-  - name: stitch_support_create_lib
+  - name: stitch_support_create_lib_community_only
   commands:
   - func: "scons compile"
     vars:
@@ -3052,10 +3052,10 @@ tasks:
         --modules=
         DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
 
-- name: stitch_support_run_tests
+- name: stitch_support_run_tests_community_only
   tags: []
   depends_on:
-  - name: stitch_support_install_tests
+  - name: stitch_support_install_tests_community_only
   commands:
   - func: "get and apply version expansions"
   - *f_expansions_write
@@ -8073,19 +8073,19 @@ task_groups:
   - "embedded_sdk_s3_put_latest"
   - "embedded_sdk_tests_s3_put_latest"
 
-- <<: *stitch_support_task_group_template
-  name: stitch_support_lib_build_and_archive
+- <<: *stitch_support_task_group_template_community_only
+  name: stitch_support_lib_build_and_archive_community_only
   tags: ["stitch"]
   tasks:
-  - "stitch_support_create_lib"
+  - "stitch_support_create_lib_community_only"
 
-- <<: *stitch_support_task_group_template
-  name: stitch_support_lib_build_and_test
+- <<: *stitch_support_task_group_template_community_only
+  name: stitch_support_lib_build_and_test_community_only
   tags: ["stitch"]
   max_hosts: 1
   tasks:
-  - "stitch_support_install_tests"
-  - "stitch_support_run_tests"
+  - "stitch_support_install_tests_community_only"
+  - "stitch_support_run_tests_community_only"
 
 - name: crypt_build
   setup_task:

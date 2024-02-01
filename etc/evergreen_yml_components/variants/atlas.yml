@@ -65,7 +65,6 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
   - name: snmp
-  - name: .stitch
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
