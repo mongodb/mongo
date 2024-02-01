@@ -90,6 +90,25 @@ TypeSignature TypeSignature::kStringType = getTypeSignature(sbe::value::TypeTags
                                                             sbe::value::TypeTags::StringBig,
                                                             sbe::value::TypeTags::bsonString);
 
+bool TypeSignature::canCompareWith(TypeSignature other) const {
+    auto lhsTypes = getBSONTypesFromSignature(*this);
+    auto rhsTypes = getBSONTypesFromSignature(other);
+    for (auto& lhsTag : lhsTypes) {
+        if (lhsTag == sbe::value::TypeTags::Nothing) {
+            return false;
+        }
+        for (auto& rhsTag : rhsTypes) {
+            if (rhsTag == sbe::value::TypeTags::Nothing ||
+                (lhsTag != rhsTag &&
+                 !(sbe::value::isNumber(lhsTag) && sbe::value::isNumber(rhsTag)) &&
+                 !(sbe::value::isStringOrSymbol(lhsTag) && sbe::value::isStringOrSymbol(rhsTag)))) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 // Return the set of SBE types encoded in the provided signature.
 std::vector<sbe::value::TypeTags> getBSONTypesFromSignature(TypeSignature signature) {
     signature = signature.intersect(TypeSignature::kAnyBSONType);

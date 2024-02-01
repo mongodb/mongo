@@ -1337,12 +1337,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
                                                    value::TypeTags::Nothing,
                                                    ColumnOpType::ReturnNothingOnMissing{}};
 
-    const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
-        tassert(8141608,
-                "valueBlockLogicalNot expects a block of boolean values as argument",
-                tag == value::TypeTags::Boolean);
-        return std::make_pair(tag, !value::bitcastTo<bool>(val));
-    });
+    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+        [&](value::TypeTags tag, value::Value val) { return genericNot(tag, val); });
 
     auto res = bitmapView->map(cmpOp);
 
@@ -1397,8 +1393,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
         folded[i] = value::bitcastFrom<bool>(static_cast<bool>(foldCounts[i]));
     }
 
-    auto blockOut = std::make_unique<value::HeterogeneousBlock>(
-        std::vector<value::TypeTags>(folded.size(), value::TypeTags::Boolean), std::move(folded));
+    auto blockOut =
+        std::make_unique<value::HomogeneousBlock<bool, value::TypeTags::Boolean>>(folded);
 
     return {true,
             value::TypeTags::valueBlock,

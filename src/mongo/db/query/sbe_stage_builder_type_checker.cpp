@@ -252,13 +252,13 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         } break;
 
         case optimizer::Operations::Eq: {
-            // Equality: check if one of the terms is a boolean constant, and remove it
             if (op.getLeftChild().is<optimizer::Constant>() &&
                 !op.getRightChild().is<optimizer::Constant>()) {
                 // Ensure we don't have a constant on the left side.
                 std::swap(op.getLeftChild(), op.getRightChild());
                 std::swap(lhs, rhs);
             }
+            // Equality: check if one of the terms is a boolean constant, and remove it
             if (!op.getLeftChild().is<optimizer::Constant>() &&
                 op.getRightChild().is<optimizer::Constant>() &&
                 lhs.isSubset(TypeSignature::kBooleanType.include(TypeSignature::kNothingType))) {
@@ -281,10 +281,13 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
                     }
                 }
             }
-            // The signature of the Eq is boolean plus Nothing if either operands can be
-            // Nothing.
-            return TypeSignature::kBooleanType.include(
-                lhs.include(rhs).intersect(TypeSignature::kNothingType));
+            // The signature of the Eq is boolean plus Nothing when the types of the arguments are
+            // not comparable.
+            if (lhs.canCompareWith(rhs)) {
+                return TypeSignature::kBooleanType;
+            } else {
+                return TypeSignature::kBooleanType.include(TypeSignature::kNothingType);
+            }
         } break;
 
         case optimizer::Operations::Neq:
@@ -292,17 +295,24 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         case optimizer::Operations::Gte:
         case optimizer::Operations::Lt:
         case optimizer::Operations::Lte: {
-            // The signature of comparison is boolean plus Nothing if either operands can be
-            // Nothing.
-            return TypeSignature::kBooleanType.include(
-                lhs.include(rhs).intersect(TypeSignature::kNothingType));
+            // The signature of comparison is boolean plus Nothing when the types of the arguments
+            // are not comparable.
+            if (lhs.canCompareWith(rhs)) {
+                return TypeSignature::kBooleanType;
+            } else {
+                return TypeSignature::kBooleanType.include(TypeSignature::kNothingType);
+            }
         } break;
 
         case optimizer::Operations::Cmp3w: {
-            // The signature of comparison is integer plus Nothing if either operands can be
-            // Nothing.
-            return getTypeSignature(sbe::value::TypeTags::NumberInt32)
-                .include(lhs.include(rhs).intersect(TypeSignature::kNothingType));
+            // The signature of comparison is integer plus Nothing when the types of the arguments
+            // are not comparable.
+            if (lhs.canCompareWith(rhs)) {
+                return getTypeSignature(sbe::value::TypeTags::NumberInt32);
+            } else {
+                return getTypeSignature(sbe::value::TypeTags::NumberInt32)
+                    .include(TypeSignature::kNothingType);
+            }
         } break;
 
         default:

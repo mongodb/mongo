@@ -68,6 +68,9 @@ struct TypeSignature {
     TypeSignature intersect(TypeSignature other) const {
         return TypeSignature{typesMask & other.typesMask};
     }
+    // Return whether all the types in this signature can be safely compared with all the types in
+    // the other signature.
+    bool canCompareWith(TypeSignature other) const;
 
     // Simple bitmask using one bit for each enum in the TypeTags definition.
     int64_t typesMask = 0;

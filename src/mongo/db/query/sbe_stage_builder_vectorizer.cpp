@@ -232,6 +232,11 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                 return rhs;
             }
 
+            // A comparison can return Nothing when the types of the arguments are not comparable.
+            TypeSignature resultType = (lhs.typeSignature.canCompareWith(rhs.typeSignature))
+                ? TypeSignature::kBooleanType
+                : TypeSignature::kBooleanType.include(TypeSignature::kNothingType);
+
             // If one of the argument is a block, and the other is a scalar value, create a
             // block-generating operation.
             if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
@@ -257,9 +262,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                     // Propagate the name of the associated cell variable, this is not the place to
                     // fold (there could be a fillEmpty node on top of this comparison).
                     return {makeABTFunction(fnName, std::move(*lhs.expr), std::move(*rhs.expr)),
-                            TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
-                                .include(lhs.typeSignature.include(rhs.typeSignature)
-                                             .intersect(TypeSignature::kNothingType)),
+                            TypeSignature::kBlockType.include(resultType),
                             TypeSignature::kBlockType.isSubset(lhs.typeSignature) ? lhs.sourceCell
                                                                                   : rhs.sourceCell};
                 }
@@ -267,9 +270,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                 // Preserve scalar operation.
                 return {
                     make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                    TypeSignature::kBooleanType.include(
-                        lhs.typeSignature.include(rhs.typeSignature)
-                            .intersect(TypeSignature::kNothingType)),
+                    resultType,
                     {}};
             }
             break;

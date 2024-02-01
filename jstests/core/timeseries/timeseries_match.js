@@ -131,11 +131,56 @@ TimeseriesTest.run((insert) => {
         {pred: {"topLevelArray": {$eq: [101, 102]}}, ids: [3], usesBlockProcessing: false},
         {pred: {"topLevelScalar": {$eq: [999, 999]}}, ids: [], usesBlockProcessing: false},
 
+        // These tests intentionally use nested arrays to force $in to produce Nothing values.
         {
             pred: {"time": {$in: [[new Date("2019-09-27T21:14:45.654Z")]]}},
             ids: [],
             usesBlockProcessing: true
-        }
+        },
+        {
+            pred: {
+                "time": {
+                    $not:
+                        {$in: [[new Date("2019-09-27T21:14:45.654Z"), new Date(datePrefix + 300)]]}
+                }
+            },
+            ids: [0, 1, 2, 3, 4],
+            usesBlockProcessing: true
+        },
+
+        // Basic support for boolean operators.
+        {
+            pred: {
+                $or: [
+                    {
+                        $and: [
+                            {"time": {$gte: new Date("2019-09-27T21:14:45.654Z")}},
+                            {"time": {$gt: new Date(datePrefix + 300)}}
+                        ]
+                    },
+                    {"time": {$eq: new Date(datePrefix + 300)}}
+                ]
+            },
+            ids: [2],
+            usesBlockProcessing: true
+        },
+        // Test boolean operators dealing with Nothing values.
+        {
+            pred: {
+                $nor: [
+                    {"time": {$ne: ["arr1", "arr2"]}},
+                    {
+                        $and: [
+                            {"time": {$gte: ["arr3", "arr4"]}},
+                            {"time": {$gt: new Date(datePrefix + 300)}}
+                        ]
+                    },
+                    {"time": {$eq: new Date(datePrefix + 300)}}
+                ]
+            },
+            ids: [],
+            usesBlockProcessing: true
+        },
     ];
 
     // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.
