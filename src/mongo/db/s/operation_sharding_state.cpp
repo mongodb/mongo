@@ -82,33 +82,68 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
     auto& oss = OperationShardingState::get(opCtx);
 
-    if (shardVersion) {
-        auto emplaceResult = oss._shardVersions.try_emplace(
-            NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()),
-            *shardVersion);
-        auto& tracker = emplaceResult.first->second;
-        if (!emplaceResult.second) {
-            uassert(ErrorCodes::IllegalChangeToExpectedShardVersion,
-                    str::stream() << "Illegal attempt to change the expected shard version for "
-                                  << nss.toStringForErrorMsg() << " from " << tracker.v << " to "
-                                  << *shardVersion << " at recursion level " << tracker.recursion,
-                    tracker.v == *shardVersion);
+    bool shardVersionInserted = false;
+    bool databaseVersionInserted = false;
+    try {
+        boost::optional<OperationShardingState::ShardVersionTracker&> shardVersionTracker;
+        if (shardVersion) {
+            auto emplaceResult = oss._shardVersions.try_emplace(
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()),
+                *shardVersion);
+            shardVersionInserted = emplaceResult.second;
+            shardVersionTracker = emplaceResult.first->second;
+            if (!shardVersionInserted) {
+                uassert(ErrorCodes::IllegalChangeToExpectedShardVersion,
+                        str::stream() << "Illegal attempt to change the expected shard version for "
+                                      << nss.toStringForErrorMsg() << " from "
+                                      << shardVersionTracker->v << " to " << *shardVersion
+                                      << " at recursion level " << shardVersionTracker->recursion,
+                        shardVersionTracker->v == *shardVersion);
+                invariant(shardVersionTracker->recursion > 0);
+            } else {
+                invariant(shardVersionTracker->recursion == 0);
+            }
         }
-        invariant(++tracker.recursion > 0);
-    }
 
-    if (databaseVersion) {
-        auto emplaceResult = oss._databaseVersions.try_emplace(nss.dbName(), *databaseVersion);
-        auto& tracker = emplaceResult.first->second;
-        if (!emplaceResult.second) {
-            uassert(ErrorCodes::IllegalChangeToExpectedDatabaseVersion,
-                    str::stream() << "Illegal attempt to change the expected database version for "
-                                  << nss.dbName().toStringForErrorMsg() << " from " << tracker.v
-                                  << " to " << *databaseVersion << " at recursion level "
-                                  << tracker.recursion,
-                    tracker.v == *databaseVersion);
+        boost::optional<OperationShardingState::DatabaseVersionTracker&> dbVersionTracker;
+        if (databaseVersion) {
+            auto emplaceResult = oss._databaseVersions.try_emplace(nss.dbName(), *databaseVersion);
+            databaseVersionInserted = emplaceResult.second;
+            dbVersionTracker = emplaceResult.first->second;
+            if (!databaseVersionInserted) {
+                uassert(ErrorCodes::IllegalChangeToExpectedDatabaseVersion,
+                        str::stream()
+                            << "Illegal attempt to change the expected database version for "
+                            << nss.dbName().toStringForErrorMsg() << " from " << dbVersionTracker->v
+                            << " to " << *databaseVersion << " at recursion level "
+                            << dbVersionTracker->recursion,
+                        dbVersionTracker->v == *databaseVersion);
+                invariant(dbVersionTracker->recursion > 0);
+            } else {
+                invariant(dbVersionTracker->recursion == 0);
+            }
         }
-        invariant(++tracker.recursion > 0);
+
+        // Update the recursion at the end to preserve the strong exception guarantee.
+        if (shardVersionTracker) {
+            shardVersionTracker->recursion++;
+        }
+        if (dbVersionTracker) {
+            dbVersionTracker->recursion++;
+        }
+
+    } catch (const DBException&) {
+        // Clean any oss update done within this method on failure to get a strong exception
+        // guarantee on ScopedSetShardRole objects.
+        if (shardVersionInserted) {
+            oss._shardVersions.erase(
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+        }
+        if (databaseVersionInserted) {
+            oss._databaseVersions.erase(nss.dbName());
+        }
+
+        throw;
     }
 }
 
