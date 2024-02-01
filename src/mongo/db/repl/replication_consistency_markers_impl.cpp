@@ -41,8 +41,12 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
@@ -299,10 +303,77 @@ void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint
 }
 
 Status ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(
-    OperationContext* opCtx, const BSONObj& updateSpec) {
-    return _storageInterface->upsertById(
-        opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec);
+    OperationContext* opCtx, const BSONObj& doc) {
+    AutoGetCollection collection(opCtx, _oplogTruncateAfterPointNss, MODE_IX);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Unable to persist transaction state because the session transaction "
+                             "collection is missing. This indicates that the "
+                          << _oplogTruncateAfterPointNss.toStringForErrorMsg()
+                          << " collection has been manually deleted.",
+            collection.getCollection());
+    return writeConflictRetry(
+        opCtx, "upsertOplogTruncateAfterPointDocument", _oplogTruncateAfterPointNss, [&] {
+            WriteUnitOfWork wuow(opCtx);
+
+            if (!_oplogTruncateRecordId) {
+                auto idIndex = collection.getCollection()->getIndexCatalog()->findIdIndex(opCtx);
+
+                const IndexCatalogEntry* entry =
+                    collection.getCollection()->getIndexCatalog()->getEntry(idIndex);
+                auto indexAccess = entry->accessMethod()->asSortedData();
+
+                auto recordId = indexAccess->findSingle(
+                    opCtx, collection.getCollection(), entry, kOplogTruncateAfterPointId);
+
+                if (recordId.isNull()) {
+                    // insert case.
+                    auto status = collection_internal::insertDocument(opCtx,
+                                                                      collection.getCollection(),
+                                                                      InsertStatement(doc),
+                                                                      nullptr /* opDebug */,
+                                                                      false /* fromMigrate */);
+
+                    if (!status.isOK()) {
+                        return status;
+                    }
+
+                    wuow.commit();
+                    return Status::OK();
+                }
+
+                _oplogTruncateRecordId = recordId;
+            }
+
+            // Since we are looking up a key inside the _id index, create a key object consisting of
+            // only the _id field.
+            auto startingSnapshotId = shard_role_details::getRecoveryUnit(opCtx)->getSnapshotId();
+
+            auto originalRecordData = collection.getCollection()->getRecordStore()->dataFor(
+                opCtx, _oplogTruncateRecordId.get());
+            auto originalDoc = originalRecordData.toBson();
+
+            CollectionUpdateArgs args{originalDoc};
+            args.criteria = kOplogTruncateAfterPointId;
+            args.update = doc;
+
+            collection_internal::updateDocument(
+                opCtx,
+                collection.getCollection(),
+                _oplogTruncateRecordId.get(),
+                Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
+                doc,
+                collection_internal::kUpdateNoIndexes,
+                nullptr /* indexesAffected */,
+                nullptr /* opDebug */,
+                &args);
+
+
+            wuow.commit();
+
+            return Status::OK();
+        });
 }
+
 
 Status ReplicationConsistencyMarkersImpl::_setOplogTruncateAfterPoint(OperationContext* opCtx,
                                                                       const Timestamp& timestamp) {
@@ -313,8 +384,9 @@ Status ReplicationConsistencyMarkersImpl::_setOplogTruncateAfterPoint(OperationC
 
     return _upsertOplogTruncateAfterPointDocument(
         opCtx,
-        BSON("$set" << BSON(OplogTruncateAfterPointDocument::kOplogTruncateAfterPointFieldName
-                            << timestamp)));
+        BSON("_id"
+             << "oplogTruncateAfterPoint"
+             << OplogTruncateAfterPointDocument::kOplogTruncateAfterPointFieldName << timestamp));
 }
 
 void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,

@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
@@ -170,6 +171,9 @@ private:
 
     // Cached initialSyncId from last initial sync. Will only be set on startup or initial sync.
     BSONObj _initialSyncId;
+
+    // Cached recordId of the oplogTruncateAfterPoint to speed up subsequent updates
+    boost::optional<RecordId> _oplogTruncateRecordId;
 };
 
 }  // namespace repl
