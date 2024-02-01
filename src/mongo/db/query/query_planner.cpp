@@ -1736,7 +1736,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     bool collScanRequired = 0 == out.size();
     if (collScanRequired && noTableAndClusteredIDXScan(params)) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
-                      "No indexed plans available, and running with 'notablescan' 1");
+                      "No indexed plans available, and running with 'notablescan'");
     }
 
     bool clusteredCollection = params.clusteredInfo.has_value();
