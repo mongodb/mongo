@@ -22,6 +22,7 @@ buildvariants:
     separate_debug: off
   tasks:
     - name: compile_test_and_package_serial_TG
+    - name: compile_test_and_package_parallel_unittest_stream_TG
     - name: .aggfuzzer .common
     - name: .jstestfuzz !.initsync
 
@@ -49,6 +50,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_benchmarks
   - name: compile_integration_and_test_parallel_stream_TG
   - name: .aggregation
@@ -118,6 +120,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_benchmarks
   - name: compile_integration_and_test_parallel_stream_TG
   - name: .aggregation

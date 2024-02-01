@@ -2612,6 +2612,96 @@ tasks:
       targets: install-all-meta
       compiling_for_test: true
 
+- name: compile_all_but_not_unittests
+  tags: []
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-all-meta-but-not-unittests
+      compiling_for_test: true
+
+- name: compile_and_run_unittests_first_quarter
+  exec_timeout_secs: 10800 # 3 hours
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-first-quarter-unittests install-first-quarter-unittests-debug
+      compiling_for_test: true
+  - func: "f_expansions_write"
+  - func: "run diskstats"
+  - func: "f_expansions_write"
+  - func: "monitor process threads"
+  - func: "collect system resource info"
+  - func: "run tests"
+    vars:
+      suite: unittests_first_quarter
+      install_dir: build/install/bin
+      exec_timeout_secs: 10800 # 3 hours
+
+- name: compile_and_run_unittests_second_quarter
+  exec_timeout_secs: 10800 # 3 hours
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-second-quarter-unittests install-second-quarter-unittests-debug
+      compiling_for_test: true
+  - func: "f_expansions_write"
+  - func: "run diskstats"
+  - func: "f_expansions_write"
+  - func: "monitor process threads"
+  - func: "collect system resource info"
+  - func: "run tests"
+    vars:
+      suite: unittests_second_quarter
+      install_dir: build/install/bin
+      exec_timeout_secs: 10800 # 3 hours
+
+- name: compile_and_run_unittests_third_quarter
+  exec_timeout_secs: 10800 # 3 hours
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-third-quarter-unittests install-third-quarter-unittests-debug
+      compiling_for_test: true
+  - func: "f_expansions_write"
+  - func: "run diskstats"
+  - func: "f_expansions_write"
+  - func: "monitor process threads"
+  - func: "collect system resource info"
+  - func: "run tests"
+    vars:
+      suite: unittests_third_quarter
+      install_dir: build/install/bin
+      exec_timeout_secs: 10800 # 3 hours
+
+- name: compile_and_run_unittests_fourth_quarter
+  exec_timeout_secs: 10800 # 3 hours
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-fourth-quarter-unittests install-fourth-quarter-unittests-debug
+      compiling_for_test: true
+  - func: "f_expansions_write"
+  - func: "run diskstats"
+  - func: "f_expansions_write"
+  - func: "monitor process threads"
+  - func: "collect system resource info"
+  - func: "run tests"
+    vars:
+      suite: unittests_fourth_quarter
+      install_dir: build/install/bin
+      exec_timeout_secs: 10800 # 3 hours
+
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
   tags: []
@@ -7891,12 +7981,10 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
-  - compile_unittests
-  - run_unittests
   - compile_dbtest
   - run_dbtest
   - archive_dbtest
-  - compile_all
+  - compile_all_but_not_unittests
   - package
 
 # SERVER-76006
@@ -7915,15 +8003,6 @@ task_groups:
   - archive_dbtest
   - package
 
-- <<: *compile_task_group_template
-  name: compile_and_test_TG
-  tasks:
-  - compile_dist_test
-  - compile_unittests
-  - run_unittests
-  - compile_dbtest
-  - run_dbtest
-  - compile_all
 
 # These `parallel` task groups are only appropriate for builders that
 # use --link-model=dynamic, and have scons_cache_scope: shared and
@@ -7941,14 +8020,17 @@ task_groups:
   - determine_patch_tests
   - archive_dist_test
   - archive_dist_test_debug
-  - compile_all
+  - compile_all_but_not_unittests
   - package
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_parallel_unittest_stream_TG
+  max_hosts: -1
   tasks:
-  - compile_unittests
-  - run_unittests
+  - compile_and_run_unittests_first_quarter
+  - compile_and_run_unittests_second_quarter
+  - compile_and_run_unittests_third_quarter
+  - compile_and_run_unittests_fourth_quarter
 
 #- <<: *compile_task_group_template
 #  name: compile_test_and_package_parallel_unittest_stream_with_recording_TG

@@ -457,6 +457,7 @@ readtest_wrapper_install = env.AutoInstall(
     AIB_COMPONENTS_EXTRA=[
         "unittests",
         "tests",
+        "first-quarter-unittests",
     ],
 )
 
@@ -476,6 +477,7 @@ if env.TargetOSIs('windows'):
         AIB_COMPONENTS_EXTRA=[
             "unittests",
             "tests",
+            "first-quarter-unittests",
         ],
     )
     env.RegisterTest("$UNITTEST_LIST", readtest_wrapper_bat_install[0])

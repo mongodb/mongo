@@ -31,6 +31,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel81-power8-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel81-power8-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel81-power8-large
@@ -82,6 +85,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel71-power8-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel71-power8-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel71-power8-large
@@ -131,6 +137,9 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_s390x,requires_increased_memlock_limits
   tasks:
   - name: small_compile_test_and_package_serial_TG
+    distros:
+    - rhel72-zseries-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel72-zseries-build
   - name: compile_integration_and_test_no_audit_parallel_stream_TG

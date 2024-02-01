@@ -96,6 +96,7 @@ visibility_test1 = env.Program(
     AIB_COMPONENTS_EXTRA=[
         "unittests",
         "tests",
+        "first-quarter-unittests",
     ],
 )
 env.RegisterTest("$UNITTEST_LIST", visibility_test1[0])
@@ -115,6 +116,7 @@ visibility_test2 = env.Program(
     AIB_COMPONENTS_EXTRA=[
         "unittests",
         "tests",
+        "first-quarter-unittests",
     ],
 )
 env.RegisterTest("$UNITTEST_LIST", visibility_test2[0])

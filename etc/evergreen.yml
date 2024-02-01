@@ -91,6 +91,9 @@ variables:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - windows-vsCurrent-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -140,6 +143,9 @@ variables:
     scons_cache_scope: shared
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel70
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel70
   - name: compile_build_tools_next_TG
@@ -792,6 +798,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - windows-vsCurrent-xlarge
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
@@ -866,6 +875,9 @@ buildvariants:
     test_flags: *windows_common_test_excludes
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - windows-vsCurrent-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - windows-vsCurrent-xlarge
   - name: compile_build_tools_next_TG
@@ -1017,6 +1029,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - windows-vsCurrent-large
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -1090,6 +1105,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: aggregation
   - name: auth_gen
@@ -1117,6 +1133,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1143,6 +1160,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1167,6 +1185,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1877,6 +1896,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
@@ -2046,6 +2068,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - rhel72-zseries-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel72-zseries-build
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -2212,6 +2237,7 @@ buildvariants:
   - name: cqf
   - name: cqf_parallel
   - name: compile_and_archive_dist_test_then_package_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_benchmarks
   - name: .aggregation
   #  - name: .auth
@@ -2281,6 +2307,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
@@ -2419,6 +2446,7 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_benchmarks
   - name: .aggregation
   - name: .auth
@@ -2558,6 +2586,7 @@ buildvariants:
     separate_debug: off
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: jsCore
 
 - name: enterprise-rhel80-unoptimized-64-bit
@@ -2832,6 +2861,9 @@ buildvariants:
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel80-build
+  - name: compile_test_and_package_parallel_unittest_stream_TG
     distros:
     - rhel80-build
   - name: .aggregation !.no_async
