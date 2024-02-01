@@ -667,6 +667,8 @@ functions:
             mv ./dist-test/bin/mongos mongodb/bin
             mv ./dist-test/bin/mongod mongodb/bin
             mv ./dist-test/bin/mongocryptd mongodb/bin
+            # Copy libs folder if it exists
+            [ ! -d ./dist-test/lib ] || mv ./dist-test/lib mongodb
   download mongodb old:
     - command: shell.exec
       params:
