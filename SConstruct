@@ -4439,9 +4439,7 @@ def doConfigure(myenv):
             # By default, undefined behavior sanitizer doesn't stop on
             # the first error. Make it so. Newer versions of clang
             # have renamed the flag.
-            # However, this flag cannot be included when using the fuzzer sanitizer
-            # if we want to suppress errors to uncover new ones.
-            if not using_fsan and not myenv.AddToCCFLAGSIfSupported("-fno-sanitize-recover"):
+            if not myenv.AddToCCFLAGSIfSupported("-fno-sanitize-recover"):
                 myenv.AddToCCFLAGSIfSupported("-fno-sanitize-recover=undefined")
             myenv.AppendUnique(CPPDEFINES=['UNDEFINED_BEHAVIOR_SANITIZER'])
 
