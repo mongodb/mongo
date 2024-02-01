@@ -565,6 +565,13 @@ public:
             return true;
         }
 
+        /**
+         * Annotate that this transaction has attempted to create database 'dbName'.
+         */
+        void annotateCreatedDatabase(const StringData dbName) {
+            p().createdDatabases.insert(dbName.toString());
+        }
+
     private:
         /**
          * Resets the router's state. Used when the router sees a new transaction for the first
@@ -833,6 +840,9 @@ private:
 
         // Track whether commit or abort have been initiated.
         bool terminationInitiated{false};
+
+        // Tracks databases that this transaction has attempted to create.
+        std::set<std::string> createdDatabases;
     } _p;
 };
 

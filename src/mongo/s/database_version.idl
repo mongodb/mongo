@@ -48,7 +48,8 @@ structs:
                 optional: true
             timestamp:
                 type: timestamp
-                description: "Uniquely identifies to distinguish different incarnations of this database."
+                description: "Unique identifier to distinguish major events in the lifetime of a
+                   database, such as create/drop and change of primary."
             lastMod:
                 type: int
                 description: "an integer which is bumped whenever the database's primary shard changes"

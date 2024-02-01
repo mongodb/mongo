@@ -653,9 +653,10 @@ void TransactionRouter::Router::_checkForPlacementConflict(OperationContext* opC
     // is more recent than the timestamp the current transaction started with. If
     // so, we throw a MigrationConflict error to force the client to retry so the
     // storage engine uses an up to date snapshot.
+    // No need to check it when using snapshot readConcern.
     const auto cm =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    if (cm.isSharded() &&
+    if (!_atClusterTimeHasBeenSet() && cm.isSharded() &&
         (getPlacementConflictTime().asTimestamp() < cm.getMaxValidAfter(shardId))) {
         uasserted(ErrorCodes::MigrationConflict,
                   str::stream() << "Collection " << nss
@@ -666,15 +667,35 @@ void TransactionRouter::Router::_checkForPlacementConflict(OperationContext* opC
                                 << getPlacementConflictTime().asTimestamp()
                                 << ". Transaction will be aborted.");
     }
+
+    // For dbVersion, the router needs to check when using both snapshot and non-snapshot read
+    // concerns.
+    if (!cm.isSharded()) {
+        const auto txnConflictTimestamp = _atClusterTimeHasBeenSet()
+            ? getSelectedAtClusterTime().asTimestamp()
+            : getPlacementConflictTime().asTimestamp();
+
+        bool dbWasCreatedByThisTransaction =
+            !p().createdDatabases.empty() && p().createdDatabases.count(nss.db().toString()) > 0;
+        if (txnConflictTimestamp < cm.dbVersion().getTimestamp() &&
+            !dbWasCreatedByThisTransaction) {
+            uasserted(ErrorCodes::MigrationConflict,
+                      str::stream() << "Database " << nss.db()
+                                    << " has undergone a catalog change operation at time "
+                                    << cm.dbVersion().getTimestamp()
+                                    << " and no longer satisfies the "
+                                       "requirements for the current transaction which requires "
+                                    << txnConflictTimestamp << ". Transaction will be aborted.");
+        }
+    }
 }
 
 BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                                            const ShardId& shardId,
                                                            const BSONObj& cmdObj,
                                                            const StringData& dbName) {
-    // Skip the placement check if we are not running a transaction or if we are using snapshot read
-    // concern.
-    if (!(opCtx->isRetryableWrite() || _atClusterTimeHasBeenSet() ||
+    // Skip the placement check if we are not running a transaction.
+    if (!(opCtx->isRetryableWrite() ||
           MONGO_unlikely(skipConflictPlacementTimestampCheck.shouldFail()))) {
         // For commands only against a db and not a collection, skip the placementConflict check.
         if (auto nss = NamespaceString(CommandHelpers::parseNsFromCommand(dbName, cmdObj));
@@ -1529,6 +1550,7 @@ void TransactionRouter::Router::_resetRouterState(
         o(lk).abortCause = std::string();
         o(lk).metricsTracker.emplace(opCtx->getServiceContext());
         p().terminationInitiated = false;
+        p().createdDatabases.clear();
 
         auto tickSource = opCtx->getServiceContext()->getTickSource();
         o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());

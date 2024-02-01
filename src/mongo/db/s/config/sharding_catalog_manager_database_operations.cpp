@@ -309,7 +309,14 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
         }();
 
         const auto update = [&] {
-            const auto newDbVersion = expectedDbVersion.makeUpdated();
+            auto newDbVersion = expectedDbVersion.makeUpdated();
+            const auto now = VectorClock::get(opCtx)->getTime();
+            const auto clusterTime = now.clusterTime().asTimestamp();
+
+            newDbVersion.setTimestamp(clusterTime);
+            tassert(8235300,
+                    "New database timestamp must be newer than previous one",
+                    newDbVersion.getTimestamp() > expectedDbVersion.getTimestamp());
 
             BSONObjBuilder bsonBuilder;
             bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShardId);

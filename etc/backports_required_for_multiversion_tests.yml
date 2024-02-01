@@ -314,7 +314,7 @@ last-continuous:
   - test_file: jstests/core/nested_or_duplicate_predicates_index_scan.js
     ticket: SERVER-84013
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-77506
+    ticket: SERVER-82353
   suites: null
 last-lts:
   all:
@@ -675,5 +675,5 @@ last-lts:
   - test_file: jstests/core/nested_or_duplicate_predicates_index_scan.js
     ticket: SERVER-84013
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-77506
+    ticket: SERVER-82353
   suites: null

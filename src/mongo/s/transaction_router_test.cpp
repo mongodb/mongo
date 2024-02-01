@@ -56,6 +56,15 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/tick_source_mock.h"
 
+#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
+    try {                                                                          \
+        EXPRESSION;                                                                \
+    } catch (const AssertionException& e) {                                        \
+        str::stream err;                                                           \
+        err << "Threw an exception incorrectly: " << e.toString();                 \
+        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
+    }
+
 namespace mongo {
 namespace {
 
@@ -220,12 +229,15 @@ protected:
         });
     }
 
+protected:
+    std::unique_ptr<FailPointEnableBlock> _skipConflictPlacementTimestampCheck;
+
+
 private:
     // Enables the transaction router to retry within a transaction on stale version and snapshot
     // errors for the duration of each test.
     // TODO SERVER-39704: Remove this failpoint block.
     std::unique_ptr<FailPointEnableBlock> _staleVersionAndSnapshotRetriesBlock;
-    std::unique_ptr<FailPointEnableBlock> _skipConflictPlacementTimestampCheck;
 };
 
 class TransactionRouterTestWithDefaultSession : public TransactionRouterTest {
@@ -3121,6 +3133,92 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotBeReapedWithActiveYielders
     txnRouter.stash(opCtx, TransactionRouter::StashReason::kDone);
     ASSERT(txnRouter.canBeReaped());
 }
+
+TEST_F(TransactionRouterTestWithDefaultSession, DetectsConflictsDueToMovePrimary) {
+    _skipConflictPlacementTimestampCheck.reset();
+
+    const auto kDbName = "testDB";
+    const auto kNss = NamespaceString(kDbName, "collA");
+
+    TxnNumber txnNum{3};
+
+    const auto runTest = [&]() {
+        const auto setCatalogCache = [&](Timestamp databaseTimestamp) {
+            auto refreshFuture = launchAsync([this, kNss] {
+                auto client = getServiceContext()->makeClient("Test");
+                auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
+
+                uassertStatusOK(
+                    catalogCache->getDatabaseWithRefresh(operationContext(), kNss.db()));
+
+                return boost::make_optional(uassertStatusOK(
+                    catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), kNss)));
+            });
+
+            // Set kDbName with the requested database timestamp.
+            expectFindSendBSONObjVector(kTestConfigShardHost, [&]() {
+                DatabaseType db(kDbName, shard1, DatabaseVersion(UUID::gen(), databaseTimestamp));
+                return std::vector<BSONObj>{db.toBSON()};
+            }());
+
+            // Set kNss as an unsharded collection.
+            expectFindSendBSONObjVector(kTestConfigShardHost,
+                                        []() { return std::vector<BSONObj>{}; }());
+
+            refreshFuture.default_timed_get();
+        };
+
+        operationContext()->setTxnNumber(txnNum);
+        operationContext()->setInMultiDocumentTransaction();
+
+        auto txnRouter = TransactionRouter::get(operationContext());
+        txnRouter.beginOrContinueTxn(
+            operationContext(), txnNum++, TransactionRouter::TransactionActions::kStart);
+        txnRouter.setDefaultAtClusterTime(operationContext());
+
+        // Note the fixture sets VectorClock::clusterTime to Timestamp(3, 1). This will get used by
+        // the transaction as 'atClusterTime'/'placementConflictTime'.
+
+        // Database timestamp is valid for the transaction.
+        setCatalogCache(Timestamp(2, 0));
+
+        ASSERT_DOES_NOT_THROW(txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                                shard1,
+                                                                BSON("insert"
+                                                                     << "collA"),
+                                                                kDbName));
+
+        // Database timestamp is not valid for the transaction.
+        setCatalogCache(Timestamp(4, 0));
+
+        ASSERT_THROWS_CODE(txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                             shard1,
+                                                             BSON("insert"
+                                                                  << "collA"),
+                                                             kDbName),
+                           AssertionException,
+                           ErrorCodes::MigrationConflict);
+
+        // But no error if this transaction created that database.
+        txnRouter.annotateCreatedDatabase(kDbName);
+        ASSERT_DOES_NOT_THROW(txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                                                shard1,
+                                                                BSON("insert"
+                                                                     << "collA"),
+                                                                kDbName));
+    };
+
+    // Test with non-snapshot read concern.
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+    runTest();
+
+    // Test with snapshot read concern.
+    repl::ReadConcernArgs::get(operationContext()) =
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+    runTest();
+}
+
 
 // Begins a transaction with snapshot level read concern and sets a default cluster time.
 class TransactionRouterTestWithDefaultSessionAndStartedSnapshot
