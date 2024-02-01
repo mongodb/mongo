@@ -42,6 +42,7 @@ CachedPlanner::CachedPlanner(OperationContext* opCtx,
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CachedPlanner::plan() {
     LOGV2_DEBUG(8523404, 5, "Recovering SBE plan from the cache");
+    _cachedPlanHolder->cachedPlan->planStageData.debugInfo = _cachedPlanHolder->debugInfo;
     return prepareSbePlanExecutor(nullptr /*solution*/,
                                   {std::move(_cachedPlanHolder->cachedPlan->root),
                                    std::move(_cachedPlanHolder->cachedPlan->planStageData)},
