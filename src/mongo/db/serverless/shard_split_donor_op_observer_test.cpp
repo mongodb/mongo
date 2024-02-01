@@ -129,6 +129,7 @@ protected:
                                  *autoColl,
                                  inserts.begin(),
                                  inserts.end(),
+                                 /*recordIds*/ {},
                                  /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                                  /*defaultFromMigrate=*/false);
             wow.commit();
@@ -249,6 +250,7 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertWrongType) {
                              *autoColl,
                              inserts1.begin(),
                              inserts1.end(),
+                             /*recordIds*/ {},
                              /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
                              /*defaultFromMigrate=*/false),
         DBException,
@@ -293,6 +295,7 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
                              *autoColl,
                              inserts.begin(),
                              inserts.end(),
+                             /*recordIds*/ {},
                              /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                              /*defaultFromMigrate=*/false);
         wow.commit();

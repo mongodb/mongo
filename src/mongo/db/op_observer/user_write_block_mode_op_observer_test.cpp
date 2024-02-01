@@ -135,6 +135,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
+                                     /*recordIds*/ {},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
@@ -149,6 +150,7 @@ protected:
                                      *autoColl,
                                      inserts.begin(),
                                      inserts.end(),
+                                     /*recordIds*/ {},
                                      /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
                                      /*defaultFromMigrate=*/fromMigrate),
                 AssertionException);

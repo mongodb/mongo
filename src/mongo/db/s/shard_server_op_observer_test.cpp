@@ -129,6 +129,7 @@ protected:
                              *coll,
                              insert.begin(),
                              insert.end(),
+                             /*recordIds*/ {},
                              /*fromMigrate=*/std::vector<bool>(insert.size(), false),
                              /*defaultFromMigrate=*/false);
         wuow.commit();

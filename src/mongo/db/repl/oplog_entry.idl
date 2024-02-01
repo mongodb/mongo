@@ -41,6 +41,7 @@ imports:
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/multitenancy.idl"
     - "mongo/s/sharding_types.idl"
+    - "mongo/db/record_id.idl"
 
 enums:
     OpType:
@@ -104,6 +105,13 @@ structs:
                 type: object
                 optional: true
                 description: "Additional information about the operation applied"
+            rid:
+                cpp_name: recordId
+                type: RecordId
+                optional: true
+                description: "The RecordId corresponding to the CRUD operation that generated
+                              this oplog entry. Added when operating on a collection with
+                              'recordIdsReplicated' set to true."
             b:
                 cpp_name: upsert
                 type: bool

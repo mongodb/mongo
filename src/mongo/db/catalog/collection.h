@@ -646,6 +646,8 @@ public:
     // Stats
     //
 
+    virtual bool areRecordIdsReplicated() const = 0;
+
     virtual bool isCapped() const = 0;
     virtual long long getCappedMaxDocs() const = 0;
     virtual long long getCappedMaxSize() const = 0;

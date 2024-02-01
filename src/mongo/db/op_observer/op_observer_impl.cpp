@@ -586,6 +586,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
                                         MutableOplogEntry* oplogEntryTemplate,
                                         std::vector<InsertStatement>::const_iterator begin,
                                         std::vector<InsertStatement>::const_iterator end,
+                                        const std::vector<RecordId>& recordIds,
                                         const std::vector<bool>& fromMigrate,
                                         const ShardingWriteRouter& shardingWriteRouter,
                                         const CollectionPtr& collectionPtr,
@@ -614,6 +615,11 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     }
 
     const size_t count = end - begin;
+    // Either no recordIds were passed in, or the number passed in is equal to the number
+    // of inserts that happened.
+    invariant(!recordIds.size() || recordIds.size() == count,
+              str::stream() << "recordIds' size: " << recordIds.size()
+                            << ", is non-empty but not equal to count: " << count);
 
     // Use OplogAccessMode::kLogOp to avoid recursive locking.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
@@ -634,6 +640,9 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
             insertStatementOplogSlot = operationLogger->getNextOpTimes(opCtx, 1U)[0];
         }
         const auto docKey = getDocumentKey(collectionPtr, begin[i].doc).getShardKeyAndId();
+        if (recordIds.size()) {
+            oplogEntry.setRecordId(recordIds[i]);
+        }
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
@@ -716,6 +725,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
+                               const std::vector<RecordId>& recordIds,
                                std::vector<bool> fromMigrate,
                                bool defaultFromMigrate,
                                OpStateAccumulator* opAccumulator) {
@@ -797,6 +807,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                    &oplogEntryTemplate,
                                    first,
                                    last,
+                                   recordIds,
                                    std::move(fromMigrate),
                                    *shardingWriteRouter,
                                    coll,

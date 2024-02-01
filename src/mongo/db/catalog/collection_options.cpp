@@ -317,11 +317,11 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
-        } else if (fieldName == "replicateRecordIds") {
+        } else if (fieldName == "recordIdsReplicated") {
             if (e.type() != mongo::Bool) {
-                return {ErrorCodes::TypeMismatch, "'replicateRecordIds' must be a boolean."};
+                return {ErrorCodes::TypeMismatch, "'recordIdsReplicated' must be a boolean."};
             }
-            collectionOptions.replicateRecordIds = e.Bool();
+            collectionOptions.recordIdsReplicated = e.Bool();
         } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream()
@@ -411,8 +411,8 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
                                                     options.encryptedFieldConfig.get_ptr());
     }
 
-    if (auto replicateRecordIds = cmd.getReplicateRecordIds()) {
-        options.replicateRecordIds = *replicateRecordIds;
+    if (auto recordIdsReplicated = cmd.getRecordIdsReplicated()) {
+        options.recordIdsReplicated = *recordIdsReplicated;
     }
 
     return options;
@@ -516,8 +516,8 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
         builder->append(CreateCommand::kEncryptedFieldsFieldName, encryptedFieldConfig->toBSON());
     }
 
-    if (replicateRecordIds && shouldAppend(CreateCommand::kReplicateRecordIdsFieldName)) {
-        builder->appendBool(CreateCommand::kReplicateRecordIdsFieldName, true);
+    if (recordIdsReplicated && shouldAppend(CreateCommand::kRecordIdsReplicatedFieldName)) {
+        builder->appendBool(CreateCommand::kRecordIdsReplicatedFieldName, true);
     }
 }
 

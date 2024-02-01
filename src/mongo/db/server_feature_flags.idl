@@ -58,9 +58,9 @@ feature_flags:
         cpp_varname: gFeatureFlagBulkWriteCommand
         default: false
         shouldBeFCVGated: false
-    featureFlagReplicateRecordIds:
-        description: "Enable creating collections with the replicateRecordIds option."
-        cpp_varname: gFeatureFlagReplicateRecordIds
+    featureFlagRecordIdsReplicated:
+        description: "Enable creating collections with the RecordIdsReplicated option."
+        cpp_varname: gFeatureFlagRecordIdsReplicated
         default: false
         shouldBeFCVGated: true
     featureFlagAuditConfigClusterParameter:

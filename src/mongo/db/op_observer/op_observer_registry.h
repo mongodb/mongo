@@ -223,6 +223,7 @@ public:
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
+                   const std::vector<RecordId>& recordIds,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
                    OpStateAccumulator* opAccumulator = nullptr) override {
@@ -240,8 +241,14 @@ public:
         }
 
         for (auto& o : *observerQueue)
-            o->onInserts(
-                opCtx, coll, begin, end, fromMigrate, defaultFromMigrate, &opStateAccumulator);
+            o->onInserts(opCtx,
+                         coll,
+                         begin,
+                         end,
+                         recordIds,
+                         fromMigrate,
+                         defaultFromMigrate,
+                         &opStateAccumulator);
     }
 
     void onInsertGlobalIndexKey(OperationContext* opCtx,

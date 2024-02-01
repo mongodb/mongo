@@ -495,6 +495,10 @@ public:
         return _coll->takeCappedVisibilitySnapshot();
     }
 
+    bool areRecordIdsReplicated() const override {
+        return _coll->areRecordIdsReplicated();
+    }
+
     bool isCapped() const override {
         return _coll->isCapped();
     }

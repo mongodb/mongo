@@ -474,6 +474,15 @@ public:
         return {};
     }
 
+    /**
+     * Virtual collections represent external data sources that are outside the control of the
+     * replication system. RecordIds being replicated are a property specific to collections
+     * managed by the replication & storage layers.
+     */
+    bool areRecordIdsReplicated() const final {
+        return false;
+    }
+
     bool isCapped() const final {
         return false;
     }

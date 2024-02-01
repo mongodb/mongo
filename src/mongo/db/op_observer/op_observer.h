@@ -262,6 +262,9 @@ public:
                                    bool fromMigrate) = 0;
 
     /**
+     * 'recordIds' is a vector of recordIds corresponding to the inserted documents.
+     * The presence of a non-empty vector of recordIds indicates that the recordIds should
+     * be added to the oplog.
      * 'fromMigrate' array contains settings for each insert operation and takes into
      * account orphan documents.
      * 'defaultFromMigrate' is the initial 'fromMigrate' value for the 'fromMigrate' array
@@ -274,6 +277,7 @@ public:
                            const CollectionPtr& coll,
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
+                           const std::vector<RecordId>& recordIds,
                            std::vector<bool> fromMigrate,
                            bool defaultFromMigrate,
                            OpStateAccumulator* opAccumulator = nullptr) = 0;

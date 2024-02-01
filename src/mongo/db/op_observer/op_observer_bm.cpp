@@ -219,8 +219,14 @@ void BM_OnInserts(benchmark::State& state, const char* nss) {
     repl::UnreplicatedWritesBlock uwb(opCtx.get());
     setUpObservers(serviceContext, &registry, ClusterRole::None, false /* not serverless */);
     for (auto _ : state) {
-        registry.onInserts(
-            opCtx.get(), collptr, statements.cbegin(), statements.cend(), {false}, false, nullptr);
+        registry.onInserts(opCtx.get(),
+                           collptr,
+                           statements.cbegin(),
+                           statements.cend(),
+                           {} /* recordIds */,
+                           {false},
+                           false,
+                           nullptr);
     }
 }
 

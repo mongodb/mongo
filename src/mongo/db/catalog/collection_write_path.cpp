@@ -280,6 +280,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     }
 
     Status status = collection->getRecordStore()->insertRecords(opCtx, &records, timestamps);
+
     if (!status.isOK()) {
         if (auto extraInfo = status.extraInfo<DuplicateKeyErrorInfo>();
             extraInfo && collection->isClustered()) {
@@ -302,6 +303,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         }
         return status;
     }
+
     std::vector<BsonRecord> bsonRecords;
     bsonRecords.reserve(count);
     int recordIndex = 0;
@@ -315,6 +317,16 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         BsonRecord bsonRecord = {
             std::move(loc), Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};
         bsonRecords.emplace_back(std::move(bsonRecord));
+    }
+
+    // An empty vector of recordIds is ignored by the OpObserver. When non-empty,
+    // the OpObserver will add recordIds to the generated oplog entries.
+    std::vector<RecordId> recordIds;
+    if (collection->areRecordIdsReplicated()) {
+        recordIds.reserve(count);
+        for (const auto& r : records) {
+            recordIds.push_back(r.id);
+        }
     }
 
     int64_t keysInserted = 0;
@@ -341,6 +353,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             collection,
             begin,
             end,
+            recordIds,
             /*fromMigrate=*/makeFromMigrateForInserts(opCtx, nss, begin, end, fromMigrate),
             /*defaultFromMigrate=*/fromMigrate);
     }
@@ -407,11 +420,19 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     }
     inserts.emplace_back(kUninitializedStmtId, doc, slot);
 
+    // An empty vector of recordIds is ignored by the OpObserver. When non-empty,
+    // the OpObserver will add recordIds to the generated oplog entries.
+    std::vector<RecordId> recordIds;
+    if (collection->areRecordIdsReplicated()) {
+        recordIds = {loc.getValue()};
+    }
+
     opCtx->getServiceContext()->getOpObserver()->onInserts(
         opCtx,
         collection,
         inserts.begin(),
         inserts.end(),
+        recordIds,
         /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
         /*defaultFromMigrate=*/false);
 

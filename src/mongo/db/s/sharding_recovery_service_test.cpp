@@ -607,6 +607,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
                                criticalSectionColl(),
                                inserts.begin(),
                                inserts.end(),
+                               /*recordIds*/ {},
                                /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                                /*defaultFromMigrate=*/false);
         wuow.commit();
@@ -678,6 +679,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
                                criticalSectionColl(),
                                inserts.begin(),
                                inserts.end(),
+                               /*recordIds*/ {},
                                /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
                                /*defaultFromMigrate=*/false);
         wuow.commit();

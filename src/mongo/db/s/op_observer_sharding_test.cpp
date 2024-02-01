@@ -300,6 +300,7 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
                              *autoColl,
                              toInsert.begin(),
                              toInsert.end(),
+                             /*recordIds*/ {},
                              /*fromMigrate=*/std::vector<bool>(toInsert.size(), fromMigrate),
                              /*defaultFromMigrate=*/fromMigrate);
     };

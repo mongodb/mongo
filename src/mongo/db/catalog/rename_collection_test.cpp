@@ -130,6 +130,7 @@ public:
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
+                   const std::vector<RecordId>& recordIds,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
                    OpStateAccumulator* opAccumulator = nullptr) override;
@@ -241,6 +242,7 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator begin,
                                std::vector<InsertStatement>::const_iterator end,
+                               const std::vector<RecordId>& recordIds,
                                std::vector<bool> fromMigrate,
                                bool defaultFromMigrate,
                                OpStateAccumulator* opAccumulator) {
@@ -252,7 +254,8 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
         shard_role_details::getLocker(opCtx)->isDbLockedForMode(coll->ns().dbName(), MODE_X);
 
     _logOp(opCtx, coll->ns(), "inserts");
-    OpObserverNoop::onInserts(opCtx, coll, begin, end, std::move(fromMigrate), defaultFromMigrate);
+    OpObserverNoop::onInserts(
+        opCtx, coll, begin, end, recordIds, std::move(fromMigrate), defaultFromMigrate);
 }
 
 void OpObserverMock::onCreateCollection(OperationContext* opCtx,

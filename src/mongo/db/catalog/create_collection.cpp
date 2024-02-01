@@ -1016,9 +1016,10 @@ Status createCollection(OperationContext* opCtx,
     }
 
     uassert(ErrorCodes::CommandNotSupported,
-            "Replicate recordIds may not be run without featureFlagReplicateRecordIds enabled",
-            !options.replicateRecordIds ||
-                gFeatureFlagReplicateRecordIds.isEnabled(
+            "'recordIdsReplicated' option may not be run without featureFlagRecordIdsReplicated "
+            "enabled",
+            !options.recordIdsReplicated ||
+                gFeatureFlagRecordIdsReplicated.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
     if (options.isView()) {

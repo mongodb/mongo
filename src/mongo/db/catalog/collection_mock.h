@@ -254,6 +254,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool areRecordIdsReplicated() const {
+        return false;
+    }
+
     bool isCapped() const {
         return false;
     }

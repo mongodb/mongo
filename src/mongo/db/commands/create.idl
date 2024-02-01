@@ -161,7 +161,7 @@ structs:
                     variant: [safeBool, ClusteredIndexSpec]
                 optional: true
                 stability: stable
-            replicateRecordIds:
+            recordIdsReplicated:
                 description: "Specifies whether this collection should utilize the same recordId for a given document
                               across all nodes in the a replica set."
                 type: safeBool
