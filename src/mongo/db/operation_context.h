@@ -875,8 +875,6 @@ private:
     // of what locks it's taken.
     AtomicWord<bool> _alwaysInterruptAtStepDownOrUp{false};
 
-    AtomicWord<bool> _killRequestedForReplStateChange{false};
-
     // If populated, this is an owned singleton BSONObj whose only field, 'comment', is a copy of
     // the 'comment' field from the input command object.
     boost::optional<BSONObj> _comment;

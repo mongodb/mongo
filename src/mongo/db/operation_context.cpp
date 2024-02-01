@@ -375,13 +375,6 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
         LOGV2(20883, "Interrupted operation as its client disconnected", "opId"_attr = getOpID());
     }
 
-    // Record that a kill was requested on this operationContext due to replication state change
-    // since it is possible to call markKilled() multiple times but only the first killCode will
-    // be preserved.
-    if (killCode == ErrorCodes::InterruptedDueToReplStateChange) {
-        _killRequestedForReplStateChange.store(true);
-    }
-
     if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
         _cancelSource.cancel();
         if (_baton) {
