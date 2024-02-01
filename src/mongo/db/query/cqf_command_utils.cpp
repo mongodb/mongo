@@ -1209,31 +1209,6 @@ BonsaiEligibility determineEligibilityCommon(const RequestType& request,
         .setIneligibleIf(storageGlobalParams.noTableScan.load());
 }
 
-boost::optional<bool> shouldForceEligibility(QueryFrameworkControlEnum frameworkControl) {
-    // We don't need to consult the feature flag here, since the framework control knob can only
-    // be set to enable bonsai if featureFlagCommonQueryFramework is enabled.
-    LOGV2_DEBUG(7325101,
-                4,
-                "logging internalQueryFrameworkControl",
-                "knob"_attr = QueryFrameworkControl_serializer(frameworkControl));
-
-    switch (frameworkControl) {
-        case QueryFrameworkControlEnum::kForceClassicEngine:
-        case QueryFrameworkControlEnum::kTrySbeEngine:
-        case QueryFrameworkControlEnum::kTrySbeRestricted:
-            return false;
-        case QueryFrameworkControlEnum::kTryBonsai:
-        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
-            // Return boost::none to indicate that we should not force eligibility of bonsai nor
-            // the classic engine.
-            return boost::none;
-        case QueryFrameworkControlEnum::kForceBonsai:
-            return true;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
 BonsaiEligibility checkSupportedFeatures(ServiceContext* serviceCtx,
                                          const Pipeline& pipeline,
                                          bool queryHasNaturalHint) {
@@ -1291,12 +1266,40 @@ BonsaiEligibility::Eligibility getMinRequiredEligibility(OperationContext* opCtx
 }
 }  // namespace
 
+bool isBonsaiEnabled(OperationContext* opCtx) {
+    // We don't need to consult the feature flag here, since the framework control knob can only
+    // be set to enable bonsai if featureFlagCommonQueryFramework is enabled.
+    auto frameworkControl =
+        QueryKnobConfiguration::decoration(opCtx).getInternalQueryFrameworkControlForOp();
+    LOGV2_DEBUG(7325101,
+                4,
+                "logging internalQueryFrameworkControl",
+                "knob"_attr = QueryFrameworkControl_serializer(frameworkControl));
+
+    switch (frameworkControl) {
+        case QueryFrameworkControlEnum::kForceClassicEngine:
+        case QueryFrameworkControlEnum::kTrySbeEngine:
+        case QueryFrameworkControlEnum::kTrySbeRestricted:
+            return false;
+        case QueryFrameworkControlEnum::kTryBonsai:
+        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
+        case QueryFrameworkControlEnum::kForceBonsai:
+            return true;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 MONGO_FAIL_POINT_DEFINE(enableExplainInBonsai);
 
 BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
                                              const CollectionPtr& collection,
                                              const AggregateCommandRequest& request,
                                              const Pipeline& pipeline) {
+    if (!isBonsaiEnabled(opCtx)) {
+        return BonsaiEligibility::Ineligible;
+    }
+
     return BonsaiEligibility{BonsaiEligibility::FullyEligible, getMinRequiredEligibility(opCtx)}
         .minOf([&]() { return determineEligibilityCommon(request, opCtx, collection); })
         .setIneligibleIf(request.getRequestReshardingResumeToken().has_value())
@@ -1313,6 +1316,10 @@ BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
 BonsaiEligibility determineBonsaiEligibility(OperationContext* opCtx,
                                              const CollectionPtr& collection,
                                              const CanonicalQuery& cq) {
+    if (!isBonsaiEnabled(opCtx)) {
+        return BonsaiEligibility::Ineligible;
+    }
+
     auto& request = cq.getFindCommandRequest();
     return BonsaiEligibility{BonsaiEligibility::FullyEligible, getMinRequiredEligibility(opCtx)}
         .setIneligibleIf(!cq.useCqfIfEligible())
