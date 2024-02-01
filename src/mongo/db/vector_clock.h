@@ -43,6 +43,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/vector_clock_gen.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util_core.h"
@@ -174,7 +175,7 @@ public:
      * or external client.
      */
     void gossipIn(OperationContext* opCtx,
-                  const BSONObj& inMessage,
+                  const GossipedVectorClockComponents& timepoints,
                   bool couldBeUnauthenticated,
                   bool defaultIsInternalClient = false);
 
@@ -216,7 +217,7 @@ protected:
                          Component component) const = 0;
         virtual LogicalTime in(ServiceContext* service,
                                OperationContext* opCtx,
-                               const BSONObj& in,
+                               const GossipedVectorClockComponents& timepoints,
                                bool couldBeUnauthenticated,
                                Component component) const = 0;
 
@@ -324,6 +325,9 @@ protected:
 private:
     class PlainComponentFormat;
     class SignedComponentFormat;
+    class ConfigTimeComponent;
+    class TopologyTimeComponent;
+    class ClusterTimeComponent;
 
     /**
      * Called to determine if the cluster time component should be gossiped in and out to external
@@ -348,7 +352,7 @@ private:
      * BSONObj, using the appropriate field name and representation for that Component.
      */
     void _gossipInComponent(OperationContext* opCtx,
-                            const BSONObj& in,
+                            const GossipedVectorClockComponents& timepoints,
                             bool couldBeUnauthenticated,
                             LogicalTimeArray* newTime,
                             Component component);

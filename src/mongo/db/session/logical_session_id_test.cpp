@@ -328,8 +328,14 @@ OperationSessionInfoFromClient initializeOpSessionInfoWithRequestBody(
         DatabaseName::createDatabaseName_forTest(boost::none, "test_unused_dbname"),
         requestBody,
         BSONObj());
-    return initializeOperationSessionInfo(
-        opCtx, opMsgRequest, requiresAuth, attachToOpCtx, isReplSetMemberOrMongos);
+    auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},
+                                                     opMsgRequest.body);
+    return initializeOperationSessionInfo(opCtx,
+                                          opMsgRequest.getValidatedTenantId(),
+                                          osi,
+                                          requiresAuth,
+                                          attachToOpCtx,
+                                          isReplSetMemberOrMongos);
 }
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {

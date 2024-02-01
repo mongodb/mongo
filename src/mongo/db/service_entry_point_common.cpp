@@ -76,6 +76,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
@@ -84,7 +85,6 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/logical_time.h"
@@ -129,6 +129,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/db/validate_api_parameters.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
@@ -254,9 +255,8 @@ struct HandleRequest {
 
         void assertValidNsString() {
             if (!nsString().isValid()) {
-                uassert(16257,
-                        str::stream() << "Invalid ns [" << nsString().toStringForErrorMsg() << "]",
-                        false);
+                uassert(
+                    16257, fmt::format("Invalid ns [{}]", nsString().toStringForErrorMsg()), false);
             }
         }
 
@@ -313,153 +313,6 @@ void generateErrorResponse(OperationContext* opCtx,
     replyBuilder->reset();
     replyBuilder->setCommandReply(status, extraFields);
     replyBuilder->getBodyBuilder().appendElements(replyMetadata);
-}
-
-/**
- * Given the specified command, returns an effective read concern which should be used or an error
- * if the read concern is not valid for the command.
- * Note that the validation performed is not necessarily exhaustive.
- */
-StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
-                                                      const CommandInvocation* invocation,
-                                                      const BSONObj& cmdObj,
-                                                      bool startTransaction,
-                                                      bool isInternalClient) {
-    repl::ReadConcernArgs readConcernArgs;
-
-    auto readConcernParseStatus = readConcernArgs.initialize(cmdObj);
-    if (!readConcernParseStatus.isOK()) {
-        return readConcernParseStatus;
-    }
-
-    // Represents whether the client explicitly defines read concern within the cmdObj or not.
-    // It will be set to false also if the client specifies empty read concern {readConcern: {}}.
-    bool clientSuppliedReadConcern = !readConcernArgs.isEmpty();
-    bool customDefaultWasApplied = false;
-    auto readConcernSupport = invocation->supportsReadConcern(readConcernArgs.getLevel(),
-                                                              readConcernArgs.isImplicitDefault());
-
-    auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
-        LOGV2_DEBUG(21955,
-                    2,
-                    "Applying default readConcern on command",
-                    "readConcernDefault"_attr = rcDefault,
-                    "command"_attr = invocation->definition()->getName());
-        readConcernArgs = std::move(rcDefault);
-        // Update the readConcernSupport, since the default RC was applied.
-        readConcernSupport =
-            invocation->supportsReadConcern(readConcernArgs.getLevel(), !customDefaultWasApplied);
-    };
-
-    auto shouldApplyDefaults = (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
-        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
-        !opCtx->getClient()->isInDirectClient();
-
-    if (readConcernSupport.defaultReadConcernPermit.isOK() && shouldApplyDefaults) {
-        if (isInternalClient) {
-            // ReadConcern should always be explicitly specified by operations received from
-            // internal clients (ie. from a mongos or mongod), even if it is empty (ie.
-            // readConcern: {}, meaning to use the implicit server defaults).
-            uassert(
-                4569200,
-                "received command without explicit readConcern on an internalClient connection {}"_format(
-                    redact(cmdObj.toString())),
-                readConcernArgs.isSpecified());
-        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
-                   serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-            if (!readConcernArgs.isSpecified()) {
-                // TODO: Disabled until after SERVER-44539, to avoid log spam.
-                // LOGV2(21954, "Missing readConcern on {command}", "Missing readConcern "
-                // "for command", "command"_attr = invocation->definition()->getName());
-            }
-        } else {
-            // A member in a regular replica set.  Since these servers receive client queries, in
-            // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
-            // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
-            // since this covers both isSpecified() && !isSpecified()
-            if (readConcernArgs.isEmpty()) {
-                const auto rwcDefaults =
-                    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
-                const auto rcDefault = rwcDefaults.getDefaultReadConcern();
-                if (rcDefault) {
-                    const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
-                    customDefaultWasApplied =
-                        (readConcernSource &&
-                         readConcernSource.value() == DefaultReadConcernSourceEnum::kGlobal);
-
-                    applyDefaultReadConcern(*rcDefault);
-                }
-            }
-        }
-    }
-
-    // Apply the implicit default read concern even if the command does not support a cluster wide
-    // read concern.
-    if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
-        readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
-        !isInternalClient && readConcernArgs.isEmpty()) {
-        auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                             .getImplicitDefaultReadConcern();
-        applyDefaultReadConcern(rcDefault);
-    }
-
-    // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an
-    // appropriate provenance needs to be determined.
-    auto& provenance = readConcernArgs.getProvenance();
-    if (!provenance.hasSource()) {
-        if (clientSuppliedReadConcern) {
-            provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
-        } else if (customDefaultWasApplied) {
-            provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
-        } else {
-            provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
-        }
-    }
-
-    // If we are starting a transaction, we need to check whether the read concern is
-    // appropriate for running a transaction.
-    if (startTransaction) {
-        if (!isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel())) {
-            return {ErrorCodes::InvalidOptions,
-                    "The readConcern level must be either 'local' (default), 'majority' or "
-                    "'snapshot' in "
-                    "order to run in a transaction"};
-        }
-        if (readConcernArgs.getArgsOpTime()) {
-            return {ErrorCodes::InvalidOptions,
-                    str::stream() << "The readConcern cannot specify '"
-                                  << repl::ReadConcernArgs::kAfterOpTimeFieldName
-                                  << "' in a transaction"};
-        }
-    }
-
-    // Otherwise, if there is a read concern present - either user-specified or from the default -
-    // then check whether the command supports it. If there is no explicit read concern level, then
-    // it is implicitly "local". There is no need to check whether this is supported, because all
-    // commands either support "local" or upconvert the absent readConcern to a stronger level that
-    // they do support; for instance, $changeStream upconverts to RC level "majority".
-    //
-    // Individual transaction statements are checked later on, after we've unstashed the
-    // transaction resources.
-    if (!opCtx->inMultiDocumentTransaction() && readConcernArgs.hasLevel()) {
-        if (!readConcernSupport.readConcernSupport.isOK()) {
-            return readConcernSupport.readConcernSupport.withContext(
-                str::stream() << "Command " << invocation->definition()->getName()
-                              << " does not support " << readConcernArgs.toString());
-        }
-    }
-
-    // If this command invocation asked for 'majority' read concern, supports blocking majority
-    // reads, and storage engine support for majority reads is disabled, then we set the majority
-    // read mechanism appropriately i.e. we utilize "speculative" read behavior.
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
-        invocation->allowsSpeculativeMajorityReads() &&
-        !serverGlobalParams.enableMajorityReadConcern) {
-        readConcernArgs.setMajorityReadMechanism(
-            repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative);
-    }
-
-    return readConcernArgs;
 }
 
 /**
@@ -725,25 +578,35 @@ public:
             _execContext->getCommand()->getName() == "isMaster"_sd;
     }
 
+    const CommonRequestArgs& getCommonRequestArgs() const {
+        return _requestArgs;
+    }
+
 private:
     void _parseCommand() {
         auto opCtx = _execContext->getOpCtx();
         auto command = _execContext->getCommand();
         auto& request = _execContext->getRequest();
 
-        const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
+        CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
+
+        _requestArgs = CommonRequestArgs::parse(IDLParserContext("request"), request.body);
+
+        validateAPIParameters(request.body, _requestArgs.getAPIParametersFromClient(), command);
+
         Client* client = opCtx->getClient();
 
         {
             stdx::lock_guard<Client> lk(*client);
             CurOp::get(opCtx)->setCommand_inlock(command);
-            APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
+            APIParameters::get(opCtx) =
+                APIParameters::fromClient(_requestArgs.getAPIParametersFromClient());
         }
 
-        CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
         _startOperationTime = getClientOperationTime(opCtx);
 
-        rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
+        rpc::readRequestMetadata(opCtx, _requestArgs, request, command->requiresAuth());
+
         _invocation = command->parse(opCtx, request);
         CommandInvocation::set(opCtx, _invocation);
 
@@ -781,6 +644,9 @@ private:
         return _execContext->isInternalClient();
     }
 
+    StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
+                                                          bool startTransaction);
+
     const std::shared_ptr<HandleRequest::ExecutionContext> _execContext;
 
     // The following allows `_initiateCommand`, `_commandExec`, and `_handleFailure` to share
@@ -789,6 +655,8 @@ private:
     std::shared_ptr<CommandInvocation> _invocation;
     LogicalTime _startOperationTime;
     OperationSessionInfoFromClient _sessionOptions;
+    CommonRequestArgs _requestArgs;
+
     boost::optional<RunCommandOpTimes> _runCommandOpTimes;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
     boost::optional<ImpersonationSessionGuard> _impersonationSessionGuard;
@@ -797,6 +665,7 @@ private:
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
     bool _refreshedCatalogCache = false;
+
     // Keep a static variable to track the last time a warning about direct shard connections was
     // logged.
     static Mutex _staticMutex;
@@ -1355,8 +1224,7 @@ void RunCommandImpl::_epilogue() {
 
 Future<void> RunCommandImpl::_runImpl() {
     auto execContext = _ecd->getExecutionContext();
-    execContext->behaviors->uassertCommandDoesNotSpecifyWriteConcern(
-        execContext->getRequest().body);
+    execContext->behaviors->uassertCommandDoesNotSpecifyWriteConcern(_ecd->getCommonRequestArgs());
     return _runCommand();
 }
 
@@ -1414,11 +1282,12 @@ void RunCommandAndWaitForWriteConcern::_setup() {
     OperationContext* opCtx = _execContext->getOpCtx();
     const Command* command = invocation->definition();
     const OpMsgRequest& request = _execContext->getRequest();
+    const CommonRequestArgs& requestArgs = _ecd->getCommonRequestArgs();
 
     if (command->getLogicalOp() == LogicalOp::opGetMore) {
         // WriteConcern will be set up during command processing, it must not be specified on
         // the command body.
-        _execContext->behaviors->uassertCommandDoesNotSpecifyWriteConcern(request.body);
+        _execContext->behaviors->uassertCommandDoesNotSpecifyWriteConcern(requestArgs);
     } else {
         // WriteConcern should always be explicitly specified by operations received on shard
         // and config servers, even if it is empty (ie. writeConcern: {}).  In this context
@@ -1435,10 +1304,10 @@ void RunCommandAndWaitForWriteConcern::_setup() {
                     4569201,
                     "received command without explicit writeConcern on an internalClient connection {}"_format(
                         redact(request.body.toString())),
-                    request.body.hasField(WriteConcernOptions::kWriteConcernField));
+                    requestArgs.getWriteConcern());
             } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
                        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                if (!request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
+                if (!requestArgs.getWriteConcern()) {
                     // TODO: Disabled until after SERVER-44539, to avoid log spam.
                     // LOGV2(21959, "Missing writeConcern on {command}", "Missing "
                     // "writeConcern on command", "command"_attr = command->getName());
@@ -1513,6 +1382,150 @@ Future<void> RunCommandAndWaitForWriteConcern::_checkWriteConcern() {
 Mutex ExecCommandDatabase::_staticMutex = MONGO_MAKE_LATCH("DirectShardConnectionTimer");
 Date_t ExecCommandDatabase::_lastDirectConnectionWarningTime = Date_t();
 
+/**
+ * Given the specified command, returns an effective read concern which should be used or an error
+ * if the read concern is not valid for the command.
+ * Note that the validation performed is not necessarily exhaustive.
+ */
+StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(OperationContext* opCtx,
+                                                                           bool startTransaction) {
+    auto& request = _execContext->getRequest();
+    repl::ReadConcernArgs readConcernArgs;
+
+    if (_requestArgs.getReadConcern()) {
+        auto readConcernParseStatus = readConcernArgs.parse(*_requestArgs.getReadConcern());
+        if (!readConcernParseStatus.isOK()) {
+            return readConcernParseStatus;
+        }
+    }
+    bool clientSuppliedReadConcern = !readConcernArgs.isEmpty();
+    bool customDefaultWasApplied = false;
+    auto readConcernSupport = _invocation->supportsReadConcern(readConcernArgs.getLevel(),
+                                                               readConcernArgs.isImplicitDefault());
+
+    auto applyDefaultReadConcern = [&](const repl::ReadConcernArgs rcDefault) -> void {
+        LOGV2_DEBUG(21955,
+                    2,
+                    "Applying default readConcern on command",
+                    "readConcernDefault"_attr = rcDefault,
+                    "command"_attr = _invocation->definition()->getName());
+        readConcernArgs = std::move(rcDefault);
+        // Update the readConcernSupport, since the default RC was applied.
+        readConcernSupport =
+            _invocation->supportsReadConcern(readConcernArgs.getLevel(), !customDefaultWasApplied);
+    };
+
+    auto shouldApplyDefaults = (startTransaction || !opCtx->inMultiDocumentTransaction()) &&
+        repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() &&
+        !opCtx->getClient()->isInDirectClient();
+
+    if (readConcernSupport.defaultReadConcernPermit.isOK() && shouldApplyDefaults) {
+        if (_isInternalClient()) {
+            // ReadConcern should always be explicitly specified by operations received from
+            // internal clients (ie. from a mongos or mongod), even if it is empty (ie.
+            // readConcern: {}, meaning to use the implicit server defaults).
+            uassert(
+                4569200,
+                "received command without explicit readConcern on an internalClient connection {}"_format(
+                    redact(request.body.toString())),
+                readConcernArgs.isSpecified());
+        } else if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+                   serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            if (!readConcernArgs.isSpecified()) {
+                // TODO: Disabled until after SERVER-44539, to avoid log spam.
+                // LOGV2(21954, "Missing readConcern on {command}", "Missing readConcern "
+                // "for command", "command"_attr = _invocation->definition()->getName());
+            }
+        } else {
+            // A member in a regular replica set.  Since these servers receive client queries, in
+            // this context empty RC (ie. readConcern: {}) means the same as if absent/unspecified,
+            // which is to apply the CWRWC defaults if present.  This means we just test isEmpty(),
+            // since this covers both isSpecified() && !isSpecified()
+            if (readConcernArgs.isEmpty()) {
+                const auto rwcDefaults =
+                    ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
+                const auto rcDefault = rwcDefaults.getDefaultReadConcern();
+                if (rcDefault) {
+                    const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
+                    customDefaultWasApplied =
+                        (readConcernSource &&
+                         readConcernSource.value() == DefaultReadConcernSourceEnum::kGlobal);
+
+                    applyDefaultReadConcern(*rcDefault);
+                }
+            }
+        }
+    }
+
+    // Apply the implicit default read concern even if the command does not support a cluster wide
+    // read concern.
+    if (!readConcernSupport.defaultReadConcernPermit.isOK() &&
+        readConcernSupport.implicitDefaultReadConcernPermit.isOK() && shouldApplyDefaults &&
+        !_isInternalClient() && readConcernArgs.isEmpty()) {
+        auto rcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                             .getImplicitDefaultReadConcern();
+        applyDefaultReadConcern(rcDefault);
+    }
+
+    // It's fine for clients to provide any provenance value to mongod. But if they haven't, then an
+    // appropriate provenance needs to be determined.
+    auto& provenance = readConcernArgs.getProvenance();
+    if (!provenance.hasSource()) {
+        if (clientSuppliedReadConcern) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
+        } else if (customDefaultWasApplied) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
+        } else {
+            provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
+        }
+    }
+
+    // If we are starting a transaction, we need to check whether the read concern is
+    // appropriate for running a transaction.
+    if (startTransaction) {
+        if (!isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel())) {
+            return {ErrorCodes::InvalidOptions,
+                    "The readConcern level must be either 'local' (default), 'majority' or "
+                    "'snapshot' in "
+                    "order to run in a transaction"};
+        }
+        if (readConcernArgs.getArgsOpTime()) {
+            return {ErrorCodes::InvalidOptions,
+                    fmt::format("The readConcern cannot specify '{}' in a transaction",
+                                repl::ReadConcernArgs::kAfterOpTimeFieldName)};
+        }
+    }
+
+    // Otherwise, if there is a read concern present - either user-specified or from the default -
+    // then check whether the command supports it. If there is no explicit read concern level, then
+    // it is implicitly "local". There is no need to check whether this is supported, because all
+    // commands either support "local" or upconvert the absent readConcern to a stronger level that
+    // they do support; for instance, $changeStream upconverts to RC level "majority".
+    //
+    // Individual transaction statements are checked later on, after we've unstashed the
+    // transaction resources.
+    if (!opCtx->inMultiDocumentTransaction() && readConcernArgs.hasLevel()) {
+        if (!readConcernSupport.readConcernSupport.isOK()) {
+            return readConcernSupport.readConcernSupport.withContext(
+                fmt::format("Command {} does not support {}",
+                            _invocation->definition()->getName(),
+                            readConcernArgs.toString()));
+        }
+    }
+
+    // If this command invocation asked for 'majority' read concern, supports blocking majority
+    // reads, and storage engine support for majority reads is disabled, then we set the majority
+    // read mechanism appropriately i.e. we utilize "speculative" read behavior.
+    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
+        _invocation->allowsSpeculativeMajorityReads() &&
+        !serverGlobalParams.enableMajorityReadConcern) {
+        readConcernArgs.setMajorityReadMechanism(
+            repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative);
+    }
+
+    return readConcernArgs;
+}
+
 void ExecCommandDatabase::_initiateCommand() {
     auto opCtx = _execContext->getOpCtx();
     auto& request = _execContext->getRequest();
@@ -1531,8 +1544,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (auto scope = request.validatedTenancyScope; scope && scope->hasAuthenticatedUser()) {
         uassert(ErrorCodes::Unauthorized,
-                str::stream() << "Command " << command->getName()
-                              << " is not supported in multitenancy mode",
+                fmt::format("Command {} is not supported in multitenancy mode", command->getName()),
                 command->allowedWithSecurityToken());
         _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.value());
     }
@@ -1556,15 +1568,17 @@ void ExecCommandDatabase::_initiateCommand() {
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-    _sessionOptions = initializeOperationSessionInfo(opCtx,
-                                                     request,
-                                                     command->requiresAuth(),
-                                                     command->attachLogicalSessionsToOpCtx(),
-                                                     replCoord->getSettings().isReplSet());
+    _sessionOptions =
+        initializeOperationSessionInfo(opCtx,
+                                       request.getValidatedTenantId(),
+                                       _requestArgs.getOperationSessionInfoFromClientBase(),
+                                       command->requiresAuth(),
+                                       command->attachLogicalSessionsToOpCtx(),
+                                       replCoord->getSettings().isReplSet());
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
 
-    const auto dbName = request.getDbName();
+    const auto dbName = CurOp::get(opCtx)->getNSS().dbName();
     uassert(ErrorCodes::InvalidNamespace,
             fmt::format("Invalid database name: '{}'", dbName.toStringForErrorMsg()),
             DatabaseName::isValid(dbName, DatabaseName::DollarInDbNameBehavior::Allow));
@@ -1586,37 +1600,22 @@ void ExecCommandDatabase::_initiateCommand() {
                            _invocation->allNamespaces(),
                            allowTransactionsOnConfigDatabase);
 
-    BSONElement cmdOptionMaxTimeMSField;
-    BSONElement maxTimeMSOpOnlyField;
-    BSONElement helpField;
-
-    StringDataSet topLevelFields(8);
-    for (auto&& element : request.body) {
-        StringData fieldName = element.fieldNameStringData();
-        if (fieldName == query_request_helper::cmdOptionMaxTimeMS) {
-            cmdOptionMaxTimeMSField = element;
-        } else if (fieldName == query_request_helper::kMaxTimeMSOpOnlyField) {
-            uassert(ErrorCodes::InvalidOptions,
-                    "Can not specify maxTimeMSOpOnly for non internal clients",
-                    _isInternalClient());
-            maxTimeMSOpOnlyField = element;
-        } else if (fieldName == CommandHelpers::kHelpFieldName) {
-            helpField = element;
-        } else if (fieldName == "comment") {
-            stdx::lock_guard<Client> lk(*client);
-            opCtx->setComment(element.wrap());
-        } else if (fieldName == query_request_helper::queryOptionMaxTimeMS) {
-            uasserted(ErrorCodes::InvalidOptions,
-                      "no such command option $maxTimeMs; use maxTimeMS instead");
-        }
-
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << "Parsed command object contains duplicate top level key: "
-                              << fieldName,
-                topLevelFields.insert(fieldName).second);
+    if (auto& commentField = _requestArgs.getComment()) {
+        stdx::lock_guard<Client> lk(*client);
+        opCtx->setComment(commentField->getElement().wrap());
     }
 
-    if (MONGO_unlikely(CommandHelpers::isHelpRequest(helpField))) {
+    uassert(ErrorCodes::InvalidOptions,
+            "no such command option $maxTimeMs; use maxTimeMS instead",
+            !_requestArgs.getDollarMaxTimeMS());
+
+    if (_requestArgs.getMaxTimeMSOpOnly()) {
+        uassert(ErrorCodes::InvalidOptions,
+                "Can not specify maxTimeMSOpOnly for non internal clients",
+                _isInternalClient());
+    }
+
+    if (MONGO_unlikely(_requestArgs.getHelp().value_or(false))) {
         CurOp::get(opCtx)->ensureStarted();
         // We disable not-primary-error tracker for help requests due to SERVER-11492, because
         // config servers use help requests to determine which commands are database writes, and so
@@ -1712,7 +1711,7 @@ void ExecCommandDatabase::_initiateCommand() {
         globalOpCounters.gotQuery();
     }
 
-    if (cmdOptionMaxTimeMSField || maxTimeMSOpOnlyField) {
+    if (_requestArgs.getMaxTimeMS() || _requestArgs.getMaxTimeMSOpOnly()) {
         // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
         // the OperationContext. The 'maxTimeMS' option unfortunately has a different meaning for a
         // getMore command, where it is used to communicate the maximum time to wait for new inserts
@@ -1721,10 +1720,10 @@ void ExecCommandDatabase::_initiateCommand() {
         // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will
         // require introducing a new 'max await time' parameter for getMore, and eventually banning
         // maxTimeMS altogether on a getMore command.
-        const auto maxTimeMS =
-            Milliseconds{uassertStatusOK(parseMaxTimeMS(cmdOptionMaxTimeMSField))};
-        const auto maxTimeMSOpOnly =
-            Milliseconds{uassertStatusOK(parseMaxTimeMSOpOnly(maxTimeMSOpOnlyField))};
+        const auto maxTimeMS = Milliseconds{uassertStatusOK(
+            parseMaxTimeMS(_requestArgs.getMaxTimeMS().value_or(IDLAnyType()).getElement()))};
+        const auto maxTimeMSOpOnly = Milliseconds{uassertStatusOK(parseMaxTimeMSOpOnly(
+            _requestArgs.getMaxTimeMSOpOnly().value_or(IDLAnyType()).getElement()))};
 
         if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
             command->getLogicalOp() != LogicalOp::opGetMore) {
@@ -1755,13 +1754,12 @@ void ExecCommandDatabase::_initiateCommand() {
     auto skipReadConcern = opCtx->getClient()->isInDirectClient();
     bool startTransaction = static_cast<bool>(_sessionOptions.getStartTransaction());
     if (!skipReadConcern) {
-        auto newReadConcernArgs = uassertStatusOK(_extractReadConcern(
-            opCtx, _invocation.get(), request.body, startTransaction, _isInternalClient()));
+        auto newReadConcernArgs = uassertStatusOK(_extractReadConcern(opCtx, startTransaction));
 
         // Ensure that the RC being set on the opCtx has provenance.
         invariant(newReadConcernArgs.getProvenance().hasSource(),
-                  str::stream() << "unexpected unset provenance on readConcern: "
-                                << newReadConcernArgs.toBSONInner());
+                  fmt::format("unexpected unset provenance on readConcern: {}",
+                              newReadConcernArgs.toBSONInner().toString()));
 
         uassert(ErrorCodes::InvalidOptions,
                 "Only the first command in a transaction may specify a readConcern",
@@ -1843,15 +1841,8 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (!opCtx->getClient()->isInDirectClient() &&
         readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern) {
-        boost::optional<ShardVersion> shardVersion;
-        if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
-            shardVersion = ShardVersion::parse(shardVersionElem);
-        }
-
-        boost::optional<DatabaseVersion> databaseVersion;
-        if (auto databaseVersionElem = request.body[DatabaseVersion::kDatabaseVersionField]) {
-            databaseVersion = DatabaseVersion(databaseVersionElem.Obj());
-        }
+        const boost::optional<ShardVersion>& shardVersion = _requestArgs.getShardVersion();
+        const boost::optional<DatabaseVersion>& databaseVersion = _requestArgs.getDatabaseVersion();
 
         if (shardVersion || databaseVersion) {
             // If a timeseries collection is sharded, only the buckets collection would be sharded.
@@ -2072,11 +2063,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     // it here, so if it is valid it can be used to compute the proper operationTime.
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.isEmpty()) {
-        auto readConcernArgsStatus = _extractReadConcern(opCtx,
-                                                         _invocation.get(),
-                                                         request.body,
-                                                         false /*startTransaction*/,
-                                                         _isInternalClient());
+        auto readConcernArgsStatus = _extractReadConcern(opCtx, false /*startTransaction*/);
         if (readConcernArgsStatus.isOK()) {
             // We must obtain the client lock to set the ReadConcernArgs on the operation context as
             // it may be concurrently read by CurrentOp.
@@ -2200,16 +2187,18 @@ DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> 
                 notPrimaryUnackWrites.increment();
 
             uasserted(ErrorCodes::NotWritablePrimary,
-                      str::stream()
-                          << "Not-primary error while processing '" << request.getCommandName()
-                          << "' operation  on '" << request.getDatabase() << "' database via "
-                          << "fire-and-forget command execution.");
+                      fmt::format("Not-primary error while processing '{}' operation  on '{}' "
+                                  "database via fire-and-forget command execution.",
+                                  request.getCommandName(),
+                                  request.getDatabase()));
         }
         return {};  // Don't reply.
     }
 
     DbResponse dbResponse;
-    CommandHelpers::checkForInternalError(replyBuilder, execContext->isInternalClient());
+    if constexpr (kDebugBuild) {
+        CommandHelpers::checkForInternalError(replyBuilder, execContext->isInternalClient());
+    }
 
     if (OpMsg::isFlagSet(message, OpMsg::kExhaustSupported)) {
         auto responseObj = replyBuilder->getBodyBuilder().asTempObj();

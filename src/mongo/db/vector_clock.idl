@@ -29,6 +29,55 @@
 global:
     cpp_namespace: "mongo"
 
+imports:
+  - "mongo/db/basic_types.idl"
+
+structs:
+  ClusterTimeSignature:
+    description: "Used to validate the identity of a request or response's ClusterTime."
+    strict: false
+    fields:
+        hash:
+            type: bindata_generic
+            optional: false
+        keyId:
+            type: safeInt64
+            optional: false
+
+  ClusterTime:
+      description: "Gossiped in component for the cluster time tracking the state of user databases 
+        across the cluster. It may optionally include a signature identifying the process that
+        generated such a value."
+      strict: false
+      fields:
+          clusterTime:
+              type: timestamp
+              optional: false
+          signature:
+              type: ClusterTimeSignature
+              optional: true
+
+  GossipedVectorClockComponents:
+    description: Common time components to describe a point in time for the cluster.
+    strict: false
+    fields:
+      $configTime:
+        description: The time component that represents the config time.
+        type: timestamp
+        cpp_name: dollarConfigTime
+        optional: true
+      $topologyTime:
+        description: The time component that represents the topology time.
+        type: timestamp
+        cpp_name: dollarTopologyTime
+        optional: true
+      $clusterTime:
+        description: The time component that represents the cluster time.
+        type: ClusterTime
+        cpp_name: dollarClusterTime
+        optional: true
+
+
 server_parameters:
     maxAcceptableLogicalClockDriftSecs:
         description: "The value defines the maximum time, in seconds, that a new logical time (such

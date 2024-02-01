@@ -39,6 +39,7 @@ imports:
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/s/forwardable_operation_metadata.idl"
+    - "mongo/db/vector_clock.idl"
     - "mongo/db/write_concern_options.idl"       
     - "mongo/rpc/metadata/client_metadata.idl"
     - "mongo/rpc/metadata/impersonated_user_metadata.idl"
@@ -218,33 +219,6 @@ structs:
                 forward_to_shards: true
                 optional: true
 
-    ClusterTimeSignature:
-        description: "Structure used in '$clusterTime'."
-        strict: false
-        fields:
-            hash:
-                type: bindata_generic
-                forward_from_shards: false
-                optional: false
-            keyId:
-                type: safeInt64
-                forward_from_shards: false
-                optional: false
-
-    ClusterTime:
-        description: "Field under '$clusterTime' that appears in GenericReplyFields. Matches VectorClock::SignedComponentFormat"
-        strict: false
-        fields:
-            clusterTime:
-                type: logicalTime
-                forward_from_shards: false
-                optional: true
-            signature:
-                type: ClusterTimeSignature
-                forward_from_shards: false
-                optional: true
-
-    
     GenericReplyFieldsWithTypesV1:
         # This struct is meant to mirror 'generic_reply_fields_api_v1' in '../idl/generic_argument.idl'.
         description: "Fields that may appear in any command reply. These are guaranteed backwards-compatible for as long as the server supports API Version 1."

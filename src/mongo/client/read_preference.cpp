@@ -42,6 +42,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/read_preference_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -78,11 +79,6 @@ Status validateReadPreferenceMode(const std::string& prefStr, const boost::optio
     }
     return Status::OK();
 }
-
-/**
- * Replica set refresh period on the task executor.
- */
-const Seconds ReadPreferenceSetting::kMinimalMaxStalenessValue(90);
 
 const OperationContext::Decoration<ReadPreferenceSetting> ReadPreferenceSetting::get =
     OperationContext::declareDecoration<ReadPreferenceSetting>();
@@ -124,111 +120,61 @@ ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref)
 }
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONObj& readPrefObj) {
-    std::string modeStr;
-    auto modeExtractStatus = bsonExtractStringField(readPrefObj, kModeFieldName, &modeStr);
-    if (!modeExtractStatus.isOK()) {
-        return modeExtractStatus;
-    }
 
-    ReadPreference mode;
+    ReadPreferenceStruct rp;
+
+    // Translate any parsing related exceptions to status.
     try {
-        mode = ReadPreference_parse(IDLParserContext(kModeFieldName), modeStr);
-    } catch (DBException& e) {
-        return e.toStatus().withContext(
-            str::stream() << "Could not parse $readPreference mode '" << modeStr
-                          << "'. Only the modes '"
-                          << ReadPreference_serializer(ReadPreference::PrimaryOnly) << "', '"
-                          << ReadPreference_serializer(ReadPreference::PrimaryPreferred) << "', '"
-                          << ReadPreference_serializer(ReadPreference::SecondaryOnly) << "', '"
-                          << ReadPreference_serializer(ReadPreference::SecondaryPreferred)
-                          << "', and '" << ReadPreference_serializer(ReadPreference::Nearest)
-                          << "' are supported.");
+        rp = ReadPreferenceStruct::parse(IDLParserContext("readPreference"), readPrefObj);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 
     boost::optional<HedgingMode> hedgingMode;
-    if (auto hedgingModeEl = readPrefObj[kHedgeFieldName]) {
-        if (hedgingModeEl.type() != BSONType::Object) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << kHedgeFieldName
-                                        << " field must be of type object if provided; found "
-                                        << hedgingModeEl);
-        }
-        hedgingMode =
-            HedgingMode::parse(IDLParserContext(kHedgeFieldName), hedgingModeEl.embeddedObject());
-        if (hedgingMode->getEnabled() && mode == ReadPreference::PrimaryOnly) {
+    if (rp.getHedge()) {
+        hedgingMode = rp.getHedge();
+        if (hedgingMode->getEnabled() && rp.getMode() == ReadPreference::PrimaryOnly) {
             return {
                 ErrorCodes::InvalidOptions,
                 str::stream() << "cannot enable hedging for $readPreference mode \"primaryOnly\""};
         }
-    }
-
-    if (!hedgingMode && mode == ReadPreference::Nearest) {
+    } else if (rp.getMode() == ReadPreference::Nearest) {
         hedgingMode = HedgingMode();
     }
 
     TagSet tags;
-    BSONElement tagsElem;
-    auto tagExtractStatus =
-        bsonExtractTypedField(readPrefObj, kTagsFieldName, mongo::Array, &tagsElem);
-    if (tagExtractStatus.isOK()) {
-        tags = TagSet{BSONArray(tagsElem.Obj().getOwned())};
+
+    if (rp.getTags()) {
+        tags = TagSet{static_cast<BSONArray>(rp.getTags()->getOwned())};
 
         // In accordance with the read preference spec, passing the default wildcard tagset
         // '[{}]' is the same as not passing a TagSet at all. Furthermore, passing an empty
         // TagSet with a non-primary ReadPreference is equivalent to passing the wildcard
         // ReadPreference.
         if (tags == TagSet() || tags == TagSet::primaryOnly()) {
-            tags = defaultTagSetForMode(mode);
+            tags = defaultTagSetForMode(rp.getMode());
         }
 
         // If we are using a user supplied TagSet, check that it is compatible with
         // the readPreference mode.
-        else if (ReadPreference::PrimaryOnly == mode && (tags != TagSet::primaryOnly())) {
+        else if (ReadPreference::PrimaryOnly == rp.getMode() && (tags != TagSet::primaryOnly())) {
             return Status(ErrorCodes::BadValue,
                           "Only empty tags are allowed with primary read preference");
         }
-    }
-
-    else if (ErrorCodes::NoSuchKey == tagExtractStatus) {
-        tags = defaultTagSetForMode(mode);
     } else {
-        return tagExtractStatus;
+        tags = defaultTagSetForMode(rp.getMode());
     }
 
-    long long maxStalenessSecondsValue;
-    auto maxStalenessSecondsExtractStatus = bsonExtractIntegerFieldWithDefault(
-        readPrefObj, kMaxStalenessSecondsFieldName, 0, &maxStalenessSecondsValue);
+    auto maxStalenessSecondsValue = rp.getMaxStalenessSeconds();
 
-    if (!maxStalenessSecondsExtractStatus.isOK()) {
-        return maxStalenessSecondsExtractStatus;
-    }
-
-    if (maxStalenessSecondsValue && maxStalenessSecondsValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream()
-                          << kMaxStalenessSecondsFieldName << " must be a non-negative integer");
-    }
-
-    if (maxStalenessSecondsValue && maxStalenessSecondsValue >= Seconds::max().count()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kMaxStalenessSecondsFieldName << " value can not exceed "
-                                    << Seconds::max().count());
-    }
-
-    if (maxStalenessSecondsValue && maxStalenessSecondsValue < kMinimalMaxStalenessValue.count()) {
-        return Status(ErrorCodes::MaxStalenessOutOfRange,
-                      str::stream()
-                          << kMaxStalenessSecondsFieldName << " value can not be less than "
-                          << kMinimalMaxStalenessValue.count());
-    }
-
-    if ((mode == ReadPreference::PrimaryOnly) && maxStalenessSecondsValue) {
+    if ((rp.getMode() == ReadPreference::PrimaryOnly) && maxStalenessSecondsValue) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kMaxStalenessSecondsFieldName
                                     << " can not be set for the primary mode");
     }
 
-    return ReadPreferenceSetting(mode, tags, Seconds(maxStalenessSecondsValue), hedgingMode);
+    return ReadPreferenceSetting(
+        rp.getMode(), tags, Seconds(maxStalenessSecondsValue), hedgingMode);
 }
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONElement& elem) {

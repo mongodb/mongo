@@ -82,4 +82,13 @@ StatusWith<int> parseMaxTimeMSOpOnly(BSONElement maxTimeMSElt) {
     return parseMaxTimeMS(maxTimeMSElt,
                           (long long)(INT_MAX) + query_request_helper::kMaxTimeMSOpOnlyMaxPadding);
 }
+
+int parseAndThrowMaxTimeMS(BSONElement maxTimeMSElt) {
+    return parseMaxTimeMS(maxTimeMSElt).getValue();
+}
+
+int parseAndThrowMaxTimeMSOpOnly(BSONElement maxTimeMSElt) {
+    return parseMaxTimeMSOpOnly(maxTimeMSElt).getValue();
+}
+
 }  // namespace mongo

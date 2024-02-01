@@ -27,10 +27,13 @@
 #
 
 global:
-   cpp_namespace: "mongo"
+    cpp_namespace: "mongo"
+    cpp_includes:
+      - "mongo/client/read_preference_validators.h"
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/client/hedging_mode.idl"
 
 enums:
   ReadPreference:
@@ -54,3 +57,29 @@ enums:
           #
           # Read from any member.
           Nearest: "nearest"
+
+
+structs:
+
+  ReadPreferenceStruct:
+      description: Stores commonly used values for ReadPreferenceSetting.
+      strict: false
+      unsafe_dangerous_disable_extra_field_duplicate_checks: true
+      fields:
+        mode:
+          description: Read preference mode.
+          type: ReadPreference
+        hedge:
+          description: Hedging mode determines whether or not hedging is enabled.
+          type: HedgingMode
+          optional: true
+        tags:
+          description: List of tags requested by $readPreference.
+          type: array
+          optional: true
+        maxStalenessSeconds:
+          description: Specifies a maximum replication lag for reads from secondaries.
+          type: safeInt64
+          default: 0
+          validator:
+            callback: validateMaxStalenessSecondsExternal

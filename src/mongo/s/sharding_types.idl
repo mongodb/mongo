@@ -33,6 +33,7 @@ global:
     cpp_includes:
         - "mongo/db/shard_id.h"
         - "mongo/s/database_version.h"
+        - "mongo/s/shard_version.h"
 
 imports:
     - "mongo/db/basic_types.idl"

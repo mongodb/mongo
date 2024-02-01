@@ -210,7 +210,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
     genericReplyUnstable.setOk(1);
     genericReplyUnstable.setDollarConfigTime(Timestamp(1, 1));
     auto clusterTime = ClusterTime();
-    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     genericReplyApiV1.setDollarClusterTime(clusterTime);
     auto configTime = Timestamp(1, 1);
@@ -452,7 +452,7 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
 
     GenericReplyFieldsWithTypesV1 stableFields;
     auto clusterTime = ClusterTime();
-    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     stableFields.setDollarClusterTime(clusterTime);
     GenericReplyFieldsWithTypesUnstableV1 unstableFields;

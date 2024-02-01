@@ -309,7 +309,7 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
 
     GenericReplyFieldsWithTypesV1 stableFields;
     auto clusterTime = ClusterTime();
-    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setClusterTime(Timestamp(2, 3));
     clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     stableFields.setDollarClusterTime(clusterTime);
     GenericReplyFieldsWithTypesUnstableV1 unstableFields;

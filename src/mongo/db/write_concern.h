@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/net/hostandport.h"
@@ -54,7 +55,7 @@ class OpTime;
 /**
  * Returns true if 'cmdObj' has a 'writeConcern' field.
  */
-bool commandSpecifiesWriteConcern(const BSONObj& cmdObj);
+bool commandSpecifiesWriteConcern(const CommonRequestArgs& requestArgs);
 
 /**
  * Attempts to extract a writeConcern from cmdObj.

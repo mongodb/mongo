@@ -232,10 +232,11 @@ public:
         }
     }
 
-    void uassertCommandDoesNotSpecifyWriteConcern(const BSONObj& cmd) const override {
-        if (commandSpecifiesWriteConcern(cmd)) {
-            uasserted(ErrorCodes::InvalidOptions, "Command does not support writeConcern");
-        }
+    void uassertCommandDoesNotSpecifyWriteConcern(
+        const CommonRequestArgs& requestArgs) const override {
+        uassert(ErrorCodes::InvalidOptions,
+                "Command does not support writeConcern",
+                !commandSpecifiesWriteConcern(requestArgs));
     }
 
     void attachCurOpErrInfo(OperationContext* opCtx, const BSONObj& replyObj) const override {

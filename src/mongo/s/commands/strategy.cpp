@@ -58,7 +58,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
@@ -80,6 +79,7 @@
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/db/validate_api_parameters.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -408,6 +408,10 @@ public:
 
     Future<void> run();
 
+    const CommonRequestArgs& getCommonRequestArgs() const {
+        return _requestArgs;
+    }
+
 private:
     class RunInvocation;
     class RunAndRetry;
@@ -429,6 +433,7 @@ private:
     OperationSessionInfoFromClient _osi;
     boost::optional<WriteConcernOptions> _wc;
     boost::optional<bool> _isHello;
+    CommonRequestArgs _requestArgs;
 };
 
 /*
@@ -547,6 +552,8 @@ void ParseAndRunCommand::_parseCommand() {
 
     CommandHelpers::uassertShouldAttemptParse(opCtx, command, request);
 
+    _requestArgs = CommonRequestArgs::parse(IDLParserContext("request"), request.body);
+
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on
     // the OperationContext. Be sure to do this as soon as possible so that further processing by
     // subsequent code has the deadline available. The 'maxTimeMS' option unfortunately has a
@@ -557,24 +564,25 @@ void ParseAndRunCommand::_parseCommand() {
     // maxTimeMS altogether on a getMore command.
     uassert(ErrorCodes::InvalidOptions,
             "no such command option $maxTimeMs; use maxTimeMS instead",
-            request.body[query_request_helper::queryOptionMaxTimeMS].eoo());
+            !_requestArgs.getDollarMaxTimeMS());
 
     // If the command includes a 'comment' field, set it on the current OpCtx.
-    if (auto commentField = request.body["comment"]) {
+    if (auto& commentField = _requestArgs.getComment()) {
         stdx::lock_guard<Client> lk(*client);
-        opCtx->setComment(commentField.wrap());
+        opCtx->setComment(commentField->getElement().wrap());
     }
 
-    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
+    validateAPIParameters(request.body, _requestArgs.getAPIParametersFromClient(), command);
 
     {
         // We must obtain the client lock to set APIParameters on the operation context, as it may
         // be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*client);
-        APIParameters::get(opCtx) = APIParameters::fromClient(apiParamsFromClient);
+        APIParameters::get(opCtx) =
+            APIParameters::fromClient(_requestArgs.getAPIParametersFromClient());
     }
 
-    rpc::readRequestMetadata(opCtx, request, command->requiresAuth());
+    rpc::readRequestMetadata(opCtx, _requestArgs, request, command->requiresAuth());
 
     _invocation = command->parse(opCtx, request);
     CommandInvocation::set(opCtx, _invocation);
@@ -590,8 +598,12 @@ void ParseAndRunCommand::_parseCommand() {
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(nss, command, request.body, _opType);
 
-    _osi = initializeOperationSessionInfo(
-        opCtx, request, command->requiresAuth(), command->attachLogicalSessionsToOpCtx(), true);
+    _osi = initializeOperationSessionInfo(opCtx,
+                                          request.getValidatedTenantId(),
+                                          _requestArgs.getOperationSessionInfoFromClientBase(),
+                                          command->requiresAuth(),
+                                          command->attachLogicalSessionsToOpCtx(),
+                                          true);
 
     auto allowTransactionsOnConfigDatabase =
         !serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer) ||
@@ -618,7 +630,9 @@ void ParseAndRunCommand::_parseCommand() {
         // We must obtain the client lock to set ReadConcernArgs on the operation context, as it may
         // be concurrently read by CurrentOp.
         stdx::lock_guard<Client> lk(*client);
-        readConcernParseStatus = readConcernArgs.initialize(request.body);
+        if (_requestArgs.getReadConcern()) {
+            readConcernParseStatus = readConcernArgs.parse(*_requestArgs.getReadConcern());
+        }
     }
 
     if (!readConcernParseStatus.isOK()) {
@@ -638,9 +652,10 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     auto command = _parc->_rec->getCommand();
     const auto& request = _parc->_rec->getRequest();
     auto replyBuilder = _parc->_rec->getReplyBuilder();
+    auto requestArgs = _parc->getCommonRequestArgs();
 
-    const int maxTimeMS =
-        uassertStatusOK(parseMaxTimeMS(request.body[query_request_helper::cmdOptionMaxTimeMS]));
+    const int maxTimeMS = uassertStatusOK(
+        parseMaxTimeMS(requestArgs.getMaxTimeMS().value_or(IDLAnyType()).getElement()));
     if (maxTimeMS > 0 && command->getLogicalOp() != LogicalOp::opGetMore) {
         opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
     }
@@ -714,7 +729,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     }
 
     bool supportsWriteConcern = invocation->supportsWriteConcern();
-    if (!supportsWriteConcern && request.body.hasField(WriteConcernOptions::kWriteConcernField)) {
+    if (!supportsWriteConcern && requestArgs.getWriteConcern()) {
         // This command doesn't do writes so it should not be passed a writeConcern.
         const auto errorMsg = "Command does not support writeConcern";
         return appendStatusToReplyAndSkipCommandExecution({ErrorCodes::InvalidOptions, errorMsg});
@@ -748,7 +763,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                     5569900,
                     "received command without explicit writeConcern on an internalClient connection {}"_format(
                         redact(request.body.toString())),
-                    request.body.hasField(WriteConcernOptions::kWriteConcernField));
+                    requestArgs.getWriteConcern());
             } else {
                 // This command is not from a DBDirectClient or internal client, and supports WC,
                 // but wasn't given one - so apply the default, if there is one.

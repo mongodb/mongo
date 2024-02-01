@@ -41,6 +41,7 @@
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_gen.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
@@ -79,8 +80,12 @@ Status VectorClockMetadataHook::readReplyMetadata(OperationContext* opCtx,
         }
     }
 
-    VectorClock::get(_service)->gossipIn(
-        opCtx, metadataObj, false /* couldBeUnauthorized */, true /* defaultIsInternalClient */);
+    auto receivedComponents = GossipedVectorClockComponents::parse(
+        IDLParserContext("VectorClockComponents"), metadataObj);
+    VectorClock::get(_service)->gossipIn(opCtx,
+                                         receivedComponents,
+                                         false /* couldBeUnauthorized */,
+                                         true /* defaultIsInternalClient */);
     return Status::OK();
 }
 

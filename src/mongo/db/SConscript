@@ -1224,6 +1224,19 @@ env.Library(
 )
 
 env.Library(
+    target='service_request_common', source=[
+        'common_request_args.idl',
+    ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/session/logical_session_id',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/s/common_s',
+        'api_parameters',
+        'vector_clock',
+    ])
+
+env.Library(
     target='service_entry_point_common',
     source=[
         'service_entry_point_common.cpp',
@@ -1243,7 +1256,6 @@ env.Library(
         'commands/server_status_core',
         'commands/txn_cmd_request',
         'curop_metrics',
-        'initialize_api_parameters',
         'introspect',
         'multitenancy',
         'not_primary_error_tracker',
@@ -1252,6 +1264,7 @@ env.Library(
         'repl/tenant_migration_access_blocker',
         'rw_concern_d',
         'server_feature_flags',
+        'service_request_common',
         'session/session_catalog_mongod',
         'shared_request_handling',
         'stats/api_version_metrics',
@@ -1263,6 +1276,7 @@ env.Library(
         'storage/storage_engine_lock_file',
         'storage/storage_engine_metadata',
         'transaction/transaction',
+        'validate_api_parameters',
         'write_block_bypass',
     ],
 )
@@ -1990,9 +2004,9 @@ env.Library(
 )
 
 env.Library(
-    target='initialize_api_parameters',
+    target='validate_api_parameters',
     source=[
-        'initialize_api_parameters.cpp',
+        'validate_api_parameters.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/transport/transport_layer_common',

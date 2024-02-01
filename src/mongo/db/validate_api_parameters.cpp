@@ -41,8 +41,8 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/validate_api_parameters.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
@@ -52,12 +52,11 @@
 
 namespace mongo {
 
-APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command) {
-    auto apiParamsFromClient =
-        APIParametersFromClient::parse(IDLParserContext{"APIParametersFromClient"}, requestBody);
-
+void validateAPIParameters(const BSONObj& requestBody,
+                           const APIParametersFromClient& apiParamsFromClient,
+                           Command* command) {
     if (command->skipApiVersionCheck()) {
-        return apiParamsFromClient;
+        return;
     }
 
     if (apiParamsFromClient.getApiDeprecationErrors() || apiParamsFromClient.getApiStrict()) {
@@ -67,7 +66,7 @@ APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Comm
     }
 
     if (apiParamsFromClient.getApiVersion()) {
-        auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value();
+        auto apiVersionFromClient = *apiParamsFromClient.getApiVersion();
         if (apiVersionFromClient == "2") {
             uassert(ErrorCodes::APIVersionError, "Cannot accept API version 2", acceptApiVersion2);
         } else {
@@ -77,43 +76,49 @@ APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Comm
         }
     }
 
-    if (apiParamsFromClient.getApiStrict().get_value_or(false)) {
+    if (apiParamsFromClient.getApiStrict() && *apiParamsFromClient.getApiStrict()) {
         auto cmdApiVersions = command->apiVersions();
-        auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value().toString();
+        auto apiVersionFromClient = apiParamsFromClient.getApiVersion()->toString();
         bool strictAssert = (cmdApiVersions.find(apiVersionFromClient) != cmdApiVersions.end());
-        uassert(
-            ErrorCodes::APIStrictError,
-            str::stream() << "Provided apiStrict:true, but the command " << command->getName()
-                          << " is not in API Version " << apiVersionFromClient
-                          << ". Information on supported commands and migrations in API Version "
-                          << apiVersionFromClient
-                          << " can be found at "
-                             "https://dochub.mongodb.org/core/manual-versioned-api",
-            strictAssert);
+        uassert(ErrorCodes::APIStrictError,
+                fmt::format("Provided apiStrict:true, but the command {} is not in API Version {}. "
+                            "Information on supported commands and migrations in API Version {} "
+                            "can be found at https://dochub.mongodb.org/core/manual-versioned-api.",
+                            command->getName(),
+                            apiVersionFromClient,
+                            apiVersionFromClient),
+                strictAssert);
         bool strictDoesntWriteToSystemJS =
             !(command->getReadWriteType() == BasicCommand::ReadWriteType::kWrite &&
               requestBody.firstElementType() == BSONType::String &&
               requestBody.firstElement().String() == "system.js");
         uassert(ErrorCodes::APIStrictError,
-                str::stream() << "Provided apiStrict:true, but the command " << command->getName()
-                              << " attempts to write to system.js",
+                fmt::format(
+                    "Provided apiStrict:true, but the command {} attempts to write to system.js.",
+                    command->getName()),
                 strictDoesntWriteToSystemJS);
     }
 
     if (apiParamsFromClient.getApiDeprecationErrors().get_value_or(false)) {
         auto cmdDepApiVersions = command->deprecatedApiVersions();
-        auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value().toString();
-
+        auto apiVersionFromClient = apiParamsFromClient.getApiVersion()->toString();
         bool deprecationAssert =
             (cmdDepApiVersions.find(apiVersionFromClient) == cmdDepApiVersions.end());
         uassert(ErrorCodes::APIDeprecationError,
-                str::stream() << "Provided apiDeprecationErrors:true, but the command "
-                              << command->getName() << " is deprecated in API Version "
-                              << apiVersionFromClient,
+                fmt::format("Provided apiDeprecationErrors:true, but the command {} is deprecated "
+                            "in API Version {}.",
+                            command->getName(),
+                            apiVersionFromClient),
                 deprecationAssert);
     }
+}
 
-    return apiParamsFromClient;
+APIParametersFromClient parseAndValidateAPIParameters(const BSONObj& requestBody,
+                                                      Command* command) {
+    auto apiParams =
+        APIParametersFromClient::parse(IDLParserContext{"APIParametersFromClient"}, requestBody);
+    validateAPIParameters(requestBody, apiParams, command);
+    return apiParams;
 }
 
 void enforceRequireAPIVersion(OperationContext* opCtx, Command* command) {

@@ -112,7 +112,7 @@ struct ReadPreferenceSetting {
     /**
      * The minimal value maxStalenessSeconds can have.
      */
-    static const Seconds kMinimalMaxStalenessValue;
+    static constexpr Seconds kMinimalMaxStalenessValue = Seconds(90);
 
     /**
      * An object representing the metadata generated for a SecondaryPreferred read preference:

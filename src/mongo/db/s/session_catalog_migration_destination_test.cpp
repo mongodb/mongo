@@ -288,8 +288,11 @@ public:
                 DatabaseName::createDatabaseName_forTest(boost::none, "test_unused_dbname"),
                 insertBuilder.obj(),
                 BSONObj());
+            auto osi = OperationSessionInfoFromClient::parse(
+                IDLParserContext{"OperationSessionInfo"}, opMsgRequest.body);
             initializeOperationSessionInfo(innerOpCtx.get(),
-                                           opMsgRequest,
+                                           opMsgRequest.getValidatedTenantId(),
+                                           osi,
                                            true /* requiresAuth */,
                                            true /* attachToOpCtx */,
                                            true /* isReplSetMemberOrMongos */);

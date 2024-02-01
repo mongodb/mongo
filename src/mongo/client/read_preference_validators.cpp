@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,40 @@
  *    it in the license file.
  */
 
+#include <fmt/format.h>
 
-#pragma once
+#include "mongo/base/status.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/duration.h"
 
-#include <cstdint>
-
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 
-/**
- * Parses maxTimeMS from the BSONElement containing its value.
- *
- * Ensures the value is within the range [0, maxValue].
- */
-StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt, long long maxValue = INT_MAX);
+constexpr char kMaxStalenessSecondsFieldName[] = "maxStalenessSeconds";
 
-/**
- * Parses maxTimeMSOpOnly from the BSONElement containing its value.
- *
- * 'maxTimeMSOpOnly' needs a slightly higher max value than regular 'maxTimeMS' to account for
- * the case where a user provides the max possible value for 'maxTimeMS' to one server process
- * (mongod or mongos), then that server process passes the max time on to another server as
- * 'maxTimeMSOpOnly', but after adding a small amount to the max time to account for clock
- * precision.  This can push the 'maxTimeMSOpOnly' sent to the mongod over the max value allowed
- * for users to provide. This is safe because 'maxTimeMSOpOnly' is only allowed to be provided
- * for internal intra-cluster requests.
- *
- * Thus, this method ensures the value is within the range [0, INT_MAX+kMaxTimeMSOpOnlyMaxPadding]
- */
-StatusWith<int> parseMaxTimeMSOpOnly(BSONElement maxTimeMSElt);
+Status validateMaxStalenessSecondsExternal(const std::int64_t maxStalenessSeconds) {
+    if (!maxStalenessSeconds) {
+        return Status::OK();
+    }
 
-/**
- * Returns the provided, valid maxTimeMS or throws.
- */
-int parseAndThrowMaxTimeMS(BSONElement maxTimeMSElt);
-
-/**
- * Returns the provided, valid maxTimeMSOpOnly or throws.
- */
-int parseAndThrowMaxTimeMSOpOnly(BSONElement maxTimeMSElt);
+    if (MONGO_unlikely(maxStalenessSeconds < 0)) {
+        return Status(
+            ErrorCodes::BadValue,
+            fmt::format("{} must be a non-negative integer", kMaxStalenessSecondsFieldName));
+    } else if (MONGO_unlikely(maxStalenessSeconds >= Seconds::max().count())) {
+        return Status(ErrorCodes::BadValue,
+                      fmt::format("{} value cannot exceed {}",
+                                  kMaxStalenessSecondsFieldName,
+                                  Seconds::max().count()));
+    } else if (MONGO_unlikely(maxStalenessSeconds <
+                              ReadPreferenceSetting::kMinimalMaxStalenessValue.count())) {
+        return Status(ErrorCodes::MaxStalenessOutOfRange,
+                      fmt::format("{} value cannot be less than {}",
+                                  kMaxStalenessSecondsFieldName,
+                                  ReadPreferenceSetting::kMinimalMaxStalenessValue.count()));
+    }
+    return Status::OK();
+}
 
 }  // namespace mongo

@@ -31,7 +31,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/initialize_api_parameters.h"
+#include "mongo/db/validate_api_parameters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
@@ -70,7 +70,7 @@ void runCommand(OperationContext* opCtx,
             str::stream() << "Invalid database name: '" << dbname << "'",
             DatabaseName::validDBName(dbname, DatabaseName::DollarInDbNameBehavior::Allow));
 
-    const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
+    const auto apiParamsFromClient = parseAndValidateAPIParameters(request.body, command);
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setCommand_inlock(command);

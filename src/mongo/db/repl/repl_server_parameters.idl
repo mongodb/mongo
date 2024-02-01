@@ -32,6 +32,7 @@ global:
     cpp_namespace: "mongo::repl"
     cpp_includes:
       - "mongo/client/read_preference.h"
+      - "mongo/client/read_preference_validators.h"
 
 imports:
     - "mongo/db/basic_types.idl"

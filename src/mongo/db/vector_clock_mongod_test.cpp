@@ -231,12 +231,12 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
     auto dummySignature =
         BSON("hash" << BSONBinData("\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1", 20, BinDataGeneral)
                     << "keyId" << 0);
-    vc->gossipIn(nullptr,
-                 BSON("$clusterTime"
-                      << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2)),
-                 false,
-                 true);
+    auto timepointsObj = BSON(
+        "$clusterTime" << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
+                       << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
+    auto timepoints = GossipedVectorClockComponents::parse(
+        IDLParserContext("VectorClockComponents"), timepointsObj);
+    vc->gossipIn(nullptr, timepoints, false, true);
 
     // On plain replset servers, gossip in from internal clients should update $clusterTime, but not
     // $configTime or $topologyTime.
@@ -245,24 +245,24 @@ TEST_F(VectorClockMongoDTest, GossipInInternal) {
     ASSERT_EQ(afterTime.configTime(), VectorClock::kInitialComponentTime);
     ASSERT_EQ(afterTime.topologyTime(), VectorClock::kInitialComponentTime);
 
-    vc->gossipIn(nullptr,
-                 BSON("$clusterTime"
-                      << BSON("clusterTime" << Timestamp(1, 1) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1)),
-                 false,
-                 true);
+    timepointsObj = BSON("$clusterTime"
+                         << BSON("clusterTime" << Timestamp(1, 1) << "signature" << dummySignature)
+                         << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1));
+    timepoints = GossipedVectorClockComponents::parse(IDLParserContext("VectorClockComponents"),
+                                                      timepointsObj);
+    vc->gossipIn(nullptr, timepoints, false, true);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
     ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
     ASSERT_EQ(afterTime2.topologyTime(), VectorClock::kInitialComponentTime);
 
-    vc->gossipIn(nullptr,
-                 BSON("$clusterTime"
-                      << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3)),
-                 false,
-                 true);
+    timepointsObj = BSON("$clusterTime"
+                         << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
+                         << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3));
+    timepoints = GossipedVectorClockComponents::parse(IDLParserContext("VectorClockComponents"),
+                                                      timepointsObj);
+    vc->gossipIn(nullptr, timepoints, false, true);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
@@ -279,11 +279,12 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     auto dummySignature =
         BSON("hash" << BSONBinData("\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1\1", 20, BinDataGeneral)
                     << "keyId" << 0);
-    vc->gossipIn(nullptr,
-                 BSON("$clusterTime"
-                      << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2)),
-                 false);
+    auto timepointsObj = BSON(
+        "$clusterTime" << BSON("clusterTime" << Timestamp(2, 2) << "signature" << dummySignature)
+                       << "$configTime" << Timestamp(2, 2) << "$topologyTime" << Timestamp(2, 2));
+    auto timepoints = GossipedVectorClockComponents::parse(
+        IDLParserContext("VectorClockComponents"), timepointsObj);
+    vc->gossipIn(nullptr, timepoints, false);
 
     // On plain replset servers, gossip in from external clients should update $clusterTime, but not
     // $configTime or $topologyTime.
@@ -292,22 +293,24 @@ TEST_F(VectorClockMongoDTest, GossipInExternal) {
     ASSERT_EQ(afterTime.configTime(), VectorClock::kInitialComponentTime);
     ASSERT_EQ(afterTime.topologyTime(), VectorClock::kInitialComponentTime);
 
-    vc->gossipIn(nullptr,
-                 BSON("$clusterTime"
-                      << BSON("clusterTime" << Timestamp(1, 1) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1)),
-                 false);
+    timepointsObj = BSON("$clusterTime"
+                         << BSON("clusterTime" << Timestamp(1, 1) << "signature" << dummySignature)
+                         << "$configTime" << Timestamp(1, 1) << "$topologyTime" << Timestamp(1, 1));
+    timepoints = GossipedVectorClockComponents::parse(IDLParserContext("VectorClockComponents"),
+                                                      timepointsObj);
+    vc->gossipIn(nullptr, timepoints, false);
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
     ASSERT_EQ(afterTime2.configTime(), VectorClock::kInitialComponentTime);
     ASSERT_EQ(afterTime2.topologyTime(), VectorClock::kInitialComponentTime);
 
-    vc->gossipIn(nullptr,
-                 BSON("$clusterTime"
-                      << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
-                      << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3)),
-                 false);
+    timepointsObj = BSON("$clusterTime"
+                         << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
+                         << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3));
+    timepoints = GossipedVectorClockComponents::parse(IDLParserContext("VectorClockComponents"),
+                                                      timepointsObj);
+    vc->gossipIn(nullptr, timepoints, false);
 
     auto afterTime3 = vc->getTime();
     ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));

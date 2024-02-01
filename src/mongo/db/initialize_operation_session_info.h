@@ -52,10 +52,12 @@ namespace mongo {
  * isReplSetMemberOrMongos needs to be true if the command contains a transaction number, otherwise
  * this function will throw.
  */
-OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
-                                                              const OpMsgRequest& opMsgRequest,
-                                                              bool requiresAuth,
-                                                              bool attachToOpCtx,
-                                                              bool isReplSetMemberOrMongos);
+OperationSessionInfoFromClient initializeOperationSessionInfo(
+    OperationContext* opCtx,
+    const boost::optional<TenantId>& validatedTenantId,
+    const OperationSessionInfoFromClientBase& osi,
+    bool requiresAuth,
+    bool attachToOpCtx,
+    bool isReplSetMemberOrMongos);
 
 }  // namespace mongo

@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
@@ -156,21 +157,37 @@ public:
         out->append(_fieldName, time.asTimestamp());
         return true;
     }
+};
+
+LogicalTime fromOptionalTimestamp(const boost::optional<Timestamp>& time) {
+    return time ? LogicalTime(*time) : LogicalTime();
+}
+
+class VectorClock::ConfigTimeComponent : public VectorClock::PlainComponentFormat {
+public:
+    ConfigTimeComponent() : PlainComponentFormat(VectorClock::kConfigTimeFieldName) {}
+    virtual ~ConfigTimeComponent() = default;
 
     LogicalTime in(ServiceContext* service,
                    OperationContext* opCtx,
-                   const BSONObj& in,
+                   const GossipedVectorClockComponents& timepoints,
                    bool couldBeUnauthenticated,
                    Component component) const override {
-        const auto componentElem(in[_fieldName]);
-        if (componentElem.eoo()) {
-            // Nothing to gossip in.
-            return LogicalTime();
-        }
-        uassert(ErrorCodes::BadValue,
-                str::stream() << _fieldName << " is not a Timestamp",
-                componentElem.type() == bsonTimestamp);
-        return LogicalTime(componentElem.timestamp());
+        return fromOptionalTimestamp(timepoints.getDollarConfigTime());
+    }
+};
+
+class VectorClock::TopologyTimeComponent : public VectorClock::PlainComponentFormat {
+public:
+    TopologyTimeComponent() : PlainComponentFormat(VectorClock::kTopologyTimeFieldName) {}
+    virtual ~TopologyTimeComponent() = default;
+
+    LogicalTime in(ServiceContext* service,
+                   OperationContext* opCtx,
+                   const GossipedVectorClockComponents& timepoints,
+                   bool couldBeUnauthenticated,
+                   Component component) const override {
+        return fromOptionalTimestamp(timepoints.getDollarTopologyTime());
     }
 };
 
@@ -230,38 +247,24 @@ public:
 
     LogicalTime in(ServiceContext* service,
                    OperationContext* opCtx,
-                   const BSONObj& in,
+                   const GossipedVectorClockComponents& timepoints,
                    bool couldBeUnauthenticated,
                    Component component) const override {
-        const auto& metadataElem = in.getField(_fieldName);
-        if (metadataElem.eoo()) {
+        if (!timepoints.getDollarClusterTime()) {
             // Nothing to gossip in.
             return LogicalTime();
         }
 
-        const auto& obj = metadataElem.Obj();
+        auto& clusterTime = *(timepoints.getDollarClusterTime());
+        Timestamp ts = clusterTime.getClusterTime();
 
-        Timestamp ts;
-        uassertStatusOK(bsonExtractTimestampField(obj, kClusterTimeFieldName, &ts));
-
-        BSONElement signatureElem;
-        uassertStatusOK(bsonExtractTypedField(obj, kSignatureFieldName, Object, &signatureElem));
-
-        const auto& signatureObj = signatureElem.Obj();
-
-        // Extract BinData type signature hash and construct a SHA1Block instance from it.
-        BSONElement hashElem;
-        uassertStatusOK(
-            bsonExtractTypedField(signatureObj, kSignatureHashFieldName, BinData, &hashElem));
-
-        int hashLength = 0;
-        auto rawBinSignature = hashElem.binData(hashLength);
-        BSONBinData proofBinData(rawBinSignature, hashLength, hashElem.binDataType());
+        auto hashCDR = clusterTime.getSignature()->getHash();
+        auto hashLength = hashCDR.length();
+        auto rawBinSignature = reinterpret_cast<const unsigned char*>(hashCDR.data());
+        BSONBinData proofBinData(rawBinSignature, hashLength, BinDataType::BinDataGeneral);
         auto proofStatus = SHA1Block::fromBinData(proofBinData);
-        uassertStatusOK(proofStatus);
 
-        long long keyId;
-        uassertStatusOK(bsonExtractIntegerField(signatureObj, kSignatureKeyIdFieldName, &keyId));
+        long long keyId = clusterTime.getSignature()->getKeyId();
 
         auto signedTime =
             SignedLogicalTime(LogicalTime(ts), std::move(proofStatus.getValue()), keyId);
@@ -309,8 +312,8 @@ private:
 const VectorClock::ComponentArray<std::unique_ptr<VectorClock::ComponentFormat>>
     VectorClock::_gossipFormatters{
         std::make_unique<VectorClock::SignedComponentFormat>(VectorClock::kClusterTimeFieldName),
-        std::make_unique<VectorClock::PlainComponentFormat>(VectorClock::kConfigTimeFieldName),
-        std::make_unique<VectorClock::PlainComponentFormat>(VectorClock::kTopologyTimeFieldName)};
+        std::make_unique<VectorClock::ConfigTimeComponent>(),
+        std::make_unique<VectorClock::TopologyTimeComponent>()};
 
 bool VectorClock::gossipOut(OperationContext* opCtx,
                             BSONObjBuilder* outMessage,
@@ -344,7 +347,7 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
 }
 
 void VectorClock::gossipIn(OperationContext* opCtx,
-                           const BSONObj& inMessage,
+                           const GossipedVectorClockComponents& timepoints,
                            bool couldBeUnauthenticated,
                            bool defaultIsInternalClient) {
     if (!isEnabled()) {
@@ -364,7 +367,7 @@ void VectorClock::gossipIn(OperationContext* opCtx,
 
     LogicalTimeArray newTime;
     for (auto component : toGossip) {
-        _gossipInComponent(opCtx, inMessage, couldBeUnauthenticated, &newTime, component);
+        _gossipInComponent(opCtx, timepoints, couldBeUnauthenticated, &newTime, component);
     }
     // Since the times in LogicalTimeArray are default constructed (ie. to Timestamp(0, 0)), any
     // component not present in the input BSONObj won't be advanced.
@@ -381,12 +384,12 @@ bool VectorClock::_gossipOutComponent(OperationContext* opCtx,
 }
 
 void VectorClock::_gossipInComponent(OperationContext* opCtx,
-                                     const BSONObj& in,
+                                     const GossipedVectorClockComponents& timepoints,
                                      bool couldBeUnauthenticated,
                                      LogicalTimeArray* newTime,
                                      Component component) {
-    (*newTime)[component] =
-        _gossipFormatters[component]->in(_service, opCtx, in, couldBeUnauthenticated, component);
+    (*newTime)[component] = _gossipFormatters[component]->in(
+        _service, opCtx, timepoints, couldBeUnauthenticated, component);
 }
 
 std::string VectorClock::_componentName(Component component) {

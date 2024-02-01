@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,31 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
-#include <cstdint>
+#include "api_parameters.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/api_parameters_gen.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-/**
- * Parses maxTimeMS from the BSONElement containing its value.
- *
- * Ensures the value is within the range [0, maxValue].
- */
-StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt, long long maxValue = INT_MAX);
+class BSONObj;
+class Command;
+class OperationContext;
 
 /**
- * Parses maxTimeMSOpOnly from the BSONElement containing its value.
- *
- * 'maxTimeMSOpOnly' needs a slightly higher max value than regular 'maxTimeMS' to account for
- * the case where a user provides the max possible value for 'maxTimeMS' to one server process
- * (mongod or mongos), then that server process passes the max time on to another server as
- * 'maxTimeMSOpOnly', but after adding a small amount to the max time to account for clock
- * precision.  This can push the 'maxTimeMSOpOnly' sent to the mongod over the max value allowed
- * for users to provide. This is safe because 'maxTimeMSOpOnly' is only allowed to be provided
- * for internal intra-cluster requests.
- *
- * Thus, this method ensures the value is within the range [0, INT_MAX+kMaxTimeMSOpOnlyMaxPadding]
+ * Validates the provided API parameters, unless not required for the specified command,
+ * and throws if the validation fails.
  */
-StatusWith<int> parseMaxTimeMSOpOnly(BSONElement maxTimeMSElt);
+void validateAPIParameters(const BSONObj& requestBody,
+                           const APIParametersFromClient& apiParamsFromClient,
+                           Command* command);
+APIParametersFromClient parseAndValidateAPIParameters(const BSONObj& requestBody, Command* command);
 
 /**
- * Returns the provided, valid maxTimeMS or throws.
+ * If the server parameter "requireApiVersion" is set, enforce it.
  */
-int parseAndThrowMaxTimeMS(BSONElement maxTimeMSElt);
-
-/**
- * Returns the provided, valid maxTimeMSOpOnly or throws.
- */
-int parseAndThrowMaxTimeMSOpOnly(BSONElement maxTimeMSElt);
-
+void enforceRequireAPIVersion(OperationContext* opCtx, Command* command);
 }  // namespace mongo

@@ -484,7 +484,7 @@ void ClientMetadata::setAndFinalize(Client* client, boost::optional<ClientMetada
     state.meta = std::move(meta);
 }
 
-void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem) {
+void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, const BSONElement& elem) {
     if (MONGO_unlikely(elem.eoo())) {
         return;
     }
@@ -534,7 +534,7 @@ void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem, bool isI
     state.meta = std::move(meta);
 }
 
-boost::optional<ClientMetadata> ClientMetadata::readFromMetadata(BSONElement& element) {
+boost::optional<ClientMetadata> ClientMetadata::readFromMetadata(const BSONElement& element) {
     return uassertStatusOK(ClientMetadata::parse(element));
 }
 

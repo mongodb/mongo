@@ -85,8 +85,8 @@ static CounterMetric gleDefaultUnsatisfiable("getLastError.default.unsatisfiable
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
 
-bool commandSpecifiesWriteConcern(const BSONObj& cmdObj) {
-    return cmdObj.hasField(WriteConcernOptions::kWriteConcernField);
+bool commandSpecifiesWriteConcern(const CommonRequestArgs& requestArgs) {
+    return !!requestArgs.getWriteConcern();
 }
 
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,

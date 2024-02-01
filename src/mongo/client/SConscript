@@ -35,6 +35,18 @@ env.Library(
 
 env.Library(
     target=[
+        'read_preference_validators',
+    ],
+    source=[
+        'read_preference_validators.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target=[
         'read_preference',
     ],
     source=[
@@ -45,6 +57,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/service_context',
+        'read_preference_validators',
     ],
 )
 

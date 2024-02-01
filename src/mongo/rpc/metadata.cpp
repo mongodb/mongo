@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/vector_clock.h"
@@ -67,45 +68,22 @@ BSONObj makeEmptyMetadata() {
     return BSONObj();
 }
 
-void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRequiresAuth) {
-    BSONElement readPreferenceElem;
-    BSONElement trackingElem;
-    BSONElement clientElem;
-    BSONElement helloClientElem;
-    BSONElement impersonationElem;
-    BSONElement clientOperationKeyElem;
-    BSONElement mayBypassWriteBlockingElem;
-
-    for (const auto& metadataElem : opMsg.body) {
-        auto fieldName = metadataElem.fieldNameStringData();
-        if (fieldName == "$readPreference") {
-            readPreferenceElem = metadataElem;
-        } else if (fieldName == ClientMetadata::fieldName()) {
-            clientElem = metadataElem;
-        } else if (fieldName == TrackingMetadata::fieldName()) {
-            trackingElem = metadataElem;
-        } else if (fieldName == kImpersonationMetadataSectionName) {
-            impersonationElem = metadataElem;
-        } else if (fieldName == "clientOperationKey"_sd) {
-            clientOperationKeyElem = metadataElem;
-        } else if (fieldName == WriteBlockBypass::fieldName()) {
-            mayBypassWriteBlockingElem = metadataElem;
-        }
-    }
-
+void readRequestMetadata(OperationContext* opCtx,
+                         const CommonRequestArgs& requestArgs,
+                         const OpMsgRequest& request,
+                         bool cmdRequiresAuth) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
-    if (clientOperationKeyElem &&
+    if (requestArgs.getClientOperationKey() &&
         (TestingProctor::instance().isEnabled() ||
          authSession->isAuthorizedForActionsOnResource(
-             ResourcePattern::forClusterResource(opMsg.getValidatedTenantId()),
+             ResourcePattern::forClusterResource(request.getValidatedTenantId()),
              ActionType::internal))) {
-        auto opKey = uassertStatusOK(UUID::parse(clientOperationKeyElem));
         {
             // We must obtain the client lock to set the OperationKey on the operation context as
             // it may be concurrently read by CurrentOp.
             stdx::lock_guard lg(*opCtx->getClient());
-            opCtx->setOperationKey(std::move(opKey));
+            opCtx->setOperationKey(std::move(*requestArgs.getClientOperationKey()));
         }
         failIfOperationKeyMismatch.execute([&](const BSONObj& data) {
             tassert(7446600,
@@ -115,33 +93,41 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
         });
     }
 
-    if (readPreferenceElem) {
-        ReadPreferenceSetting::get(opCtx) =
-            uassertStatusOK(ReadPreferenceSetting::fromInnerBSON(readPreferenceElem));
+    if (requestArgs.getReadPreference()) {
+        ReadPreferenceSetting::get(opCtx) = uassertStatusOK(
+            ReadPreferenceSetting::fromInnerBSON(requestArgs.getReadPreference()->getElement()));
     }
 
-    readImpersonatedUserMetadata(impersonationElem, opCtx);
+    readImpersonatedUserMetadata(requestArgs.getImpersonation().value_or(IDLAnyType()).getElement(),
+                                 opCtx);
 
     invariant(!auth::ValidatedTenancyScope::get(opCtx).has_value() ||
-              (opMsg.validatedTenancyScope &&
-               *auth::ValidatedTenancyScope::get(opCtx) == *opMsg.validatedTenancyScope));
+              (request.validatedTenancyScope &&
+               *auth::ValidatedTenancyScope::get(opCtx) == *request.validatedTenancyScope));
 
-    auth::ValidatedTenancyScope::set(opCtx, opMsg.validatedTenancyScope);
+    auth::ValidatedTenancyScope::set(opCtx, request.validatedTenancyScope);
 
     // We check for "$client" but not "client" here, because currentOp can filter on "client" as
     // a top-level field.
-    if (clientElem) {
+    if (requestArgs.getClientMetadata()) {
         // The '$client' field is populated by mongos when it sends requests to shards on behalf of
         // its own requests. This may or may not be relevant for SERVER-50804.
-        ClientMetadata::setFromMetadataForOperation(opCtx, clientElem);
+        ClientMetadata::setFromMetadataForOperation(opCtx,
+                                                    requestArgs.getClientMetadata()->getElement());
     }
 
-    TrackingMetadata::get(opCtx) =
-        uassertStatusOK(TrackingMetadata::readFromMetadata(trackingElem));
+    if (auto ti = requestArgs.getTracking_info()) {
+        TrackingMetadata::get(opCtx) =
+            uassertStatusOK(TrackingMetadata::readFromMetadata(ti->getElement()));
+    } else {
+        TrackingMetadata::get(opCtx) = {};
+    }
 
-    VectorClock::get(opCtx)->gossipIn(opCtx, opMsg.body, !cmdRequiresAuth);
+    VectorClock::get(opCtx)->gossipIn(
+        opCtx, requestArgs.getGossipedVectorClockComponents(), !cmdRequiresAuth);
 
-    WriteBlockBypass::get(opCtx).setFromMetadata(opCtx, mayBypassWriteBlockingElem);
+    WriteBlockBypass::get(opCtx).setFromMetadata(
+        opCtx, requestArgs.getMayBypassWriteBlocking().value_or(IDLAnyType()).getElement());
 }
 
 namespace {

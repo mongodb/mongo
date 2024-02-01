@@ -245,14 +245,14 @@ public:
      * This function is only valid to invoke if you are on the Client's thread. This function takes
      * the Client lock.
      */
-    static void setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem);
+    static void setFromMetadataForOperation(OperationContext* opCtx, const BSONElement& elem);
 
     /**
      * Read from the $client field in requests.
      *
      * Throws an error if the $client section is not valid. It is valid for it to not exist though.
      */
-    static boost::optional<ClientMetadata> readFromMetadata(BSONElement& elem);
+    static boost::optional<ClientMetadata> readFromMetadata(const BSONElement& elem);
 
     /**
      * Write the $client section to request bodies if there is a non-empty client metadata

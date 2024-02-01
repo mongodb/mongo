@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,26 +29,11 @@
 
 #pragma once
 
-#include "api_parameters.h"
+#include "mongo/base/status.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/api_parameters_gen.h"
-#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-class BSONObj;
-class Command;
-class OperationContext;
+Status validateMaxStalenessSecondsExternal(std::int64_t maxStalenessSeconds);
 
-/**
- * Parse a command's API Version parameters from a request and store the apiVersion,
- * apiStrict, and apiDeprecationErrors fields.
- */
-APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody, Command* command);
-
-/**
- * If the server parameter "requireApiVersion" is set, enforce it.
- */
-void enforceRequireAPIVersion(OperationContext* opCtx, Command* command);
 }  // namespace mongo
