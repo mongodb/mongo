@@ -339,7 +339,9 @@ buildvariants:
   - name: feature_flag_multiversion_gen
   - name: idl_tests
   - name: index_filters_to_query_settings
-  - name: cursor_hints_to_query_settings
+  - name: cursor_hints_to_query_settings_replset_passthrough
+  - name: cursor_hints_to_query_settings_sharded_collections_passthrough
+  - name: cursor_hints_to_query_settings_unsharded_collections_passthrough
   - name: initial_sync_fuzzer_gen
   - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: fcv_upgrade_downgrade_sharding_jscore_passthrough_gen

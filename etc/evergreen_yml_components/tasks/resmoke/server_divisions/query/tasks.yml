@@ -460,7 +460,21 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: cursor_hints_to_query_settings
+  name: cursor_hints_to_query_settings_replset_passthrough
+  tags: ["assigned_to_jira_team_server_query_execution"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: cursor_hints_to_query_settings_sharded_collections_passthrough
+  tags: ["assigned_to_jira_team_server_query_execution"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: cursor_hints_to_query_settings_unsharded_collections_passthrough
   tags: ["assigned_to_jira_team_server_query_execution"]
   commands:
   - func: "do setup"

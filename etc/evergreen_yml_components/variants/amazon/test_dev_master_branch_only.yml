@@ -228,7 +228,9 @@ buildvariants:
   - name: query_stats_mongos_aggregation_passthrough
   - name: query_stats_mongos_passthrough
   - name: query_stats_passthrough
-  - name: cursor_hints_to_query_settings
+  - name: cursor_hints_to_query_settings_replset_passthrough
+  - name: cursor_hints_to_query_settings_sharded_collections_passthrough
+  - name: cursor_hints_to_query_settings_unsharded_collections_passthrough
   - name: index_filters_to_query_settings
 
 - &enterprise-amazon-linux2-arm64-all-feature-flags-fuzzers

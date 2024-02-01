@@ -13,6 +13,9 @@ selector:
     # TODO SERVER-85242 Re-enable once the fallback mechanism also covers runtime planning errors.
     - jstests/core/query/or/orj.js
 
+    # TODO SERVER-81601 Re-enable once query settings support views.
+    - jstests/core/timeseries/**/*.js
+
     # Query settings do not force indexes, and therefore empty filter will result in collection scans.
     - jstests/core/index/geo/geo6.js
     - jstests/core/index/index_check6.js
@@ -44,15 +47,10 @@ selector:
     - jstests/core/index/indext.js
     - jstests/core/index/sparse_index_internal_expr.js
     - jstests/core/query/exists/existsa.js
-    # Similar to the above, column store indexes cannot be forced using query settings.
+    # Similar to the above, column store and timeseries indexes cannot be forced using query settings.
     - jstests/core/columnstore/columnstore_index_correctness.js
 
     - jstests/core/query/query_settings/**/*.js
-    - jstests/core/timeseries/**/*.js
-
-    # Tests which are not supported on standalone.
-    - jstests/core/queryable_encryption/**/*.js
-    - jstests/core/txns/**/*.js
   exclude_with_any_tags:
     - assumes_standalone_mongod
     - requires_profiling
