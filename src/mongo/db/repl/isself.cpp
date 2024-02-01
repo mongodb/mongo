@@ -82,8 +82,7 @@
 
 #elif defined(_WIN32)
 #include <Ws2tcpip.h>
-#include <boost/asio/detail/socket_ops.hpp>  // IWYU pragma: keep
-#include <boost/system/error_code.hpp>
+#include <asio.hpp>  // IWYU pragma: keep
 #include <iphlpapi.h>
 #include <winsock2.h>
 #endif  // defined(_WIN32)
@@ -405,9 +404,9 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                 // IPv4
                 SOCKADDR_IN* sock = reinterpret_cast<SOCKADDR_IN*>(addr->Address.lpSockaddr);
                 char addrstr[INET_ADDRSTRLEN] = {0};
-                boost::system::error_code ec;
+                asio::error_code ec;
                 // Not all windows versions have inet_ntop
-                boost::asio::detail::socket_ops::inet_ntop(
+                asio::detail::socket_ops::inet_ntop(
                     AF_INET, &(sock->sin_addr), addrstr, INET_ADDRSTRLEN, 0, ec);
                 if (ec) {
                     LOGV2_WARNING(21213,
@@ -420,8 +419,8 @@ std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
                 // IPv6
                 SOCKADDR_IN6* sock = reinterpret_cast<SOCKADDR_IN6*>(addr->Address.lpSockaddr);
                 char addrstr[INET6_ADDRSTRLEN] = {0};
-                boost::system::error_code ec;
-                boost::asio::detail::socket_ops::inet_ntop(
+                asio::error_code ec;
+                asio::detail::socket_ops::inet_ntop(
                     AF_INET6, &(sock->sin6_addr), addrstr, INET6_ADDRSTRLEN, 0, ec);
                 if (ec) {
                     LOGV2_WARNING(21214,

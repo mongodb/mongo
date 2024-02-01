@@ -492,7 +492,9 @@ env.Library(
     ],
 )
 
-env.Library(
+isSelfEnv = env.Clone()
+isSelfEnv.InjectThirdParty(libraries=['asio'])
+isSelfEnv.Library(
     target="isself",
     source=[
         'isself.cpp',
