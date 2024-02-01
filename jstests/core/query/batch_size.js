@@ -83,8 +83,8 @@ assert.eq(15, explain.executionStats.nReturned);
 explain = coll.find({a: {$gte: 85}}).sort({b: 1}).limit(6).explain("executionStats");
 if (FixtureHelpers.isMongos(db)) {
     // If we're talking to a mongos, we expect at most one batch from each shard.
-    assert.eq(FixtureHelpers.numberOfShardsForCollection(coll) * 6,
-              explain.executionStats.nReturned);
+    assert.gte(FixtureHelpers.numberOfShardsForCollection(coll) * 6,
+               explain.executionStats.nReturned);
 } else {
     assert.eq(6, explain.executionStats.nReturned);
 }
