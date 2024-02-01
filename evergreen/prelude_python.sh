@@ -1,5 +1,5 @@
 if [ "Windows_NT" = "$OS" ]; then
-  python='/cygdrive/c/python/python39/python.exe'
+  python='/cygdrive/c/python/python310/python.exe'
 else
   if [ -f /opt/mongodbtoolchain/v4/bin/python3 ]; then
     python="/opt/mongodbtoolchain/v4/bin/python3"

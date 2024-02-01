@@ -27,7 +27,7 @@ variables:
   burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
   exe: ".exe"
   content_type: application/zip
-  python: '/cygdrive/c/python/python39/python.exe'
+  python: '/cygdrive/c/python/python310/python.exe'
   ext: zip
   multiversion_platform: windows
   multiversion_edition: enterprise
@@ -64,7 +64,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8")
       --win-version-min=win10
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     compile_variant: *windows-bazel-compile
   tasks:
     - name: compile_bazel_windows_TG
@@ -83,7 +83,7 @@ buildvariants:
       CPPPATH="c:/sasl/include"
       LIBPATH="c:/sasl/lib"
     num_scons_link_jobs_available: 0.2
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     scons_cache_scope: shared
     compile_variant: *windows-dev-compile-suggested
   tasks:
@@ -101,7 +101,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     has_packages: false
     scons_cache_scope: shared
@@ -136,7 +136,7 @@ buildvariants:
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
     num_scons_link_jobs_available: 0.5
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows
@@ -165,7 +165,7 @@ buildvariants:
     burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
     exe: ".exe"
     content_type: application/zip
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     multiversion_platform: windows
     multiversion_edition: enterprise
@@ -250,7 +250,7 @@ buildvariants:
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
     num_scons_link_jobs_available: 0.5
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows

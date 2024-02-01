@@ -27,7 +27,7 @@ variables:
   burn_in_tests_build_variant: enterprise-windows-all-feature-flags-required
   exe: ".exe"
   content_type: application/zip
-  python: '/cygdrive/c/python/python39/python.exe'
+  python: '/cygdrive/c/python/python310/python.exe'
   ext: zip
   multiversion_platform: windows
   multiversion_edition: enterprise
@@ -68,7 +68,7 @@ buildvariants:
       --win-version-min=win10
       --use-diagnostic-latches=on
     num_scons_link_jobs_available: 0.3
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     scons_cache_scope: shared
     compile_variant: *windows-compile-required
   tasks:

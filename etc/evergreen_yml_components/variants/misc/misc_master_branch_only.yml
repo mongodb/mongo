@@ -15,7 +15,7 @@ buildvariants:
       LIBPATH="c:/sasl/lib"
       -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 ))
       --win-version-min=win10
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
   tasks:
   - name: build_metrics_gen_TG
 
@@ -93,7 +93,7 @@ buildvariants:
   - windows-vsCurrent-small
   stepback: false
   expansions:
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
   tasks:
   - name: win_shared_scons_cache_pruning
 

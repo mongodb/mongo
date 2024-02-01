@@ -272,7 +272,7 @@ buildvariants:
       MONGO_DISTMOD=windows
       --use-diagnostic-latches=on
     num_scons_link_jobs_available: 0.2
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     scons_cache_scope: shared
     multiversion_platform: windows
@@ -362,7 +362,7 @@ buildvariants:
       --win-version-min=win10
       --use-diagnostic-latches=on
     num_scons_link_jobs_available: 0.25
-    python: '/cygdrive/c/python/python39/python.exe'
+    python: '/cygdrive/c/python/python310/python.exe'
     ext: zip
     resmoke_jobs_max: 1
     scons_cache_scope: shared

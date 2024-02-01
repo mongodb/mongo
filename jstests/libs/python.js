@@ -6,18 +6,10 @@ export function getPython3Binary() {
     clearRawMongoProgramOutput();
     assert.eq(runNonMongoProgram("python", "--version"), 0);
     const pythonVersion = rawMongoProgramOutput();  // Will look like "Python 3.10.4\n"
-    const usingPython39 = /Python 3\.9/.exec(pythonVersion);
     const usingPython310 = /Python 3\.10/.exec(pythonVersion);
     if (usingPython310) {
         print(
             "Found python 3.10 by default. Likely this is because we are using a virtual enviorment.");
-        return "python";
-    } else if (usingPython39) {
-        // TODO: SERVER-79172
-        // Once the above ticket is complete we should stop using python 3.9 on windows and upgrade
-        // to python 310 everywhere To solve: grep for python39 and fix instances of it
-        print(
-            "Found python 3.9 by default. Likely this is because we are using a windows virtual enviorment.");
         return "python";
     }
 
