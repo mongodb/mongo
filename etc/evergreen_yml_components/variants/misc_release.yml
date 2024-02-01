@@ -2727,6 +2727,9 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - windows-vsCurrent-large
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
@@ -2785,6 +2788,7 @@ buildvariants:
     compile_variant: macos
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
@@ -2838,6 +2842,7 @@ buildvariants:
     compile_variant: macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
@@ -2898,6 +2903,7 @@ buildvariants:
     compile_variant: enterprise-macos
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: audit
   - name: auth_audit_gen
@@ -2943,6 +2949,7 @@ buildvariants:
     compile_variant: enterprise-macos-arm64
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
   - name: audit
   - name: auth_audit_gen

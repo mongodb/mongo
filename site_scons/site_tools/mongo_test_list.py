@@ -27,7 +27,7 @@ from collections import defaultdict
 TEST_REGISTRY = defaultdict(list)
 
 
-def register_test(env, file, test):
+def register_test(env, file, test, generate_alias=True):
     """Register test into the dictionary of tests for file_name"""
     test_path = test
     if env.get("AUTO_INSTALL_ENABLED", False) and env.GetAutoInstalledFiles(test):
@@ -39,7 +39,8 @@ def register_test(env, file, test):
     env.Depends(file, test_path)
     file_name = file.path
     TEST_REGISTRY[file_name].append(test_path)
-    env.GenerateTestExecutionAliases(test)
+    if generate_alias:
+        env.GenerateTestExecutionAliases(test)
 
 
 def test_list_builder_action(env, target, source):

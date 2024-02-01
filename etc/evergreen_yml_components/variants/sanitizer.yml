@@ -42,6 +42,7 @@ buildvariants:
     compile_variant: rhel80-asan
   tasks:
     - name: compile_test_and_package_serial_TG
+    - name: compile_test_and_package_parallel_unittest_stream_TG
     - name: .aggfuzzer .common !.feature_flag_guarded
     - name: .jstestfuzz !.initsync
     - name: generate_buildid_to_debug_symbols_mapping
@@ -81,6 +82,9 @@ buildvariants:
     compile_variant: rhel80-debug-asan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
@@ -163,6 +167,9 @@ buildvariants:
     compile_variant: rhel80-debug-ubsan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-large
   - name: compile_integration_and_test_parallel_stream_TG
     distros:
     - rhel80-large
