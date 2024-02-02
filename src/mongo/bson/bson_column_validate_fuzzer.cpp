@@ -40,9 +40,6 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     using namespace mongo;
 
     // Skip inputs that do not pass validation
-    if (Size == 0) {
-        return 0;
-    }
     if (!validateBSONColumn(Data, Size).isOK()) {
         return 0;
     }
