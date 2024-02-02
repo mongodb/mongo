@@ -99,7 +99,8 @@ private:
 // Convenience routines for creating oplog entries to test with.
 OplogEntry makeInsertOplogEntry(int t,
                                 const NamespaceString& nss,
-                                boost::optional<UUID> uuid = boost::none);
+                                boost::optional<UUID> uuid = boost::none,
+                                std::int64_t version = repl::OplogEntry::kOplogVersion);
 
 OplogEntry makeDBCheckBatchEntry(int t,
                                  const NamespaceString& nss,

@@ -172,6 +172,24 @@ StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
     info.networkDocumentBytes = 0;
     info.networkDocumentCount = 0;
     for (auto&& doc : documents) {
+        if (feature_flags::gReduceMajorityWriteLatency.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // Check for oplog version change.
+            auto version = doc[OplogEntry::kVersionFieldName].numberLong();
+            if (version != OplogEntry::kOplogVersion) {
+                static constexpr char message[] = "Unexpected oplog version";
+                LOGV2_FATAL_CONTINUE(8539101,
+                                     message,
+                                     "expectedVersion"_attr = OplogEntry::kOplogVersion,
+                                     "foundVersion"_attr = version,
+                                     "oplogEntry"_attr = redact(doc));
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << message << ", expected oplog version "
+                                            << OplogEntry::kOplogVersion << ", found version "
+                                            << version << ", oplog entry: " << redact(doc));
+            }
+        }
+
         info.networkDocumentBytes += doc.objsize();
         ++info.networkDocumentCount;
 

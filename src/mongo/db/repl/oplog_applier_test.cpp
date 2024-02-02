@@ -44,6 +44,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
@@ -129,6 +130,24 @@ void OplogApplierTest::tearDown() {
 }
 
 const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+
+TEST_F(OplogApplierTest, GetNextApplierBatchReturnsBadValueIfAnyOplogEntryHasWrongVersion) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", false);
+    std::vector<OplogEntry> srcOps;
+    srcOps.push_back(
+        makeInsertOplogEntry(1, NamespaceString::createNamespaceString_forTest(dbName, "foo")));
+    auto secondEntry =
+        makeInsertOplogEntry(2,
+                             NamespaceString::createNamespaceString_forTest(dbName, "bar"),
+                             boost::none,
+                             OplogEntry::kOplogVersion - 1);
+    srcOps.push_back(secondEntry);
+    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
+
+    auto batch = _applier->getNextApplierBatch(opCtx(), _limits);
+    ASSERT_EQUALS(ErrorCodes::BadValue, batch.getStatus().code());
+}
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOps) {
     std::vector<OplogEntry> srcOps;

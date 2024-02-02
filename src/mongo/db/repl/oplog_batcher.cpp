@@ -154,19 +154,22 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
                   "oplogEntry"_attr = entry.toBSONForLogging());
         }
 
-        // Check for oplog version change.
-        if (entry.getVersion() != OplogEntry::kOplogVersion) {
-            static constexpr char message[] = "Unexpected oplog version";
-            LOGV2_FATAL_CONTINUE(21240,
-                                 message,
-                                 "expectedVersion"_attr = OplogEntry::kOplogVersion,
-                                 "foundVersion"_attr = entry.getVersion(),
-                                 "oplogEntry"_attr = redact(entry.toBSONForLogging()));
-            return {ErrorCodes::BadValue,
-                    str::stream() << message << ", expected oplog version "
-                                  << OplogEntry::kOplogVersion << ", found version "
-                                  << entry.getVersion()
-                                  << ", oplog entry: " << redact(entry.toBSONForLogging())};
+        if (!feature_flags::gReduceMajorityWriteLatency.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            // Check for oplog version change.
+            if (entry.getVersion() != OplogEntry::kOplogVersion) {
+                static constexpr char message[] = "Unexpected oplog version";
+                LOGV2_FATAL_CONTINUE(8539100,
+                                     message,
+                                     "expectedVersion"_attr = OplogEntry::kOplogVersion,
+                                     "foundVersion"_attr = entry.getVersion(),
+                                     "oplogEntry"_attr = redact(entry.toBSONForLogging()));
+                return {ErrorCodes::BadValue,
+                        str::stream()
+                            << message << ", expected oplog version " << OplogEntry::kOplogVersion
+                            << ", found version " << entry.getVersion()
+                            << ", oplog entry: " << redact(entry.toBSONForLogging())};
+            }
         }
 
         if (batchLimits.secondaryDelaySecsLatestTimestamp) {

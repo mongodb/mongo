@@ -68,6 +68,7 @@
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
@@ -119,7 +120,7 @@ BSONObj concatenate(BSONObj a, const BSONObj& b) {
     return bob.obj();
 }
 
-BSONObj makeNoopOplogEntry(OpTime opTime) {
+BSONObj makeNoopOplogEntry(OpTime opTime, std::int64_t version = repl::OplogEntry::kOplogVersion) {
     auto oplogEntry = repl::DurableOplogEntry(
         opTime,                                                    // optime
         OpTypeEnum ::kNoop,                                        // opType
@@ -127,7 +128,7 @@ BSONObj makeNoopOplogEntry(OpTime opTime) {
         boost::none,                                               // uuid
         boost::none,                                               // fromMigrate
         boost::none,                                               // checkExistenceForDiffInsert
-        repl::OplogEntry::kOplogVersion,                           // version
+        version,                                                   // version
         BSONObj(),                                                 // o
         boost::none,                                               // o2
         {},                                                        // sessionInfo
@@ -143,8 +144,9 @@ BSONObj makeNoopOplogEntry(OpTime opTime) {
     return oplogEntry.toBSON();
 }
 
-BSONObj makeNoopOplogEntry(Seconds seconds) {
-    return makeNoopOplogEntry({{seconds, 0}, 1LL});
+BSONObj makeNoopOplogEntry(Seconds seconds,
+                           std::int64_t version = repl::OplogEntry::kOplogVersion) {
+    return makeNoopOplogEntry({{seconds, 0}, 1LL}, version);
 }
 
 BSONObj makeOplogBatchMetadata(boost::optional<const rpc::ReplSetMetadata&> replMetadata,
@@ -2141,6 +2143,32 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckReturnsStopSyncingAndDropBatch) {
     // If the 'shouldStopFetching' check returns kStopSyncingAndDropLastBatchIfPresent, we should
     // not enqueue any documents.
     ASSERT_TRUE(lastEnqueuedDocuments.empty());
+}
+
+TEST_F(OplogFetcherTest, ValidateDocumentsReturnsBadValueIfAnyOplogEntryHasWrongVersion) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", true);
+    auto firstEntry = makeNoopOplogEntry(Seconds(123));
+    auto secondEntry = makeNoopOplogEntry(Seconds(456),
+                                          firstEntry.getIntField(OplogEntry::kVersionFieldName) -
+                                              1 /* Set the wrong oplog version. */);
+
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        OplogFetcher::validateDocuments({firstEntry, secondEntry}, false, {Seconds(100), 0})
+            .getStatus());
+}
+
+TEST_F(OplogFetcherTest, ValidateDocumentsReturnsBadValueIfAnyOplogEntryHasMissingVersion) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", true);
+    auto firstEntry = makeNoopOplogEntry(Seconds(123));
+    auto secondEntry = makeNoopOplogEntry(Seconds(456)).removeField(OplogEntry::kVersionFieldName);
+
+    ASSERT_EQUALS(
+        ErrorCodes::BadValue,
+        OplogFetcher::validateDocuments({firstEntry, secondEntry}, false, {Seconds(100), 0})
+            .getStatus());
 }
 
 TEST_F(OplogFetcherTest, ValidateDocumentsReturnsNoSuchKeyIfTimestampIsNotFoundInAnyDocument) {
