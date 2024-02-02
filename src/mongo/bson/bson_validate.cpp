@@ -780,7 +780,9 @@ public:
                     ptr += size;
                 } else if (bsoncolumn::isInterleavedStartControlByte(control)) {
                     // interleaved objects begin with a reference object, and then a series
-                    // of diff blocks for followup objects, ending with an EOO
+                    // of diff blocks for followup objects, ending with an EOO. Nesting interleaved
+                    // mode is not allowed.
+                    uassert(NonConformantBSON, "Nested interleaved mode", !interleavedMode);
                     ptr++;
                     uassert(NonConformantBSON,
                             "Invalid reference object for interleaved mode",
