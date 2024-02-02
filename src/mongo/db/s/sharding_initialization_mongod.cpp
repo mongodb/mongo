@@ -81,6 +81,7 @@
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_ready.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
@@ -565,8 +566,14 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 void ShardingInitializationMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
     _isPrimary.store(true);
     if (Grid::get(opCtx)->isInitialized()) {
-        ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-            opCtx, [&]() -> bool { return _isPrimary.load(); });
+        auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+        // Update the replica set connection string in the config.shards document for this shard.
+        // Wait for the cluster to be fully initialized to avoid a race where an auto-bootstrapped
+        // config shard finishes initializing after the update finishes (resulting in no updates).
+        (void)ShardingReady::get(opCtx)->isReadyFuture().thenRunOn(executor).then([&]() {
+            ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
+                [&]() -> bool { return _isPrimary.load(); });
+        });
     }
 }
 
@@ -586,7 +593,7 @@ void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
     }
     if (Grid::get(opCtx)->isInitialized()) {
         ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-            opCtx, [&]() -> bool { return _isPrimary.load(); });
+            [&]() -> bool { return _isPrimary.load(); });
     }
 }
 
