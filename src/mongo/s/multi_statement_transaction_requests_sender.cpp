@@ -46,11 +46,15 @@ namespace mongo {
 namespace {
 
 std::vector<AsyncRequestsSender::Request> attachTxnDetails(
-    OperationContext* opCtx, const std::vector<AsyncRequestsSender::Request>& requests) {
+    OperationContext* opCtx,
+    const std::vector<AsyncRequestsSender::Request>& requests,
+    bool activeTxnParticipantAddParticipants) {
     auto txnRouter = TransactionRouter::get(opCtx);
     if (!txnRouter) {
         return requests;
     }
+
+    // TODO SERVER-85165 Set up txnRouter state if activeTxnParticipantAddParticipants is true
 
     std::vector<AsyncRequestsSender::Request> newRequests;
     newRequests.reserve(requests.size());
@@ -58,6 +62,8 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     for (const auto& request : requests) {
         newRequests.emplace_back(
             request.shardId,
+            // TODO SERVER-85164 txnRouter should attach startOrContinue if
+            // activeTxnParticipantAddParticipants is true
             txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));
     }
 
@@ -93,9 +99,14 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
           opCtx,
           std::move(executor),
           dbName,
-          attachTxnDetails(opCtx, requests),
+          attachTxnDetails(
+              opCtx,
+              requests,
+              (opCtx->isActiveTransactionParticipant() && opCtx->inMultiDocumentTransaction())),
           readPreference,
           retryPolicy,
+          // TODO SERVER-85526 Construct TransactionParticipantResourceYielder if
+          // is an active TransactionParticipant
           TransactionRouterResourceYielder::makeForRemoteCommand(),
           designatedHostsMap)) {}
 

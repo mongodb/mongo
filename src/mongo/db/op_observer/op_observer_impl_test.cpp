@@ -1193,6 +1193,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(sessionId);
+        opCtx->setTxnNumber(txnNum);
         auto ocs = mongoDSessionCatalog->checkOutSession(opCtx.get());
         auto txnParticipant = TransactionParticipant::get(opCtx.get());
         txnParticipant.refreshFromStorageIfNeeded(opCtx.get());

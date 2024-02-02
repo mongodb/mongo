@@ -1035,6 +1035,8 @@ void TransactionParticipant::Participant::beginOrContinue(
     TxnNumberAndRetryCounter txnNumberAndRetryCounter,
     boost::optional<bool> autocommit,
     TransactionActions action) {
+    opCtx->setActiveTransactionParticipant();
+
     if (_isInternalSessionForRetryableWrite()) {
         auto parentTxnParticipant =
             TransactionParticipant::get(opCtx, _session()->getParentSession());
@@ -1153,6 +1155,7 @@ void TransactionParticipant::Participant::beginOrContinue(
 void TransactionParticipant::Participant::beginOrContinueTransactionUnconditionally(
     OperationContext* opCtx, TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
     invariant(opCtx->inMultiDocumentTransaction());
+    opCtx->setActiveTransactionParticipant();
 
     // We don't check or fetch any on-disk state, so treat the transaction as 'valid' for the
     // purposes of this method and continue the transaction unconditionally

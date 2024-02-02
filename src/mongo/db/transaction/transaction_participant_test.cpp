@@ -507,6 +507,12 @@ void insertTxnRecord(OperationContext* opCtx, unsigned i, DurableTxnStateEnum st
 }
 }  // namespace
 
+TEST_F(TxnParticipantTest, IsActiveTransactionParticipantSetCorrectly) {
+    auto sessionCheckout = checkOutSession();
+    ASSERT(TransactionParticipant::get(opCtx()));
+    ASSERT(opCtx()->isActiveTransactionParticipant());
+}
+
 // Test that transaction lock acquisition times out in `maxTransactionLockRequestTimeoutMillis`
 // milliseconds.
 TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
@@ -1210,6 +1216,7 @@ TEST_F(TxnParticipantTest, CleanOperationContextOnStepUp) {
         // context.
         ASSERT_FALSE(opCtx->inMultiDocumentTransaction());
         ASSERT_FALSE(opCtx->isStartingMultiDocumentTransaction());
+        ASSERT_FALSE(opCtx->isActiveTransactionParticipant());
         ASSERT_FALSE(opCtx->getLogicalSessionId());
         ASSERT_FALSE(opCtx->getTxnNumber());
     };

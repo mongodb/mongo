@@ -50,8 +50,7 @@ class MultiStatementTransactionRequestsSender {
 public:
     /**
      * Constructs a new MultiStatementTransactionRequestsSender. The OperationContext* and
-     * TaskExecutor* must
-     * remain valid for the lifetime of the ARS.
+     * TaskExecutor* must remain valid for the lifetime of the ARS.
      */
     MultiStatementTransactionRequestsSender(
         OperationContext* opCtx,
