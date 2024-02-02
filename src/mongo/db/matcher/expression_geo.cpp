@@ -465,7 +465,7 @@ void GeoMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
                                                        const SerializationOptions& opts,
                                                        bool includePath) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        geoCustomSerialization(bob, _rawObj, opts, includePath);
+        geoExpressionCustomSerialization(*bob, _rawObj, opts, includePath);
         return;
     }
     bob->appendElements(_rawObj);
@@ -522,7 +522,7 @@ void GeoNearMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
                                                            const SerializationOptions& opts,
                                                            bool includePath) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        geoCustomSerialization(bob, _rawObj, opts, includePath);
+        geoNearExpressionCustomSerialization(*bob, _rawObj, opts, includePath);
         return;
     }
     bob->appendElements(_rawObj);

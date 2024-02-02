@@ -133,6 +133,10 @@ public:
     static Status parseLegacyPoint(const BSONElement& elem,
                                    PointWithCRS* out,
                                    bool allowAddlFields = false);
+    static Status parseFlatPointCoordinates(const BSONElement& elem,
+                                            BSONElement& x,
+                                            BSONElement& y,
+                                            bool allowAddlFields = false);
     // Parse the BSON object after $box, $center, etc.
     static Status parseLegacyBox(const BSONObj& obj, BoxWithCRS* out);
     static Status parseLegacyCenter(const BSONObj& obj, CapWithCRS* out);
