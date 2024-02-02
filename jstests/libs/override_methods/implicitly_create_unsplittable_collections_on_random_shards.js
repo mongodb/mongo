@@ -13,7 +13,7 @@ import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js
 import {ShardingOverrideCommon} from "jstests/libs/override_methods/shard_collection_util.js";
 
 // Save a reference to the original methods to be called by the overrides below.
-var originalCreateCollection = DB.prototype.createCollection;
+var originalRunCommand = DB.prototype.runCommand;
 var originalGetCollection = DB.prototype.getCollection;
 var originalInsert = DBCollection.prototype.insert;
 
@@ -60,11 +60,28 @@ DB.prototype.createCollection = function(collName, opts) {
 
     if (unsupportedOption || !FixtureHelpers.isMongos(this) ||
         ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(collName)) {
-        return originalCreateCollection.apply(this, [collName, options]);
+        // Because runCommand is overridden, using the original createCollection command will still
+        // create an unsplittable collection on a random shard. Instead, we use the original
+        // runCommand directly.
+        var cmd = {create: collName};
+        Object.extend(cmd, options);
+        return originalRunCommand.apply(this, [cmd]);
     }
 
-    return ShardingOverrideCommon.createUnsplittableCollectionOnRandomShard(
+    let res = ShardingOverrideCommon.createUnsplittableCollectionOnRandomShard(
         {db: this, collName: collName, opts: options});
+
+    if (!res.ok && res.code === ErrorCodes.AlreadyInitialized) {
+        // This can happen if we created the collection on getCollection and then chose a different
+        // data shard when we created it above. However, we want to ensure that this is what
+        // happened and the AlreadyInitialized error wasn't for some other reason so we issue the
+        // command without specifying a dataShard.
+        delete options.dataShard;
+        var cmd = {create: collName};
+        Object.extend(cmd, options);
+        res = originalRunCommand.apply(this, [cmd]);
+    }
+    return res;
 };
 
 /**
@@ -103,7 +120,7 @@ DB.prototype.getCollection = function() {
     assert.commandWorkedOrFailedWithCode(
         ShardingOverrideCommon.createUnsplittableCollectionOnRandomShard(
             {db: this, collName: collection.getName()}),
-        ErrorCodes.NamespaceExists);
+        [ErrorCodes.NamespaceExists, ErrorCodes.AlreadyInitialized]);
 
     return collection;
 };
@@ -141,7 +158,7 @@ DBCollection.prototype.insert = function() {
     assert.commandWorkedOrFailedWithCode(
         ShardingOverrideCommon.createUnsplittableCollectionOnRandomShard(
             {db: db, collName: collName}),
-        ErrorCodes.NamespaceExists);
+        [ErrorCodes.NamespaceExists, ErrorCodes.AlreadyInitialized]);
 
     return originalInsert.apply(this, arguments);
 };
@@ -149,23 +166,25 @@ DBCollection.prototype.insert = function() {
 /**
  * Override create command to create unsplittable collection on a random shard.
  */
-function runCommandOverride(conn, dbName, cmdName, cmdObj, runCommandOriginal, makeFuncArgs) {
-    if (cmdName !== "create" || !conn.isMongos()) {
-        return runCommandOriginal.apply(conn, makeFuncArgs(cmdObj));
+DB.prototype.runCommand = function(obj, extra, queryOptions) {
+    const mergedObj = this._mergeCommandOptions(obj, extra);
+    const cmdName = Object.keys(mergedObj)[0];
+    if (cmdName !== "create" || !FixtureHelpers.isMongos(this)) {
+        return originalRunCommand.apply(this, [obj, extra, queryOptions]);
     }
 
     // Call original create method if the given options are not supported by
-    // createUnsplittableCollection
+    // createUnsplittableCollection.
     let unsupportedOption = false;
 
-    let options = Object.merge({}, cmdObj);
-    let nss = options['create'];
+    let cmdOptions = Object.merge({}, mergedObj);
+    let nss = cmdOptions['create'];
     if (ShardingOverrideCommon.nssCanBeTrackedByShardingCatalog(nss)) {
         unsupportedOption = true
     }
-    delete options['create'];
+    delete cmdOptions['create'];
 
-    const optNames = Object.keys(options);
+    const optNames = Object.keys(cmdOptions);
     optNames.forEach((optName) => {
         if (kUnsupportedOptions.has(optName)) {
             unsupportedOption = true;
@@ -173,14 +192,24 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, runCommandOriginal, m
     })
 
     if (unsupportedOption) {
-        return runCommandOriginal.apply(conn, makeFuncArgs(cmdObj));
+        return originalRunCommand.apply(this, [obj, extra, queryOptions]);
     }
 
-    return ShardingOverrideCommon.createUnsplittableCollectionOnRandomShard(
-        {db: conn.getDB(dbName), collName: cmdObj['create'], opts: options});
-}
+    let res = ShardingOverrideCommon.createUnsplittableCollectionOnRandomShard(
+        {db: this, collName: nss, opts: cmdOptions});
 
-OverrideHelpers.overrideRunCommand(runCommandOverride);
+    if (!res.ok && res.code === ErrorCodes.AlreadyInitialized) {
+        // This can happen if we created the collection on getCollection and then chose a different
+        // data shard when we created it above. However, we want to ensure that this is what
+        // happened and the AlreadyInitialized error wasn't for some other reason so we issue the
+        // command without specifying a dataShard.
+        delete cmdOptions.dataShard;
+        var cmd = {create: nss};
+        Object.extend(cmd, cmdOptions);
+        res = originalRunCommand.apply(this, [cmd]);
+    }
+    return res;
+};
 
 OverrideHelpers.prependOverrideInParallelShell(
     "jstests/libs/override_methods/implicitly_create_unsplittable_collections_on_random_shards.js");
