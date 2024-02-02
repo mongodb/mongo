@@ -3271,8 +3271,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, NoShardFindsMatchErrorsOnlyMode) {
     ASSERT_EQ(replyInfo.summaryFields.nMatched, 0);
 }
 
-// Test that if the first shard returns n=0 and the second shard returns n=1 we do not wait for
-// a reply from the last shard.
+// Test that if the first shard returns n=0 and the second shard returns n=1 we do not use response
+// from the last shard.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatch) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithIdWithoutShardKey", true);
@@ -3326,8 +3326,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatch) {
     ASSERT_EQ(replies.replyItems[0].getNModified(), 1);
 }
 
-// Test that if the first shard returns n=0 and the second shard returns n=1 we do not wait for
-// a reply from the last shard. Same as the previous test but uses bulkWrite errorsOnly mode.
+// Test that if the first shard returns n=0 and the second shard returns n=1 we do not use response
+// from the last shard. Same as the previous test but uses bulkWrite errorsOnly mode.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyMode) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithIdWithoutShardKey", true);
@@ -3382,8 +3382,8 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchErrorsOnlyMode)
     ASSERT_EQ(replyInfo.summaryFields.nModified, 1);
 }
 
-// Test that if the first shard returns n=0 and the second shard returns n=1 we do not wait for
-// a reply from the last shard. Same as the SecondShardFindMatch test, but ensures we correctly
+// Test that if the first shard returns n=0 and the second shard returns n=1 we do not use response
+// from the last shard. Same as the SecondShardFindMatch test, but ensures we correctly
 // extract 'n' for deletes as well as updates.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDelete) {
     RAIIServerParameterControllerForTest featureFlagController(
@@ -3443,7 +3443,7 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, SecondShardFindMatchForDelete) {
     ASSERT_EQ(replies.replyItems[0].getN(), 1);
 }
 
-// Test that if the first shard returns n=1 we do not wait for replies from the other two shards.
+// Test that if the first shard returns n=1 we do not use response from the other two shards.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatch) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithIdWithoutShardKey", true);
@@ -3476,7 +3476,7 @@ TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatch) {
     ASSERT_EQ(replies.replyItems[0].getNModified(), 1);
 }
 
-// Test that if the first shard returns n=1 we do not wait for replies from the other two shards
+// Test that if the first shard returns n=1 we do not use response from the other two shards
 // and we correctly report a WC error.
 TEST_F(BulkWriteOpWithoutShardKeyWithIdTest, FirstShardFindMatchAndWCError) {
     RAIIServerParameterControllerForTest featureFlagController(
@@ -4799,6 +4799,78 @@ TEST_F(BulkWriteExecTest, BulkWriteWriteConcernErrorMultiShardTest) {
         auto reply = createBulkWriteShardResponse(request);
         return reply.toBSON();
     });
+    future.default_timed_get();
+}
+
+// Tests that all pending shard requests are awaited for writes without shard key with _id.
+TEST_F(BulkWriteExecTest, BulkWriteWriteWriteWithoutShardKeyWithIdAwaitsAllShardResponses) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithIdWithoutShardKey", true);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
+    ShardEndpoint endpoint0(
+        kShardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpoint1(
+        kShardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+
+    class MockWriteWithoutShardKeyWithIdTargeter : public MockNSTargeter {
+        using MockNSTargeter::MockNSTargeter;
+        const ShardId kShardIdA = ShardId("shardA");
+        const ShardId kShardIdB = ShardId("shardB");
+        std::vector<ShardEndpoint> targetUpdate(
+            OperationContext* opCtx,
+            const BatchItemRef& itemRef,
+            bool* useTwoPhaseWriteProtocol = nullptr,
+            bool* isNonTargetedWriteWithoutShardKeyWithExactId = nullptr,
+            std::set<ChunkRange>* chunkRange = nullptr) const override {
+            *isNonTargetedWriteWithoutShardKeyWithExactId = true;
+            return std::vector{
+                ShardEndpoint(kShardIdA,
+                              ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                              boost::none),
+                ShardEndpoint(kShardIdB,
+                              ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                              boost::none)};
+        }
+    };
+
+    auto targeter = MockWriteWithoutShardKeyWithIdTargeter(
+        nss,
+        {MockRange(endpoint0, BSON("x" << MINKEY), BSON("x" << 0)),
+         MockRange(endpoint1, BSON("x" << 0), BSON("x" << 100))});
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(std::make_unique<MockWriteWithoutShardKeyWithIdTargeter>(targeter));
+
+    BulkWriteCommandRequest request(
+        {BulkWriteUpdateOp(0, BSON("_id" << 1), BSON("$inc" << BSON("y" << 1)))},
+        {NamespaceInfoEntry(nss)});
+
+    auto future = launchAsync([&] {
+        auto reply = bulk_write_exec::execute(operationContext(), targeters, request);
+        ASSERT_EQUALS(reply.replyItems.size(), 1u);
+        ASSERT_EQ(reply.replyItems[0].getN(), 1);
+    });
+
+    // ShardA response.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        BulkWriteReplyItem item = BulkWriteReplyItem(0);
+        item.setN(1);
+        auto reply = createBulkWriteShardResponse(request, false);
+        reply.setCursor(
+            BulkWriteCommandResponseCursor(0, std::vector<mongo::BulkWriteReplyItem>{item}, nss));
+        reply.setNMatched(1);
+        reply.setNModified(1);
+        return reply.toBSON();
+    });
+
+    // Shard B response.
+    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+        auto reply = createBulkWriteShardResponse(request, false);
+        reply.setCursor(BulkWriteCommandResponseCursor(
+            0, std::vector<mongo::BulkWriteReplyItem>{BulkWriteReplyItem(0)}, nss));
+        return reply.toBSON();
+    });
+
     future.default_timed_get();
 }
 

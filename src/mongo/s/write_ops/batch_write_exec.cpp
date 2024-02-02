@@ -654,6 +654,13 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
 
     while (!ars.done()) {
         auto response = ars.next();
+        // The write op is complete if we receive ok:1 n:1 shard response and we can return early
+        // without processing further responses from other shards. Any pending child write ops would
+        // be marked NoOp. However we wait for the responses due to SERVER-85857.
+        if (writeOp.getWriteState() == WriteOpState_Completed) {
+            ars.stopRetrying();
+            continue;
+        }
 
         // Get the TargetedWriteBatch to find where to put the response.
         dassert(pendingBatches.find(response.shardId) != pendingBatches.end());
@@ -686,11 +693,6 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
                                    batchedCommandResponse.isElectionIdSet()
                                        ? batchedCommandResponse.getElectionId()
                                        : OID());
-            }
-            // The write op is complete if we receive ok:1 n:1 shard response and we can return
-            // early. Any pending child write ops would be marked NoOp.
-            if (writeOp.getWriteState() == WriteOpState_Completed) {
-                break;
             }
         } else {
             bool abortBatch = processErrorResponseFromLocal(

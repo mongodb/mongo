@@ -178,15 +178,22 @@ void executeChildBatches(OperationContext* opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         shouldRetry ? Shard::RetryPolicy::kIdempotent : Shard::RetryPolicy::kNoRetry);
 
-    // The BulkWriteOp may be marked finished early if we are in a transaction and encounter an
-    // error, which aborts the transaction. In those cases, we do not bother waiting for any
-    // outstanding responses from shards.
-    // Additionally, 'shouldStopCurrentRound()' can return true if we have hit some condition
-    // that means we no longer care about the responses for any other requests we are sending
-    // in this round of processing. See 'BulkWriteOp._shouldStopCurrentRound' for more details.
-    while (!ars.done() && !bulkWriteOp.isFinished() && !bulkWriteOp.shouldStopCurrentRound()) {
+    while (!ars.done()) {
         // Block until a response is available.
         auto response = ars.next();
+
+        // We wait for the responses from pending shards due to SERVER-85857, and skip processing
+        // them - see 'BulkWriteOp._shouldStopCurrentRound' for more details.
+        if (bulkWriteOp.shouldStopCurrentRound()) {
+            ars.stopRetrying();
+            continue;
+        }
+        // The BulkWriteOp may be marked finished early if we are in a transaction and encounter an
+        // error, which aborts the transaction. In those cases, we do not bother processing those
+        // responses.
+        if (bulkWriteOp.isFinished()) {
+            break;
+        }
 
         TargetedWriteBatch* writeBatch = childBatches.find(response.shardId)->second.get();
         tassert(8048101, "Unexpectedly could not find write batch for shard", writeBatch);

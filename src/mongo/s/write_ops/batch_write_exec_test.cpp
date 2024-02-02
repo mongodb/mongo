@@ -2310,7 +2310,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatch) {
 }
 
 /**
- * Tests the scenario where 1st shard returns n=1 and 2nd shard write is pending (and cancelled).
+ * Tests the scenario where 1st shard returns n=1 and 2nd shard write is pending.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatch) {
     RAIIServerParameterControllerForTest _featureFlagController{
@@ -2778,7 +2778,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyNoMatchRetr
 
 /**
  * Tests the scenario where 1st shard returns non-retryable error, 2nd shard returns n = 1, 3rd
- * shard's response is pending (and cancelled).
+ * shard's response is pending.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchNonRetryableError) {
     RAIIServerParameterControllerForTest _featureFlagController{
@@ -2957,7 +2957,7 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchNo
 
 /**
  * Tests the scenario where 1st shard returns StaleConfig error, 2nd shard returns n = 1, 3rd
- * shard's response is pending (and cancelled).
+ * shard's response is pending.
  */
 TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRetryableError) {
     RAIIServerParameterControllerForTest _featureFlagController{
@@ -3119,6 +3119,19 @@ TEST_F(BatchWriteExecTest, UpdateOneAndDeleteOneWithIdWithoutShardKeyWithMatchRe
             BatchedCommandResponse response;
             response.setStatus(Status::OK());
             response.setN(1);
+            return response.toBSON();
+        });
+
+        onCommandForPoolExecutor([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(kTestShardHost3, request.target);
+            if (bcRequest == *requests.begin())
+                ASSERT_EQUALS("update", request.cmdObj.firstElement().fieldNameStringData());
+            else
+                ASSERT_EQUALS("delete", request.cmdObj.firstElement().fieldNameStringData());
+
+            BatchedCommandResponse response;
+            response.setStatus(Status::OK());
+            response.setN(0);
             return response.toBSON();
         });
 
