@@ -118,4 +118,4 @@ feature_flags:
                     and subplanner are used instead."
       cpp_varname: gFeatureFlagClassicRuntimePlanningForSbe
       default: false
-      shouldBeFCVGated: true
+      shouldBeFCVGated: false
