@@ -134,6 +134,19 @@ makeView("v0", "ok", [makeFacet("v1")], ErrorCodes.ViewDepthLimitExceeded);
 makeView("v0", "ok", [makeUnion("v1")], ErrorCodes.ViewDepthLimitExceeded);
 
 // Test that querying a view that descends more than 20 views will fail.
+
+// If this is a sharded cluster, we run the initial aggregate once. If this doesn't have the
+// necessary routing information to detect that the view is invalid, this will throw a StaleConfig
+// error instead. In doing so it will obtain the routing information for 10 of our views (one on
+// each attempt), which will allow the subsequent aggregates to discover that the view chain is 20
+// deep and fail as expected.
+// TODO SERVER-85941: This ticket aims to prevent needing an extra aggregate to get some of the
+// routing information.
+if (db.getMongo().isMongos()) {
+    assert.commandFailedWithCode(
+        viewsDb.runCommand({aggregate: "v10", pipeline: [makeUnion("v1")], cursor: {}}),
+        [ErrorCodes.ViewDepthLimitExceeded, ErrorCodes.StaleConfig]);
+}
 assert.commandFailedWithCode(
     viewsDb.runCommand({aggregate: "v10", pipeline: [makeUnion("v1")], cursor: {}}),
     ErrorCodes.ViewDepthLimitExceeded);
