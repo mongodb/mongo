@@ -112,14 +112,22 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     // Add the second shard back but convert the config shard to dedicated config server.
     assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
     assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard1Name}));
-    assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
+
+    // Ensure the balancer is enabled so sharded data can be moved out by the transition to
+    // dedicated command.
+    assert.commandWorked(mongos.adminCommand({balancerStart: 1}));
+
+    assert.soon(() => {
+        let res = mongos.adminCommand({transitionToDedicatedConfigServer: 1});
+        return res.state == "completed";
+    });
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");
 
     assert.eq(mongosTestColl.find().itcount(), 3);
-    assert.eq(shard0TestColl.find().itcount(), 3);
-    assert.eq(shard1TestColl.find().itcount(), 0);
+    assert.eq(shard0TestColl.find().itcount(), 0);
+    assert.eq(shard1TestColl.find().itcount(), 3);
 
     tearDownFunc();
     shard1Rst.stopSet();
