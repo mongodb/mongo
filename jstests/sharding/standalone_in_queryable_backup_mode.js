@@ -35,6 +35,8 @@ var kUnshardedCollName = 'testUnshardedColl';
 assert.commandWorked(
     st.s.adminCommand({shardCollection: kDbName + '.' + kShardedCollName, key: {_id: 1}}));
 
+assert.commandWorked(st.s.getDB(kDbName).createCollection(kUnshardedCollName));
+
 const recoveryTimestamp =
     assert.commandWorked(st.rs0.getPrimary().getDB(kDbName).runCommand({ping: 1})).operationTime;
 

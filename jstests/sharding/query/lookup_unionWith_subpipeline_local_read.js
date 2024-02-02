@@ -14,6 +14,7 @@
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
 import {
@@ -463,50 +464,62 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "lookup_to_view_of_un
     subPipelineRemote: [false, false],
 });
 
-// Test $lookup when it is routed to a secondary which is not yet aware of the foreign collection.
-st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
+// TODO SERVER-77915 remove this test case since the unsharded collection are now tracked and cannot
+// be unknown by a the secondary node: The secondary node in the below test case has staleDbVersion.
+// This leads the pipeline targeter to run a remote request and refresh. Now that collections are
+// tracked, the aggregation is sent using ShardVersion, which is never stale due to an
+// AutoGetCollection in the pipeline execution path that causes always to refresh if not installed.
+const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+if (!isTrackUnshardedEnabled) {
+    // Test $lookup when it is routed to a secondary which is not yet aware of the foreign
+    // collection.
+    st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
-pipeline[0].$lookup.from = foreign.getName();
-assertAggResultAndRouting(
-    pipeline,
-    expectedRes,
-    {
-        comment: "lookup_on_stale_secondary",
-        $readPreference: {mode: 'secondary'},
-        readConcern: {level: 'majority'}
-    },
-    {
-        executeOnSecondaries: true,
-        // The $lookup cannot be executed in parallel because the foreign collection is unsharded.
-        toplevelExec: [true, false],
-        subPipelineLocal: [true, false],
-        subPipelineRemote: [true, false],
-    });
+    pipeline[0].$lookup.from = foreign.getName();
+    assertAggResultAndRouting(pipeline,
+                              expectedRes,
+                              {
+                                  comment: "lookup_on_stale_secondary",
+                                  $readPreference: {mode: 'secondary'},
+                                  readConcern: {level: 'majority'}
+                              },
+                              {
+                                  executeOnSecondaries: true,
+                                  // The $lookup cannot be executed in parallel because the foreign
+                                  // collection is unsharded.
+                                  toplevelExec: [true, false],
+                                  subPipelineLocal: [true, false],
+                                  subPipelineRemote: [true, false],
+                              });
+}
 
 // Test $lookup when it is routed to a secondary which is aware of the foreign collection.
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
+pipeline[0].$lookup.from = foreign.getName();
 
 // Ensure the secondary knows about the foreign collection.
 assert.eq(foreign.aggregate([], {$readPreference: {mode: 'secondary'}}).itcount(), 0);
-assertAggResultAndRouting(
-    pipeline,
-    expectedRes,
-    {
-        comment: "lookup_on_secondary",
-        $readPreference: {mode: 'secondary'},
-        readConcern: {level: 'majority'}
-    },
-    {
-        executeOnSecondaries: true,
-        // The $lookup cannot be executed in parallel because the foreign collection is unsharded.
-        toplevelExec: [true, false],
-        subPipelineLocal: [true, false],
-        subPipelineRemote: [false, false],
-    });
+assertAggResultAndRouting(pipeline,
+                          expectedRes,
+                          {
+                              comment: "lookup_on_secondary",
+                              $readPreference: {mode: 'secondary'},
+                              readConcern: {level: 'majority'}
+                          },
+                          {
+                              executeOnSecondaries: true,
+                              // The $lookup cannot be executed in parallel because the foreign
+                              // collection is unsharded.
+                              toplevelExec: [true, false],
+                              subPipelineLocal: [true, false],
+                              subPipelineRemote: [false, false],
+                          });
 
 // Test $lookup when it is routed to a secondary which thinks the foreign collection is unsharded,
 // but it is stale.
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
+pipeline[0].$lookup.from = foreign.getName();
 
 // Ensure the secondaries know about the local collection.
 assert.eq(local.aggregate([], {$readPreference: {mode: 'secondary'}}).itcount(), 0);

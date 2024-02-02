@@ -39,7 +39,7 @@ function checkCollAndChunks(collName, unsplittable, shardKey, numChunks) {
     assert.eq(configChunks.length, numChunks);
 }
 
-jsTest.log("Sharded --> Unsplittable fails");
+jsTest.log("Sharded --> Unsplittable OK");
 {
     const kColl = getNewCollName();
     const kNss = kDbName + "." + kColl;
@@ -48,9 +48,7 @@ jsTest.log("Sharded --> Unsplittable fails");
 
     checkCollAndChunks(kColl, false, {_id: 1}, 1);
 
-    assert.commandFailedWithCode(
-        st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl}),
-        ErrorCodes.AlreadyInitialized);
+    assert.commandWorked(st.s.getDB(kDbName).runCommand({createUnsplittableCollection: kColl}));
 
     checkCollAndChunks(kColl, false, {_id: 1}, 1);
 }

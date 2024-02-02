@@ -6,6 +6,7 @@
  *   uses_transactions,
  * ]
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
@@ -45,6 +46,14 @@ const pipeline = [{
 const kBatchSize = 2;
 
 const testLookupDoesNotSeeDocumentsOutsideSnapshot = function() {
+    // TODO SERVER-84470 Remove this check once lookup on unsplittable collection still on the
+    // primary is supported
+    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    if (isTrackUnshardedEnabled) {
+        return;
+    }
+
     unshardedColl.drop();
     // Insert some stuff into the unsharded collection.
     const kUnshardedCollOriginalSize = 10;

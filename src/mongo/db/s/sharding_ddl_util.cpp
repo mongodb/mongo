@@ -468,7 +468,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyTrackedWithOpt
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,
-            str::stream() << "collection already tracked with different options for collection "
+            str::stream() << "collection already exists with different options for collection "
                           << nss.toStringForErrorMsg(),
             SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() == key) &&
                 SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&

@@ -2,6 +2,8 @@
  * Tests the setShardVersion logic on the this shard side, specifically when comparing
  * against a major version of zero or incompatible epochs.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 var st = new ShardingTest({shards: 2, mongos: 2});
 
 var testDB_s0 = st.s.getDB('test');
@@ -68,20 +70,24 @@ assert.commandWorked(testDB_s1.user.insert({x: 10}));
 
 // Routing information:
 //   - mongos0: 2|0|a
-//   - mongos1: 0|0|b
+//   - mongos1: 1|0|b
 
 // Shard information:
 //   - shard0: UNKNOWN
-//   - shard1: 0|0|b
+//   - shard1: 1|0|b
 
-checkShardMajorVersion(st.rs1.getPrimary(), 0);
+// TODO SERVER-77915 Remove the feature flag. Now that user unsharded collection are tracked we no
+// longer store them with UNSHARDED version
+const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+checkShardMajorVersion(st.rs1.getPrimary(), isTrackUnshardedEnabled ? 1 : 0);
 
 // mongos0 still thinks { x: 10 } belong to st.shard0.shardName, but since coll is dropped,
 // query should be routed to primary shard.
 assert.neq(null, testDB_s0.user.findOne({x: 10}));
 
 checkShardMajorVersion(st.rs0.getPrimary(), 0);
-checkShardMajorVersion(st.rs1.getPrimary(), 0);
+checkShardMajorVersion(st.rs1.getPrimary(), isTrackUnshardedEnabled ? 1 : 0);
 
 // Routing information:
 //   - mongos0: 0|0|b

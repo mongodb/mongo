@@ -88,6 +88,12 @@ for (let i = 0; i < 10; i++) {
     db[testCollName].insert({_id: i, a: i, b: 1});
 }
 
+// Make sure we have no opened sessions before starting the test. Creating a collection will
+// generate a new session during the commit phase of the create coordinator
+refreshSessionsAndVerifyExistence(mongosConfig, shardConfig, [], false /* expectToExist */);
+let openedSessionIDs = mongosConfig.system.sessions.find().toArray().map(s => s._id);
+assert.commandWorked(db.runCommand({endSessions: openedSessionIDs}))
+
 let cursors = [];
 sessionIDs = [];
 for (let i = 0; i < 5; i++) {

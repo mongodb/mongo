@@ -15,6 +15,7 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     assertShardingMetadataForUnshardedCollectionDoesNotExist,
@@ -71,22 +72,39 @@ function makeDatabaseNameForTest() {
 
 function runTest(shard0Primary, execCtxType, expectShardingMetadata) {
     // Test implicit database and collection creation.
-    const dbName0 = makeDatabaseNameForTest();
-    const collName0 = "testColl";
-    testImplicitCreateCollection(
-        shard0Primary, execCtxType, dbName0, collName0, "insert", expectShardingMetadata);
 
+    // TODO SERVER-85366 remove this check once retryable write can create unsplittable collections
+    // after an insert
+    if (execCtxType == execCtxTypes.kRetryableWrite) {
+        const dbName0 = makeDatabaseNameForTest();
+        const collName0 = "testColl";
+        testImplicitCreateCollection(
+            shard0Primary, execCtxType, dbName0, collName0, "insert", false);
+    } else {
+        const dbName0 = makeDatabaseNameForTest();
+        const collName0 = "testColl";
+        testImplicitCreateCollection(
+            shard0Primary, execCtxType, dbName0, collName0, "insert", expectShardingMetadata);
+    }
+
+    // Test implicit collection creation.
     const dbName1 = makeDatabaseNameForTest();
     const collName1 = "testColl";
     testImplicitCreateCollection(
         shard0Primary, execCtxType, dbName1, collName1, "createIndex", expectShardingMetadata);
 
-    // Test implicit collection creation.
     const dbName2 = makeDatabaseNameForTest();
     const collName2 = "testColl0";
     assert.commandWorked(shard0Primary.getDB(dbName2).createCollection("testColl1"));
-    testImplicitCreateCollection(
-        shard0Primary, execCtxType, dbName2, collName2, "insert", expectShardingMetadata);
+    // TODO SERVER-85366 remove this check once retryable write can create unsplittable collections
+    // after an insert
+    if (execCtxType == execCtxTypes.kRetryableWrite) {
+        testImplicitCreateCollection(
+            shard0Primary, execCtxType, dbName2, collName2, "insert", false);
+    } else {
+        testImplicitCreateCollection(
+            shard0Primary, execCtxType, dbName2, collName2, "insert", expectShardingMetadata);
+    }
 
     const dbName3 = makeDatabaseNameForTest();
     const collName3 = "testColl0";
@@ -108,16 +126,16 @@ function runTests(getShard0PrimaryFunc,
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (config shard)");
 
-    // The cluster now contains only one shard (shard0) which acts as also the config server so the
-    // commands against shard0 should go through the router code paths.
-    // TODO (PM-3364): Uncomment once we start tracking unsharded collections.
-    const expectShardingMetadata0 = false;
     // Currently, sharding isn't supported in serverless.
-    // const expectShardingMetadata0 = !isMultitenant;
+    const expectShardingMetadata0 = !isMultitenant &&
+        FeatureFlagUtil.isPresentAndEnabled(shard0Primary.getDB('admin'),
+                                            "TrackUnshardedCollectionsOnShardingCatalog")
     runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata0);
     runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata0);
     runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata0);
-    runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata0);
+    // TODO SERVER-81937 once transaction track unsharded collection, replace false with
+    // expectShardingMetadata
+    runTest(shard0Primary, execCtxTypes.kTransaction, false);
 
     if (!skipMaintenanceMode) {
         jsTest.log("Restarting shard0 in maintenance mode");
@@ -159,13 +177,16 @@ function runTests(getShard0PrimaryFunc,
     jsTest.log("Running tests for " + shard0Primary.host + " while the cluster contains one " +
                "shard (config shard) after restarting the shard in default mode");
 
-    const expectShardingMetadata2 = false;
     // Currently, sharding isn't supported in serverless.
-    // const expectShardingMetadata2 = !isMultitenant;
+    const expectShardingMetadata2 = !isMultitenant &&
+        FeatureFlagUtil.isPresentAndEnabled(getShard0PrimaryFunc().getDB('admin'),
+                                            "TrackUnshardedCollectionsOnShardingCatalog")
     runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata2);
     runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata2);
     runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata2);
-    runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata2);
+    // TODO SERVER-81937 once transaction track unsharded collection, replace false with
+    // expectShardingMetadata
+    runTest(shard0Primary, execCtxTypes.kTransaction, false);
 
     if (isMultitenant) {
         // Currently, sharding isn't supported in serverless. So the cluster cannot become
@@ -211,9 +232,8 @@ function runTests(getShard0PrimaryFunc,
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");
 
-    // The cluster now contains only one shard (shard1) but it is not the config server so
-    // commands against shard0 (config server) or shard1 should not go through the router code
-    // paths.
+    // The cluster now contains only one shard (shard1) but it is not the config server so commands
+    // against shard0 (config server) or shard1 should not go through the router code paths.
     const expectShardingMetadata4 = false;
     runTest(shard0Primary, execCtxTypes.kNoSession, expectShardingMetadata4);
     runTest(shard0Primary, execCtxTypes.kNonRetryableWrite, expectShardingMetadata4);

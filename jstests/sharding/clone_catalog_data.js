@@ -5,6 +5,7 @@ import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 // Do not check metadata consistency as unsharded collections are cloned to non-primary shards for
 // testing purposes.
 TestData.skipCheckMetadataConsistency = true;
+TestData.skipCheckOrphans = true;
 
 (() => {
     function sortByName(a, b) {

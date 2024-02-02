@@ -199,8 +199,8 @@ function testWriteConcernMetrics(cmd, opName, inc, setupCommand) {
               "expected no change in secondary writeConcern metrics, before: " +
                   tojson(serverStatus) + ", after: " + tojson(newStatus));
 
-    rst.stopSet();
     st.stop();
+    rst.stopSet();
 }
 
 // Test single insert/update/delete.

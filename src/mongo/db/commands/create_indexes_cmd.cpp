@@ -348,9 +348,10 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
-        // Only collections that are not registered in the sharding catalog are affected by
-        // movePrimary
-        if (!collDesc.hasRoutingTable()) {
+        // Currently all the unsharded collections owned by the primary are affected by the
+        // movePrimary.
+        // TODO SERVER-83925 set this to !collDesc.hasRoutingTable()
+        if (!collDesc.isSharded()) {
             if (scopedDss->isMovePrimaryInProgress()) {
                 LOGV2(4909200, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
@@ -412,13 +413,14 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
         // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
         // TODO (SERVER-82066): Update handling for direct connections.
         // TODO (SERVER-81937): Update handling for transactions.
+        // TODO (SERVER-85366): Update handling for retryable writes.
         boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
             allowCollectionCreation;
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         if (!fcvSnapshot.isVersionInitialized() ||
             !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(fcvSnapshot) ||
             !OperationShardingState::get(opCtx).isComingFromRouter(opCtx) ||
-            (opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite())) {
+            opCtx->inMultiDocumentTransaction() || opCtx->isRetryableWrite()) {
             allowCollectionCreation.emplace(opCtx);
         }
         auto createStatus =

@@ -97,7 +97,8 @@ export const $config = (function() {
             } catch (e) {
                 const exceptionCode = e.code;
                 if (exceptionCode) {
-                    if (exceptionCode == ErrorCodes.AlreadyInitialized ||
+                    if (exceptionCode == ErrorCodes.ConflictingOperationInProgress ||
+                        exceptionCode == ErrorCodes.AlreadyInitialized ||
                         exceptionCode == ErrorCodes.InvalidOptions) {
                         // It is fine for a shardCollection to throw AlreadyInitialized, a
                         // resharding state might have changed the shard key for the namespace. It

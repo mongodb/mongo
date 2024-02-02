@@ -14,6 +14,12 @@
 import {
     retryOnceOnTransientAndRestartTxnOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+// TODO SERVER-86104: adapt the test for tracked collections
+if (FeatureFlagUtil.isPresentAndEnabled(db, "TrackUnshardedCollectionsOnShardingCatalog")) {
+    quit();
+}
 
 const dbName = jsTest.name();
 const collNameA = "coll_A";

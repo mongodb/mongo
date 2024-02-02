@@ -121,7 +121,7 @@ public:
                     ErrorCodes::InvalidOptions,
                     "The range {} for the namespace {} is required to be owned by one shard"_format(
                         rangeString(req.getMin(), req.getMax()), ns().toStringForErrorMsg()),
-                    !collection.getShardingDescription().hasRoutingTable() ||
+                    !collection.getShardingDescription().isSharded() ||
                         collection.getShardingFilter()->isRangeEntirelyOwned(req.getMin(),
                                                                              req.getMax()));
             }

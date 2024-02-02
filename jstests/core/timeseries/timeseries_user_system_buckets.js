@@ -13,36 +13,45 @@
  *   requires_fcv_63
  * ]
  */
-let userCollSystemBuckets = db.system.buckets.coll;
-let userColl = db.coll;
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-userCollSystemBuckets.drop();
-userColl.drop();
+const isTrackingUnsplittableCollections = FeatureFlagUtil.isPresentAndEnabled(
+    db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
 
-// inserting into a user defined system buckets collection is possible
-assert.commandWorked(userCollSystemBuckets.insert({a: 1}));
+// TODO SERVER-85382 re-enable this test with tracked collection once create collection coordinator
+// support all timeseries/bucket namespace cases
+if (!isTrackingUnsplittableCollections) {
+    let userCollSystemBuckets = db.system.buckets.coll;
+    let userColl = db.coll;
 
-// A user collection with the same postfix should not be considered time series collection
-assert.commandWorked(userColl.insert({a: 2}));
+    userCollSystemBuckets.drop();
+    userColl.drop();
 
-let docs = userColl.find().toArray();
-assert.eq(1, docs.length);
+    // inserting into a user defined system buckets collection is possible
+    assert.commandWorked(userCollSystemBuckets.insert({a: 1}));
 
-let docsSystemBuckets = userCollSystemBuckets.find().toArray();
-assert.eq(1, docsSystemBuckets.length);
+    // A user collection with the same postfix should not be considered time series collection
+    assert.commandWorked(userColl.insert({a: 2}));
 
-userCollSystemBuckets.drop();
-userColl.drop();
+    let docs = userColl.find().toArray();
+    assert.eq(1, docs.length);
 
-// the sequence in different order should also work
-assert.commandWorked(userColl.insert({a: 2}));
-assert.commandWorked(userCollSystemBuckets.insert({a: 1}));
+    let docsSystemBuckets = userCollSystemBuckets.find().toArray();
+    assert.eq(1, docsSystemBuckets.length);
 
-docs = userColl.find().toArray();
-assert.eq(1, docs.length);
+    userCollSystemBuckets.drop();
+    userColl.drop();
 
-docsSystemBuckets = userCollSystemBuckets.find().toArray();
-assert.eq(1, docsSystemBuckets.length);
+    // the sequence in different order should also work
+    assert.commandWorked(userColl.insert({a: 2}));
+    assert.commandWorked(userCollSystemBuckets.insert({a: 1}));
 
-userCollSystemBuckets.drop();
-userColl.drop();
+    docs = userColl.find().toArray();
+    assert.eq(1, docs.length);
+
+    docsSystemBuckets = userCollSystemBuckets.find().toArray();
+    assert.eq(1, docsSystemBuckets.length);
+
+    userCollSystemBuckets.drop();
+    userColl.drop();
+}
