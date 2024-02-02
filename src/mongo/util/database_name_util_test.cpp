@@ -504,4 +504,62 @@ TEST(DatabaseNameUtilTest, AuthPrevalidatedContext) {
     }
 }
 
+TEST(DatabaseNameUtilTest, ParseFailPointData) {
+    const TenantId tid = TenantId(OID::gen());
+
+    for (bool multitenancy : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancy);
+        // Test fail point data has tenantId
+        {
+            auto fpData = BSON("a"
+                               << "1"
+                               << "db"
+                               << "myDb"
+                               << "tenantId" << tid);
+            if (multitenancy) {
+                auto dbName = DatabaseNameUtil::parseFailPointData(fpData, "db"_sd);
+                ASSERT_EQ(DatabaseName::createDatabaseName_forTest(tid, "myDb"), dbName);
+            } else {
+                ASSERT_THROWS_CODE(DatabaseNameUtil::parseFailPointData(fpData, "db"_sd),
+                                   AssertionException,
+                                   7005302);
+            }
+        }
+        // Test fail point data only has tenantId
+        {
+            auto fpData = BSON("tenantId" << tid);
+            if (multitenancy) {
+                auto dbName = DatabaseNameUtil::parseFailPointData(fpData, "db"_sd);
+                ASSERT_EQ(DatabaseName::createDatabaseName_forTest(tid, ""), dbName);
+            } else {
+                ASSERT_THROWS_CODE(DatabaseNameUtil::parseFailPointData(fpData, "db"_sd),
+                                   AssertionException,
+                                   7005302);
+            }
+        }
+        // Test fail point data has no tenantId
+        {
+            auto fpData = BSON("b"
+                               << "2"
+                               << "db"
+                               << "myDb");
+            const auto dbName = DatabaseNameUtil::parseFailPointData(fpData, "db"_sd);
+            ASSERT_EQ(DatabaseName::createDatabaseName_forTest(boost::none, "myDb"), dbName);
+        }
+        // Test fail point data only has db
+        {
+            auto fpData = BSON("db"
+                               << "myDb");
+            const auto dbName = DatabaseNameUtil::parseFailPointData(fpData, "db"_sd);
+            ASSERT_EQ(DatabaseName::createDatabaseName_forTest(boost::none, "myDb"), dbName);
+        }
+        // Test fail point data empty
+        {
+            auto dbName = DatabaseNameUtil::parseFailPointData(BSONObj(), "db"_sd);
+            ASSERT_EQ(DatabaseName(), dbName);
+        }
+    }
+}
+
 }  // namespace mongo

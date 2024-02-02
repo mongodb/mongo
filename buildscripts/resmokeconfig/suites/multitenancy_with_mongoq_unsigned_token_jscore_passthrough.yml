@@ -76,7 +76,7 @@ selector:
   # Queryable encryption test requires an internal connection for the keyvault that does not
   # inject a security token.
   - jstests/core/queryable_encryption/**/*.js
-  # TODO SERVER-82748: make "configureFailPoint" support unsigned security token.
+  # Failpoints do not support passing in tenancy information.
   - jstests/core/administrative/profile/profile_hide_index.js
   - jstests/core/failcommand_failpoint.js
   - jstests/core/comment_field.js

@@ -670,7 +670,6 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].end);
 }
 
-// TODO: SERVER-82748 Remove $tenant in BSON objects and pass the tenant information another way
 TEST_F(AllDatabaseClonerTest,
        DatabaseStatsMultitenancySupportAndFeatureFlagRequireTenantIdEnabled) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
@@ -758,7 +757,7 @@ TEST_F(AllDatabaseClonerTest,
             FailPoint::alwaysOn,
             0,
             fromjson(str::stream()
-                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', tenantId: ObjectId('"
                      << adminWithTenantId.tenantId()->toString() << "'), database: '"
                      << adminWithTenantId.toString_forTest() << "'}"));
 
@@ -766,7 +765,7 @@ TEST_F(AllDatabaseClonerTest,
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream()
-                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', tenantId: ObjectId('"
                  << adminWithTenantId.tenantId()->toString() << "'), database: '"
                  << adminWithTenantId.toString_forTest() << "'}"));
     // Wait for the failpoint to be reached.
@@ -793,14 +792,14 @@ TEST_F(AllDatabaseClonerTest,
             FailPoint::alwaysOn,
             0,
             fromjson(str::stream()
-                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', tenantId: ObjectId('"
                      << aabWithTenantId.tenantId()->toString() << "'), database: '"
                      << aabWithTenantId.toString_forTest() << "'}"));
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream()
-                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', tenantId: ObjectId('"
                  << aabWithTenantId.tenantId()->toString() << "'), database: '"
                  << aabWithTenantId.toString_forTest() << "'}"));
     // Wait for the failpoint to be reached.
@@ -826,14 +825,14 @@ TEST_F(AllDatabaseClonerTest,
             FailPoint::alwaysOn,
             0,
             fromjson(str::stream()
-                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                     << "{cloner: 'DatabaseCloner', stage: 'listCollections', tenantId: ObjectId('"
                      << aWithTenantId.tenantId()->toString() << "'), database: '"
                      << aWithTenantId.toString_forTest() << "'}"));
     dbClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
         fromjson(str::stream()
-                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', $tenant: ObjectId('"
+                 << "{cloner: 'DatabaseCloner', stage: 'listCollections', tenantId: ObjectId('"
                  << aWithTenantId.tenantId()->toString() << "'), database: '"
                  << aWithTenantId.toString_forTest() << "'}"));
 
