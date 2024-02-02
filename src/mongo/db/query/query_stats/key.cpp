@@ -108,7 +108,7 @@ BSONObj UniversalKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
     // Read concern should not be considered a literal.
     // afterClusterTime is distinct for every operation with causal consistency enabled. We
     // normalize it in order not to blow out the queryStats store cache.
-    if (readConcern["afterClusterTime"].eoo()) {
+    if (readConcern["afterClusterTime"].eoo() && readConcern["atClusterTime"].eoo()) {
         return readConcern.copy();
     } else {
         BSONObjBuilder bob;
@@ -116,7 +116,12 @@ BSONObj UniversalKeyComponents::shapifyReadConcern(const BSONObj& readConcern,
         if (auto levelElem = readConcern["level"]) {
             bob.append(levelElem);
         }
-        opts.appendLiteral(&bob, "afterClusterTime", readConcern["afterClusterTime"]);
+        if (auto afterClusterTime = readConcern["afterClusterTime"]) {
+            opts.appendLiteral(&bob, "afterClusterTime", afterClusterTime);
+        }
+        if (auto atClusterTime = readConcern["atClusterTime"]) {
+            opts.appendLiteral(&bob, "atClusterTime", atClusterTime);
+        }
         return bob.obj();
     }
 }

@@ -27,7 +27,9 @@ const primaryColl = primaryDB.getCollection(collName);
 
 primaryColl.drop();
 
-assert.commandWorked(primaryColl.insert({a: 1000}));
+const clusterTime =
+    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [{a: 1000}]}))
+        .operationTime;
 
 replTest.awaitReplication();
 
@@ -90,5 +92,14 @@ assert.eq(stats.key["readConcern"], {level: "local"});
 // We're not concerned with this field here.
 delete stats.key["collectionType"];
 confirmCommandFieldsPresent(stats.key, commandObj);
+
+// Check that the 'atClusterTime' parameter is shapified correctly.
+commandObj.readConcern = {
+    level: "snapshot",
+    atClusterTime: clusterTime
+},
+    assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
+stats = getLatestQueryStatsEntry(replSetConn, {collName: collName});
+assert.eq(stats.key["readConcern"], {level: "snapshot", atClusterTime: "?timestamp"});
 
 replTest.stopSet();

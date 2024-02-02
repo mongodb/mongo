@@ -79,8 +79,8 @@ struct UniversalKeyComponents {
                            query_shape::CollectionType collectionType,
                            bool maxTimeMS);
     /**
-     * Returns a copy of the read concern object. If there is an "afterClusterTime" component, the
-     * timestamp is shapified according to 'opts'.
+     * Returns a copy of the read concern object. If there is an "afterClusterTime" or
+     * "atClusterTime" component, the timestamp is shapified according to 'opts'.
      */
     static BSONObj shapifyReadConcern(
         const BSONObj& readConcern,
@@ -102,7 +102,7 @@ struct UniversalKeyComponents {
 
     // Preserved literal except value of 'tags' field is sorted.
     BSONObj _shapifiedReadPreference;
-    // Preserved literal except afterClusterTime is shapified.
+    // Preserved literal except 'afterClusterTime' and 'atClusterTime' are shapified.
     BSONObj _shapifiedReadConcern;
 
     // Separate the possibly-enormous BSONObj from the remaining members
