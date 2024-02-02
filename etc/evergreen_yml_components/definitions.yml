@@ -32,8 +32,6 @@ variables:
   - amazon
   - enterprise-linux-64-amazon-ami
   - amazon2
-  - amazon2-openssl111
-  - amazon2-arm64-openssl111
   - amazon2023
   - amazon2023-arm64
   - enterprise-amazon2
