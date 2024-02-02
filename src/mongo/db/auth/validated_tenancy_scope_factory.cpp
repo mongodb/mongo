@@ -48,6 +48,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/net/socket_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -357,7 +358,23 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(std::string token, In
 
 ValidatedTenancyScope ValidatedTenancyScopeFactory::create(TenantId tenant,
                                                            TrustedForInnerOpMsgRequestTag) {
-    return ValidatedTenancyScope(std::move(tenant));
+    crypto::JWSHeader header;
+    header.setType("JWT"_sd);
+    header.setAlgorithm("none"_sd);
+    header.setKeyId("none"_sd);
+
+    crypto::JWT body;
+    body.setIssuer("mongodb://{}"_format(getHostNameCachedAndPort()));
+    body.setSubject(".");
+    body.setAudience(std::string{"interal-request"});
+    body.setTenantId(tenant);
+    body.setExpiration(Date_t::max());
+    body.setExpectPrefix(false);  // Always use default protocol, not expect prefix.
+
+    const std::string originalToken = "{}.{}."_format(base64url::encode(tojson(header.toBSON())),
+                                                      base64url::encode(tojson(body.toBSON())));
+    return ValidatedTenancyScope(
+        originalToken, std::move(tenant), ValidatedTenancyScope::TenantProtocol::kDefault);
 }
 
 ValidatedTenancyScopeGuard::ValidatedTenancyScopeGuard(OperationContext* opCtx) : _opCtx(opCtx) {

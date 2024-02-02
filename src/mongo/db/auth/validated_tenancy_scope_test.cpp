@@ -256,6 +256,18 @@ TEST_F(ValidatedTenancyScopeTestFixture, VTSCreateFromOriginalToken) {
     assertIdenticalVTS(*vts, *copyVts);
 }
 
+TEST_F(ValidatedTenancyScopeTestFixture, VTSCreateWithInnerRequestTag) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    const TenantId kTenantId(OID::gen());
+    const auto vts = ValidatedTenancyScopeFactory::create(
+        kTenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{});
+
+    ASSERT_FALSE(vts.getOriginalToken().empty());
+    ASSERT_FALSE(vts.isFromAtlasProxy());
+    ASSERT_EQUALS(vts.tenantId(), kTenantId);
+    ASSERT(ValidatedTenancyScopeFactory::parse(client.get(), {}, vts.getOriginalToken()));
+}
 }  // namespace
 }  // namespace auth
 }  // namespace mongo
