@@ -445,11 +445,14 @@ void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
-    auto queryNss = query.nss();
+
+    // The following are expensive to look up, so only do it once for each.
+    const mongo::NamespaceString nss = query.nss();
+    const bool isOplog = nss.isOplog();
 
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
-    csn->name = queryNss.ns().toString();
+    csn->name = nss.ns().toString();
     csn->filter = query.root()->clone();
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =
@@ -457,6 +460,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->shouldWaitForOplogVisibility =
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
     csn->direction = direction;
+    csn->isOplog = isOplog;
 
     if (params.clusteredInfo) {
         csn->clusteredIndex = params.clusteredInfo->getIndexSpec();

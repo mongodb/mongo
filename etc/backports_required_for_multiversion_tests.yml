@@ -453,6 +453,10 @@ last-continuous:
     ticket: SERVER-84130
   - test_file: jstests/core/txns/out_not_blocked_by_txn.js
     ticket: SERVER-72703
+  - test_file: jstests/core/notablescan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/clustered_coll_scan.js
+    ticket: SERVER-83119
   suites: null
 last-lts:
   all:
@@ -948,4 +952,8 @@ last-lts:
     ticket: SERVER-84130
   - test_file: jstests/core/txns/out_not_blocked_by_txn.js
     ticket: SERVER-72703
+  - test_file: jstests/core/notablescan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/clustered_coll_scan.js
+    ticket: SERVER-83119
   suites: null

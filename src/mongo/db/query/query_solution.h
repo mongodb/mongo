@@ -448,6 +448,10 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
         return false;
     }
 
+    bool doClusteredCollectionScan() const {
+        return (!isOplog && (minRecord || maxRecord));
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     // Name of the namespace.
@@ -488,6 +492,9 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     boost::optional<Timestamp> assertTsHasNotFallenOff = boost::none;
 
     int direction{1};
+
+    // Tells whether the collection is an oplog.
+    bool isOplog = false;
 
     // By default, includes the minRecord and maxRecord when present.
     CollectionScanParams::ScanBoundInclusion boundInclusion =
