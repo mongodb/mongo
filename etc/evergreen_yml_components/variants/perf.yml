@@ -77,7 +77,6 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
-    - name: ycsb_single_thread
     - name: ycsb_60GB.2023-09
     - name: tpcc
     - name: tpcc_majority
@@ -179,7 +178,6 @@ buildvariants:
     - name: ycsb_60GB.2023-09
     - name: ycsb.load
     - name: ycsb_60GB.long.2023-09
-    - name: ycsb_single_thread
     - name: ycsb_secondary_reads.2023-09
     - name: crud_workloads_majority
     - name: crud_workloads_w1
@@ -249,7 +247,6 @@ buildvariants:
     - name: ycsb.2023-09
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
-    - name: ycsb_single_thread
     - name: crud_workloads_majority
     - name: smoke_test
     - name: bestbuy_agg

@@ -17,6 +17,7 @@ functions:
     - command: expansions.write
       params:
         file: ./expansions.yml
+        redacted: true
     - command: shell.exec
       params:
         script: ./src/dsi/run-dsi run_workload
