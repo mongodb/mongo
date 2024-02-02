@@ -20,7 +20,6 @@ variables:
 
 # Used when the tests it runs depend only on mongod, mongos, the jstestshell and the tools.
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
@@ -38,7 +37,6 @@ variables:
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
@@ -59,7 +57,6 @@ variables:
       resmoke_args: --help
 
 # THIS HAS COPIES IN
-# - etc/evergreen_yml_components/definitions.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/clusters_and_integrations/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/durable_transactions_and_availability/tasks.yml
 # - etc/evergreen_yml_components/tasks/resmoke/server_divisions/query/tasks.yml
@@ -85,6 +82,45 @@ variables:
 #                    Tasks                     #
 ################################################
 tasks:
+## pretty_printer ##
+- <<: *task_template
+  name: run_pretty_printer_tests
+  tags: ["assigned_to_jira_team_devprod_build"]
+  commands:
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "configure evergreen api credentials"
+  - func: "do setup"
+    vars:
+      extraction_change_dir: build/install/
+  - command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_debugsymbols}
+      bucket: mciuploads
+      local_file: src/mongo-debugsymbols.tgz
+      optional: true
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/functions/binaries_extract.py"
+      - "--tarball=mongo-debugsymbols.tgz"
+      - "--extraction-command=${decompress}"
+      - "--change-dir=build/install/"
+      - "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
+  - func: "run tests"
+    vars:
+      suite: pretty-printer-tests
+      install_dir: build/install/dist-test/bin
+      exec_timeout_secs: 1800 # 30 min timeout.
+
 - name: buildscripts_test
   tags: ["assigned_to_jira_team_devprod_correctness"]
   depends_on: []
@@ -119,6 +155,15 @@ tasks:
   patch_only: true
   commands:
   - func: "generate resmoke tasks"
+
+- <<: *task_template
+  name: mongosTest
+  tags: ["assigned_to_jira_team_devprod_correctness", "misc_js", "non_read_maj", "non_live_record"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      suite: mongos_test
 
 ## Tests that the multiversion test generation logic is not broken.
 - <<: *gen_task_template

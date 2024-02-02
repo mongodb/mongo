@@ -911,6 +911,7 @@ tasks:
       compiling_for_test: true
 
 - name: compile_and_run_unittests_first_quarter
+  tags: ["assigned_to_jira_team_devprod_build"]
   exec_timeout_secs: 10800 # 3 hours
   depends_on:
   - name: compile_dist_test
@@ -931,6 +932,7 @@ tasks:
       exec_timeout_secs: 10800 # 3 hours
 
 - name: compile_and_run_unittests_second_quarter
+  tags: ["assigned_to_jira_team_devprod_build"]
   exec_timeout_secs: 10800 # 3 hours
   depends_on:
   - name: compile_dist_test
@@ -951,6 +953,7 @@ tasks:
       exec_timeout_secs: 10800 # 3 hours
 
 - name: compile_and_run_unittests_third_quarter
+  tags: ["assigned_to_jira_team_devprod_build"]
   exec_timeout_secs: 10800 # 3 hours
   depends_on:
   - name: compile_dist_test
@@ -971,6 +974,7 @@ tasks:
       exec_timeout_secs: 10800 # 3 hours
 
 - name: compile_and_run_unittests_fourth_quarter
+  tags: ["assigned_to_jira_team_devprod_build"]
   exec_timeout_secs: 10800 # 3 hours
   depends_on:
   - name: compile_dist_test
@@ -1002,7 +1006,7 @@ tasks:
 ## run_unittests ##
 - &run_unittests
   name: run_unittests
-  tags: []
+  tags: ["assigned_to_jira_team_devprod_build"]
   depends_on:
   - name: compile_unittests
   commands:
@@ -1023,6 +1027,7 @@ tasks:
 
 ## run_unittests with UndoDB live-record ##
 #- name: run_unittests_with_recording
+#  tags: ["assigned_to_jira_team_devprod_build"]
 #  depends_on:
 #  - name: compile_unittests_for_recorded_unittest
 #  commands:
@@ -1093,7 +1098,7 @@ tasks:
 ## run_dbtest ##
 - &run_dbtest
   name: run_dbtest
-  tags: []
+  tags: ["assigned_to_jira_team_devprod_build"]
   depends_on:
   - name: compile_dbtest
   commands:
