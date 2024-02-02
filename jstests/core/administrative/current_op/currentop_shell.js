@@ -105,10 +105,10 @@ if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
             assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
         });
     } catch (e) {
-        const chunksInfo =
-            coll.getDB().getSiblingDB("config").chunks.find({uuid: collInfo.uuid}).toArray();
         const collInfo =
             coll.getDB().getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
+        const chunksInfo =
+            coll.getDB().getSiblingDB("config").chunks.find({uuid: collInfo.uuid}).toArray();
         jsTestLog(res);
         jsTestLog(collInfo);
         jsTestLog(chunksInfo);
