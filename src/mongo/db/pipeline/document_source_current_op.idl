@@ -1,0 +1,63 @@
+# Copyright (C) 2023-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+  cpp_namespace: "mongo"
+
+imports:
+  - "mongo/db/basic_types.idl"
+
+structs:
+  CurrentOpSpec:
+    description: Specification for a $currentOp stage.
+    strict: true
+    fields:
+      allUsers:
+        description: Determines whether we will report ops belonging to all users or those belonging to the current user.
+        type: optionalBool
+      idleConnections:
+        description: If false, only reports on active ops. It true, also reports on idle connections. 
+        type: optionalBool
+      idleCursors:
+        description: If false, only reports on active cursors. If true, also reports on idle cursors. 
+        type: optionalBool
+      idleSessions:
+        description: If false, only reports on active sessions. If true, also reports on idle sessions.
+        type: optionalBool
+      localOps:
+        description: Determines whether we will only report ops running locally on mongos or only those running on shards.
+        type: optionalBool
+      backtrace:
+        description: Determines whether callstack information is returned as part of the waitingForLatch output field.
+        type: optionalBool
+      truncateOps:
+        description: Determines whether the output should be truncated. Internal, only allowed when the server is in test mode.
+        type: optionalBool
+      targetAllNodes:
+        description: Determines whether we will retrieve operations from all members of each shard in a cluster.
+        type: optionalBool

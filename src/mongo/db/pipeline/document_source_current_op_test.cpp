@@ -129,42 +129,42 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIdleConnectionsIfNotBoolean
     const auto specObj = fromjson("{$currentOp:{idleConnections:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIdleSessionsIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{idleSessions:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseAllUsersIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{allUsers:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseLocalOpsIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{localOps:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTruncateOpsIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{truncateOps:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTargetAllNodesIfNotBoolean) {
     const auto specObj = fromjson("{$currentOp:{targetAllNodes:1}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       ErrorCodes::TypeMismatch);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseTrueTargetAllNodesIfTrueLocalOps) {
@@ -200,7 +200,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpec
     const auto specObj = fromjson("{$currentOp:{foo:true}}");
     ASSERT_THROWS_CODE(DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       40415);  // Location40415: BSON field '$currentOp.foo' is an unknown field.
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeAllExplicitlySpecifiedArguments) {
