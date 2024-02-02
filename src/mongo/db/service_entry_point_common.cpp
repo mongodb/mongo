@@ -1761,6 +1761,7 @@ void ExecCommandDatabase::_initiateCommand() {
                   fmt::format("unexpected unset provenance on readConcern: {}",
                               newReadConcernArgs.toBSONInner().toString()));
 
+        // TODO SERVER-85643 Check for startOrContinueTransaction as well
         uassert(ErrorCodes::InvalidOptions,
                 "Only the first command in a transaction may specify a readConcern",
                 startTransaction || !opCtx->inMultiDocumentTransaction() ||

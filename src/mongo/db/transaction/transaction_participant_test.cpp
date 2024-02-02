@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -2160,7 +2162,7 @@ TEST_F(TxnParticipantTest, StartOrContinueTxnWithEqualTxnNumsShouldContinue) {
 }
 
 TEST_F(ShardTxnParticipantTest,
-       StartOrContinueTxnWithGreaterRetryCounterInProgressStateCounterShouldRestart) {
+       StartOrContinueTxnWithGreaterRetryCounterInProgressStateShouldRestart) {
     auto sessionCheckout = checkOutSession();
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT(txnParticipant.transactionIsInProgress());
@@ -2281,6 +2283,7 @@ TEST_F(ShardTxnParticipantTest,
               *opCtx()->getTxnNumber());
     ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnRetryCounter(), 0);
 }
+
 TEST_F(ShardTxnParticipantTest,
        StartOrContinueTxnWithEqualRetryCounterAndPreparedStateShouldContinue) {
     auto sessionCheckout = checkOutSession();
@@ -2510,6 +2513,90 @@ TEST_F(
         ASSERT_EQ(txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber(),
                   *newOpCtx->getTxnNumber());
     });
+}
+
+TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithMatchingReadConcernShouldContinue) {
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(
+        readConcernArgs.initialize(BSON("find"
+                                        << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                        << BSON(repl::ReadConcernArgs::kAfterClusterTimeFieldName
+                                                << LogicalTime(Timestamp(1, 2)).asTimestamp()
+                                                << repl::ReadConcernArgs::kLevelFieldName
+                                                << "majority"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsInProgress());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    // Stash the resources to mimic that an op with readConern 'readConcern' has already executed
+    txnParticipant.stashTransactionResources(opCtx());
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getLevel(),
+              repl::ReadConcernArgs::get(opCtx()).getLevel());
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getArgsAtClusterTime(),
+              repl::ReadConcernArgs::get(opCtx()).getArgsAtClusterTime());
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getArgsAfterClusterTime(),
+              repl::ReadConcernArgs::get(opCtx()).getArgsAfterClusterTime());
+
+    // The readConern on the opCtx has not been updated and it matches that on the TxnResourceStash,
+    // so the TransactionParticipant should continue
+    txnParticipant.beginOrContinue(opCtx(),
+                                   {*opCtx()->getTxnNumber()},
+                                   false /* autocommit */,
+                                   TransactionParticipant::TransactionActions::kStartOrContinue);
+    ASSERT_TRUE(txnParticipant.transactionIsInProgress());
+}
+
+
+TEST_F(ShardTxnParticipantTest, StartOrContinueTxnWithDifferentReadConcernShouldError) {
+    repl::ReadConcernArgs originalReadConcernArgs;
+    ASSERT_OK(originalReadConcernArgs.initialize(
+        BSON("find"
+             << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+             << BSON(repl::ReadConcernArgs::kAfterClusterTimeFieldName
+                     << LogicalTime(Timestamp(1, 2)).asTimestamp()
+                     << repl::ReadConcernArgs::kLevelFieldName << "majority"))));
+    repl::ReadConcernArgs::get(opCtx()) = originalReadConcernArgs;
+
+    auto sessionCheckout = checkOutSession();
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    ASSERT(txnParticipant.transactionIsInProgress());
+    txnParticipant.unstashTransactionResources(opCtx(), "insert");
+
+    // Stash the resources to mimic that an op with readConern 'readConcern' has already executed
+    txnParticipant.stashTransactionResources(opCtx());
+
+    // Set the newReadConernArgs on the opCtx before calling beginOrContinue to mimic the service
+    // entry point's behavior. The readConcern args on the TxnResourceStash should still be the
+    // original readConern.
+    repl::ReadConcernArgs newReadConcernArgs;
+    ASSERT_OK(
+        newReadConcernArgs.initialize(BSON("find"
+                                           << "test" << repl::ReadConcernArgs::kReadConcernFieldName
+                                           << BSON(repl::ReadConcernArgs::kAtClusterTimeFieldName
+                                                   << LogicalTime(Timestamp(1, 2)).asTimestamp()
+                                                   << repl::ReadConcernArgs::kLevelFieldName
+                                                   << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = newReadConcernArgs;
+
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getLevel(),
+              originalReadConcernArgs.getLevel());
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getArgsAtClusterTime(),
+              originalReadConcernArgs.getArgsAtClusterTime());
+    ASSERT_EQ(txnParticipant.getTxnResourceStashReadConcernArgsForTest().getArgsAfterClusterTime(),
+              originalReadConcernArgs.getArgsAfterClusterTime());
+
+    // Assert that we fail to continue the transaction because the readConcern on the
+    // TxnResourceStash does not match that on the opCtx
+    ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
+                           opCtx(),
+                           {*opCtx()->getTxnNumber()},
+                           false /* autocommit */,
+                           TransactionParticipant::TransactionActions::kStartOrContinue),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
 }
 
 /**

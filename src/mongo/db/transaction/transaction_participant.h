@@ -837,6 +837,11 @@ public:
             return o().txnResourceStash->recoveryUnit();
         }
 
+        repl::ReadConcernArgs getTxnResourceStashReadConcernArgsForTest() const {
+            invariant(o().txnResourceStash);
+            return o().txnResourceStash->getReadConcernArgs();
+        }
+
         void transitionToPreparedforTest(OperationContext* opCtx, repl::OpTime prepareOpTime) {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             o(lk).prepareOpTime = prepareOpTime;
@@ -1042,7 +1047,9 @@ public:
         // Attempt to continue an in-progress multi document transaction at the given transaction
         // number and transaction retry counter.
         void _continueMultiDocumentTransaction(
-            OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter);
+            OperationContext* opCtx,
+            const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+            TransactionActions action);
 
         // Implementation of public refreshFromStorageIfNeeded methods.
         void _refreshFromStorageIfNeeded(OperationContext* opCtx, bool fetchOplogEntries);

@@ -932,7 +932,9 @@ void TransactionParticipant::Participant::_beginOrContinueRetryableWrite(
 }
 
 void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
-    OperationContext* opCtx, const TxnNumberAndRetryCounter& txnNumberAndRetryCounter) {
+    OperationContext* opCtx,
+    const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
+    TransactionActions action) {
     uassert(ErrorCodes::NoSuchTransaction,
             str::stream()
                 << "Given transaction number " << txnNumberAndRetryCounter.getTxnNumber()
@@ -982,6 +984,23 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
             str::stream()
                 << "Transaction with " << txnNumberAndRetryCounter.toBSON()
                 << " has been aborted because an earlier command in this transaction failed.");
+    }
+
+    if (action == TransactionParticipant::TransactionActions::kStartOrContinue &&
+        o().txnResourceStash) {
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot continue transaction "
+                              << txnNumberAndRetryCounter.getTxnNumber() << " on session "
+                              << _sessionId() << " because readConcern  "
+                              << repl::ReadConcernArgs::get(opCtx).toString()
+                              << " does not match the existing readConcern for the transaction  "
+                              << o().txnResourceStash->getReadConcernArgs().toString(),
+                o().txnResourceStash->getReadConcernArgs().getLevel() ==
+                        repl::ReadConcernArgs::get(opCtx).getLevel() &&
+                    o().txnResourceStash->getReadConcernArgs().getArgsAfterClusterTime() ==
+                        repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime() &&
+                    o().txnResourceStash->getReadConcernArgs().getArgsAtClusterTime() ==
+                        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
     }
 }
 
@@ -1138,7 +1157,9 @@ void TransactionParticipant::Participant::beginOrContinue(
     }
 
     if (!startTransaction) {
-        _continueMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
+        invariant(action == TransactionActions::kContinue ||
+                  action == TransactionActions::kStartOrContinue);
+        _continueMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter, action);
         return;
     }
 
