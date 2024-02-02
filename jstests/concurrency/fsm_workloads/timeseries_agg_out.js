@@ -90,7 +90,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     /**
-     * 'convertToCapped' should always fail with a 'CommandNotSupportedOnView' error.
+     * Convert the collection to capped.
      */
     $config.states.convertToCapped = function convertToCapped(db, unusedCollName) {
         if (isMongos(db)) {
@@ -99,12 +99,7 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
         jsTestLog(`Running convertToCapped: coll=${this.outputCollName}`);
         assert.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
-            ErrorCodes.CommandNotSupportedOnView);
-    };
-
-    // TODO: SERVER-85439 Enable movePrimary once the bug is fixed
-    $config.states.movePrimary = function movePrimary(db, collName) {
-        return;
+            [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.NamespaceNotFound]);
     };
 
     $config.teardown = function teardown(db) {
