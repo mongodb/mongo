@@ -1658,9 +1658,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line(_gen_mark_present(field.cpp_name))
 
     def gen_field_deserializer(self, field, field_type, bson_object, bson_element,
-                               field_usage_check, tenant, is_command_field=False, check_type=True,
-                               deserialize_fn=None):
-        # type: (ast.Field, ast.Type, str, str, _FieldUsageCheckerBase, str, bool, bool, Optional[Callable[[], None]]) -> None
+                               field_usage_check, tenant, is_command_field=False, check_type=True):
+        # type: (ast.Field, ast.Type, str, str, _FieldUsageCheckerBase, str, bool, bool) -> None
         """Generate the C++ deserializer piece for a field.
 
         If field_type is scalar and check_type is True (the default), generate type-checking code.
@@ -1675,18 +1674,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (bson_element)
             with self._predicate(predicate):
                 self._gen_usage_check(field, bson_element, field_usage_check)
-                if deserialize_fn:
-                    deserialize_fn()
-                else:
-                    self._gen_array_deserializer(field, bson_element, field_type, tenant)
+                self._gen_array_deserializer(field, bson_element, field_type, tenant)
             return
 
         elif field_type.is_variant:
             self._gen_usage_check(field, bson_element, field_usage_check)
-            if deserialize_fn:
-                deserialize_fn()
-            else:
-                self._gen_variant_deserializer(field, bson_element, tenant)
+            self._gen_variant_deserializer(field, bson_element, tenant)
             return
 
         def validate_and_assign_or_uassert(field, expression):
@@ -1703,7 +1696,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('%s = std::move(value);' % (field_name))
 
         if field.chained:
-            assert not deserialize_fn
             # Do not generate a predicate check since we always call these deserializers.
 
             if field_type.is_struct:
@@ -1726,9 +1718,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._predicate(predicate):
 
                 self._gen_usage_check(field, bson_element, field_usage_check)
-                if deserialize_fn:
-                    deserialize_fn()
-                    return
 
                 object_value = self._gen_field_deserializer_expression(
                     bson_element, field, field_type, tenant)
@@ -1744,11 +1733,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         '%s.%s(%s);' % (_get_field_member_name(field.chained_struct_field),
                                         _get_field_member_setter_name(field), object_value))
-                elif field.name == 'expectPrefix':
-                    # expectPrefix is only included in commands, and we need this value to set
-                    # the state in the local SerializerFlags object
-                    self._writer.write_line(
-                        '_serializationContext.setPrefixState(%s);' % object_value)
                 else:
                     validate_and_assign_or_uassert(field, object_value)
 
@@ -2016,45 +2000,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-        deferred_fields = []  # type: List[ast.Field]
-        deferred_field_names = []  # type: List[str]
         field_name_map = {f.name: f for f in struct.fields}
 
         def map_field(field_name):
             field = field_name_map[field_name]
 
-            def defer_field():
-                # type: () -> None
-                """Field depends on other field(s), store its location and defer processing till later."""
-                assert field.name in deferred_field_names
-                self._writer.write_line('%s = element;' % (_gen_field_element_name(field)))
-
             if field.ignore:
                 field_usage_check.add(field, "element")
                 self._writer.write_line('// ignore field')
             else:
-                fn = defer_field if field.name in deferred_field_names else None
                 self.gen_field_deserializer(field, field.type, bson_object, "element",
-                                            field_usage_check, tenant, deserialize_fn=fn)
+                                            field_usage_check, tenant)
             self._writer.write_line('return true;')
-
-        if 'expectPrefix' in [field.name for field in struct.fields]:
-            # Deserialization of 'expectPrefix' modifies the deserializationContext and how
-            # certain other fields are then deserialized.
-            # Such dependent fields include those which "deserialize_with_tenant" and
-            # any complex struct type.
-            # In practice, this typically only occurs on Command structs.
-            deferred_fields = [
-                field for field in struct.fields
-                if field.type and (field.type.is_struct or field.type.deserialize_with_tenant)
-            ]
-            deferred_field_names = [field.name for field in deferred_fields]
-            if deferred_fields:
-                self._writer.write_line(
-                    '// Anchors for values of fields which may depend on others.')
-                for field in deferred_fields:
-                    self._writer.write_line('BSONElement %s;' % (_gen_field_element_name(field)))
-                self._writer.write_empty_line()
 
         with self._block('for (const auto& element :%s) {' % (bson_object), '}'):
 
@@ -2105,14 +2062,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 with writer.IndentedScopedBlock(
                         self._writer, 'if (MONGO_unlikely(push_result.second == false)) {', '}'):
                     self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
-
-        # Handle the deferred fields after their possible dependencies have been processed.
-        for field in deferred_fields:
-            element_name = _gen_field_element_name(field)
-            self._writer.write_empty_line()
-            with self._predicate(element_name):
-                self.gen_field_deserializer(field, field.type, bson_object, element_name, None,
-                                            tenant)
 
         # Parse chained structs if not inlined
         # Parse chained types always here
@@ -2675,9 +2624,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if field.supports_doc_sequence and is_op_msg_request:
                 continue
 
-            # Internal-only types aren't serialized or deserialized, while expectPrefix should not
-            # be serialized
-            if field.type and field.type.internal_only or field.name == 'expectPrefix':
+            # Internal-only types aren't serialized or deserialized.
+            if field.type and field.type.internal_only:
                 continue
 
             self._gen_serializer_method_common(field)

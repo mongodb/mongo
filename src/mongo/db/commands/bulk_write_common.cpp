@@ -176,7 +176,6 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
     const mongo::NamespaceInfoEntry& nsInfoEntry) {
     write_ops::InsertCommandRequest request(nsInfoEntry.getNs(), documents);
     request.setDollarTenant(req.getDollarTenant());
-    request.setExpectPrefix(req.getExpectPrefix());
     auto& requestBase = request.getWriteCommandRequestBase();
     requestBase.setEncryptionInformation(nsInfoEntry.getEncryptionInformation());
     requestBase.setOrdered(req.getOrdered());
@@ -253,7 +252,6 @@ write_ops::UpdateCommandRequest makeUpdateCommandRequestFromUpdateOp(
     write_ops::UpdateCommandRequest updateCommand(nsEntry.getNs(), updates);
 
     updateCommand.setDollarTenant(req.getDollarTenant());
-    updateCommand.setExpectPrefix(req.getExpectPrefix());
     updateCommand.setLet(req.getLet());
 
     auto& requestBase = updateCommand.getWriteCommandRequestBase();
@@ -285,7 +283,6 @@ write_ops::DeleteCommandRequest makeDeleteCommandRequestForFLE(
     std::vector<write_ops::DeleteOpEntry> deletes{deleteEntry};
     write_ops::DeleteCommandRequest deleteRequest(nsEntry.getNs(), deletes);
     deleteRequest.setDollarTenant(req.getDollarTenant());
-    deleteRequest.setExpectPrefix(req.getExpectPrefix());
     deleteRequest.setLet(req.getLet());
     deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
 

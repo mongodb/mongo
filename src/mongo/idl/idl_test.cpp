@@ -2542,14 +2542,14 @@ OpMsgRequest makeOMR(BSONObj obj) {
     return request;
 }
 
-OpMsgRequest makeOMRWithTenant(BSONObj obj, TenantId tenant) {
+using VTS = auth::ValidatedTenancyScope;
+OpMsgRequest makeOMRWithTenant(BSONObj obj, TenantId tenant, VTS::TenantProtocol tenantProtocol) {
     OpMsgRequest request;
     request.body = obj;
 
-    using VTS = auth::ValidatedTenancyScope;
     request.validatedTenancyScope = auth::ValidatedTenancyScopeFactory::create(
         std::move(tenant),
-        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+        tenantProtocol,
         auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
     return request;
 }
@@ -2605,8 +2605,6 @@ TEST(IDLCommand, TestConcatentateWithDb) {
 
 TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    IDLParserContext ctxt("root");
-
     const auto tenantId = TenantId(OID::gen());
     const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
 
@@ -2614,7 +2612,6 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
                        .append(BasicConcatenateWithDbCommand::kCommandName, "coll1")
                        .append("field1", 3)
                        .append("field2", "five")
-                       .append("expectPrefix", true)
                        .append("$db", prefixedDb)
                        .obj();
 
@@ -2625,8 +2622,10 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
                          .append("$db", prefixedDb)
                          .obj();
 
-    auto testStruct =
-        BasicConcatenateWithDbCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
+    auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
+    IDLParserContext ctxt("root", false, opMsg.validatedTenancyScope, tenantId);
+
+    auto testStruct = BasicConcatenateWithDbCommand::parse(ctxt, opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespace(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
@@ -2763,8 +2762,6 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
 
 TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    IDLParserContext ctxt("root");
-
     const auto tenantId = TenantId(OID::gen());
     const auto prefixedDb = std::string(str::stream() << tenantId.toString() << "_db");
 
@@ -2772,7 +2769,6 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
                        .append(BasicConcatenateWithDbOrUUIDCommand::kCommandName, "coll1")
                        .append("field1", 3)
                        .append("field2", "five")
-                       .append("expectPrefix", true)
                        .append("$db", prefixedDb)
                        .obj();
 
@@ -2783,8 +2779,10 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
                          .append("$db", prefixedDb)
                          .obj();
 
-    auto testStruct =
-        BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
+    const auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
+    IDLParserContext ctxt("root", false, opMsg.validatedTenancyScope, tenantId);
+
+    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
@@ -2846,7 +2844,6 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
 
 TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    IDLParserContext ctxt("root");
 
     UUID uuid = UUID::gen();
     const auto tenantId = TenantId(OID::gen());
@@ -2857,7 +2854,6 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
             .appendElements(BSON(BasicConcatenateWithDbOrUUIDCommand::kCommandName << uuid))
             .append("field1", 3)
             .append("field2", "five")
-            .append("expectPrefix", true)
             .append("$db", prefixedDb)
             .obj();
 
@@ -2869,8 +2865,10 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
             .append("$db", prefixedDb)
             .obj();
 
-    auto testStruct =
-        BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
+    const auto opMsg = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kAtlasProxy);
+    IDLParserContext ctxt("root", false, opMsg.validatedTenancyScope, tenantId);
+
+    auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, opMsg);
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName(),
                   DatabaseName::createDatabaseName_forTest(tenantId, "db"));
@@ -4267,8 +4265,8 @@ TEST(IDLCommand,
                                                                   << "admin");
 
     const auto tenantId = TenantId(OID::gen());
-    auto testStruct =
-        CommandTypeNamespaceCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
+    auto testStruct = CommandTypeNamespaceCommand::parse(
+        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
     ASSERT_EQUALS(testStruct.getDbName(),
                   DatabaseName::createDatabaseName_forTest(tenantId, "admin"));
     ASSERT_EQUALS(testStruct.getCommandParameter(),
@@ -4320,7 +4318,8 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
                        .obj();
 
     const auto tenantId = TenantId(OID::gen());
-    auto testStruct = CommandWithNamespaceMember::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
+    auto testStruct = CommandWithNamespaceMember::parse(
+        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
 
     assert_same_types<decltype(testStruct.getField1()), const NamespaceString&>();
     assert_same_types<decltype(testStruct.getField2()),
@@ -4358,7 +4357,8 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
                        .obj();
 
     const auto tenantId = TenantId(OID::gen());
-    auto testStruct = CommandWithNamespaceStruct::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
+    auto testStruct = CommandWithNamespaceStruct::parse(
+        ctxt, makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault));
 
     assert_same_types<decltype(testStruct.getField1()), NamespaceInfoStruct&>();
     assert_same_types<decltype(testStruct.getField2()), std::vector<NamespaceInfoStruct>&>();
@@ -4389,11 +4389,6 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
-    const auto vts = auth::ValidatedTenancyScopeFactory::create(
-        tenantId,
-        auth::ValidatedTenancyScope::TenantProtocol::kDefault,
-        auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
-    IDLParserContext ctxt("root", false, vts, tenantId);
 
     auto nsInfoStructBSON = [&](const char* ns) {
         BSONObjBuilder builder;
@@ -4409,10 +4404,10 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
             .obj();
 
     const auto otherTenantId = TenantId(OID::gen());
-    ASSERT_THROWS_CODE(
-        CommandWithNamespaceStruct::parse(ctxt, makeOMRWithTenant(testDoc, otherTenantId)),
-        DBException,
-        8423379);
+    const auto otherOpMsg =
+        makeOMRWithTenant(testDoc, otherTenantId, VTS::TenantProtocol::kDefault);
+    auto ctxt = IDLParserContext("root", false, otherOpMsg.validatedTenancyScope, tenantId);
+    ASSERT_THROWS_CODE(CommandWithNamespaceStruct::parse(ctxt, otherOpMsg), DBException, 8423379);
 }
 
 TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
@@ -4449,7 +4444,7 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
             OpMsgRequest request;
             if (multitenancySupport) {
                 const auto tenantId = TenantId(OID::gen());
-                request = makeOMRWithTenant(testDoc, tenantId);
+                request = makeOMRWithTenant(testDoc, tenantId, VTS::TenantProtocol::kDefault);
             } else
                 request.body = testDoc;
 
@@ -4502,7 +4497,7 @@ TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
                 tenantId = boost::make_optional(TenantId(OID::gen()));
                 vts = auth::ValidatedTenancyScopeFactory::create(
                     *tenantId,
-                    auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                    VTS::TenantProtocol::kDefault,
                     auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
             }
             IDLParserContext ctxt("root", false, vts, tenantId);
@@ -4565,7 +4560,7 @@ TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
                 tenantId = TenantId(OID::gen());
                 vts = auth::ValidatedTenancyScopeFactory::create(
                     *tenantId,
-                    auth::ValidatedTenancyScope::TenantProtocol::kDefault,
+                    VTS::TenantProtocol::kDefault,
                     auth::ValidatedTenancyScopeFactory::TenantForTestingTag{});
             }
             IDLParserContext ctxt("root", false, vts, tenantId);
@@ -4826,166 +4821,6 @@ TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgs) 
                               SerializationContext::CallerType::Request);
             }
         }
-    }
-}
-
-TEST(IDLTypeCommand, TestCommandParseExpectPrefix_MissingExpectPrefix) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-
-    IDLParserContext ctxt("root");
-
-    const std::string ns1 = "db.coll1";
-    const std::string ns2 = "a.b";
-    const std::string ns3 = "c.d";
-    auto nsInfoStructBSON = [&](StringData ns) {
-        BSONObjBuilder builder;
-        builder.append("ns", ns);
-        return builder.obj();
-    };
-    auto bypassStructBSON = [&]() {
-        BSONObjBuilder builder;
-        builder.append("field1", nsInfoStructBSON(ns1));
-        builder.append("field2", BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
-        return builder.obj();
-    };
-
-    auto testDoc = BSONObjBuilder{}
-                       .append("CommandWithBypassAndNamespaceMember", 1)
-                       .append("field1", bypassStructBSON())
-                       .append("$db", "admin")
-                       .obj();
-
-    OpMsgRequest request;
-    const auto tenantId = TenantId(OID::gen());
-    request = makeOMRWithTenant(testDoc, tenantId);
-
-    auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
-
-    auto serializationContextCommand = testStruct.getSerializationContext();
-    ASSERT_EQUALS(serializationContextCommand.getPrefix(), SerializationContext::Prefix::Default);
-
-    auto bypassStruct = testStruct.getField1();
-    auto serializationContextBypass = bypassStruct.getSerializationContext();
-    ASSERT_EQUALS(serializationContextBypass.getPrefix(), SerializationContext::Prefix::Default);
-
-    auto nsInfoStruct = bypassStruct.getField1();
-    auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-    ASSERT_EQUALS(serializationContextNsInfo.getPrefix(), SerializationContext::Prefix::Default);
-
-    auto nsInfoArray = bypassStruct.getField2();
-    for (const auto& nsInfo : nsInfoArray) {
-        auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-        ASSERT_EQUALS(serializationContextNsInfoArr.getPrefix(),
-                      SerializationContext::Prefix::Default);
-    }
-}
-
-TEST(IDLTypeCommand, TestCommandParseExpectPrefix) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-
-    for (bool expectPrefix : {false, true}) {
-        IDLParserContext ctxt("root");
-
-        const auto tenantId = TenantId(OID::gen());
-        std::string prefix = "";
-        if (expectPrefix)
-            prefix = str::stream() << tenantId.toString() << "_";
-
-        const std::string ns1 = prefix + "db.coll1";
-        const std::string ns2 = prefix + "a.b";
-        const std::string ns3 = prefix + "c.d";
-        auto nsInfoStructBSON = [&](StringData ns) {
-            BSONObjBuilder builder;
-            builder.append("ns", ns);
-            return builder.obj();
-        };
-        auto bypassStructBSON = [&]() {
-            BSONObjBuilder builder;
-            builder.append("field1", nsInfoStructBSON(ns1));
-            builder.append("field2", BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
-            return builder.obj();
-        };
-
-        auto testDoc = BSONObjBuilder{}
-                           .append("CommandWithBypassAndNamespaceMember", 1)
-                           .append("field1", bypassStructBSON())
-                           .append("expectPrefix", expectPrefix)
-                           .append("$db", prefix + "admin")
-                           .obj();
-
-        std::cout << "expectPrefix: " << (expectPrefix ? "true" : "false") << std::endl;
-        OpMsgRequest request;
-        request = makeOMRWithTenant(testDoc, tenantId);
-
-        std::cout << "request.body: " << request.body << std::endl;
-        auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
-
-        auto serializationContextCommand = testStruct.getSerializationContext();
-        ASSERT_EQUALS(serializationContextCommand.getPrefix(),
-                      expectPrefix ? SerializationContext::Prefix::IncludePrefix
-                                   : SerializationContext::Prefix::ExcludePrefix);
-
-        auto bypassStruct = testStruct.getField1();
-        auto serializationContextBypass = bypassStruct.getSerializationContext();
-        ASSERT_EQUALS(serializationContextBypass.getPrefix(),
-                      expectPrefix ? SerializationContext::Prefix::IncludePrefix
-                                   : SerializationContext::Prefix::ExcludePrefix);
-
-        auto nsInfoStruct = bypassStruct.getField1();
-        auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
-        ASSERT_EQUALS(serializationContextNsInfo.getPrefix(),
-                      expectPrefix ? SerializationContext::Prefix::IncludePrefix
-                                   : SerializationContext::Prefix::ExcludePrefix);
-
-        auto nsInfoArray = bypassStruct.getField2();
-        for (const auto& nsInfo : nsInfoArray) {
-            auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
-            ASSERT_EQUALS(serializationContextNsInfoArr.getPrefix(),
-                          expectPrefix ? SerializationContext::Prefix::IncludePrefix
-                                       : SerializationContext::Prefix::ExcludePrefix);
-        }
-    }
-}
-
-TEST(IDLTypeCommand, TestCommandParseDuplicateExpectPrefix) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-
-    for (bool featureFlag : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   featureFlag);
-        IDLParserContext ctxt("root");
-
-        const std::string ns1 = "db.coll1";
-        const std::string ns2 = "a.b";
-        const std::string ns3 = "c.d";
-        auto nsInfoStructBSON = [&](StringData ns) {
-            BSONObjBuilder builder;
-            builder.append("ns", ns);
-            return builder.obj();
-        };
-        auto bypassStructBSON = [&]() {
-            BSONObjBuilder builder;
-            builder.append("field1", nsInfoStructBSON(ns1));
-            builder.append("field2", BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
-            return builder.obj();
-        };
-
-        auto testDoc = BSONObjBuilder{}
-                           .append("CommandWithBypassAndNamespaceMember", 1)
-                           .append("field1", bypassStructBSON())
-                           .append("expectPrefix", true)
-                           .append("expectPrefix", false)
-                           .append("$db", "admin")
-                           .obj();
-
-        OpMsgRequest request;
-        const auto tenantId = TenantId(OID::gen());
-        request = makeOMRWithTenant(testDoc, tenantId);
-
-        ASSERT_THROWS(CommandWithBypassAndNamespaceStruct::parse(ctxt, request),
-                      AssertionException);
     }
 }
 
