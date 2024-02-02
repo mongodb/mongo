@@ -114,6 +114,9 @@ selector:
   - jstests/core/administrative/profile/profile1.js
   - jstests/aggregation/sources/lookup/profile_lookup.js
 
+  # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail
+  - jstests/core/bench_test1.js
+
 executor:
   archive:
     hooks:
