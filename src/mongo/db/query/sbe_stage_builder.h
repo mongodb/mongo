@@ -1126,6 +1126,18 @@ private:
                                                          PlanStageSlots& outputs,
                                                          bool forFilterStage);
 
+    /**
+     * Given a scalar filter Expression it tries to produced the vectorised stage. If this is
+     * possible it returns a pair {vectorisedStage, true}. If this is not possible it adds a
+     * block-to-row transition and returns {newStage, false}.
+     */
+    std::pair<std::unique_ptr<sbe::PlanStage>, bool> buildVectorizedFilterExpr(
+        std::unique_ptr<sbe::PlanStage> stage,
+        const PlanStageReqs& reqs,
+        SbExpr scalarFilterExpression,
+        PlanStageSlots& outputs,
+        PlanNodeId nodeId);
+
     std::unique_ptr<sbe::EExpression> buildLimitSkipAmountExpression(
         LimitSkipParameterization canBeParameterized,
         long long amount,

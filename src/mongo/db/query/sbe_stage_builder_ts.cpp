@@ -382,73 +382,30 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     if (eventFilter) {
         auto eventFilterSbExpr =
             generateFilter(_state, eventFilter, /*rootSlot*/ boost::none, &outputs);
-        auto filterExpr = buildVectorizedExpr(std::move(eventFilterSbExpr), outputs, true);
-        if (filterExpr.has_value()) {
-            if (auto constExpr = filterExpr->expr->as<sbe::EConstant>(); constExpr) {
-                auto [tag, val] = constExpr->getConstant();
-                // The expression is a scalar constant, it must be a boolean value.
-                tassert(7969850,
-                        "Expected true or false value for filter",
-                        tag == sbe::value::TypeTags::Boolean);
-                if (sbe::value::bitcastTo<bool>(val)) {
-                    eventFilter = nullptr;
-                } else {
-                    stage = makeS<sbe::FilterStage<true>>(
-                        std::move(stage),
-                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
-                                                   sbe::value::bitcastFrom<bool>(false)),
-                        unpackNode->nodeId());
-                }
-            } else if (TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
-                           .isSubset(filterExpr->typeSignature)) {
-                // We successfully created an expression working on the block values and
-                // returning a block of boolean values; attach it to a project stage and use
-                // the result as the bitmap for the BlockToRow stage.
-                sbe::value::SlotId bitmapSlotId = _state.slotId();
-                sbe::SlotExprPairVector projects;
-                projects.emplace_back(bitmapSlotId, std::move(filterExpr->expr));
+        auto [newStage, isVectorised] = buildVectorizedFilterExpr(
+            std::move(stage), reqs, std::move(eventFilterSbExpr), outputs, unpackNode->nodeId());
 
-                stage = sbe::makeS<sbe::ProjectStage>(
-                    std::move(stage), std::move(projects), unpackNode->nodeId());
+        stage = std::move(newStage);
+
+        if (!isVectorised) {
+            // The last step was to convert the block to row. Generate the filter expression
+            // again to use the scalar slots instead of the block slots.
+            auto eventFilterSbExpr =
+                generateFilter(_state, eventFilter, boost::none /* rootSlot */, &outputs);
+            if (!eventFilterSbExpr.isNull()) {
+                stage =
+                    sbe::makeS<sbe::FilterStage<false>>(std::move(stage),
+                                                        eventFilterSbExpr.extractExpr(_state).expr,
+                                                        unpackNode->nodeId());
                 printPlan(*stage);
-
-                // Add a filter stage that pulls new data if there isn't at least one 'true' value
-                // in the produced bitmap.
-                SbExprBuilder b(_state);
-                auto filterSbExpr = b.makeNot(b.makeFunction("valueBlockNone"_sd,
-                                                             b.makeVariable(SbVar{bitmapSlotId}),
-                                                             b.makeBoolConstant(true)));
-                stage = sbe::makeS<sbe::FilterStage<false>>(
-                    std::move(stage), filterSbExpr.extractExpr(_state).expr, unpackNode->nodeId());
-                printPlan(*stage);
-
-                outputs.set(
-                    PlanStageSlots::kBlockSelectivityBitmap,
-                    TypedSlot{bitmapSlotId,
-                              TypeSignature::kBlockType.include(TypeSignature::kBooleanType)});
-                // Reset the variable so that the filter is not generated as a stage in the
-                // scalar section of the pipeline.
-                eventFilter = nullptr;
             }
         }
-    }
-
-    // Insert a BlockToRow stage and let the rest of the pipeline work on scalar values if:
-    // - we have a filter that we could not vectorize
-    // - we are supposed to return a BSON result
-    // - the caller doesn't support working on block values
-    if (eventFilter || reqs.hasResult() || !reqs.getCanProcessBlockValues()) {
-        stage = buildBlockToRow(std::move(stage), outputs);
-    }
-
-    // Add filter stage(s) for the per-event filter.
-    if (eventFilter) {
-        auto eventFilterSbExpr =
-            generateFilter(_state, eventFilter, boost::none /* rootSlot */, &outputs);
-        if (!eventFilterSbExpr.isNull()) {
-            stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), eventFilterSbExpr.extractExpr(_state).expr, unpackNode->nodeId());
-            printPlan(*stage);
+    } else {
+        // Insert a BlockToRow stage and let the rest of the pipeline work on scalar values if:
+        // - we are supposed to return a BSON result
+        // - the caller doesn't support working on block values
+        if (reqs.hasResult() || !reqs.getCanProcessBlockValues()) {
+            stage = buildBlockToRow(std::move(stage), outputs);
         }
     }
 

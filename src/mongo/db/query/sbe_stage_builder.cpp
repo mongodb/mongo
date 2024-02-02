@@ -2397,7 +2397,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         childReqs.setResultObj();
     }
 
+    // Indicate we can work on block values, if we are not requested to produce a result object.
+    childReqs.setCanProcessBlockValues(!childReqs.hasResult());
+
     auto [stage, outputs] = build(mn->children[0].get(), childReqs);
+
     if (mn->filter) {
         auto childResultSlot =
             needChildResultDoc ? boost::make_optional(outputs.getResultObj()) : boost::none;
@@ -2405,9 +2409,32 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         SbExpr filterExpr = generateFilter(_state, mn->filter.get(), childResultSlot, &outputs);
 
         if (!filterExpr.isNull()) {
-            VariableTypes varTypes = buildVariableTypes(outputs);
-            stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(_state, &varTypes).expr, root->nodeId());
+            // Try to vectorize if the stage received blocked input from children.
+            if (outputs.hasBlockOutput()) {
+                auto [newStage, isVectorised] = buildVectorizedFilterExpr(
+                    std::move(stage), reqs, std::move(filterExpr), outputs, root->nodeId());
+
+                stage = std::move(newStage);
+
+                if (!isVectorised) {
+                    // The last step was to convert the block to row. Generate the filter expression
+                    // again to use the scalar slots instead of the block slots.
+                    SbExpr filterScalarExpr =
+                        generateFilter(_state, mn->filter.get(), childResultSlot, &outputs);
+                    VariableTypes varTypes = buildVariableTypes(outputs);
+                    stage = sbe::makeS<sbe::FilterStage<false>>(
+                        std::move(stage),
+                        filterScalarExpr.extractExpr(_state, &varTypes).expr,
+                        root->nodeId());
+                }
+            } else {
+                // Did not receive block input. Continue the scalar execution.
+                VariableTypes varTypes = buildVariableTypes(outputs);
+                stage = sbe::makeS<sbe::FilterStage<false>>(
+                    std::move(stage),
+                    filterExpr.extractExpr(_state, &varTypes).expr,
+                    root->nodeId());
+            }
         }
     }
 
@@ -5656,6 +5683,80 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     return {std::move(stage), std::move(outputs)};
 }
+
+std::pair<std::unique_ptr<sbe::PlanStage>, bool> SlotBasedStageBuilder::buildVectorizedFilterExpr(
+    std::unique_ptr<sbe::PlanStage> stage,
+    const PlanStageReqs& reqs,
+    SbExpr scalarFilterExpression,
+    PlanStageSlots& outputs,
+    PlanNodeId nodeId) {
+    // Attempt to vectorize the filter expression.
+    auto vectorizedFilterExpression =
+        buildVectorizedExpr(std::move(scalarFilterExpression), outputs, true);
+
+    if (vectorizedFilterExpression.has_value()) {
+        // Vectorisation was possible.
+        if (auto constExpr = vectorizedFilterExpression->expr->as<sbe::EConstant>(); constExpr) {
+            auto [tag, val] = constExpr->getConstant();
+            // The expression is a scalar constant, it must be a boolean value.
+            tassert(8333500,
+                    "Expected true or false value for filter",
+                    tag == sbe::value::TypeTags::Boolean);
+            if (sbe::value::bitcastTo<bool>(val)) {
+                LOGV2_DEBUG(8333501, 1, "Trivially true boolean expression is ignored");
+            } else {
+                stage = makeS<sbe::FilterStage<true>>(
+                    std::move(stage),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                               sbe::value::bitcastFrom<bool>(false)),
+                    nodeId);
+            }
+        } else if (TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                       .isSubset(vectorizedFilterExpression->typeSignature)) {
+            // The vectorised filter expression should return a block of boolean values. We will
+            // project this block in a slot with a special type
+            // (PlanStageSlots::kBlockSelectivityBitmap) so that later stages know where to find it.
+
+            // Add a project stage to project the boolean block to a slot.
+            sbe::value::SlotId bitmapSlotId = _state.slotId();
+            sbe::SlotExprPairVector projects;
+            projects.emplace_back(bitmapSlotId, std::move(vectorizedFilterExpression->expr));
+            stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
+
+            // Use the result as the bitmap for the BlockToRow stage.
+            outputs.set(PlanStageSlots::kBlockSelectivityBitmap,
+                        TypedSlot{bitmapSlotId,
+                                  TypeSignature::kBlockType.include(TypeSignature::kBooleanType)});
+
+            // Add a filter stage that pulls new data if there isn't at least
+            // one 'true' value in the produced bitmap.
+            SbExprBuilder b(_state);
+            auto filterSbExpr = b.makeNot(b.makeFunction("valueBlockNone"_sd,
+                                                         b.makeVariable(SbVar{bitmapSlotId}),
+                                                         b.makeBoolConstant(true)));
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterSbExpr.extractExpr(_state).expr, nodeId);
+        } else {
+            // The vectorised expression returns a scalar result.
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), std::move(vectorizedFilterExpression->expr), nodeId);
+        }
+
+        // The vectorised execution should stop if the caller cannot process blocks or the stage
+        // needs to return a scalar result document.
+        if (reqs.hasResult() || !reqs.getCanProcessBlockValues()) {
+            stage = buildBlockToRow(std::move(stage), outputs);
+        }
+
+        return {std::move(stage), true};
+    } else {
+        // It is not possible to create the vectorised expression. Convert block to row and
+        // continue with the scalar filter expression.
+        stage = buildBlockToRow(std::move(stage), outputs);
+        return {std::move(stage), false};
+    }
+}
+
 
 const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {
     auto nss = reqs.getTargetNamespace();

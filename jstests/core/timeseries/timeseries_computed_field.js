@@ -34,7 +34,7 @@ TimeseriesTest.run((insert) => {
 
     insert(coll, {
         _id: 0,
-        [timeFieldName]: new Date(datePrefix + 100),
+        [timeFieldName]: new Date(datePrefix + 100),  // ISODate("1970-01-20T10:55:12.540Z")
         [metaFieldName]: "cpu",
         topLevelScalar: 123,
         topLevelArray: [1, 2, 3, 4],
@@ -43,7 +43,7 @@ TimeseriesTest.run((insert) => {
     });
     insert(coll, {
         _id: 1,
-        [timeFieldName]: new Date(datePrefix + 200),
+        [timeFieldName]: new Date(datePrefix + 200),  // ISODate("1970-01-20T10:55:12.640Z")
         [metaFieldName]: "cpu",
         topLevelScalar: 456,
         topLevelArray: [101, 102, 103, 104],
@@ -248,6 +248,74 @@ TimeseriesTest.run((insert) => {
         const res = coll.aggregate(pipeline).toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        let pipeline = [
+            {
+                $addFields: {
+                    "hourDiff": {
+                        $dateDiff: {
+                            "startDate": "$time",
+                            "endDate": new Date("1970-01-21"),
+                            "unit": "hour"
+                        }
+                    }
+                }
+            },
+            {$match: {"hourDiff": {$gte: 12}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "open": {"$first": "$topLevelScalar"},
+                }
+            }
+        ];
+
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 123}],
+                     coll.aggregate(pipeline).toArray());
+    }
+
+    {
+        let pipeline = [
+            {$addFields: {"mt": {$multiply: ["$topLevelScalar", 10]}}},
+            {$match: {"mt": {$gte: 2000}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "open": {"$first": "$topLevelScalar"},
+                }
+            }
+        ];
+
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 456}],
+                     coll.aggregate(pipeline).toArray());
+    }
+
+    {
+        let pipeline = [
+            {
+                $addFields: {
+                    "hourDiff": {
+                        $dateDiff: {
+                            "startDate": "$time",
+                            "endDate": new Date("1970-01-21"),
+                            "unit": "hour"
+                        }
+                    }
+                }
+            },
+            {$match: {$or: [{topLevelScalar: {$gt: 200, $lt: 800}}, {hourDiff: {$gte: 12}}]}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "open": {"$first": "$topLevelScalar"},
+                }
+            }
+        ];
+
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "open": 123}],
+                     coll.aggregate(pipeline).toArray());
     }
 
     {
