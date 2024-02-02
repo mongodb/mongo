@@ -930,7 +930,9 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: medical_workload_diagnosis_50_50_high_value
+      cron: *high-value-workload-cron
     - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
+      cron: *high-value-workload-cron
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-audit-log-encryption-compression.arm.aws.2023-11
@@ -1115,14 +1117,14 @@ buildvariants:
     - name: smoke_test
     - name: canaries_only
     - name: mongos_workloads
-      #cron: *high-value-workload-cron
+      cron: *high-value-workload-cron
     - name: mongos_large_catalog_workloads
     - name: move_chunk_workloads
-      #cron: *high-value-workload-cron
+      cron: *high-value-workload-cron
     - name: change_streams_latency
-      #cron: *high-value-workload-cron
+      cron: *high-value-workload-cron
     - name: change_streams_listen_throughput
-      #cron: *high-value-workload-cron
+      cron: *high-value-workload-cron
     - name: change_streams_multi_mongos
     - name: tsbs_query_sharded
     - name: tsbs_query_finance_sharded
@@ -1427,40 +1429,30 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
-      cron: *high-value-workload-cron
     - name: ycsb_single_thread
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
-      cron: *high-value-workload-cron
     - name: crud_workloads_majority
     - name: smoke_test
     - name: bestbuy_agg
-      cron: *high-value-workload-cron
     - name: bestbuy_agg_merge_different_db
     - name: bestbuy_agg_merge_same_db
     - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
     - name: tpcc_majority
-      cron: *high-value-workload-cron
     - name: linkbench
     - name: linkbench2
       cron: *high-value-workload-cron
     - name: tsbs_load
       cron: &only-run-in-patch-cron "0 0 29 2 1"
     - name: tsbs_query
-      cron: *high-value-workload-cron
     - name: mixed_workloads_genny_rate_limited_high_value
       cron: *high-value-workload-cron
     - name: load_test_high_value
-      cron: *high-value-workload-cron
     - name: majority_reads10_k_threads_high_value
-      cron: *high-value-workload-cron
     - name: large_indexed_ins_high_value
-      cron: *high-value-workload-cron
     - name: expressive_queries_high_value
-      cron: *high-value-workload-cron
     - name: time_series_sort_high_value
-      cron: *high-value-workload-cron
     - name: tsbs-expression-query
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
@@ -2377,33 +2369,20 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - name: schedule_variant_auto_tasks
     - name: ycsb.2023-09
-      cron: *high-value-workload-cron
     - name: ycsb_60GB.2023-09
     - name: ycsb_60GB.long.2023-09
-      cron: *high-value-workload-cron
     - name: tpcc_majority
-      cron: *high-value-workload-cron
     - name: linkbench2
-      cron: *high-value-workload-cron
     - name: mixed_workloads_genny_rate_limited_high_value
-      cron: *high-value-workload-cron
     - name: majority_reads10_k_threads_high_value
-      cron: *high-value-workload-cron
     - name: bestbuy_agg
-      cron: *high-value-workload-cron
     - name: large_indexed_ins_high_value
-      cron: *high-value-workload-cron
     - name: expressive_queries_high_value
-      cron: *high-value-workload-cron
     - name: time_series_sort_high_value
-      cron: *high-value-workload-cron
     - name: tsbs_query
-      cron: *high-value-workload-cron
     - name: array_traversal_high_value
-      cron: *high-value-workload-cron
     - name: filter_with_complex_logical_expression_high_value
     - name: tsbs_query
-      cron: *high-value-workload-cron
 
 
 - <<: *shard-baseline
@@ -2418,25 +2397,14 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - name: schedule_variant_auto_tasks
     - name: ycsb.2023-09
-      cron: *high-value-workload-cron
     - name: tpcc_majority
-      cron: *high-value-workload-cron
     - name: mixed_workloads_genny_rate_limited_high_value
-      cron: *high-value-workload-cron
     - name: bestbuy_agg
-      cron: *high-value-workload-cron
     - name: large_indexed_ins_high_value
-      cron: *high-value-workload-cron
     - name: expressive_queries_high_value
-      cron: *high-value-workload-cron
     - name: time_series_sort_high_value
-      cron: *high-value-workload-cron
     - name: tsbs_query
-      cron: *high-value-workload-cron
     - name: array_traversal_high_value
-      cron: *high-value-workload-cron
     - name: filter_with_complex_logical_expression_high_value
     - name: tsbs_query
-      cron: *high-value-workload-cron
     - name: mongos_workloads
-      cron: *high-value-workload-cron
