@@ -98,7 +98,6 @@ replTest.startSet();
 replTest.initiate();
 let primary = replTest.getPrimary();
 let db = primary.getDB(dbName);
-let primaryAdmin = primary.getDB("admin");
 let primaryColl = db[collName];
 let queuedReaders = [];
 
