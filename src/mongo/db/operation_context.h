@@ -672,6 +672,14 @@ public:
         _querySamplingOpts = option;
     }
 
+    void setRoutedByReplicaSetEndpoint(bool value) {
+        _routedByReplicaSetEndpoint = value;
+    }
+
+    bool routedByReplicaSetEndpoint() const {
+        return _routedByReplicaSetEndpoint;
+    }
+
     /**
      * Invokes the passed callback while ignoring interrupts. Note that this causes the deadline to
      * be reset to Date_t::max(), but that it can also subsequently be reduced in size after the
@@ -895,6 +903,10 @@ private:
 
     // The query sampling options for operations on this opCtx.
     boost::optional<QuerySamplingOptions> _querySamplingOpts;
+
+    // Set to true if this operation is going through the router code paths because of the replica
+    // set endpoint.
+    bool _routedByReplicaSetEndpoint = false;
 };
 
 // Gets a TimeZoneDatabase pointer from the ServiceContext.
