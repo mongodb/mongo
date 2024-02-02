@@ -52,6 +52,7 @@
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b_builder.h"
+#include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -424,6 +425,116 @@ public:
         builder.appendChar(EOO);
     }
 
+    static void assertSbeValueEquals(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual,
+                                     sbe::bsoncolumn::SBEColumnMaterializer::Element& expected) {
+        // We should have already have checked the tags are equal or are expected values. Tags for
+        // strings can differ based on how the SBE element is created, and thus should be verified
+        // before.
+        using namespace sbe::value;
+        switch (actual.first) {
+            // Values that are stored in 'Value' can be compared directly.
+            case TypeTags::Nothing:
+            case TypeTags::NumberInt32:
+            case TypeTags::NumberInt64:
+            case TypeTags::NumberDouble:
+            case TypeTags::Boolean:
+            case TypeTags::Null:
+            case TypeTags::bsonUndefined:
+            case TypeTags::MinKey:
+            case TypeTags::MaxKey:
+            case TypeTags::Date:
+            case TypeTags::Timestamp:
+                ASSERT_EQ(actual.second, expected.second);
+                break;
+            // The following types store pointers in 'Value'.
+            case TypeTags::NumberDecimal:
+                ASSERT_EQ(bitcastTo<Decimal128>(actual.second),
+                          bitcastTo<Decimal128>(expected.second));
+                break;
+            case TypeTags::bsonObjectId:
+                ASSERT_EQ(memcmp(bitcastTo<uint8_t*>(actual.second),
+                                 bitcastTo<uint8_t*>(expected.second),
+                                 sizeof(ObjectIdType)),
+                          0);
+                break;
+            // For strings we can retrieve the strings and compare them directly.
+            case TypeTags::bsonJavascript: {
+                ASSERT_EQ(getBsonJavascriptView(actual.second),
+                          getBsonJavascriptView(expected.second));
+                break;
+            }
+            case TypeTags::StringSmall:
+            case TypeTags::bsonString:
+                // Generic conversion won't produce StringSmall from BSONElements, but the
+                // SBEColumnMaterializer will. So we can't compare the raw pointers since they are
+                // different lengths, but we can compare the string values.
+                ASSERT_EQ(getStringView(actual.first, actual.second),
+                          getStringView(expected.first, expected.second));
+                break;
+            // We can read the raw pointer for these types, since the 32-bit 'length' at the
+            // beginning of pointer holds the full length of the value.
+            case TypeTags::bsonCodeWScope:
+            case TypeTags::bsonSymbol:
+            case TypeTags::bsonObject:
+            case TypeTags::bsonArray: {
+                auto actualPtr = getRawPointerView(actual.second);
+                auto expectedPtr = getRawPointerView(expected.second);
+                auto actSize = ConstDataView(actualPtr).read<LittleEndian<uint32_t>>();
+                ASSERT_EQ(actSize, ConstDataView(expectedPtr).read<LittleEndian<uint32_t>>());
+                ASSERT_EQ(memcmp(actualPtr, expectedPtr, actSize), 0);
+                break;
+            }
+            // For these types we must find the correct number of bytes to read.
+            case TypeTags::bsonRegex: {
+                auto actualPtr = getRawPointerView(actual.second);
+                auto expectedPtr = getRawPointerView(expected.second);
+                auto numBytes = BsonRegex(actualPtr).byteSize();
+                ASSERT_EQ(BsonRegex(expectedPtr).byteSize(), numBytes);
+                ASSERT_EQ(memcmp(actualPtr, expectedPtr, numBytes), 0);
+                break;
+            }
+            case TypeTags::bsonBinData: {
+                // The 32-bit 'length' at the beginning of a BinData does _not_ account for the
+                // 'length' field itself or the 'subtype' field.
+                auto actualSize = getBSONBinDataSize(actual.first, actual.second);
+                auto expectedSize = getBSONBinDataSize(expected.first, expected.second);
+                ASSERT_EQ(actualSize, expectedSize);
+                // We add 1 to compare the subtype and binData payload in one pass.
+                ASSERT_EQ(memcmp(getRawPointerView(actual.second),
+                                 getRawPointerView(expected.second),
+                                 actualSize + 1),
+                          0);
+                break;
+            }
+            case TypeTags::bsonDBPointer: {
+                auto actualPtr = getRawPointerView(actual.second);
+                auto expectedPtr = getRawPointerView(expected.second);
+                auto numBytes = BsonDBPointer(actualPtr).byteSize();
+                ASSERT_EQ(BsonDBPointer(expectedPtr).byteSize(), numBytes);
+                ASSERT_EQ(memcmp(actualPtr, expectedPtr, numBytes), 0);
+                break;
+            }
+            default:
+                FAIL(str::stream()
+                     << "Hit unreachable case in the SBEColumnMaterializer. Expected: " << expected
+                     << "Actual: " << actual);
+                break;
+        }
+    }
+
+    static void convertAndAssertSBEEquals(sbe::bsoncolumn::SBEColumnMaterializer::Element& actual,
+                                          const BSONElement& expected) {
+        auto expectedSBE = sbe::bson::convertFrom<true>(expected);
+        if (actual.first == sbe::value::TypeTags::StringSmall) {
+            // Generic conversion won't produce StringSmall from BSONElements, but
+            // SBEColumnMaterializer will, don't compare the type tag for that case.
+            ASSERT_EQ(expectedSBE.first, sbe::value::TypeTags::bsonString);
+        } else {
+            ASSERT_EQ(actual.first, expectedSBE.first);
+        }
+        assertSbeValueEquals(actual, expectedSBE);
+    }
+
     static void verifyColumnReopenFromBinary(const char* buffer, size_t size) {
         BSONColumn column(buffer, size);
 
@@ -647,6 +758,7 @@ public:
                 }
             }
         }
+
         // Verify we can decompress the entire column using the block-based API using the
         // BSONElementMaterializer.
         {
@@ -662,6 +774,21 @@ public:
             }
         }
 
+        // Verify we can decompress the entire column using the block-based API using the
+        // SBEColumnMaterializer.
+        {
+            using SBEMaterializer = sbe::bsoncolumn::SBEColumnMaterializer;
+            bsoncolumn::BSONColumnBlockBased col(columnBinary);
+            boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+            std::vector<SBEMaterializer::Element> container;
+            col.decompressIterative<SBEMaterializer>(container, allocator);
+            ASSERT_EQ(container.size(), expected.size());
+            auto actual = container.begin();
+            for (auto&& elem : expected) {
+                convertAndAssertSBEEquals(*actual, elem);
+                ++actual;
+            }
+        }
         // This gate will be removed once all types are onboarded to decompress all interface
         if (testBlockBased) {
             boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
