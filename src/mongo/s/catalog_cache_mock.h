@@ -67,6 +67,9 @@ public:
 
     void setCollectionReturnValue(const NamespaceString& nss, CollectionRoutingInfo chunkManager);
 
+    void advanceCollectionTimeInStore(const NamespaceString& nss,
+                                      const ChunkVersion& newVersionInStore);
+
     static std::unique_ptr<CatalogCacheMock> make();
 
     static const Status kChunkManagerInternalErrorStatus;
@@ -101,6 +104,8 @@ public:
     static CachedDatabaseInfo makeDatabaseInfo(const DatabaseName& dbName,
                                                const ShardId& dbPrimaryShard,
                                                const DatabaseVersion& dbVersion);
+
+    stdx::unordered_map<NamespaceString, ChunkVersion> lastNotifiedTimeInStore;
 
 private:
     stdx::unordered_map<DatabaseName, CachedDatabaseInfo> _dbCache;

@@ -797,6 +797,14 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     }
 }
 
+void CatalogCache::advanceCollectionTimeInStore(const NamespaceString& nss,
+                                                const ChunkVersion& newVersionInStore) {
+    const auto newChunkVersion =
+        ComparableChunkVersion::makeComparableChunkVersion(newVersionInStore);
+    _collectionCache.advanceTimeInStore(nss, newChunkVersion);
+}
+
+
 void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
     LOGV2_DEBUG(4997600,
                 1,
@@ -869,6 +877,15 @@ void CatalogCache::invalidateIndexEntry_LINEARIZABLE(const NamespaceString& nss)
     // (Ignore FCV check): It is okay to ignore FCV in mongos.
     if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         _indexCache.invalidateKey(nss);
+    }
+}
+
+boost::optional<ChunkVersion> CatalogCache::peekCollectionCacheVersion(const NamespaceString& nss) {
+    auto valueHandle = _collectionCache.peekLatestCached(nss);
+    if (valueHandle && valueHandle->optRt) {
+        return valueHandle->optRt->getVersion();
+    } else {
+        return boost::none;
     }
 }
 

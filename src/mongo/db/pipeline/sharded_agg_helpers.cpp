@@ -59,6 +59,7 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -97,6 +98,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -120,6 +122,7 @@
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
@@ -1088,11 +1091,32 @@ BSONObj createPassthroughCommandForShard(
         std::move(targetedCmd), expCtx, explainVerbosity, std::move(readConcern));
 
     // Apply filter and RW concern to the final shard command.
-    return CommandHelpers::filterCommandRequestForPassthrough(
+    auto filteredCommand = CommandHelpers::filterCommandRequestForPassthrough(
         applyReadWriteConcern(expCtx->opCtx,
                               true,              /* appendRC */
                               !explainVerbosity, /* appendWC */
                               shardCommand));
+
+    // Request the targeted shard to gossip back the routing metadata versions for the involved
+    // collections.
+    if (pipeline &&
+        feature_flags::gShardedAggregationCatalogCacheGossiping.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        BSONArrayBuilder arrayBuilder;
+        for (const auto& nss : pipeline->getInvolvedCollections()) {
+            arrayBuilder.append(
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+        }
+
+        if (arrayBuilder.arrSize() > 0) {
+            filteredCommand = filteredCommand.addField(
+                BSON(Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName
+                     << arrayBuilder.arr())
+                    .firstElement());
+        }
+    }
+
+    return filteredCommand;
 }
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -1123,6 +1147,22 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                 return stage->constraints().writesPersistentData();
             })) {
             targetedCmd[WriteConcernOptions::kWriteConcernField] = Value();
+        }
+    }
+
+    // Request the targeted shards to gossip back the routing metadata versions for the involved
+    // collections.
+    if (feature_flags::gShardedAggregationCatalogCacheGossiping.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        BSONArrayBuilder arrayBuilder;
+        for (const auto& nss : splitPipeline.shardsPipeline->getInvolvedCollections()) {
+            arrayBuilder.append(
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+        }
+
+        if (arrayBuilder.arrSize() > 0) {
+            targetedCmd[Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName] =
+                Value(arrayBuilder.arr());
         }
     }
 

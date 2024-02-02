@@ -43,6 +43,7 @@ imports:
     - "mongo/db/write_concern_options.idl"       
     - "mongo/rpc/metadata/client_metadata.idl"
     - "mongo/rpc/metadata/impersonated_user_metadata.idl"
+    - "mongo/s/gossiped_routing_cache.idl"
     - "mongo/s/sharding_types.idl"
 
 # This file lists the generic arguments accepted by all commands, and generic
@@ -218,6 +219,10 @@ structs:
                 cpp_name: "dollarTenant"
                 forward_to_shards: true
                 optional: true
+            requestGossipRoutingCache:
+                type: array<namespacestring>
+                forward_to_shards: false
+                optional: true
 
     GenericReplyFieldsWithTypesV1:
         # This struct is meant to mirror 'generic_reply_fields_api_v1' in '../idl/generic_argument.idl'.
@@ -286,4 +291,8 @@ structs:
             ok:
                 type: safeBool
                 forward_from_shards: true
+                optional: true
+            routingCacheGossip:
+                type: array<GossipedRoutingCache>
+                forward_from_shards: false
                 optional: true

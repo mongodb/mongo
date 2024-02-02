@@ -123,4 +123,11 @@ feature_flags:
     default: true
     version: 7.3
     shouldBeFCVGated: true
-
+  featureFlagShardedAggregationCatalogCacheGossiping:
+    description: "Feature flag that makes routers executing distributed aggregations that involve
+                  secondary collections request the shards to gossip back the catalog cache versions
+                  for these collections."
+    cpp_varname: feature_flags::gShardedAggregationCatalogCacheGossiping
+    default: true
+    version: 8.0
+    shouldBeFCVGated: true

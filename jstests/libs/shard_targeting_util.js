@@ -180,9 +180,11 @@ export class ShardTargetingTest {
     }) {
         const coll = this.db[targetCollName];
 
+        const options = comment ? {'comment': comment} : {};
+
         // Test explain if 'explainAssertionObj' is specified.
         if (explainAssertionObj) {
-            const explain = coll.explain().aggregate(pipeline);
+            const explain = coll.explain().aggregate(pipeline, options);
             this._assertExplainTargeting(explain, explainAssertionObj);
         }
 
@@ -190,7 +192,6 @@ export class ShardTargetingTest {
         this._resetProfiling();
 
         // Verify that 'pipeline' returns the expected results.
-        const options = comment ? {'comment': comment} : {};
         const res = coll.aggregate(pipeline, options).toArray();
         assert(arrayEq(res, expectedResults),
                "sharded aggregation results did not match: " + tojson(res) +

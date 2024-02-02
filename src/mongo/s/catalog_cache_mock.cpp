@@ -82,6 +82,11 @@ void CatalogCacheMock::setCollectionReturnValue(const NamespaceString& nss,
     _collectionCache.emplace(nss, collectionRoutingInfo);
 }
 
+void CatalogCacheMock::advanceCollectionTimeInStore(const NamespaceString& nss,
+                                                    const ChunkVersion& newVersionInStore) {
+    lastNotifiedTimeInStore[nss] = newVersionInStore;
+}
+
 std::unique_ptr<CatalogCacheMock> CatalogCacheMock::make() {
     auto catalogCacheLoader = std::make_unique<CatalogCacheLoaderMock>();
     auto serviceContext = ServiceContext::make();

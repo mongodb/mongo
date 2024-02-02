@@ -58,6 +58,7 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -80,6 +81,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -117,6 +119,7 @@
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
@@ -223,6 +226,33 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
         // participant, it will already have received another 'aggregate' command earlier which
         // contained a readConcern.
         mergeCmd.remove("readConcern");
+    }
+
+    // Request the merging shard to gossip back the routing metadata versions for the collections
+    // involved in the decision of the merging shard. For the merging part of the pipeline, only the
+    // first stage that involves secondary collections can have effect on the merging decision, so
+    // just request gossiping for these.
+    if (feature_flags::gShardedAggregationCatalogCacheGossiping.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        stdx::unordered_set<NamespaceString> collectionsInvolvedInMergingShardChoice;
+        for (const auto& source : pipelineForMerging->getSources()) {
+            source->addInvolvedCollections(&collectionsInvolvedInMergingShardChoice);
+            if (!collectionsInvolvedInMergingShardChoice.empty()) {
+                // Only consider the first stage that involves secondary collections.
+                break;
+            }
+        }
+
+        BSONArrayBuilder arrayBuilder;
+        for (const auto& nss : collectionsInvolvedInMergingShardChoice) {
+            arrayBuilder.append(
+                NamespaceStringUtil::serialize(nss, SerializationContext::stateDefault()));
+        }
+
+        if (arrayBuilder.arrSize() > 0) {
+            mergeCmd[Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName] =
+                Value(arrayBuilder.arr());
+        }
     }
 
     // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual

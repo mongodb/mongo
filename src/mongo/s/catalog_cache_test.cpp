@@ -576,5 +576,68 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionIndexVersionBumpNotNone) {
     const auto routingInfo = _catalogCache->getCollectionRoutingInfo(operationContext(), kNss);
     future.default_timed_get();
 }
+
+TEST_F(CatalogCacheTest, PeekCollectionCacheVersion) {
+    // Nothing cached, then peek returns boost::none. Does not attempt to refresh.
+    ASSERT_EQ(boost::none, _catalogCache->peekCollectionCacheVersion(kNss));
+
+    // Now force the cache to refresh. Now peek returns the version of whatever has been cached.
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
+    loadCollection(cachedCollVersion);
+
+    ASSERT_EQ(cachedCollVersion.placementVersion(),
+              _catalogCache->peekCollectionCacheVersion(kNss));
+
+    // If we have cached an untracked collection, then peek returns boost::none.
+    _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        kNss, boost::none, ShardId());
+    loadUnshardedCollection(kNss);
+
+    ASSERT_EQ(boost::none, _catalogCache->peekCollectionCacheVersion(kNss));
+}
+
+TEST_F(CatalogCacheTest, AdvanceCollectionTimeInStore) {
+    // Cache something.
+    const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
+    const CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+    const auto cachedCollVersion = ShardVersionFactory::make(
+        ChunkVersion(gen, {1, 0}), boost::optional<CollectionIndexes>(boost::none));
+    loadDatabases({DatabaseType(kNss.dbName(), kShards[0], dbVersion)});
+    const auto coll = loadCollection(cachedCollVersion);
+
+    ASSERT_EQ(cachedCollVersion,
+              uassertStatusOK(_catalogCache->getCollectionRoutingInfo(operationContext(), kNss))
+                  .getCollectionVersion());
+
+    // Advance the time-in-store of the cache.
+    auto newCollectionVersion = cachedCollVersion;
+    newCollectionVersion.placementVersion().incMajor();
+    _catalogCache->advanceCollectionTimeInStore(kNss, newCollectionVersion.placementVersion());
+
+    // getCollectionRoutingInfo should return the new version, because the cache has been notified
+    // that it is stale.
+    {
+        // Put the new version on the loader.
+        const auto scopedCollProv = scopedCollectionProvider(coll);
+        const auto scopedChunksProv =
+            scopedChunksProvider(makeChunks(newCollectionVersion.placementVersion()));
+
+        // getCollectionRoutingInfo will trigger a refresh and see the new version
+        ASSERT_EQ(newCollectionVersion,
+                  uassertStatusOK(_catalogCache->getCollectionRoutingInfo(operationContext(), kNss))
+                      .getCollectionVersion());
+    }
+
+    // Call 'advanceCollectionTimeInStore' but with an older version. This should be a no-op.
+    _catalogCache->advanceCollectionTimeInStore(kNss, cachedCollVersion.placementVersion());
+    ASSERT_EQ(newCollectionVersion,
+              uassertStatusOK(_catalogCache->getCollectionRoutingInfo(operationContext(), kNss))
+                  .getCollectionVersion());
+}
+
 }  // namespace
 }  // namespace mongo

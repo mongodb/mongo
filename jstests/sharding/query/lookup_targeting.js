@@ -14,7 +14,7 @@ import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
 import {ShardTargetingTest} from "jstests/libs/shard_targeting_util.js";
 
 const kDbName = "lookup_targeting";
-const st = new ShardingTest({shards: 3});
+const st = new ShardingTest({shards: 3, mongos: 2});
 const db = st.s.getDB(kDbName);
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
@@ -894,6 +894,242 @@ shardTargetingTest.assertShardTargeting({
     profileFilters: profileFilters,
 });
 
+// ----------------------------------------
+// Tests with stale router
+// Router believes outer and inner are not collocated, but they are.
+{
+    // Move kUnsplittable2CollName from shard2 to shard1. Use a mongos1 so that mongos0 is left
+    // stale.
+    assert.commandWorked(st.s1.adminCommand(
+        {moveCollection: db[kUnsplittable2CollName].getFullName(), toShard: st.shard1.shardName}));
+
+    let pipeline =
+        [{$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}}];
+
+    let expectedResults = [
+        {_id: 0, a: -1, unsplittable: 1, out: [{_id: 0, a: -1, unsplittable: 2}]},
+        {_id: 1, a: 1, unsplittable: 1, out: [{_id: 1, a: 1, unsplittable: 2}]},
+        {_id: 2, a: 101, unsplittable: 1, out: [{_id: 2, a: 101, unsplittable: 2}]},
+    ];
+
+    // Run the aggregation one first time to let the router gossip in the new placement for the
+    // inner collection. Expect correct results, but sub-optimal pipeline splitting choice (pipeline
+    // gets split in this run).
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedMergingShard: shard2,
+            expectedMergingStages: ["$mergeCursors", "$lookup"],
+        },
+        expectedResults: expectedResults,
+        comment: "outer_unsplittable_1_inner_unsplittable_2_collocated_but_stale_router_1",
+    });
+
+    // Check that router now routes optimally for the new placement.
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedShard: shard1,
+            assertSBELookupPushdown: true,
+        },
+        expectedResults: expectedResults,
+        comment: "outer_unsplittable_1_inner_unsplittable_2_collocated_but_stale_router_2",
+        profileFilters: {
+            [shard0]: [],
+            [shard1]: [{ns: kUnsplittable1CollName, expectedStages: ["$lookup"]}],
+            [shard2]: []
+        }
+    });
+}
+
+// Router believes outer and inner are collocated, but they are not anymore.
+{
+    // Return kUnsplittable2CollName to shard2. Use mongos1 so that mongos0 is left stale.
+    assert.commandWorked(st.s1.adminCommand(
+        {moveCollection: db[kUnsplittable2CollName].getFullName(), toShard: st.shard2.shardName}));
+
+    let pipeline =
+        [{$lookup: {from: kUnsplittable2CollName, localField: "a", foreignField: "a", as: "out"}}];
+
+    let expectedResults = [
+        {_id: 0, a: -1, unsplittable: 1, out: [{_id: 0, a: -1, unsplittable: 2}]},
+        {_id: 1, a: 1, unsplittable: 1, out: [{_id: 1, a: 1, unsplittable: 2}]},
+        {_id: 2, a: 101, unsplittable: 1, out: [{_id: 2, a: 101, unsplittable: 2}]},
+    ];
+
+    // Run the aggregation one first time to let the router gossip in the new placement for the
+    // inner collection. Expect correct results, but sub-optimal merging shard choice (no pipeline
+    // split in this case. The whole pipeline is sent to shard1).
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedShard: shard1,
+        },
+        expectedResults: expectedResults,
+        comment: "outer_unsplittable_1_inner_unsplittable_2_not_collocated_but_stale_router_1",
+    });
+
+    // Check that router now routes optimally for the new placement.
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedMergingShard: shard2,
+            expectedMergingStages: ["$mergeCursors", "$lookup"],
+        },
+        expectedResults: expectedResults,
+        comment: "outer_unsplittable_1_inner_unsplittable_2_not_collocated_but_stale_router_2",
+        profileFilters: {
+            [shard0]: [],
+            [shard1]: [{ns: kUnsplittable1CollName, expectedStages: []}],
+            [shard2]: [{ns: kUnsplittable1CollName, expectedStages: ["$mergeCursors", "$lookup"]}],
+        }
+    });
+}
+
+// Router believes inner is sharded, but it is not anymore.
+{
+    // Unshard kShardedColl1Name and place it on shard2. Use mongos1 so that mongos0 is left stale.
+    assert.commandWorked(st.s1.adminCommand(
+        {unshardCollection: db[kShardedColl1Name].getFullName(), toShard: st.shard2.shardName}));
+
+    let pipeline =
+        [{$lookup: {from: kShardedColl1Name, localField: "a", foreignField: "a", as: "out"}}];
+
+    let expectedResults = [
+        {_id: 0, a: -1, unsplittable: 1, out: [{_id: 0, a: -1}]},
+        {_id: 1, a: 1, unsplittable: 1, out: [{_id: 1, a: 1}]},
+        {_id: 2, a: 101, unsplittable: 1, out: [{_id: 2, a: 101}]},
+    ];
+
+    // Run the aggregation one first time to let the router gossip in the new placement for the
+    // inner collection. Expect correct results, but sub-optimal merging shard choice (no pipeline
+    // split in this case).
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedShard: shard1,
+        },
+        expectedResults: expectedResults,
+        comment:
+            "outer_unsplittable_1_inner_unsplittable_not_collocated_but_stale_router_believes_inner_is_sharded",
+    });
+
+    // Check that router now routes optimally for the new placement (uses shard2 as merging shard).
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedMergingShard: shard2,
+            expectedMergingStages: ["$mergeCursors", "$lookup"],
+        },
+        expectedResults: expectedResults,
+        comment:
+            "outer_unsplittable_1_inner_unsplittable_not_collocated_but_stale_router_believes_inner_is_sharded",
+        profileFilters: {
+            [shard0]: [],
+            [shard1]: [{ns: kUnsplittable1CollName, expectedStages: []}],
+            [shard2]: [{ns: kUnsplittable1CollName, expectedStages: ["$mergeCursors", "$lookup"]}],
+        }
+    });
+
+    // Reset kShardedColl1Name to leave it as it was.
+    db[kShardedColl1Name].drop();
+    shardTargetingTest.setupColl({
+        collName: kShardedColl1Name,
+        indexList: [{a: 1}],
+        docs: kShardedColl1Docs,
+        collType: "sharded",
+        shardKey: {a: 1},
+        chunkList: kShardedColl1ChunkList
+    });
+}
+
+// Multiple secondary collections. Router believes they are all sharded, but one of them is not
+// anymore.
+{
+    // Unshard kShardedColl2Name and place it on shard2. Use mongos1 so that mongos0 is left stale.
+    assert.commandWorked(st.s1.adminCommand(
+        {unshardCollection: db[kShardedColl2Name].getFullName(), toShard: st.shard2.shardName}));
+
+    let pipeline = [{
+        $facet: {
+            pipe1: [{
+                $lookup: {from: kShardedColl1Name, localField: "a", foreignField: "a", as: "out_1"}
+            }],
+            pipe2: [{
+                $lookup: {from: kShardedColl2Name, localField: "a", foreignField: "b", as: "out_2"}
+            }]
+        }
+    }];
+
+    let expectedResults = [
+        {
+            pipe1: [
+                {_id: 0, a: -1, unsplittable: 1, out_1: [{_id: 0, a: -1}]},
+                {_id: 1, a: 1, unsplittable: 1, out_1: [{_id: 1, a: 1}]},
+                {_id: 2, a: 101, unsplittable: 1, out_1: [{_id: 2, a: 101}]},
+
+            ],
+            pipe2: [
+                {_id: 0, a: -1, unsplittable: 1, out_2: [{_id: 0, b: -1}]},
+                {_id: 1, a: 1, unsplittable: 1, out_2: [{_id: 1, b: 1}]},
+                {_id: 2, a: 101, unsplittable: 1, out_2: [{_id: 2, b: 101}]},
+            ]
+        },
+    ];
+
+    // Run the aggregation one first time to let the router gossip in the new placement for the
+    // inner collections. Expect correct results, but sub-optimal merging shard choice (no pipeline
+    // split in this case).
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedShard: shard1,
+        },
+        expectedResults: expectedResults,
+        comment: "facet_inner_sharded_and_unsharded_but_router_stale_1",
+    });
+
+    // Check that router now routes optimally for the new placement (uses shard2 as merging
+    // shard).
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedMergingShard: shard2,
+            expectedMergingStages: ["$mergeCursors", "$facet"],
+        },
+        expectedResults: expectedResults,
+        comment: "facet_inner_sharded_and_unsharded_but_router_stale_2",
+        profileFilters: {
+            [shard0]: [{ns: kShardedColl1Name, expectedStages: ["$match"]}],
+            [shard1]: [
+                {ns: kUnsplittable1CollName, expectedStages: []},
+                {ns: kShardedColl1Name, expectedStages: ["$match"]}
+            ],
+            [shard2]: [{ns: kUnsplittable1CollName, expectedStages: ["$mergeCursors", "$facet"]}],
+        }
+    });
+
+    // Reset kShardedColl2Name to leave it as it was.
+    assert(db[kShardedColl2Name].drop());
+    shardTargetingTest.setupColl({
+        collName: kShardedColl2Name,
+        indexList: [{b: 1}],
+        docs: kShardedColl2Docs,
+        collType: "sharded",
+        shardKey: {b: 1},
+        chunkList: kShardedColl2ChunkList
+    });
+}
+
+// ----------------------------------------
 // Set of tests which involve moving an unsplittable collection during query execution.
 
 // Test moving the outer collection to another shard during $lookup execution. This should

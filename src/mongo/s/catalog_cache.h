@@ -315,6 +315,12 @@ public:
         const ShardId& shardId);
 
     /**
+     * Notifies the cache that there is a (possibly) newer collection version on the backing store.
+     */
+    virtual void advanceCollectionTimeInStore(const NamespaceString& nss,
+                                              const ChunkVersion& newVersionInStore);
+
+    /**
      * Non-blocking method, which invalidates all namespaces which contain data on the specified
      * shard and all databases which have the shard listed as their primary shard.
      */
@@ -352,6 +358,12 @@ public:
     void invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss);
 
     void invalidateIndexEntry_LINEARIZABLE(const NamespaceString& nss);
+
+    /**
+     * Peeks at the collection routing cache and returns the currently cached collection version.
+     * Returns boost::none if none is cached. Never blocks waiting for a refresh.
+     */
+    boost::optional<ChunkVersion> peekCollectionCacheVersion(const NamespaceString& nss);
 
 private:
     class DatabaseCache : public DatabaseTypeCache {

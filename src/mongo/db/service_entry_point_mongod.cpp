@@ -64,6 +64,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/idl/generic_argument_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -76,6 +77,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/gossiped_routing_cache_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
@@ -84,6 +86,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/polymorphic_scoped.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -254,6 +257,32 @@ public:
             repl::OpTime lastOpTimeFromClient =
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
+        }
+
+        // Gossip back requested routing table cache versions.
+        if (request.body.hasField(Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName)) {
+            const auto collectionsToGossip =
+                request.body.getField(Generic_args_unstable_v1::kRequestGossipRoutingCacheFieldName)
+                    .Array();
+
+            const auto catalogCache = Grid::get(opCtx)->catalogCache();
+
+            BSONArrayBuilder arrayBuilder;
+            for (const auto& collectionToGossip : collectionsToGossip) {
+                const auto nss = NamespaceStringUtil::deserialize(
+                    boost::none, collectionToGossip.String(), SerializationContext::stateDefault());
+                const auto cachedCollectionVersion = catalogCache->peekCollectionCacheVersion(nss);
+                if (cachedCollectionVersion) {
+                    GossipedRoutingCache gossipedRoutingCache(nss, *cachedCollectionVersion);
+                    arrayBuilder.append(gossipedRoutingCache.toBSON());
+                }
+            }
+
+            if (arrayBuilder.arrSize() > 0) {
+                metadataBob->appendArray(
+                    Generic_reply_fields_unstable_v1::kRoutingCacheGossipFieldName,
+                    arrayBuilder.obj());
+            }
         }
     }
 
