@@ -265,6 +265,11 @@ var ShardingTest = function ShardingTest(params) {
         return this.config.shards.find({_id: {$ne: x.primary}}).map(z => z._id);
     };
 
+    ShardingTest.prototype.printNodes = function() {
+        print("ShardingTest " + this._testName + " :\n" +
+              tojson({config: this._configDB, shards: this._connections, mongos: this._mongos}));
+    };
+
     ShardingTest.prototype.getConnNames = function() {
         var names = [];
         for (var i = 0; i < this._connections.length; i++) {
@@ -1793,8 +1798,7 @@ var ShardingTest = function ShardingTest(params) {
 
         printjson('Config servers: ' + this._configDB);
 
-        print("ShardingTest " + this._testName + " :\n" +
-              tojson({config: this._configDB, shards: this._connections}));
+        this.printNodes();
 
         this._mongos = [];
 
