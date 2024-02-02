@@ -68,7 +68,8 @@ const runTest = function(write, numExpectedDocs) {
               TimeseriesTest.BucketVersion.kCompressed);
 };
 
-runTest((coll) => coll.insert({t: time, m: 0, a: 2}), 3);
+runTest((coll) => coll.insert({t: time, m: 0, a: 2}, {ordered: false}), 3);
+runTest((coll) => coll.insert({t: time, m: 0, a: 2}, {ordered: true}), 3);
 // TODO (SERVER-68058): Remove this condition.
 if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesUpdatesSupport")) {
     runTest((coll) => coll.update({}, {$set: {m: 1}}, {multi: true}), 2);

@@ -207,10 +207,18 @@ TEST_F(BucketStateRegistryTest, TransitionsFromUntrackedState) {
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
 
     // We expect direct writes to succeed on untracked buckets.
     addDirectWrite(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    // Reset the state.
+    removeDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+
+    // We expect transition to 'kFrozen' to succeed.
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnUntrackedBucket, "invariant") {
@@ -252,10 +260,20 @@ TEST_F(BucketStateRegistryTest, TransitionsFromNormalState) {
     // Reset the state.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
 
     // We expect direct writes to succeed on 'kNormal' buckets.
     addDirectWrite(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    // Reset the state.
+    removeDirectWrite(bucketStateRegistry, bucket.bucketId);
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kNormal));
+
+    // We expect transition to 'kFrozen' to succeed.
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
@@ -291,6 +309,39 @@ TEST_F(BucketStateRegistryTest, TransitionsFromClearedState) {
     // We expect direct writes to succeed on 'kCleared' buckets.
     addDirectWrite(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+    // Reset the state.
+    removeDirectWrite(bucketStateRegistry, bucket.bucketId);
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+
+    // We expect transition to 'kFrozen' to succeed.
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+}
+
+TEST_F(BucketStateRegistryTest, TransitionsFromFrozenState) {
+    // Start with a 'kFrozen' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+
+    // We expect transition to 'kCleared' to fail.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+
+    // We expect transition to 'kPrepared' to fail.
+    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+                StateChangeSuccessful::kNo);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+
+    // We expect direct writes leave the state as 'kFrozen'.
+    addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_FALSE(doesBucketHaveDirectWrite(bucket.bucketId));
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+
+    // We cannot untrack a 'kFrozen' bucket.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
@@ -313,10 +364,23 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {
     // We expect transition to 'kCleared' to succeed and update the state as 'kPreparedAndCleared'.
     clearBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+    // Reset the state.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
 
     // We can untrack a 'kPrepared' bucket
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    // Reset the state.
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr));
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+
+    // We expect transition to 'kFrozen' to succeed.
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
 }
 
 DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAPreparedBucket, "invariant") {
@@ -373,6 +437,51 @@ TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
     // We expect unpreparing 'kPreparedAndCleared' buckets to transition to 'kCleared'.
     unprepareBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kCleared));
+    // Reset the state.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, boost::none));
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
+    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+                StateChangeSuccessful::kYes);
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndCleared));
+
+    // We expect transition to 'kFrozen' to succeed.
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+}
+
+TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndFrozenState) {
+    // Start with a 'kPreparedAndFrozen' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+    auto& bucket2 = createBucket(info2);
+    (void)prepareBucketState(bucketStateRegistry, bucket2.bucketId);
+    freezeBucket(bucketStateRegistry, bucket2.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket2.bucketId, BucketState::kPreparedAndFrozen));
+
+    // We expect transition to 'kPrepared' to fail.
+    ASSERT_TRUE(prepareBucketState(bucketStateRegistry, bucket.bucketId) ==
+                StateChangeSuccessful::kNo);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+
+    // We expect direct writes to fail and leave the state as 'kPreparedAndCleared'.
+    (void)addDirectWrite(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+
+    // We expect clearing the bucket state will not affect the state.
+    clearBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPreparedAndFrozen));
+
+    // We expect untracking 'kPreparedAndFrozen' buckets to transition the state to 'kFrozen'.
+    stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+
+    // We expect unpreparing 'kPreparedAndCleared' buckets to transition to 'kFrozen'.
+    unprepareBucketState(bucketStateRegistry, bucket2.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket2.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
@@ -404,6 +513,10 @@ TEST_F(BucketStateRegistryTest, TransitionsFromDirectWriteState) {
     // We expect transition to 'kPrepared' to leave the state unaffected.
     (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucket.bucketId));
+
+    // We expect transition to 'kFrozen' to succeed.
+    freezeBucket(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
 }
 
 TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {

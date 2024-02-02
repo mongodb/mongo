@@ -657,6 +657,14 @@ void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, 
         return;
     }
 
+    if (isBucketStateFrozen(state)) {
+        // It's okay to perform a direct write on a frozen bucket. Multiple direct writes will
+        // coordinate via the storage engine's conflict handling. We just need to make sure that
+        // direct writes aren't potentially conflicting with normal writes that go through the
+        // bucket catalog.
+        return;
+    }
+
     // We cannot perform direct writes on prepared buckets.
     invariant(isBucketStatePrepared(state));
     hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
@@ -681,6 +689,10 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns) {
 void clear(BucketCatalog& catalog, const DatabaseName& dbName) {
     clear(catalog,
           [dbName](const NamespaceString& bucketNs) { return bucketNs.dbName() == dbName; });
+}
+
+void freeze(BucketCatalog& catalog, const NamespaceString& ns, const OID& oid) {
+    freezeBucket(catalog.bucketStateRegistry, {ns, oid});
 }
 
 void resetBucketOIDCounter() {

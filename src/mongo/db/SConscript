@@ -2515,6 +2515,7 @@ env.Library(
         'storage/storage_init_d',
         'storage/storage_options',
         'system_index',
+        'timeseries/bucket_compression_failure',
         'traffic_recorder',
         'ttl_collection_cache',
         'ttl_d',

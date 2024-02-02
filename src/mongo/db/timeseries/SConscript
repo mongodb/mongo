@@ -41,6 +41,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='bucket_compression_failure',
+    source=[
+        'bucket_compression_failure.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target='timeseries_tracking_allocator_test',
     source=[
@@ -126,6 +136,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
         '$BUILD_DIR/mongo/db/update/update_common',
         'bucket_compression',
+        'bucket_compression_failure',
         'timeseries_conversion_util',
         'timeseries_options',
     ],

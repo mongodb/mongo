@@ -68,26 +68,38 @@ enum class ContinueTrackingBucket { kContinue, kStop };
  * State Transition Chart:
  * {+ = valid transition, INV = invariants, WCE = throws WriteConflictException, nop = no-operation}
  *
- * | Current State      |                      Tranistion State                      |
- * |--------------------|:---------:|:------:|:-----:|:--------:|:------------------:|
- * |                    | Untracked | Normal | Clear | Prepared | DirectWriteCounter |
- * |--------------------|-----------|--------|-------|----------|--------------------|
- * | Untracked          |     nop   |    +   |  nop  |   INV    |         +          |
- * | Normal             |      +    |    +   |   +   |    +     |         +          |
- * | Clear              |      +    |    +   |   +   |   nop    |         +          |
- * | Prepared           |      +    |   INV  |   +   |   INV    |       no-op        |
- * | PreparedAndCleared |      +    |   WCE  |   +   |   nop    |        WCE         |
- * | DirectWriteCounter |     nop   |   WCE  |  nop  |   nop    |         +          |
+ * | Current State      |                           Tranistion State                            |
+ * |--------------------|:---------:|:------:|:-------:|:------:|:--------:|:------------------:|
+ * |                    | Untracked | Normal | Cleared | Frozen | Prepared | DirectWriteCounter |
+ * |--------------------|-----------|--------|---------|--------|----------|--------------------|
+ * | Untracked          |    nop    |   +    |   nop   |   +    |   INV    |         +          |
+ * | Normal             |     +     |   +    |    +    |   +    |    +     |         +          |
+ * | Cleared            |     +     |   +    |    +    |   +    |   nop    |         +          |
+ * | Frozen             |    nop    |  nop   |   nop   |  nop   |   nop    |        nop         |
+ * | Prepared           |     +     |  INV   |    +    |   +    |   INV    |        nop         |
+ * | PreparedAndCleared |     +     |  WCE   |    +    |   +    |   nop    |        WCE         |
+ * | PreparedAndFrozen  |    nop    |  WCE   |   nop   |   +    |   nop    |        nop         |
+ * | DirectWriteCounter |    nop    |  WCE   |   nop   |   +    |   nop    |         +          |
  *
  * Note: we never explicitly set the 'kPreparedAndCleared' state.
  */
 enum class BucketState : uint8_t {
-    kNormal,    // Can accept inserts.
-    kPrepared,  // Can accept inserts, and has an outstanding prepared commit.
-    kCleared,   // Cannot accept inserts as the bucket will soon be removed from the registry.
-    kPreparedAndCleared  // Cannot accept inserts, and has an outstanding prepared commit. This
-                         // state will propogate WriteConflictExceptions to all writers aside from
-                         // the writer who prepared the commit.
+    // Can accept inserts.
+    kNormal,
+    // Can accept inserts, and has an outstanding prepared commit.
+    kPrepared,
+    // Cannot accept inserts as the bucket will soon be removed from the registry.
+    kCleared,
+    // Cannot accept inserts and will continue to not accept inserts.
+    kFrozen,
+    // Cannot accept inserts, and has an outstanding prepared commit. This
+    // state will propogate WriteConflictExceptions to all writers aside from
+    // the writer who prepared the commit.
+    kPreparedAndCleared,
+    // Cannot accept inserts, and has an outstanding prepared commit. This
+    // state will propogate WriteConflictExceptions to all writers aside from
+    // the writer who prepared the commit.
+    kPreparedAndFrozen,
 };
 
 /**
@@ -173,6 +185,11 @@ boost::optional<std::variant<BucketState, DirectWriteCounter>> getBucketState(
 bool isBucketStateCleared(std::variant<BucketState, DirectWriteCounter>& state);
 
 /**
+ * Returns true if the state is frozen.
+ */
+bool isBucketStateFrozen(std::variant<BucketState, DirectWriteCounter>& state);
+
+/**
  * Returns true if the state is prepared.
  */
 bool isBucketStatePrepared(std::variant<BucketState, DirectWriteCounter>& state);
@@ -197,9 +214,11 @@ bool conflictsWithInsertions(std::variant<BucketState, DirectWriteCounter>& stat
  * |--------------------|-----------
  * | Untracked          | kNormal
  * | Normal             | kNormal
- * | Clear              | kNormal
+ * | Cleared            | kNormal
+ * | Frozen             | kFrozen
  * | Prepared           | invariants
  * | PreparedAndCleared | throws WCE
+ * | PreparedAndFrozen  | throws WCE
  * | DirectWriteCounter | throws WCE
  */
 Status initializeBucketState(BucketStateRegistry& registry,
@@ -216,9 +235,11 @@ Status initializeBucketState(BucketStateRegistry& registry,
  * |--------------------|-----------
  * | Untracked          | invariants
  * | Normal             | kPrepared
- * | Clear              |     -
+ * | Cleared            |     -
+ * | Frozen             |     -
  * | Prepared           | invariants
  * | PreparedAndCleared |     -
+ * | PreparedAndFrozen  |     -
  * | DirectWriteCounter |     -
  */
 StateChangeSuccessful prepareBucketState(BucketStateRegistry& registry,
@@ -235,9 +256,11 @@ StateChangeSuccessful prepareBucketState(BucketStateRegistry& registry,
  * |--------------------|-----------
  * | Untracked          | invariants
  * | Normal             | invariants
- * | Clear              | invariants
+ * | Cleared            | invariants
+ * | Frozen             | invariants
  * | Prepared           | kNormal
- * | PreparedAndCleared | KCleared
+ * | PreparedAndCleared | kCleared
+ * | PreparedAndFrozen  | kFrozen
  * | DirectWriteCounter | invariants
  */
 StateChangeSuccessful unprepareBucketState(BucketStateRegistry& registry,
@@ -254,9 +277,11 @@ StateChangeSuccessful unprepareBucketState(BucketStateRegistry& registry,
  * |--------------------|-----------------
  * | Untracked          | negative count
  * | Normal             | positive count
- * | Clear              | positive count
+ * | Cleared            | positive count
+ * | Frozen             |       -
  * | Prepared           |       -
  * | PreparedAndCleared |       -
+ * | PreparedAndFrozen  |       -
  * | DirectWriteCounter | increments value
  */
 std::variant<BucketState, DirectWriteCounter> addDirectWrite(
@@ -274,9 +299,11 @@ std::variant<BucketState, DirectWriteCounter> addDirectWrite(
  * |--------------------|-----------------
  * | Untracked          | invariants
  * | Normal             | invariants
- * | Clear              | invariants
+ * | Cleared            | invariants
+ * | Frozen             |        -
  * | Prepared           | invariants
  * | PreparedAndCleared | invariants
+ * | PreparedAndFrozen  |        -
  * | DirectWriteCounter | decrements value
  */
 void removeDirectWrite(BucketStateRegistry& registry, const BucketId& bucketId);
@@ -291,9 +318,11 @@ void removeDirectWrite(BucketStateRegistry& registry, const BucketId& bucketId);
  * |--------------------|--------------------
  * | Untracked          |         -
  * | Normal             | kCleared
- * | Clear              | kCleared
+ * | Cleared            | kCleared
+ * | Frozen             | kFrozen
  * | Prepared           | kPreparedAndCleared
  * | PreparedAndCleared | kPreparedAndCleared
+ * | PreparedAndFrozen  | kPreparedAndFrozen
  * | DirectWriteCounter |         -
  */
 void clearBucketState(BucketStateRegistry& registry, const BucketId& bucketId);
@@ -306,12 +335,30 @@ void clearBucketState(BucketStateRegistry& registry, const BucketId& bucketId);
  * |--------------------|----------------
  * | Untracked          |        -
  * | Normal             | erases entry
- * | Clear              | erases entry
+ * | Cleared            | erases entry
+ * | Frozen             |        -
  * | Prepared           | erases entry
  * | PreparedAndCleared | erases entry
+ * | PreparedAndFrozen  |        -
  * | DirectWriteCounter | negative value
  */
 void stopTrackingBucketState(BucketStateRegistry& registry, const BucketId& bucketId);
+
+/**
+ * Freezes the bucket. A frozen bucket cannot become unfrozen or untracked.
+ *
+ * |   Current State    |       Result
+ * |--------------------|--------------------
+ * | Untracked          | kFrozen
+ * | Normal             | kFrozen
+ * | Cleared            | kFrozen
+ * | Frozen             | kFrozen
+ * | Prepared           | kPreparedAndFrozen
+ * | PreparedAndCleared | kPreparedAndFrozen
+ * | PreparedAndFrozen  | kPreparedAndFrozen
+ * | DirectWriteCounter | kFrozen
+ */
+void freezeBucket(BucketStateRegistry&, const BucketId&);
 
 /**
  * Appends statistics for observability.

@@ -534,6 +534,8 @@ error_codes:
 
     - {code: 406, name: MigrationBlockingOperationCoordinatorCleaningUp}
 
+    - {code: 407, name: TimeseriesBucketCompressionFailed, extra: 'timeseries::BucketCompressionFailure'}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

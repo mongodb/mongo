@@ -376,7 +376,7 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
     return {};
 }
 
-boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) {
+boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) try {
     BSONObjBuilder builder;
 
     for (auto&& topLevel : bucketDoc) {
@@ -430,6 +430,8 @@ boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) {
     }
 
     return builder.obj();
+} catch (...) {
+    return boost::none;
 }
 
 bool isCompressedBucket(const BSONObj& bucketDoc) {

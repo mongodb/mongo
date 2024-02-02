@@ -2548,16 +2548,10 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
         _ns1, autoColl->getDefaultCollator(), options, tempDoc);
     ASSERT_OK(statusWithKeyAndTime);
     auto key = statusWithKeyAndTime.getValue().first;
-    internal::CreationInfo info{key, 0, currentTime, options, stats, &closedBuckets};
 
-    // Allocate our bucket on the bucket catalog.
-    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
-    // Check that we only have one bucket allocated for this key - the one we just created.
-    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 1);
-
-    // Now create a bucket that we will reopen. Reopening should succeed without removing the other
-    // open bucket for this metadata.
-    BSONObj firstBucketToReopen = ::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+    // Reopen a bucket.
+    auto firstBucketToReopen =
+        compressBucket(::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
                                    "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
                                    "meta":42,
@@ -2565,19 +2559,38 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
                             "1":{"$date":"2022-06-06T15:34:30.000Z"},
                             "2":{"$date":"2022-06-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2,"2":3},
-                    "b":{"0":1,"1":2,"2":3}}})");
-    ASSERT_OK(_reopenBucket(autoColl.getCollection(), firstBucketToReopen));
+                    "b":{"0":1,"1":2,"2":3}}})"),
+                       _timeField,
+                       _ns1,
+                       true);
+    ASSERT(firstBucketToReopen.compressedBucket);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), *firstBucketToReopen.compressedBucket));
+    // Check that we only have one bucket allocated for this key - the one we just reopened.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 1);
+
+    // Reopening another bucket should succeed without removing the other open bucket for this
+    // metadata.
+    auto secondBucketToReopen =
+        compressBucket(::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a518"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})"),
+                       _timeField,
+                       _ns1,
+                       true);
+    ASSERT(secondBucketToReopen.compressedBucket);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), *secondBucketToReopen.compressedBucket));
     // There should still be two open buckets for this key.
     ASSERT_EQ(stripe.openBucketsByKey[key].size(), 2);
 
-    // We allocate one more bucket, which puts us at our maximum of 3.
-    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
-    // Check that we only have one bucket allocated for this key - the one we just created.
-    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
-
-    // Now, when we try reopening a second bucket, we should see that adding this bucket would set
-    // us over our limit; we should then close one of the existing open buckets.
-    BSONObj secondBucketToReopen = ::mongo::fromjson(R"({"_id":{"$oid":"734d2e673747f168ee18b420"},
+    // Reopen one more bucket, which puts us at our maximum of 3.
+    auto thirdBucketToReopen =
+        compressBucket(::mongo::fromjson(R"({"_id":{"$oid":"734d2e673747f168ee18b420"},
             "control":{"version":1,"min":{"time":{"$date":"2022-07-06T15:34:00.000Z"},"a":1,"b":1},
                                    "max":{"time":{"$date":"2022-07-06T15:34:30.000Z"},"a":3,"b":3}},
                                    "meta":42,
@@ -2585,8 +2598,32 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
                             "1":{"$date":"2022-07-06T15:34:30.000Z"},
                             "2":{"$date":"2022-07-06T15:34:30.000Z"}},
                     "a":{"0":1,"1":2},
-                    "b":{"0":1,"1":2}}})");
-    ASSERT_OK(_reopenBucket(autoColl.getCollection(), secondBucketToReopen));
+                    "b":{"0":1,"1":2}}})"),
+                       _timeField,
+                       _ns1,
+                       true);
+    ASSERT(thirdBucketToReopen.compressedBucket);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), *thirdBucketToReopen.compressedBucket));
+    // There should still be three open buckets for this key.
+    ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
+
+    // Now, when we try reopening a fourth bucket, we should see that adding this bucket would set
+    // us over our limit; we should then close one of the existing open buckets.
+    auto fourthBucketToReopen =
+        compressBucket(::mongo::fromjson(R"({"_id":{"$oid":"734d2e673747f168ee18b421"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-07-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-07-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-07-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-07-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-07-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2},
+                    "b":{"0":1,"1":2}}})"),
+                       _timeField,
+                       _ns1,
+                       true);
+    ASSERT(fourthBucketToReopen.compressedBucket);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), *fourthBucketToReopen.compressedBucket));
     // There should still be three open buckets for this key.
     ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
 }
@@ -2664,11 +2701,56 @@ TEST_F(BucketCatalogTest, AllocateBucketClosesExistingOpenBucketsWhenOverLimit) 
     auto key = statusWithKeyAndTime.getValue().first;
     internal::CreationInfo info{key, 0, currentTime, options, stats, &closedBuckets};
 
-    // We allocate 3 buckets with the same metadata, which is the max number allowed under our
-    // current server parameter value.
-    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
-    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
-    internal::allocateBucket(_opCtx, *_bucketCatalog, stripe, WithLock::withoutLock(), info);
+    // We reopen 3 buckets with the same metadata, which is the max number allowed under our current
+    // server parameter value.
+    auto firstBucketToReopen =
+        compressBucket(::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})"),
+                       _timeField,
+                       _ns1,
+                       true);
+    ASSERT(firstBucketToReopen.compressedBucket);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), *firstBucketToReopen.compressedBucket));
+
+    auto secondBucketToReopen =
+        compressBucket(::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a518"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})"),
+                       _timeField,
+                       _ns1,
+                       true);
+    ASSERT(secondBucketToReopen.compressedBucket);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), *secondBucketToReopen.compressedBucket));
+
+    auto thirdBucketToReopen =
+        compressBucket(::mongo::fromjson(R"({"_id":{"$oid":"629e1e680958e279dc29a519"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+                                   "meta":42,
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})"),
+                       _timeField,
+                       _ns1,
+                       true);
+    ASSERT(thirdBucketToReopen.compressedBucket);
+    ASSERT_OK(_reopenBucket(autoColl.getCollection(), *thirdBucketToReopen.compressedBucket));
+
     ASSERT_EQ(stripe.openBucketsByKey[key].size(), 3);
 
     // Now, when we try to allocate another bucket, we should close one of the existing ones.

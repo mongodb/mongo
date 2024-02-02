@@ -119,13 +119,6 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
 }
 
 void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
-    // Bucket is not compressed, likely because compression failed.
-    // TODO SERVER-80653: This should no longer be possible with a retry mechanism on bucket
-    // compression failure.
-    if (!bucket.compressed) {
-        return;
-    }
-
     ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, bucket.key.ns);
     stats.incNumBytesUncompressed(bucket.uncompressed.objsize());
     stats.incNumBytesCompressed(bucket.compressed->objsize());
@@ -366,7 +359,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
         }
 
         // Clean up the bucket if it has been cleared.
-        if (state && isBucketStateCleared(state.value())) {
+        if (state && (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
             abort(catalog,
                   stripe,
                   stripeLock,
@@ -584,7 +577,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
     // may miss if e.g. there was a move chunk operation.
     auto state = getBucketState(catalog.bucketStateRegistry, &existingBucket);
     invariant(state);
-    if (isBucketStateCleared(state.value())) {
+    if (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value())) {
         abort(catalog,
               stripe,
               stripeLock,
@@ -1046,7 +1039,8 @@ void expireIdleBuckets(OperationContext* opCtx,
             // Can archive a bucket if it's still eligible for insertions.
             archiveBucket(opCtx, catalog, stripe, stripeLock, *bucket, closedBuckets);
             stats.incNumBucketsArchivedDueToMemoryThreshold();
-        } else if (state && isBucketStateCleared(state.value())) {
+        } else if (state &&
+                   (isBucketStateCleared(state.value()) || isBucketStateFrozen(state.value()))) {
             // Bucket was cleared and just needs to be removed from catalog.
             removeBucket(catalog, stripe, stripeLock, *bucket, RemovalMode::kAbort);
         } else {

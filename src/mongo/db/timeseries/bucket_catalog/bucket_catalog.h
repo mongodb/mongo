@@ -357,6 +357,11 @@ void clear(BucketCatalog& catalog, const NamespaceString& ns);
 void clear(BucketCatalog& catalog, const DatabaseName& dbName);
 
 /**
+ * Freezes the given bucket in the registry so that this bucket will never be used in the future.
+ */
+void freeze(BucketCatalog&, const NamespaceString&, const OID&);
+
+/**
  * Resets the counter used for bucket OID generation. Should be called after a bucket _id collision.
  */
 void resetBucketOIDCounter();

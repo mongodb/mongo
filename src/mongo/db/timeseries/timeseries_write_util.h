@@ -168,6 +168,11 @@ write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds = {});
 
+enum class BucketReopeningPermittance {
+    kAllowed,
+    kDisallowed,
+};
+
 /**
  * Attempts to insert a measurement doc into a bucket in the bucket catalog and retries
  * automatically on certain errors. Only reopens existing buckets if the insert was initiated from a
@@ -182,8 +187,8 @@ StatusWith<timeseries::bucket_catalog::InsertResult> attemptInsertIntoBucket(
     const Collection* bucketsColl,
     TimeseriesOptions& timeSeriesOptions,
     const BSONObj& measurementDoc,
-    bucket_catalog::CombineWithInsertsFromOtherClients combine,
-    bool fromUpdates = false);
+    BucketReopeningPermittance,
+    bucket_catalog::CombineWithInsertsFromOtherClients combine);
 
 /**
  * Prepares the final write batches needed for performing the writes to storage.
