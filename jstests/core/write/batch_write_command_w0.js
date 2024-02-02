@@ -33,6 +33,7 @@ coll.drop();
 //
 // Single document insert, w:0 write concern specified, missing ordered
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 let request = {insert: coll.getName(), documents: [{a: 1}], writeConcern: {w: 0}};
 let result = coll.runCommand(request);
 assert.eq({ok: 1}, result);
@@ -41,6 +42,7 @@ countEventually(coll, 1);
 //
 // Single document upsert, write concern 0 specified, ordered = true
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 request = {
     update: coll.getName(),
     updates: [{q: {a: 1}, u: {$set: {a: 1}}, upsert: true}],
@@ -54,6 +56,7 @@ countEventually(coll, 1);
 //
 // Two document upsert, write concern 0 specified, ordered = true
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 request = {
     update: coll.getName(),
     updates: [
@@ -70,7 +73,8 @@ countEventually(coll, 2);
 //
 // Upsert fail due to duplicate key index, w:0, ordered:true
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+assert.commandWorked(db.runCommand(
+    {createIndexes: coll.getName(), indexes: [{key: {a: 1}, name: "a_1", unique: true}]}));
 request = {
     update: coll.getName(),
     updates: [
@@ -87,6 +91,7 @@ countEventually(coll, 1);
 //
 // Single document delete, w:0 write concern specified
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -100,6 +105,7 @@ countEventually(coll, 0);
 //
 // Cause remove error using ordered:false and w:0
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -114,6 +120,7 @@ countEventually(coll, 0);
 //
 // Cause remove error using ordered:true and w:0 - $set isn't a valid delete filter
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
@@ -128,6 +135,7 @@ assert.eq(coll.count(), 1);
 //
 // When limit is not 0 and 1
 coll.drop();
+assert.commandWorked(db.runCommand({create: coll.getName()}));
 coll.insert({a: 1});
 request = {
     delete: coll.getName(),
