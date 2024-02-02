@@ -101,8 +101,9 @@ public:
             try {
                 const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns());
 
-                uassert(ErrorCodes::NotImplemented,
-                        "drop collection of a sharded time-series collection is not supported",
+                uassert(ErrorCodes::IllegalOperation,
+                        "Sharded time-series buckets collections cannot be dropped directly; drop "
+                        "the logical namespace instead",
                         !coll.getTimeseriesFields());
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // The collection is not sharded or doesn't exist.
