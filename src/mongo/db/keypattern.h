@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -82,6 +83,14 @@ public:
      */
     const BSONObj& toBSON() const {
         return _pattern;
+    }
+
+    BSONObj serializeForIDL(const SerializationOptions& options = {}) const {
+        BSONObjBuilder bob;
+        for (const auto& e : _pattern) {
+            bob.appendAs(e, options.serializeIdentifier(e.fieldNameStringData()));
+        }
+        return bob.obj();
     }
 
     /**

@@ -25,7 +25,7 @@ assert.commandFailedWithCode(
 // Pipeline, with a filter, to read telemetry store fails without feature flag turned on.
 assert.commandFailedWithCode(testDB.adminCommand({
     aggregate: 1,
-    pipeline: [{$telemetry: {}}, {$match: {"key.find.find": {$eq: "###"}}}],
+    pipeline: [{$telemetry: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],
     cursor: {}
 }),
                              ErrorCodes.QueryFeatureNotAllowed);

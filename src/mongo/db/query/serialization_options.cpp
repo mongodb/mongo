@@ -360,7 +360,7 @@ Value SerializationOptions::serializeLiteral(const ImplicitValue& v) const {
 }
 
 std::string SerializationOptions::serializeFieldPathFromString(StringData path) const {
-    if (redactIdentifiers) {
+    if (applyHmacToIdentifiers) {
         // Some valid field names are considered invalid as a FieldPath (for example, fields
         // like "foo.$bar" where a sub-component is prefixed with "$"). For now, if
         // serializeFieldPath errors due to an "invalid" field name, we'll serialize that field

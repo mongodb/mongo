@@ -1045,14 +1045,14 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     // syntax) or if a $match was absorbed.
     auto serializedPipeline = [&]() -> std::vector<BSONObj> {
         auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
-        if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+        if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
             return Pipeline::parse(pipeline, _fromExpCtx)->serializeToBson(opts);
         }
         return pipeline;
     }();
     if (_additionalFilter) {
         auto serializedFilter = [&]() -> BSONObj {
-            if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+            if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
                 auto filter =
                     uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
                 return filter->serialize(opts);

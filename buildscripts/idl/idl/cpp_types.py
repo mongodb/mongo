@@ -511,14 +511,14 @@ class BsonCppTypeBase(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def gen_serializer_expression(self, indented_writer, expression):
-        # type: (writer.IndentedTextWriter, str) -> str
+    def gen_serializer_expression(self, indented_writer, expression, should_shapify=False):
+        # type: (writer.IndentedTextWriter, str, bool) -> str
         """Generate code with the text writer and return an expression to serialize the type."""
         pass
 
 
-def _call_method_or_global_function(expression, ast_type):
-    # type: (str, ast.Type) -> str
+def _call_method_or_global_function(expression, ast_type, should_shapify=False):
+    # type: (str, ast.Type, bool) -> str
     """
     Given a fully-qualified method name, call it correctly.
 
@@ -528,18 +528,31 @@ def _call_method_or_global_function(expression, ast_type):
     """
     method_name = ast_type.serializer
     serialization_context = 'getSerializationContext()' if ast_type.deserialize_with_tenant else ''
+    shape_options = ''
+    if should_shapify:
+        shape_options = 'options'
+        if serialization_context != '':
+            shape_options = ', ' + shape_options
 
     short_method_name = writer.get_method_name(method_name)
     if writer.is_function(method_name):
         if ast_type.deserialize_with_tenant:
             serialization_context = ', ' + serialization_context
-        return common.template_args('${method_name}(${expression}${serialization_context})',
-                                    expression=expression, method_name=method_name,
-                                    serialization_context=serialization_context)
+        return common.template_args(
+            '${method_name}(${expression}${serialization_context}${shape_options})',
+            expression=expression,
+            method_name=method_name,
+            serialization_context=serialization_context,
+            shape_options=shape_options,
+        )
 
-    return common.template_args('${expression}.${method_name}(${serialization_context})',
-                                expression=expression, method_name=short_method_name,
-                                serialization_context=serialization_context)
+    return common.template_args(
+        '${expression}.${method_name}(${serialization_context}${shape_options})',
+        expression=expression,
+        method_name=short_method_name,
+        serialization_context=serialization_context,
+        shape_options=shape_options,
+    )
 
 
 class _CommonBsonCppTypeBase(BsonCppTypeBase):
@@ -560,9 +573,9 @@ class _CommonBsonCppTypeBase(BsonCppTypeBase):
         # type: () -> bool
         return self._ast_type.serializer is not None
 
-    def gen_serializer_expression(self, indented_writer, expression):
-        # type: (writer.IndentedTextWriter, str) -> str
-        return _call_method_or_global_function(expression, self._ast_type)
+    def gen_serializer_expression(self, indented_writer, expression, should_shapify=False):
+        # type: (writer.IndentedTextWriter, str, bool) -> str
+        return _call_method_or_global_function(expression, self._ast_type, should_shapify)
 
 
 class _ObjectBsonCppTypeBase(BsonCppTypeBase):
@@ -584,8 +597,8 @@ class _ObjectBsonCppTypeBase(BsonCppTypeBase):
         # type: () -> bool
         return self._ast_type.serializer is not None
 
-    def gen_serializer_expression(self, indented_writer, expression):
-        # type: (writer.IndentedTextWriter, str) -> str
+    def gen_serializer_expression(self, indented_writer, expression, should_shapify=False):
+        # type: (writer.IndentedTextWriter, str, bool) -> str
         method_name = writer.get_method_name(self._ast_type.serializer)
         if self._ast_type.deserialize_with_tenant:  # SerializationContext is tied to tenant deserialization
             indented_writer.write_line(
@@ -618,8 +631,8 @@ class _ArrayBsonCppTypeBase(BsonCppTypeBase):
         # type: () -> bool
         return self._ast_type.serializer is not None
 
-    def gen_serializer_expression(self, indented_writer, expression):
-        # type: (writer.IndentedTextWriter, str) -> str
+    def gen_serializer_expression(self, indented_writer, expression, should_shapify=False):
+        # type: (writer.IndentedTextWriter, str, bool) -> str
         method_name = writer.get_method_name(self._ast_type.serializer)
         indented_writer.write_line(
             common.template_args('BSONArray localArray(${expression}.${method_name}());',
@@ -642,8 +655,8 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
         # type: () -> bool
         return True
 
-    def gen_serializer_expression(self, indented_writer, expression):
-        # type: (writer.IndentedTextWriter, str) -> str
+    def gen_serializer_expression(self, indented_writer, expression, should_shapify=False):
+        # type: (writer.IndentedTextWriter, str, bool) -> str
         if self._ast_type.serializer:
             method_name = writer.get_method_name(self._ast_type.serializer)
             indented_writer.write_line(

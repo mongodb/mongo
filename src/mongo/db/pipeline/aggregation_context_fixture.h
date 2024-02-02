@@ -86,10 +86,10 @@ public:
             options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
             // TODO SERVER-75399 Use only 'literalPolicy.'
             options.replacementForLiteralArgs = "?";
-            options.identifierRedactionPolicy = [](StringData s) -> std::string {
+            options.identifierHmacPolicy = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };
-            options.redactIdentifiers = true;
+            options.applyHmacToIdentifiers = true;
         }
         std::vector<Value> serialized;
         docSource.serializeToArray(serialized, options);
@@ -104,10 +104,10 @@ public:
             // TODO SERVER-75399 Use only 'literalPolicy.'
             options.replacementForLiteralArgs = "?";
             options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-            options.identifierRedactionPolicy = [](StringData s) -> std::string {
+            options.identifierHmacPolicy = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };
-            options.redactIdentifiers = true;
+            options.applyHmacToIdentifiers = true;
         }
         std::vector<Value> serialized;
         docSource.serializeToArray(serialized, options);

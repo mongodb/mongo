@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/serialization_context.h"
 
@@ -52,7 +53,8 @@ public:
      * eg. serialize(NamespaceString(boost::none, "foo.bar")) -> "foo.bar"
      */
     static std::string serialize(const NamespaceString& ns,
-                                 const SerializationContext& context = SerializationContext());
+                                 const SerializationContext& context = SerializationContext(),
+                                 const SerializationOptions& = {});
 
     /**
      * Deserializes StringData ns to a NamespaceString object.

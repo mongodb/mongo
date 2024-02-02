@@ -58,7 +58,7 @@ std::unique_ptr<projection_executor::ProjectionExecutor> compileProjection(BSONO
         expCtx, &ast, policies, projection_executor::kDefaultBuilderParams);
     return exec;
 }
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -66,9 +66,9 @@ TEST(Redaction, ProjectionTest) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.redactIdentifiers = true;
+    options.applyHmacToIdentifiers = true;
 
-    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.identifierHmacPolicy = applyHmacForTest;
     auto redactProj = [&](std::string obj) {
         return compileProjection(fromjson(obj))->serializeTransformation(boost::none, options);
     };

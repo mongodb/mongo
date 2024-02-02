@@ -44,12 +44,12 @@ namespace {
 /**
  * Simplistic redaction strategy for testing which appends the field name to the prefix "REDACT_".
  */
-std::string redactFieldNameForTest(StringData sd) {
+std::string applyHmacForTest(StringData sd) {
     return "REDACT_" + sd.toString();
 }
 
 static const SerializationOptions literalAndFieldRedactOpts{
-    redactFieldNameForTest, LiteralSerializationPolicy::kToDebugTypeString};
+    applyHmacForTest, LiteralSerializationPolicy::kToDebugTypeString};
 
 
 BSONObj predicateShape(std::string filterJson) {
@@ -59,7 +59,7 @@ BSONObj predicateShape(std::string filterJson) {
 
 BSONObj predicateShapeRedacted(std::string filterJson) {
     ParsedMatchExpressionForTest expr(filterJson);
-    return query_shape::debugPredicateShape(expr.get(), redactFieldNameForTest);
+    return query_shape::debugPredicateShape(expr.get(), applyHmacForTest);
 }
 
 #define ASSERT_SHAPE_EQ_AUTO(expected, actual) \
@@ -165,7 +165,7 @@ void assertShapeIs(std::string filterJson, BSONObj expectedShape) {
 void assertRedactedShapeIs(std::string filterJson, BSONObj expectedShape) {
     ParsedMatchExpressionForTest expr(filterJson);
     ASSERT_BSONOBJ_EQ(expectedShape,
-                      query_shape::debugPredicateShape(expr.get(), redactFieldNameForTest));
+                      query_shape::debugPredicateShape(expr.get(), applyHmacForTest));
 }
 }  // namespace
 
@@ -528,7 +528,7 @@ TEST(SortPatternShape, NormalSortPattern) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"a.b.c":1,"foo":-1})",
-        query_shape::sortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"), expCtx, opts));
 }
 
 TEST(SortPatternShape, NaturalSortPattern) {
@@ -538,10 +538,10 @@ TEST(SortPatternShape, NaturalSortPattern) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: 1})",
-        query_shape::sortShape(fromjson(R"({$natural: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: 1})"), expCtx, opts));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: -1})",
-        query_shape::sortShape(fromjson(R"({$natural: -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: -1})"), expCtx, opts));
 }
 
 TEST(SortPatternShape, NaturalSortPatternWithMeta) {
@@ -551,7 +551,7 @@ TEST(SortPatternShape, NaturalSortPatternWithMeta) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: 1, x: '?'})",
-        query_shape::sortShape(
+        query_shape::extractSortShape(
             fromjson(R"({$natural: 1, x: {$meta: "textScore"}})"), expCtx, opts));
 }
 
@@ -562,7 +562,8 @@ TEST(SortPatternShape, MetaPatternWithoutNatural) {
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"normal":1,"$computed1":{"$meta":"textScore"}})",
-        query_shape::sortShape(fromjson(R"({normal: 1, x: {$meta: "textScore"}})"), expCtx, opts));
+        query_shape::extractSortShape(
+            fromjson(R"({normal: 1, x: {$meta: "textScore"}})"), expCtx, opts));
 }
 
 // Here we have one test to ensure that the redaction policy is accepted and applied in the
@@ -572,22 +573,22 @@ TEST(SortPatternShape, RespectsRedactionPolicy) {
     expCtx = make_intrusive<ExpressionContextForTest>();
     SerializationOptions opts;
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
-    opts.redactIdentifiers = true;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.applyHmacToIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"REDACT_normal":1,"REDACT_y":1})",
-        query_shape::sortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
 
     // No need to redact $natural.
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$natural":1,"REDACT_y":1})",
-        query_shape::sortShape(fromjson(R"({$natural: 1, y: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: 1, y: 1})"), expCtx, opts));
 }
 
 TEST(QueryShapeIDL, ShapifyIDLStruct) {
     SerializationOptions options;
-    options.redactIdentifiers = true;
-    options.identifierRedactionPolicy = [](StringData s) -> std::string {
+    options.applyHmacToIdentifiers = true;
+    options.identifierHmacPolicy = [](StringData s) -> std::string {
         return str::stream() << "HASH<" << s << ">";
     };
     options.replacementForLiteralArgs = "?"_sd;
@@ -598,7 +599,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                                "hello",
                                {1, 2, 3, 4},
                                "field.path",
-                               {"field.path.1", "fieldpath2"});
+                               {"field.path.1", "fieldpath2"},
+                               NamespaceString{"db", "coll"},
+                               NamespaceString{"db", "coll"});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "stringField": "value",
@@ -615,7 +618,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
             "fieldpathList": [
                 "field.path.1",
                 "fieldpath2"
-            ]
+            ],
+            "nss": "db.coll",
+            "plainNss": "db.coll"
         })",
         nested.toBSON());
 
@@ -630,7 +635,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
             "fieldpathList": [
                 "HASH<field>.HASH<path>.HASH<1>",
                 "HASH<fieldpath2>"
-            ]
+            ],
+            "nss": "HASH<db.coll>",
+            "plainNss": "db.coll"
         })",
         nested.toBSON(options));
 
@@ -653,7 +660,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "field.path.1",
                     "fieldpath2"
-                ]
+                ],
+                "nss": "db.coll",
+                "plainNss": "db.coll"
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -670,7 +679,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "field.path.1",
                     "fieldpath2"
-                ]
+                ],
+                "nss": "db.coll",
+                "plainNss": "db.coll"
             }
         })",
         parent.toBSON());
@@ -687,7 +698,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "HASH<field>.HASH<path>.HASH<1>",
                     "HASH<fieldpath2>"
-                ]
+                ],
+                "nss": "HASH<db.coll>",
+                "plainNss": "db.coll"
             },
             "nested_no_shape": {
                 "stringField": "value",
@@ -704,7 +717,9 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                 "fieldpathList": [
                     "field.path.1",
                     "fieldpath2"
-                ]
+                ],
+                "nss": "db.coll",
+                "plainNss": "db.coll"
             }
         })",
         parent.toBSON(options));

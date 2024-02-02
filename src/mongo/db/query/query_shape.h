@@ -30,6 +30,9 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/query_request_helper.h"
 
 namespace mongo::query_shape {
 
@@ -53,13 +56,19 @@ BSONObj debugPredicateShape(const MatchExpression* predicate);
 BSONObj representativePredicateShape(const MatchExpression* predicate);
 
 BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> identifierRedactionPolicy);
-BSONObj representativePredicateShape(
-    const MatchExpression* predicate,
-    std::function<std::string(StringData)> identifierRedactionPolicy);
+                            std::function<std::string(StringData)> identifierHmacPolicy);
+BSONObj representativePredicateShape(const MatchExpression* predicate,
+                                     std::function<std::string(StringData)> identifierHmacPolicy);
 
-BSONObj sortShape(const BSONObj& sortSpec,
-                  const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                  const SerializationOptions& opts);
+BSONObj extractSortShape(const BSONObj& sortSpec,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         const SerializationOptions& opts);
 
+BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+                          const SerializationOptions& opts,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
+BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
+                          const std::vector<BSONObj>& serializedPipeline,
+                          const SerializationOptions& opts,
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
 }  // namespace mongo::query_shape

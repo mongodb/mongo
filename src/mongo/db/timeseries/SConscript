@@ -21,6 +21,7 @@ env.Library(
         'timeseries_options.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/serialization_options',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/processinfo',

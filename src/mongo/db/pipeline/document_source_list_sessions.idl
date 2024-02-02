@@ -44,10 +44,10 @@ structs:
     fields:
       user: 
         type: string
-        query_shape_anonymize: true
+        query_shape: anonymize
       db: 
         type: string
-        query_shape_anonymize: true
+        query_shape: anonymize
 
   ListSessionsSpec:
     description: "$listSessions and $listLocalSessions pipeline spec"
@@ -58,13 +58,13 @@ structs:
         type: bool
         default: false
         # This boolean parameterizes the stage rather than representing user input, so do not abstract the literal.
-        query_shape_literal: false
+        query_shape: parameter
       users:
         type: array<ListSessionsUser>
         optional: true
-        query_shape_literal: true
+        query_shape: literal
       $_internalPredicate:
         cpp_name: predicate
         type: object
         optional: true
-        query_shape_literal: true  # This is a MatchExpression predicate and could be shape-ified rather than completely abstracted.
+        query_shape: literal  # This is a MatchExpression predicate and could be shape-ified rather than completely abstracted.

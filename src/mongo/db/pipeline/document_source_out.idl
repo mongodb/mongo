@@ -40,18 +40,23 @@ structs:
     DocumentSourceOutSpec:
         description: "$out pipeline spec"
         strict: true
+        query_shape_component: true
         fields:
             coll:
                 description: "Target collection name to write documents from $out to."
                 type: string
                 optional: false
+                query_shape: anonymize
             db:
                 description: "Target database name to write documents from $out to."
                 type: string 
                 optional: false
+                query_shape: anonymize
             timeseries:
                 cpp_name: timeseries
                 description: "If set, the aggregation stage will use these options to create or 
                              replace a time-series collection in the given namespace."
                 type: TimeseriesOptions
                 optional: true
+                query_shape: literal
+

@@ -215,7 +215,7 @@ void DocumentSourceCursor::recordPlanSummaryStats() {
 
 Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
     auto verbosity = opts.verbosity;
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(7484350);
     }
     // We never parse a DocumentSourceCursor, so we only serialize for explain.

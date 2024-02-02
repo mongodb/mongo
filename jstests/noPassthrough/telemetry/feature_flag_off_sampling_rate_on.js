@@ -45,7 +45,7 @@ assert.commandFailedWithCode(
 // sampling rate is > 0.
 assert.commandFailedWithCode(testdb.adminCommand({
     aggregate: 1,
-    pipeline: [{$telemetry: {}}, {$match: {"key.find.find": {$eq: "###"}}}],
+    pipeline: [{$telemetry: {}}, {$match: {"key.queryShape.find": {$eq: "###"}}}],
     cursor: {}
 }),
                              ErrorCodes.QueryFeatureNotAllowed);

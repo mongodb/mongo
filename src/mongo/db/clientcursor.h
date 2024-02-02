@@ -588,10 +588,13 @@ void startClientCursorMonitor();
  * Records certain metrics for the current operation on OpDebug and aggregates those metrics for
  * telemetry use. If a cursor pin is provided, metrics are aggregated on the cursor; otherwise,
  * metrics are written directly to the telemetry store.
+ * NOTE: Metrics are taken from opDebug.additiveMetrics, so CurOp::setEndOfOpMetrics must be called
+ * *prior* to calling these.
+ *
+ * Currently, telemetry is only collected for find and aggregate requests (and their subsequent
+ * getMore requests), so these should only be called from those request paths.
  */
-void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor, long long nreturned);
-void collectTelemetryMongod(OperationContext* opCtx,
-                            const BSONObj& originatingCommand,
-                            long long nreturned);
+void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor);
+void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand);
 
 }  // namespace mongo

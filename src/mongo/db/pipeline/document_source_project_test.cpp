@@ -341,7 +341,7 @@ TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
 /**
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
-std::string redactIdentifiersForTest(StringData s) {
+std::string applyHmacToIdentifiersForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 

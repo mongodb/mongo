@@ -337,6 +337,15 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
     _nss = std::move(nss);
 }
 
+void CurOp::setEndOfOpMetrics(long long nreturned) {
+    _debug.additiveMetrics.nreturned = nreturned;
+    // executionTime is set with the final executionTime in completeAndLogOperation, but for
+    // telemetry collection we want it set before incrementing cursor metrics using OpDebug's
+    // AdditiveMetrics. The value set here will be overwritten later in
+    // completeAndLogOperation.
+    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+}
+
 void CurOp::setMessage_inlock(StringData message) {
     if (_progressMeter.isActive()) {
         LOGV2_ERROR(20527,

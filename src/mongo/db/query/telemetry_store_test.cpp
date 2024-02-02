@@ -29,7 +29,9 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/pipeline/aggregate_request_shapifier.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -119,164 +121,176 @@ TEST_F(TelemetryStoreTest, EvictEntries) {
 }
 
 /**
- * A default redaction strategy that generates easy to check results for testing purposes.
+ * A default hmac application strategy that generates easy to check results for testing purposes.
  */
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
+
     fcr.setFilter(BSON("a" << 1));
     SerializationOptions opts;
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.redactIdentifiers = true;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.applyHmacToIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
 
-    auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    auto hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
                 }
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add sort.
     fcr.setSort(BSON("sortVal" << 1 << "otherSort" << -1));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add inclusion projection.
     fcr.setProjection(BSON("e" << true << "f" << true));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add let.
     fcr.setLet(BSON("var1"
                     << "$a"
                     << "var2"
                     << "const1"));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add hinting fields.
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
                 }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Add the literal redaction fields.
     fcr.setLimit(5);
@@ -285,50 +299,52 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setMaxTimeMS(1000);
     fcr.setNoCursorTimeout(false);
 
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
-                }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
-            },
-            "limit": "?number",
-            "skip": "?number",
-            "batchSize": "?number",
-            "maxTimeMS": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
+                },
+                "limit": "?number",
+                "skip": "?number",
+                "batchSize": "?number",
+                "maxTimeMS": "?number"
+            }
         })",
-        redacted);
+        hmacApplied);
 
-    // Add the fields that shouldn't be redacted.
+    // Add the fields that shouldn't be hmacApplied.
     fcr.setSingleBatch(true);
     fcr.setAllowDiskUse(false);
     fcr.setAllowPartialResults(true);
@@ -336,75 +352,90 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setShowRecordId(true);
     fcr.setAwaitData(false);
     fcr.setMirrored(true);
+    hmacApplied = findShapifier.makeTelemetryKey(opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<a>": {
-                    "$eq": "?number"
-                }
-            },
-            "let": {
-                "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": "?string"
-            },
-            "projection": {
-                "HASH<e>": true,
-                "HASH<f>": true,
-                "HASH<_id>": true
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
-            },
-            "sort": {
-                "HASH<sortVal>": 1,
-                "HASH<otherSort>": -1
-            },
-            "limit": "?number",
-            "skip": "?number",
-            "batchSize": "?number",
-            "maxTimeMS": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<a>": {
+                        "$eq": "?number"
+                    }
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<a>",
+                    "HASH<var2>": "?string"
+                },
+                "projection": {
+                    "HASH<e>": true,
+                    "HASH<f>": true,
+                    "HASH<_id>": true
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
+                },
+                "sort": {
+                    "HASH<sortVal>": 1,
+                    "HASH<otherSort>": -1
+                },
+                "limit": "?number",
+                "skip": "?number",
+                "batchSize": "?number",
+                "maxTimeMS": "?number",
+                "singleBatch": "?bool",
+                "allowDiskUse": "?bool",
+                "showRecordId": "?bool",
+                "awaitData": "?bool",
+                "allowPartialResults": "?bool",
+                "mirrored": "?bool"
+            }
         })",
-        redacted);
+        hmacApplied);
 }
+
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
     fcr.setFilter(BSONObj());
     fcr.setSort(BSONObj());
     fcr.setProjection(BSONObj());
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.redactIdentifiers = true;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.applyHmacToIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
 
-    auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    auto hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {}
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {}
+            }
         })",
-        redacted);  // NOLINT (test auto-update)
+        hmacApplied);  // NOLINT (test auto-update)
 }
 
 TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
+    FindRequestShapifier findShapifier(fcr, expCtx->opCtx);
+
     fcr.setFilter(BSON("b" << 1));
     SerializationOptions opts;
     // TODO SERVER-75419 Use only 'literalPolicy.'
@@ -414,153 +445,163 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
 
-    auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    auto hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "testDB",
-                "coll": "testColl"
-            },
-            "find": "testColl",
-            "filter": {
-                "b": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "find": "testColl",
+                "filter": {
+                    "b": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "z": 1,
+                    "c": 1
+                },
+                "max": {
+                    "z": "?"
+                },
+                "min": {
+                    "z": "?"
                 }
-            },
-            "hint": {
-                "z": 1,
-                "c": 1
-            },
-            "max": {
-                "z": "?"
-            },
-            "min": {
-                "z": "?"
             }
         })",
-        redacted);
+        hmacApplied);
     // Test with a string hint. Note that this is the internal representation of the string hint
     // generated at parse time.
     fcr.setHint(BSON("$hint"
                      << "z"));
 
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "testDB",
-                "coll": "testColl"
-            },
-            "find": "testColl",
-            "filter": {
-                "b": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "find": "testColl",
+                "filter": {
+                    "b": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "$hint": "z"
+                },
+                "max": {
+                    "z": "?"
+                },
+                "min": {
+                    "z": "?"
                 }
-            },
-            "hint": {
-                "$hint": "z"
-            },
-            "max": {
-                "z": "?"
-            },
-            "min": {
-                "z": "?"
             }
         })",
-        redacted);
+        hmacApplied);
 
     fcr.setHint(BSON("z" << 1 << "c" << 1));
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
-    opts.redactIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.applyHmacToIdentifiers = true;
     opts.replacementForLiteralArgs = boost::none;
     opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": 1
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<b>": {
+                        "$eq": 1
+                    }
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": 25
+                },
+                "min": {
+                    "HASH<z>": 80
                 }
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": 25
-            },
-            "min": {
-                "HASH<z>": 80
             }
         })",
-        redacted);
+        hmacApplied);
 
     // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<b>": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
                 }
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
             }
         })",
-        redacted);
+        hmacApplied);
 
     // Test that $natural comes through unmodified.
     fcr.setHint(BSON("$natural" << -1));
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
+    hmacApplied = telemetry::makeTelemetryKey(fcr, opts, expCtx);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": "?number"
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "find": "HASH<testColl>",
+                "filter": {
+                    "HASH<b>": {
+                        "$eq": "?number"
+                    }
+                },
+                "hint": {
+                    "$natural": -1
+                },
+                "max": {
+                    "HASH<z>": "?"
+                },
+                "min": {
+                    "HASH<z>": "?"
                 }
-            },
-            "hint": {
-                "$natural": -1
-            },
-            "max": {
-                "HASH<z>": "?"
-            },
-            "min": {
-                "HASH<z>": "?"
             }
         })",
-        redacted);
+        hmacApplied);
 }
 
 TEST_F(TelemetryStoreTest, DefinesLetVariables) {
-    // Test that the expression context we use to redact will understand the 'let' part of the find
-    // command while parsing the other pieces of the command.
+    // Test that the expression context we use to apply hmac will understand the 'let' part of the
+    // find command while parsing the other pieces of the command.
 
     // Note that this ExpressionContext will not have the let variables defined - we expect the
     // 'makeTelemetryKey' call to do that.
@@ -574,10 +615,11 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
                                         << "testDB"));
     TelemetryMetrics testMetrics{cmdObj, boost::none, fcr.getNamespaceOrUUID()};
 
-    bool redactIdentifiers = false;
-    auto redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
-    ASSERT_OK(redacted.getStatus());
-
+    bool applyHmacToIdentifiers = false;
+    auto hmacApplied =
+        testMetrics.applyHmacToKey(cmdObj, applyHmacToIdentifiers, std::string{}, opCtx.get());
+    // As the query never moves through registerFindRequest and hmac is not enabled,
+    // makeTelemetryKey() never gets called and consequently the query never gets shapified.
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "testColl",
@@ -599,38 +641,440 @@ TEST_F(TelemetryStoreTest, DefinesLetVariables) {
             },
             "$db": "testDB"
         })",
-        redacted.getValue());
+        hmacApplied);
 
-    // Now be sure the variable names are redacted. We don't currently expose a different way to do
-    // the hashing, so we'll just stick with the big long strings here for now.
-    redactIdentifiers = true;
-    redacted = testMetrics.redactKey(cmdObj, redactIdentifiers, std::string{}, opCtx.get());
-    ASSERT_OK(redacted.getStatus());
+    // Now be sure hmac is applied to variable names. We don't currently expose a different way to
+    // do the hashing, so we'll just stick with the big long strings here for now.
+    applyHmacToIdentifiers = true;
+    hmacApplied =
+        testMetrics.applyHmacToKey(cmdObj, applyHmacToIdentifiers, std::string{}, opCtx.get());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            "cmdNs": {
-                "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
-                "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
-            },
-            "find": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c=",
-            "filter": {
-                "$expr": [
-                    {
-                        "$eq": [
-                            "$lhWpXUozYRjENbnNVMXoZEq5VrVzqikmJ0oSgLZnRxM=",
-                            "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8="
-                        ]
-                    }
-                ]
-            },
-            "let": {
-                "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
-            },
-            "projection": {
-                "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
-                "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
+            "queryShape": {
+                "cmdNs": {
+                    "db": "IyuPUD33jXD1td/VA/JyhbOPYY0MdGkXgdExniXmCyg=",
+                    "coll": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c="
+                },
+                "find": "QFhYnXorzWDLwH/wBgpXxp8fkfsZKo4n2cIN/O0uf/c=",
+                "filter": {
+                    "$expr": [
+                        {
+                            "$eq": [
+                                "$lhWpXUozYRjENbnNVMXoZEq5VrVzqikmJ0oSgLZnRxM=",
+                                "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8="
+                            ]
+                        }
+                    ]
+                },
+                "let": {
+                    "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
+                },
+                "projection": {
+                    "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
+                    "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
+                }
             }
         })",
-        redacted.getValue());
+        hmacApplied);
+}
+
+TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimplePipeline) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    AggregateCommandRequest acr(NamespaceString("testDB.testColl"));
+    auto matchStage = fromjson(R"({
+            $match: {
+                foo: { $in: ["a", "b"] },
+                bar: { $gte: { $date: "2022-01-01T00:00:00Z" } }
+            }
+        })");
+    auto unwindStage = fromjson("{$unwind: '$x'}");
+    auto groupStage = fromjson(R"({
+            $group: {
+                _id: "$_id",
+                c: { $first: "$d.e" },
+                f: { $sum: 1 }
+            }
+        })");
+    auto limitStage = fromjson("{$limit: 10}");
+    auto outStage = fromjson(R"({$out: 'outColl'})");
+    auto rawPipeline = {matchStage, unwindStage, groupStage, limitStage, outStage};
+    acr.setPipeline(rawPipeline);
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+    AggregateRequestShapifier aggShapifier(acr, *pipeline, expCtx->opCtx);
+
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
+    opts.applyHmacToIdentifiers = false;
+    opts.identifierHmacPolicy = applyHmacForTest;
+
+    auto shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "testDB",
+                    "coll": "testColl"
+                },
+                "aggregate": "testColl",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "foo": {
+                                "$in": [
+                                    "a",
+                                    "b"
+                                ]
+                            },
+                            "bar": {
+                                "$gte": {"$date":"2022-01-01T00:00:00.000Z"}
+                            }
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$x"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$_id",
+                            "c": {
+                                "$first": "$d.e"
+                            },
+                            "f": {
+                                "$sum": {
+                                    "$const": 1
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "$limit": 10
+                    },
+                    {
+                        "$out": {
+                            "coll": "outColl",
+                            "db": "test"
+                        }
+                    }
+                ]
+            }
+        })",
+        shapified);
+
+    // TODO SERVER-75419 Use only 'literalPolicy.'
+    opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    opts.applyHmacToIdentifiers = true;
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ]
+            }
+        })",
+        shapified);
+
+    // Add the fields that shouldn't be abstracted.
+    acr.setExplain(ExplainOptions::Verbosity::kExecStats);
+    acr.setAllowDiskUse(false);
+    acr.setHint(BSON("z" << 1 << "c" << 1));
+    acr.setCollation(BSON("locale"
+                          << "simple"));
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ],
+                "explain": true,
+                "allowDiskUse": false,
+                "collation": {
+                    "locale": "simple"
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                }
+            }
+        })",
+        shapified);
+
+    // Add let.
+    acr.setLet(BSON("var1"
+                    << "$foo"
+                    << "var2"
+                    << "bar"));
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ],
+                "explain": true,
+                "allowDiskUse": false,
+                "collation": {
+                    "locale": "simple"
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<foo>",
+                    "HASH<var2>": "?string"
+                }
+            }
+        })",
+        shapified);
+
+    // Add the fields that should be abstracted.
+    auto cursorOptions = SimpleCursorOptions();
+    cursorOptions.setBatchSize(10);
+    acr.setCursor(cursorOptions);
+    acr.setMaxTimeMS(500);
+    acr.setBypassDocumentValidation(true);
+    expCtx->opCtx->setComment(BSON("comment"
+                                   << "note to self"));
+    shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$and": [
+                                {
+                                    "HASH<foo>": {
+                                        "$in": "?array<?string>"
+                                    }
+                                },
+                                {
+                                    "HASH<bar>": {
+                                        "$gte": "?date"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$unwind": {
+                            "path": "$HASH<x>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<_id>",
+                            "HASH<c>": {
+                                "$first": "$HASH<d>.HASH<e>"
+                            },
+                            "HASH<f>": {
+                                "$sum": "?number"
+                            }
+                        }
+                    },
+                    {
+                        "$limit": "?"
+                    },
+                    {
+                        "$out": {
+                            "coll": "HASH<outColl>",
+                            "db": "HASH<test>"
+                        }
+                    }
+                ],
+                "explain": true,
+                "allowDiskUse": false,
+                "collation": {
+                    "locale": "simple"
+                },
+                "hint": {
+                    "HASH<z>": 1,
+                    "HASH<c>": 1
+                },
+                "let": {
+                    "HASH<var1>": "$HASH<foo>",
+                    "HASH<var2>": "?string"
+                }
+            },
+            "cursor": {
+                "batchSize": "?number"
+            },
+            "maxTimeMS": "?number",
+            "bypassDocumentValidation": "?bool"
+        })",
+        shapified);
+}
+TEST_F(TelemetryStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    AggregateCommandRequest acr(NamespaceString("testDB.testColl"));
+    acr.setPipeline({});
+    auto pipeline = Pipeline::parse({}, expCtx);
+    AggregateRequestShapifier aggShapifier(acr, *pipeline, expCtx->opCtx);
+
+    SerializationOptions opts;
+    // TODO SERVER-75419 Use only 'literalPolicy.'
+    opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    opts.applyHmacToIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
+
+    auto shapified = aggShapifier.makeTelemetryKey(opts, expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "ns": {
+                    "db": "HASH<testDB>",
+                    "coll": "HASH<testColl>"
+                },
+                "aggregate": "HASH<testColl>",
+                "pipeline": []
+            }
+        })",
+        shapified);  // NOLINT (test auto-update)
 }
 }  // namespace mongo::telemetry

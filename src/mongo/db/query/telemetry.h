@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/request_shapifier.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 #include <cstdint>
@@ -127,10 +128,10 @@ public:
     /**
      * Redact a given telemetry key and set _keySize.
      */
-    StatusWith<BSONObj> redactKey(const BSONObj& key,
-                                  bool redactIdentifiers,
-                                  std::string redactionKey,
-                                  OperationContext* opCtx) const;
+    BSONObj applyHmacToKey(const BSONObj& key,
+                           bool applyHmacToIdentifiers,
+                           std::string hmacKey,
+                           OperationContext* opCtx) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -152,7 +153,7 @@ public:
     AggregatedMetric docsReturned;
 
     /**
-     * A representative command for a given telemetry key. This is used to derive the redacted
+     * A representative command for a given telemetry key. This is used to derive the hmac applied
      * telemetry key at read-time.
      */
     BSONObj cmdObj;
@@ -167,9 +168,9 @@ public:
 
 private:
     /**
-     * We cache the redacted key the first time it's computed.
+     * We cache the hmac applied key the first time it's computed.
      */
-    mutable boost::optional<BSONObj> _redactedKey;
+    mutable boost::optional<BSONObj> _hmacAppliedKey;
 };
 
 struct TelemetryPartitioner {
@@ -210,13 +211,13 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx);
  *
  * Note that calling this affects internal state. It should be called once for each request for
  * which telemetry may be collected.
+ * TODO SERVER-76557 remove request-specific registers, leave only registerRequest
  */
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx);
-
-void registerFindRequest(const FindCommandRequest& request,
-                         const NamespaceString& collection,
-                         OperationContext* ocCtx,
-                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
+void registerRequest(const RequestShapifier&,
+                     const NamespaceString& collection,
+                     OperationContext* opCtx,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
  * Writes telemetry to the telemetry store for the operation identified by `telemetryKey`.
@@ -229,19 +230,11 @@ void writeTelemetry(OperationContext* opCtx,
 
 /**
  * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
- * with all field names and literals redacted.
+ * with hmac applied to all field names and literals.
  */
-StatusWith<BSONObj> makeTelemetryKey(
-    const FindCommandRequest& findCommand,
-    const SerializationOptions& opts,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<const TelemetryMetrics&> existingMetrics = boost::none);
-
-/**
- * Collects metrics for telemetry from the current operation onto OpDebug. This must be called prior
- * to incrementing metrics on cursors (either ClientCursor or ClusterClientCursor) since cursor
- * metric aggregation happens via OpDebug::AdditiveMetrics.
- */
-void collectMetricsOnOpDebug(CurOp* curOp, long long nreturned);
+BSONObj makeTelemetryKey(const FindCommandRequest& findCommand,
+                         const SerializationOptions& opts,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         boost::optional<const TelemetryMetrics&> existingMetrics = boost::none);
 }  // namespace telemetry
 }  // namespace mongo

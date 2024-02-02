@@ -21,7 +21,7 @@ function testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion(
 
     // Must re-enable telemetry in order to check via $telemetry that nothing was recorded.
     enableTelemetryFn();
-    const res = getTelemetryFindCmd(conn, {collName: coll, redactIdentifiers: false});
+    const res = getTelemetryFindCmd(conn, {collName: coll, applyHmacToIdentifiers: false});
     assert.eq(res.length, 0, res);
 }
 

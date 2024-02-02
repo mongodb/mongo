@@ -115,29 +115,55 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
     ASSERT_EQ(reSerialized["$out"]["coll"].getStringData(), "some_collection");
 }
 
-TEST_F(DocumentSourceOutTest, SerializeToStringWithTimeseries) {
-    BSONObj spec = BSON("$out" << BSON("db"
-                                       << "some_db"
-                                       << "coll"
-                                       << "some_coll"
-                                       << "timeseries"
-                                       << BSON("timeField"
-                                               << "t")));
-    auto outStage = createOutStage(spec);
-    auto serialized = outStage->serialize().getDocument();
-    auto expectedDoc = Document{{"$out",
-                                 Document{{"coll", "some_coll"_sd},
-                                          {"db", "some_db"_sd},
-                                          {"timeseries", Document{{"timeField", "t"_sd}}}}}};
-    ASSERT_DOCUMENT_EQ(serialized, expectedDoc);
-
-    // Make sure we can reparse the serialized BSON.
-    auto reparsedOutStage = createOutStage(serialized.toBson());
-    auto reSerialized = reparsedOutStage->serialize().getDocument();
-    ASSERT_DOCUMENT_EQ(reSerialized, expectedDoc);
+TEST_F(DocumentSourceOutTest, RedactionNoTimeseries) {
+    auto spec = fromjson(R"({
+            $out: {
+                db: "foo",
+                coll: "bar"
+            }
+        })");
+    auto docSource = DocumentSourceOut::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            $out: {
+                coll: "HASH<bar>",
+                db: "HASH<foo>"
+            }
+        })",
+        redact(*docSource));
 }
 
-// TODO SERVER-75138 add test support for redaction with and without timeseries options.
+TEST_F(DocumentSourceOutTest, RedactionTimeseries) {
+    auto spec = fromjson(R"({
+            $out: {
+                db: "foo",
+                coll: "bar",
+                timeseries: {
+                    timeField: "time", 
+                    metaField: "meta", 
+                    granularity: "minutes",
+                    bucketRoundingSeconds: 300,
+                    bucketMaxSpanSeconds: 300
+                }
+            }
+        })");
+    auto docSource = DocumentSourceOut::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            $out: {
+                coll: "HASH<bar>",
+                db: "HASH<foo>",
+                timeseries: {
+                    timeField: "HASH<time>",
+                    metaField: "HASH<meta>",
+                    granularity: "minutes",
+                    bucketRoundingSeconds: "?",
+                    bucketMaxSpanSeconds: "?"
+                }
+            }
+        })",
+        redact(*docSource));
+}
 
 using DocumentSourceOutServerlessTest = ServerlessAggregationContextFixture;
 

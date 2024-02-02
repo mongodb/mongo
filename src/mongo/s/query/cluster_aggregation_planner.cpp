@@ -365,10 +365,11 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     opDebug.nShards = std::max(opDebug.nShards, nShards);
     opDebug.cursorExhausted = exhausted;
     opDebug.additiveMetrics.nBatches = 1;
+    CurOp::get(opCtx)->setEndOfOpMetrics(responseBuilder.numDocs());
     if (exhausted) {
-        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand(), responseBuilder.numDocs());
+        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand());
     } else {
-        collectTelemetryMongos(opCtx, ccc, responseBuilder.numDocs());
+        collectTelemetryMongos(opCtx, ccc);
     }
 
     ccc->detachFromOperationContext();

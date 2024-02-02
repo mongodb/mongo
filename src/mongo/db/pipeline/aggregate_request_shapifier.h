@@ -27,43 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/expression_function.h"
-#include "mongo/dbtests/dbtests.h"
-namespace mongo {
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/request_shapifier.h"
 
-namespace {
+namespace mongo::telemetry {
 
 /**
- * A default redaction strategy that generates easy to check results for testing purposes.
+ * Handles shapification for AggregateCommandRequests. Requires a pre-parsed pipeline in order to
+ * avoid parsing the raw pipeline multiple times, but users should be sure to provide a
+ * non-optimized pipeline.
  */
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
+class AggregateRequestShapifier final : public RequestShapifier {
+public:
+    AggregateRequestShapifier(const AggregateCommandRequest& request,
+                              const Pipeline& pipeline,
+                              OperationContext* opCtx,
+                              const boost::optional<std::string> applicationName = boost::none)
+        : RequestShapifier(opCtx, applicationName), _request(request), _pipeline(pipeline) {}
 
+    virtual ~AggregateRequestShapifier() = default;
 
-TEST(ExpressionFunction, SerializeAndRedactArgs) {
+    BSONObj makeTelemetryKey(const SerializationOptions& opts,
+                             const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 
-    SerializationOptions options;
-    std::string replacementChar = "?";
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementChar;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
-
-    auto expCtx = ExpressionContextForTest();
-    auto expr = BSON("$function" << BSON("body"
-                                         << "function(age) {return age >= 21;}"
-                                         << "args" << BSON_ARRAY("$age") << "lang"
-                                         << "js"));
-    VariablesParseState vps = expCtx.variablesParseState;
-    auto exprFunc = ExpressionFunction::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"$function":{"body":"?string","args":["$HASH<age>"],"lang":"js"}})",
-        exprFunc->serialize(options).getDocument());
-}
-}  // namespace
-}  // namespace mongo
+private:
+    const AggregateCommandRequest& _request;
+    const Pipeline& _pipeline;
+};
+}  // namespace mongo::telemetry

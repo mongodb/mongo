@@ -37,6 +37,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+namespace {
+CounterMetric telemetryHmacApplicationErrors("telemetry.numHmacApplicationErrors");
+}
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
                                            DocumentSourceTelemetry::LiteParsed::parse,
@@ -46,14 +49,14 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
 
 namespace {
 /**
- * Try to parse the redactIdentifiers property from the element.
+ * Try to parse the applyHmacToIdentifiers property from the element.
  */
-boost::optional<bool> parseRedactIdentifiers(const BSONElement& el) {
-    if (el.fieldNameStringData() == "redactIdentifiers"_sd) {
+boost::optional<bool> parseApplyHmacToIdentifiers(const BSONElement& el) {
+    if (el.fieldNameStringData() == "applyHmacToIdentifiers"_sd) {
         auto type = el.type();
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << DocumentSourceTelemetry::kStageName
-                              << " redactIdentifiers parameter must be boolean. Found type: "
+                              << " applyHmacToIdentifiers parameter must be boolean. Found type: "
                               << typeName(type),
                 type == BSONType::Bool);
         return el.trueValue();
@@ -62,33 +65,32 @@ boost::optional<bool> parseRedactIdentifiers(const BSONElement& el) {
 }
 
 /**
- * Try to parse the `redactionKey' property from the element.
+ * Try to parse the `hmacKey' property from the element.
  */
-boost::optional<std::string> parseRedactionKey(const BSONElement& el) {
-    if (el.fieldNameStringData() == "redactionKey"_sd) {
+boost::optional<std::string> parseHmacKey(const BSONElement& el) {
+    if (el.fieldNameStringData() == "hmacKey"_sd) {
         auto type = el.type();
         if (el.isBinData(BinDataType::BinDataGeneral)) {
             int len;
             auto data = el.binData(len);
             uassert(ErrorCodes::FailedToParse,
                     str::stream() << DocumentSourceTelemetry::kStageName
-                                  << "redactionKey must be greater than or equal to 32 bytes",
+                                  << "hmacKey must be greater than or equal to 32 bytes",
                     len >= 32);
             return {{data, (size_t)len}};
         }
-        uasserted(
-            ErrorCodes::FailedToParse,
-            str::stream()
-                << DocumentSourceTelemetry::kStageName
-                << " redactionKey parameter must be bindata of length 32 or greater. Found type: "
-                << typeName(type));
+        uasserted(ErrorCodes::FailedToParse,
+                  str::stream()
+                      << DocumentSourceTelemetry::kStageName
+                      << " hmacKey parameter must be bindata of length 32 or greater. Found type: "
+                      << typeName(type));
     }
     return boost::none;
 }
 
 /**
- * Parse the spec object calling the `ctor` with the bool redactIdentifiers and std::string
- * redactionKey arguments.
+ * Parse the spec object calling the `ctor` with the bool applyHmacToIdentifiers and std::string
+ * hmacKey arguments.
  */
 template <typename Ctor>
 auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
@@ -97,32 +99,34 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
-    bool redactIdentifiers = false;
-    std::string redactionKey;
+    bool applyHmacToIdentifiers = false;
+    std::string hmacKey;
     for (auto&& el : spec.embeddedObject()) {
-        if (auto maybeRedactIdentifiers = parseRedactIdentifiers(el); maybeRedactIdentifiers) {
-            redactIdentifiers = *maybeRedactIdentifiers;
-        } else if (auto maybeRedactionKey = parseRedactionKey(el); maybeRedactionKey) {
-            redactionKey = *maybeRedactionKey;
+        if (auto maybeApplyHmacToIdentifiers = parseApplyHmacToIdentifiers(el);
+            maybeApplyHmacToIdentifiers) {
+            applyHmacToIdentifiers = *maybeApplyHmacToIdentifiers;
+        } else if (auto maybeHmacKey = parseHmacKey(el); maybeHmacKey) {
+            hmacKey = *maybeHmacKey;
         } else {
             uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << DocumentSourceTelemetry::kStageName
-                                    << " parameters object may only contain 'redactIdentifiers' or "
-                                       "'redactionKey' options. Found: "
-                                    << el.fieldName());
+                      str::stream()
+                          << DocumentSourceTelemetry::kStageName
+                          << " parameters object may only contain 'applyHmacToIdentifiers' or "
+                             "'hmacKey' options. Found: "
+                          << el.fieldName());
         }
     }
 
-    return ctor(redactIdentifiers, redactionKey);
+    return ctor(applyHmacToIdentifiers, hmacKey);
 }
 
 }  // namespace
 
 std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-    return parseSpec(spec, [&](bool redactIdentifiers, std::string redactionKey) {
+    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
         return std::make_unique<DocumentSourceTelemetry::LiteParsed>(
-            spec.fieldName(), redactIdentifiers, redactionKey);
+            spec.fieldName(), applyHmacToIdentifiers, hmacKey);
     });
 }
 
@@ -134,14 +138,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
             "$telemetry must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
-    return parseSpec(spec, [&](bool redactIdentifiers, std::string redactionKey) {
-        return new DocumentSourceTelemetry(pExpCtx, redactIdentifiers, redactionKey);
+    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
+        return new DocumentSourceTelemetry(pExpCtx, applyHmacToIdentifiers, hmacKey);
     });
 }
 
 Value DocumentSourceTelemetry::serialize(SerializationOptions opts) const {
     // This document source never contains any user information, so no need for any work when
-    // redacting.
+    // applying hmac.
     return Value{Document{{kStageName, Document{}}}};
 }
 
@@ -185,22 +189,24 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
-            auto swKey = metrics->redactKey(key, _redactIdentifiers, _redactionKey, pExpCtx->opCtx);
-            if (!swKey.isOK()) {
+            try {
+                auto hmacKey =
+                    metrics->applyHmacToKey(key, _applyHmacToIdentifiers, _hmacKey, pExpCtx->opCtx);
+                _materializedPartition.push_back({{"key", std::move(hmacKey)},
+                                                  {"metrics", metrics->toBSON()},
+                                                  {"asOf", partitionReadTime}});
+            } catch (const DBException& ex) {
+                telemetryHmacApplicationErrors.increment();
                 LOGV2_DEBUG(7349403,
                             3,
-                            "Error encountered when redacting query shape, will not publish "
+                            "Error encountered when applying hmac to query shape, will not publish "
                             "telemetry for this entry.",
-                            "status"_attr = swKey.getStatus());
+                            "status"_attr = ex.toStatus());
                 if (kDebugBuild) {
                     tasserted(7349401,
                               "Was not able to re-parse telemetry key when reading telemetry.");
                 }
-                continue;
             }
-            _materializedPartition.push_back({{"key", std::move(swKey.getValue())},
-                                              {"metrics", metrics->toBSON()},
-                                              {"asOf", partitionReadTime}});
         }
     }
 }

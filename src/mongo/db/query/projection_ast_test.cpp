@@ -773,7 +773,7 @@ TEST_F(ProjectionASTTest, ShouldThrowWithPositionalOnExclusion) {
         DBException,
         31395);
 }
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -781,8 +781,8 @@ TEST_F(ProjectionASTTest, TestASTRedaction) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.redactIdentifiers = true;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.applyHmacToIdentifiers = true;
+    options.identifierHmacPolicy = applyHmacForTest;
 
 
     auto proj = fromjson("{'a.b': 1}");

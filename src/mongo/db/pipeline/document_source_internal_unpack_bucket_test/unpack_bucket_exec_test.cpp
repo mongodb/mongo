@@ -926,7 +926,7 @@ TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldOverri
     ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
 }
 
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -936,8 +936,8 @@ TEST_F(InternalUnpackBucketExecTest, RedactsCorrectly) {
         "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
     auto array = std::vector<Value>{};
     SerializationOptions opts;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
-    opts.redactIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.applyHmacToIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
     DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
         ->serializeToArray(array, opts);

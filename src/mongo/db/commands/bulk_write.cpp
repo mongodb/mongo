@@ -751,6 +751,7 @@ public:
                 numReplies++;
                 bytesBuffered += nextDoc.objsize();
             }
+            CurOp::get(opCtx)->setEndOfOpMetrics(numReplies);
             if (exec->isEOF()) {
                 invariant(numReplies == replies.size());
                 return BulkWriteCommandReply(BulkWriteCommandResponseCursor(

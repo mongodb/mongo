@@ -803,7 +803,7 @@ DEATH_TEST_REGEX(ExprMatchTest, GetChildFailsIndexGreaterThanZero, "Tripwire ass
 /**
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -813,8 +813,8 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
 
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierRedactionPolicy = redactFieldNameForTest;
-    opts.redactIdentifiers = true;
+    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.applyHmacToIdentifiers = true;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$expr":{"$sum":["$HASH<a>","$HASH<b>"]}})",

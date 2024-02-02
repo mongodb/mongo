@@ -86,7 +86,7 @@ Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
         result.setField("minDistance", opts.serializeLiteralValue(*minDistance));
     }
 
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
         auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, pExpCtx));
         result.setField("query", Value(matchExpr->serialize(opts)));
     } else {

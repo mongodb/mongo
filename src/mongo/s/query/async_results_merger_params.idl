@@ -51,15 +51,19 @@ types:
 structs:
     RemoteCursor:
         description: A description of a cursor opened on a remote server.
+        query_shape_component: true
         fields:
             shardId:
                 type: string
                 description: The shardId of the shard on which the cursor resides.
+                query_shape: anonymize
             hostAndPort:
                 type: HostAndPort
                 description: The exact host (within the shard) on which the cursor resides.
+                query_shape: anonymize
             cursorResponse:
                 type: CursorResponse
+                query_shape: literal
                 description: The response after establishing a cursor on the remote shard, including
                              the first batch.
 
@@ -67,35 +71,46 @@ structs:
         description: The parameters needed to establish an AsyncResultsMerger.
         chained_structs:
             OperationSessionInfoFromClient : OperationSessionInfo
+        query_shape_component: true
         fields:
             sort:
                 type: object
                 description: The sort requested on the merging operation. Empty if there is no sort.
                 optional: true
+                query_shape: literal
             compareWholeSortKey:
                 type: bool
                 default: false
+                query_shape: literal
                 description: >-
                     When 'compareWholeSortKey' is true, $sortKey is a scalar value, rather than an
                     object. We extract the sort key {$sortKey: <value>}. The sort key pattern is
                     verified to be {$sortKey: 1}.
-            remotes: array<RemoteCursor>
+            remotes: 
+                type: array<RemoteCursor>
+                query_shape: literal
             tailableMode:
                 type: TailableMode
                 optional: true
                 description: If set, the tailability mode of this cursor.
+                query_shape: parameter
             batchSize:
                 type: safeInt64
                 optional: true
                 description: The batch size for this cursor.
-            nss: namespacestring
+                query_shape: literal
+            nss: 
+                type: namespacestring
+                query_shape: custom
             allowPartialResults:
                 type: bool
                 default: false
                 description: If set, error responses are ignored.
+                query_shape: parameter
             recordRemoteOpWaitTime:
                 type: bool
                 default: false
+                query_shape: parameter
                 description: >-
                     This parameter is not used anymore but should stay for a while for backward
                     compatibility.

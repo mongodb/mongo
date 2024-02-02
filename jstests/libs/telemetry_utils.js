@@ -58,20 +58,22 @@ function getTelemetry(conn) {
 
 function getTelemetryRedacted(
     conn,
-    redactIdentifiers = true,
-    redactionKey = BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")) {
-    // Hashed application name is generated using the default redactionKey argument.
+    applyHmacToIdentifiers = true,
+    hmacKey = BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")) {
+    // Hashed application name is generated using the default hmacKey argument.
     const kApplicationName = "T1iwlAqhXYroi7HTycmBJvWZSETwKXnaNa5akM4q0H4=";
     // Filter out agg queries, including $telemetry.
-    const match = {$match: {"key.find": {$exists: true}, "key.applicationName": kApplicationName}};
-    if (!redactIdentifiers) {
+    const match = {
+        $match: {"key.queryShape.find": {$exists: true}, "key.applicationName": kApplicationName}
+    };
+    if (!applyHmacToIdentifiers) {
         match.$match["key.applicationName"] = "MongoDB Shell";
     }
 
     const result = conn.adminCommand({
         aggregate: 1,
         pipeline: [
-            {$telemetry: {redactIdentifiers: redactIdentifiers, redactionKey: redactionKey}},
+            {$telemetry: {applyHmacToIdentifiers: applyHmacToIdentifiers, hmacKey: hmacKey}},
             match,
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
@@ -86,12 +88,12 @@ function getTelemetryRedacted(
  * @param {object} conn - connection to database
  * @param {object} options {
  *  {String} collName - name of collection
- *  {boolean} redactIdentifiers - whether or not to redact identifiers
+ *  {boolean} applyHmacToIdentifiers - whether or not to redact identifiers
  * }
  */
 function getTelemetryFindCmd(conn, options = {
     collName: "",
-    redactIdentifiers: false,
+    applyHmacToIdentifiers: false,
 }) {
     // Filter out agg queries, including $queryStats.
     let matchExpr = {"key.find": {$exists: true}, "key.client.application.name": "MongoDB Shell"};
@@ -99,7 +101,7 @@ function getTelemetryFindCmd(conn, options = {
         matchExpr["key.cmdNs.coll"] = options.collName;
     }
     const pipeline = [
-        {$telemetry: {redactIdentifiers: options.redactIdentifiers}},
+        {$telemetry: {applyHmacToIdentifiers: options.applyHmacToIdentifiers}},
         {$match: matchExpr},
         // Sort on queryStats key so entries are in a deterministic order.
         {$sort: {key: 1}},

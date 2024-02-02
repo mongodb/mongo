@@ -314,15 +314,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 }
 
 Value DocumentSourceOut::serialize(SerializationOptions opts) const {
-    // TODO SERVER-75110 add support for redaction with and without timeseries options.
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484325);
-    }
+    BSONObjBuilder bob;
     DocumentSourceOutSpec spec;
     spec.setDb(_outputNs.dbName().db());
     spec.setColl(_outputNs.coll());
     spec.setTimeseries(_timeseries);
-    return Value(Document{{kStageName, spec.toBSON()}});
+    spec.serialize(&bob, opts);
+    return Value(Document{{kStageName, bob.done()}});
 }
 
 void DocumentSourceOut::waitWhileFailPointEnabled() {

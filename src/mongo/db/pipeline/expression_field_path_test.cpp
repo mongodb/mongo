@@ -61,7 +61,7 @@ Document fromBson(BSONObj obj) {
     return Document(obj);
 }
 
-std::string redactFieldNameForTest(StringData s) {
+std::string applyHmacForTest(StringData s) {
     return str::stream() << "HASH<" << s << ">";
 }
 
@@ -233,8 +233,8 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
 
 TEST(FieldPath, SerializeWithRedaction) {
     SerializationOptions options;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
-    options.redactIdentifiers = true;
+    options.identifierHmacPolicy = applyHmacForTest;
+    options.applyHmacToIdentifiers = true;
 
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression =

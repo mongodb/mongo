@@ -27,43 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/expression_function.h"
-#include "mongo/dbtests/dbtests.h"
-namespace mongo {
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 
-namespace {
+namespace mongo::telemetry {
 
 /**
- * A default redaction strategy that generates easy to check results for testing purposes.
+ * An abstract base class to handle query shapification for telemetry. Each request type should
+ * define its own shapification strategy in its implementation of makeTelemetryKey(), and then a
+ * request should be registered with telemetry via telemetry::registerRequest(RequestShapifier).
  */
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
+class RequestShapifier {
+public:
+    virtual ~RequestShapifier() = default;
+    virtual BSONObj makeTelemetryKey(
+        const SerializationOptions& opts,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
 
+protected:
+    RequestShapifier(OperationContext* opCtx,
+                     const boost::optional<std::string> applicationName = boost::none)
+        : _applicationName(applicationName) {
+        if (!_applicationName) {
+            if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+                _applicationName = metadata->getApplicationName().toString();
+            }
+        }
+    }
 
-TEST(ExpressionFunction, SerializeAndRedactArgs) {
-
-    SerializationOptions options;
-    std::string replacementChar = "?";
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementChar;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
-
-    auto expCtx = ExpressionContextForTest();
-    auto expr = BSON("$function" << BSON("body"
-                                         << "function(age) {return age >= 21;}"
-                                         << "args" << BSON_ARRAY("$age") << "lang"
-                                         << "js"));
-    VariablesParseState vps = expCtx.variablesParseState;
-    auto exprFunc = ExpressionFunction::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"$function":{"body":"?string","args":["$HASH<age>"],"lang":"js"}})",
-        exprFunc->serialize(options).getDocument());
-}
-}  // namespace
-}  // namespace mongo
+    boost::optional<std::string> _applicationName;
+};
+}  // namespace mongo::telemetry

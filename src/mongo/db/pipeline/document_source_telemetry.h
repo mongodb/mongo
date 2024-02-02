@@ -47,10 +47,10 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, bool redactIdentifiers, std::string redactionKey)
+        LiteParsed(std::string parseTimeName, bool applyHmacToIdentifiers, std::string hmacKey)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _redactIdentifiers(redactIdentifiers),
-              _redactionKey(redactionKey) {}
+              _applyHmacToIdentifiers(applyHmacToIdentifiers),
+              _hmacKey(hmacKey) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -75,9 +75,9 @@ public:
             transactionNotSupported(kStageName);
         }
 
-        bool _redactIdentifiers;
+        bool _applyHmacToIdentifiers;
 
-        std::string _redactionKey;
+        std::string _hmacKey;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -115,11 +115,11 @@ public:
 
 private:
     DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            bool redactIdentifiers = false,
-                            std::string redactionKey = {})
+                            bool applyHmacToIdentifiers = false,
+                            std::string hmacKey = {})
         : DocumentSource(kStageName, expCtx),
-          _redactIdentifiers(redactIdentifiers),
-          _redactionKey(redactionKey) {}
+          _applyHmacToIdentifiers(applyHmacToIdentifiers),
+          _hmacKey(hmacKey) {}
 
     GetNextResult doGetNext() final;
 
@@ -135,13 +135,13 @@ private:
      */
     TelemetryStore::PartitionId _currentPartition = -1;
 
-    // When true, redact field names from returned query shapes.
-    bool _redactIdentifiers;
+    // When true, apply hmac to field names from returned query shapes.
+    bool _applyHmacToIdentifiers;
 
     /**
-     * Key used for SHA-256 HMAC redaction of field names.
+     * Key used for SHA-256 HMAC application on field names.
      */
-    std::string _redactionKey;
+    std::string _hmacKey;
 };
 
 }  // namespace mongo

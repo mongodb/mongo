@@ -27,43 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/query/find_request_shapifier.h"
 
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/pipeline/expression_function.h"
-#include "mongo/dbtests/dbtests.h"
-namespace mongo {
+#include "mongo/db/query/projection_ast_util.h"
+#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_shape.h"
 
-namespace {
+namespace mongo::telemetry {
+BSONObj FindRequestShapifier::makeTelemetryKey(
+    const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    BSONObjBuilder bob;
 
-/**
- * A default redaction strategy that generates easy to check results for testing purposes.
- */
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
+    bob.append("queryShape", query_shape::extractQueryShape(_request, opts, expCtx));
+
+
+    if (auto optObj = _request.getReadConcern()) {
+        // Read concern should not be considered a literal.
+        bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
+    }
+
+    if (_applicationName.has_value()) {
+        // TODO SERVER-76143 don't serialize appName
+        bob.append("applicationName", opts.serializeIdentifier(_applicationName.value()));
+    }
+
+    return bob.obj();
 }
-
-
-TEST(ExpressionFunction, SerializeAndRedactArgs) {
-
-    SerializationOptions options;
-    std::string replacementChar = "?";
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementChar;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
-
-    auto expCtx = ExpressionContextForTest();
-    auto expr = BSON("$function" << BSON("body"
-                                         << "function(age) {return age >= 21;}"
-                                         << "args" << BSON_ARRAY("$age") << "lang"
-                                         << "js"));
-    VariablesParseState vps = expCtx.variablesParseState;
-    auto exprFunc = ExpressionFunction::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"$function":{"body":"?string","args":["$HASH<age>"],"lang":"js"}})",
-        exprFunc->serialize(options).getDocument());
-}
-}  // namespace
-}  // namespace mongo
+}  // namespace mongo::telemetry

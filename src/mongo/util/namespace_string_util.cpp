@@ -37,17 +37,19 @@
 namespace mongo {
 
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
-                                           const SerializationContext& context) {
+                                           const SerializationContext& context,
+                                           const SerializationOptions& options) {
     if (gMultitenancySupport) {
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
         if (fcvSnapshot.isVersionInitialized() &&
             gFeatureFlagRequireTenantID.isEnabled(fcvSnapshot)) {
-            return ns.toString();
+            return options.serializeIdentifier(ns.toString());
         }
-        return ns.toStringWithTenantId();
+        return options.serializeIdentifier(ns.toStringWithTenantId());
     }
-    return ns.toString();
+    return options.serializeIdentifier(ns.toString());
 }
+
 
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
                                                  StringData ns,
