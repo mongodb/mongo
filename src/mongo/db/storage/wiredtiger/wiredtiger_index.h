@@ -302,7 +302,7 @@ protected:
      * constructed.
      */
     int _dataFormatVersion;
-    std::string _uri;
+    const std::string _uri;
     uint64_t _tableId;
     const UUID _collectionUUID;
     const std::string _indexName;

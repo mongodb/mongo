@@ -2206,7 +2206,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     }
     invariantWTOK(seekRet, c->session);
 
-    _metrics->incrementOneCursorSeek(c->uri);
+    _metrics->incrementOneCursorSeek(_uri);
 
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value), c->session);
@@ -2250,7 +2250,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     }
     invariantWTOK(ret, c->session);
 
-    _metrics->incrementOneCursorSeek(c->uri);
+    _metrics->incrementOneCursorSeek(_uri);
 
     RecordId curId = getKey(c);
 
