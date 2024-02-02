@@ -11,6 +11,7 @@ mongo_cc_library(
         "visibility.h",
         "visibility_test_libcommon.h",
     ],
+    mongo_api_name = "visibility_test_libcommon",
 )
 
 mongo_cc_library(
@@ -21,6 +22,7 @@ mongo_cc_library(
     hdrs = [
         "visibility_test_lib1.h",
     ],
+    mongo_api_name = "visibility_test_lib1",
     deps = [
         ":visibility_test_libcommon",
     ],
@@ -34,6 +36,7 @@ mongo_cc_library(
     hdrs = [
         "visibility_test_lib2.h",
     ],
+    mongo_api_name = "visibility_test_lib2",
     deps = [
         ":visibility_test_lib1",
     ],

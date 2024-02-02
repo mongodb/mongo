@@ -29,6 +29,7 @@ load(
     "use_ocsp_stapling",
     "use_wait_for_debugger",
     "use_wiredtiger",
+    "visibility_support",
 )
 load("@bazel_skylib//lib:selects.bzl", "selects")
 
@@ -1041,5 +1042,62 @@ selects.config_setting_group(
         ":release",
         ":streams_release_build_enabled",
         ":platform_for_streaming_build",
+    ],
+)
+
+# --------------------------------------
+# stream_release_build
+# --------------------------------------
+
+visibility_support(
+    name = "visibility_support",
+    build_setting_default = "auto",
+)
+
+config_setting(
+    name = "visibility_support_auto",
+    flag_values = {
+        "//bazel/config:visibility_support": "auto",
+    },
+)
+
+config_setting(
+    name = "visibility_support_on",
+    flag_values = {
+        "//bazel/config:visibility_support": "on",
+    },
+)
+
+selects.config_setting_group(
+    name = "visibility_support_auto_non_windows_dynamic_linking",
+    match_all = [
+        ":visibility_support_auto",
+        ":not_windows",
+        ":linkstatic_disabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "visibility_support_enabled_setting",
+    match_any = [
+        ":visibility_support_auto_non_windows_dynamic_linking",
+        ":visibility_support_on",
+    ],
+)
+
+selects.config_setting_group(
+    name = "visibility_support_enabled_dynamic_linking_setting",
+    match_all = [
+        ":visibility_support_enabled_setting",
+        ":linkstatic_disabled",
+    ],
+)
+
+selects.config_setting_group(
+    name = "visibility_support_enabled_dynamic_linking_non_windows_setting",
+    match_all = [
+        ":not_windows",
+        ":visibility_support_enabled_setting",
+        ":linkstatic_disabled",
     ],
 )

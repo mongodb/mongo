@@ -393,3 +393,25 @@ streams_release_build = rule(
     implementation = lambda ctx: streams_release_build_provider(enabled = ctx.build_setting_value),
     build_setting = config.bool(flag = True),
 )
+
+# =========
+# visibility-support
+# =========
+
+visibility_support_values = ["auto", "on", "off"]
+
+visibility_support_provider = provider(
+    doc = "Enable visibility annotations",
+    fields = ["type"],
+)
+
+def visibility_support_impl(ctx):
+    visibility_support_value = ctx.build_setting_value
+    if visibility_support_value not in visibility_support_values:
+        fail(str(ctx.label) + " visibility-support allowed to take values {" + ", ".join(visibility_support_values) + "} but was set to unallowed value " + visibility_support_value)
+    return visibility_support_provider(type = visibility_support_value)
+
+visibility_support = rule(
+    implementation = visibility_support_impl,
+    build_setting = config.string(flag = True),
+)
