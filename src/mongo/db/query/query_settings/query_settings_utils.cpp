@@ -319,6 +319,14 @@ void validateQuerySettingsEncryptionInformation(
 void validateQuerySettings(const QueryShapeConfiguration& config,
                            const RepresentativeQueryInfo& representativeQueryInfo,
                            const boost::optional<TenantId>& tenantId) {
+    uassert(8584900,
+            "setQuerySettings command cannot be used on internal databases",
+            !representativeQueryInfo.namespaceString.isOnInternalDb());
+
+    uassert(8584901,
+            "setQuerySettings command cannot be used on system collections",
+            !representativeQueryInfo.namespaceString.isSystem());
+
     // Validates that the settings field for query settings is not empty.
     uassert(7746604,
             "settings field in setQuerySettings command cannot be empty",

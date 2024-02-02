@@ -11,6 +11,7 @@
  * ]
  */
 
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {funWithArgs} from "jstests/libs/parallel_shell_helpers.js";
@@ -24,9 +25,9 @@ if (!FixtureHelpers.isMongos(db) && !db.runCommand({hello: 1}).hasOwnProperty('s
 }
 
 const testConn = db.getMongo();
-const adminDB = testConn.getDB("admin");
-const qsutils = new QuerySettingsUtils(adminDB, jsTestName());
-
+// (Re)create the collection - will be sharded if required.
+assertDropAndRecreateCollection(db, jsTestName());
+const qsutils = new QuerySettingsUtils(db, jsTestName());
 const queryA = qsutils.makeFindQueryInstance({filter: {a: 1}});
 const queryB = qsutils.makeFindQueryInstance({filter: {b: "string"}});
 const queryC = qsutils.makeFindQueryInstance({filter: {c: 1}});

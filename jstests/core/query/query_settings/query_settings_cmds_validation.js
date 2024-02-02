@@ -144,3 +144,38 @@ const nonExistentQueryShapeHash = "0".repeat(64);
     }),
                                  7746608);
 }
+
+{
+    // Ensure setQuerySettings fails for internal dbs.
+    function testInternalDBQuerySettings(dbName, collection, index) {
+        // Ensure that setQuerySettings command fails for this db.
+        assert.commandFailedWithCode(db.adminCommand({
+            setQuerySettings: {find: collection, $db: dbName},
+            settings: {
+                "indexHints": [
+                    {"ns": {"db": dbName, "coll": collection}, "allowedIndexes": [index]},
+                ]
+            }
+        }),
+                                     8584900);
+    }
+    testInternalDBQuerySettings("admin", "system.version", {version: 1});
+    testInternalDBQuerySettings("local", "system.views", {viewOn: 1});
+    testInternalDBQuerySettings("config", "clusterParameters", {clusterParameterTime: 1});
+}
+
+{
+    // Ensure setQuerySettings fails for system collections.
+    assert.commandFailedWithCode(db.adminCommand({
+        setQuerySettings: {find: "system.foobar", $db: db.getName()},
+        settings: {
+            "indexHints": [
+                {
+                    "ns": {"db": db.getName(), "coll": "system.foobar"},
+                    "allowedIndexes": [{"anything": 1}]
+                },
+            ]
+        }
+    }),
+                                 8584901);
+}

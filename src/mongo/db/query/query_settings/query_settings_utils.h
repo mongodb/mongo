@@ -69,6 +69,11 @@ QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>&
         return query_settings::QuerySettings();
     }
 
+    // No query settings lookup on internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
+
     auto* opCtx = expCtx->opCtx;
     auto queryShapeHashFn = [&]() {
         auto& opDebug = CurOp::get(opCtx)->debug();
