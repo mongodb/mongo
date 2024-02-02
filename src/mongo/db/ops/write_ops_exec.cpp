@@ -292,7 +292,6 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
             // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
             // TODO (SERVER-82066): Update handling for direct connections.
             // TODO (SERVER-81937): Update handling for transactions.
-            // TODO (SERVER-85366): Update handling for retryable writes.
             boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
                 allowCollectionCreation;
             const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
@@ -792,7 +791,6 @@ UpdateResult performUpdate(OperationContext* opCtx,
         // TODO (SERVER-77915): Remove once 8.0 becomes last LTS.
         // TODO (SERVER-82066): Update handling for direct connections.
         // TODO (SERVER-81937): Update handling for transactions.
-        // TODO (SERVER-85366): Update handling for retryable writes.
         boost::optional<OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE>
             allowCollectionCreation;
         const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();

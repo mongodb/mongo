@@ -8,7 +8,6 @@
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 
 const dbName = "foo";
@@ -217,11 +216,7 @@ const newShardName =
     // Blocked because of the sharded and unsharded databases and the remaining chunk.
     removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert.eq("ongoing", removeRes.state);
-    // TODO SERVER-77915 remove feature flag and set remaining chunks to 2 (before track unsharded,
-    // only sharded collection had associated chunks)
-    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-    assert.eq(isTrackUnshardedEnabled ? 2 : 1, removeRes.remaining.chunks);
+    assert.eq(1, removeRes.remaining.chunks);
     assert.eq(3, removeRes.remaining.dbs);
 
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: newShardName}));

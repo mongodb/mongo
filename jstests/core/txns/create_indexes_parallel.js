@@ -15,7 +15,6 @@ import {
     createIndexAndCRUDInTxn,
     indexSpecs
 } from "jstests/libs/create_index_txn_helpers.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
@@ -149,30 +148,21 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 
-    // TODO SERVER-77915 Remove isTrackUnshardedEnabled. Once track unsharded is enabled, creation
-    // within a transaction will always serialize with any other collection creation by taking the
-    // DDLLock
-    const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
-        db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-    if (isTrackUnshardedDisabled) {
-        jsTest.log(
-            "Testing createIndexes inside txn and createCollection on conflicting collection " +
-            "in parallel.");
-        session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
-        retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-            createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
-        }, {writeConcern: {w: "majority"}});
-        assert.commandWorked(secondSessionDB.createCollection(collName));
-        assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
+    jsTest.log("Testing createIndexes inside txn and createCollection on conflicting collection " +
+               "in parallel.");
+    session.startTransaction({writeConcern: {w: "majority"}});  // txn 1
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        createIndexAndCRUDInTxn(sessionDB, collName, explicitCollectionCreate, multikeyIndex);
+    }, {writeConcern: {w: "majority"}});
+    assert.commandWorked(secondSessionDB.createCollection(collName));
+    assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
-        jsTest.log("Committing transaction (SHOULD FAIL)");
-        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                     ErrorCodes.WriteConflict);
-        assert.eq(sessionColl.find({}).itcount(), 1);
-        assert.eq(sessionColl.getIndexes().length, 1);
-    }
+    jsTest.log("Committing transaction (SHOULD FAIL)");
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
+    assert.eq(sessionColl.find({}).itcount(), 1);
+    assert.eq(sessionColl.getIndexes().length, 1);
+
     assert.commandWorked(sessionDB.dropDatabase());
-
     jsTest.log("Testing duplicate createIndexes which implicitly create a database in parallel" +
                ", both attempt to commit, second to commit fails");
     secondSession.startTransaction({writeConcern: {w: "majority"}});  // txn 2

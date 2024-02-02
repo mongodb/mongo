@@ -95,9 +95,7 @@ public:
 
     std::unique_ptr<ShardingDDLCoordinatorExternalState> createExternalState() const;
 
-    std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx,
-                                                  BSONObj initialState,
-                                                  bool checkOptions = true);
+    std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
 
     std::shared_ptr<executor::TaskExecutor> getInstanceCleanupExecutor() const;
 

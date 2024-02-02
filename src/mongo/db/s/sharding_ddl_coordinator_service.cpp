@@ -300,9 +300,7 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
 }
 
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
-ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
-                                                   BSONObj coorDoc,
-                                                   bool checkOptions) {
+ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSONObj coorDoc) {
 
     // Wait for all coordinators to be recovered before to allow the creation of new ones.
     waitForRecoveryCompletion(opCtx);
@@ -331,7 +329,7 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
     auto [coordinator, created] = [&] {
         try {
             auto [coordinator, created] =
-                PrimaryOnlyService::getOrCreateInstance(opCtx, patchedCoorDoc, checkOptions);
+                PrimaryOnlyService::getOrCreateInstance(opCtx, patchedCoorDoc);
             return std::make_pair(
                 checked_pointer_cast<ShardingDDLCoordinator>(std::move(coordinator)),
                 std::move(created));

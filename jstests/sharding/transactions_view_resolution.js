@@ -8,7 +8,6 @@
  * ]
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     flushRoutersAndRefreshShardMetadata
 } from "jstests/sharding/libs/sharded_transactions_helpers.js";
@@ -268,36 +267,28 @@ function assertAggResultEqInTransaction(coll, pipeline, expected) {
     assert.commandWorked(session.commitTransaction_forTesting());
 }
 
-// TODO SERVER-84470 Remove this check once lookup on unsplittable collection still on the primary
-// is supported
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-if (!isTrackUnshardedEnabled) {
-    // Set up an unsharded collection to use for $lookup, as lookup into a sharded collection in a
-    // transaction is not yet supported.
-    // TODO SERVER-39162: Add testing for lookup into sharded collections in a transaction.
-    const lookupDbName = "dbForLookup";
-    const lookupCollName = "collForLookup";
-    assert.commandWorked(
-        st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
-    const lookupColl = session.getDatabase(unshardedDbName)[unshardedCollName];
+// Set up an unsharded collection to use for $lookup, as lookup into a sharded collection in a
+// transaction is not yet supported.
+// TODO SERVER-39162: Add testing for lookup into sharded collections in a transaction.
+const lookupDbName = "dbForLookup";
+const lookupCollName = "collForLookup";
+assert.commandWorked(
+    st.s.getDB(lookupDbName)[lookupCollName].insert({_id: 1}, {writeConcern: {w: "majority"}}));
+const lookupColl = session.getDatabase(unshardedDbName)[unshardedCollName];
 
-    // Lookup the document in the unsharded collection with _id: 1 through the unsharded view.
-    assertAggResultEqInTransaction(
-        lookupColl,
-        [
-            {$match: {_id: 1}},
-            {
-                $lookup:
-                    {from: unshardedViewName, localField: "_id", foreignField: "_id", as: "matched"}
-            },
-            {$unwind: "$matched"},
-            {$project: {_id: 1, matchedX: "$matched.x"}}
-        ],
-        [{_id: 1, matchedX: "unsharded"}]);
+// Lookup the document in the unsharded collection with _id: 1 through the unsharded view.
+assertAggResultEqInTransaction(
+    lookupColl,
+    [
+        {$match: {_id: 1}},
+        {$lookup: {from: unshardedViewName, localField: "_id", foreignField: "_id", as: "matched"}},
+        {$unwind: "$matched"},
+        {$project: {_id: 1, matchedX: "$matched.x"}}
+    ],
+    [{_id: 1, matchedX: "unsharded"}]);
 
-    // Find the same document through the view using $graphLookup.
-    assertAggResultEqInTransaction(lookupColl,
+// Find the same document through the view using $graphLookup.
+assertAggResultEqInTransaction(lookupColl,
                                    [
                                      {$match: {_id: 1}},
                                      {
@@ -313,5 +304,5 @@ if (!isTrackUnshardedEnabled) {
                                      {$project: {_id: 1, matchedX: "$matched.x"}}
                                    ],
                                    [{_id: 1, matchedX: "unsharded"}]);
-}
+
 st.stop();

@@ -1,7 +1,6 @@
 // Tests mongos behavior on stale database version errors received in a transaction.
 //
 // @tags: [requires_sharding, uses_transactions, uses_multi_shard_transaction]
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     assertNoSuchTransactionOnAllShards,
     disableStaleVersionAndSnapshotRetriesWithinTransactions,
@@ -111,28 +110,20 @@ session.startTransaction();
 // Target Shard1, to verify the transaction on it is implicitly aborted later.
 assert.commandWorked(sessionOtherDB.runCommand({find: otherCollName}));
 
-// TODO SERVER-77915 remove this entire part of the test. Now that all collection are implicitly
-// tracked we will no longer target unsharded collection using dbVersion
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-if (!isTrackUnshardedEnabled) {
-    // Target the first database which is on Shard0. The shard is stale and won't refresh its
-    // metadata, so mongos should exhaust its retries and implicitly abort the transaction.
-    res = assert.commandFailedWithCode(
-        sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}),
-        ErrorCodes.StaleDbVersion);
-    assert.eq(res.errorLabels, ["TransientTransactionError"]);
+// Target the first database which is on Shard0. The shard is stale and won't refresh its
+// metadata, so mongos should exhaust its retries and implicitly abort the transaction.
+res = assert.commandFailedWithCode(
+    sessionDB.runCommand({distinct: collName, key: "_id", query: {_id: 0}}),
+    ErrorCodes.StaleDbVersion);
+assert.eq(res.errorLabels, ["TransientTransactionError"]);
 
-    // Verify all shards aborted the transaction.
-    assertNoSuchTransactionOnAllShards(
-        st, session.getSessionId(), session.getTxnNumber_forTesting());
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+// Verify all shards aborted the transaction.
+assertNoSuchTransactionOnAllShards(st, session.getSessionId(), session.getTxnNumber_forTesting());
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
-    assert.commandWorked(st.rs0.getPrimary().adminCommand(
-        {configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}));
+assert.commandWorked(st.rs0.getPrimary().adminCommand(
+    {configureFailPoint: "skipDatabaseVersionMetadataRefresh", mode: "off"}));
 
-    disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
-}
+disableStaleVersionAndSnapshotRetriesWithinTransactions(st);
 
 st.stop();

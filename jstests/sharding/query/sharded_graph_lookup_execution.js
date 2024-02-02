@@ -14,16 +14,10 @@
  */
 
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {enableLocalReadLogs, getLocalReadCount} from "jstests/libs/local_reads.js";
 import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
-
-// TODO SERVER-77915 remove feature flag
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-
 const testName = "sharded_graph_lookup";
 
 const mongosDB = st.s0.getDB(testName);
@@ -322,8 +316,6 @@ assertGraphLookupExecution(pipeline, {comment: "sharded_to_sharded_to_unsharded"
     {
         collName: airportsColl.getName(),
         fromCollName: airfieldsColl.getName(),
-        // TODO SERVER-77915 remove this comment:
-
         // When executing the subpipeline, the nested $graphLookup stage will stay on the merging
         // half of the pipeline and execute on the merging node, sending requests to execute the
         // nested $matches on the primary shard (where the unsharded 'airfields' collection is).
@@ -331,7 +323,7 @@ assertGraphLookupExecution(pipeline, {comment: "sharded_to_sharded_to_unsharded"
         // the rest can be done via a local read. The $graphLookups cannot share a cache because
         // they run indepedently.
         toplevelExec: [0, 0],
-        recursiveMatchExec: [isTrackUnshardedEnabled ? 7 : 6, 0]
+        recursiveMatchExec: [6, 0]
     }
 ]);
 

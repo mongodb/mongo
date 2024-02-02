@@ -2683,9 +2683,10 @@ var ReplSetTest = function ReplSetTest(opts) {
             // Set the cursor to read backwards, from last to first. We also set the cursor not
             // to time out since it may take a while to process each batch and a test may have
             // changed "cursorTimeoutMillis" to a short time period.
+            this._cursorExhausted = false;
             // TODO SERVER-75496 remove the batchSize once the the following issue is fixed: The
             // find{...} will always run with apiStrict:false, however getMore may run with
-            // apiStrict: true on specific suites. Use a big batch size to prevent getMore from
+            // apiStrict: true on specific suites. Use a bigger batch size to prevent getMore from
             // running.
             this._cursorExhausted = false;
             this.cursor = coll.find(query)

@@ -3,7 +3,6 @@
  *
  * @tags: [requires_fcv_70]
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {
     AnalyzeShardKeyUtil
@@ -59,14 +58,6 @@ function runTest(readPreference) {
     };
 
     // Run the analyzeShardKey command and verify that the metrics are as expected.
-    // TODO SERVER-81461 Remove this forced return once movePrimary is replaced by moveCollection.
-    // Analyze shard key won't work after a movePrimary when targetting secondaries for an
-    // unsplittable collection since the old primary currently does not update its filtering
-    // metadata for the moved collection on the secondaries.
-    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-    if (isTrackUnshardedEnabled && readPreference.mode == "secondary")
-        return;
     const res0 = assert.commandWorked(st.s1.adminCommand(analyzeShardKeyCmdObj));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0.keyCharacteristics, expectedMetrics);
 

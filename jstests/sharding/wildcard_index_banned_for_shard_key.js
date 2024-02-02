@@ -13,9 +13,7 @@ function assertCannotShardCollectionOnWildcardIndex(keyDoc) {
         mongos.adminCommand({shardCollection: `${kDbName}.foo`, key: keyDoc}),
         ErrorCodes.InvalidOptions);
 
-    assert.eq(mongos.getDB('config').collections.countDocuments(
-                  {_id: `${kDbName}.foo`, unsplittable: {$ne: true}}),
-              0);
+    assert.eq(mongos.getDB('config').collections.count({_id: `${kDbName}.foo`}), 0);
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 }
 

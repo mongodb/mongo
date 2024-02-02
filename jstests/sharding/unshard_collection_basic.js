@@ -34,6 +34,9 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: 
 let coll = mongos.getDB(dbName)[collName];
 assert.commandWorked(coll.insert({oldKey: 50}));
 
+// Fail if untracked collection.
+assert.commandFailedWithCode(mongos.adminCommand(cmdObj), ErrorCodes.NamespaceNotFound);
+
 // Fail if unsplittable tracked collection.
 const unsplittableCollName = "foo_unsplittable"
 const unsplittableCollNs = dbName + '.' + unsplittableCollName;

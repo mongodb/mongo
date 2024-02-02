@@ -1294,23 +1294,19 @@ export let MongosAPIParametersUtil = (function() {
         },
         {
             commandName: "splitVector",
-            // run: {
-            //     inAPIVersion1: false,
-            //     shardCommandName: "splitVector",
-            //     permittedInTxn: false,
-            //     permittedOnShardedCollection: false,
-            //     command: () => ({
-            //         splitVector: "db.collection",
-            //         keyPattern: {_id: 1},
-            //         min: {_id: 0},
-            //         max: {_id: MaxKey},
-            //         maxChunkSizeBytes: 1024 * 1024
-            //     })
-            // },
-            // TODO SERVER-84469: re-enable this test case once the command is fixed for tracked
-            // collections
-            skip:
-                "split vector command do not correctly target unsharded collection tracked on the config server"
+            run: {
+                inAPIVersion1: false,
+                shardCommandName: "splitVector",
+                permittedInTxn: false,
+                permittedOnShardedCollection: false,
+                command: () => ({
+                    splitVector: "db.collection",
+                    keyPattern: {_id: 1},
+                    min: {_id: 0},
+                    max: {_id: MaxKey},
+                    maxChunkSizeBytes: 1024 * 1024
+                })
+            }
         },
         {
             commandName: "startRecordingTraffic",

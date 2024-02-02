@@ -60,6 +60,9 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 
     // Run the enableSharding and addShard commands against shard0's primary mongod instead
     // to verify that replica set endpoint supports router commands.
+    // TODO (PM-3364): Remove the enableSharding command below once we start tracking unsharded
+    // collections.
+    assert.commandWorked(shard0Primary.adminCommand({enableSharding: dbName}));
     assert.commandWorked(
         shard0Primary.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 

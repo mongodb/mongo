@@ -3,7 +3,6 @@
  * TransientTransactionError label) if a collection or database placement changes have occurred
  * later than the transaction data snapshot timestamp.
  */
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
 
@@ -99,16 +98,7 @@ const st = new ShardingTest({mongos: 1, shards: 2});
     }
 
     runTest('majority');
-
-    // TODO SERVER-86014: adapt test to work correctly with tracked collections.
-    // The test assume that moveCollection invalidate routing for unsharded collection.
-    // This is not the case for tracked unsharded collection because the router can use the
-    // shardVersioning protocol instead of the DB versioning protocol.
-    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-    if (!isTrackUnshardedEnabled) {
-        runTest('snapshot');
-    }
+    runTest('snapshot');
 }
 
 // Tests transactions with concurrent DDL operations.

@@ -10,8 +10,7 @@ function testAndClenaupWithKeyNoIndexFailed(keyDoc) {
     var ns = kDbName + '.foo';
     assert.commandFailed(mongos.adminCommand({shardCollection: ns, key: keyDoc}));
 
-    assert.eq(
-        mongos.getDB('config').collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 0);
+    assert.eq(mongos.getDB('config').collections.count({_id: ns}), 0);
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 }
 
@@ -20,13 +19,11 @@ function testAndClenaupWithKeyOK(keyDoc) {
     assert.commandWorked(mongos.getDB(kDbName).foo.createIndex(keyDoc));
 
     var ns = kDbName + '.foo';
-    assert.eq(
-        mongos.getDB('config').collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 0);
+    assert.eq(mongos.getDB('config').collections.count({_id: ns}), 0);
 
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: keyDoc}));
 
-    assert.eq(
-        mongos.getDB('config').collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 1);
+    assert.eq(mongos.getDB('config').collections.count({_id: ns}), 1);
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 }
 
@@ -34,13 +31,11 @@ function testAndClenaupWithKeyNoIndexOK(keyDoc) {
     assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 
     var ns = kDbName + '.foo';
-    assert.eq(
-        mongos.getDB('config').collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 0);
+    assert.eq(mongos.getDB('config').collections.count({_id: ns}), 0);
 
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: keyDoc}));
 
-    assert.eq(
-        mongos.getDB('config').collections.countDocuments({_id: ns, unsplittable: {$ne: true}}), 1);
+    assert.eq(mongos.getDB('config').collections.count({_id: ns}), 1);
     assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 }
 

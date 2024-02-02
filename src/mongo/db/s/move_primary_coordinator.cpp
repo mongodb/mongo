@@ -57,7 +57,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -658,23 +657,6 @@ void MovePrimaryCoordinator::clearDbMetadataOnPrimary(OperationContext* opCtx) c
     scopedDss->clearDbInfo(opCtx);
 }
 
-// TODO SERVER-83925 clearFilteringMetadata was forced after SERVER-79668 due to unsplittable
-// collection being moved without bumping the shardVersion. Remove this once movePrimary is
-// officially replaced by moveCollection or changePrimary in every test
-void MovePrimaryCoordinator::clearFilteringMetadata(OperationContext* opCtx) const {
-    if (_doc.getCollectionsToClone()) {
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
-        for (const auto& nss : *_doc.getCollectionsToClone()) {
-            if (nss.isNamespaceAlwaysUntracked()) {
-                continue;
-            }
-            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-                ->clearFilteringMetadata(opCtx);
-        }
-    }
-}
-
 void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const {
     // Enable write blocking bypass to allow cleaning of stale data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
@@ -761,7 +743,6 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
     // The release of the critical section will clear db metadata on secondaries
     clearDbMetadataOnPrimary(opCtx);
-    clearFilteringMetadata(opCtx);
     // In case of step-down, this operation could be re-executed and trigger the invariant in case
     // the new primary runs a DDL that acquires the critical section in the old primary shard
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(

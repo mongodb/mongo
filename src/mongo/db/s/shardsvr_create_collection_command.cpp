@@ -50,7 +50,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
-#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -113,30 +112,10 @@ void runCreateCommandDirectClient(OperationContext* opCtx,
                                   const CreateCommand& cmd) {
     BSONObj createRes;
     DBDirectClient localClient(opCtx);
-    // Forward the api check rules enforced by the client
+    // Forward the api parameters required by the aggregation framework
     localClient.runCommand(ns.dbName(), cmd.toBSON(APIParameters::get(opCtx).toBSON()), createRes);
     auto createStatus = getStatusFromCommandResult(createRes);
     uassertStatusOK(createStatus);
-}
-
-bool isAlwaysUntracked(OperationContext* opCtx,
-                       NamespaceString&& nss,
-                       const ShardsvrCreateCollection& request) {
-    bool isFromCreateCommand = !request.getIsFromCreateUnsplittableCollectionTestCommand();
-    bool isTimeseries = request.getTimeseries().has_value();
-    bool isView = request.getViewOn().has_value();
-    bool hasCustomCollation = request.getCollation().has_value();
-    bool isEncryptedCollection =
-        request.getEncryptedFields().has_value() || nss.isFLE2StateCollection();
-    bool hasApiParams = APIParameters::get(opCtx).getParamsPassed();
-
-    // TODO SERVER-83878 Remove isFromCreateCommand && isTimeseries
-    // TODO SERVER-81936 Remove hasCustomCollation
-    // TODO SERVER-79248 or SERVER-79254 remove isEncryptedCollection once we both cleanup
-    // and compaction coordinator work on unsplittable collections
-    // TODO SERVER-86018 Remove hasApiParams
-    return isView || nss.isNamespaceAlwaysUntracked() || (isFromCreateCommand && isTimeseries) ||
-        hasCustomCollation || isEncryptedCollection || hasApiParams;
 }
 
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {
@@ -172,17 +151,17 @@ public:
         Response typedRun(OperationContext* opCtx) {
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+            bool inTransaction = opCtx->inMultiDocumentTransaction();
             bool isUnsplittable = request().getUnsplittable();
             bool hasShardKey = request().getShardKey().has_value();
-            if (opCtx->inMultiDocumentTransaction()) {
+            bool isFromCreateCommand =
+                isUnsplittable && !request().getIsFromCreateUnsplittableCollectionTestCommand();
+            bool isConfigCollection = isUnsplittable && ns().isConfigDB();
+            if (inTransaction) {
+                // only unsplittable collections are allowed in a transaction
                 uassert(ErrorCodes::InvalidOptions,
                         "cannot shard a collection in a transaction",
                         isUnsplittable);
-
-                auto cmd =
-                    makeCreateCommand(opCtx, ns(), request().getShardsvrCreateCollectionRequest());
-                runCreateCommandDirectClient(opCtx, ns(), cmd);
-                return CreateCollectionResponse{ShardVersion::UNSHARDED()};
             }
 
             uassert(ErrorCodes::NotImplemented,
@@ -195,40 +174,19 @@ public:
                         request().getShardKey()->woCompare(
                             sharding_ddl_util::unsplittableCollectionShardKey().toBSON()) == 0);
 
-            // The request might be coming from an "insert" operation. To keep "insert" behaviour
-            // back-compatible, a serialization is expected instead of returning "conflicting
-            // operation in progress". Because we are holding a FCVFixedRegion (which locks
-            // upgrade/downgrade), release the lock before serializing and re-acquire it once the
-            // on-going creation is over.
-            while (true) {
-                boost::optional<FixedFCVRegion> optFixedFcvRegion{boost::in_place_init, opCtx};
-                // In case of "unsplittable" collections, create the collection locally if either
-                // the feature flag is disabled or the nss identifies a collection which should
-                // always be local
-                if (isUnsplittable) {
-                    bool isTrackUnshardedDisabled =
-                        !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
-                            (*optFixedFcvRegion)->acquireFCVSnapshot());
-                    if (isTrackUnshardedDisabled) {
-                        auto cmd = makeCreateCommand(
-                            opCtx, ns(), request().getShardsvrCreateCollectionRequest());
-                        runCreateCommandDirectClient(opCtx, ns(), cmd);
-                        return CreateCollectionResponse{ShardVersion::UNSHARDED()};
-                    } else if (isAlwaysUntracked(opCtx, ns(), request())) {
-                        // Acquire the DDL lock to serialize with other DDL operations.
-                        // A parallel coordinator for an unsplittable collection will attempt to
-                        // access the collection outside of the critical section on the local
-                        // catalog to check the options. We need to serialize any create
-                        // collection/view to prevent wrong results
-                        static constexpr StringData lockReason{"CreateCollectionUntracked"_sd};
-                        const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
-                            opCtx, ns(), lockReason, MODE_X};
-                        auto cmd = makeCreateCommand(
-                            opCtx, ns(), request().getShardsvrCreateCollectionRequest());
-                        runCreateCommandDirectClient(opCtx, ns(), cmd);
-                        return CreateCollectionResponse{ShardVersion::UNSHARDED()};
-                    }
-                }
+            // TODO SERVER-81190 remove isFromCreatecommand from the check
+            if (isFromCreateCommand || inTransaction || isConfigCollection) {
+                auto cmd =
+                    makeCreateCommand(opCtx, ns(), request().getShardsvrCreateCollectionRequest());
+                runCreateCommandDirectClient(opCtx, ns(), cmd);
+                auto response = CreateCollectionResponse{ShardVersion::UNSHARDED()};
+                return response;
+            }
+
+            const auto createCollectionCoordinator = [&] {
+                // TODO (SERVER-79304): Remove once 8.0 becomes last LTS.
+                FixedFCVRegion fixedFcvRegion{opCtx};
+                const auto fcvSnapshot = (*fixedFcvRegion).acquireFCVSnapshot();
 
                 auto requestToForward = request().getShardsvrCreateCollectionRequest();
                 // Validates and sets missing time-series options fields automatically. This may
@@ -236,21 +194,20 @@ public:
                 // format it is feature flagged to 7.1+
                 if (requestToForward.getTimeseries() &&
                     gFeatureFlagValidateAndDefaultValuesForShardedTimeseries.isEnabled(
-                        (*optFixedFcvRegion)->acquireFCVSnapshot())) {
+                        fcvSnapshot)) {
                     auto timeseriesOptions = *requestToForward.getTimeseries();
                     uassertStatusOK(
                         timeseries::validateAndSetBucketingParameters(timeseriesOptions));
                     requestToForward.setTimeseries(std::move(timeseriesOptions));
                 }
 
-                if (isUnsplittable && !hasShardKey) {
+                if (isUnsplittable && !requestToForward.getShardKey()) {
                     requestToForward.setShardKey(
                         sharding_ddl_util::unsplittableCollectionShardKey().toBSON());
                 }
 
                 auto coordinatorDoc = [&] {
-                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(
-                            (*optFixedFcvRegion)->acquireFCVSnapshot())) {
+                    if (feature_flags::gAuthoritativeShardCollection.isEnabled(fcvSnapshot)) {
                         const DDLCoordinatorTypeEnum coordType =
                             DDLCoordinatorTypeEnum::kCreateCollection;
                         auto doc = CreateCollectionCoordinatorDocument();
@@ -268,39 +225,11 @@ public:
                 }();
 
                 auto service = ShardingDDLCoordinatorService::getService(opCtx);
-                auto instance = service->getOrCreateInstance(
-                    opCtx, coordinatorDoc.copy(), false /* checkOptions */);
-                try {
-                    instance->checkIfOptionsConflict(coordinatorDoc);
-                } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
-                    if (isUnsplittable) {
-                        LOGV2_DEBUG(8119001,
-                                    1,
-                                    "Found an incompatible create collection coordinator "
-                                    "already running while "
-                                    "attempting to create an unsharded collection. Waiting for "
-                                    "it to complete and then retrying",
-                                    "namespace"_attr = ns(),
-                                    "error"_attr = ex);
-                        // Release FCV region and wait for incompatible coordinator to finish
-                        optFixedFcvRegion.reset();
-                        (dynamic_pointer_cast<ShardingDDLCoordinator>(instance))
-                            ->getCompletionFuture()
-                            .getNoThrow(opCtx)
-                            .ignore();
-                        continue;
-                    }
+                return dynamic_pointer_cast<CreateCollectionResponseProvider>(
+                    service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
+            }();
 
-                    // If this is not a creation of an unsplittable collection just propagate the
-                    // conflicting exception
-                    throw;
-                }
-
-                // Release FCV region and wait for coordinator completion
-                optFixedFcvRegion.reset();
-                return (dynamic_pointer_cast<CreateCollectionResponseProvider>(instance))
-                    ->getResult(opCtx);
-            }
+            return createCollectionCoordinator->getResult(opCtx);
         }
 
     private:

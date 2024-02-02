@@ -13,7 +13,7 @@ const st = new ShardingTest({
     },
     // The config server uses a session for internal operations, so raise the limit by 1 for a
     // config shard.
-    shardOptions: {setParameter: {maxSessions: TestData.configShard ? 3 : 2}}
+    shardOptions: {setParameter: {maxSessions: TestData.configShard ? 2 : 1}}
 });
 const shard0Primary = st.rs0.getPrimary();
 

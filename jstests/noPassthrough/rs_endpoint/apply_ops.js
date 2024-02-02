@@ -185,9 +185,8 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     });
     const tearDownFunc = () => {
         // Do not check metadata consistency since unsharded collections are created on non-primary
-        // shards through apply-ops for testing purposes.
+        // shards for testing purposes.
         TestData.skipCheckMetadataConsistency = true;
-        TestData.skipCheckOrphans = true;
         st.stop();
         TestData.skipCheckMetadataConsistency = false;
     };

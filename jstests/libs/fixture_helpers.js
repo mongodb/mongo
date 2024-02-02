@@ -62,19 +62,6 @@ export var FixtureHelpers = (function() {
     }
 
     /**
-     * Looks for an entry in the sharding catalog for the given collection, to check whether it's
-     * unsplittable.
-     */
-    function isUnsplittable(coll) {
-        const collEntry =
-            coll.getDB().getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
-        if (collEntry === null) {
-            return false;
-        }
-        return collEntry.unsplittable !== null && collEntry.unsplittable;
-    }
-
-    /**
      * Returns the resolved view definition for 'collName' if it is a view, 'undefined' otherwise.
      */
     function getViewDefinition(db, collName) {
@@ -214,7 +201,6 @@ export var FixtureHelpers = (function() {
     return {
         isMongos: isMongos,
         isSharded: isSharded,
-        isUnsplittable: isUnsplittable,
         getViewDefinition: getViewDefinition,
         numberOfShardsForCollection: numberOfShardsForCollection,
         awaitReplication: awaitReplication,

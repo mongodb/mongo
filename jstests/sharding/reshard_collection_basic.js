@@ -6,7 +6,6 @@
 //
 
 import {DiscoverTopology} from "jstests/libs/discover_topology.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ReshardCollectionCmdTest} from "jstests/sharding/libs/reshard_collection_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
@@ -103,17 +102,9 @@ assert.commandFailedWithCode(mongos.adminCommand({
 }),
                              ErrorCodes.BadValue);
 
-// TODO SERVER-77915 remove or adapt this test case since a user-created unsharded collection is
-// now always tracked. A temporary db.system.resharding.collection must now exist as unsplittable as
-// well to support moveCollection
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-if (!isTrackUnshardedEnabled) {
-    jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
-    assert.commandFailedWithCode(
-        mongos.getDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),
-        ErrorCodes.NamespaceNotSharded);
-}
+jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
+assert.commandFailedWithCode(mongos.getDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),
+                             ErrorCodes.NamespaceNotSharded);
 
 /**
  * Success cases

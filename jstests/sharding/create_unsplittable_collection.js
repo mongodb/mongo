@@ -51,50 +51,6 @@ jsTest.log("Running test command createUnsplittableCollection to track an unshar
     assert.eq(configChunks.length, 1);
 }
 
-jsTest.log('Check that createCollection can create a tracked unsharded collection');
-{
-    const kDataColl = 'unsplittable_collection_on_create_collection';
-    const kDataCollNss = kDbName + '.' + kDataColl;
-
-    assert.commandWorked(st.s.getDB(kDbName).createCollection(kDataColl));
-
-    // running the same request again will behave as no-op
-    assert.commandWorked(st.s.getDB(kDbName).createCollection(kDataColl));
-
-    let res = assert.commandWorked(
-        st.getPrimaryShard(kDbName).getDB(kDbName).runCommand({listIndexes: kDataColl}));
-    let indexes = res.cursor.firstBatch;
-    assert(indexes.length === 1);
-
-    let col = st.s.getCollection('config.collections').findOne({_id: kDataCollNss});
-    assert.eq(col.unsplittable, true);
-    assert.eq(col.key, {_id: 1});
-    assert.eq(st.s.getCollection('config.chunks').countDocuments({uuid: col.uuid}), 1);
-}
-
-jsTest.log('When "capped" is true, the "size" field needs to be present.');
-{
-    const kDataColl = 'unsplittable_collection_on_create_collection_capped_size';
-
-    // Creating a collection that already exists with different options reports failure.
-    assert.commandFailedWithCode(st.s.getDB(kDbName).createCollection(kDataColl, {capped: true}),
-                                 ErrorCodes.InvalidOptions);
-
-    assert.commandFailedWithCode(
-        st.s.getDB(kDbName).createCollection(kDataColl, {capped: true, max: 10}),
-        ErrorCodes.InvalidOptions);
-}
-
-jsTest.log('If a view already exists with same namespace fail with NamespaceExists');
-{
-    const kDataColl = 'simple_view';
-
-    assert.commandWorked(st.s.getDB(kDbName).createView(kDataColl, kDbName + '.simple_coll', []));
-
-    assert.commandFailedWithCode(st.s.getDB(kDbName).createCollection(kDataColl),
-                                 [ErrorCodes.NamespaceExists]);
-}
-
 jsTest.log('Check that shardCollection won\'t generate an unsplittable collection');
 {
     const kCollSharded = 'sharded_collection';
