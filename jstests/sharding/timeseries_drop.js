@@ -37,6 +37,11 @@ function generateBatch(size) {
     }));
 }
 
+function ensureCollectionExists(collName, db) {
+    const collections = db.getCollectionNames();
+    assert(collections.includes(collName), collections);
+}
+
 function ensureCollectionDoesNotExist(collName) {
     const databases = [mainDB, st.shard0.getDB(dbName), st.shard1.getDB(dbName)];
     for (const db of databases) {
@@ -101,6 +106,12 @@ function runTest(getShardKey, performChunkSplit) {
         assert.eq(1, counts[primaryShard.shardName], counts);
         assert.eq(1, counts[otherShard.shardName], counts);
     }
+
+    // Confirm it's illegal to directly drop the ticket-series buckets collection.
+    assert.commandFailedWithCode(mainDB.runCommand({drop: `system.buckets.${collName}`}),
+                                 ErrorCodes.IllegalOperation);
+    ensureCollectionExists(collName, mainDB);
+    ensureCollectionExists(`system.buckets.${collName}`, mainDB);
 
     // Drop the time-series collection.
     assert(coll.drop());
