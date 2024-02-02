@@ -51,6 +51,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/util/bsoncolumn_util.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -1149,6 +1150,20 @@ TEST(BSONValidateColumn, BSONColumnInterleavedEmptyObjectPasses) {
                   .getField("c"));
     BSONBinData columnData = cb.finalize();
     ASSERT_OK(validateBSONColumn((char*)columnData.data, columnData.length));
+}
+
+TEST(BSONValidateColumn, BSONColumnInterleavedNestedInterleaved) {
+    BufBuilder buffer;
+    BSONObj ref = BSON("c" << 1);
+
+    buffer.appendChar(bsoncolumn::kInterleavedStartControlByteLegacy);
+    buffer.appendBuf(ref.objdata(), ref.objsize());
+    buffer.appendChar(bsoncolumn::kInterleavedStartControlByteLegacy);
+    buffer.appendBuf(ref.objdata(), ref.objsize());
+    buffer.appendChar(0);
+    buffer.appendChar(0);
+
+    ASSERT_EQ(validateBSONColumn(buffer.buf(), buffer.len()), ErrorCodes::NonConformantBSON);
 }
 
 TEST(BSONValidateColumn, BSONColumnNoOverflowBlocksShort) {
