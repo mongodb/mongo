@@ -2731,11 +2731,19 @@ void ReplicationCoordinatorImpl::_killConflictingOpsOnStepUpAndStepDown(
         // Don't kill step up/step down thread.
         if (toKill && !toKill->isKillPending() && toKill->getOpID() != rstlOpCtx->getOpID()) {
             auto locker = shard_role_details::getLocker(toKill);
-            if (toKill->shouldAlwaysInterruptAtStepDownOrUp() ||
-                locker->wasGlobalLockTakenInModeConflictingWithWrites() ||
-                PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict()) {
+            bool alwaysInterrupt = toKill->shouldAlwaysInterruptAtStepDownOrUp();
+            bool globalLockConfict = locker->wasGlobalLockTakenInModeConflictingWithWrites();
+            bool isWaitingOnPrepareConflict =
+                PrepareConflictTracker::get(toKill).isWaitingOnPrepareConflict();
+            if (alwaysInterrupt || globalLockConfict || isWaitingOnPrepareConflict) {
                 serviceCtx->killOperation(lk, toKill, reason);
                 arsc->incrementTotalOpsKilled();
+                LOGV2(8562701,
+                      "Repl state change interrupted a thread.",
+                      "name"_attr = client->desc(),
+                      "alwaysInterrupt"_attr = alwaysInterrupt,
+                      "globalLockConflict"_attr = globalLockConfict,
+                      "isWaitingOnPrepareConflict"_attr = isWaitingOnPrepareConflict);
             } else {
                 arsc->incrementTotalOpsRunning();
             }
