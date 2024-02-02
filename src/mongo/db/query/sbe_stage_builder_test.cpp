@@ -36,12 +36,13 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer_mock.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/shard_filterer_factory_mock.h"
@@ -229,4 +230,42 @@ TEST_F(SbeStageBuilderTest, VirtualIndexScanWithoutRecordId) {
     }
     ASSERT_EQ(index, 3);
 }
+
+TEST_F(SbeStageBuilderTest, VirtualScanWithFilter) {
+    auto filteredDocs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
+                                               BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
+                                               BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    auto filter = uassertStatusOK(MatchExpressionParser::parse(
+        fromjson("{b: 2}"), make_intrusive<ExpressionContextForTest>(operationContext(), _nss)));
+
+    std::vector<BSONArray> allDocs = filteredDocs;
+    allDocs.insert(allDocs.begin() + 1, BSON_ARRAY(BSON("a" << 2 << "b" << 1)));
+    allDocs.insert(allDocs.end(), BSON_ARRAY(BSON("a" << 4 << "b" << 1)));
+
+    // Construct a QuerySolution consisting of a single VirtualScanNode to test if a stream of
+    // documents can be produced and filtered, according to the provided filter.
+    auto virtScan = std::make_unique<VirtualScanNode>(
+        std::move(allDocs), VirtualScanNode::ScanType::kCollScan, false);
+    virtScan->filter = std::move(filter);
+    // Make a QuerySolution from the root virtual scan node.
+    auto querySolution = makeQuerySolution(std::move(virtScan));
+
+    // Translate the QuerySolution tree to an sbe::PlanStage.
+    auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
+    auto [resultSlots, stage, data, _] =
+        buildPlanStage(std::move(querySolution), false, std::move(shardFiltererInterface));
+    auto resultAccessors = prepareTree(&data.env.ctx, stage.get(), resultSlots);
+    ASSERT_EQ(resultAccessors.size(), 1u);
+
+    int64_t index = 0;
+    for (auto st = stage->getNext(); st == sbe::PlanState::ADVANCED; st = stage->getNext()) {
+        // Assert that the document produced from the stage is what we expect.
+        auto [tagDoc, valDoc] = resultAccessors[0]->getViewOfValue();
+        ASSERT_TRUE(tagDoc == sbe::value::TypeTags::bsonObject);
+        auto bo = BSONObj(sbe::value::bitcastTo<const char*>(valDoc));
+        ASSERT_BSONOBJ_EQ(bo, BSON("a" << ++index << "b" << 2));
+    }
+    ASSERT_EQ(index, 3);
+}
+
 }  // namespace mongo

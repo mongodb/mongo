@@ -58,9 +58,9 @@
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/limit.h"
 #include "mongo/db/exec/merge_sort.h"
+#include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/projection.h"
-#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/skip.h"
@@ -414,24 +414,29 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             invariant(!vsn->hasRecordId);
             invariant(vsn->scanType == VirtualScanNode::ScanType::kCollScan);
 
-            auto qds = std::make_unique<QueuedDataStage>(expCtx, _ws);
+            auto mockStage = std::make_unique<MockStage>(expCtx, _ws);
             for (auto&& arr : vsn->docs) {
                 // The VirtualScanNode should only have a single element that carrys the document
-                // as the QueuedDataStage cannot handle a recordId properly.
+                // as the MockStage cannot handle a recordId properly.
                 BSONObjIterator arrIt{arr};
                 invariant(arrIt.more());
                 auto firstElt = arrIt.next();
                 invariant(firstElt.type() == BSONType::Object);
                 invariant(!arrIt.more());
+                BSONObj doc = firstElt.embeddedObject();
 
-                // Only add the first element to the working set.
-                auto wsID = _ws->allocate();
-                qds->pushBack(wsID);
-                auto* member = _ws->get(wsID);
-                member->keyData.clear();
-                member->doc = {{}, Document{firstElt.embeddedObject()}};
+                if (vsn->filter && !vsn->filter->matchesBSON(doc)) {
+                    mockStage->enqueueStateCode(PlanStage::NEED_TIME);
+                } else {
+                    auto wsID = _ws->allocate();
+                    auto* member = _ws->get(wsID);
+                    member->keyData.clear();
+                    member->doc = {{}, Document{doc}.getOwned()};
+                    member->transitionToOwnedObj();
+                    mockStage->enqueueAdvanced(wsID);
+                }
             }
-            return qds;
+            return mockStage;
         }
         case STAGE_BATCHED_DELETE:
         case STAGE_CACHED_PLAN:

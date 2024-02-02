@@ -1008,7 +1008,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     inputGuard.reset();
-    auto [scanSlots, scanStage] = generateVirtualScanMulti(
+    auto [scanSlots, stage] = generateVirtualScanMulti(
         &_slotIdGenerator, vsn->hasRecordId ? 2 : 1, inputTag, inputVal, _yieldPolicy);
 
     sbe::value::SlotId resultSlot;
@@ -1031,7 +1031,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         outputs.set(kRecordId, scanSlots[0]);
     }
 
-    return {std::move(scanStage), std::move(outputs)};
+    if (vsn->filter) {
+        auto filterExpr = generateFilter(_state,
+                                         vsn->filter.get(),
+                                         TypedSlot{resultSlot, TypeSignature::kAnyScalarType},
+                                         &outputs);
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(_state).expr, vsn->nodeId());
+        }
+    }
+
+    return {std::move(stage), std::move(outputs)};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildIndexScan(

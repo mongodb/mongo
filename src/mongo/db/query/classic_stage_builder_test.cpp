@@ -31,17 +31,17 @@
 #include <utility>
 #include <vector>
 
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/classic_stage_builder.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_solution.h"
@@ -129,18 +129,24 @@ private:
 
 
 /**
- * Verify that a VirtualScanNode can be translated to a QueuedDataStage and produce a data stream.
+ * Verify that a VirtualScanNode can be translated to a MockStage and produce a filtered data
+ * stream.
  */
 TEST_F(ClassicStageBuilderTest, VirtualScanTranslation) {
-    auto docs = std::vector<BSONArray>{BSON_ARRAY(BSON("a" << 1 << "b" << 2)),
-                                       BSON_ARRAY(BSON("a" << 2 << "b" << 2)),
-                                       BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    static const std::vector<BSONArray> kFilteredDocs = std::vector<BSONArray>{
+        BSON_ARRAY(BSON("a" << 1 << "b" << 2)), BSON_ARRAY(BSON("a" << 3 << "b" << 2))};
+    auto filter = uassertStatusOK(MatchExpressionParser::parse(
+        fromjson("{a: {$ne: 2}}"), make_intrusive<ExpressionContextForTest>(opCtx(), kNss)));
+
+    std::vector<BSONArray> allDocs = kFilteredDocs;
+    allDocs.insert(allDocs.begin() + 1, BSON_ARRAY(BSON("a" << 2 << "b" << 2)));
+    allDocs.insert(allDocs.end(), BSON_ARRAY(BSON("a" << 2 << "b" << 2)));
 
     // Construct a QuerySolution consisting of a single VirtualScanNode to test if a stream of
-    // documents can be produced.
-    auto virtScan =
-        std::make_unique<VirtualScanNode>(docs, VirtualScanNode::ScanType::kCollScan, false);
-
+    // documents can be produced and filtered, according to the provided filter.
+    auto virtScan = std::make_unique<VirtualScanNode>(
+        std::move(allDocs), VirtualScanNode::ScanType::kCollScan, false);
+    virtScan->filter = std::move(filter);
     // Make a QuerySolution from the root virtual scan node.
     auto querySolution = makeQuerySolution(std::move(virtScan));
     ASSERT_EQ(querySolution->root()->nodeId(), 1);
@@ -150,11 +156,11 @@ TEST_F(ClassicStageBuilderTest, VirtualScanTranslation) {
 
     // Work the stage and collect the results.
     auto results = collectResults(std::move(stage));
-    ASSERT_EQ(results.size(), 3);
+    ASSERT_EQ(results.size(), kFilteredDocs.size());
 
     // Check that the results produced from the translated VirtualScanNode meet expectation.
-    for (size_t i = 0; i < docs.size(); ++i) {
-        BSONObjIterator arrIt{docs[i]};
+    for (size_t i = 0; i < kFilteredDocs.size(); ++i) {
+        BSONObjIterator arrIt{kFilteredDocs[i]};
         auto firstElt = arrIt.next();
         ASSERT_BSONOBJ_EQ(firstElt.embeddedObject(), results[i]);
     }

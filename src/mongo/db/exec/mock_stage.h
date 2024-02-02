@@ -77,7 +77,7 @@ public:
      * The caller is responsible for allocating 'id' and filling out the WSM keyed by 'id'
      * appropriately.
      *
-     * The QueuedDataStage takes ownership of 'id', so the caller should not call WorkingSet::free()
+     * The MockStage takes ownership of 'id', so the caller should not call WorkingSet::free()
      * on it.
      */
     void enqueueAdvanced(WorkingSetID wsid) {
