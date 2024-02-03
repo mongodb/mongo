@@ -71,6 +71,9 @@ selector:
   exclude_files:
   - jstests/core/**/max_doc_size.js
   - jstests/core/**/exhaust.js
+  - jstests/core/**/geo_update_btree.js
+  - jstests/core/query/explain/explain_agg_write_concern.js
+  - jstests/core/administrative/builtin_roles_external.js
   exclude_with_any_tags:
   - simulate_atlas_proxy_incompatible
   - not_allowed_with_signed_security_token
@@ -83,6 +86,5 @@ selector:
   - uses_transactions
   - requires_emptycapped
   roots:
-  - jstests/core/*.js
-  - jstests/core/txns/**/*.js
+  - jstests/core/**/*.js
 test_kind: js_test

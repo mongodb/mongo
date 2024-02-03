@@ -753,11 +753,10 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *task_template
-  name: replica_sets_kill_secondaries_jscore_passthrough
+  name: replica_sets_kill_secondaries_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_repl", "replica_sets", "san", "large", "non_live_record", "ignore_on_code_coverage"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *task_template
   name: replica_sets_large_txns_format_jscore_passthrough

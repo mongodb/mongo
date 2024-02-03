@@ -1,4 +1,4 @@
-# Overrides for enabling pre-images.
+# Overrides for change collections
 
 ###
 # Fixture options.
@@ -11,3 +11,11 @@
           set_parameters:
             changeCollectionTruncateMarkersMinBytes: 4096  # 4KiB
             changeCollectionExpiredDocumentsRemoverJobSleepSeconds: 1
+
+- name: exclusions
+  value:
+    exclude_files:
+    # TODO(SERVER-77000): Remove the test exclusion when $out.db in response has expected prefix.
+    - jstests/core/query/explain/explain_agg_write_concern.js
+    # `rolesInfo` is returning unprefixed database names
+    - jstests/core/administrative/builtin_roles_external.js

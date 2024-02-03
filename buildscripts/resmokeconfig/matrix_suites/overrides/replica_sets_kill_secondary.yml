@@ -2,8 +2,7 @@
   value:
     selector:
       roots:
-      - jstests/core/*.js
-      - jstests/core/txns/**/*.js
+      - jstests/core/**/*.js
       exclude_files:
       # Intentional empty override.
 
@@ -49,6 +48,10 @@
     # primary's oplog when run as a part of burn_in_tests.
     - jstests/core/**/max_doc_size.js
     - jstests/core/**/exhaust.js
+    # The following tests perform a write with a writeConcern of w=2 when 'testingReplication' is
+    # true. This causes the test to hang because the secondary is running with the "rsSyncApplyStop"
+    # failpoint enabled.
+    - jstests/core/**/geo_update_btree.js
     exclude_with_any_tags:
     # emptycapped is not supported with rollback using recover-to-timestamp.
     - requires_emptycapped

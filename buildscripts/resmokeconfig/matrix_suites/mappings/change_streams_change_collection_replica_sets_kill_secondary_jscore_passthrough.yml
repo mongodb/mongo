@@ -18,3 +18,4 @@ extends:
 
 excludes:
   - "replica_sets_kill_secondary.exclusions"
+  - "change_streams_change_collection_remover.exclusions"

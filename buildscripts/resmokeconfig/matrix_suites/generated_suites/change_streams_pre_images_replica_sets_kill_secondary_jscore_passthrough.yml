@@ -49,12 +49,12 @@ selector:
   exclude_files:
   - jstests/core/**/max_doc_size.js
   - jstests/core/**/exhaust.js
+  - jstests/core/**/geo_update_btree.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - requires_profiling
   - requires_emptycapped
   - incompatible_with_preimages_by_default
   roots:
-  - jstests/core/*.js
-  - jstests/core/txns/**/*.js
+  - jstests/core/**/*.js
 test_kind: js_test
