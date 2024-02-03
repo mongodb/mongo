@@ -2,6 +2,7 @@
 
 import atexit
 import copy
+import distro
 import errno
 import functools
 import json
@@ -950,6 +951,11 @@ def fatal_error(env, msg, *args):
     Exit(1)
 
 
+def bazel_by_default():
+    return distro.name() == "Ubuntu" and distro.version().split(
+        ".")[0] == "22" and platform.machine() == "aarch64"
+
+
 # Apply the default variables files, and walk the provided
 # arguments. Interpret any falsy argument (like the empty string) as
 # resetting any prior state. This makes the argument
@@ -1078,7 +1084,7 @@ env_vars.Add(
     help=
     'Enables/disables building with bazel. Note that this project is in flight, and thus subject to breaking changes. See https://jira.mongodb.org/browse/PM-3332 for details.',
     converter=functools.partial(bool_var_converter, var='BAZEL_BUILD_ENABLED'),
-    default="0",
+    default="1" if bazel_by_default() else "0",
 )
 
 env_vars.Add(

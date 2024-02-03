@@ -1,5 +1,6 @@
 import atexit
 import functools
+import getpass
 import json
 import os
 import platform
@@ -12,7 +13,9 @@ import threading
 import time
 from typing import List, Dict, Set, Tuple, Any
 import urllib.request
+import requests
 import sys
+import socket
 
 import SCons
 
@@ -354,6 +357,41 @@ def create_idlc_builder(env: SCons.Environment.Environment) -> None:
     env['BUILDERS']['BazelIdlc'] = create_bazel_builder(env['BUILDERS']["Idlc"])
 
 
+def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
+    running_in_evergreen = env.GetOption("evergreen-tmp-dir") is not None
+
+    if running_in_evergreen and not os.path.exists("./engflow.cert"):
+        print(
+            "ERROR: ./engflow.cert not found, which is required to build in evergreen without BAZEL_FLAGS=--config=local set. Please reach out to #server-dev-platform for help."
+        )
+        return False
+
+    if not running_in_evergreen and not os.path.exists("/engflow/creds/engflow.crt"):
+        # Pull the external hostname of the system from aws
+        response = requests.get(
+            "http://instance-data.ec2.internal/latest/meta-data/public-hostname")
+        if response.status_code == 200:
+            public_hostname = response.text
+        else:
+            public_hostname = "{{REPLACE_WITH_WORKSTATION_HOST_NAME}}"
+        print(
+            f"""\nERROR: /engflow/creds/engflow.crt not found. Please reach out to #server-dev-platform if you need help with the steps below.
+
+Please complete the following steps to generate a certificate:
+- (If not in the Engineering org) Request access to the MANA group https://mana.corp.mongodbgov.com/resources/659ec4b9bccf3819e5608712
+- Go to https://sodalite.cluster.engflow.com/gettingstarted (Uses mongodbcorp.okta.com auth URL)
+- Login with Okta, then click the \"GENERATE AND DOWNLOAD MTLS CERTIFICATE\" button
+- On your macbook, open a terminal and run:
+
+unzip ~/Downloads/engflow-mTLS.zip
+rsync --rsync-path="sudo mkdir -p /engflow/creds && sudo rsync" ./engflow.crt {getpass.getuser()}@{public_hostname}:/engflow/creds
+rsync --rsync-path="sudo rsync" ./engflow.key {getpass.getuser()}@{public_hostname}:/engflow/creds
+ssh {getpass.getuser()}@{public_hostname} "sudo chown -R {getpass.getuser()}:{getpass.getuser()} /engflow"
+ssh {getpass.getuser()}@{public_hostname} "sudo chmod -R u=rwX,g=rX,o= /engflow"\n""")
+        return False
+    return True
+
+
 def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     # create a json file which contains all the relevant info from this generation
     # that bazel will need to construct the correct command line for any given targets
@@ -483,8 +521,11 @@ def generate(env: SCons.Environment.Environment) -> None:
             formatted_options = [f'--//bazel/config:{_SANITIZER_MAP[opt]}=True' for opt in options]
             bazel_internal_flags.extend(formatted_options)
 
+        # Disable RE for external developers
+        is_external_developer = not os.path.exists("/opt/mongodbtoolchain")
+
         # TODO SERVER-85806 enable RE for amd64
-        if normalized_os != "linux" or normalized_arch not in ["arm64"]:
+        if normalized_os != "linux" or normalized_arch not in ["arm64"] or is_external_developer:
             bazel_internal_flags.append('--config=local')
 
         # Disable remote execution for public release builds.
@@ -505,6 +546,13 @@ def generate(env: SCons.Environment.Environment) -> None:
         # Store the bazel command line flags so scons can check if it should rerun the bazel targets
         # if the bazel command line changes.
         env['BAZEL_FLAGS_STR'] = str(bazel_internal_flags) + env.get("BAZEL_FLAGS", "")
+
+        if "--config=local" not in env['BAZEL_FLAGS_STR']:
+            print(
+                "Running bazel with remote execution enabled. To disable bazel remote execution, please add BAZEL_FLAGS=--config=local to the end of your scons command line invocation."
+            )
+            if not validate_remote_execution_certs(env):
+                sys.exit(1)
 
         # We always use --compilation_mode debug for now as we always want -g, so assume -dbg location
         out_dir_platform = "$TARGET_ARCH"
