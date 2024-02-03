@@ -98,21 +98,10 @@ private:
 };
 
 /**
- * Class which contains logic common to routers which target one or more collections.
- */
-class CollectionRouterCommon : public RouterBase {
-protected:
-    CollectionRouterCommon(ServiceContext* service);
-
-    void _onException(RouteContext* context, Status s);
-    CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx, const NamespaceString& nss);
-};
-
-/**
  * This class should mostly be used for routing CRUD operations which need to have a view of the
  * entire routing table for a collection.
  */
-class CollectionRouter : public CollectionRouterCommon {
+class CollectionRouter : public RouterBase {
 public:
     CollectionRouter(ServiceContext* service, NamespaceString nss);
 
@@ -120,7 +109,7 @@ public:
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
         RouteContext context{comment.toString()};
         while (true) {
-            auto cri = _getRoutingInfo(opCtx, _nss);
+            auto cri = _getRoutingInfo(opCtx);
             try {
                 return callbackFn(opCtx, cri);
             } catch (const DBException& ex) {
@@ -134,40 +123,10 @@ public:
                                                 BSONObjBuilder* builder);
 
 private:
-    const NamespaceString _nss;
-};
+    CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx) const;
+    void _onException(RouteContext* context, Status s);
 
-class MultiCollectionRouter : public CollectionRouterCommon {
-public:
-    MultiCollectionRouter(ServiceContext* service, const std::vector<NamespaceString>& nssList);
-
-    /**
-     * Member function which discerns whether any of the namespaces in '_nssList' are not local.
-     */
-    bool isAnyCollectionNotLocal(
-        OperationContext* opCtx,
-        const stdx::unordered_map<NamespaceString, CollectionRoutingInfo>& criMap);
-
-
-    template <typename F>
-    auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
-        RouteContext context{comment.toString()};
-        while (true) {
-            stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
-            for (const auto& nss : _nssList) {
-                criMap.emplace(nss, _getRoutingInfo(opCtx, nss));
-            }
-
-            try {
-                return callbackFn(opCtx, criMap);
-            } catch (const DBException& ex) {
-                _onException(&context, ex.toStatus());
-            }
-        }
-    }
-
-private:
-    const std::vector<NamespaceString> _nssList;
+    NamespaceString _nss;
 };
 
 }  // namespace router

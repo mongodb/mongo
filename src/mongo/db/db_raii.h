@@ -143,8 +143,8 @@ public:
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
 
-    bool isAnySecondaryNamespaceAView() const {
-        return _isAnySecondaryNamespaceAView;
+    bool isAnySecondaryNamespaceAViewOrSharded() const {
+        return _secondaryNssIsAViewOrSharded;
     }
 
 private:
@@ -160,8 +160,8 @@ private:
     // the same as the input namespace string
     NamespaceString _resolvedNss;
 
-    // Tracks whether any secondary collection namespaces is a view.
-    bool _isAnySecondaryNamespaceAView = false;
+    // Tracks whether any secondary collection namespaces is a view or sharded.
+    bool _secondaryNssIsAViewOrSharded = false;
 };
 
 /**
@@ -189,8 +189,8 @@ public:
         return _resolvedNss;
     }
 
-    bool isAnySecondaryNamespaceAView() const {
-        return _isAnySecondaryNamespaceAView;
+    bool isAnySecondaryNamespaceAViewOrSharded() const {
+        return _secondaryNssIsAViewOrSharded;
     }
 
 private:
@@ -220,10 +220,12 @@ private:
     // Doesn't change after construction.
     CollectionPtr _collectionPtr;
 
-    // Tracks whether any secondary collection namespace is a view. Note that this should not change
-    // after construction because even during a yield, it is not possible for a regular collection
-    // to become a view.
-    bool _isAnySecondaryNamespaceAView{false};
+    // Tracks whether any secondary collection namespace is a view or is sharded.
+    //
+    // Doesn't change after construction, see comment in "EmplaceHelper".  Should NOT invariant that
+    // this is true when restoring from yield, because changing to be sharded is allowed, but
+    // changing to a view is not.
+    bool _secondaryNssIsAViewOrSharded{false};
 
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
     // the same as the input namespace string.
@@ -269,7 +271,7 @@ public:
     const CollectionPtr& getCollection() const;
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
-    bool isAnySecondaryNamespaceAView() const;
+    bool isAnySecondaryNamespaceAViewOrSharded() const;
 
 private:
     boost::optional<AutoGetCollectionForRead> _autoGet;
@@ -317,8 +319,8 @@ public:
         return _autoCollForRead.getNss();
     }
 
-    bool isAnySecondaryNamespaceAView() const {
-        return _autoCollForRead.isAnySecondaryNamespaceAView();
+    bool isAnySecondaryNamespaceAViewOrSharded() const {
+        return _autoCollForRead.isAnySecondaryNamespaceAViewOrSharded();
     }
 
 protected:
@@ -396,7 +398,7 @@ public:
     query_shape::CollectionType getCollectionType() const;
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
-    bool isAnySecondaryNamespaceAView() const;
+    bool isAnySecondaryNamespaceAViewOrSharded() const;
 
 private:
     boost::optional<AutoGetCollectionForReadCommand> _autoGet;

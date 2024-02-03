@@ -188,7 +188,7 @@ public:
         MultipleCollectionAccessor colls(operationContext(),
                                          &localColl.getCollection(),
                                          _nss,
-                                         false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */,
+                                         false /* isAnySecondaryNamespaceAViewOrSharded */,
                                          {_foreignNss});
 
         auto tree = buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);

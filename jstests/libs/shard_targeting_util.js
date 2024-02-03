@@ -93,10 +93,6 @@ export class ShardTargetingTest {
             const split = explain.splitPipeline;
             assert(split.hasOwnProperty("mergerPart"), explain);
             const mergerPart = split.mergerPart;
-            assert(
-                expectedMergingStages,
-                "Should have specified merging stages for test case if 'expectedMergingShard' was specified" +
-                    tojson(explain));
             assert(expectedMergingStages, explain);
             this._assertExpectedStages(expectedMergingStages, mergerPart, explain);
         } else {
@@ -121,11 +117,10 @@ export class ShardTargetingTest {
                 this._assertExpectedStages(expectedShardStages, stages, explain);
             }
 
-            const stage = getAggPlanStage(shard, "EQ_LOOKUP", true /* useQueryPlannerSection */);
             if (assertSBELookupPushdown) {
+                const stage =
+                    getAggPlanStage(shard, "EQ_LOOKUP", true /* useQueryPlannerSection */);
                 assert.neq(stage, null, shard);
-            } else {
-                assert.eq(stage, null, shard);
             }
         }
     }

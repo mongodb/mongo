@@ -69,7 +69,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/search/search_helper.h"
@@ -509,34 +508,23 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     // when constructing our query executor.
     auto lpp = LiteParsedPipeline(expCtx->ns, pipeline->serializeToBson());
     std::vector<NamespaceStringOrUUID> secondaryNamespaces = lpp.getForeignExecutionNamespaces();
-    auto* opCtx = expCtx->opCtx;
 
-    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl = boost::none;
-    auto initAutoGetCallback = [&]() {
-        autoColl.emplace(opCtx,
-                         expCtx->ns,
-                         AutoGetCollection::Options{}.secondaryNssOrUUIDs(
-                             secondaryNamespaces.cbegin(), secondaryNamespaces.cend()),
-                         AutoStatsTracker::LogMode::kUpdateTop);
-    };
+    AutoGetCollectionForReadCommandMaybeLockFree autoColl(
+        expCtx->opCtx,
+        expCtx->ns,
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces.cbegin(),
+                                                         secondaryNamespaces.cend()),
+        AutoStatsTracker::LogMode::kUpdateTop);
 
-    bool isAnySecondaryCollectionNotLocal =
-        intializeAutoGet(opCtx, expCtx->ns, secondaryNamespaces, initAutoGetCallback);
-
-    tassert(8322002,
-            "Should have initialized AutoGet* after calling 'initializeAutoGet'",
-            autoColl.has_value());
     uassert(ErrorCodes::NamespaceNotFound,
             fmt::format("collection '{}' does not match the expected uuid",
                         expCtx->ns.toStringForErrorMsg()),
-            !expCtx->uuid ||
-                (autoColl->getCollection() && autoColl->getCollection()->uuid() == expCtx->uuid));
+            !expCtx->uuid || (autoColl && autoColl->uuid() == expCtx->uuid));
 
     MultipleCollectionAccessor holder{expCtx->opCtx,
-                                      &autoColl->getCollection(),
-                                      autoColl->getNss(),
-                                      autoColl->isAnySecondaryNamespaceAView() ||
-                                          isAnySecondaryCollectionNotLocal,
+                                      &autoColl.getCollection(),
+                                      autoColl.getNss(),
+                                      autoColl.isAnySecondaryNamespaceAViewOrSharded(),
                                       secondaryNamespaces};
     auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
