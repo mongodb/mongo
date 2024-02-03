@@ -1637,7 +1637,7 @@ class raw_hash_set {
     }
     // For end() iterators.
     explicit iterator(const GenerationType* generation_ptr)
-        : HashSetIteratorGenerationInfo(generation_ptr), ctrl_(nullptr) {}
+        : HashSetIteratorGenerationInfo(generation_ptr), ctrl_(nullptr), slot_(nullptr) {}
 
     // Fixes up `ctrl_` to point to a full by advancing it and `slot_` until
     // they reach one.
