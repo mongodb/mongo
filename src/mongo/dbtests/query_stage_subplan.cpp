@@ -183,7 +183,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
 
     // Get planner params.
     QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    MultipleCollectionAccessor collectionsAccessor(collection);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, cq.get(), &plannerParams);
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
@@ -218,7 +219,8 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
 
     // Get planner params.
     QueryPlannerParams plannerParams;
-    fillOutPlannerParams(test->opCtx(), collection, cq.get(), &plannerParams);
+    MultipleCollectionAccessor collectionsAccessor(collection);
+    fillOutPlannerParams(test->opCtx(), collectionsAccessor, cq.get(), &plannerParams);
 
     // For the remainder of this test, ensure that cache entries are available immediately, and
     // don't need go through an 'inactive' state before being usable.
@@ -305,7 +307,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
 
     // Get planner params.
     QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    MultipleCollectionAccessor collectionsAccessor(collection);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, cq.get(), &plannerParams);
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
@@ -363,7 +366,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
 
     // Get planner params.
     QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    MultipleCollectionAccessor collectionsAccessor(collection);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, cq.get(), &plannerParams);
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
@@ -537,7 +541,8 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     CollectionPtr collection = ctx.getCollection();
 
     QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
+    MultipleCollectionAccessor collectionsAccessor(collection);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, cq.get(), &plannerParams);
 
     WorkingSet ws;
     std::unique_ptr<SubplanStage> subplan(
@@ -574,7 +579,9 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
     addIndex(BSON("p2" << 1 << "opt1" << 1));
     addIndex(BSON("p2" << 1 << "opt2" << 1));
     QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), ctx.getCollection(), canonicalQuery.get(), &params);
+    auto coll = ctx.getCollection();
+    MultipleCollectionAccessor collectionsAccessor(coll);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, canonicalQuery.get(), &params);
 
     // Add some data so planning has to do some thinking.
     for (int i = 0; i < 100; ++i) {
@@ -586,7 +593,6 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    auto coll = ctx.getCollection();
     SubplanStage subplanStage(_expCtx.get(), &coll, &workingSet, params, canonicalQuery.get());
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(_expCtx->opCtx,
@@ -609,11 +615,12 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
     addIndex(BSON("p2" << 1 << "opt1" << 1));
     addIndex(BSON("p2" << 1 << "opt2" << 1));
     QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), ctx.getCollection(), canonicalQuery.get(), &params);
+    auto coll = ctx.getCollection();
+    MultipleCollectionAccessor collectionsAccessor(coll);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, canonicalQuery.get(), &params);
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    auto coll = ctx.getCollection();
     SubplanStage subplanStage(_expCtx.get(), &coll, &workingSet, params, canonicalQuery.get());
 
     AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(_expCtx->opCtx,
@@ -648,7 +655,8 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
     // the query.
     QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
+    MultipleCollectionAccessor collectionsAccessor(collection);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, canonicalQuery.get(), &params);
 
     // Create the SubplanStage.
     WorkingSet workingSet;
@@ -697,7 +705,8 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
     // the query.
     QueryPlannerParams params;
-    fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
+    MultipleCollectionAccessor collectionsAccessor(collection);
+    fillOutPlannerParams(opCtx(), collectionsAccessor, canonicalQuery.get(), &params);
 
     // Create the SubplanStage.
     WorkingSet workingSet;

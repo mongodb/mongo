@@ -138,7 +138,8 @@ public:
         AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
         QueryPlannerParams plannerParams;
-        fillOutPlannerParams(&_opCtx, collection.getCollection(), cq, &plannerParams);
+        MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
+        fillOutPlannerParams(&_opCtx, collectionsAccessor, cq, &plannerParams);
 
         // Plan.
         auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);

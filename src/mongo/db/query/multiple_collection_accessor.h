@@ -103,7 +103,7 @@ public:
     VariantCollectionPtrOrAcquisition getMainCollectionPtrOrAcquisition() const {
         return isAcquisition() ? VariantCollectionPtrOrAcquisition(*_mainAcq)
                                : VariantCollectionPtrOrAcquisition(_mainColl);
-    };
+    }
 
     const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
         if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
