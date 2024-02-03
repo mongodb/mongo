@@ -179,6 +179,7 @@ env.CppUnitTest(
         'unittest.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/auth/security_token_auth',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',

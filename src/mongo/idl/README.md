@@ -34,6 +34,7 @@
     - [Error Handling and Recovery](#error-handling-and-recovery)
     - [Testing](#testing)
     - [Extending IDL](#extending-idl)
+    - [Implementation Details](#implementation)
   - [Best Practices](#best-practices)
 
 Interface Definition Language (IDL) is a custom Domain Specific Language (DSL) originally designed
@@ -498,9 +499,10 @@ string:
     description: "A BSON UTF-8 string"
     cpp_type: "std::string"
     deserializer: "mongo::BSONElement::str"
+    is_view: false
 ```
 
-The four key things to note in this example:
+The five key things to note in this example:
 
 - `bson_serialization_type` - a list of types BSON generated code should check a type is before
   calling the deserializer. In this case, IDL generated code checks if the BSON type is `string`.
@@ -510,6 +512,11 @@ The four key things to note in this example:
   `BSONElement` as a parameter. The IDL generator has custom rules for `BSONElement`.
 - `serializer` - omitted in this example because `BSONObjBuilder` has builtin support for
   `std::string`
+- `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
+  possible that objects of the type will not own all of it's members. If the type is not a view,
+  then objects of the type are guaranteed to own all of it's members. This field is optional and
+  defaults to True. To reduce the size of the C++ representation of structs including this type,
+  you can specify this field as False if the type is not a view type.
 
 ### Custom Types
 
@@ -524,6 +531,7 @@ namespacestring:
     serializer: ::mongo::NamespaceStringUtil::serialize
     deserializer: ::mongo::NamespaceStringUtil::deserialize
     deserialize_with_tenant: true
+    is_view: false
 ```
 
 The key thing to note is this example specifies that both `deserializer` and `serializer`. They are
@@ -547,6 +555,7 @@ IDLAnyType:
     cpp_type: "mongo::IDLAnyType"
     serializer: mongo::IDLAnyType::serializeToBSON
     deserializer: mongo::IDLAnyType::parseFromBSON
+    is_view: true
 ```
 
 ### Type Reference
@@ -588,6 +597,9 @@ IDLAnyType:
 - `internal_only` - bool - undocumented, DO NOT USE
 - `default` - string - default value for a type. A field in a struct inherits this value if a field
   does not set a default. See struct's `default` rules for more information.
+- `is_view` - indicates whether the type is a view or not. If the type is a view, then it's
+  possible that objects of the type will not own all of it's members. If the type is not a view,
+  then objects of the type are guaranteed to own all of it's members.
 
 ## Structs
 
@@ -974,6 +986,23 @@ the top of the file.
 
 When extending IDL, add tests to the python unit tests and C++ unit tests. With few exceptions, the
 unit tests exercise all features and combinations IDL can handle.
+
+### Implementaion Details
+
+#### BSONObj Anchor
+
+The parsing method a struct is initialized with indicates what type of ownership the constructed
+object has on the `BSONObj` parameter. An internal `BSONObj` anchor ensures that the lifetime of
+the `BSONObj` matches the lifetime of the object in the cases that the `BSONObj` parameter is
+owned or shared.
+
+#### View Types
+
+If the struct is a view, then it's possible that objects of the type will not own all of it's
+members. If the struct is not a view, then objects of the type are guaranteed to own all of it's
+members. This is determined by recursively checking the fields of a struct. This info is used
+during generation to determine whether or not a struct will need a `BSONObj` anchor.
+
 
 ## Best Practices
 

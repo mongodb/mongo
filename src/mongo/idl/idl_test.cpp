@@ -63,6 +63,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/auth/access_checks_gen.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_contract.h"
@@ -71,7 +72,9 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/write_concern_options_gen.h"
@@ -4955,6 +4958,169 @@ TEST(IDLOwnershipTests, ParseSharingOwnershipTmpIDLStruct) {
     // Now that idlStruct is out of scope, if bson didn't particpate in ownership, it would be
     // accessing free'd memory which should error on ASAN and debug builds.
     ASSERT_BSONOBJ_EQ(bson["value"].Obj(), BSON("x" << 42));
+}
+
+TEST(IDLOwnershipTests, ChainedParseSharingOwnershipTmpBSON) {
+    IDLParserContext ctxt("root");
+
+    ViewStructChainedStruct view_struct_chained_struct;
+    {
+        auto tmp = BSON("view_type" << BSON("a"
+                                            << "b"));
+        view_struct_chained_struct = ViewStructChainedStruct::parseSharingOwnership(ctxt, tmp);
+    }
+    // Now that tmp is out of scope, if idlStruct didn't particpate in ownership, it would be
+    // accessing free'd memory which should error on ASAN and debug builds.
+    ASSERT_BSONOBJ_EQ(view_struct_chained_struct.getView_type(),
+                      BSON("a"
+                           << "b"));
+
+    ViewStructChainedType view_struct_chained_type;
+    {
+        auto tmp = BSON("view_type" << BSON("a"
+                                            << "b"));
+        view_struct_chained_type = ViewStructChainedType::parseSharingOwnership(ctxt, tmp);
+    }
+    ASSERT_BSONOBJ_EQ(view_struct_chained_type.getViewChainedType().getView_type(),
+                      BSON("view_type" << BSON("a"
+                                               << "b")));
+
+    ViewStructWithViewStructMember view_struct_member;
+    {
+        auto tmp = BSON("view_struct" << BSON("view_type" << BSON("a"
+                                                                  << "b")));
+        view_struct_member = ViewStructWithViewStructMember::parseSharingOwnership(ctxt, tmp);
+    }
+    ASSERT_BSONOBJ_EQ(view_struct_member.getView_struct().getView_type(),
+                      BSON("a"
+                           << "b"));
+}
+
+/**
+ * Tests that a non view struct (which has only non view type members) will own the data of all
+ * of its members. The IDL types tested are the types defined in `basic_types.idl`.
+ */
+TEST(IDLOwnershipTests, NonViewStructParseAssumesOwnership) {
+    IDLParserContext ctxt("root");
+    NonViewStruct idlStruct;
+    BSONObj ownedBSON = BSON("a"
+                             << "b");
+    ASSERT_TRUE(ownedBSON.isOwned());
+    BSONObj ownedElementBSON = BSON("field34"
+                                    << "a");
+    BSONElement ownedElement = ownedElementBSON.getField("field34");
+    ASSERT_TRUE(ownedElementBSON.isOwned());
+    {
+        uint8_t testArray[] = {1, 2, 3};
+        UUID testUUID = UUID::gen();
+        BSONBinData testUUIDBin =
+            BSONBinData(testUUID.toCDR().data(), testUUID.toCDR().length(), newUUID);
+        BSONBinData testArrayBinGen = BSONBinData(testArray, 3, BinDataGeneral);
+        BSONBinData testArrayBinFun = BSONBinData(testArray, 3, Function);
+        BSONBinData testArrayBinUUID =
+            BSONBinData(testUUID.toCDR().data(), testUUID.toCDR().length(), newUUID);
+        BSONBinData testArrayBinEnc = BSONBinData(testArray, 3, Encrypt);
+        BSONBinData testArrayBinSen = BSONBinData(testArray, 3, Sensitive);
+        uint8_t testData[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        BSONBinData testDataBin = BSONBinData(testData, 16, MD5Type);
+        OID testOID = OID::gen();
+        Timestamp testTimestamp = Timestamp::max();
+        Date_t testDate = Date_t::now();
+        BSONObj testLogicalTimeBSON = LogicalTime(testTimestamp).toBSON();
+        DatabaseName testDatabaseName = DatabaseName::createDatabaseName_forTest({}, "test");
+        std::string testNamespaceString = NamespaceString(testDatabaseName).toString_forTest();
+        std::string testConnectionString = ConnectionString::forLocal().toString();
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+        StringData testFCVstring = multiversion::toString(multiversion::GenericFCV::kLastLTS);
+        TenantId testTenantId = TenantId(testOID);
+        std::string testTenantIdStr = testTenantId.toString();
+        std::string testDatabaseNameStr = testDatabaseName.toString_forTest();
+        BSONObjBuilder bob;
+        bob.append("field1", "1");
+        bob.append("field2", 2);
+        bob.append("field3", 3);
+        bob.append("field4", 4);
+        bob.append("field5", 5);
+        bob.append("field6", 6.0);
+        bob.append("field7", 7LL);
+        bob.append("field8", 8.0);
+        bob.append("field9", true);
+        bob.append("field10", true);
+        bob.append("field11", true);
+        bob.append("field12", testArrayBinGen);
+        bob.append("field13", testArrayBinFun);
+        bob.append("field14", testArrayBinUUID);
+        bob.append("field15", testArrayBinEnc);
+        bob.append("field16", testArrayBinSen);
+        bob.append("field17", testUUIDBin);
+        bob.append("field18", testDataBin);
+        bob.append("field19", testOID);
+        bob.append("field20", ownedBSON);
+        bob.append("field21", testDate);
+        bob.append("field22", 22);
+        bob.append("field23", 23);
+        bob.append("field24", 25);
+        bob.append("field25", 26);
+        bob.append("field26", testLogicalTimeBSON);
+        bob.append("field27", testLogicalTimeBSON);
+        bob.append("field28", testTimestamp);
+        bob.append("field29", testNamespaceString);
+        bob.append("field30", "abcd");
+        bob.append("field31", "abcd");
+        bob.append("field32", testConnectionString);
+        bob.append("field33", testFCVstring);
+        bob.append(ownedElement);
+        bob.append("field35", testOID);
+        bob.append("field36", testTenantIdStr);
+        bob.append("field37", testDatabaseNameStr);
+        auto tmp = bob.obj();
+        // We want to test that idlStruct is internally a non view type, and that the struct
+        // inherently owns all its members.
+        idlStruct = NonViewStruct::parse(ctxt, std::move(tmp));
+    }
+
+    // Now that tmp is out of scope, if idlStruct is a view type, it would be accessing
+    // free'd memory which should error on ASAN and debug builds.
+    idlStruct.getField1();
+    idlStruct.getField2();
+    idlStruct.getField3();
+    idlStruct.getField4();
+    idlStruct.getField5();
+    idlStruct.getField6();
+    idlStruct.getField7();
+    idlStruct.getField8();
+    idlStruct.getField9();
+    idlStruct.getField10();
+    idlStruct.getField11();
+    idlStruct.getField12();
+    idlStruct.getField13();
+    idlStruct.getField14();
+    idlStruct.getField15();
+    idlStruct.getField16();
+    idlStruct.getField17();
+    idlStruct.getField18();
+    idlStruct.getField19();
+    idlStruct.getField20();
+    idlStruct.getField21();
+    idlStruct.getField22();
+    idlStruct.getField23();
+    idlStruct.getField24();
+    idlStruct.getField25();
+    idlStruct.getField26();
+    idlStruct.getField27();
+    idlStruct.getField28();
+    idlStruct.getField29();
+    idlStruct.getField30();
+    idlStruct.getField31();
+    idlStruct.getField32();
+    idlStruct.getField33();
+    idlStruct.getField34();
+    idlStruct.getField35();
+    idlStruct.getField36();
+    idlStruct.getField37();
+    ASSERT_BSONOBJ_EQ(idlStruct.getField20(),
+                      BSON("a"
+                           << "b"));
 }
 
 

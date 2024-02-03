@@ -129,8 +129,8 @@ class IDLTestcase(unittest.TestCase):
 
         return bound_doc.spec
 
-    def assert_bind_fail(self, doc_str, error_id, resolver=NothingImportResolver()):
-        # type: (str, str, idl.parser.ImportResolverBase) -> None
+    def assert_bind_fail(self, doc_str, error_id, multiple=False, resolver=NothingImportResolver()):
+        # type: (str, str, bool, idl.parser.ImportResolverBase) -> None
         """
         Assert a document parsed correctly by the YAML parser and IDL parser, but not bound by the IDL binder.
 
@@ -145,8 +145,9 @@ class IDLTestcase(unittest.TestCase):
         self.assertIsNotNone(bound_doc.errors, "Expected binder errors")
 
         # Assert that negative test cases are only testing one fault in a test.
+        # This is impossible to assert for all tests though.
         self.assertTrue(
-            bound_doc.errors.count() == 1,
+            (multiple and bound_doc.errors.count() >= 1) or bound_doc.errors.count() == 1,
             "For document:\n%s\nExpected only error message '%s' but received multiple errors:\n\n%s"
             % (doc_str, error_id, errors_to_str(bound_doc.errors)))
 

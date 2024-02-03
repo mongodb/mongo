@@ -149,6 +149,11 @@ class Struct(common.SourceLocation):
         # pylint: disable=invalid-name
         self.unsafe_dangerous_disable_extra_field_duplicate_checks = None  # type: bool
 
+        # Indicates if the struct is a view type or not. If a struct is a view type, then the
+        # struct may not own all of it's members. If a struct is not a view type, then the struct
+        # owns all of it's members.
+        self.is_view = True  # type: Optional[bool]
+
         super(Struct, self).__init__(file_name, line, column)
 
 

@@ -789,7 +789,7 @@ class TestBinder(testcase.IDLTestcase):
                             - string
                             - int
                             - not_defined
-            """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+            """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
 
         # Enums are banned in variants for now.
         self.assert_bind_fail(
@@ -803,7 +803,7 @@ class TestBinder(testcase.IDLTestcase):
                             variant:
                             - string
                             - foo_enum
-            """), idl.errors.ERROR_ID_NO_VARIANT_ENUM)
+            """), idl.errors.ERROR_ID_NO_VARIANT_ENUM, True)
 
         self.assert_bind_fail(
             test_preamble + textwrap.dedent("""
@@ -877,7 +877,7 @@ class TestBinder(testcase.IDLTestcase):
                             - one_string
                             - one_string
                             - int
-            """), idl.errors.ERROR_ID_VARIANT_STRUCTS)
+            """), idl.errors.ERROR_ID_VARIANT_STRUCTS, True)
 
         # For multiple BSON serialization type Objects they must have different field names
         # for their first field.
@@ -899,7 +899,7 @@ class TestBinder(testcase.IDLTestcase):
                             - one_string
                             - one_int
                             - int
-            """), idl.errors.ERROR_ID_VARIANT_STRUCTS)
+            """), idl.errors.ERROR_ID_VARIANT_STRUCTS, True)
 
         # At most one type can have BSON serialization type NumberInt.
         self.assert_bind_fail(
@@ -1080,7 +1080,7 @@ class TestBinder(testcase.IDLTestcase):
                     strict: true
                     fields:
                         foo: array<array<string>>
-            """), idl.errors.ERROR_ID_BAD_ARRAY_TYPE_NAME)
+            """), idl.errors.ERROR_ID_BAD_ARRAY_TYPE_NAME, True)
 
         # Test inherited default with array
         self.assert_bind_fail(
@@ -1284,7 +1284,7 @@ class TestBinder(testcase.IDLTestcase):
                     foobar1: alias
                 fields:
                     foo1: string
-        """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+        """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
 
         # A regular field as a chained type
         self.assert_bind_fail(
@@ -1296,7 +1296,7 @@ class TestBinder(testcase.IDLTestcase):
                 fields:
                     foo1: string
                     foo2: foobar1
-        """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+        """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
 
         # Array of chained types
         self.assert_bind_fail(
@@ -1469,7 +1469,7 @@ class TestBinder(testcase.IDLTestcase):
                 strict: true
                 chained_structs:
                     foobar1: alias
-        """)), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+        """)), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
 
         # Type as chained struct
         self.assert_bind_fail(
@@ -1701,7 +1701,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 fields:
                     foo1: array<foo>
-            """), idl.errors.ERROR_ID_NO_ARRAY_ENUM)
+            """), idl.errors.ERROR_ID_NO_ARRAY_ENUM, True)
 
     def test_command_positive(self):
         # type: () -> None
@@ -1977,7 +1977,7 @@ class TestBinder(testcase.IDLTestcase):
                 type: int
                 fields:
                     field1: string
-            """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+            """), idl.errors.ERROR_ID_UNKNOWN_TYPE, True)
 
     def test_server_parameter_positive(self):
         # type: () -> None

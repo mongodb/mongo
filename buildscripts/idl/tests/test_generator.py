@@ -107,6 +107,7 @@ class TestGenerator(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
 
         enums:
 
@@ -149,6 +150,7 @@ class TestGenerator(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
 
                 Pokemon:
                   description: "Yet another custom type"
@@ -156,6 +158,7 @@ class TestGenerator(testcase.IDLTestcase):
                   bson_serialization_type: any
                   serializer: ::pokemon::pokedex::record
                   deserializer: ::pokemon::pokedex::lookup
+                  is_view: false
 
         structs:
                 Pokedex:
@@ -188,6 +191,7 @@ class TestGenerator(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
 
                 Pokemon:
                   description: "Yet another custom type"
@@ -195,6 +199,7 @@ class TestGenerator(testcase.IDLTestcase):
                   bson_serialization_type: any
                   serializer: record
                   deserializer: lookup
+                  is_view: false
 
         structs:
                 Pokedex:
@@ -227,6 +232,7 @@ class TestGenerator(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
 
                 object_type_with_custom_serializer:
                     bson_serialization_type: object
@@ -234,6 +240,7 @@ class TestGenerator(testcase.IDLTestcase):
                     cpp_type: ObjWithCustomSerializer
                     serializer: ObjWithCustomSerializer::toBSON
                     deserializer: ObjWithCustomSerializer::parse
+                    is_view: false
 
         structs:
                 QueryShapeSpec:
@@ -269,6 +276,7 @@ class TestGenerator(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
 
                 object_type_with_custom_serializer:
                     bson_serialization_type: object
@@ -276,6 +284,7 @@ class TestGenerator(testcase.IDLTestcase):
                     cpp_type: ObjWithCustomSerializer
                     serializer: ObjWithCustomSerializer::toBSON
                     deserializer: ObjWithCustomSerializer::parse
+                    is_view: false
 
         structs:
                 QueryShapeSpec:
@@ -303,6 +312,198 @@ class TestGenerator(testcase.IDLTestcase):
 
         }""")
         self.assertIn(expected, source)
+
+    view_test_common_types = dedent("""
+        types:
+                serialization_context:
+                    bson_serialization_type: any
+                    description: foo
+                    cpp_type: foo
+                    internal_only: true
+                    is_view: false
+
+                object_is_view:
+                    bson_serialization_type: object
+                    description: ObjIsView
+                    cpp_type: ObjIsView
+                    serializer: ObjIsView::toBSON
+                    deserializer: ObjIsView::parse
+                    is_view: true
+                
+                object_is_not_view:
+                    bson_serialization_type: object
+                    description: ObjIsView
+                    cpp_type: ObjIsView
+                    serializer: ObjIsView::toBSON
+                    deserializer: ObjIsView::parse
+                    is_view: false
+                
+                random_type_not_view:
+                    bson_serialization_type: any
+                    description: RandomType
+                    cpp_type: RandomType
+                    serializer: RandomType::toBSON
+                    deserializer: RandomType::parse
+                    is_view: false
+                
+                tenant_id:
+                    bson_serialization_type: any
+                    description: "A struct representing a tenant id"
+                    cpp_type: "TenantId"
+                    deserializer: "mongo::TenantId::parseFromBSON"
+                    serializer: "mongo::TenantId::serializeToBSON"
+                    is_view: false
+
+                database_name:
+                    bson_serialization_type: string
+                    description: "A MongoDB DatabaseName"
+                    cpp_type: "mongo::DatabaseName"
+                    serializer: "::mongo::DatabaseNameUtil::serialize"
+                    deserializer: "::mongo::DatabaseNameUtil::deserialize"
+                    deserialize_with_tenant: true
+                    is_view: false
+                
+                bool:
+                    bson_serialization_type: bool
+                    description: "A BSON bool"
+                    cpp_type: "bool"
+                    deserializer: "mongo::BSONElement::boolean"
+                    is_view: false
+    """)
+
+    def test_view_struct_generates_anchor(self) -> None:
+        """Test anchor generation on view struct."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        structs:
+                ViewStruct:
+                    description: ViewStruct
+                    fields:
+                        value1: object_is_view
+                        value2: random_type_not_view
+                        value3: random_type_not_view
+                        value4: random_type_not_view
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertIn(expected, header)
+
+    def test_non_view_struct_does_not_generate_anchor(self) -> None:
+        """Test anchor is not generated on non view struct."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        structs:
+                NonViewStruct:
+                    description: NonViewStruct
+                    fields:
+                        value1: object_is_not_view
+                        value2: random_type_not_view
+                        value3: random_type_not_view
+                        value4: random_type_not_view
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertNotIn(expected, header)
+
+    def test_compound_view_struct_generates_anchor(self) -> None:
+        """Test anchor generation on view struct with compound type."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        structs:
+                ViewStruct:
+                    description: ViewStruct
+                    fields:
+                        value1: array<object_is_view>
+                        value2: random_type_not_view
+                        value3: random_type_not_view
+                        value4: random_type_not_view
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertIn(expected, header)
+
+    def test_compound_non_view_struct_does_not_generate_anchor(self) -> None:
+        """Test anchor is not generated on non view struct with compound type."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        structs:
+                NonViewStruct:
+                    description: NonViewStruct
+                    fields:
+                        value1: array<object_is_not_view>
+                        value2: random_type_not_view
+                        value3: random_type_not_view
+                        value4: random_type_not_view
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertNotIn(expected, header)
+
+    def test_command_view_type_generates_anchor(self) -> None:
+        """Test anchor generation on command with view parameter."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        commands:
+                CommandTypeArrayObjectCommand:
+                    description: CommandTypeArrayObjectCommand
+                    command_name: CommandTypeArrayObjectCommand
+                    namespace: type
+                    api_version: ""
+                    type: array<object_is_view>
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertIn(expected, header)
+
+    def test_command_non_view_type_does_not_generate_anchor(self) -> None:
+        """Test anchor is not generated on command with nont view parameter."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        commands:
+                CommandTypeArrayObjectCommand:
+                    description: CommandTypeArrayObjectCommand
+                    command_name: CommandTypeArrayObjectCommand
+                    namespace: type
+                    api_version: ""
+                    type: array<object_is_not_view>
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertNotIn(expected, header)
+
+    def test_chained_view_struct_generates_anchor(self) -> None:
+        """Test anchor generation on struct chained with view struct."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        structs:
+                ViewStruct:
+                    description: ViewStruct
+                    fields:
+                        value1: array<object_is_view>
+                        value2: random_type_not_view
+                        value3: random_type_not_view
+                        value4: random_type_not_view
+                ViewStructChainedStruct:
+                    description: ViewStructChainedStruct
+                    chained_structs:
+                        ViewStruct: ViewStruct
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertIn(expected, header)
+
+    def test_chained_non_view_struct_does_not_generate_anchor(self) -> None:
+        """Test anchor not generated on struct chained with non view struct."""
+        header, _ = self.assert_generate(self.view_test_common_types + dedent("""
+        structs:
+                NonViewStruct:
+                    description: NonViewStruct
+                    fields:
+                        value1: array<object_is_not_view>
+                        value2: random_type_not_view
+                        value3: random_type_not_view
+                        value4: random_type_not_view
+                NonViewStructChainedStruct:
+                    description: NonViewStructChainedStruct
+                    chained_structs:
+                        NonViewStruct: NonViewStruct
+        """))
+
+        expected = dedent("BSONObj _anchorObj;")
+        self.assertNotIn(expected, header)
 
 
 if __name__ == '__main__':

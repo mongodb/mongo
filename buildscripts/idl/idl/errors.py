@@ -284,6 +284,18 @@ class ParserContext(object):
         self._add_error(location, ERROR_ID_UNKNOWN_TYPE,
                         "'%s' is an unknown type for field '%s'" % (type_name, field_name))
 
+    def add_unknown_command_type_error(self, location, struct_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about an unknown command type."""
+        self._add_error(location, ERROR_ID_UNKNOWN_TYPE,
+                        "'%s' is an unknown command type." % (struct_name))
+
+    def add_unknown_symbol_error(self, location, symbol_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about an unknown symbol."""
+        self._add_error(location, ERROR_ID_UNKNOWN_TYPE,
+                        "'%s' is an unknown symbol" % (symbol_name))
+
     def _is_node_type(self, node, node_name, expected_node_type):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], str, str) -> bool
         """Return True if the yaml node type is expected, otherwise returns False and logs an error."""

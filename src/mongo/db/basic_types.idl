@@ -30,6 +30,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
+        - "mongo/client/connection_string.h"
         - "mongo/db/basic_types.h"
         - "mongo/db/logical_time.h"
         - "mongo/db/namespace_string.h"
@@ -46,12 +47,14 @@ types:
         description: "A BSON UTF-8 string"
         cpp_type: "std::string"
         deserializer: "mongo::BSONElement::str"
+        is_view: false
 
     int:
         bson_serialization_type: int
         description: "A BSON 32-bit integer"
         cpp_type: "std::int32_t"
         deserializer: "mongo::BSONElement::_numberInt"
+        is_view: false
 
     safeInt:
         bson_serialization_type:
@@ -62,6 +65,7 @@ types:
         description: "Accepts any numerical type within integer range"
         cpp_type: "std::int32_t"
         deserializer: "mongo::BSONElement::safeNumberInt"
+        is_view: false
 
     safeInt64:
         bson_serialization_type:
@@ -72,6 +76,7 @@ types:
         description: "Accepts any numerical type within int64 range"
         cpp_type: std::int64_t
         deserializer: "mongo::BSONElement::safeNumberLong"
+        is_view: false
 
     exactInt64:
         bson_serialization_type:
@@ -82,6 +87,7 @@ types:
         description: "Accepts any number that can be exactly converted to an int64"
         cpp_type: std::int64_t
         deserializer: "mongo::BSONElement::exactNumberLong"
+        is_view: false
 
     safeDouble:
         bson_serialization_type:
@@ -92,24 +98,28 @@ types:
         description: "Accepts any numerical type within double range"
         cpp_type: double
         deserializer: "mongo::BSONElement::safeNumberDouble"
+        is_view: false
 
     long:
         bson_serialization_type: long
         description: "A BSON 64-bit integer"
         cpp_type: "std::int64_t"
         deserializer: "mongo::BSONElement::_numberLong"
+        is_view: false
 
     double:
         bson_serialization_type: double
         description: "A BSON 64-bit floating point number"
         cpp_type: "double"
         deserializer: "mongo::BSONElement::_numberDouble"
+        is_view: false
 
     bool:
         bson_serialization_type: bool
         description: "A BSON bool"
         cpp_type: "bool"
         deserializer: "mongo::BSONElement::boolean"
+        is_view: false
 
     safeBool:
         bson_serialization_type:
@@ -122,6 +132,7 @@ types:
                       true/false value"
         cpp_type: bool
         deserializer: "mongo::BSONElement::trueValue"
+        is_view: false
 
     optionalBool:
         bson_serialization_type: any
@@ -133,6 +144,7 @@ types:
         default: "mongo::OptionalBool()"
         deserializer: "mongo::OptionalBool::parseFromBSON"
         serializer: "mongo::OptionalBool::serializeToBSON"
+        is_view: false
 
     bindata_generic:
         bson_serialization_type: bindata
@@ -140,6 +152,7 @@ types:
         description: "A BSON bindata of generic sub type"
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
+        is_view: false
 
     bindata_function:
         bson_serialization_type: bindata
@@ -147,6 +160,7 @@ types:
         description: "A BSON bindata of function sub type"
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
+        is_view: false
 
     bindata_uuid:
         bson_serialization_type: bindata
@@ -154,6 +168,7 @@ types:
         description: "A BSON bindata of uuid sub type"
         cpp_type: "std::array<std::uint8_t, 16>"
         deserializer: "mongo::BSONElement::uuid"
+        is_view: false
 
     bindata_encrypt:
         bson_serialization_type: bindata
@@ -161,6 +176,7 @@ types:
         description: "A BSON bindata of encrypt sub type"
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
+        is_view: false
 
     bindata_sensitive:
         bson_serialization_type: bindata
@@ -168,6 +184,7 @@ types:
         description: "A BSON bindata of sensitive sub type"
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
+        is_view: false
 
     uuid:
         bson_serialization_type: bindata
@@ -176,6 +193,7 @@ types:
         cpp_type: "mongo::UUID"
         deserializer: "UUID"
         serializer: "mongo::UUID::toCDR"
+        is_view: false
 
     bindata_md5:
         bson_serialization_type: bindata
@@ -183,40 +201,47 @@ types:
         description: "A BSON bindata of uuid sub type"
         cpp_type: "std::array<std::uint8_t, 16>"
         deserializer: "mongo::BSONElement::md5"
+        is_view: false
 
     objectid:
         bson_serialization_type: objectid
         description: "A BSON ObjectID"
         cpp_type: "mongo::OID"
         deserializer: "mongo::BSONElement::OID"
+        is_view: false
 
     object:
         bson_serialization_type: object
         description: "An unowned BSONObj without custom deserialization or serialization"
         cpp_type: "mongo::BSONObj"
+        is_view: true
 
     object_owned:
         bson_serialization_type: object
         description: "An owned BSONObj"
         cpp_type: "mongo::BSONObj"
         deserializer: "BSONObj::getOwned"
+        is_view: false
 
     array:
         bson_serialization_type: array
         description: "An unowned BSONArray without custom deserialization or seialization"
         cpp_type: "mongo::BSONArray"
+        is_view: true
 
     array_owned:
         bson_serialization_type: array
         description: "An owned BSONArray"
         cpp_type: "mongo::BSONArray"
         deserializer: "BSONObj::getOwned"
+        is_view: false
 
     date:
         bson_serialization_type: date
         description: "A BSON UTC DateTime"
         cpp_type: "mongo::Date_t"
         deserializer: "mongo::BSONElement::date"
+        is_view: false
 
     millisEpoch:
         bson_serialization_type: any
@@ -224,6 +249,7 @@ types:
         cpp_type: "mongo::Date_t"
         deserializer: "mongo::parseDateFromDurationSinceEpoch<Milliseconds>"
         serializer: "::mongo::serializeDateToDurationSinceEpoch<Milliseconds>"
+        is_view: false
 
     unixEpoch:
         bson_serialization_type: any
@@ -231,6 +257,7 @@ types:
         cpp_type: "mongo::Date_t"
         deserializer: "mongo::parseDateFromDurationSinceEpoch<Seconds>"
         serializer: "::mongo::serializeDateToDurationSinceEpoch<Seconds>"
+        is_view: false
 
     milliseconds:
         bson_serialization_type: any
@@ -238,6 +265,7 @@ types:
         cpp_type: "mongo::Milliseconds"
         deserializer: "mongo::parseDurationFromCount<Milliseconds>"
         serializer: "::mongo::serializeDurationToCount<Milliseconds>"
+        is_view: false
 
     seconds:
         bson_serialization_type: any
@@ -245,6 +273,7 @@ types:
         cpp_type: "mongo::Seconds"
         deserializer: "mongo::parseDurationFromCount<Seconds>"
         serializer: "::mongo::serializeDurationToCount<Seconds>"
+        is_view: false
 
     logicalTime:
         bson_serialization_type: any
@@ -252,12 +281,14 @@ types:
         cpp_type: LogicalTime
         serializer: LogicalTime::serializeToBSON
         deserializer: LogicalTime::parseFromBSON
+        is_view: false
 
     timestamp:
         bson_serialization_type: timestamp
         description: "A BSON TimeStamp"
         cpp_type: "mongo::Timestamp"
         deserializer: "mongo::BSONElement::timestamp"
+        is_view: false
 
     namespacestring:
         bson_serialization_type: string
@@ -266,6 +297,7 @@ types:
         serializer: ::mongo::NamespaceStringUtil::serialize
         deserializer: mongo::NamespaceStringUtil::deserialize
         deserialize_with_tenant: true
+        is_view: false
 
     base64string:
         bson_serialization_type: string
@@ -273,6 +305,7 @@ types:
         cpp_type: "std::string"
         serializer: "::mongo::base64::encode"
         deserializer: "mongo::base64::decode"
+        is_view: false
 
     base64urlstring:
         bson_serialization_type: string
@@ -280,6 +313,7 @@ types:
         cpp_type: "std::string"
         serializer: "::mongo::base64url::encode"
         deserializer: "mongo::base64url::decode"
+        is_view: false
 
     connection_string:
         bson_serialization_type: string
@@ -287,6 +321,7 @@ types:
         cpp_type: "mongo::ConnectionString"
         serializer: mongo::ConnectionString::toString
         deserializer: mongo::ConnectionString::deserialize
+        is_view: false
 
     fcv_string:
         bson_serialization_type: string
@@ -296,6 +331,7 @@ types:
         cpp_type: "multiversion::FeatureCompatibilityVersion"
         serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersion"
         deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"
+        is_view: false
 
     IDLAnyType:
         bson_serialization_type: any
@@ -303,6 +339,7 @@ types:
         cpp_type: "mongo::IDLAnyType"
         serializer: mongo::IDLAnyType::serializeToBSON
         deserializer: mongo::IDLAnyType::parseFromBSON
+        is_view: true
 
     IDLAnyTypeOwned:
         bson_serialization_type: any
@@ -311,6 +348,7 @@ types:
         cpp_type: "mongo::IDLAnyTypeOwned"
         serializer: mongo::IDLAnyTypeOwned::serializeToBSON
         deserializer: mongo::IDLAnyTypeOwned::parseFromBSON
+        is_view: false
 
     tenant_id:
         bson_serialization_type: any
@@ -318,6 +356,8 @@ types:
         cpp_type: "TenantId"
         deserializer: "mongo::TenantId::parseFromBSON"
         serializer: "mongo::TenantId::serializeToBSON"
+        # TenantId has only non view members.
+        is_view: false
 
     tenant_id_hex:
         bson_serialization_type: string
@@ -325,6 +365,7 @@ types:
         cpp_type: "TenantId"
         deserializer: "mongo::TenantId::parseFromString"
         serializer: "mongo::TenantId::toString"
+        is_view: false
 
     database_name:
         bson_serialization_type: string
@@ -333,6 +374,7 @@ types:
         serializer: "::mongo::DatabaseNameUtil::serialize"
         deserializer: "::mongo::DatabaseNameUtil::deserialize"
         deserialize_with_tenant: true
+        is_view: false
 
     # internal_only is used here because this type is not part of the input or output (ie. not to
     # be serialized/deserialized), and is only used internally by the class structures
@@ -341,6 +383,7 @@ types:
         description: "modifies serializer/deserializer behavior based on caller context"
         cpp_type: "SerializationContext"
         internal_only: true
+        is_view: false
 
 enums:
     CollationCaseFirst:

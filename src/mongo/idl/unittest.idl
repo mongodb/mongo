@@ -55,6 +55,7 @@ types:
         cpp_type: "mongo::BinDataCustomType"
         serializer: mongo::BinDataCustomType::serializeToBSON
         deserializer: mongo::BinDataCustomType::parseFromBSON
+        is_view: false
 
 ##################################################################################################
 #
@@ -68,6 +69,7 @@ types:
         cpp_type: "mongo::AnyBasicType"
         serializer: mongo::AnyBasicType::serializeToBSON
         deserializer: mongo::AnyBasicType::parseFromBSON
+        is_view: true
 
 ##################################################################################################
 #
@@ -81,6 +83,7 @@ types:
         cpp_type: "mongo::ObjectBasicType"
         serializer: mongo::ObjectBasicType::serializeToBSON
         deserializer: mongo::ObjectBasicType::parseFromBSON
+        is_view: true
 
 ##################################################################################################
 #
@@ -94,6 +97,7 @@ types:
         cpp_type: "mongo::ChainedType"
         serializer: mongo::ChainedType::serializeToBSON
         deserializer: mongo::ChainedType::parseFromBSON
+        is_view: false
 
     AnotherChainedType:
         bson_serialization_type: chain
@@ -101,6 +105,15 @@ types:
         cpp_type: "mongo::AnotherChainedType"
         serializer: mongo::AnotherChainedType::serializeToBSON
         deserializer: mongo::AnotherChainedType::parseFromBSON
+        is_view: false
+
+    ViewChainedType:
+        bson_serialization_type: chain
+        description: "Chain Type that is a view to test chaining"
+        cpp_type: "mongo::ViewChainedType"
+        serializer: mongo::ViewChainedType::serializeToBSON
+        deserializer: mongo::ViewChainedType::parseFromBSON
+        is_view: true
 
 
 ##################################################################################################
@@ -204,6 +217,90 @@ structs:
             field1: int
             field2: int
 
+
+##################################################################################################
+#
+# Struct to test non view basic types
+#
+##################################################################################################
+
+    NonViewStruct:
+        description: UnitTest for parsing non view types
+        fields:
+            field1: string
+            field2: int
+            field3: safeInt
+            field4: safeInt64
+            field5: exactInt64
+            field6: safeDouble
+            field7: long
+            field8: double
+            field9: bool
+            field10: safeBool
+            field11: optionalBool
+            field12: bindata_generic
+            field13: bindata_function
+            field14: bindata_uuid
+            field15: bindata_encrypt
+            field16: bindata_sensitive
+            field17: uuid
+            field18: bindata_md5
+            field19: objectid
+            field20: object_owned
+            field21: date
+            field22: millisEpoch
+            field23: unixEpoch
+            field24: milliseconds
+            field25: seconds
+            field26: logicalTime
+            field27: logicalTime
+            field28: timestamp
+            field29: namespacestring
+            field30: base64string
+            field31: base64urlstring
+            field32: connection_string
+            field33: fcv_string
+            field34: IDLAnyTypeOwned
+            field35:
+                type: tenant_id
+                optional: true
+            field36:
+                type: tenant_id_hex
+                optional: true
+            field37: database_name
+
+##################################################################################################
+#
+# Struct to test as a view type
+#
+##################################################################################################
+
+    ViewStruct:
+        description: Struct that is a view.
+        fields:
+            view_type: object
+
+##################################################################################################
+#
+# Structs to test chained view types
+#
+##################################################################################################
+
+    ViewStructChainedStruct:
+        description: Struct that is chained with a view struct.
+        chained_structs:
+            ViewStruct: ViewStruct
+    
+    ViewStructChainedType:
+        description: Struct that is chained with a view type.
+        strict: false
+        chained_types:
+            ViewChainedType: ViewChainedType
+    
+    ViewStructWithViewStructMember:
+        description: Struct that has a type that is a view and a struct.
+        fields:
+            view_struct: ViewStruct
 
 ##################################################################################################
 #

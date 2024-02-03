@@ -593,34 +593,49 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-    def gen_ownership_getter(self):
-        # type: () -> None
+    def gen_ownership_getter(self, struct):
+        # type: (ast.Struct) -> None
         """Generate a getter that returns true if this IDL object owns its underlying data."""
-        self.gen_description_comment(
-            textwrap.dedent("""\
-        An IDL struct can either provide a view onto some underlying BSON data, or it can
-        participate in owning that data. This function returns true if the struct participates in
-        owning the underlying data.
+        if struct.is_view:
+            self.gen_description_comment(
+                textwrap.dedent("""\
+            *An IDL struct can either provide a view onto some underlying BSON data, or it can
+            participate in owning that data. This function returns true if the struct participates in
+            owning the underlying data.
 
-        Note that the underlying data is not synchronized with the IDL struct over its lifetime; to
-        generate a BSON representation of an IDL struct, use its `serialize` member functions.
-        Participating in ownership of the underlying data merely allows the struct to ensure that
-        struct members that are pointers-into-BSON (i.e. BSONElement and BSONObject) are valid for
-        the lifetime of the struct itself."""))
-        self._writer.write_line("bool isOwned() const { return _anchorObj.isOwned(); }")
+            Note that the underlying data is not synchronized with the IDL struct over its lifetime; to
+            generate a BSON representation of an IDL struct, use its `serialize` member functions.
+            Participating in ownership of the underlying data merely allows the struct to ensure that
+            struct members that are pointers-into-BSON (i.e. BSONElement and BSONObject) are valid for
+            the lifetime of the struct itself."""))
+            self._writer.write_line("bool isOwned() const { return _anchorObj.isOwned(); }")
+        else:
+            self.gen_description_comment(
+                textwrap.dedent("""\
+            This function will return true every time because there is no underlying BSONObj anchor.
+            The object owns the data of all of its members."""))
+            self._writer.write_line("bool isOwner() const { return true; }")
 
-    def gen_protected_ownership_setters(self):
-        # type: () -> None
+    def gen_protected_ownership_setters(self, struct):
+        # type: (ast.Struct) -> None
         """Generate a setter that can be used to allow this IDL struct to particpate in the ownership of some BSON that the struct's members refer to."""
-        with self._block('void setAnchor(const BSONObj& obj) {', '}'):
-            self._writer.write_line("invariant(obj.isOwned());")
-            self._writer.write_line("_anchorObj = obj;")
-        self._writer.write_empty_line()
+        if struct.is_view:
+            # If the struct is not a view type, then a BSONObj anchor is not needed because we
+            # know the struct owns all of its data.
+            with self._block('void setAnchor(const BSONObj& obj) {', '}'):
+                self._writer.write_line("invariant(obj.isOwned());")
+                self._writer.write_line("_anchorObj = obj;")
+            self._writer.write_empty_line()
 
-        with self._block('void setAnchor(BSONObj&& obj) {', '}'):
-            self._writer.write_line("invariant(obj.isOwned());")
-            self._writer.write_line("_anchorObj = std::move(obj);")
-        self._writer.write_empty_line()
+            with self._block('void setAnchor(BSONObj&& obj) {', '}'):
+                self._writer.write_line("invariant(obj.isOwned());")
+                self._writer.write_line("_anchorObj = std::move(obj);")
+            self._writer.write_empty_line()
+        else:
+            self._writer.write_line("void setAnchor(const BSONObj& obj) { }")
+            self._writer.write_empty_line()
+            self._writer.write_line("void setAnchor(BSONObj&& obj) { }")
+            self._writer.write_empty_line()
 
     def gen_protected_serializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -1250,7 +1265,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     if isinstance(struct, ast.Command):
                         self.gen_op_msg_request_methods(struct)
 
-                    self.gen_ownership_getter()
+                    self.gen_ownership_getter(struct)
 
                     # Write getters & setters
                     for field in struct.fields:
@@ -1271,9 +1286,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                         self.gen_field_list_entry_lookup_methods_struct(struct)
 
                     self.write_unindented_line('protected:')
-                    self.gen_protected_ownership_setters()
+                    if (struct.is_view):
+                        # If the struct is not a view type, then a BSONObj anchor is not needed because we
+                        # know the struct owns all of its data.
+                        self.gen_protected_ownership_setters(struct)
+                        self._writer.write_line("BSONObj _anchorObj;")
+
                     self.gen_protected_serializer_methods(struct)
-                    self._writer.write_line("BSONObj _anchorObj;")
 
                     # Write private validators
                     if [field for field in struct.fields if field.validator]:
@@ -2100,11 +2119,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line(method_info.get_call('object'))
 
-            if ownership == _StructDataOwnership.OWNER:
-                self._writer.write_line('object.setAnchor(std::move(bsonObject));')
+            if struct.is_view:
+                if ownership == _StructDataOwnership.OWNER:
+                    self._writer.write_line('object.setAnchor(std::move(bsonObject));')
 
-            elif ownership == _StructDataOwnership.SHARED:
-                self._writer.write_line('object.setAnchor(bsonObject);')
+                elif ownership == _StructDataOwnership.SHARED:
+                    self._writer.write_line('object.setAnchor(bsonObject);')
 
             self._writer.write_line('return object;')
 

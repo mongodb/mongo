@@ -385,6 +385,9 @@ class Type(common.SourceLocation):
         self.name = None  # type: str
         self.cpp_type = None  # type: str
         self.bson_serialization_type = None  # type: List[str]
+        # A view type means the type could act as a view upon unowned data. The member is used to
+        # determine whether BSONObj anchors are needed for memory safety.
+        self.is_view = True  # type: bool
         self.bindata_subtype = None  # type: str
         self.serializer = None  # type: str
         self.deserializer = None  # type: str
@@ -668,7 +671,7 @@ class Command(Struct):
         self.namespace = None  # type: str
         self.command_name = None  # type: str
         self.command_alias = None  # type: str
-        self.type = None  # type: FieldType
+        self.type = None  # type: Optional[FieldType]
         self.reply_type = None  # type: str
         self.api_version = None  # type: str
         self.is_deprecated = False  # type: bool
