@@ -1075,7 +1075,7 @@ Status AsioTransportLayer::setup() {
 
         acceptor.bind(*addr, ec);
         if (ec) {
-            return errorCodeToStatus(ec, "setup bind");
+            return errorCodeToStatus(ec, "setup bind").withContext(addr.toString());
         }
 
 #ifndef _WIN32
