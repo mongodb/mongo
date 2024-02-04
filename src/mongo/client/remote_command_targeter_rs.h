@@ -77,11 +77,23 @@ public:
     void markHostShuttingDown(const HostAndPort& host, const Status& status) override;
 
 private:
+    /**
+     * Returns true if the local host must be targeted, i.e. this is a shardsvr mongod targeting the
+     * replica set it is in and the readPreference has been pre-targeted by the client connected to
+     * it.
+     */
+    bool _mustTargetLocalHost(const ReadPreferenceSetting& readPref) const;
+
+    ServiceContext* const _serviceContext;
+
     // Name of the replica set which this targeter maintains
     const std::string _rsName;
 
     // Monitor for this replica set
     std::shared_ptr<ReplicaSetMonitor> _rsMonitor;
+
+    // Set to true if this is shardsvr mongod targeting the replica set it is in.
+    bool _isTargetingLocalRS = false;
 };
 
 }  // namespace mongo

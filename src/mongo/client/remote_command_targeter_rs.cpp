@@ -42,6 +42,8 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -55,12 +57,36 @@
 
 namespace mongo {
 
+namespace {
+
+/**
+ * To be used on mongod only. Returns the host and port for this mongod as specified in the current
+ * replica set configuration.
+ */
+HostAndPort getLocalHostAndPort(ServiceContext* serviceContext) {
+    auto localHostAndPort = repl::ReplicationCoordinator::get(serviceContext)->getMyHostAndPort();
+    // The host and port would be empty if the replica set configuration has not been initialized or
+    // if this mongod is no longer part of the replica set it was in. Returns a retryable error to
+    // make the external client retry.
+    uassert(ErrorCodes::HostNotFound,
+            "Cannot find the host and port for this node in the replica set configuration.",
+            !localHostAndPort.empty());
+    return localHostAndPort;
+}
+
+}  // namespace
+
 RemoteCommandTargeterRS::RemoteCommandTargeterRS(const std::string& rsName,
                                                  const std::vector<HostAndPort>& seedHosts)
-    : _rsName(rsName) {
+    : _serviceContext(getGlobalServiceContext()), _rsName(rsName) {
 
     std::set<HostAndPort> seedServers(seedHosts.begin(), seedHosts.end());
     _rsMonitor = ReplicaSetMonitor::createIfNeeded(rsName, seedServers);
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+        auto replCoord = repl::ReplicationCoordinator::get(_serviceContext);
+        _isTargetingLocalRS = replCoord->getConfig().getReplSetName() == _rsName;
+    }
 
     LOGV2_DEBUG(20157,
                 1,
@@ -73,13 +99,23 @@ ConnectionString RemoteCommandTargeterRS::connectionString() {
     return uassertStatusOK(ConnectionString::parse(_rsMonitor->getServerAddress()));
 }
 
+bool RemoteCommandTargeterRS::_mustTargetLocalHost(const ReadPreferenceSetting& readPref) const {
+    return _isTargetingLocalRS && readPref.isPretargeted;
+}
+
 SemiFuture<HostAndPort> RemoteCommandTargeterRS::findHost(const ReadPreferenceSetting& readPref,
                                                           const CancellationToken& cancelToken) {
+    if (_mustTargetLocalHost(readPref)) {
+        return getLocalHostAndPort(_serviceContext);
+    }
     return _rsMonitor->getHostOrRefresh(readPref, cancelToken);
 }
 
 SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterRS::findHosts(
     const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) {
+    if (_mustTargetLocalHost(readPref)) {
+        return std::vector<HostAndPort>{getLocalHostAndPort(_serviceContext)};
+    }
     return _rsMonitor->getHostsOrRefresh(readPref, cancelToken);
 }
 
@@ -88,6 +124,10 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCt
     const auto interruptStatus = opCtx->checkForInterruptNoAssert();
     if (!interruptStatus.isOK()) {
         return interruptStatus;
+    }
+
+    if (_mustTargetLocalHost(readPref)) {
+        return getLocalHostAndPort(_serviceContext);
     }
 
     bool maxTimeMsLesser = (opCtx->getRemainingMaxTimeMillis() <
