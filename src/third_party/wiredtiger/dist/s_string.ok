@@ -1301,7 +1301,6 @@ trylock
 tryrdlock
 trywrlock
 tupdate
-tvalue
 tw
 txn
 txnid
