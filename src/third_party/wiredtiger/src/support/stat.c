@@ -1368,7 +1368,6 @@ static const char *const __stats_connection_desc[] = {
   "block-cache: pre-fetch not triggered due to internal session",
   "block-cache: pre-fetch not triggered due to special btree handle",
   "block-cache: pre-fetch page not on disk when reading",
-  "block-cache: pre-fetch pages failed to queue",
   "block-cache: pre-fetch pages queued",
   "block-cache: pre-fetch pages read in background",
   "block-cache: pre-fetch triggered by page read",
@@ -2097,7 +2096,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->block_prefetch_skipped_internal_session = 0;
     stats->block_prefetch_skipped_special_handle = 0;
     stats->block_prefetch_pages_fail = 0;
-    stats->block_prefetch_page_not_queued = 0;
     stats->block_prefetch_pages_queued = 0;
     stats->block_prefetch_pages_read = 0;
     stats->block_prefetch_attempts = 0;
@@ -2782,7 +2780,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->block_prefetch_skipped_special_handle +=
       WT_STAT_READ(from, block_prefetch_skipped_special_handle);
     to->block_prefetch_pages_fail += WT_STAT_READ(from, block_prefetch_pages_fail);
-    to->block_prefetch_page_not_queued += WT_STAT_READ(from, block_prefetch_page_not_queued);
     to->block_prefetch_pages_queued += WT_STAT_READ(from, block_prefetch_pages_queued);
     to->block_prefetch_pages_read += WT_STAT_READ(from, block_prefetch_pages_read);
     to->block_prefetch_attempts += WT_STAT_READ(from, block_prefetch_attempts);

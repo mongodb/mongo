@@ -52,7 +52,7 @@ struct __wt_hazard_array {
  *	Pre-fetch structure containing useful information for pre-fetch.
  */
 struct __wt_prefetch {
-    WT_REF *prefetch_prev_ref;
+    WT_PAGE *prefetch_prev_ref_home;
     uint64_t prefetch_disk_read_count; /* Sequential cache requests that caused a leaf read */
     uint64_t prefetch_skipped_with_parent;
 };
