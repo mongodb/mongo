@@ -55,7 +55,6 @@ const char kModeFieldName[] = "mode";
 const char kTagsFieldName[] = "tags";
 const char kMaxStalenessSecondsFieldName[] = "maxStalenessSeconds";
 const char kHedgeFieldName[] = "hedge";
-const char kIsPretargetedFieldName[] = "$_isPretargeted";
 
 // Slight kludge here: if we weren't passed a TagSet, we default to the empty
 // TagSet if ReadPreference is Primary, or the default (wildcard) TagSet otherwise.
@@ -101,13 +100,11 @@ TagSet TagSet::primaryOnly() {
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref,
                                              TagSet tags,
                                              Seconds maxStalenessSeconds,
-                                             boost::optional<HedgingMode> hedgingMode,
-                                             bool isPretargeted)
+                                             boost::optional<HedgingMode> hedgingMode)
     : pref(std::move(pref)),
       tags(std::move(tags)),
       maxStalenessSeconds(std::move(maxStalenessSeconds)),
-      hedgingMode(std::move(hedgingMode)),
-      isPretargeted(isPretargeted) {}
+      hedgingMode(std::move(hedgingMode)) {}
 
 ReadPreferenceSetting::ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds)
     : ReadPreferenceSetting(pref, defaultTagSetForMode(pref), maxStalenessSeconds) {
@@ -176,25 +173,8 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
                                     << " can not be set for the primary mode");
     }
 
-    bool isPretargetedValue = false;
-    if (auto isPretargetedElem = readPrefObj[kIsPretargetedFieldName]) {
-        if (isPretargetedElem.type() != BSONType::Bool) {
-            return Status(ErrorCodes::TypeMismatch,
-                          str::stream() << kIsPretargetedFieldName
-                                        << " field must be of type boolean if provided; found "
-                                        << isPretargetedElem);
-        }
-        if (!isPretargetedElem.Bool()) {
-            return Status(ErrorCodes::InvalidOptions,
-                          str::stream()
-                              << kIsPretargetedFieldName
-                              << " field must be true if provided; found " << isPretargetedElem);
-        }
-        isPretargetedValue = true;
-    }
-
     return ReadPreferenceSetting(
-        rp.getMode(), tags, Seconds(maxStalenessSecondsValue), hedgingMode, isPretargetedValue);
+        rp.getMode(), tags, Seconds(maxStalenessSecondsValue), hedgingMode);
 }
 
 StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSONElement& elem) {
@@ -231,9 +211,6 @@ void ReadPreferenceSetting::toInnerBSON(BSONObjBuilder* bob) const {
     }
     if (hedgingMode) {
         bob->append(kHedgeFieldName, hedgingMode.value().toBSON());
-    }
-    if (isPretargeted) {
-        bob->append(kIsPretargetedFieldName, true);
     }
 }
 

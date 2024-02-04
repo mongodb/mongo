@@ -130,8 +130,7 @@ struct ReadPreferenceSetting {
     ReadPreferenceSetting(ReadPreference pref,
                           TagSet tags,
                           Seconds maxStalenessSeconds,
-                          boost::optional<HedgingMode> hedgingMode = boost::none,
-                          bool isPretargeted = false);
+                          boost::optional<HedgingMode> hedgingMode = boost::none);
     ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
@@ -151,7 +150,7 @@ struct ReadPreferenceSetting {
         return (pref == other.pref) && (tags == other.tags) &&
             (maxStalenessSeconds == other.maxStalenessSeconds) &&
             hedgingModeEquals(hedgingMode, other.hedgingMode) &&
-            (minClusterTime == other.minClusterTime) && (isPretargeted == other.isPretargeted);
+            (minClusterTime == other.minClusterTime);
     }
 
     /**
@@ -242,11 +241,6 @@ struct ReadPreferenceSetting {
      * Either way, it must be that a node opTime of X implies ClusterTime >= X.
      */
     Timestamp minClusterTime{};
-
-    // Set to true if this is a shardsvr mongod and the readPreference has been pre-targeted by
-    // the client connected to it. Used by the replica set endpoint in sharding to mark commands
-    // that it forces to go through the router as needing to target the local mongod.
-    bool isPretargeted = false;
 
 private:
     bool _usedDefaultReadPrefValue = false;

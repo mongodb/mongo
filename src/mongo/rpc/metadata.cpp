@@ -96,10 +96,6 @@ void readRequestMetadata(OperationContext* opCtx,
     if (requestArgs.getReadPreference()) {
         ReadPreferenceSetting::get(opCtx) = uassertStatusOK(
             ReadPreferenceSetting::fromInnerBSON(requestArgs.getReadPreference()->getElement()));
-
-        if (opCtx->routedByReplicaSetEndpoint()) {
-            ReadPreferenceSetting::get(opCtx).isPretargeted = true;
-        }
     }
 
     readImpersonatedUserMetadata(requestArgs.getImpersonation().value_or(IDLAnyType()).getElement(),

@@ -216,7 +216,7 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_AdminDatabase) {
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
 
-TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_SystemDotProfileCollection) {
+TEST_F(ReplicaSetEndpointUtilTest, ShouldNotRoute_SystemDotProfileCollection) {
     std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
     auto client =
         getServiceContext()->getService()->makeClient("SystemDotProfileCollection", session);
@@ -228,7 +228,7 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_SystemDotProfileCollection) {
     commands_test_example::ExampleIncrement incrementCmd(ns, 0);
     auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), incrementCmd.toBSON({}));
 
-    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    ASSERT_FALSE(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
 
 TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_ConfigSystemSessionsCollection) {
