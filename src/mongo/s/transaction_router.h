@@ -205,7 +205,7 @@ public:
         TickSource::Tick lastTimeActiveStart{0};
     };
 
-    enum class TransactionActions { kStart, kContinue, kCommit };
+    enum class TransactionActions { kStart, kContinue, kStartOrContinue, kCommit };
 
     // Reason a transaction terminated.
     enum class TerminationCause {
@@ -853,6 +853,10 @@ private:
         // transaction number cannot be changed until this returns to 0, otherwise we cannot
         // guarantee that unyielding the session cannot fail.
         int32_t activeYields{0};
+
+        // Indicates whether the router was created by a shard that is an active transaction
+        // participant.
+        bool subRouter{false};
     } _o;
 
     /**

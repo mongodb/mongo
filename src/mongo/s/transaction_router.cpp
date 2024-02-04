@@ -207,6 +207,8 @@ std::string actionTypeToString(TransactionRouter::TransactionActions action) {
     switch (action) {
         case TransactionRouter::TransactionActions::kStart:
             return "start";
+        case TransactionRouter::TransactionActions::kStartOrContinue:
+            return "startOrContinue";
         case TransactionRouter::TransactionActions::kContinue:
             return "continue";
         case TransactionRouter::TransactionActions::kCommit:
@@ -1029,13 +1031,23 @@ void TransactionRouter::Router::_continueTxn(OperationContext* opCtx,
                     isInternalSessionForRetryableWrite(_sessionId()));
             break;
         }
-        case TransactionActions::kContinue: {
+        case TransactionActions::kStartOrContinue:
+            // Check that the readConcern matches what is set in the router.
             uassert(ErrorCodes::InvalidOptions,
-                    "Only the first command in a transaction may specify a readConcern",
-                    repl::ReadConcernArgs::get(opCtx).isEmpty());
+                    "ReadConcern must match previously-set value on the router.",
+                    repl::ReadConcernArgs::get(opCtx).getLevel() == o().readConcernArgs.getLevel());
+            FMT_FALLTHROUGH;
+        case TransactionActions::kContinue: {
+            // When a participant shard calls with action kStartOrContinue, the readConcern
+            // should already be set in the opCtx, so skip this assert and assignment.
+            if (action != TransactionActions::kStartOrContinue) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Only the first command in a transaction may specify a readConcern",
+                        repl::ReadConcernArgs::get(opCtx).isEmpty());
 
-            APIParameters::get(opCtx) = o().apiParameters;
-            repl::ReadConcernArgs::get(opCtx) = o().readConcernArgs;
+                APIParameters::get(opCtx) = o().apiParameters;
+                repl::ReadConcernArgs::get(opCtx) = o().readConcernArgs;
+            }
 
             // Don't increment latestStmtId if no shards have been targeted, since that implies no
             // statements would have been executed inside this transaction at this point. This can
@@ -1070,8 +1082,16 @@ void TransactionRouter::Router::_beginTxn(OperationContext* opCtx,
               o().txnNumberAndRetryCounter.getTxnNumber());
 
     switch (action) {
+        case TransactionActions::kStartOrContinue:  // fall through to case kStart
         case TransactionActions::kStart: {
             _resetRouterStateForStartTransaction(opCtx, txnNumberAndRetryCounter);
+            if (action == TransactionActions::kStartOrContinue) {
+                {
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    o(lk).subRouter = true;
+                }
+                setDefaultAtClusterTime(opCtx);
+            }
             break;
         }
         case TransactionActions::kContinue: {
@@ -1115,7 +1135,8 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                o().txnNumberAndRetryCounter.getTxnNumber()) {
         // This is the same transaction as the one in progress.
         auto apiParamsFromClient = APIParameters::get(opCtx);
-        if (action == TransactionActions::kContinue || action == TransactionActions::kCommit) {
+        if (action == TransactionActions::kStartOrContinue ||
+            action == TransactionActions::kContinue || action == TransactionActions::kCommit) {
             uassert(
                 ErrorCodes::APIMismatchError,
                 "API parameter mismatch: transaction-continuing command used {}, the transaction's"
@@ -1221,6 +1242,9 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
 BSONObj TransactionRouter::Router::commitTransaction(
     OperationContext* opCtx, const boost::optional<TxnRecoveryToken>& recoveryToken) {
     invariant(isInitialized());
+    uassert(ErrorCodes::IllegalOperation,
+            "Transaction sub-router on shard cannot execute commit.",
+            !o().subRouter);
 
     const auto isFirstCommitAttempt = !p().terminationInitiated;
     p().terminationInitiated = true;
@@ -1405,6 +1429,9 @@ bool failedToUnyieldSessionAtShutdown(OperationContext* opCtx) {
 
 BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
     invariant(isInitialized());
+    uassert(ErrorCodes::IllegalOperation,
+            "Transaction sub-router on shard cannot execute abort.",
+            !o().subRouter);
 
     // Update stats on scope exit so the transaction is considered "active" while waiting on abort
     // responses.
@@ -1473,6 +1500,9 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
 void TransactionRouter::Router::implicitlyAbortTransaction(OperationContext* opCtx,
                                                            const Status& status) {
     invariant(isInitialized());
+    uassert(ErrorCodes::IllegalOperation,
+            "Transaction sub-router on shard cannot execute implicit abort.",
+            !o().subRouter);
 
     if (o().commitType == CommitType::kTwoPhaseCommit ||
         o().commitType == CommitType::kRecoverWithToken) {
