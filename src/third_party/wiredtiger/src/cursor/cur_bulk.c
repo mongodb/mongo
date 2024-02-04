@@ -352,6 +352,8 @@ __wt_curbulk_close(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk)
     WT_DECL_RET;
 
     ret = __wt_bulk_wrapup(session, cbulk);
+    if (ret == 0)
+        WT_STAT_CONN_DECR_ATOMIC(session, cursor_bulk_count);
 
     __wt_scr_free(session, &cbulk->last);
     return (ret);

@@ -33,6 +33,7 @@
 import wiredtiger, wttest
 from wtdataset import simple_key, simple_value
 from wtscenario import make_scenarios
+from wiredtiger import stat
 
 # Smoke test bulk-load.
 class test_bulk_load(wttest.WiredTigerTestCase):
@@ -54,14 +55,27 @@ class test_bulk_load(wttest.WiredTigerTestCase):
     ]
     scenarios = make_scenarios(types, keyfmt, valfmt)
 
+    def get_stat(self, stat):
+        stat_cursor = self.session.open_cursor('statistics:')
+        val = stat_cursor[stat][2]
+        stat_cursor.close()
+        return val
+
     # Test a simple bulk-load
     def test_bulk_load(self):
         uri = self.type + self.name
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
+
+        self.assertEqual(self.get_stat(stat.conn.cursor_bulk_count), 0)
         cursor = self.session.open_cursor(uri, None, "bulk")
+        self.assertEqual(self.get_stat(stat.conn.cursor_bulk_count), 1)
+
         for i in range(1, 1000):
             cursor[simple_key(cursor, i)] = simple_value(cursor, i)
+        cursor.close()
+
+        self.assertEqual(self.get_stat(stat.conn.cursor_bulk_count), 0)
 
     # Test a bulk-load triggers variable-length column-store RLE correctly.
     def test_bulk_load_var_rle(self):
