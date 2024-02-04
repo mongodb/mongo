@@ -177,6 +177,7 @@ functions:
           ${HAVE_BUILTIN_EXTENSION_ZLIB|} \
           ${HAVE_BUILTIN_EXTENSION_ZSTD|} \
           ${HAVE_UNITTEST} \
+          ${CODE_COVERAGE_FLAGS} \
           ${NON_BARRIER_DIAGNOSTIC_YIELDS|} \
           ${HAVE_DIAGNOSTIC|} \
           ${GNU_C_VERSION|} \
@@ -1517,6 +1518,12 @@ tasks:
         vars:
           GNU_C_VERSION: -DGNU_C_VERSION=9
           GNU_CXX_VERSION: -DGNU_CXX_VERSION=9
+      # Check that WiredTiger will compile for code coverage, as this may switch to alternative
+      # implementations of some code which may generate different compiler errors to a 'normal' build
+      - func: "compile wiredtiger"
+        vars:
+          CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
+          CODE_COVERAGE_FLAGS: -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1
 
   - name: compile-clang
     tags: ["pull_request", "pull_request_compilers"]
@@ -2867,25 +2874,26 @@ tasks:
     tags: ["pull_request_code_statistics"]
     commands:
       - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          HAVE_UNITTEST: -DHAVE_UNITTEST=1
-          <<: *configure_flags_with_builtins
-          CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/cmake_build"
+          working_dir: "wiredtiger"
           shell: bash
           script: |
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
+            test/evergreen/find_cmake.sh
+
+            # Create directories for 1 builds, as only one test will be run at once
+            mkdir build_0
+
             # Record the start time, in seconds
-            date +%s > ../time.txt
-            # Perform the tests to get code coverage metrics for
-            test/unittest/catch2-unittests
+            date +%s > time.txt
+
+            ${python_binary|python3} test/evergreen/code_coverage/parallel_code_coverage.py -v -c test/evergreen/code_coverage/code_coverage_config_catch2.json -b $(pwd)/build_ -j 1 -s
+
             # Record the end time, in seconds
-            date +%s >> ../time.txt
+            date +%s >> time.txt
       - func: "code coverage analysis"
         vars:
           working_dir: "wiredtiger"

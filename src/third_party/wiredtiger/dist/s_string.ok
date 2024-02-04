@@ -369,6 +369,7 @@ TID
 TMP
 TODO
 TORTIOUS
+TRET
 TRYLOCK
 TSO
 TW
@@ -519,6 +520,7 @@ breakpoint
 bs
 bstorage
 bswap
+bt
 btcur
 btmem
 btree
@@ -609,6 +611,7 @@ csv
 ctime
 ctype
 curbackup
+curbt
 curbulk
 curconfig
 curdump
@@ -853,6 +856,7 @@ initn
 initsize
 initval
 inlined
+inlining
 inmem
 inmemory
 inserters

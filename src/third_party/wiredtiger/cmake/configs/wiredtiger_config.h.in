@@ -47,6 +47,22 @@
 /* Define to 1 for unit tests. */
 #cmakedefine HAVE_UNITTEST 0
 
+/*
+ * Define to 1 to when measuring code coverage to make measurements more accurate, by switching code where needed,
+ * for example from macros to inline functions.
+ *
+ * An #ifdef guard for CODE_COVERAGE_MEASUREMENT macro can be used as a temporary measure while evaluating the
+ * performance of inline functions vs the original macros.
+ *
+ * Once inline functions have been validated as providing similar (or better) performance than the original macros
+ * the macro versions can be removed and the #ifdef guard using CODE_COVERAGE_MEASUREMENT removed to make the inline
+ * functions the only version.
+ */
+#cmakedefine CODE_COVERAGE_MEASUREMENT 0
+
+/* define 1 to to switch code that exists in both inline function and macro versions to use the inline versions. */
+#cmakedefine INLINE_FUNCTIONS_INSTEAD_OF_MACROS 0
+
 /* 
  * Define to 1 for unit testing assertions. 
  * This overrides normal abort logic and should be used *only* when unit testing assertions.
