@@ -43,17 +43,6 @@ namespace model {
  *     Add an update. Throw exception on error.
  */
 void
-kv_table_item::add_update(kv_update &&update, bool must_exist, bool must_not_exist)
-{
-    std::shared_ptr<kv_update> update_ptr = std::make_shared<kv_update>(std::move(update));
-    add_update(update_ptr, must_exist, must_not_exist);
-}
-
-/*
- * kv_table_item::add_update --
- *     Add an update. Throw exception on error.
- */
-void
 kv_table_item::add_update(std::shared_ptr<kv_update> update, bool must_exist, bool must_not_exist)
 {
     std::lock_guard lock_guard(_lock);
@@ -267,9 +256,12 @@ kv_table_item::get(kv_transaction_snapshot_ptr txn_snapshot, txn_id_t txn_id,
         if (stable_timestamp != k_timestamp_latest)
             throw model_exception(
               "If the stable timestamp is set, the transaction snapshot must be set also");
-        if (i == _updates.begin())
-            return NONE;
-        return (*(--i))->value();
+        while (i != _updates.begin()) {
+            const std::shared_ptr<kv_update> &u = *(--i);
+            if (u->committed())
+                return u->value();
+        }
+        return NONE;
     } else {
         while (i != _updates.begin()) {
             const std::shared_ptr<kv_update> &u = *(--i);

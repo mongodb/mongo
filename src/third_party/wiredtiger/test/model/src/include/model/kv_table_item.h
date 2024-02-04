@@ -56,12 +56,6 @@ public:
      * kv_table_item::add_update --
      *     Add an update. Throw exception on error.
      */
-    void add_update(kv_update &&update, bool must_exist, bool must_not_exist);
-
-    /*
-     * kv_table_item::add_update --
-     *     Add an update. Throw exception on error.
-     */
     void add_update(std::shared_ptr<kv_update> update, bool must_exist, bool must_not_exist);
 
     /*
