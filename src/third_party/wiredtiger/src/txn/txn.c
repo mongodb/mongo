@@ -139,6 +139,9 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
         txn_global->checkpoint_txn_shared.pinned_id = WT_TXN_NONE;
         txn_global->checkpoint_timestamp = WT_TS_NONE;
     }
+
+    /* Leave the generation after releasing the snapshot. */
+    __wt_session_gen_leave(session, WT_GEN_HAS_SNAPSHOT);
 }
 
 /*
@@ -197,7 +200,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *s, *txn_shared;
-    uint64_t commit_gen, current_id, id, prev_oldest_id, pinned_id;
+    uint64_t current_id, id, prev_oldest_id, pinned_id, snapshot_gen;
     uint32_t i, n, session_cnt;
 
     conn = S2C(session);
@@ -207,12 +210,17 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
     n = 0;
 
     /* Fast path if we already have the current snapshot. */
-    if ((commit_gen = __wt_session_gen(session, WT_GEN_COMMIT)) != 0) {
-        if (F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) && commit_gen == __wt_gen(session, WT_GEN_COMMIT))
+    if ((snapshot_gen = __wt_session_gen(session, WT_GEN_HAS_SNAPSHOT)) != 0) {
+        WT_ASSERT(
+          session, F_ISSET(txn, WT_TXN_HAS_SNAPSHOT) || !F_ISSET(txn, WT_TXN_REFRESH_SNAPSHOT));
+        if (!F_ISSET(txn, WT_TXN_REFRESH_SNAPSHOT) &&
+          snapshot_gen == __wt_gen(session, WT_GEN_HAS_SNAPSHOT))
             return;
-        __wt_session_gen_leave(session, WT_GEN_COMMIT);
+
+        /* Leave the generation here and enter again later to acquire a new snapshot. */
+        __wt_session_gen_leave(session, WT_GEN_HAS_SNAPSHOT);
     }
-    __wt_session_gen_enter(session, WT_GEN_COMMIT);
+    __wt_session_gen_enter(session, WT_GEN_HAS_SNAPSHOT);
 
     /* We're going to scan the table: wait for the lock. */
     __wt_readlock(session, &txn_global->rwlock);
@@ -343,12 +351,6 @@ __wt_txn_snapshot_save_and_refresh(WT_SESSION_IMPL *session)
 
     /* Swap the snapshot pointers. */
     __txn_swap_snapshot(&txn->snapshot_data.snapshot, &txn->backup_snapshot_data->snapshot);
-
-    /*
-     * __txn_get_snapshot_int will return without getting the new snapshot if the transaction
-     * already has a snapshot so clear the flag WT_TXN_HAS_SNAPSHOT.
-     */
-    F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
 
     /* Get the snapshot without publishing the shared ids. */
     __wt_txn_bump_snapshot(session);
@@ -1895,11 +1897,11 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
         __wt_readunlock(session, &txn_global->visibility_rwlock);
 
     /*
-     * If we have made some updates visible, start a new commit generation: any cached snapshots
+     * If we have made some updates visible, start a new snapshot generation: any cached snapshots
      * have to be refreshed.
      */
     if (!readonly)
-        __wt_gen_next(session, WT_GEN_COMMIT, NULL);
+        __wt_gen_next(session, WT_GEN_HAS_SNAPSHOT, NULL);
 
     /* First check if we've made something durable in the future. */
     update_durable_ts = false;

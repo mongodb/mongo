@@ -26,10 +26,10 @@ __gen_name(int which)
     switch (which) {
     case WT_GEN_CHECKPOINT:
         return ("checkpoint");
-    case WT_GEN_COMMIT:
-        return ("commit");
     case WT_GEN_EVICT:
         return ("evict");
+    case WT_GEN_HAS_SNAPSHOT:
+        return ("snapshot");
     case WT_GEN_HAZARD:
         return ("hazard");
     case WT_GEN_SPLIT:
