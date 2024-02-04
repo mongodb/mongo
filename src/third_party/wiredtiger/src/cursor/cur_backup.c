@@ -348,6 +348,9 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     if (othercb != NULL)
         WT_CURSOR_BACKUP_CHECK_STOP(othercb);
 
+    if (cfg != NULL && cfg[1] != NULL)
+        __wt_verbose(session, WT_VERB_BACKUP, "Backup cursor config \"%s\"", cfg[1]);
+
     /* Special backup cursor to query incremental IDs. */
     if (WT_STRING_MATCH("backup:query_id", uri, strlen(uri))) {
         /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
