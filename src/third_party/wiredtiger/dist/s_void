@@ -2,8 +2,7 @@
 
 t=__wt.$$
 trap 'rm -f $t' 0 1 2 3 13 15
-
-cd ..
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/.. || exit $?
 
 # Parse a C file, discarding functions that don't return an int, and formatting
 # the remaining functions as a single line.
@@ -171,11 +170,15 @@ func_ok()
         -e '/int __wt_curhs_search_near_before$/d'
 }
 
-for f in `find bench ext src test -name '*.c' -o -name '*_inline.h'`; do
-    if expr "$f" : '.*/windows_shim.c' > /dev/null; then
-        continue
-    fi
+SUBDIRS="bench ext src test"
 
+if [[ "$1" = "-F" ]]; then
+    last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
+    l=`git diff --name-only "${last_commit_from_dev}" $SUBDIRS | grep -E '(_inline\.h|\.c)$' | egrep -Ev '/windows_shim\.c$'`
+else
+    l=`find $SUBDIRS -name '*.c' -o -name '*_inline.h' | egrep -Ev '/windows_shim\.c$'`
+fi
+for f in $l; do
     # Complain about functions which return an "int" but which don't return
     # except at the end of the function.
     #

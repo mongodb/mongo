@@ -173,12 +173,12 @@ run --bg "s_lang" &
 run --bg "s_longlines" &
 run --bg "s_python" &
 run --bg "s_stat" &
-run --bg "s_string" &
+run --bg "s_string $fast" &
 run --bg "s_tags" &
 run --bg "s_typedef -c" &
 run --bg "s_visibility_checks" &
-run --bg "s_void" &
-run --bg "s_whitespace" &
+run --bg "s_void $fast" &
+run --bg "s_whitespace $fast" &
 run --bg "function.py" &
 run --bg "style.py" &
 run --bg "comment_style.py $fast" &
