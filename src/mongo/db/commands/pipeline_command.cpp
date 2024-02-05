@@ -128,8 +128,8 @@ public:
 
         // TODO: SERVER-73632 Remove feature flag for PM-635.
         // Forbid users from passing 'querySettings' explicitly.
-        const bool isInternalCLient =
-            opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
+        const bool isInternalCLient = opCtx->getClient()->session() &&
+            (opCtx->getClient()->isInternalClient() || opCtx->getClient()->isInDirectClient());
         uassert(7708001,
                 "BSON field 'querySettings' is an unknown field",
                 isInternalCLient || !aggregationRequest.getQuerySettings().has_value());

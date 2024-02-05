@@ -477,6 +477,11 @@ BSONObj getSuitableBucketForReopening(OperationContext* opCtx,
                     AggregateCommandRequest aggRequest(bucketsColl->ns(), pipeline);
                     aggRequest.setHint(index);
 
+                    // TODO SERVER-86094: remove after fixing perf regression.
+                    query_settings::QuerySettings querySettings;
+                    querySettings.setQueryFramework(QueryFrameworkControlEnum::kForceClassicEngine);
+                    aggRequest.setQuerySettings(querySettings);
+
                     auto swCursor = DBClientCursor::fromAggregationRequest(
                         &client, aggRequest, false /* secondaryOk */, false /* useExhaust */);
                     if (swCursor.isOK() && swCursor.getValue()->more()) {

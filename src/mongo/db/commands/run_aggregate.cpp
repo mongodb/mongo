@@ -1131,8 +1131,8 @@ query_settings::QuerySettings lookupQuerySettingsForAgg(
     const stdx::unordered_set<NamespaceString>& involvedNamespaces,
     const NamespaceString& nss) {
     auto opCtx = expCtx->opCtx;
-    const bool isInternalClient =
-        opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
+    const bool isInternalClient = opCtx->getClient()->session() &&
+        (opCtx->getClient()->isInternalClient() || opCtx->getClient()->isInDirectClient());
     auto serializationContext = aggregateCommandRequest.getSerializationContext();
     return isInternalClient
         ? aggregateCommandRequest.getQuerySettings().get_value_or({})
