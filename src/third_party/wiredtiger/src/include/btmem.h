@@ -791,36 +791,123 @@ struct __wt_page {
 #define WT_PAGE_REF_OFFSET(page, o) ((void *)((uint8_t *)((page)->dsk) + (o)))
 
 /*
- * Prepare update states.
+ * Prepare states.
  *
- * Prepare update synchronization is based on the state field, which has the
- * following possible states:
+ * Prepare states are used by both updates and the fast truncate page_del structure to indicate
+ * which phase of the prepared transaction lifecycle they are in.
  *
  * WT_PREPARE_INIT:
- *	The initial prepare state of either an update or a page_del structure,
- *	indicating a prepare phase has not started yet.
- *	This state has no impact on the visibility of the update's data.
+ *  The default prepare state, indicating that the transaction which created the update or fast
+ *  truncate structure has not yet called prepare transaction. There is no requirement that an
+ *  object moves beyond this state.
+ *
+ *  This state has no impact on the visibility of the associated update or fast truncate structure.
  *
  * WT_PREPARE_INPROGRESS:
- *	Update is in prepared phase.
+ *  When a transaction calls prepare all objects created by it, updates or page_del structures will
+ *  transition to this state.
  *
  * WT_PREPARE_LOCKED:
- *	State is locked as state transition is in progress from INPROGRESS to
- *	RESOLVED. Any reader of the state needs to wait for state transition to
- *	complete.
+ *  This state is a transitional state between INPROGRESS and RESOLVED. It occurs when a prepared
+ *  transaction commits. If a reader sees an object in this state it is required to wait until the
+ *  object transitions out of this state, and then read the associated visibility information. This
+ *  state exists to provide a clear ordering semantic between transitioning the prepare state and
+ *  a reader reading it concurrently. For more details see below.
  *
  * WT_PREPARE_RESOLVED:
- *	Represents the commit state of the prepared update.
+ *  When a prepared transaction calls commit all objects created by it will transition to this
+ *  state, which is the final state.
  *
- * State Transition:
- * 	From uncommitted -> prepare -> commit:
- * 	INIT --> INPROGRESS --> LOCKED --> RESOLVED
- * 	LOCKED will be a momentary phase during timestamp update.
+ * ---
+ * State transitions:
+ * Object created (uncommitted) -> transaction prepare -> transaction commit:
+ *  INIT --> INPROGRESS --> LOCKED --> RESOLVED
+ *  LOCKED will be a momentary phase during timestamp update.
  *
- * 	From uncommitted -> prepare -> rollback:
- * 	INIT --> INPROGRESS
- * 	Prepare state will not be updated during rollback and will continue to
- * 	have the state as INPROGRESS.
+ * Object created -> transaction prepare -> transaction rollback:
+ *  INIT --> INPROGRESS
+ *  The prepare state will not be modified during rollback.
+ *
+ * Object created -> transaction commit:
+ *  INIT
+ *  Preparing a transaction is the uncommon case and most updates and page_del structures will
+ *  never leave the INIT state.
+ *
+ * ---
+ * Ordering complexities of prepare state transitions.
+ *
+ * The prepared transaction system works alongside the timestamp system. When committing a
+ * transaction a user can define a timestamp which represents the time at which a key/value pair
+ * is visible. This is represented by the start_ts in memory on the update structure. The page_del
+ * structure visibility is the same as an update's for the most part, this comment won't refer to it
+ * again.
+ *
+ * Prepared transactions introduce the need for an additional two timestamps, a prepare timestamp.
+ * The point at which an update is "prepared" and the durable timestamp which is when update is to
+ * be made stable by WiredTiger. The purpose of those timestamps is not something that will be
+ * described here.
+ *
+ * When a transaction calls prepare the start_ts field on the update structure is used to represent
+ * the prepare timestamp. The start_ts field is also used to represent the commit timestamp of the
+ * transaction. The prepare state tells the reader which of the two timestamps are available.
+ * However these two fields can't be written atomically and no lock is taken when transitioning
+ * between prepared update states. So the writer must write one field then the other, and a reader
+ * can read at any time. This introduces a need for the WT_PREPARE_LOCKED state and memory barriers.
+ *
+ * Let's construct a simplified example:
+ * We can assume the writing thread does the sane thing by writing the timestamp and then the
+ * prepare state. We also assume the reader thread reads the state then the timestamp. If we ignore
+ * the locked state we can construct a scenario where the reader can't tell which timestamp, commit
+ * or prepare, exists on the update. Ignoring CPU instruction reordering for now.
+ *
+ * The writer performs the following operations:
+ *  1: start_ts = 5
+ *  2: prepare_state = WT_PREPARE_INPROGRESS
+ *  3: start_ts = 10
+ *  4: prepare_state = WT_PREPARE_RESOLVED
+ *
+ * In this scenario it is possible the writer thread context switches between 3 and 4, and therefore
+ * the reader may see a timestamp of 10 for start_ts and wrongly attribute it to the prepare
+ * timestamp. This creates a need for the WT_PREPARE_LOCKED state. The writer thread now performs:
+ *  1: start_ts = 5
+ *  2: prepare_state = WT_PREPARE_INPROGRESS
+ *  3: prepare_state = WT_PREPARE_LOCKED
+ *  3: start_ts = 10
+ *  4: prepare_state = WT_PREPARE_RESOLVED
+ *
+ * The reader thread can, in this scenario, read any prepare state and behave correctly. If it reads
+ * WT_PREPARE_INPROGRESS it knows the start_ts is the prepare timestamp. If it reads
+ * WT_PREPARE_RESOLVED it knows the start_ts is the commit timestamp. If it reads WT_PREPARE_LOCKED
+ * it will wait until it reads WT_PREPARE_RESOLVED.
+ *
+ * By introducing the WT_PREPARE_LOCKED field we resolve some ambiguity about the start_ts. However
+ * as previously mentioned we were ignoring CPU reordering hijinx. CPU reordering will cause issues,
+ * to be fully correct here we need memory barriers. The need for a WT_PREPARE_LOCKED state makes
+ * the ordering requirements somewhat more complex than the typical message passing scenario.
+ *
+ * The writer thread has two orderings:
+ * Prepare transaction:
+ *  - start_ts = X
+ *  - WT_WRITE_BARRIER
+ *  - prepare_state = WT_PREPARE_INPROGRESS
+ *
+ * Commit transaction:
+ *  - prepare_state = WT_PREPARE_LOCKED
+ *  - WT_WRITE_BARRIER
+ *  - start_ts = Y
+ *  - durable_ts = Z
+ *  - WT_WRITE_BARRIER
+ *  - prepare_state = WT_PREPARE_RESOLVED
+ *
+ * The reader does the opposite. The more complex of the two is as follows:
+ *  - read prepare_state
+ *  - WT_READ_BARRIER
+ *  - if locked, retry
+ *  - read start_ts
+ *  - read durable_ts
+ *  - WT_READ_BARRIER
+ *  - read prepare_state
+ *  - if prepare state has changed, retry
  */
 
 /* Must be 0, as structures will be default initialized with 0. */
