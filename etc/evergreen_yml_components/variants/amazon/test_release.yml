@@ -1071,6 +1071,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --streams-release-build
+      --use-diagnostic-latches=on
     multiversion_platform: amazon2
     multiversion_edition: enterprise-streams
     has_packages: true
