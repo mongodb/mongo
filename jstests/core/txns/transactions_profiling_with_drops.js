@@ -6,6 +6,8 @@
 //   uses_transactions,
 //   uses_parallel_shell,
 //   requires_profiling,
+//   # The config fuzzer with a very low level of concurrency is exhausting the write tickets.
+//   does_not_support_config_fuzzer,
 //   # Uses $where
 //   requires_scripting
 // ]
