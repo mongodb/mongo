@@ -35,6 +35,15 @@
           # retry logic in auto_retry_on_network_error.js.
           nodb: ""
 
+- name: replica_sets_shell_options_retry_attempts
+  value:
+    executor:
+      config:
+        shell_options:
+          global_vars:
+            TestData:
+              overrideRetryAttempts: 6
+
 - name: replcia_sets_reconfig_shell_options_TestData
   value:
     executor:

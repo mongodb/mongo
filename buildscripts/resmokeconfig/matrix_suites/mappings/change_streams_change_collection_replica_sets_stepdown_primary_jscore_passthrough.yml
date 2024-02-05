@@ -3,6 +3,7 @@ base_suite: multitenancy_with_atlas_proxy_jscore_passthrough
 overrides:
   - "serverless.enable"
   - "kill_primary.replica_sets_shell_options"
+  - "kill_primary.replica_sets_shell_options_retry_attempts"
   - "stepdown_primary_change_streams.replica_sets_archive"
   - "kill_primary.replica_sets_fixture"
   - "change_streams_truncate.replica_sets_fixture"
