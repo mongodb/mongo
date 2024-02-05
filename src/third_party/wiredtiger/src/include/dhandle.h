@@ -79,16 +79,17 @@ struct __wt_data_handle {
     TAILQ_ENTRY(__wt_data_handle) q;
     TAILQ_ENTRY(__wt_data_handle) hashq;
 
-    const char *name;         /* Object name as a URI */
-    uint64_t name_hash;       /* Hash of name */
-    const char *checkpoint;   /* Checkpoint name (or NULL) */
-    int64_t checkpoint_order; /* Checkpoint order number, when applicable */
-    const char **cfg;         /* Configuration information */
-    const char *meta_base;    /* Base metadata configuration */
-    size_t meta_base_length;  /* Base metadata length */
-#ifdef HAVE_DIAGNOSTIC
+    const char *name;           /* Object name as a URI */
+    uint64_t name_hash;         /* Hash of name */
+    const char *checkpoint;     /* Checkpoint name (or NULL) */
+    int64_t checkpoint_order;   /* Checkpoint order number, when applicable */
+    const char **cfg;           /* Configuration information */
+    const char *meta_base;      /* Base metadata configuration */
+    uint64_t meta_hash;         /* Base metadata hash */
+    struct timespec base_upd;   /* Time of last metadata update with meta base */
     const char *orig_meta_base; /* Copy of the base metadata configuration */
-#endif
+    uint64_t orig_meta_hash;    /* Copy of base metadata hash */
+    struct timespec orig_upd;   /* Time of original setup of meta base */
     /*
      * Sessions holding a connection's data handle will have a non-zero reference count; sessions
      * using a connection's data handle will have a non-zero in-use count. Instances of cached

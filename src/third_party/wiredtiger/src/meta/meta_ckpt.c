@@ -272,10 +272,11 @@ __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session, const char *fname)
 static int
 __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v, bool use_base)
 {
+    struct timespec ts;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    size_t meta_base_length;
+    uint64_t base_hash;
     char *config, *newcfg;
     const char *cfg[3], *meta_base, *str;
 
@@ -294,27 +295,23 @@ __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v, bool use_
 
         /* Check the metadata is not corrupted. */
         meta_base = dhandle->meta_base;
-        meta_base_length = strlen(meta_base);
-        if (dhandle->meta_base_length != meta_base_length)
+        base_hash = __wt_hash_city64(meta_base, strlen(meta_base));
+        __wt_epoch(session, &ts);
+        if (dhandle->meta_hash != base_hash)
             WT_ERR_PANIC(session, WT_PANIC,
-              "Corrupted metadata. The original metadata length was %lu while the new one is %lu.",
-              dhandle->meta_base_length, meta_base_length);
-#ifdef HAVE_DIAGNOSTIC
-        if (!WT_STREQ(dhandle->orig_meta_base, meta_base))
-            WT_ERR_PANIC(session, WT_PANIC,
-              "Corrupted metadata. The original metadata length was %lu while the new one is %lu. "
-              "The original metadata inserted was %s and the current "
+              "Corrupted metadata. The original metadata inserted was %s and the current "
               "metadata is now %s.",
-              dhandle->meta_base_length, meta_base_length, dhandle->orig_meta_base, meta_base);
-#endif
+              dhandle->orig_meta_base, meta_base);
+        else
+            /*
+             * Only if the hash matches, update the time structure to know when we last had a
+             * matching hash. If there is a problem with the metadata string then we have bounded
+             * the time from what is in the dhandle to the local time structure we have.
+             */
+            dhandle->base_upd = ts;
 
         /* Concatenate the metadata base string with the checkpoint string. */
         WT_ERR(__wt_buf_fmt(session, tmp, "%s,%s", meta_base, str));
-        /*
-         * Check the new metadata length is at least as long as the original metadata string with
-         * the checkpoint base stripped out.
-         */
-        WT_ASSERT(session, tmp->size >= dhandle->meta_base_length);
         WT_ERR(__wt_metadata_update(session, fname, tmp->mem));
     } else {
         /* Retrieve the metadata for this file. */
