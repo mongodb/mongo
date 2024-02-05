@@ -44,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -64,7 +65,6 @@
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 
@@ -281,17 +281,24 @@ Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
     {
         auto opCtx = pExpCtx->opCtx;
         auto secondaryNssList = _exec->getSecondaryNamespaces();
-        AutoGetCollectionForReadMaybeLockFree readLock(
-            opCtx,
-            _exec->nss(),
-            AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNssList.cbegin(),
-                                                             secondaryNssList.cend()));
+        boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock = boost::none;
+        auto initAutoGetFn = [&]() {
+            readLock.emplace(pExpCtx->opCtx,
+                             _exec->nss(),
+                             AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                 secondaryNssList.cbegin(), secondaryNssList.cend()));
+        };
+        bool isAnySecondaryCollectionNotLocal =
+            intializeAutoGet(opCtx, _exec->nss(), secondaryNssList, initAutoGetFn);
+        tassert(8322003,
+                "Should have initialized AutoGet* after calling 'initializeAutoGet'",
+                readLock.has_value());
         MultipleCollectionAccessor collections(opCtx,
-                                               &readLock.getCollection(),
-                                               readLock.getNss(),
-                                               readLock.isAnySecondaryNamespaceAViewOrSharded(),
+                                               &readLock->getCollection(),
+                                               readLock->getNss(),
+                                               readLock->isAnySecondaryNamespaceAView() ||
+                                                   isAnySecondaryCollectionNotLocal,
                                                secondaryNssList);
-
         Explain::explainStages(_exec.get(),
                                collections,
                                verbosity.value(),

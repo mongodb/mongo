@@ -256,6 +256,17 @@ ScopedSetShardRole::ScopedSetShardRole(OperationContext* opCtx,
     OperationShardingState::setShardRole(_opCtx, _nss, _shardVersion, _databaseVersion);
 }
 
+ScopedSetShardRole::ScopedSetShardRole(ScopedSetShardRole&& other)
+    : _opCtx(other._opCtx),
+      _nss(std::move(other._nss)),
+      _shardVersion(std::move(other._shardVersion)),
+      _databaseVersion(std::move(other._databaseVersion)) {
+    // Clear the _shardVersion/_databaseVersion of 'other'; this prevents modifying
+    // OperationShardingState on destruction of the moved from object.
+    other._shardVersion.reset();
+    other._databaseVersion.reset();
+}
+
 ScopedSetShardRole::~ScopedSetShardRole() {
     auto& oss = OperationShardingState::get(_opCtx);
 

@@ -49,10 +49,11 @@ public:
     MultipleCollectionAccessor(OperationContext* opCtx,
                                const CollectionPtr* mainColl,
                                const NamespaceString& mainCollNss,
-                               bool isAnySecondaryNamespaceAViewOrSharded,
+                               bool isAnySecondaryNamespaceAViewOrNotFullyLocal,
                                const std::vector<NamespaceStringOrUUID>& secondaryExecNssList)
         : _mainColl(mainColl),
-          _isAnySecondaryNamespaceAViewOrSharded(isAnySecondaryNamespaceAViewOrSharded) {
+          _isAnySecondaryNamespaceAViewOrNotFullyLocal(
+              isAnySecondaryNamespaceAViewOrNotFullyLocal) {
         auto catalog = CollectionCatalog::get(opCtx);
         for (const auto& secondaryNssOrUuid : secondaryExecNssList) {
             auto secondaryNss = catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUuid);
@@ -87,8 +88,8 @@ public:
         return _secondaryColls;
     }
 
-    bool isAnySecondaryNamespaceAViewOrSharded() const {
-        return _isAnySecondaryNamespaceAViewOrSharded;
+    bool isAnySecondaryNamespaceAViewOrNotFullyLocal() const {
+        return _isAnySecondaryNamespaceAViewOrNotFullyLocal;
     }
 
     bool isAcquisition() const {
@@ -136,11 +137,11 @@ private:
     const CollectionPtr* _mainColl{&CollectionPtr::null};
     boost::optional<CollectionAcquisition> _mainAcq;
 
-    // Tracks whether any secondary namespace is a view or sharded based on information captured
-    // at the time of lock acquisition. This is used to determine if a $lookup is eligible for
-    // pushdown into the query execution subsystem as $lookup against a foreign view or a foreign
-    // sharded collection is not currently supported by the execution subsystem.
-    bool _isAnySecondaryNamespaceAViewOrSharded = false;
+    // Tracks whether any secondary namespace is a view or is not fully local based on information
+    // captured at the time of AutoGet* object acquisition. This is used to determine if a $lookup
+    // is eligible for pushdown into the query execution subsystem as $lookup against a foreign view
+    // or a  non-local collection is not currently supported by the execution subsystem.
+    bool _isAnySecondaryNamespaceAViewOrNotFullyLocal = false;
 
     // Map from namespace to a corresponding CollectionPtr.
     std::map<NamespaceString, CollectionPtr> _secondaryColls{};

@@ -118,37 +118,13 @@ void verifyNamespaceLockingRequirements(OperationContext* opCtx,
             !resolvedNss.isSystemDotViews() || modeColl != MODE_IX);
 }
 
-/**
- * Returns true if 'nss' is a view. False if the view doesn't exist.
- */
-bool isNssAView(OperationContext* opCtx,
-                const CollectionCatalog* catalog,
-                const NamespaceString& nss) {
-    return catalog->lookupView(opCtx, nss).get();
-}
 
-/**
- * Returns true if 'nss' is sharded. False otherwise.
- */
-bool isNssSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    return CollectionShardingState::acquire(opCtx, nss)
-        ->getCollectionDescription(opCtx)
-        .isSharded();
-}
-
-bool isNssAViewOrSharded(OperationContext* opCtx,
-                         const CollectionCatalog* catalog,
-                         const NamespaceString& nss) {
-    auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
-    bool isView = !collection && isNssAView(opCtx, catalog, nss);
-    return isView || isNssSharded(opCtx, nss);
-}
-
-bool isAnyNssAViewOrSharded(OperationContext* opCtx,
-                            const CollectionCatalog* catalog,
-                            const std::vector<NamespaceString>& namespaces) {
-    return std::any_of(namespaces.begin(), namespaces.end(), [&](auto&& nss) {
-        return isNssAViewOrSharded(opCtx, catalog, nss);
+bool isAnySecondaryNamespaceAView(OperationContext* opCtx,
+                                  const CollectionCatalog* catalog,
+                                  const std::vector<NamespaceString>& secondaryNamespaces) {
+    return std::any_of(secondaryNamespaces.begin(), secondaryNamespaces.end(), [&](auto&& nss) {
+        auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
+        return !collection && catalog->lookupView(opCtx, nss).get();
     });
 }
 
@@ -156,8 +132,7 @@ bool isAnyNssAViewOrSharded(OperationContext* opCtx,
  * Resolves all NamespaceStringOrUUIDs in the input vector by using the input catalog to call
  * CollectionCatalog::resolveSecondaryNamespacesOrUUIDs.
  *
- * If any of the input NamespaceStringOrUUIDs is found to correspond to a view, or to a sharded
- * collection, returns boost::none.
+ * If any of the input NamespaceStringOrUUIDs is found to correspond to a view, returns boost::none.
  *
  * Otherwise, returns a vector of NamespaceStrings that the input NamespaceStringOrUUIDs resolved
  * to.
@@ -167,22 +142,19 @@ boost::optional<std::vector<NamespaceString>> resolveSecondaryNamespacesOrUUIDs(
     const CollectionCatalog* catalog,
     std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsBegin,
     std::vector<NamespaceStringOrUUID>::const_iterator secondaryNssOrUUIDsEnd) {
-    std::vector<NamespaceString> resolvedNamespaces;
-    resolvedNamespaces.reserve(std::distance(secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd));
+    std::vector<NamespaceString> resolvedSecondaryNamespaces;
+    resolvedSecondaryNamespaces.reserve(
+        std::distance(secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd));
     for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
         const auto& nssOrUUID = *iter;
         auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
-        resolvedNamespaces.emplace_back(nss);
+        resolvedSecondaryNamespaces.emplace_back(nss);
     }
 
-    auto isAnySecondaryNssShardedOrAView =
-        isAnyNssAViewOrSharded(opCtx, catalog, resolvedNamespaces);
-
-    if (isAnySecondaryNssShardedOrAView) {
+    if (isAnySecondaryNamespaceAView(opCtx, catalog, resolvedSecondaryNamespaces)) {
         return boost::none;
-    } else {
-        return std::move(resolvedNamespaces);
     }
+    return std::move(resolvedSecondaryNamespaces);
 }
 
 /*
@@ -201,37 +173,13 @@ void establishCappedSnapshotIfNeeded(OperationContext* opCtx,
     }
 }
 
-bool haveAcquiredConsistentCatalogAndSnapshot(
-    OperationContext* opCtx,
-    const CollectionCatalog* catalogBeforeSnapshot,
-    const CollectionCatalog* catalogAfterSnapshot,
-    long long replTermBeforeSnapshot,
-    long long replTermAfterSnapshot,
-    const boost::optional<std::vector<NamespaceString>>& resolvedSecondaryNamespaces) {
-
-    if (catalogBeforeSnapshot == catalogAfterSnapshot &&
-        replTermBeforeSnapshot == replTermAfterSnapshot) {
-        // At this point, we know all secondary namespaces map to the same collections/views,
-        // because the catalog has not changed.
-        //
-        // It's still possible that some collection has become sharded since before opening the
-        // snapshot, in which case we would need to retry and acquire a new snapshot, so we must
-        // check for that as well.
-        //
-        // If some secondary namespace was already a view or sharded (i.e.
-        // resolvedSecondaryNamespaces is boost::none), then we don't care whether any namespaces
-        // are newly sharded, so this will be false.
-        bool secondaryNamespaceBecameSharded = resolvedSecondaryNamespaces &&
-            std::any_of(resolvedSecondaryNamespaces->begin(),
-                        resolvedSecondaryNamespaces->end(),
-                        [&](auto&& nss) { return isNssSharded(opCtx, nss); });
-
-        // If no secondary namespace has become sharded since opening a snapshot, we have found a
-        // consistent catalog and snapshot and can stop retrying.
-        return !secondaryNamespaceBecameSharded;
-    } else {
-        return false;
-    }
+bool haveAcquiredConsistentCatalogAndSnapshot(OperationContext* opCtx,
+                                              const CollectionCatalog* catalogBeforeSnapshot,
+                                              const CollectionCatalog* catalogAfterSnapshot,
+                                              long long replTermBeforeSnapshot,
+                                              long long replTermAfterSnapshot) {
+    return catalogBeforeSnapshot == catalogAfterSnapshot &&
+        replTermBeforeSnapshot == replTermAfterSnapshot;
 }
 
 void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
@@ -276,6 +224,17 @@ void checkInvariantsForReadOptions(boost::optional<const NamespaceString&> nss,
         LOGV2_FATAL(4728700,
                     "Reading from replicated collection on a secondary without read timestamp",
                     logAttrs(*nss));
+    }
+}
+
+void checkSecondaryNssShardVersions(
+    OperationContext* opCtx,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryCollItBegin,
+    std::vector<NamespaceStringOrUUID>::const_iterator secondaryCollItEnd) {
+    for (auto iter = secondaryCollItBegin; iter != secondaryCollItEnd; ++iter) {
+        if (iter->isNamespaceString()) {
+            CollectionShardingState::acquire(opCtx, iter->nss())->checkShardVersionOrThrow(opCtx);
+        }
     }
 }
 
@@ -390,13 +349,12 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
     // Check secondary collections and verify they are valid for use.
     if (secondaryNssOrUUIDsBegin != secondaryNssOrUUIDsEnd) {
-        // Check that none of the namespaces are views or sharded collections, which are not
-        // supported for secondary namespaces.
+        // Check that none of the namespaces are views, which are not supported for secondary
+        // namespaces.
         auto resolvedSecondaryNamespaces = resolveSecondaryNamespacesOrUUIDs(
             opCtx, catalog.get(), secondaryNssOrUUIDsBegin, secondaryNssOrUUIDsEnd);
-        _secondaryNssIsAViewOrSharded = !resolvedSecondaryNamespaces.has_value();
-
-        if (!_secondaryNssIsAViewOrSharded) {
+        _isAnySecondaryNamespaceAView = !resolvedSecondaryNamespaces.has_value();
+        if (!_isAnySecondaryNamespaceAView) {
             // Ensure that the readTimestamp is compatible with the latest Collection instances or
             // create PIT instances in the 'catalog' (if the collections existed at that PIT).
             for (auto iter = secondaryNssOrUUIDsBegin; iter != secondaryNssOrUUIDsEnd; ++iter) {
@@ -423,6 +381,11 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                 opCtx, *catalog, _coll, _resolvedNss);
         }
     }
+
+    // Check that we have valid shard versions for all of our secondary namespaces, if any was
+    // specified on the OperationShardingState.
+    checkSecondaryNssShardVersions(
+        opCtx, options._secondaryNssOrUUIDsBegin, options._secondaryNssOrUUIDsEnd);
 
     if (_coll) {
         // Fetch and store the sharding collection description data needed for use during the
@@ -528,7 +491,7 @@ namespace {
  */
 struct ConsistentCatalogAndSnapshot {
     std::shared_ptr<const CollectionCatalog> catalog;
-    bool isAnySecondaryNamespaceAViewOrSharded;
+    bool isAnySecondaryNamespaceAView;
     RecoveryUnit::ReadSource readSource;
     boost::optional<Timestamp> readTimestamp;
 };
@@ -651,11 +614,9 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
                                                      catalogBeforeSnapshot.get(),
                                                      catalogAfterSnapshot.get(),
                                                      replTermBeforeSnapshot,
-                                                     replTermAfterSnapshot,
-                                                     resolvedSecondaryNamespaces)) {
-            bool isAnySecondaryNssShardedOrAView = !resolvedSecondaryNamespaces.has_value();
-            return {
-                catalogBeforeSnapshot, isAnySecondaryNssShardedOrAView, readSource, readTimestamp};
+                                                     replTermAfterSnapshot)) {
+            bool isAnySecondaryNamespaceAView = !resolvedSecondaryNamespaces.has_value();
+            return {catalogBeforeSnapshot, isAnySecondaryNamespaceAView, readSource, readTimestamp};
         } else {
             shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
 
@@ -704,8 +665,7 @@ void acquireConsistentCatalogAndSnapshotUnsafe(OperationContext* opCtx,
                 catalog.get(),
                 newCatalog.get(),
                 replTerm,
-                repl::ReplicationCoordinator::get(opCtx)->getTerm(),
-                boost::none)) {
+                repl::ReplicationCoordinator::get(opCtx)->getTerm())) {
             CollectionCatalog::stash(opCtx, std::move(catalog));
             return;
         }
@@ -766,7 +726,7 @@ static const Lock::GlobalLockSkipOptions kLockFreeReadsGlobalLockOptions{[] {
 
 struct CatalogStateForNamespace {
     std::shared_ptr<const CollectionCatalog> catalog;
-    bool isAnySecondaryNssShardedOrAView;
+    bool isAnySecondaryNamespaceAView;
     NamespaceString resolvedNss;
     const Collection* collection;
     std::shared_ptr<const ViewDefinition> view;
@@ -780,7 +740,7 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
 
     bool needsRetry = false;
     while (true) {
-        auto [catalog, isAnySecondaryNssShardedOrAView, readSource, readTimestamp] =
+        auto [catalog, isAnySecondaryNamespaceAView, readSource, readTimestamp] =
             getConsistentCatalogAndSnapshot(opCtx,
                                             nsOrUUID,
                                             options._secondaryNssOrUUIDsBegin,
@@ -803,7 +763,7 @@ inline CatalogStateForNamespace acquireCatalogStateForNamespace(
         }
 
         return CatalogStateForNamespace{std::move(catalog),
-                                        isAnySecondaryNssShardedOrAView,
+                                        isAnySecondaryNamespaceAView,
                                         std::move(resolvedNss),
                                         collection,
                                         std::move(view)};
@@ -860,10 +820,14 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         supportsLockFreeRead(opCtx) &&
         (!shard_role_details::getRecoveryUnit(opCtx)->isActive() || _isLockFreeReadSubOperation));
 
+    // Pre-snapshot shard version checks.
     DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.dbName());
     if (nsOrUUID.isNamespaceString()) {
         CollectionShardingState::acquire(opCtx, nsOrUUID.nss())->checkShardVersionOrThrow(opCtx);
     }
+
+    checkSecondaryNssShardVersions(
+        opCtx, options._secondaryNssOrUUIDsBegin, options._secondaryNssOrUUIDsEnd);
 
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (_isLockFreeReadSubOperation) {
@@ -904,7 +868,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
             _lockFreeReadsBlock.reset();
         }
         CollectionCatalog::stash(opCtx, std::move(catalogStateForNamespace.catalog));
-        _secondaryNssIsAViewOrSharded = catalogStateForNamespace.isAnySecondaryNssShardedOrAView;
+        _isAnySecondaryNamespaceAView = catalogStateForNamespace.isAnySecondaryNamespaceAView;
 
         _collectionPtr = CollectionPtr(catalogStateForNamespace.collection);
 
@@ -914,8 +878,12 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
             });
     }
 
+    // Post-snapshot shard version checks.
     auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
     scopedCss->checkShardVersionOrThrow(opCtx);
+
+    checkSecondaryNssShardVersions(
+        opCtx, options._secondaryNssOrUUIDsBegin, options._secondaryNssOrUUIDsEnd);
 
     if (_collectionPtr) {
         assertReadConcernSupported(
@@ -967,11 +935,11 @@ const CollectionPtr& AutoGetCollectionForReadMaybeLockFree::getCollection() cons
     }
 }
 
-bool AutoGetCollectionForReadMaybeLockFree::isAnySecondaryNamespaceAViewOrSharded() const {
+bool AutoGetCollectionForReadMaybeLockFree::isAnySecondaryNamespaceAView() const {
     if (_autoGet) {
-        return _autoGet->isAnySecondaryNamespaceAViewOrSharded();
+        return _autoGet->isAnySecondaryNamespaceAView();
     } else {
-        return _autoGetLockFree->isAnySecondaryNamespaceAViewOrSharded();
+        return _autoGetLockFree->isAnySecondaryNamespaceAView();
     }
 }
 
@@ -1101,10 +1069,9 @@ query_shape::CollectionType AutoGetCollectionForReadCommandMaybeLockFree::getCol
                       : query_shape::CollectionType::kNonExistent;
 }
 
-
-bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAViewOrSharded() const {
-    return _autoGet ? _autoGet->isAnySecondaryNamespaceAViewOrSharded()
-                    : _autoGetLockFree->isAnySecondaryNamespaceAViewOrSharded();
+bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAView() const {
+    return _autoGet ? _autoGet->isAnySecondaryNamespaceAView()
+                    : _autoGetLockFree->isAnySecondaryNamespaceAView();
 }
 
 AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)

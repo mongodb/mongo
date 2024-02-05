@@ -55,6 +55,8 @@ public:
                        NamespaceString nss,
                        boost::optional<ShardVersion> shardVersion,
                        boost::optional<DatabaseVersion> databaseVersion);
+    ScopedSetShardRole(const ScopedSetShardRole&) = delete;
+    ScopedSetShardRole(ScopedSetShardRole&&);
     ~ScopedSetShardRole();
 
 private:
@@ -89,8 +91,6 @@ private:
  * from mongos as a command parameter.
  *
  * The metadata for a particular operation can be retrieved using the get() method.
- *
- * Note: This only supports storing the version for a single namespace.
  */
 class OperationShardingState {
     OperationShardingState(const OperationShardingState&) = delete;

@@ -12,15 +12,21 @@ selector:
   - jstests/aggregation/use_query_projection.js
   - jstests/aggregation/use_query_sort.js
 
-  # TODO: SERVER-83220 (Failing due to incorrect pushdown of $lookup for non-collocated collections).
-  # Reenable:
-  - jstests/aggregation/sources/facet/inner_lookup.js
+  # These tests are written such that, after we check the engine being used and the colocation of
+  # the involved collections, we drop and recreate our collections for each test case. Given that
+  # this suite creates unsplittable collections on random shards and we cannot reliably check the
+  # colocation of collections in these tests, this means that these tests are incompatible with
+  # this suite as written.
+  # TODO SERVER-83351: Rewrite these tests to be compatible with this suite.
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
+
+  # TODO SERVER-85965: These tests currently fail because we do not track the collation of
+  # unsplittable collections in the sharding catalog, and we do not lookup the collation from the
+  # primary shard. Re-enable these tests once we either track this information, or look it up.
   - jstests/aggregation/sources/lookup/lookup_collation.js
   - jstests/aggregation/sources/lookup/lookup_foreign_collation.js
-  - jstests/aggregation/dbref.js
 
   # TODO: SERVER-83351 (failing due to incorrect explain expectations). Reenable:
   - jstests/aggregation/explain_writing_aggs.js

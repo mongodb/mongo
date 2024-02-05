@@ -90,6 +90,7 @@
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/initialize_auto_get_helper.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
@@ -1311,19 +1312,29 @@ Status _runAggregate(OperationContext* opCtx,
         [&](const BSONObj& data) { return nss.coll() == data["collection"].valueStringData(); });
 
     auto initContext = [&](auto_get_collection::ViewMode m) {
-        ctx.emplace(opCtx,
-                    nss,
-                    AutoGetCollection::Options{}.viewMode(m).secondaryNssOrUUIDs(
-                        secondaryExecNssList.cbegin(), secondaryExecNssList.cend()),
-                    AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
+        auto initAutoGetCallback = [&]() {
+            ctx.emplace(opCtx,
+                        nss,
+                        AutoGetCollection::Options{}.viewMode(m).secondaryNssOrUUIDs(
+                            secondaryExecNssList.cbegin(), secondaryExecNssList.cend()),
+                        AutoStatsTracker::LogMode::kUpdateTopAndCurOp);
+        };
+        bool anySecondaryCollectionNotLocal =
+            intializeAutoGet(opCtx, nss, secondaryExecNssList, initAutoGetCallback);
+        tassert(8322000,
+                "Should have initialized AutoGet* after calling 'initializeAutoGet'",
+                ctx.has_value());
         collections = MultipleCollectionAccessor(opCtx,
                                                  &ctx->getCollection(),
                                                  ctx->getNss(),
-                                                 ctx->isAnySecondaryNamespaceAViewOrSharded(),
+                                                 ctx->isAnySecondaryNamespaceAView() ||
+                                                     anySecondaryCollectionNotLocal,
                                                  secondaryExecNssList);
-        // Return the catalog that gets implicitly stashed during the collection acquisition above,
-        // which also implicitly opened a storage snapshot. This catalog object can be potentially
-        // different than the one obtained before and will be in sync with the opened snapshot.
+
+        // Return the catalog that gets implicitly stashed during the collection acquisition
+        // above, which also implicitly opened a storage snapshot. This catalog object can
+        // be potentially different than the one obtained before and will be in sync with
+        // the opened snapshot.
         return CollectionCatalog::get(opCtx);
     };
 
@@ -1732,10 +1743,16 @@ Status _runAggregate(OperationContext* opCtx,
         if (ctx) {
             // Due to yielding, the collection pointers saved in MultipleCollectionAccessor might
             // have become invalid. We will need to refresh them here.
+
+            // Stash the old value of 'isAnySecondaryNamespaceAViewOrNotFullyLocal' before
+            // refreshing. This is ok because we expect that our view of the collection should not
+            // have changed while holding 'ctx'.
+            auto isAnySecondaryNamespaceAViewOrNotFullyLocal =
+                collections.isAnySecondaryNamespaceAViewOrNotFullyLocal();
             collections = MultipleCollectionAccessor(opCtx,
                                                      &ctx->getCollection(),
                                                      ctx->getNss(),
-                                                     ctx->isAnySecondaryNamespaceAViewOrSharded(),
+                                                     isAnySecondaryNamespaceAViewOrNotFullyLocal,
                                                      secondaryExecNssList);
 
             auto exec =
