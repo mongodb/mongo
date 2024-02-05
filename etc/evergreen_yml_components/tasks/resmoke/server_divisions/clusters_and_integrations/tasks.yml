@@ -1199,7 +1199,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
-  tags: []
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -1218,7 +1218,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_jscore_txns_with_replica_set_endpoint_gen
-  tags: []
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -1231,7 +1231,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
-  tags: []
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -1324,7 +1324,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
-  tags: []
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
 

@@ -183,7 +183,6 @@ buildvariants:
   - name: .read_write_concern !.large
   - name: .replica_sets !.encrypt !.auth
   - name: replica_sets_api_version_jscore_passthrough_gen
-  - name: replica_sets_jscore_passthrough_with_auto_bootstrap_and_replica_set_endpoint_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
@@ -201,11 +200,6 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
-  - name: secondary_reads_passthrough_with_replica_set_endpoint_gen
-  - name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
-  - name: sharded_jscore_txns_with_replica_set_endpoint_gen
-  - name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen
-  - name: sharding_jscore_passthrough_with_replica_set_endpoint_gen
   - name: .serverless
     distros:
     - amazon2-arm64-large

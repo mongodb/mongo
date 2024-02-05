@@ -741,8 +741,8 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: replica_sets_jscore_passthrough_with_auto_bootstrap_and_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_repl"]
+  name: replica_sets_jscore_passthrough_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -928,7 +928,7 @@ tasks:
 
 - <<: *gen_task_template
   name: secondary_reads_passthrough_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_repl"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "sharding", "jscore", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
 
