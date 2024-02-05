@@ -433,6 +433,7 @@ Split's
 Stoica
 StoreLoad
 StoreStore
+Strobed
 Su
 Syscall
 TAILQ
@@ -1156,6 +1157,7 @@ mfence
 minSnapshotHistoryWindowInSeconds
 minorp
 mips
+misalignments
 mkdir
 mmap
 mmrand
@@ -1443,6 +1445,7 @@ strlen
 strncpy
 strndup
 strnlen
+strobed
 strtok
 strtoll
 strtouq
