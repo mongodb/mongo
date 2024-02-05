@@ -300,14 +300,13 @@ std::string getHostNameCached() {
     return temp;
 }
 
-std::string getHostNameCachedAndPort() {
-    return str::stream() << getHostNameCached() << ':' << serverGlobalParams.port;
+std::string prettyHostNameAndPort(int port) {
+    return str::stream() << getHostNameCached() << ':' << port;
 }
 
-std::string prettyHostName() {
-    return (serverGlobalParams.port == ServerGlobalParams::DefaultDBPort
-                ? getHostNameCached()
-                : getHostNameCachedAndPort());
+std::string prettyHostName(int port) {
+    return port == ServerGlobalParams::DefaultDBPort ? getHostNameCached()
+                                                     : prettyHostNameAndPort(port);
 }
 
 }  // namespace mongo

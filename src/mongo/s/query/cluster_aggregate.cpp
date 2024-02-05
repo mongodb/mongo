@@ -591,7 +591,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     auto opts = SerializationOptions{.verbosity = boost::make_optional(
                                                          ExplainOptions::Verbosity::kQueryPlanner)};
                     *result << "splitPipeline" << BSONNULL << "mongos"
-                            << Document{{"host", getHostNameCachedAndPort()},
+                            << Document{{"host",
+                                         prettyHostNameAndPort(
+                                             expCtx->opCtx->getClient()->getLocalPort())},
                                         {"stages", targeter.pipeline->writeExplainOps(opts)}};
                     return Status::OK();
                 }

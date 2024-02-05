@@ -155,11 +155,12 @@ void TransactionCoordinatorService::reportCoordinators(OperationContext* opCtx,
             return false;
         };
 
-    auto reporter = [ops](const LogicalSessionId lsid,
+    auto reporter = [opCtx,
+                     ops](const LogicalSessionId lsid,
                           const TxnNumberAndRetryCounter txnNumberAndRetryCounter,
                           const std::shared_ptr<TransactionCoordinator> transactionCoordinator) {
         BSONObjBuilder doc;
-        transactionCoordinator->reportState(doc);
+        transactionCoordinator->reportState(opCtx, doc);
         ops->push_back(doc.obj());
     };
 

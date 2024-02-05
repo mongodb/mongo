@@ -525,7 +525,7 @@ void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem, bool isI
 
     if (meta && serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
         // If we had a full ClientMetadata and we're on mongos, attach some additional client data.
-        meta->setMongoSMetadata(getHostNameCachedAndPort(),
+        meta->setMongoSMetadata(prettyHostNameAndPort(client->getLocalPort()),
                                 client->clientAddress(true),
                                 VersionInfoInterface::instance().version());
     }

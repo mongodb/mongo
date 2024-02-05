@@ -5838,7 +5838,8 @@ TEST_F(TransactionRouterMetricsTest, ReportResources) {
     ASSERT_EQ(transactionDocument.getField("numNonReadOnlyParticipants").numberInt(), 0);
     ASSERT_EQ(transactionDocument.getField("numReadOnlyParticipants").numberInt(), 0);
 
-    ASSERT_EQ(state.getField("host").valueStringData().toString(), getHostNameCachedAndPort());
+    ASSERT_EQ(state.getField("host").valueStringData().toString(),
+              prettyHostNameAndPort(operationContext()->getClient()->getLocalPort()));
     ASSERT_EQ(state.getField("desc").valueStringData().toString(), "inactive transaction");
     ASSERT_BSONOBJ_EQ(state.getField("lsid").Obj(), getSessionId().toBSON());
     ASSERT_EQ(state.getField("client").valueStringData().toString(), "");

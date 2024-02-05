@@ -170,9 +170,10 @@ void SingleTransactionCoordinatorStats::reportMetrics(BSONObjBuilder& parent,
     parent.append("stepDurations", stepDurationsBuilder.obj());
 }
 
-void SingleTransactionCoordinatorStats::reportLastClient(BSONObjBuilder& parent) const {
+void SingleTransactionCoordinatorStats::reportLastClient(OperationContext* opCtx,
+                                                         BSONObjBuilder& parent) const {
     parent.append("client", _lastClientInfo.clientHostAndPort);
-    parent.append("host", getHostNameCachedAndPort());
+    parent.append("host", prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
     parent.append("connectionId", _lastClientInfo.connectionId);
     parent.append("appName", _lastClientInfo.appName);
     parent.append("clientMetadata", _lastClientInfo.clientMetadata);

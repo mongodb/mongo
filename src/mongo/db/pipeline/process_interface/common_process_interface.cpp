@@ -135,7 +135,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
         for (auto&& cursor : getIdleCursors(expCtx, userMode)) {
             BSONObjBuilder cursorObj;
             cursorObj.append("type", "idleCursor");
-            cursorObj.append("host", getHostNameCachedAndPort());
+            cursorObj.append("host", prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
             // First, extract fields which need to go at the top level out of the GenericCursor.
             if (auto ns = cursor.getNs()) {
                 tassert(7663401,
@@ -282,7 +282,7 @@ boost::optional<ShardId> CommonProcessInterface::findOwningShard(OperationContex
 }
 
 std::string CommonProcessInterface::getHostAndPort(OperationContext* opCtx) const {
-    return getHostNameCachedAndPort();
+    return prettyHostNameAndPort(opCtx->getClient()->getLocalPort());
 }
 
 }  // namespace mongo

@@ -663,7 +663,7 @@ TransactionCoordinator::Step TransactionCoordinator::getStep() const {
     return _step;
 }
 
-void TransactionCoordinator::reportState(BSONObjBuilder& parent) const {
+void TransactionCoordinator::reportState(OperationContext* opCtx, BSONObjBuilder& parent) const {
     BSONObjBuilder doc;
     TickSource* tickSource = _serviceContext->getTickSource();
     TickSource::Tick currentTick = tickSource->getTicks();
@@ -685,7 +685,7 @@ void TransactionCoordinator::reportState(BSONObjBuilder& parent) const {
     const auto& singleStats =
         _transactionCoordinatorMetricsObserver->getSingleTransactionCoordinatorStats();
     singleStats.reportMetrics(doc, tickSource, currentTick);
-    singleStats.reportLastClient(parent);
+    singleStats.reportLastClient(opCtx, parent);
 
     if (_decision)
         doc.append("decision", _decision->toBSON());

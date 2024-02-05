@@ -70,10 +70,15 @@ std::string getHostName();
  * will be stale */
 std::string getHostNameCached();
 
-/** Returns getHostNameCached():<port>. */
-std::string getHostNameCachedAndPort();
 
-/** Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port. */
-std::string prettyHostName();
+/**
+ * Returns getHostNameCached():<port>.
+ */
+std::string prettyHostNameAndPort(int port);
+
+/**
+ * Returns getHostNameCached(), or getHostNameCached():<port> if running on a non-default port.
+ */
+std::string prettyHostName(int port);
 
 }  // namespace mongo

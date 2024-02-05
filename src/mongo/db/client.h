@@ -390,6 +390,11 @@ public:
 
     TagMask getTags() const;
 
+    /**
+     * Returns the associated port for this client.
+     */
+    int getLocalPort() const;
+
 private:
     friend class ServiceContext;
     friend class ThreadClient;

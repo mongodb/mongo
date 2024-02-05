@@ -278,7 +278,7 @@ public:
             autoDb.emplace(opCtx, dbName, MODE_S);
         }
 
-        result.append("host", prettyHostName());
+        result.append("host", prettyHostName(opCtx->getClient()->getLocalPort()));
 
         md5_state_t globalState;
         md5_init(&globalState);

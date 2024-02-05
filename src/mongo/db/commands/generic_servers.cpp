@@ -184,7 +184,7 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext* opCtx) {
 
     HostInfoSystemReply system;
     system.setCurrentTime(jsTime());
-    system.setHostname(prettyHostName());
+    system.setHostname(prettyHostName(opCtx->getClient()->getLocalPort()));
     system.setCpuAddrSize(static_cast<int>(p.getAddrSize()));
     system.setMemSizeMB(static_cast<long>(p.getSystemMemSizeMB()));
     system.setMemLimitMB(static_cast<long>(p.getMemSizeMB()));

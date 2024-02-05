@@ -3706,7 +3706,7 @@ TEST_F(TransactionsMetricsTest, ReportStashedResources) {
     auto parametersDocument = transactionDocument.getObjectField("parameters");
 
     ASSERT_EQ(stashedState.getField("host").valueStringData().toString(),
-              getHostNameCachedAndPort());
+              prettyHostNameAndPort(opCtx()->getClient()->getLocalPort()));
     ASSERT_EQ(stashedState.getField("desc").valueStringData().toString(), "inactive transaction");
     ASSERT_BSONOBJ_EQ(stashedState.getField("lsid").Obj(), _sessionId.toBSON());
     ASSERT_EQ(parametersDocument.getField("txnNumber").numberLong(), _txnNumber);

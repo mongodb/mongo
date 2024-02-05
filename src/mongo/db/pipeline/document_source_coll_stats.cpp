@@ -118,7 +118,7 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
         builder.append("shard", shardName);
     }
 
-    builder.append("host", getHostNameCachedAndPort());
+    builder.append("host", prettyHostNameAndPort(expCtx->opCtx->getClient()->getLocalPort()));
     builder.appendDate("localTime", jsTime());
 
     if (auto latencyStatsSpec = spec.getLatencyStats()) {

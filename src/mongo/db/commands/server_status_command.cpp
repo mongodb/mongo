@@ -131,7 +131,7 @@ public:
 
         // --- basic fields that are global
 
-        result.append("host", prettyHostName());
+        result.append("host", prettyHostName(opCtx->getClient()->getLocalPort()));
         result.append("version", VersionInfoInterface::instance().version());
         result.append("process", serverGlobalParams.binaryName);
         result.append("service", toBSON(opCtx->getService()->role()));

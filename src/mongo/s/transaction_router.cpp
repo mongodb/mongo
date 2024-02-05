@@ -353,7 +353,7 @@ void TransactionRouter::Observer::_reportState(OperationContext* opCtx,
 
     if (!sessionIsActive) {
         builder->append("type", "idleSession");
-        builder->append("host", getHostNameCachedAndPort());
+        builder->append("host", prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
         builder->append("desc", "inactive transaction");
 
         const auto& lastClientInfo = o().lastClientInfo;

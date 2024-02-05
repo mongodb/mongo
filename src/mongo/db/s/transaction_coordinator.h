@@ -157,7 +157,7 @@ public:
         return *_transactionCoordinatorMetricsObserver;
     }
 
-    void reportState(BSONObjBuilder& parent) const;
+    void reportState(OperationContext* opCtx, BSONObjBuilder& parent) const;
     static std::string toString(Step step);
 
     Step getStep() const;

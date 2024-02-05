@@ -364,7 +364,7 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::create(TenantId tenant,
     header.setKeyId("none"_sd);
 
     crypto::JWT body;
-    body.setIssuer("mongodb://{}"_format(getHostNameCachedAndPort()));
+    body.setIssuer("mongodb://{}"_format(prettyHostNameAndPort(serverGlobalParams.port)));
     body.setSubject(".");
     body.setAudience(std::string{"interal-request"});
     body.setTenantId(tenant);

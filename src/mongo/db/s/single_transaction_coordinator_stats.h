@@ -173,7 +173,7 @@ public:
     /**
      * Reports information about the last client to interact with this transaction.
      */
-    void reportLastClient(BSONObjBuilder& parent) const;
+    void reportLastClient(OperationContext* opCtx, BSONObjBuilder& parent) const;
 
     /**
      * Updates the LastClientInfo object stored in this SingleTransactionStats instance with the

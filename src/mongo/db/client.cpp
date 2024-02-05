@@ -244,6 +244,14 @@ Client::TagMask Client::getTags() const {
     return _tags.load();
 }
 
+int Client::getLocalPort() const {
+    if (_service->role().hasExclusively(ClusterRole::RouterServer) &&
+        serverGlobalParams.routerPort) {
+        return serverGlobalParams.routerPort.value();
+    }
+    return serverGlobalParams.port;
+}
+
 void Client::_setOperationContext(OperationContext* opCtx) {
     _opCtx = opCtx;
     if (_session) {

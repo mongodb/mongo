@@ -2632,7 +2632,7 @@ void TransactionParticipant::Observer::reportStashedState(OperationContext* opCt
         if (auto lockerInfo = o().txnResourceStash->locker()->getLockerInfo(boost::none)) {
             invariant(o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
             builder->append("type", "idleSession");
-            builder->append("host", getHostNameCachedAndPort());
+            builder->append("host", prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
             builder->append("desc", "inactive transaction");
 
             const auto& lastClientInfo =

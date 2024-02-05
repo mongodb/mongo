@@ -66,7 +66,7 @@ intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
         auto indexStats = pExpCtx->mongoProcessInterface->getIndexStats(
             pExpCtx->opCtx,
             pExpCtx->ns,
-            getHostNameCachedAndPort(),
+            prettyHostNameAndPort(pExpCtx->opCtx->getClient()->getLocalPort()),
             !serverGlobalParams.clusterRole.has(ClusterRole::None));
         std::deque<DocumentSource::GetNextResult> queue;
         std::copy(std::make_move_iterator(indexStats.begin()),

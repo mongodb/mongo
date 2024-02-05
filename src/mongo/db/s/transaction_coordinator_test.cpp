@@ -2835,9 +2835,10 @@ TEST_F(TransactionCoordinatorMetricsTest, RecoveryFromFailureIndicatedInReportSt
         Date_t::max(),
         _cancelToken);
 
-    const auto assertRecoveryFlag = [&coordinator](bool expectedFlagValue) {
+    const auto assertRecoveryFlag = [opCtx = operationContext(),
+                                     &coordinator](bool expectedFlagValue) {
         BSONObjBuilder builder;
-        coordinator.reportState(builder);
+        coordinator.reportState(opCtx, builder);
         auto reportDoc = builder.obj();
         auto coordinatorDoc = reportDoc.getObjectField("twoPhaseCommitCoordinator");
         ASSERT_EQ(coordinatorDoc.getBoolField("hasRecoveredFromFailover"), expectedFlagValue);
@@ -2874,7 +2875,7 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
 
     {
         BSONObjBuilder builder;
-        coordinator.reportState(builder);
+        coordinator.reportState(operationContext(), builder);
         BSONObj reportDoc = builder.obj();
         ASSERT_EQ(StringData(reportDoc.getStringField("desc")), "transaction coordinator");
         assertClientReportStateFields(reportDoc, expectedAppName, getClient()->getConnectionId());
@@ -2887,7 +2888,7 @@ TEST_F(TransactionCoordinatorMetricsTest, ClientInformationIncludedInReportState
 
     {
         BSONObjBuilder builder;
-        coordinator.reportState(builder);
+        coordinator.reportState(operationContext(), builder);
         BSONObj reportDoc = builder.obj();
         ASSERT_EQ(StringData(reportDoc.getStringField("desc")), "transaction coordinator");
         assertClientReportStateFields(reportDoc, expectedAppName2, getClient()->getConnectionId());

@@ -232,7 +232,7 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
 
     infoBuilder->append("type", "op");
 
-    const std::string hostName = getHostNameCachedAndPort();
+    const std::string hostName = prettyHostNameAndPort(client->getLocalPort());
     infoBuilder->append("host", hostName);
 
     client->reportState(*infoBuilder);
