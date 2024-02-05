@@ -91,6 +91,10 @@ selector:
   - jstests/aggregation/sources/facet/facet_stats.js
   - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
 
+  # SERVER-85472: test runs an updateOne without shard key which will use an internal transaction
+  # that can be aborted by the fcv upgrade downgrade suite.
+  - jstests/aggregation/sources/unionWith/unionWith_invalid_usage.js
+
   # Expected failure due to interfering collMod commands acquiring a lock that the test does not expect.
   - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
 
@@ -119,7 +123,7 @@ selector:
   # setFCV operations. The exclusion can be removed once the linked ticket is fixed.
   - jstests/core/top.js
 
-  # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail
+  # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
   - jstests/core/bench_test1.js
 
   exclude_with_any_tags:
