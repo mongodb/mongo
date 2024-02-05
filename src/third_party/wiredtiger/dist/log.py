@@ -253,9 +253,11 @@ static inline int
 __pack_encode_WT_ITEM(uint8_t **pp, uint8_t *end, WT_ITEM *item)
 {
     WT_RET(__wt_vpack_uint(pp, WT_PTRDIFF(end, *pp), item->size));
-    WT_SIZE_CHECK_PACK(item->size, WT_PTRDIFF(end, *pp));
-    memcpy(*pp, item->data, item->size);
-    *pp += item->size;
+    if (item->size != 0) {
+        WT_SIZE_CHECK_PACK(item->size, WT_PTRDIFF(end, *pp));
+        memcpy(*pp, item->data, item->size);
+        *pp += item->size;
+    }
     return (0);
 }
 
@@ -266,9 +268,11 @@ __pack_encode_WT_ITEM(uint8_t **pp, uint8_t *end, WT_ITEM *item)
 static inline int
 __pack_encode_WT_ITEM_last(uint8_t **pp, uint8_t *end, WT_ITEM *item)
 {
-    WT_SIZE_CHECK_PACK(item->size, WT_PTRDIFF(end, *pp));
-    memcpy(*pp, item->data, item->size);
-    *pp += item->size;
+    if (item->size != 0) {
+        WT_SIZE_CHECK_PACK(item->size, WT_PTRDIFF(end, *pp));
+        memcpy(*pp, item->data, item->size);
+        *pp += item->size;
+    }
     return (0);
 }
 
