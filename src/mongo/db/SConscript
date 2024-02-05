@@ -1355,6 +1355,25 @@ env.Library(
 )
 
 env.Library(
+    target='index_builds_coordinator_mock',
+    source=['index_builds_coordinator_mock.cpp'],
+    LIBDEPS=[
+        'index_builds_coordinator_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        'catalog/collection_catalog',
+        'catalog/index_build_entry_idl',
+        'index_build_entry_helpers',
+        'repl/tenant_migration_access_blocker',
+        'resumable_index_builds_idl',
+        's/forwardable_operation_metadata',
+        'shard_role',
+        'storage/two_phase_index_build_knobs_idl',
+    ],
+)
+
+env.Library(
     target='index_build_entry_helpers',
     source=[
         'index_build_entry_helpers.cpp',

@@ -538,7 +538,13 @@ ValidationBehaviorsReshardingBulkIndex::ValidationBehaviorsReshardingBulkIndex()
 std::vector<BSONObj> ValidationBehaviorsReshardingBulkIndex::loadIndexes(
     const NamespaceString& nss) const {
     invariant(_opCtx);
-    auto catalogCache = Grid::get(_opCtx)->catalogCache();
+    auto grid = Grid::get(_opCtx);
+    // This is a hack to make this code work in resharding_recipient_service_test. In real
+    // deployment, grid and catalogCache should always exist.
+    if (!grid->isInitialized() || !grid->catalogCache()) {
+        return std::vector<BSONObj>();
+    }
+    auto catalogCache = grid->catalogCache();
     auto cri = catalogCache->getTrackedCollectionRoutingInfo(_opCtx, nss);
     auto [indexSpecs, _] = MigrationDestinationManager::getCollectionIndexes(
         _opCtx, nss, cri.cm.getMinKeyShardIdWithSimpleCollation(), cri, _cloneTimestamp);

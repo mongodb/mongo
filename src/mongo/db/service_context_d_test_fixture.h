@@ -34,6 +34,7 @@
 #include <utility>
 
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -105,6 +106,12 @@ protected:
             return std::move(*this);
         }
 
+        Options useIndexBuildsCoordinator(
+            std::unique_ptr<IndexBuildsCoordinator> indexBuildsCoordinator) {
+            _indexBuildsCoordinator = std::move(indexBuildsCoordinator);
+            return std::move(*this);
+        }
+
     private:
         std::string _engine = "wiredTiger";
         // We use ephemeral instances by default to advise Storage Engines (in particular
@@ -118,6 +125,7 @@ protected:
         std::unique_ptr<TickSource> _mockTickSource;
         std::unique_ptr<JournalListener> _journalListener;
         std::unique_ptr<AuthzManagerExternalStateMock> _mockAuthzExternalState;
+        std::unique_ptr<IndexBuildsCoordinator> _indexBuildsCoordinator;
         bool _forceDisableTableLogging = false;
 
         friend class ServiceContextMongoDTest;

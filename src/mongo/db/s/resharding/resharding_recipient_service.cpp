@@ -1456,7 +1456,8 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
         if (!tempReshardingColl) {
             return;
         }
-        if (_recipientCtx.getState() != RecipientStateEnum::kCloning) {
+        if (_recipientCtx.getState() != RecipientStateEnum::kCloning &&
+            _recipientCtx.getState() != RecipientStateEnum::kBuildingIndex) {
             // Before cloning, these values are 0. After cloning these values are written to the
             // metrics section of the recipient state document and restored during metrics
             // initialization. This is so that applied oplog entries that add or remove

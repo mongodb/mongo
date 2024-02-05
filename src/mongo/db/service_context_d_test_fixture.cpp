@@ -172,13 +172,19 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
     Collection::Factory::set(serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
-    IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
     ShardingState::create_forTest_DO_NOT_USE(serviceContext);
     CollectionShardingStateFactory::set(
         serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(serviceContext));
 
     auto opCtx = serviceContext->makeOperationContext(getClient());
     serviceContext->getStorageEngine()->notifyStartupComplete(opCtx.get());
+
+    if (options._indexBuildsCoordinator) {
+        IndexBuildsCoordinator::set(serviceContext, std::move(options._indexBuildsCoordinator));
+    } else {
+        IndexBuildsCoordinator::set(serviceContext,
+                                    std::make_unique<IndexBuildsCoordinatorMongod>());
+    }
 
     if (_journalListener) {
         serviceContext->getStorageEngine()->setJournalListener(_journalListener.get());
