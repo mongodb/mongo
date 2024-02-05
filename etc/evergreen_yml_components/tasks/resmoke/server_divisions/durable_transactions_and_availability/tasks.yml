@@ -926,6 +926,12 @@ tasks:
     vars:
       use_large_distro: "true"
 
+- <<: *gen_task_template
+  name: secondary_reads_passthrough_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_repl"]
+  commands:
+  - func: "generate resmoke tasks"
+
 - <<: *task_template
   name: serial_run
   tags: ["assigned_to_jira_team_server_repl", "misc_js", "non_win_dbg"]

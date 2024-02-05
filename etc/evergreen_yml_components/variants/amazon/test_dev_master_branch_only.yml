@@ -201,6 +201,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
+  - name: secondary_reads_passthrough_with_replica_set_endpoint_gen
   - name: sharded_collections_jscore_passthrough_with_replica_set_endpoint_gen
   - name: sharded_jscore_txns_with_replica_set_endpoint_gen
   - name: sharded_jscore_txns_sharded_collections_with_replica_set_endpoint_gen

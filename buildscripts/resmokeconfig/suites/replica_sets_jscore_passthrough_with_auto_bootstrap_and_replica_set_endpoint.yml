@@ -1,8 +1,8 @@
-# This suite is based on the replica_sets_jscore_txns passthrough suite. It is used for testing that
+# This suite is based on the replica_sets_jscore passthrough suite. It is used for testing that
 # there is no feature parity issue between a replica set before and after it has been bootstrapped
 # as a single-shard cluster as long as the replica set endpoint is enabled. When feature parity is
 # achieved, the set of tests disabled in this suite should be the same as the set of tests disabled
-# in the replica_sets_jscore_txns passthrough suite.
+# in the replica_sets_jscore passthrough suite.
 
 test_kind: js_test
 

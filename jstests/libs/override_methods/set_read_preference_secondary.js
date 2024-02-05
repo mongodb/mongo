@@ -2,6 +2,7 @@
  * Use prototype overrides to set read preference to "secondary" when running tests.
  */
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
+import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
 const kReadPreferenceSecondary = {
     mode: "secondary"
@@ -43,6 +44,70 @@ const CursorTracker = (function() {
     };
 })();
 
+/**
+ * Returns a random integer between the given range (inclusive).
+ */
+function getRandInteger(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/**
+ * Returns a random element in the given array.
+ */
+function getRandomElement(arr) {
+    return arr[getRandInteger(0, arr.length - 1)];
+}
+
+const kSecondariesToConnectDirectlyTo = [];
+if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
+    const hostColl = db.getSiblingDB("config").connectDirectlyToSecondaries.hosts;
+    hostColl.find().forEach(doc => {
+        if (doc.isSecondary && !doc.isExcluded) {
+            kSecondariesToConnectDirectlyTo.push({host: doc.host, comment: doc.comment});
+        }
+    });
+
+    if (kSecondariesToConnectDirectlyTo.length == 0) {
+        // This is the first time this file is loaded. Choose the secondaries to connect
+        // directly to.
+        const helloRes = assert.commandWorked(db.adminCommand({hello: 1}));
+        if (!helloRes.hasOwnProperty("setName")) {
+            throw new Error(
+                "Cannot connect directly to a secondary since this is not a replica set. " +
+                "Unrecognized topology format:" + tojson(helloRes));
+        }
+        assert.gt(helloRes.passives.length, 0, {
+            msg: "Cannot definitively determine which nodes are secondaries since all nodes " +
+                "are electable",
+            helloRes
+        });
+        assert.gt(helloRes.passives.length, 1, {
+            msg: "Cannot connect to only a subset of secondaries since there is only one secondary",
+            helloRes
+        });
+
+        jsTest.log("Choosing secondaries to reads directly from");
+        assert.commandWorked(hostColl.insert({
+            host: helloRes.primary,
+            isPrimary: true,
+        }));
+
+        const secondaryToExclude =
+            helloRes.passives[getRandInteger(0, helloRes.passives.length - 1)];
+        helloRes.passives.forEach(host => {
+            if (host == secondaryToExclude) {
+                assert.commandWorked(hostColl.insert({host, isSecondary: true, isExcluded: true}));
+            } else {
+                const comment = extractUUIDFromObject(UUID());
+                kSecondariesToConnectDirectlyTo.push({host, comment});
+                assert.commandWorked(hostColl.insert({host, isSecondary: true, comment}));
+            }
+        });
+    }
+}
+jsTest.log("Forcing reads to go directly to the following secondaries: " +
+           tojsononeline(kSecondariesToConnectDirectlyTo));
+
 function runCommandWithReadPreferenceSecondary(
     conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     if (typeof commandObj !== "object" || commandObj === null) {
@@ -55,7 +120,7 @@ function runCommandWithReadPreferenceSecondary(
             "'system.profile' collection is not replicated" + tojson(commandObj));
     }
 
-    if (conn.isReplicaSetConnection()) {
+    if (conn.isReplicaSetConnection() || TestData.connectDirectlyToRandomSubsetOfSecondaries) {
         // When a "getMore" or "killCursors" command is issued on a replica set connection, we
         // attempt to automatically route the command to the server the cursor(s) were
         // originally established on. This makes it possible to use the
@@ -133,12 +198,29 @@ function runCommandWithReadPreferenceSecondary(
         } else if (!commandObj.hasOwnProperty("$readPreference")) {
             commandObj.$readPreference = kReadPreferenceToUse;
         }
+        if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
+            const randomSecondary = getRandomElement(kSecondariesToConnectDirectlyTo);
+            const currentClusterTime = conn.getClusterTime();
+            conn = new Mongo("mongodb://" + randomSecondary.host + "/?directConnection=true");
+            // To guarantee causal consistency, wait for the operationTime on the original
+            // connection.
+            assert.soon(() => {
+                const res = assert.commandWorked(conn.adminCommand({"ping": 1}));
+                return timestampCmp(res.operationTime, currentClusterTime.clusterTime) >= 0;
+            });
+            if (!commandObj.hasOwnProperty("comment")) {
+                // If this command already has the "comment" field, do not overwrite it since that
+                // could cause the test to fail.
+                commandObj.comment = randomSecondary.comment;
+            }
+        }
     }
 
     const serverResponse = func.apply(conn, makeFuncArgs(commandObj));
 
-    if (conn.isReplicaSetConnection() && kCursorGeneratingCommands.has(commandName) &&
-        serverResponse.ok === 1 && serverResponse.hasOwnProperty("cursor")) {
+    if ((conn.isReplicaSetConnection() || TestData.connectDirectlyToRandomSubsetOfSecondaries) &&
+        kCursorGeneratingCommands.has(commandName) && serverResponse.ok === 1 &&
+        serverResponse.hasOwnProperty("cursor")) {
         // We associate the cursor id returned by the server with the connection that was used
         // to establish it so that we can attempt to automatically route subsequent "getMore"
         // and "killCursors" commands.
