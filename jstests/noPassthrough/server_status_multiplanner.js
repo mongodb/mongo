@@ -3,6 +3,9 @@
  *
  * @tags: [featureFlagSbeFull]
  */
+
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 function sumHistogramBucketCounts(histogram) {
     let sum = 0;
     for (const bucket of histogram) {
@@ -28,17 +31,49 @@ assert.commandWorked(coll.insert({_id: 5, a: 1, b: 1}));
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.createIndex({b: 1}));
 
-let multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
+function assertSbeMultiPlannerMetrics(multiPlannerMetrics, expectedCount, checkHistograms = true) {
+    if (checkHistograms) {
+        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeMicros),
+                  expectedCount);
+        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumReads),
+                  expectedCount);
+        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumPlans),
+                  expectedCount);
+    }
+    assert.eq(multiPlannerMetrics.sbeCount, expectedCount);
+    if (expectedCount > 0) {
+        assert.gt(multiPlannerMetrics.sbeMicros, 0);
+        assert.gt(multiPlannerMetrics.sbeNumReads, 0);
+    } else {
+        assert.eq(multiPlannerMetrics.sbeMicros, 0);
+        assert.eq(multiPlannerMetrics.sbeNumReads, 0);
+    }
+}
+
+function assertClassicMultiPlannerMetrics(
+    multiPlannerMetrics, expectedCount, checkHistograms = true) {
+    if (checkHistograms) {
+        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros),
+                  expectedCount);
+        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans),
+                  expectedCount);
+        assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks),
+                  expectedCount);
+    }
+    assert.eq(multiPlannerMetrics.classicCount, expectedCount);
+    if (expectedCount > 0) {
+        assert.gt(multiPlannerMetrics.classicMicros, 0);
+        assert.gt(multiPlannerMetrics.classicWorks, 0);
+    } else {
+        assert.eq(multiPlannerMetrics.classicMicros, 0);
+        assert.eq(multiPlannerMetrics.classicWorks, 0);
+    }
+}
 
 // Verify initial metrics.
-assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros), 0);
-assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans), 0);
-assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks), 0);
-assert.eq(multiPlannerMetrics.classicCount, 0);
-assert.eq(multiPlannerMetrics.classicMicros, 0);
-assert.eq(multiPlannerMetrics.classicWorks, 0);
-
-assert.eq(multiPlannerMetrics.histograms.classicMicros[0].lowerBound, 0);
+let multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
+assertSbeMultiPlannerMetrics(multiPlannerMetrics, 0);
+assertClassicMultiPlannerMetrics(multiPlannerMetrics, 0);
 
 // Run with classic engine and verify metrics.
 {
@@ -47,19 +82,8 @@ assert.eq(multiPlannerMetrics.histograms.classicMicros[0].lowerBound, 0);
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeMicros), 0);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumReads), 0);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumPlans), 0);
-    assert.eq(multiPlannerMetrics.sbeMicros, 0);
-    assert.eq(multiPlannerMetrics.sbeNumReads, 0);
-    assert.eq(multiPlannerMetrics.sbeCount, 0);
-
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicMicros), 1);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicNumPlans), 1);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.classicWorks), 1);
-    assert.eq(multiPlannerMetrics.classicCount, 1);
-    assert.gt(multiPlannerMetrics.classicMicros, 0);
-    assert.gt(multiPlannerMetrics.classicWorks, 0);
+    assertSbeMultiPlannerMetrics(multiPlannerMetrics, 0);
+    assertClassicMultiPlannerMetrics(multiPlannerMetrics, 1);
 }
 
 // Run with SBE and verify metrics.
@@ -69,31 +93,39 @@ assert.eq(multiPlannerMetrics.histograms.classicMicros[0].lowerBound, 0);
     assert.commandWorked(coll.find({a: 1, b: 1, c: 1}).explain());
 
     multiPlannerMetrics = db.serverStatus().metrics.query.multiPlanner;
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeMicros), 1);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumReads), 1);
-    assert.eq(sumHistogramBucketCounts(multiPlannerMetrics.histograms.sbeNumPlans), 1);
-    assert.gt(multiPlannerMetrics.sbeMicros, 0);
-    assert.gt(multiPlannerMetrics.sbeNumReads, 0);
-    assert.eq(multiPlannerMetrics.sbeCount, 1);
-
-    // Sanity check.
-    assert.eq(multiPlannerMetrics.classicCount, 1);
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
+        assertSbeMultiPlannerMetrics(multiPlannerMetrics, 0);
+        assertClassicMultiPlannerMetrics(multiPlannerMetrics, 2);
+    } else {
+        assertSbeMultiPlannerMetrics(multiPlannerMetrics, 1);
+        assertClassicMultiPlannerMetrics(multiPlannerMetrics, 1);
+    }
 }
 
 assert.soon(() => {
     // Verify FTDC includes aggregate metrics.
     const multiPlannerMetricsFtdc =
         verifyGetDiagnosticData(conn.getDB("admin")).serverStatus.metrics.query.multiPlanner;
-    if (multiPlannerMetricsFtdc.classicCount == 0 || multiPlannerMetricsFtdc.sbeCount == 0) {
+
+    let expectedClassicCount = 0;
+    let expectedSbeCount = 0;
+    if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
+        expectedSbeCount = 0;
+        expectedClassicCount = 2;
+    } else {
+        expectedSbeCount = 1;
+        expectedClassicCount = 1;
+    }
+    if (multiPlannerMetricsFtdc.sbeCount != expectedSbeCount ||
+        multiPlannerMetricsFtdc.classicCount != expectedClassicCount) {
         // This is an indication we haven't retrieve the expected serverStatus metrics yet.
         return false;
     }
-    assert.eq(multiPlannerMetricsFtdc.classicCount, 1);
-    assert.gt(multiPlannerMetricsFtdc.classicMicros, 0);
-    assert.gt(multiPlannerMetricsFtdc.classicWorks, 0);
-    assert.eq(multiPlannerMetricsFtdc.sbeCount, 1);
-    assert.gt(multiPlannerMetricsFtdc.sbeMicros, 0);
-    assert.gt(multiPlannerMetricsFtdc.sbeNumReads, 0);
+
+    assertSbeMultiPlannerMetrics(
+        multiPlannerMetricsFtdc, expectedSbeCount, false /*checkHistograms*/);
+    assertClassicMultiPlannerMetrics(
+        multiPlannerMetricsFtdc, expectedClassicCount, false /*checkHistograms*/);
     // Verify FTDC omits detailed histograms.
     assert(!multiPlannerMetricsFtdc.hasOwnProperty("histograms"));
     return true;
