@@ -8,6 +8,7 @@ export const $config = (function() {
             ErrorCodes.ConflictingOperationInProgress,
             ErrorCodes.CursorNotFound,
             ErrorCodes.DuplicateKey,
+            ErrorCodes.FailedToSatisfyReadPreference,
             ErrorCodes.IndexBuildAborted,
             ErrorCodes.NamespaceNotFound,
             ErrorCodes.NoMatchingDocument,
