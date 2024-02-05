@@ -500,6 +500,12 @@ public:
         void setDefaultAtClusterTime(OperationContext* opCtx);
 
         /**
+         * If the transaction has specified a placementConflictTime returns the value, otherwise
+         * returns boost::none.
+         */
+        boost::optional<LogicalTime> getPlacementConflictTime() const;
+
+        /**
          * If a coordinator has been selected for the current transaction, returns its id.
          */
         const boost::optional<ShardId>& getCoordinatorId() const;

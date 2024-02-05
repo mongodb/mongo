@@ -908,11 +908,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> tryAttachCursorSourceForLocalRead(
     const ShardId& localShardId) {
     try {
         const auto& cm = targetingCri.cm;
+        auto shardVersion = [&] {
+            auto sv = cm.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
+                                           : ShardVersion::UNSHARDED();
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {
+                    sv.setPlacementConflictTime(*optOriginalPlacementConflictTime);
+                }
+            }
+            return sv;
+        }();
         ScopedSetShardRole shardRole{
             opCtx,
             expCtx.ns,
-            cm.hasRoutingTable() ? targetingCri.getShardVersion(localShardId)
-                                 : ShardVersion::UNSHARDED(),
+            shardVersion,
             boost::optional<DatabaseVersion>{!cm.hasRoutingTable(), cm.dbVersion()}};
 
         // TODO SERVER-77402 Wrap this in a shardRoleRetry loop instead of
