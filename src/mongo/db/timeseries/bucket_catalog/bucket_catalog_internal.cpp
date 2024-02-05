@@ -761,8 +761,7 @@ void removeBucket(
     switch (mode) {
         case RemovalMode::kClose: {
             auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+            if (bucket.usingAlwaysCompressedBuckets) {
                 // When removing a closed bucket, the BucketStateRegistry may contain state for this
                 // bucket due to an untracked ongoing direct write (such as TTL delete).
                 if (state.has_value()) {
@@ -1416,8 +1415,10 @@ void closeOpenBucket(OperationContext* opCtx,
                      WithLock stripeLock,
                      Bucket& bucket,
                      ClosedBuckets& closedBuckets) {
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    // Skip creating a ClosedBucket when the bucket is already compressed. Check that
+    // compressed is set because reopened uncompressed buckets can get closed without operations
+    // against them.
+    if (bucket.usingAlwaysCompressedBuckets && bucket.compressed) {
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
@@ -1426,6 +1427,7 @@ void closeOpenBucket(OperationContext* opCtx,
         return;
     }
 
+    invariant(!bucket.compressed);
     bool error = false;
     try {
         closedBuckets.emplace_back(&catalog.bucketStateRegistry,
@@ -1446,8 +1448,10 @@ void closeOpenBucket(OperationContext* opCtx,
                      WithLock stripeLock,
                      Bucket& bucket,
                      boost::optional<ClosedBucket>& closedBucket) {
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+    // Skip creating a ClosedBucket when the bucket is already compressed. Check that
+    // compressed is set because reopened uncompressed buckets can get closed without operations
+    // against them.
+    if (bucket.usingAlwaysCompressedBuckets && bucket.compressed) {
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
@@ -1456,6 +1460,7 @@ void closeOpenBucket(OperationContext* opCtx,
         return;
     }
 
+    invariant(!bucket.compressed);
     bool error = false;
     try {
         closedBucket = boost::in_place(&catalog.bucketStateRegistry,
