@@ -1060,7 +1060,7 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -1071,7 +1071,6 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --streams-release-build
-      --use-diagnostic-latches=on
     multiversion_platform: amazon2
     multiversion_edition: enterprise-streams
     has_packages: true
