@@ -55,6 +55,7 @@
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/watchdog/watchdog.h"
 #include "mongo/watchdog/watchdog_mongod.h"
 #include "mongo/watchdog/watchdog_mongod_gen.h"
@@ -69,26 +70,16 @@ namespace {
 // Run the watchdog checks at a fixed interval regardless of user choice for monitoring period.
 constexpr Seconds watchdogCheckPeriod = Seconds{10};
 
-const auto getWatchdogMonitor =
-    ServiceContext::declareDecoration<std::unique_ptr<WatchdogMonitor>>();
-
 // A boolean variable to track whether the watchdog was enabled at startup.
 // Defaults to true because set parameters are handled before we start the watchdog if needed.
 bool watchdogEnabled{true};
 
-WatchdogMonitor* getGlobalWatchdogMonitor() {
-    if (!hasGlobalServiceContext()) {
-        return nullptr;
-    }
-
-    return getWatchdogMonitor(getGlobalServiceContext()).get();
-}
-
 }  // namespace
 
 Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&) {
-    if (value < 60 && value != -1) {
-
+    const bool shouldSkipValidateForTest =
+        TestingProctor::instance().isInitialized() && TestingProctor::instance().isEnabled();
+    if (!shouldSkipValidateForTest && value < 60 && value != -1) {
         return {ErrorCodes::BadValue, "watchdogPeriodSeconds must be greater than or equal to 60s"};
     }
 
@@ -102,7 +93,7 @@ Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<Ten
 }
 
 Status onUpdateWatchdogPeriodSeconds(const int& value) {
-    auto monitor = getGlobalWatchdogMonitor();
+    auto monitor = WatchdogMonitorInterface::getGlobalWatchdogMonitorInterface();
     if (monitor) {
         monitor->setPeriod(Seconds(value));
     }
@@ -133,7 +124,8 @@ public:
         }
 
         BSONObjBuilder result;
-        WatchdogMonitor* watchdog = getWatchdogMonitor(opCtx->getServiceContext()).get();
+        WatchdogMonitorInterface* watchdog =
+            WatchdogMonitorInterface::get(opCtx->getServiceContext());
         invariant(watchdog);
 
         result.append("checkGeneration", watchdog->getCheckGeneration());
@@ -200,14 +192,13 @@ void startWatchdog(ServiceContext* service) {
         checks.push_back(std::move(auditCheck));
     }
 
-    auto monitor = std::make_unique<WatchdogMonitor>(
-        std::move(checks), watchdogCheckPeriod, period, watchdogTerminate);
+    WatchdogMonitorInterface::set(
+        service,
+        std::make_unique<WatchdogMonitor>(
+            std::move(checks), watchdogCheckPeriod, period, watchdogTerminate));
 
     // Install the new WatchdogMonitor
-    auto& staticMonitor = getWatchdogMonitor(service);
-
-    staticMonitor = std::move(monitor);
-
+    auto staticMonitor = WatchdogMonitorInterface::get(service);
     staticMonitor->start();
 }
 

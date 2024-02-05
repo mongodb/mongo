@@ -21,6 +21,8 @@
 #
 last-continuous:
   all:
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_pauses_watchdog_checks_during_storage_change.js
+    ticket: SERVER-83508
   - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
     ticket: SERVER-21185
   - test_file: jstests/sharding/query/find_and_modify_without_two_phase.js
@@ -574,6 +576,8 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_pauses_watchdog_checks_during_storage_change.js
+    ticket: SERVER-83508
   - test_file: jstests/sharding/config_shards_on_repl_set_changes.js
     ticket: SERVER-21185
   - test_file: jstests/core/query/null_query_semantics.js
