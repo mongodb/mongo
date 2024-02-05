@@ -80,6 +80,7 @@ env.Library(
     source=[
         'encryption_fields.idl',
         'encryption_fields_validation.cpp',
+        'fle_numeric.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/value_idl',

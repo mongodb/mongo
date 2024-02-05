@@ -39,6 +39,7 @@
 namespace mongo {
 class EncryptedField;
 class EncryptedFieldConfig;
+class QueryTypeConfig;
 
 /*
  * Value: Value to attempt to coerce to field's type.
@@ -59,4 +60,6 @@ void validateEncryptedFieldConfig(const EncryptedFieldConfig* config);
 
 bool validateDoublePrecisionRange(double d, uint32_t precision);
 bool validateDecimal128PrecisionRange(Decimal128& dec, uint32_t precision);
+
+void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query);
 }  // namespace mongo

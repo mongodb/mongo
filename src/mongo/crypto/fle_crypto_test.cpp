@@ -62,6 +62,7 @@
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_numeric.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/idl/idl_parser.h"

@@ -104,6 +104,14 @@ structs:
                 optional: true
                 stability: unstable
                 validator: { gte: 0 }
+            trimFactor:
+                description: >-
+                    Number of root tree levels to cut. Increasing this value will decrease write conflicts and speed up inserts,
+                    but large range queries will slow down."
+                type: safeInt
+                optional: true
+                stability: unstable
+                validator: {gte: 0}
 
     EncryptedField:
         description: "Information about encrypted fields"

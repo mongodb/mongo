@@ -29,6 +29,8 @@
 
 #include "encryption_fields_validation.h"
 
+#include <fmt/format.h>
+
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -40,6 +42,7 @@
 #include <boost/cstdint.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include <boost/move/utility_core.hpp>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
@@ -47,8 +50,10 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
+#include "mongo/crypto/fle_numeric.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -96,6 +101,47 @@ Value coerceValueToRangeIndexTypes(Value val, BSONType fieldType) {
     }
 }
 
+namespace {
+uint32_t getNumberOfBitsInDomain(BSONType fieldType,
+                                 const Value& min,
+                                 const Value& max,
+                                 const boost::optional<uint32_t>& precision) {
+    switch (fieldType) {
+        case NumberInt: {
+            int32_t minC = min.coerceToInt();
+            auto info = getTypeInfo32(minC, minC, max.coerceToInt());
+            return 64 - countLeadingZeros64(info.max);
+        }
+        case NumberLong: {
+            int64_t minC = min.coerceToLong();
+            auto info = getTypeInfo64(minC, minC, max.coerceToLong());
+            return 64 - countLeadingZeros64(info.max);
+        }
+        case Date: {
+            int64_t minC = min.coerceToDate().toMillisSinceEpoch();
+            auto info = getTypeInfo64(minC, minC, max.coerceToDate().toMillisSinceEpoch());
+            return 64 - countLeadingZeros64(info.max);
+        }
+        case NumberDouble: {
+            double minC = min.coerceToDouble();
+            auto info = getTypeInfoDouble(minC, minC, max.coerceToDouble(), precision);
+            return 64 - countLeadingZeros64(info.max);
+        }
+        case NumberDecimal: {
+            auto minC = min.coerceToDecimal();
+            auto info = getTypeInfoDecimal128(minC, minC, max.coerceToDecimal(), precision);
+            try {
+                return boost::multiprecision::msb(info.max) + 1;
+            } catch (const std::domain_error&) {
+                // no bits set case
+                return 0;
+            }
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+}  // namespace
 
 void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
     uassert(6775201,
@@ -191,6 +237,23 @@ void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
         break;
         default:
             uasserted(7018202, "Range index only supports numeric types and the Date type.");
+    }
+
+    if (gFeatureFlagQERangeV2.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        query.getTrimFactor().has_value()) {
+        uint32_t tf = query.getTrimFactor().value();
+        uint32_t bits = getNumberOfBitsInDomain(
+            fieldType,
+            query.getMin().value(),
+            query.getMax().value(),
+            query.getPrecision().map([](int32_t i) { return (uint32_t)(i); }));
+        // We allow the case where #bits = TF = 0.
+        uassert(8574000,
+                fmt::format("The field 'trimFactor' must be >= 0 and less than the total "
+                            "number of bits needed to represent elements in the domain ({})",
+                            bits),
+                tf == 0 || tf < bits);
     }
 }
 

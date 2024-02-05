@@ -30,7 +30,9 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_validation.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -99,4 +101,71 @@ TEST(FLEValidationUtils, ValidateDecimalPrecisionRange) {
     ASSERT(validateDecimal128PrecisionRangeTest("-0.000", 50));
 }
 
+Status validateRangeIndexTest(int trimFactor,
+                              BSONType fieldType,
+                              const boost::optional<Value>& min,
+                              const boost::optional<Value>& max,
+                              const boost::optional<int32_t>& precision = boost::none) {
+    QueryTypeConfig indexConfig;
+    indexConfig.setMin(min);
+    indexConfig.setMax(max);
+    indexConfig.setPrecision(precision);
+    indexConfig.setTrimFactor(trimFactor);
+    indexConfig.setSparsity(1);
+    try {
+        validateRangeIndex(fieldType, indexConfig);
+        return Status::OK();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
+TEST(FLEValidationUtils, ValidateTrimFactorRange) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2", true);
+
+    // 2^1 == 2 values in domain, we can't trim
+    ASSERT_OK(validateRangeIndexTest(0, BSONType::NumberInt, Value(0), Value(1)));
+    ASSERT_NOT_OK(validateRangeIndexTest(1, BSONType::NumberInt, Value(0), Value(1)));
+
+    // 2^2 > 3 values in domain, we can trim just the root
+    ASSERT_OK(validateRangeIndexTest(1, BSONType::NumberInt, Value(0), Value(2)));
+    ASSERT_NOT_OK(validateRangeIndexTest(2, BSONType::NumberInt, Value(0), Value(2)));
+
+    ASSERT_OK(validateRangeIndexTest(31, BSONType::NumberInt, Value(INT32_MIN), Value(INT32_MAX)));
+    ASSERT_NOT_OK(
+        validateRangeIndexTest(32, BSONType::NumberInt, Value(INT32_MIN), Value(INT32_MAX)));
+
+    ASSERT_OK(validateRangeIndexTest(
+        63, BSONType::NumberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
+    ASSERT_NOT_OK(validateRangeIndexTest(
+        64, BSONType::NumberLong, Value((long long)INT64_MIN), Value((long long)INT64_MAX)));
+
+    ASSERT_OK(
+        validateRangeIndexTest(63, BSONType::Date, Value(Date_t::min()), Value(Date_t::max())));
+    ASSERT_NOT_OK(
+        validateRangeIndexTest(64, BSONType::Date, Value(Date_t::min()), Value(Date_t::max())));
+
+    // (2^10 > ) 1000 values in domain, we can trim top 9 layers
+    ASSERT_OK(validateRangeIndexTest(
+        9, BSONType::NumberDouble, Value(0.), Value(100.), 1 /* precision */));
+    ASSERT_NOT_OK(validateRangeIndexTest(
+        10, BSONType::NumberDouble, Value(0.), Value(100.), 1 /* precision */));
+
+    ASSERT_OK(validateRangeIndexTest(63, BSONType::NumberDouble, boost::none, boost::none));
+    ASSERT_NOT_OK(validateRangeIndexTest(64, BSONType::NumberDouble, boost::none, boost::none));
+
+    ASSERT_OK(validateRangeIndexTest(9,
+                                     BSONType::NumberDecimal,
+                                     Value(Decimal128(0)),
+                                     Value(Decimal128(100)),
+                                     1 /* precision */));
+    ASSERT_NOT_OK(validateRangeIndexTest(10,
+                                         BSONType::NumberDecimal,
+                                         Value(Decimal128(0)),
+                                         Value(Decimal128(100)),
+                                         1 /* precision */));
+
+    ASSERT_OK(validateRangeIndexTest(127, BSONType::NumberDecimal, boost::none, boost::none));
+    ASSERT_NOT_OK(validateRangeIndexTest(128, BSONType::NumberDecimal, boost::none, boost::none));
+}
 }  // namespace mongo
