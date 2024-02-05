@@ -19,8 +19,6 @@ http_archive(
     url = "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
 )
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
 http_archive(
     name = "platforms",
     sha256 = "8150406605389ececb6da07cbcb509d5637a3ab9a24bc69b1101531367d89d74",
@@ -62,4 +60,44 @@ poetry(
     python_interpreter_target_default = "@py_host//:bin/python3",
     python_interpreter_target_mac = "@py_host//:bin/python3",
     python_interpreter_target_win = "@py_host//:python.exe",
+)
+
+http_archive(
+    name = "aspect_rules_js",
+    sha256 = "630a71aba66c4023a5b16ab3efafaeed8b1a2865ccd168a34611eb73876b3fc4",
+    strip_prefix = "rules_js-1.37.1",
+    url = "https://github.com/aspect-build/rules_js/releases/download/v1.37.1/rules_js-v1.37.1.tar.gz",
+)
+
+load("@aspect_rules_js//js:repositories.bzl", "rules_js_dependencies")
+
+rules_js_dependencies()
+
+load("@rules_nodejs//nodejs:repositories.bzl", "DEFAULT_NODE_VERSION", "nodejs_register_toolchains")
+
+nodejs_register_toolchains(
+    name = "nodejs",
+    node_version = DEFAULT_NODE_VERSION,
+)
+
+load("@aspect_rules_js//npm:repositories.bzl", "npm_translate_lock")
+
+npm_translate_lock(
+    name = "npm",
+    pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
+)
+
+load("@npm//:repositories.bzl", "npm_repositories")
+
+npm_repositories()
+
+# TODO: This comes with a lot of built in formatters
+# Since we are only using prettier for now we do not use the others
+# See https://github.com/aspect-build/rules_lint/releases/tag/v0.11.0 for all supported formatters
+http_archive(
+    name = "aspect_rules_lint",
+    sha256 = "98bed74aff6498ea9b58ff36db27a952c7a1b53764171c5d0d29ef0c61ffc4fb",
+    strip_prefix = "rules_lint-0.11.0",
+    url = "https://github.com/aspect-build/rules_lint/releases/download/v0.11.0/rules_lint-v0.11.0.tar.gz",
 )

@@ -1,5 +1,9 @@
 {
-  "dependencies": {
+  "name": "mongodb",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "prettier": "3.2.5",
     "eslint": "8.28.0"
   }
 }
