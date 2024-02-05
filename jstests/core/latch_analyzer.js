@@ -1,7 +1,7 @@
 /**
  * Verify that the LatchAnalyzer is working to expectations
  *
- * @tags: [multiversion_incompatible]
+ * @tags: [multiversion_incompatible, requires_latch_analyzer]
  */
 
 (function() {
