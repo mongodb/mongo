@@ -61,6 +61,12 @@ Status getWriteConcernStatusFromCommandResult(const BSONObj& cmdResponse);
 Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse);
 
 /**
+ * Extracts the first write error from a bulk write command response and converts it into a status.
+ * This ignores all errors after the first.
+ */
+Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse);
+
+/**
  * Extracts any type of error from a write command response.
  */
 Status getStatusFromWriteCommandReply(const BSONObj& cmdResponse);

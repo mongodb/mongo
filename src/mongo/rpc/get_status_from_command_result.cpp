@@ -141,12 +141,82 @@ Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse) {
                   firstWriteErrorObj);
 }
 
+Status getFirstWriteErrorStatusFromBulkWriteResult(const BSONObj& cmdResponse) {
+    BSONElement cursorElem;
+    Status status = bsonExtractTypedField(cmdResponse, "cursor", Object, &cursorElem);
+    if (!status.isOK()) {
+        if (status == ErrorCodes::NoSuchKey) {
+            return Status::OK();
+        } else {
+            return status;
+        }
+    }
+
+    BSONElement firstBatchElem;
+    status = bsonExtractTypedField(cursorElem.Obj(), "firstBatch", Array, &firstBatchElem);
+    if (!status.isOK()) {
+        if (status == ErrorCodes::NoSuchKey) {
+            return Status::OK();
+        } else {
+            return status;
+        }
+    }
+
+    // Iterate over firstBatch. Must manually parse the elements since including
+    // bulk_write_parser invokes a circular dependency.
+    for (const auto& elem : firstBatchElem.Array()) {
+        // extract ok field.
+        BSONElement okElem;
+        status = bsonExtractTypedField(elem.Obj(), "ok", NumberDouble, &okElem);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::NoSuchKey) {
+                continue;
+            } else {
+                return status;
+            }
+        }
+        if (okElem.Double() == 1.0) {
+            continue;
+        }
+        // extract error code field.
+        BSONElement codeElem;
+        status = bsonExtractTypedField(elem.Obj(), "code", NumberInt, &codeElem);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::NoSuchKey) {
+                continue;
+            } else {
+                return status;
+            }
+        }
+
+        // extract errmsg field.
+        BSONElement errMsgElem;
+        std::string errmsg = "";
+        status = bsonExtractTypedField(elem.Obj(), "errmsg", String, &errMsgElem);
+        if (!status.isOK()) {
+            if (status != ErrorCodes::NoSuchKey) {
+                return status;
+            }
+        } else {
+            errmsg = errMsgElem.str();
+        }
+
+        return Status(ErrorCodes::Error(codeElem.Int()), errmsg, elem.Obj());
+    }
+
+    return Status::OK();
+}
+
 Status getStatusFromWriteCommandReply(const BSONObj& cmdResponse) {
     auto status = getStatusFromCommandResult(cmdResponse);
     if (!status.isOK()) {
         return status;
     }
     status = getFirstWriteErrorStatusFromCommandResult(cmdResponse);
+    if (!status.isOK()) {
+        return status;
+    }
+    status = getFirstWriteErrorStatusFromBulkWriteResult(cmdResponse);
     if (!status.isOK()) {
         return status;
     }

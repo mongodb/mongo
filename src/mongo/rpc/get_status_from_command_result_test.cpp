@@ -84,4 +84,21 @@ TEST(GetStatusFromCommandResult, ExtraInfoParserSucceeds) {
     ASSERT_EQ(status.extraInfo<ErrorExtraInfoExample>()->data, 123);
 }
 
+TEST(GetStatusFromCommandResult, BulkWriteResponseSucceeds) {
+    ASSERT_OK(getFirstWriteErrorStatusFromBulkWriteResult(
+        fromjson("{ok: 1.0, cursor: {id: 0, firstBatch: [{ok: 1.0}, {ok: 1.0}]}}")));
+}
+
+TEST(GetStatusFromCommandResult, BulkWriteResponseFails) {
+    ErrorExtraInfoExample::EnableParserForTest whenInScope;
+    auto status = getFirstWriteErrorStatusFromBulkWriteResult(
+        fromjson(("{ok: 1.0, cursor: {id: 0, firstBatch: [{ok: 1.0}, {ok: 0.0, code: 236, errmsg: "
+                  "'oh no!', data: 123}]}}")));
+    ASSERT_EQ(status, ErrorCodes::ForTestingErrorExtraInfo);
+    ASSERT_EQ(status.reason(), "oh no!");
+    ASSERT(status.extraInfo());
+    ASSERT(status.extraInfo<ErrorExtraInfoExample>());
+    ASSERT_EQ(status.extraInfo<ErrorExtraInfoExample>()->data, 123);
+}
+
 }  // namespace mongo
