@@ -53,6 +53,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/cluster_role.h"
@@ -613,18 +614,23 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
         return boost::none;
     }();
 
-    CatalogCacheLoader::set(service,
-                            std::make_unique<ShardServerCatalogCacheLoader>(
-                                std::make_unique<ConfigServerCatalogCacheLoader>()));
 
-    // This is only called in startup when there shouldn't be replication state changes, but to
-    // be safe we take the RSTL anyway.
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isReplSet = replCoord->getSettings().isReplSet();
-    bool isStandaloneOrPrimary =
-        !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
-    CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+    if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        CatalogCacheLoader::set(service,
+                                std::make_unique<ShardServerCatalogCacheLoader>(
+                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
+
+        // This is only called in startup when there shouldn't be replication state changes, but to
+        // be safe we take the RSTL anyway.
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool isReplSet = replCoord->getSettings().isReplSet();
+        bool isStandaloneOrPrimary =
+            !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
+        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+    } else {
+        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+    }
 
     initializeGlobalShardingStateForMongoD(opCtx, configCS);
 

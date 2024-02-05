@@ -20,7 +20,7 @@ import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 // Test upgrade/downgrade between "latest" and "last-lts"/"last-continuous".
-for (let oldVersion of ["last-lts", "last-continuous"]) {
+for (let oldVersion of ["last-lts"]) {
     var st = new ShardingTest({
         shards: 2,
         mongos: 1,

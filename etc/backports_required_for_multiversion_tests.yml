@@ -547,6 +547,12 @@ last-continuous:
     ticket: SERVER-83119
   - test_file: jstests/sharding/eof_plan.js
     ticket: SERVER-83119
+  - test_file: jstests/multiVersion/genericSetFCVUsage/upgrade_downgrade_cluster_config_shard.js
+    ticket: SERVER-84548
+  - test_file: src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/sharded_last_cont_pit_backup_restore_simple_config_shard.js
+    ticket: SERVER-84548
+  - test_file: src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/sharded_last_cont_backup_restore_simple_config_shard.js
+    ticket: SERVER-84548
   suites: null
 last-lts:
   all:
@@ -1134,4 +1140,10 @@ last-lts:
     ticket: SERVER-83119
   - test_file: jstests/sharding/eof_plan.js
     ticket: SERVER-83119
+  - test_file: jstests/multiVersion/genericSetFCVUsage/upgrade_downgrade_cluster_config_shard.js
+    ticket: SERVER-84548
+  - test_file: src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/sharded_last_cont_pit_backup_restore_simple_config_shard.js
+    ticket: SERVER-84548
+  - test_file: src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/sharded_last_cont_backup_restore_simple_config_shard.js
+    ticket: SERVER-84548
   suites: null

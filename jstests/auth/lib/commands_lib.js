@@ -463,6 +463,9 @@ export const authCommandsLib = {
           testname: 'transitionFromDedicatedConfigServer',
           command: {transitionFromDedicatedConfigServer: 1},
           skipUnlessSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagTransitionToCatalogShard;
+          },
           testcases: [
             {
               runOnDb: adminDbName,
@@ -477,6 +480,9 @@ export const authCommandsLib = {
           testname: "_configsvrTransitionFromDedicatedConfigServer",
           command: {_configsvrTransitionFromDedicatedConfigServer: 1},
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagTransitionToCatalogShard;
+          },
           testcases: [
               {
                 runOnDb: adminDbName,
@@ -492,6 +498,9 @@ export const authCommandsLib = {
           testname: "transitionToDedicatedConfigServer",
           command: { transitionToDedicatedConfigServer: 1 },
           skipUnlessSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagTransitionToCatalogShard;
+          },
           testcases: [
             {
               runOnDb: adminDbName,
@@ -507,6 +516,9 @@ export const authCommandsLib = {
           testname: "_configsvrTransitionToDedicatedConfigServer",
           command: {_configsvrTransitionToDedicatedConfigServer: 1},
           skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagTransitionToCatalogShard;
+          },
           testcases: [
               {
                 runOnDb: adminDbName,
