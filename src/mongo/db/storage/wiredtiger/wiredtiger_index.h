@@ -363,6 +363,10 @@ protected:
                                  bool dupsAllowed);
 
 private:
+    Status _insertOldFormatKey(OperationContext* opCtx,
+                               WT_CURSOR* c,
+                               const key_string::Value& keyString);
+
     bool _partial;
 };
 

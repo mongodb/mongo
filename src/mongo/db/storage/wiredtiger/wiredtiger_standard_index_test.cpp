@@ -151,5 +151,93 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     }
 }
 
+TEST(WiredTigerUniqueIndexTest, OldFormatKeys) {
+    FailPointEnableBlock createOldFormatIndex("WTIndexCreateUniqueIndexesInOldFormat");
+
+    auto harnessHelper = newSortedDataInterfaceHarnessHelper();
+    const bool unique = true;
+    const bool partial = false;
+    auto sdi = harnessHelper->newSortedDataInterface(unique, partial);
+
+    const bool dupsAllowed = false;
+
+    // Populate index with all old format keys.
+    {
+        FailPointEnableBlock insertOldFormatKeys("WTIndexInsertUniqueKeysInOldFormat");
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
+        WriteUnitOfWork uow(opCtx.get());
+        auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
+        auto res = sdi->insert(opCtx.get(), ks, dupsAllowed);
+        ASSERT_OK(res);
+
+        ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
+        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
+        ASSERT_OK(res);
+
+        ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
+        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
+        ASSERT_OK(res);
+
+        uow.commit();
+    }
+
+    // Ensure cursors return the correct data
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
+        auto cursor = sdi->newCursor(opCtx.get());
+
+        bool forward = true;
+        bool inclusive = true;
+        auto seekKs = makeKeyStringForSeek(sdi.get(), BSON("" << 1), forward, inclusive);
+        auto record = cursor->seek(seekKs);
+        ASSERT(record);
+        ASSERT_EQ(RecordId(1), record->loc);
+
+        record = cursor->next();
+        ASSERT(record);
+        ASSERT_EQ(RecordId(2), record->loc);
+
+        record = cursor->next();
+        ASSERT(record);
+        ASSERT_EQ(RecordId(3), record->loc);
+    }
+
+    // Ensure we can't insert duplicate keys in the new format
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
+        WriteUnitOfWork uow(opCtx.get());
+        auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
+        auto res = sdi->insert(opCtx.get(), ks, dupsAllowed);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, res.code());
+
+        ks = makeKeyString(sdi.get(), BSON("" << 2), RecordId(2));
+        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, res.code());
+
+        ks = makeKeyString(sdi.get(), BSON("" << 3), RecordId(3));
+        res = sdi->insert(opCtx.get(), ks, dupsAllowed);
+        ASSERT_EQ(ErrorCodes::DuplicateKey, res.code());
+    }
+
+    // Ensure we can remove an old format key and replace it with a new one.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
+        WriteUnitOfWork uow(opCtx.get());
+        auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
+        sdi->unindex(opCtx.get(), ks, dupsAllowed);
+
+        auto res = sdi->insert(opCtx.get(), ks, dupsAllowed);
+        ASSERT_OK(res);
+        uow.commit();
+    }
+}
 }  // namespace
 }  // namespace mongo

@@ -70,6 +70,8 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(WTIndexUassertDuplicateRecordForIdIndex);
 MONGO_FAIL_POINT_DEFINE(WTIndexUassertDuplicateRecordForKeyOnIdUnindex);
+MONGO_FAIL_POINT_DEFINE(WTIndexCreateUniqueIndexesInOldFormat);
+MONGO_FAIL_POINT_DEFINE(WTIndexInsertUniqueKeysInOldFormat);
 
 static const WiredTigerItem emptyItem(nullptr, 0);
 
@@ -165,25 +167,30 @@ StatusWith<std::string> WiredTigerIndex::parseIndexOptions(const BSONObj& option
 
 // static
 std::string WiredTigerIndex::generateAppMetadataString(const IndexDescriptor& desc) {
-    StringBuilder ss;
-
-    int keyStringVersion;
+    int dataFormatVersion;
 
     if (desc.unique() && !desc.isIdIndex()) {
-        keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
-            ? kDataFormatV6KeyStringV1UniqueIndexVersionV2
-            : kDataFormatV5KeyStringV0UniqueIndexVersionV1;
+        if (MONGO_unlikely(WTIndexCreateUniqueIndexesInOldFormat.shouldFail())) {
+            LOGV2(8596200,
+                  "Creating unique index with old format version due to "
+                  "WTIndexCreateUniqueIndexesInOldFormat failpoint",
+                  "desc"_attr = desc.toString());
+            dataFormatVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
+                ? kDataFormatV4KeyStringV1UniqueIndexVersionV2
+                : kDataFormatV3KeyStringV0UniqueIndexVersionV1;
+        } else {
+            dataFormatVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
+                ? kDataFormatV6KeyStringV1UniqueIndexVersionV2
+                : kDataFormatV5KeyStringV0UniqueIndexVersionV1;
+        }
     } else {
-        keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
+        dataFormatVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
             ? kDataFormatV2KeyStringV1IndexVersionV2
             : kDataFormatV1KeyStringV0IndexVersionV1;
     }
 
     // Index metadata
-    ss << ",app_metadata=("
-       << "formatVersion=" << keyStringVersion << "),";
-
-    return (ss.str());
+    return fmt::format(",app_metadata=(formatVersion={}),", dataFormatVersion);
 }
 
 // static
@@ -1676,6 +1683,52 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
                                   duplicateRecordId);
 }
 
+Status WiredTigerIndexUnique::_insertOldFormatKey(OperationContext* opCtx,
+                                                  WT_CURSOR* c,
+                                                  const key_string::Value& keyString) {
+    const RecordId id =
+        key_string::decodeRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    invariant(id.isValid());
+
+    LOGV2_DEBUG(8596201,
+                1,
+                "Inserting old format key into unique index due to "
+                "WTIndexInsertUniqueKeysInOldFormat failpoint",
+                "key"_attr = keyString.toString(),
+                "recordId"_attr = id.toString(),
+                "indexName"_attr = _indexName,
+                "keyPattern"_attr = _keyPattern,
+                "collectionUUID"_attr = _collectionUUID);
+
+    auto sizeWithoutRecordId =
+        key_string::sizeWithoutRecordIdLongAtEnd(keyString.getBuffer(), keyString.getSize());
+    WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
+
+    key_string::Builder value(getKeyStringVersion(), id);
+    const key_string::TypeBits typeBits = keyString.getTypeBits();
+    if (!typeBits.isAllZeros()) {
+        value.appendTypeBits(typeBits);
+    }
+
+    WiredTigerItem valueItem(value.getBuffer(), value.getSize());
+    setKey(c, keyItem.Get());
+    c->set_value(c, valueItem.Get());
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementOneIdxEntryWritten(c->uri, keyItem.size);
+
+    // We don't expect WT_DUPLICATE_KEY here as we only insert old format keys when dupsAllowed is
+    // false. At this point we will have already triggered a write conflict with any concurrent
+    // writers in the new format, so we can safely insert without worrying about duplicates.
+    invariantWTOK(ret,
+                  c->session,
+                  fmt::format("WiredTigerIndexUnique::_insertOldFormatKey error: {}; uri: {}",
+                              _indexName,
+                              _uri));
+    return Status::OK();
+}
+
 Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
                                       WT_CURSOR* c,
                                       const key_string::Value& keyString,
@@ -1694,6 +1747,21 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
         } else if (result.getValue()) {
             return Status::OK();
         }
+    }
+
+    const bool hasOldFormatVersion =
+        _dataFormatVersion == kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+        _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2;
+    if (MONGO_unlikely(!dupsAllowed && hasOldFormatVersion && _rsKeyFormat == KeyFormat::Long &&
+                       WTIndexInsertUniqueKeysInOldFormat.shouldFail())) {
+        // To support correctness testing of old-format index keys that might still be in the index
+        // after an upgrade, this failpoint can be configured to insert keys in the old format,
+        // given the required prerequisites. We can't do this when dups are allowed (on
+        // secondaries), as this could result in concurrent writes to the same key, the very thing
+        // the new format intends to avoid. Note that in testing, the only way to create a unique
+        // index with the old format version is with the WTIndexCreateUniqueIndexesInOldFormat
+        // failpoint. Old format keys also predated support for KeyFormat::String.
+        return _insertOldFormatKey(opCtx, c, keyString);
     }
 
     // Now create the table key/value, the actual data record.
