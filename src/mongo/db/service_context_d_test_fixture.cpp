@@ -115,6 +115,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         auto uniqueAuthzManager = std::make_unique<AuthorizationManagerImpl>(
             serviceContext, std::move(options._mockAuthzExternalState));
         AuthorizationManager::set(serviceContext, std::move(uniqueAuthzManager));
+        AuthorizationManager::get(serviceContext)->setAuthEnabled(true);
     }
 
     if (options._useMockClock) {

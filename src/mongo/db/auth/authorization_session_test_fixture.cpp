@@ -66,7 +66,6 @@ void AuthorizationSessionTestFixture::setUp() {
     sessionState = localSessionState.get();
     authzSession = std::make_unique<AuthorizationSessionForTest>(
         std::move(localSessionState), AuthorizationSessionImpl::InstallMockForTestingOrAuthImpl{});
-    authzManager->setAuthEnabled(true);
     authzSession->startContractTracking();
 
     credentials =
