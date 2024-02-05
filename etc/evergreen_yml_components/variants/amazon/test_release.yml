@@ -48,7 +48,7 @@ buildvariants:
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .sharding .txns
@@ -114,7 +114,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: sasl
   - name: serial_run
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .txns !.csrs
   - name: slow1_gen
   - name: .stitch
@@ -181,7 +181,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: sasl
   - name: serial_run
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .txns !.csrs
   - name: slow1_gen
   - name: .stitch
@@ -343,7 +343,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
@@ -466,7 +466,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
@@ -632,7 +632,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common !.multiversion
@@ -743,7 +743,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common !.multiversion
@@ -912,7 +912,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common !.multiversion
@@ -1029,7 +1029,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common !.multiversion

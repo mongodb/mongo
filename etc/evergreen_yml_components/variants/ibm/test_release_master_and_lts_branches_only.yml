@@ -57,7 +57,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: sasl
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt
@@ -139,7 +139,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: sasl
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt

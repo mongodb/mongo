@@ -71,7 +71,7 @@ buildvariants:
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
@@ -183,7 +183,7 @@ buildvariants:
   - name: .jstestfuzz .common
   - name: replica_sets_gen
   - name: .replica_sets .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt !.multiversion
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl

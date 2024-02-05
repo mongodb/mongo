@@ -54,7 +54,7 @@ buildvariants:
   - name: .read_write_concern
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough_gen
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv !.feature_flag_guarded
   - name: .sharding .txns
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
@@ -134,7 +134,7 @@ buildvariants:
   - name: .read_write_concern
   - name: replica_sets_gen
   - name: replica_sets_jscore_passthrough_gen
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv !.feature_flag_guarded
   - name: .sharding .txns
   - name: .sharding .common !.csrs !.gcm
   - name: .ssl

@@ -729,7 +729,7 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
@@ -772,7 +772,7 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
@@ -820,7 +820,7 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
@@ -868,7 +868,7 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
   - name: .jscore .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: generate_buildid_to_debug_symbols_mapping
@@ -918,7 +918,7 @@ buildvariants:
     patch_only: true
   - name: .jscore .common
     patch_only: true
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
     patch_only: true
   - name: .sharding .common !.csrs !.encrypt
     patch_only: true
@@ -1115,7 +1115,7 @@ buildvariants:
     - rhel80-xlarge
   - name: .rollbackfuzzer
   - name: .sharding .common
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: .sharding .txns
   - name: .serverless
     distros:

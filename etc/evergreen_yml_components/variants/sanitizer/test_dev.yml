@@ -189,7 +189,7 @@ buildvariants:
   - name: .read_only
   - name: session_jscore_passthrough
   - name: sharded_multi_stmt_txn_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot
+  - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
   - name: sharding_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
 
@@ -323,7 +323,7 @@ buildvariants:
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot
+  - name: .sharding .jscore !.wo_snapshot !.feature_flag_guarded
   - name: .sharding .common !.csrs
   - name: .watchdog
   - name: .stitch
@@ -408,7 +408,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   # TODO SERVER-85584 Reenable uninitialized_fcv passthrough
-  - name: .sharding .jscore !.wo_snapshot !.uninitialized_fcv
+  - name: .sharding .jscore !.wo_snapshot !.uninitialized_fcv !.feature_flag_guarded
   - name: .sharding .common !.csrs
   - name: .stitch
   - name: .updatefuzzer
