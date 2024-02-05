@@ -341,6 +341,12 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         return result.withContext("couldn't create lock id index on config db");
     }
 
+    result = configShard->createIndexOnConfig(
+        opCtx, LocksType::ConfigNS, BSON(LocksType::process() << 1), !unique);
+    if (!result.isOK()) {
+        return result.withContext("couldn't create lock process index on config db");
+    }
+
     result =
         configShard->createIndexOnConfig(opCtx,
                                          LocksType::ConfigNS,

@@ -306,6 +306,8 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
                  << "_id_"),
         BSON("v" << 2 << "key" << BSON("ts" << 1) << "name"
                  << "ts_1"),
+        BSON("v" << 2 << "key" << BSON("process" << 1) << "name"
+                 << "process_1"),
         BSON("v" << 2 << "key" << BSON("state" << 1 << "process" << 1) << "name"
                  << "state_1_process_1")};
     auto expectedShardsIndexes = std::vector<BSONObj>{
