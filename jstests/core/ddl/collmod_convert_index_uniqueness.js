@@ -14,6 +14,12 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+// TODO SERVER-84560: remove once collMod will have the same output for tracked/untracked
+// collections
+const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+
 const collName = 'collmod_convert_to_unique';
 const coll = db.getCollection(collName);
 coll.drop();
@@ -25,6 +31,15 @@ function countUnique(key) {
     });
     return all.length;
 }
+
+// TODO SERVER-84560: remove once collMod will have the same output for tracked/untracked
+// collections
+const unpackRawResponse = function(result) {
+    if (result.hasOwnProperty('raw')) {
+        return Object.values(result.raw)[0];
+    }
+    return result;
+};
 
 // Creates a regular index and use collMod to convert it to a unique index.
 assert.commandWorked(coll.createIndex({a: 1}));
@@ -126,17 +141,8 @@ let result = assert.commandWorked(
     db.runCommand({collMod: collName, index: {keyPattern: {a: 1}, unique: true}}));
 
 // New index state should be reflected in 'unique_new' field in collMod response.
-const assertUniqueNew = function(result) {
-    assert(result.hasOwnProperty('unique_new'), tojson(result));
-    assert(result.unique_new, tojson(result));
-};
-if (db.getMongo().isMongos()) {
-    // Check the first shard's result from mongos.
-    assert(result.hasOwnProperty('raw'), tojson(result));
-    assertUniqueNew(Object.values(result.raw)[0]);
-} else {
-    assertUniqueNew(result);
-}
+
+assert(unpackRawResponse(result).unique_new, tojson(result));
 
 // Look up index details in listIndexes output.
 assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.getIndexes()));
@@ -164,13 +170,8 @@ const assertForceNonUniqueNew = function(result) {
     assert(result.hasOwnProperty('forceNonUnique_new'), tojson(result));
     assert(result.forceNonUnique_new, tojson(result));
 };
-if (db.getMongo().isMongos()) {
-    // Checks the first shard's result from mongos.
-    assert(result.hasOwnProperty('raw'), tojson(result));
-    assertForceNonUniqueNew(Object.values(result.raw)[0]);
-} else {
-    assertForceNonUniqueNew(result);
-}
+
+assertForceNonUniqueNew(unpackRawResponse(result));
 
 // Tests the index now accepts duplicate keys.
 assert.commandWorked(coll.insert({_id: 100, a: 100}));

@@ -11,6 +11,7 @@ import {
     retryOnceOnTransientAndRestartTxnOnMongos
 } from "jstests/libs/auto_retry_transaction_in_sharding.js";
 import {createCollAndCRUDInTxn} from "jstests/libs/create_collection_txn_helpers.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = 'test_txns_create_collection_parallel';
 
@@ -77,17 +78,25 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     sessionColl.drop({writeConcern: {w: "majority"}});
     distinctSessionColl.drop({writeConcern: {w: "majority"}});
 
-    jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
-    session.startTransaction({writeConcern: {w: "majority"}});
-    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-        createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
-    }, {writeConcern: {w: "majority"}});
-    assert.commandWorked(secondSessionDB.runCommand({create: collName}));  // outside txn
-    assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
+    // TODO SERVER-77915 Remove isTrackUnshardedEnabled. Once track unsharded is enabled, creation
+    // within a transaction will always serialize with any other collection creation by taking the
+    // DDLLock
+    const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
+        db.getSiblingDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    if (isTrackUnshardedDisabled) {
+        jsTest.log("Testing duplicate createCollections, one inside and one outside a txn");
+        session.startTransaction({writeConcern: {w: "majority"}});
+        retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+            createCollAndCRUDInTxn(sessionDB, collName, command, explicitCreate);
+        }, {writeConcern: {w: "majority"}});
+        assert.commandWorked(secondSessionDB.runCommand({create: collName}));  // outside txn
+        assert.commandWorked(secondSessionDB.getCollection(collName).insert({a: 1}));
 
-    jsTest.log("Committing transaction (SHOULD FAIL)");
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
-    assert.eq(sessionColl.find({}).itcount(), 1);
+        jsTest.log("Committing transaction (SHOULD FAIL)");
+        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                     ErrorCodes.WriteConflict);
+        assert.eq(sessionColl.find({}).itcount(), 1);
+    }
 
     sessionColl.drop({writeConcern: {w: "majority"}});
 

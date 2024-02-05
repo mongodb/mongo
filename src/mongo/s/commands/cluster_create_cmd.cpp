@@ -118,8 +118,6 @@ public:
             request.setUnsplittable(true);
             request.setShardKey(BSON("_id" << 1));
 
-            request.setIsFromCreateUnsplittableCollectionTestCommand(false);
-
             shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
             shardsvrCollCommand.setDbName(nss.dbName());
 

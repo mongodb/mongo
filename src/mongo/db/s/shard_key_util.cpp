@@ -305,14 +305,7 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     // TODO (SERVER-79304): Remove 'updatedToHandleTimeseriesIndex' once 8.0 becomes last LTS, or
     //  update the ticket number to when the parameter can be removed.
     auto indexKeyPatternBSON = shardKeyPattern.toBSON();
-    bool isBucketsNss = nss.isTimeseriesBucketsCollection();
-    if (updatedToHandleTimeseriesIndex && isBucketsNss) {
-        tassert(
-            7711201,
-            "If creating a shard key index on a time-series buckets collections, we must pass the "
-            "time-series options.",
-            isBucketsNss == tsOpts.has_value());
-
+    if (updatedToHandleTimeseriesIndex && tsOpts.has_value()) {
         // 'createBucketsShardKeyIndexFromTimeseriesShardKeySpec' expects the shard key to be
         // already "buckets-encoded". For example, shard keys on the timeField should already be
         // changed to use the "control.min.<timeField>". If the shard key is not buckets

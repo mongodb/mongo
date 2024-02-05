@@ -110,7 +110,9 @@ function buildCommands(collName, shouldFail) {
         {
             command:
                 {aggregate: collName, cursor: {}, pipeline: [{$match: {}}, {$out: "testOutColl"}]},
-            shouldFail: true
+            shouldFail: true,
+            // TODO SERVER-77915 Remove ErrorCodes.MovePrimaryInProgress
+            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {
             command: {
@@ -130,10 +132,17 @@ function buildCommands(collName, shouldFail) {
             },
             shouldFail: false
         },
-        {command: {create: "testCollection"}, shouldFail: true},
+        {
+            command: {create: "testCollection"},
+            shouldFail: true,
+            // TODO SERVER-77915 Remove ErrorCodes.MovePrimaryInProgress
+            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
+        },
         {
             command: {create: "testView", viewOn: collName, pipeline: [{$match: {}}]},
-            shouldFail: true
+            shouldFail: true,
+            // TODO SERVER-77915 Remove ErrorCodes.MovePrimaryInProgress
+            errorCodes: [ErrorCodes.LockBusy, ErrorCodes.MovePrimaryInProgress]
         },
         {
             command: {createIndexes: collName, indexes: [{key: {b: 1}, name: collName + "Idx_b"}]},

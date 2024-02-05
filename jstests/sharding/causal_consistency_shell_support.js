@@ -174,5 +174,5 @@ assert.commandFailedWithCode(testDB.runCommand(invalidCmd),
                                  ", should not be ahead of the clusterTime, " +
                                  tojson(session.getClusterTime().clusterTime));
 
-rst.stopSet();
 st.stop();
+rst.stopSet();

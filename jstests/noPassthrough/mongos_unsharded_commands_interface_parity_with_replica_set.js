@@ -59,6 +59,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {
     assertWriteConcernError,
@@ -364,6 +365,14 @@ function isSubset(superset, subset) {
 function assertMongosAndReplicaSetInterfaceParity(test, testCase, forceWriteConcernError, st, rst) {
     const mongosDb = st.getDB(test.database);
     const replicaSetDb = rst.getPrimary().getDB(test.database);
+    // TODO SERVER-84560: removed once replica-set parity with sharded cluster is fixed for collmod
+    // on unsplittable collections
+    if (test.name == "collMod") {
+        const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+            st.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+        if (isTrackUnshardedEnabled)
+            return;
+    }
 
     const replicaSetTestFixture = {
         db: replicaSetDb,

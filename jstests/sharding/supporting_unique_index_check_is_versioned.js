@@ -1,5 +1,6 @@
 // Tests that $merge's enforcement of a unique index on mongos includes a shard and/or database
 // version.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {profilerHasAtLeastOneMatchingEntryOrThrow} from "jstests/libs/profiler.js";
 
 function prepareProfilerOnShards(st, dbName) {
@@ -82,6 +83,12 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1}, mongos: 2});
 const sourceCollName = "sourceFoo";
 const targetCollName = "targetFoo";
 
+// TODO SERVER-77915 Remove isTrackUnshardedDisabled. Remove the dbVersion
+// check (or simply set it to false). Remove all the "sharded" cases: we now always use
+// shardVersion to run listIndexes on a user collection.
+const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
+    st.shard0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+
 //
 // Verify database versions are used to detect when the primary shard changes for an unsharded
 // target collection.
@@ -112,7 +119,7 @@ const targetCollName = "targetFoo";
         profileDB: st.rs1.getPrimary().getDB(dbName),
         collName: targetCollName,
         expectShardVersion: true,
-        expectDbVersion: true
+        expectDbVersion: isTrackUnshardedDisabled
     });
 })();
 
@@ -147,7 +154,7 @@ const targetCollName = "targetFoo";
         profileDB: st.rs1.getPrimary().getDB(dbName),
         collName: targetCollName,
         expectShardVersion: true,
-        expectDbVersion: true
+        expectDbVersion: isTrackUnshardedDisabled
     });
 })();
 
@@ -290,7 +297,7 @@ const targetCollName = "targetFoo";
         profileDB: st.rs1.getPrimary().getDB(dbName),
         collName: targetCollName,
         expectShardVersion: true,
-        expectDbVersion: true
+        expectDbVersion: isTrackUnshardedDisabled
     });
 })();
 

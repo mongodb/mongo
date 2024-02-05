@@ -12,6 +12,9 @@ const configDB = st.s.getDB('config');
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
 const shard2 = st.shard2.shardName;
+
+// TODO SERVER-77915 Remove checkUnsplittableMetadata once 8.0 becomes last LTS. Update the test as
+// this variable is now always "true"
 const checkUnsplittableMetadata = FeatureFlagUtil.isPresentAndEnabled(
     st.shard0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
 
@@ -221,13 +224,17 @@ function testDropCollection() {
     assert.commandWorked(db.runCommand({drop: collName}));
     assert.eq(numHistoryEntriesAfterFirstDrop, configDB.placementHistory.count({nss: nss}));
 
-    // Verify that no records get added in case an unsharded collection gets dropped
+    // Verify that records get added in case an unsharded collection gets dropped as well
     const unshardedCollName = 'unshardedColl';
     assert.commandWorked(db.createCollection(unshardedCollName));
 
     assert.commandWorked(db.runCommand({drop: unshardedCollName}));
 
-    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedCollName}));
+    if (checkUnsplittableMetadata) {
+        assert.eq(2, configDB.placementHistory.count({nss: dbName + '.' + unshardedCollName}));
+    } else {
+        assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedCollName}));
+    }
 }
 
 function testRenameCollection() {
@@ -278,18 +285,35 @@ function testRenameCollection() {
     assert.sameMembers(initialPlacementForOldColl.shards,
                        targetCollPlacementInfoWhenRenamed.shards);
 
-    jsTest.log(
-        'Testing that no placement entries are added by rename() for unsharded collections involved in the DDL');
-    const unshardedOldCollName = 'unshardedOld';
-    const unshardedTargetCollName = 'unshardedTarget';
-    assert.commandWorked(db.createCollection(unshardedOldCollName));
-    assert.commandWorked(db.createCollection(unshardedTargetCollName));
+    if (checkUnsplittableMetadata) {
+        jsTest.log(
+            'Testing that placement entries are added by rename() for unsharded collections involved in the DDL');
+        const unshardedOldCollName = 'unshardedOld';
+        const unshardedTargetCollName = 'unshardedTarget';
+        assert.commandWorked(db.createCollection(unshardedOldCollName));
+        assert.commandWorked(db.createCollection(unshardedTargetCollName));
 
-    assert.commandWorked(
-        db[unshardedOldCollName].renameCollection(unshardedTargetCollName, true /*dropTarget*/));
+        assert.commandWorked(db[unshardedOldCollName].renameCollection(unshardedTargetCollName,
+                                                                       true /*dropTarget*/));
 
-    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedOldCollName}));
-    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedTargetCollName}));
+        assert.eq(2, configDB.placementHistory.count({nss: dbName + '.' + unshardedOldCollName}));
+        assert.eq(3,
+                  configDB.placementHistory.count({nss: dbName + '.' + unshardedTargetCollName}));
+    } else {
+        jsTest.log(
+            'Testing that no placement entries are added by rename() for unsharded collections involved in the DDL');
+        const unshardedOldCollName = 'unshardedOld';
+        const unshardedTargetCollName = 'unshardedTarget';
+        assert.commandWorked(db.createCollection(unshardedOldCollName));
+        assert.commandWorked(db.createCollection(unshardedTargetCollName));
+
+        assert.commandWorked(db[unshardedOldCollName].renameCollection(unshardedTargetCollName,
+                                                                       true /*dropTarget*/));
+
+        assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedOldCollName}));
+        assert.eq(0,
+                  configDB.placementHistory.count({nss: dbName + '.' + unshardedTargetCollName}));
+    }
 }
 
 function testDropDatabase(dbName, primaryShardName) {
@@ -325,8 +349,13 @@ function testDropDatabase(dbName, primaryShardName) {
     assert(timestampCmp(initialShardedCollPlacementInfo.timestamp,
                         finalShardedCollPlacementInfo.timestamp) < 0);
 
-    // ...And that unshardedCollName stays untracked.
-    assert.eq(null, getLatestPlacementInfoFor(unshardedCollNss));
+    if (checkUnsplittableMetadata) {
+        // ...And that unshardedCollName is also tracked.
+        assert.neq(null, getLatestPlacementInfoFor(unshardedCollNss));
+    } else {
+        // ...And that unshardedCollName stays untracked.
+        assert.eq(null, getLatestPlacementInfoFor(unshardedCollNss));
+    }
 }
 
 function testReshardCollection() {
