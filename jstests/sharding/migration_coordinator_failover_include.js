@@ -59,12 +59,12 @@ export function runMoveChunkMakeDonorStepDownAfterFailpoint(st,
         }, ns, st.shard1.shardName, expectAbortDecisionWithCode), st.s.port);
     failpointHandle.wait();
 
-    jsTest.log("Make the donor primary step down and the donor secondary step up.");
-    const donorSecondary = st.rs0.getSecondary();
-    assert.commandWorked(
-        st.rs0.getPrimary().adminCommand({replSetStepDown: 10 /* stepDownSecs */, force: true}));
+    jsTest.log("Make the donor primary step down and an election occur");
+    const donorPrimary = st.rs0.getPrimary();
+    st.rs0.freeze(donorPrimary);
     failpointHandle.off();
-    st.rs0.stepUp(donorSecondary);
+    st.rs0.unfreeze(donorPrimary);
+    st.rs0.waitForPrimary();
 
     jsTest.log("Allow the moveChunk to finish.");
     awaitResult();
