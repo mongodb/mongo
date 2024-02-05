@@ -219,7 +219,6 @@ export class BulkWriteMetricChecker {
             opDeleted *= retryCount;
             opUpdated *= retryCount;
             if (this.fle) {
-                // TODO SERVER-83979 fix the expected opcounter changes with FLE.
                 // On Mongos, there is one extra opcounter increment per statement.
                 opDeleted *= 2;
                 if (numberOfInsertStatements >= 0) {
