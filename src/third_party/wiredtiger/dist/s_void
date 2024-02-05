@@ -167,7 +167,24 @@ func_ok()
         -e '/int zstd_pre_size$/d' \
         -e '/int zstd_terminate$/d' \
         -e '/int __wt_curhs_search_near_after$/d' \
-        -e '/int __wt_curhs_search_near_before$/d'
+        -e '/int __wt_curhs_search_near_before$/d' \
+        -e '/int __wt_logrec_read$/d' \
+        -e '/int __wt_logop_read$/d' \
+        -e '/int __wt_logop_unpack$/d' \
+        -e '/int __wt_struct_unpack_col_modify$/d' \
+        -e '/int __wt_struct_unpack_col_put$/d' \
+        -e '/int __wt_struct_unpack_col_remove$/d' \
+        -e '/int __wt_struct_unpack_col_truncate$/d' \
+        -e '/int __wt_struct_unpack_row_modify$/d' \
+        -e '/int __wt_struct_unpack_row_put$/d' \
+        -e '/int __wt_struct_unpack_row_remove$/d' \
+        -e '/int __wt_struct_unpack_row_truncate$/d' \
+        -e '/int __wt_struct_pack_checkpoint_start$/d' \
+        -e '/int __wt_struct_unpack_checkpoint_start$/d' \
+        -e '/int __wt_struct_unpack_prev_lsn$/d' \
+        -e '/int __wt_struct_unpack_backup_id$/d' \
+        -e '/int __wt_struct_unpack_txn_timestamp$/d' \
+        ;
 }
 
 SUBDIRS="bench ext src test"
