@@ -34,9 +34,15 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_mock.h"
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_test_util.h"
 #include "mongo/db/query/cqf_get_executor.h"
+#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -135,10 +141,73 @@ protected:
         return plan_cache_key_factory::make(query, MultipleCollectionAccessor{_collectionPtr});
     }
 
+    PhaseManagerWithPlan makePhaseManager(const CanonicalQuery& query) {
+        return getPhaseManager(opCtx(),
+                               query.getExpCtx(),
+                               query.nss(),
+                               _collectionPtr,
+                               stdx::unordered_set<NamespaceString>(),
+                               _queryHints,
+                               boost::none,
+                               false,
+                               internalCascadesOptimizerEnableParameterization.load(),
+                               nullptr,
+                               &query);
+    }
+
+    PhaseManagerWithPlan makePhaseManager(Pipeline& query) {
+        return getPhaseManager(opCtx(),
+                               query.getContext(),
+                               query.getContext()->ns,
+                               _collectionPtr,
+                               stdx::unordered_set<NamespaceString>(),
+                               _queryHints,
+                               boost::none,
+                               false,
+                               internalCascadesOptimizerEnableParameterization.load(),
+                               &query,
+                               nullptr);
+    }
+
+    auto makePlan(OptPhaseManager& phaseManager,
+                  PlanAndProps& planAndProps,
+                  VariableEnvironment& variableEnv,
+                  const CanonicalQuery& query) {
+        return plan(phaseManager,
+                    planAndProps,
+                    opCtx(),
+                    MultipleCollectionAccessor{_collectionPtr},
+                    false,
+                    nullptr,
+                    boost::none,
+                    makePlanCacheKey(query),
+                    variableEnv);
+    }
+
+    auto makePlan(OptPhaseManager& phaseManager,
+                  PlanAndProps& planAndProps,
+                  VariableEnvironment& variableEnv,
+                  const Pipeline& query) {
+        return plan(phaseManager,
+                    planAndProps,
+                    opCtx(),
+                    MultipleCollectionAccessor{_collectionPtr},
+                    false,
+                    nullptr,
+                    boost::none,
+                    makePlanCacheKey(query),
+                    variableEnv);
+    }
+
+    auto getCollectionUUIDString() const {
+        return _collectionPtr->uuid().toString();
+    }
+
 private:
     UUID _uuid;
     CollectionPtr _collectionPtr;
-    QueryHints _queryHints;
+    optimizer::QueryHints _queryHints;
+
     RAIIServerParameterControllerForTest _featureFlagController;
     RAIIServerParameterControllerForTest _cardinalityEstimatorController;
     RAIIServerParameterControllerForTest _parameterizationController;
@@ -159,15 +228,56 @@ TEST_F(CqfPlanCacheTest, CqfPlanCachePipelineInsertTest) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {jenny: 8675309}}")};
     const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx(), nss);
     auto query = Pipeline::parse(rawPipeline, expCtx);
+    // This test suite has parameterization on.
     query->parameterize();
+    const auto key = makePlanCacheKey(*query);
 
+    auto& planCache = sbe::getPlanCache(opCtx());
+
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
+
+    ASSERT_NE(optimize(*query, expCtx), boost::none);
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+}
+
+TEST_F(CqfPlanCacheTest, CqfPlanCacheReadTest) {
+    auto query = canonicalize("{jenny: 8675309}", "{}", "{}", "{}");
+    auto [phaseManager, maybePlanAndProps, optCounterInfo, pipelineMatchExpr] =
+        makePhaseManager(*query);
+    const auto key = makePlanCacheKey(*query);
+    auto& planCache = sbe::getPlanCache(opCtx());
+
+    ASSERT_EQ(static_cast<bool>(maybePlanAndProps), true);
+    auto& planAndProps = maybePlanAndProps.get();
+    auto variableEnv = VariableEnvironment::build(planAndProps._node);
+
+
+    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
+    ASSERT_NE(optimize(*query), boost::none);
+    const auto fromCache = makePlan(phaseManager, planAndProps, variableEnv, *query).fromCache;
+    ASSERT_EQ(fromCache, true);
+}
+TEST_F(CqfPlanCacheTest, CqfPlanCachePipelineReadTest) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {jenny: 8675309}}")};
+    const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx(), nss);
+    auto query = Pipeline::parse(rawPipeline, expCtx);
+    // This test suite has parameterization on.
+    query->parameterize();
     const auto key = makePlanCacheKey(*query);
 
     auto& planCache = sbe::getPlanCache(opCtx());
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     ASSERT_NE(optimize(*query, expCtx), boost::none);
-    ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
+
+    auto [phaseManager, maybePlanAndProps, optCounterInfo, pipelineMatchExpr] =
+        makePhaseManager(*query);
+    ASSERT_EQ(static_cast<bool>(maybePlanAndProps), true);
+    auto& planAndProps = maybePlanAndProps.get();
+    auto variableEnv = VariableEnvironment::build(planAndProps._node);
+
+    const auto fromCache = makePlan(phaseManager, planAndProps, variableEnv, *query).fromCache;
+    ASSERT_EQ(fromCache, true);
 }
 
 }  // namespace

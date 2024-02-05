@@ -390,64 +390,9 @@ void setupShardFiltering(OperationContext* opCtx,
     }
 }
 
-struct PlanWithData {
-    bool fromCache;
-    std::unique_ptr<sbe::PlanStage> plan;
-    stage_builder::PlanStageData planData;
-};
-
 bool shouldCachePlan(const sbe::PlanStage& plan) {
     // TODO SERVER-84385: Investigate ExchangeConsumer hangups when inserting into SBE plan cache.
     return typeid(plan) != typeid(sbe::ExchangeConsumer);
-}
-
-/*
- * This function either creates a plan or fetches one from cache.
- */
-PlanWithData plan(OptPhaseManager& phaseManager,
-                  PlanAndProps& planAndProps,
-                  OperationContext* opCtx,
-                  const MultipleCollectionAccessor& collections,
-                  const bool requireRID,
-                  const std::unique_ptr<PlanYieldPolicySBE>& sbeYieldPolicy,
-                  VariableEnvironment& env) {
-
-    SlotVarMap slotMap;
-    auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
-    sbe::value::SlotIdGenerator ids;
-    boost::optional<sbe::value::SlotId> ridSlot;
-
-    // Construct the ShardFilterer and bind it to the correct slot.
-    setupShardFiltering(opCtx, collections, *runtimeEnvironment, ids);
-    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
-
-    SBENodeLowering g{env,
-                      *runtimeEnvironment,
-                      ids,
-                      staticData->inputParamToSlotMap,
-                      phaseManager.getMetadata(),
-                      planAndProps._map,
-                      sbeYieldPolicy.get()};
-    auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
-    tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
-
-    uassert(6624253, "Lowering failed: did not produce a plan.", sbePlan != nullptr);
-    uassert(6624254, "Lowering failed: did not produce any output slots.", !slotMap.empty());
-
-    {
-        sbe::DebugPrinter p;
-        OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
-    }
-
-    staticData->resultSlot = slotMap.begin()->second;
-    if (requireRID) {
-        staticData->recordIdSlot = ridSlot;
-    }
-
-    stage_builder::PlanStageData data(stage_builder::Environment(std::move(runtimeEnvironment)),
-                                      std::move(staticData));
-
-    return {false, std::move(sbePlan), data};
 }
 
 template <typename QueryType>
@@ -473,11 +418,18 @@ static ExecParams createExecutor(
     }
 
     // Get the plan either from cache or by lowering + optimization.
-    auto [fromCache, sbePlan, data] =
-        plan(phaseManager, planAndProps, opCtx, collections, requireRID, sbeYieldPolicy, env);
-    CurOp::get(opCtx)->debug().fromPlanCache = fromCache;
+    auto [fromCache, sbePlan, data] = plan(phaseManager,
+                                           planAndProps,
+                                           opCtx,
+                                           collections,
+                                           requireRID,
+                                           sbeYieldPolicy,
+                                           pipelineMatchExpr,
+                                           planCacheKey,
+                                           env);
 
     sbePlan->attachToOperationContext(opCtx);
+
     if (expCtx->explain || expCtx->mayDbProfile) {
         sbePlan->markShouldCollectTimingInfo();
     }
@@ -523,7 +475,7 @@ static ExecParams createExecutor(
                                      std::move(phaseManager.getQueryPlannerOptimizationStages()));
 
     // (Possibly) cache the SBE plan.
-    if (planCacheKey && shouldCachePlan(*sbePlan)) {
+    if (!fromCache && planCacheKey && shouldCachePlan(*sbePlan)) {
         sbe::getPlanCache(opCtx).setPinned(
             *planCacheKey,
             canonical_query_encoder::computeHash(
@@ -944,64 +896,19 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
     return {std::move(scanDefs), numberOfPartitions};
 }
 
-boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
+PhaseManagerWithPlan getPhaseManager(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
-    const MultipleCollectionAccessor& collections,
+    const CollectionPtr& collection,
+    const stdx::unordered_set<NamespaceString>& involvedCollections,
     QueryHints queryHints,
-    const boost::optional<BSONObj>& indexHint,
-    BonsaiEligibility eligibility,
+    const boost::optional<BSONObj>& hint,
+    const bool requireRID,
+    const bool parameterizationOn,
     Pipeline* pipeline,
     const CanonicalQuery* canonicalQuery) {
-    if (MONGO_unlikely(failConstructingBonsaiExecutor.shouldFail())) {
-        uasserted(620340, "attempting to use CQF while it is disabled");
-    }
-    // Ensure that either pipeline or canonicalQuery is set.
-    tassert(624070,
-            "getSBEExecutorViaCascadesOptimizer expects exactly one of the following to be set: "
-            "canonicalQuery, pipeline",
-            static_cast<bool>(pipeline) != static_cast<bool>(canonicalQuery));
 
-    stdx::unordered_set<NamespaceString> involvedCollections;
-    if (pipeline) {
-        involvedCollections = pipeline->getInvolvedCollections();
-    }
-
-    // TODO SERVER-83414: Enable histogram CE with parameterization.
-    const auto parameterizationOn = (internalQueryCardinalityEstimatorMode != "histogram"_sd) &&
-        internalCascadesOptimizerEnableParameterization.load() && eligibility.isFullyEligible();
-
-    const auto planCacheKey = [&]() -> boost::optional<sbe::PlanCacheKey> {
-        // For now, only M2-eligible queries will be cached.
-        if (!eligibility.isFullyEligible()) {
-            return boost::none;
-        }
-
-        if (canonicalQuery) {
-            return createPlanCacheKey(*canonicalQuery, collections);
-        } else if (pipeline->isParameterized()) {
-            // Create plan cache key for pipeline if was parameterized
-            return createPlanCacheKey(*pipeline, collections);
-        }
-
-        return boost::none;
-    }();
-
-    if (planCacheKey) {
-        OpDebug& opDebug = CurOp::get(opCtx)->debug();
-        opDebug.queryHash = planCacheKey.get().queryHash();
-        opDebug.planCacheKey = planCacheKey.get().planCacheKeyHash();
-    }
-
-    const auto& collection = collections.getMainCollection();
-
-    const boost::optional<BSONObj>& hint =
-        (indexHint && !indexHint->isEmpty() ? indexHint : boost::none);
-
-    validateCommandOptions(canonicalQuery, collection, hint, involvedCollections);
-
-    const bool requireRID = canonicalQuery ? canonicalQuery->getForceGenerateRecordId() : false;
     const bool collectionExists = static_cast<bool>(collection);
     const std::string uuidStr = collectionExists ? collection->uuid().toString() : "<missing_uuid>";
     const std::string collNameStr = nss.coll().toString();
@@ -1041,11 +948,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     QueryParameterMap queryParameters;
 
     if (pipeline) {
-        // Clear match expression auto-parameterization before pipeline to ABT translation
-        if (!parameterizationOn && pipeline->isParameterized()) {
-            pipeline->unparameterize();
-        }
-
         abt = translatePipelineToABT(metadata,
                                      *pipeline,
                                      scanProjName,
@@ -1055,12 +957,6 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                                      maxFilterDepth);
 
     } else {
-        // Clear match expression auto-parameterization by setting max param count to zero before
-        // CQ to ABT translation
-        if (!parameterizationOn) {
-            MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
-        }
-
         abt = translateCanonicalQueryToABT(metadata,
                                            *canonicalQuery,
                                            scanProjName,
@@ -1072,10 +968,13 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
 
     // If pipeline exists, is cacheable, and is parameterized, save the MatchExpression in
     // ExecParams for binding.
-    const auto pipelineMatchExpr = pipeline && parameterizationOn && pipeline->isParameterized()
+    const auto pipelineMatchExpr = (pipeline && parameterizationOn) &&
+            dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())
         ? boost::make_optional(
               dynamic_cast<DocumentSourceMatch*>(pipeline->peekFront())->getMatchExpression())
-        : boost::none;
+        : ((canonicalQuery && parameterizationOn)
+               ? boost::make_optional(canonicalQuery->getPrimaryMatchExpression())
+               : boost::none);
 
     OPTIMIZER_DEBUG_LOG(
         6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2Compact(abt));
@@ -1111,10 +1010,102 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     auto resultPlans = phaseManager.optimizeNoAssert(std::move(abt), false /*includeRejected*/);
     if (resultPlans.empty()) {
         // Could not find a plan.
-        return boost::none;
+        return {std::move(phaseManager), boost::none, std::move(optCounterInfo), pipelineMatchExpr};
     }
+
     // At this point we should have exactly one plan.
     PlanAndProps planAndProps = std::move(resultPlans.front());
+    return {std::move(phaseManager),
+            std::move(planAndProps),
+            std::move(optCounterInfo),
+            pipelineMatchExpr};
+}
+
+boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const MultipleCollectionAccessor& collections,
+    QueryHints queryHints,
+    const boost::optional<BSONObj>& indexHint,
+    BonsaiEligibility eligibility,
+    Pipeline* pipeline,
+    const CanonicalQuery* canonicalQuery) {
+    if (MONGO_unlikely(failConstructingBonsaiExecutor.shouldFail())) {
+        uasserted(620340, "attempting to use CQF while it is disabled");
+    }
+    // Ensure that either pipeline or canonicalQuery is set.
+    tassert(624070,
+            "getSBEExecutorViaCascadesOptimizer expects exactly one of the following to be set: "
+            "canonicalQuery, pipeline",
+            static_cast<bool>(pipeline) != static_cast<bool>(canonicalQuery));
+
+    stdx::unordered_set<NamespaceString> involvedCollections;
+    if (pipeline) {
+        involvedCollections = pipeline->getInvolvedCollections();
+    }
+
+    // TODO SERVER-83414: Enable histogram CE with parameterization.
+    const auto parameterizationOn = (internalQueryCardinalityEstimatorMode != "histogram"_sd) &&
+        internalCascadesOptimizerEnableParameterization.load() && eligibility.isFullyEligible();
+
+    if (!parameterizationOn) {
+        if (canonicalQuery) {
+            MatchExpression::unparameterize(canonicalQuery->getPrimaryMatchExpression());
+        } else if (pipeline->isParameterized()) {
+            pipeline->unparameterize();
+        }
+    }
+
+    const auto planCacheKey = [&]() -> boost::optional<sbe::PlanCacheKey> {
+        if (canonicalQuery) {
+            // For now, only M2-eligible queries will be cached.
+            if (eligibility.isFullyEligible()) {
+                return createPlanCacheKey(*canonicalQuery, collections);
+            }
+        } else if (pipeline->isParameterized()) {
+            // Create plan cache key for pipeline if was parameterized
+            // For now, only M2-eligible queries will be cached.
+            if (eligibility.isFullyEligible()) {
+                return createPlanCacheKey(*pipeline, collections);
+            }
+        }
+
+        return boost::none;
+    }();
+
+    if (planCacheKey) {
+        OpDebug& opDebug = CurOp::get(opCtx)->debug();
+        opDebug.queryHash = planCacheKey.get().queryHash();
+        opDebug.planCacheKey = planCacheKey.get().planCacheKeyHash();
+    }
+
+    const auto& collection = collections.getMainCollection();
+
+    const boost::optional<BSONObj>& hint =
+        (indexHint && !indexHint->isEmpty() ? indexHint : boost::none);
+
+    validateCommandOptions(canonicalQuery, collection, hint, involvedCollections);
+
+    const bool requireRID = canonicalQuery ? canonicalQuery->getForceGenerateRecordId() : false;
+
+    auto [phaseManager, maybePlanAndProps, optCounterInfo, pipelineMatchExpr] =
+        getPhaseManager(opCtx,
+                        expCtx,
+                        nss,
+                        collection,
+                        involvedCollections,
+                        queryHints,
+                        hint,
+                        requireRID,
+                        parameterizationOn,
+                        pipeline,
+                        canonicalQuery);
+
+    if (!maybePlanAndProps)
+        return boost::none;
+
+    auto planAndProps = maybePlanAndProps.get();
 
     {
         const auto& memo = phaseManager.getMemo();
@@ -1140,7 +1131,7 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
             "estimatedCardinality"_attr = (memoStats._ce ? (double)*memoStats._ce : -1.0));
     }
 
-    const auto explainMemoFn = [&phaseManager]() {
+    const auto explainMemoFn = [&phaseManager = phaseManager]() {
         // Explain the memo only if required by the logging level.
         return ExplainGenerator::explainV2Compact(
             make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()),
@@ -1181,6 +1172,74 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     } else {
         MONGO_UNREACHABLE;
     }
+}
+
+/*
+ * This function either creates a plan or fetches one from cache.
+ */
+PlanWithData plan(OptPhaseManager& phaseManager,
+                  PlanAndProps& planAndProps,
+                  OperationContext* opCtx,
+                  const MultipleCollectionAccessor& collections,
+                  const bool requireRID,
+                  const std::unique_ptr<PlanYieldPolicySBE>& sbeYieldPolicy,
+                  const boost::optional<MatchExpression*> pipelineMatchExpr,
+                  const boost::optional<sbe::PlanCacheKey>& planCacheKey,
+                  VariableEnvironment& env) {
+
+
+    if (planCacheKey) {
+        auto&& planCache = sbe::getPlanCache(opCtx);
+        if (auto cacheEntry = planCache.getCacheEntryIfActive(*planCacheKey)) {
+            auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
+            cachedPlan->root->attachNewYieldPolicy(sbeYieldPolicy.get());
+            auto sbeData = cachedPlan->planStageData;
+            sbeData.debugInfo = cacheEntry->debugInfo;
+
+            if (pipelineMatchExpr) {
+                input_params::bind(*pipelineMatchExpr, sbeData, true);
+            }
+
+            return {true, std::move(cachedPlan->root), sbeData};
+        }
+    }
+
+    SlotVarMap slotMap;
+    auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
+    sbe::value::SlotIdGenerator ids;
+    boost::optional<sbe::value::SlotId> ridSlot;
+
+    // Construct the ShardFilterer and bind it to the correct slot.
+    setupShardFiltering(opCtx, collections, *runtimeEnvironment, ids);
+    auto staticData = std::make_unique<stage_builder::PlanStageStaticData>();
+
+    SBENodeLowering g{env,
+                      *runtimeEnvironment,
+                      ids,
+                      staticData->inputParamToSlotMap,
+                      phaseManager.getMetadata(),
+                      planAndProps._map,
+                      sbeYieldPolicy.get()};
+    auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
+    tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
+
+    uassert(6624253, "Lowering failed: did not produce a plan.", sbePlan != nullptr);
+    uassert(6624254, "Lowering failed: did not produce any output slots.", !slotMap.empty());
+
+    {
+        sbe::DebugPrinter p;
+        OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
+    }
+
+    staticData->resultSlot = slotMap.begin()->second;
+    if (requireRID) {
+        staticData->recordIdSlot = ridSlot;
+    }
+
+    stage_builder::PlanStageData data(stage_builder::Environment(std::move(runtimeEnvironment)),
+                                      std::move(staticData));
+
+    return {false, std::move(sbePlan), data};
 }
 
 boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(

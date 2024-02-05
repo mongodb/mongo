@@ -50,10 +50,14 @@
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
+#include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 #include "mongo/db/query/sbe_stage_builder_plan_data.h"
 
 namespace mongo {
@@ -105,6 +109,45 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
     BonsaiEligibility eligibility,
     Pipeline* pipeline,
     const CanonicalQuery* = nullptr);
+
+struct PhaseManagerWithPlan {
+    optimizer::OptPhaseManager phaseManager;
+    boost::optional<optimizer::PlanAndProps> planAndProps;
+    OptimizerCounterInfo optCounterInfo;
+    boost::optional<MatchExpression*> pipelineMatchExpr;
+};
+
+PhaseManagerWithPlan getPhaseManager(
+    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const NamespaceString& nss,
+    const CollectionPtr& collection,
+    const stdx::unordered_set<NamespaceString>& involvedCollections,
+    optimizer::QueryHints queryHints,
+    const boost::optional<BSONObj>& hint,
+    bool requireRID,
+    bool parameterizationOn,
+    Pipeline* pipeline,
+    const CanonicalQuery* canonicalQuery);
+
+struct PlanWithData {
+    bool fromCache;
+    std::unique_ptr<sbe::PlanStage> plan;
+    stage_builder::PlanStageData planData;
+};
+
+/*
+ * This function either creates a plan or fetches one from cache.
+ */
+PlanWithData plan(optimizer::OptPhaseManager& phaseManager,
+                  optimizer::PlanAndProps& planAndProps,
+                  OperationContext* opCtx,
+                  const MultipleCollectionAccessor& collections,
+                  bool requireRID,
+                  const std::unique_ptr<PlanYieldPolicySBE>& sbeYieldPolicy,
+                  boost::optional<MatchExpression*> pipelineMatchExpr,
+                  const boost::optional<sbe::PlanCacheKey>& planCacheKey,
+                  optimizer::VariableEnvironment& env);
 
 /**
  * Returns a PlanExecutor for the given CanonicalQuery.
