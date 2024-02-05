@@ -179,6 +179,11 @@ void User::setIndirectRestrictions(RestrictionDocuments restrictions) & {
 }
 
 Status User::validateRestrictions(OperationContext* opCtx) const {
+    if (!opCtx->getClient()->session()) {
+        // If Client has no transport session, it must be internal system connection
+        invariant(opCtx->getClient()->isFromSystemConnection());
+        return Status::OK();
+    }
     const auto& env = RestrictionEnvironment::get(*(opCtx->getClient()));
     auto status = _restrictions.validate(env);
     if (!status.isOK()) {
