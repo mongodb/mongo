@@ -65,6 +65,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -76,6 +77,13 @@
 
 
 namespace mongo {
+
+namespace {
+
+const auto getWatchdogMonitorInterface =
+    ServiceContext::declareDecoration<std::unique_ptr<WatchdogMonitorInterface>>();
+
+}  // namespace
 
 WatchdogPeriodicThread::WatchdogPeriodicThread(Milliseconds period, StringData threadName)
     : _period(period), _enabled(true), _threadName(threadName.toString()) {}
@@ -229,25 +237,36 @@ std::int64_t WatchdogCheckThread::getGeneration() {
 
 void WatchdogCheckThread::resetState() {}
 
+void WatchdogCheckThread::setShouldRunChecks(const bool shouldRunChecks) {
+    _shouldRunChecks.store(shouldRunChecks);
+}
+
 void WatchdogCheckThread::run(OperationContext* opCtx) {
     for (auto& check : _checks) {
         Timer timer(opCtx->getServiceContext()->getTickSource());
 
-        check->run(opCtx);
-        Microseconds micros = timer.elapsed();
+        if (_shouldRunChecks.load()) {
+            check->run(opCtx);
+            Microseconds micros = timer.elapsed();
 
-        LOGV2_DEBUG(23407,
-                    1,
-                    "Watchdog test '{check_getDescriptionForLogging}' took "
-                    "{duration_cast_Milliseconds_micros}",
-                    "check_getDescriptionForLogging"_attr = check->getDescriptionForLogging(),
-                    "duration_cast_Milliseconds_micros"_attr = duration_cast<Milliseconds>(micros));
+            LOGV2_DEBUG(8350803,
+                        1,
+                        "Watchdog test checked '{check_getDescriptionForLogging}' took "
+                        "{duration_cast_Milliseconds_micros}",
+                        "check_getDescriptionForLogging"_attr = check->getDescriptionForLogging(),
+                        "duration_cast_Milliseconds_micros"_attr =
+                            duration_cast<Milliseconds>(micros));
+        } else {
+            LOGV2_DEBUG(8350802,
+                        1,
+                        "Watchdog skipping running check",
+                        "check_getDescriptionForLogging"_attr = check->getDescriptionForLogging());
+        }
 
         // We completed a check, bump the generation counter.
         _checkGeneration.fetchAndAdd(1);
     }
 }
-
 
 WatchdogMonitorThread::WatchdogMonitorThread(WatchdogCheckThread* checkThread,
                                              WatchdogDeathCallback callback,
@@ -267,6 +286,7 @@ void WatchdogMonitorThread::resetState() {
 }
 
 void WatchdogMonitorThread::run(OperationContext* opCtx) {
+    _monitorGeneration.fetchAndAdd(1);
     auto currentGeneration = _checkThread->getGeneration();
 
     if (currentGeneration != _lastSeenGeneration) {
@@ -276,12 +296,34 @@ void WatchdogMonitorThread::run(OperationContext* opCtx) {
     }
 }
 
+WatchdogMonitorInterface* WatchdogMonitorInterface::get(ServiceContext* service) {
+    return getWatchdogMonitorInterface(service).get();
+}
+
+WatchdogMonitorInterface* WatchdogMonitorInterface::get(OperationContext* ctx) {
+    return getWatchdogMonitorInterface(ctx->getClient()->getServiceContext()).get();
+}
+
+WatchdogMonitorInterface* WatchdogMonitorInterface::getGlobalWatchdogMonitorInterface() {
+    if (!hasGlobalServiceContext()) {
+        return nullptr;
+    }
+    return getWatchdogMonitorInterface(getGlobalServiceContext()).get();
+};
+
+void WatchdogMonitorInterface::set(
+    ServiceContext* service, std::unique_ptr<WatchdogMonitorInterface> watchdogMonitorInterface) {
+    auto& coordinator = getWatchdogMonitorInterface(service);
+    coordinator = std::move(watchdogMonitorInterface);
+}
+
 
 WatchdogMonitor::WatchdogMonitor(std::vector<std::unique_ptr<WatchdogCheck>> checks,
                                  Milliseconds checkPeriod,
                                  Milliseconds monitorPeriod,
                                  WatchdogDeathCallback callback)
-    : _checkPeriod(checkPeriod),
+    : WatchdogMonitorInterface(),
+      _checkPeriod(checkPeriod),
       _watchdogCheckThread(std::move(checks), checkPeriod),
       _watchdogMonitorThread(&_watchdogCheckThread, callback, monitorPeriod) {
     invariant(checkPeriod < monitorPeriod);
@@ -303,6 +345,30 @@ void WatchdogMonitor::start() {
     }
 }
 
+void WatchdogMonitor::pauseChecks() {
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        if (_state == State::kStarted || _state == State::kShutdownRequested) {
+            LOGV2(8350800, "WatchdogMonitor pausing watchdog checks");
+            _watchdogCheckThread.setShouldRunChecks(false);
+        }
+    }
+}
+
+void WatchdogMonitor::unpauseChecks() {
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+        if (_state == State::kStarted || _state == State::kShutdownRequested) {
+            LOGV2(8350801, "WatchdogMonitor unpausing watchdog checks");
+            _watchdogCheckThread.setShouldRunChecks(true);
+        }
+    }
+}
+
+bool WatchdogMonitor::getShouldRunChecks_forTest() {
+    MONGO_UNREACHABLE;
+}
+
 void WatchdogMonitor::setPeriod(Milliseconds duration) {
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -312,7 +378,9 @@ void WatchdogMonitor::setPeriod(Milliseconds duration) {
 
             // Make sure that we monitor runs more frequently then checks
             // 2 feels like an arbitrary good minimum.
-            invariant(duration >= 2 * _checkPeriod);
+            invariant((TestingProctor::instance().isInitialized() &&
+                       TestingProctor::instance().isEnabled()) ||
+                      duration >= 2 * _checkPeriod);
 
             _watchdogCheckThread.setPeriod(_checkPeriod);
             _watchdogMonitorThread.setPeriod(duration);
@@ -635,7 +703,7 @@ void DirectoryCheck::run(OperationContext* opCtx) {
 }
 
 std::string DirectoryCheck::getDescriptionForLogging() {
-    return str::stream() << "checked directory '" << _directory.generic_string() << "'";
+    return str::stream() << " directory '" << _directory.generic_string() << "'";
 }
 
 }  // namespace mongo

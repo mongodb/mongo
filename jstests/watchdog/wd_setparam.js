@@ -1,4 +1,8 @@
 // Storage Node Watchdog test cases
+
+// Disable testing diagnostics (TestingProctor) since that allows setting a lower
+// watchdogPeriodSeconds.
+TestData.testingDiagnosticsEnabled = false;
 // - Validate set parameter functions correctly.
 const admin = db.getSiblingDB("admin");
 
