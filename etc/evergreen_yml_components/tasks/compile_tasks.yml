@@ -2627,7 +2627,6 @@ task_groups:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
-  - func: "get engflow creds"
   teardown_task:
   - func: "attach scons logs"
   setup_group_can_fail_task: true
