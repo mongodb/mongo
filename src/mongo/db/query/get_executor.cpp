@@ -1671,14 +1671,18 @@ private:
             solution->indexFilterApplied = _plannerParams.indexFiltersApplied;
         }
 
-        auto result = releaseResult();
-        result->runtimePlanner =
-            std::make_unique<crp_sbe::MultiPlanner>(_opCtx,
-                                                    makePlannerData(),
-                                                    _yieldPolicy,
-                                                    std::move(solutions),
-                                                    PlanCachingMode::NeverCache);
-        return result;
+        if (solutions.size() > 1) {
+            auto result = releaseResult();
+            result->runtimePlanner =
+                std::make_unique<crp_sbe::MultiPlanner>(_opCtx,
+                                                        makePlannerData(),
+                                                        _yieldPolicy,
+                                                        std::move(solutions),
+                                                        PlanCachingMode::NeverCache);
+            return result;
+        } else {
+            return buildSingleSolutionPlan(std::move(solutions[0]));
+        }
     }
 
     std::unique_ptr<WorkingSet> _ws;
