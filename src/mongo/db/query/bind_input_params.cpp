@@ -565,9 +565,7 @@ void bindLimitSkipInputSlots(const CanonicalQuery& cq,
                              sbe::RuntimeEnvironment* runtimeEnvironment) {
     auto setLimitSkipInputSlot = [&](boost::optional<sbe::value::SlotId> slot,
                                      boost::optional<int64_t> amount) {
-        if (!slot) {
-            tassert(8349201, "Slot is not present, but amount is present", !amount);
-        } else {
+        if (slot) {
             tassert(8349202, "Slot is present, but amount is not present", amount);
             runtimeEnvironment->resetSlot(*slot,
                                           sbe::value::TypeTags::NumberInt64,

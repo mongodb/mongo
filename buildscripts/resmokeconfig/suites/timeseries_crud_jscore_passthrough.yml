@@ -33,6 +33,7 @@ selector:
   - jstests/core/sparse_index_supports_ne_null.js
   # Text indexes.
   - jstests/core/query/internal_strip_invalid_assignment.js
+  - jstests/core/query/plan_cache/plan_cache_eof.js
   # Hashed indexes.
   - jstests/core/hashed_partial_and_sparse_index.js
   - jstests/core/query/distinct/distinct_with_hashed_index.js

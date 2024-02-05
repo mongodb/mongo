@@ -1494,4 +1494,24 @@ TEST(QuerySolutionTest, GetFirstNodeByTypeFindsFirstAndCountsWhenSeveral) {
     ASSERT_EQ(foundLimitNode->limit, 8ll);  // 8 is the value we assign to the first limit node
     ASSERT_EQ(2, foundCount);
 }
+
+TEST(QuerySolutionTest, ShouldCacheEofPlanTree) {
+    // QuerySolutions with EOF nodes are eligible for the plan cache.
+
+    // QuerySolution with root EOF node is eligible for the plan cache.
+    auto solution1 = std::make_unique<QuerySolution>();
+    solution1->setRoot(std::make_unique<EofNode>());
+    ASSERT_TRUE(solution1->isEligibleForPlanCache());
+
+    // QuerySolution with child EOF node is eligible for the plan cache.
+    std::vector<std::unique_ptr<QuerySolutionNode>> indexScanList;
+    indexScanList.push_back(std::make_unique<EofNode>());
+    auto orNode = std::make_unique<OrNode>();
+    orNode->addChildren(std::move(indexScanList));
+
+    auto solution2 = std::make_unique<QuerySolution>();
+    solution2->setRoot(std::move(orNode));
+
+    ASSERT_TRUE(solution2->isEligibleForPlanCache());
+}
 }  // namespace

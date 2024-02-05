@@ -5,7 +5,12 @@
 //   requires_fcv_72,
 // ]
 //
-import {getOptimizer, getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
+import {
+    getOptimizer,
+    getPlanStage,
+    getSingleNodeExplain,
+    planHasStage
+} from "jstests/libs/analyze_plan.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
@@ -97,6 +102,7 @@ if (!isMongos && getOptimizer(explain) == "classic") {
         // $unwind should be pushed down to SBE.
         assert(planHasStage(testDB, explain, "UNWIND"), explain);
     } else {
+        explain = getSingleNodeExplain(explain);
         assert(explain.hasOwnProperty("stages"), explain);
         assert.neq(explain.stages.length, 0, explain);
         let lastStage = explain.stages[explain.stages.length - 1];
