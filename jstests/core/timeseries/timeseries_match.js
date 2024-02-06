@@ -181,6 +181,18 @@ TimeseriesTest.run((insert) => {
             ids: [],
             usesBlockProcessing: true
         },
+        // Logical operators between scalar and block values.
+        {
+            pred: {
+                $or: [
+                    {$expr: {$regexFind: {input: "$measurement", regex: "^2", options: ""}}},
+                    {"topLevelScalar": {$lte: 200}}
+                ]
+            },
+            ids: [0],
+            usesBlockProcessing: false
+        },
+        {pred: {$expr: {$lt: [101, "$topLevelScalar"]}}, ids: [0, 1], usesBlockProcessing: false},
 
         {
             pred: {

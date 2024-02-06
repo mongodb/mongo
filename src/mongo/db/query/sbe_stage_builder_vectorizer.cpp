@@ -158,7 +158,6 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             if (!rhs.expr.has_value()) {
                 return rhs;
             }
-
             // If the argument is a block, create a block-generating operation.
             if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
                 return {makeABTFunction(TypeSignature::kBlockType.isSubset(rhs.typeSignature)
@@ -171,11 +170,13 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                         lhs.sourceCell};
             } else {
                 // Preserve scalar operation.
-                return {
-                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                    lhs.typeSignature.exclude(TypeSignature::kNothingType)
-                        .include(rhs.typeSignature),
-                    {}};
+                if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                    return {make<optimizer::BinaryOp>(
+                                op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                            lhs.typeSignature.exclude(TypeSignature::kNothingType)
+                                .include(rhs.typeSignature),
+                            {}};
+                }
             }
             break;
         }
@@ -188,14 +189,12 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             if (!rhs.expr.has_value()) {
                 return rhs;
             }
-
-            // If the left argument is a block, and the right is a scalar value, create a
-            // block-generating operation.
-            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
-                if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
-
-                    // Propagate the name of the associated cell variable, this is not the place to
-                    // fold (there could be a fillEmpty node on top of this comparison).
+            // The right side must be a scalar value.
+            if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                // If the left argument is a block, create a block-generating operation.
+                if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
+                    // Propagate the name of the associated cell variable, this is not the place
+                    // to fold (there could be a fillEmpty node on top of this comparison).
                     return {makeABTFunction("valueBlockCmp3wScalar"_sd,
                                             std::move(*lhs.expr),
                                             std::move(*rhs.expr)),
@@ -204,15 +203,15 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                                 .include(lhs.typeSignature.include(rhs.typeSignature)
                                              .intersect(TypeSignature::kNothingType)),
                             lhs.sourceCell};
+                } else {
+                    // Preserve scalar operation.
+                    return {make<optimizer::BinaryOp>(
+                                op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                            getTypeSignature(sbe::value::TypeTags::NumberInt32)
+                                .include(lhs.typeSignature.include(rhs.typeSignature)
+                                             .intersect(TypeSignature::kNothingType)),
+                            {}};
                 }
-            } else {
-                // Preserve scalar operation.
-                return {
-                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                    getTypeSignature(sbe::value::TypeTags::NumberInt32)
-                        .include(lhs.typeSignature.include(rhs.typeSignature)
-                                     .intersect(TypeSignature::kNothingType)),
-                    {}};
             }
             break;
         }
@@ -231,16 +230,17 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             if (!rhs.expr.has_value()) {
                 return rhs;
             }
+            // The right side must be a scalar value.
+            if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                // A comparison can return Nothing when the types of the arguments are not
+                // comparable.
+                TypeSignature resultType = (lhs.typeSignature.canCompareWith(rhs.typeSignature))
+                    ? TypeSignature::kBooleanType
+                    : TypeSignature::kBooleanType.include(TypeSignature::kNothingType);
 
-            // A comparison can return Nothing when the types of the arguments are not comparable.
-            TypeSignature resultType = (lhs.typeSignature.canCompareWith(rhs.typeSignature))
-                ? TypeSignature::kBooleanType
-                : TypeSignature::kBooleanType.include(TypeSignature::kNothingType);
-
-            // If one of the argument is a block, and the other is a scalar value, create a
-            // block-generating operation.
-            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
-                if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                // If one of the argument is a block, and the other is a scalar value, create a
+                // block-generating operation.
+                if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
                     StringData fnName = [&]() {
                         switch (op.op()) {
                             case optimizer::Operations::Gt:
@@ -259,19 +259,19 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                                 MONGO_UNREACHABLE;
                         }
                     }();
-                    // Propagate the name of the associated cell variable, this is not the place to
-                    // fold (there could be a fillEmpty node on top of this comparison).
+                    // Propagate the name of the associated cell variable, this is not the place
+                    // to fold (there could be a fillEmpty node on top of this comparison).
                     return {makeABTFunction(fnName, std::move(*lhs.expr), std::move(*rhs.expr)),
                             TypeSignature::kBlockType.include(resultType),
                             TypeSignature::kBlockType.isSubset(lhs.typeSignature) ? lhs.sourceCell
                                                                                   : rhs.sourceCell};
+                } else {
+                    // Preserve scalar operation.
+                    return {make<optimizer::BinaryOp>(
+                                op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                            resultType,
+                            {}};
                 }
-            } else {
-                // Preserve scalar operation.
-                return {
-                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                    resultType,
-                    {}};
             }
             break;
         }
@@ -284,23 +284,23 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             if (!rhs.expr.has_value()) {
                 return rhs;
             }
-
-            if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
-                if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+            // The right side must be a scalar value.
+            if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                if (TypeSignature::kBlockType.isSubset(lhs.typeSignature)) {
                     return {makeABTFunction("valueBlockIsMember"_sd,
                                             std::move(*lhs.expr),
                                             std::move(*rhs.expr)),
                             TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
                                 .include(rhs.typeSignature.intersect(TypeSignature::kNothingType)),
                             lhs.sourceCell};
+                } else {
+                    // Preserve scalar operation.
+                    return {make<optimizer::BinaryOp>(
+                                op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                            TypeSignature::kBooleanType.include(
+                                rhs.typeSignature.intersect(TypeSignature::kNothingType)),
+                            {}};
                 }
-            } else {
-                // Preserve scalar operation.
-                return {
-                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                    TypeSignature::kBooleanType.include(
-                        rhs.typeSignature.intersect(TypeSignature::kNothingType)),
-                    {}};
             }
             break;
         }
@@ -361,13 +361,15 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                 if (!rhs.expr.has_value()) {
                     return rhs;
                 }
-                // Preserve scalar operation.
-                return {
-                    make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
-                    TypeSignature::kBooleanType.include(
-                        lhs.typeSignature.include(rhs.typeSignature)
-                            .intersect(TypeSignature::kNothingType)),
-                    {}};
+                // Preserve scalar operation, reject vectorization of scalar vs vector.
+                if (!TypeSignature::kBlockType.isSubset(rhs.typeSignature)) {
+                    return {make<optimizer::BinaryOp>(
+                                op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
+                            TypeSignature::kBooleanType.include(
+                                lhs.typeSignature.include(rhs.typeSignature)
+                                    .intersect(TypeSignature::kNothingType)),
+                            {}};
+                }
             }
             break;
         }
@@ -418,7 +420,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
                         TypeSignature::kBlockType.include(returnTS),
                         sameCell};
             } else {
-                // Scalar version. Preserve scalar operation
+                // Preserve scalar operation.
                 return {
                     make<optimizer::BinaryOp>(op.op(), std::move(*lhs.expr), std::move(*rhs.expr)),
                     returnTS,
