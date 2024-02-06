@@ -230,7 +230,6 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
         """Get a new test endpoint for the buildlogger server."""
         test_id = None
         url = None
-        parsley_url = None
         build_id = _BUILD_ID_REGISTRY[job_num]
         if build_id:
             # If we're configured to log messages to the buildlogger server, then request a new
@@ -243,14 +242,13 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
                     " test_id".format(test_basename))
 
             url = BUILDLOGGER_SERVER.get_test_log_url(build_id, test_id)
-            parsley_url = BUILDLOGGER_SERVER.get_parsley_log_url(build_id, test_id)
             meta_logger.info("Writing output of %s to %s.", test_basename, url)
 
-        return (test_id, url, parsley_url)
+        return (test_id, url)
 
-    (test_id, url, parsley_url) = _get_test_endpoint(job_num, test_basename, command, job_logger)
+    (test_id, url) = _get_test_endpoint(job_num, test_basename, command, job_logger)
     _add_build_logger_handler(logger, job_num, test_id)
-    return (logger, url, parsley_url)
+    return (logger, url)
 
 
 def new_test_thread_logger(parent, test_kind, thread_id, tenant_id=None):

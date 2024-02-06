@@ -14,7 +14,6 @@ CREATE_BUILD_ENDPOINT = "/build"
 APPEND_GLOBAL_LOGS_ENDPOINT = "/build/%(build_id)s"
 CREATE_TEST_ENDPOINT = "/build/%(build_id)s/test"
 APPEND_TEST_LOGS_ENDPOINT = "/build/%(build_id)s/test/%(test_id)s"
-PARSLEY_LOGS_URL = "https://parsley.mongodb.com/resmoke/%(build_id)s/test/%(test_id)s"
 
 _BUILDLOGGER_CONFIG = os.getenv("BUILDLOGGER_CREDENTIALS", "mci.buildlogger")
 
@@ -343,8 +342,3 @@ class BuildloggerServer(object):
         base_url = _config.BUILDLOGGER_URL.rstrip("/")
         endpoint = APPEND_TEST_LOGS_ENDPOINT % {"build_id": build_id, "test_id": test_id}
         return "%s/%s" % (base_url, endpoint.strip("/"))
-
-    @staticmethod
-    def get_parsley_log_url(build_id, test_id):
-        """Return the parsley log URL."""
-        return PARSLEY_LOGS_URL % {"build_id": build_id, "test_id": test_id}
