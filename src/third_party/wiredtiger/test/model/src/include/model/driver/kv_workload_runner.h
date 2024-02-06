@@ -78,7 +78,7 @@ public:
                * point we would record and compare return codes. But we're not there yet, so just
                * fail on error.
                */
-              if (ret != 0)
+              if (ret != 0 && ret != WT_NOTFOUND)
                   throw wiredtiger_exception(ret);
           },
           op);

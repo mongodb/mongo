@@ -129,6 +129,9 @@ verify_workload(const model::kv_workload &workload, TEST_OPTS *opts, const std::
     model::kv_database database;
     workload.run(database);
 
+    /* When we load the workload from WiredTiger, that would be after running recovery. */
+    database.restart();
+
     /* Run the workload in WiredTiger. */
     testutil_recreate_dir(home.c_str());
     workload.run_in_wiredtiger(home.c_str(), env_config);
