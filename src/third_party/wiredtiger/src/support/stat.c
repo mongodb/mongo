@@ -1676,6 +1676,7 @@ static const char *const __stats_connection_desc[] = {
   "eviction of hot or large page",
   "cursor: Total number of times cursor temporarily releases pinned page to encourage eviction of "
   "hot or large page",
+  "cursor: bulk cursor count",
   "cursor: cached cursor count",
   "cursor: cursor bound calls that return an error",
   "cursor: cursor bounds cleared from reset",
@@ -2384,6 +2385,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cursor_search_near_prefix_fast_paths = 0;
     stats->cursor_reposition_failed = 0;
     stats->cursor_reposition = 0;
+    /* not clearing cursor_bulk_count */
     /* not clearing cursor_cached_count */
     stats->cursor_bound_error = 0;
     stats->cursor_bounds_reset = 0;
@@ -3119,6 +3121,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_READ(from, cursor_search_near_prefix_fast_paths);
     to->cursor_reposition_failed += WT_STAT_READ(from, cursor_reposition_failed);
     to->cursor_reposition += WT_STAT_READ(from, cursor_reposition);
+    to->cursor_bulk_count += WT_STAT_READ(from, cursor_bulk_count);
     to->cursor_cached_count += WT_STAT_READ(from, cursor_cached_count);
     to->cursor_bound_error += WT_STAT_READ(from, cursor_bound_error);
     to->cursor_bounds_reset += WT_STAT_READ(from, cursor_bounds_reset);
