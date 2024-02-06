@@ -52,6 +52,11 @@ ExternalDataSourceScopeGuard::ExternalDataSourceScopeGuard(
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
         usedExternalDataSources)
     : _opCtx(opCtx) {
+    tassert(8545300,
+            "ExternalDataSourceScopeGuard should only be created when there is at least one "
+            "external data source.",
+            usedExternalDataSources.size() > 0);
+
     // Just in case that any virtual collection could not be created, when dtor does not have a
     // chance to be executed, cleans up collections that has already been created at that
     // moment.

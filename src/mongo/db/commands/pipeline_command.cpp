@@ -48,7 +48,6 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/database_name.h"
@@ -269,19 +268,13 @@ public:
             CommandHelpers::handleMarkKillOnClientDisconnect(
                 opCtx, !Pipeline::aggHasWriteStage(_request.body));
 
-            // Create virtual collections and drop them when aggregate command is done. Conceptually
-            // ownership of virtual collections are moved to runAggregate() function together with
-            // 'dropVcollGuard' so that it can clean up virtual collections when it's done with
-            // them. ExternalDataSourceScopeGuard will take care of the situation when any
-            // collection could not be created.
-            ExternalDataSourceScopeGuard dropVcollGuard(opCtx, _usedExternalDataSources);
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
                                          reply,
-                                         std::move(dropVcollGuard)));
+                                         _usedExternalDataSources));
 
             // The aggregate command's response is unstable when 'explain' or 'exchange' fields are
             // set.
@@ -302,14 +295,13 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             // See run() method for details.
-            ExternalDataSourceScopeGuard dropVcollGuard(opCtx, _usedExternalDataSources);
             uassertStatusOK(runAggregate(opCtx,
                                          _aggregationRequest,
                                          _liteParsedPipeline,
                                          _request.body,
                                          _privileges,
                                          result,
-                                         std::move(dropVcollGuard)));
+                                         _usedExternalDataSources));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
