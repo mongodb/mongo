@@ -2,17 +2,6 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-# Used to restrict compilation flags to only be added when compiling with gcc on windows.
-config_setting(
-    name = "gcc_windows",
-    constraint_values = [
-        "@platforms//os:windows",
-    ],
-    flag_values = {
-        "//bazel/config:compiler_type": "gcc",
-    },
-)
-
 # TODO(SERVER-80603): conditionally inject libunwind.
 
 mongo_cc_library(
@@ -82,9 +71,6 @@ mongo_cc_library(
             "/wd4003",
         ],
         "//conditions:default": ["-Wno-unused-result"],
-    }) + select({
-        ":gcc_windows": ["-Wno-attribute-alias"],
-        "//conditions:default": [],
     }),
     local_defines = [
         "NO_HEAP_CHECK",

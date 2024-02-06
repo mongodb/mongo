@@ -4,7 +4,7 @@ load("@poetry//:dependencies.bzl", "dependency")
 # config selection
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
-load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo")
+load("//bazel:separate_debug.bzl", "CC_SHARED_LIBRARY_SUFFIX", "WITH_DEBUG_SUFFIX", "extract_debuginfo", "extract_debuginfo_binary")
 # === Windows-specific compilation settings ===
 
 # /RTC1              Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized (implies /Od: no optimizations)
@@ -630,7 +630,7 @@ def mongo_cc_binary(
         }),
     )
 
-    extract_debuginfo(
+    extract_debuginfo_binary(
         name = name,
         binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
         type = "program",

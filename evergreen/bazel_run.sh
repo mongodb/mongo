@@ -24,3 +24,5 @@ if bazel_rbe_supported; then
 else
   LOCAL_ARG="--config=local"
 fi
+
+./bazelisk run --verbose_failures $LOCAL_ARG ${args} ${target}
