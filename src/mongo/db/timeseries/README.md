@@ -55,19 +55,19 @@ Uncompressed bucket (version 1):
     meta: <meta-data field (if specified at creation) value common to all measurements in this bucket>,
     data: {
         <time field>: {
-            '0', <time of first measurement>,
-            '1', <time of second measurement>,
+            '0': <time of first measurement>,
+            '1': <time of second measurement>,
             ...
             '<n-1>': <time of n-th measurement>,
         },
         <field0>: {
-            '0', <value of 'field0' in first measurement>,
-            '1', <value of 'field0' in second measurement>,
+            '0': <value of 'field0' in first measurement>,
+            '1': <value of 'field0' in second measurement>,
             ...
         },
         <field1>: {
-            '0', <value of 'field1' in first measurement>,
-            '1', <value of 'field1' in second measurement>,
+            '0': <value of 'field1' in first measurement>,
+            '1': <value of 'field1' in second measurement>,
             ...
         },
         ...
