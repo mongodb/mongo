@@ -1,6 +1,6 @@
 # Query Rewrites for Time-Series Collections
 
-For a general overview about how time-series collection are implemented, see [db/timeseries/README.md](../../../db/timeseries/README.md).
+For a general overview about how time-series collection are implemented, see [db/timeseries/README.md](../../../db/timeseries/README.md). For sharding specific logic, see [db/s/README_timeseries.md](../../../db/s/README_timeseries.md).
 This section will focus on the query rewrites for time-series collections and the `$_internalUnpackBucket`
 aggregation stage, and assumes knowledge of time-series collections basics.
 
@@ -49,6 +49,24 @@ classic execution engine.
 
 The descriptions of the optimizations below are summaries and do not list all of the requirements for
 each optimization.
+
+## A quick note about the `timeField` and `metaField`
+
+Most of the query rewrites described below will rely on the `timeField` and `metaField`. The user
+inputted `timeField` and `metaField` values will be different than what is stored in the buckets collection.
+When implementing and testing query optimizations, the rewrites from the user `timeField` and `metaField` values
+to the buckets collection fields must be tested.
+
+Let's look at an example with a time-series collection created with these options: `{timeField: t, metaField: m}`.
+
+The `timeField` will be used in the `control` object in the buckets collection. The `control.min.<time field>`
+will be `control.min.t`, and `control.max.<time field>` will be `control.max.t`. The values for `t` in the
+user documents are stored in `data.t`.
+
+The meta-data field is always specified as `meta` in the buckets collection. We will return documents with the user-specified meta-data field (in this case `m`), but we will store the meta-data field values under 
+the field `meta` in the buckets collection. Therefore, when returning documents we will need to 
+rewrite the field `meta` to the field the user expects: `m`. When optimizing queries, we will need to 
+rewrite the field the user inserted (`m`) to the field the buckets collection stores: `meta`.
 
 ## $match on metaField reorder
 

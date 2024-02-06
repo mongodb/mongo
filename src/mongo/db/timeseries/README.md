@@ -26,6 +26,8 @@ certain properties:
       all measurements within a bucket have a common meta-data value.
     * Besides the time range, buckets are also constrained by the total number and size of measurements.
 
+Time-series collections can also be sharded. For more information about sharding-specific implementation
+details, see [db/s/README_timeseries.md](../s/README_timeseries.md).
 ## Bucket Collection Schema
 
 Uncompressed bucket (version 1):
