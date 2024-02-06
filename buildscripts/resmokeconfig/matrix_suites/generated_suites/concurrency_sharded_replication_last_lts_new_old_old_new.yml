@@ -91,6 +91,7 @@ selector:
   - jstests/concurrency/fsm_workloads/map_reduce_drop.js
   exclude_with_any_tags:
   - requires_replication
+  - assumes_against_mongod_not_mongos
   - assumes_balancer_on
   - requires_profiling
   - assumes_unsharded_collection

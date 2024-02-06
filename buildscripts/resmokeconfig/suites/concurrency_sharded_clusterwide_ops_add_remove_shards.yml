@@ -6,6 +6,7 @@ selector:
 
   exclude_with_any_tags:
   - requires_replication
+  - assumes_against_mongod_not_mongos
   # mongos has no system.profile collection.
   - requires_profiling
   - does_not_support_add_remove_shards

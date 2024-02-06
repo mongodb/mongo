@@ -207,6 +207,7 @@ selector:
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding
   - requires_replication
+  - assumes_against_mongod_not_mongos
   - does_not_support_causal_consistency
 
 executor:

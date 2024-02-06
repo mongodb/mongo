@@ -124,6 +124,7 @@ selector:
   exclude_with_any_tags:
   - does_not_support_causal_consistency
   - requires_replication
+  - assumes_against_mongod_not_mongos
   # Snapshot reads in transactions are banned on capped collections.
   - requires_capped
   - assumes_balancer_on

@@ -52,14 +52,16 @@ namespace mongo {
  *
  * On success, fills out 'result' with the command response.
  */
-Status runAggregate(OperationContext* opCtx,
-                    const NamespaceString& nss,
-                    AggregateCommandRequest& request,
-                    const LiteParsedPipeline& liteParsedPipeline,
-                    const BSONObj& cmdObj,
-                    const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result,
-                    ExternalDataSourceScopeGuard externalDataSourceGuard);
+Status runAggregate(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    AggregateCommandRequest& request,
+    const LiteParsedPipeline& liteParsedPipeline,
+    const BSONObj& cmdObj,
+    const PrivilegeVector& privileges,
+    rpc::ReplyBuilderInterface* result,
+    const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
+        usedExternalDataSources = {});
 
 /**
  * Convenience version that internally constructs the LiteParsedPipeline.

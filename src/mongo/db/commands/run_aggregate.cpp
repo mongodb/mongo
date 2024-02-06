@@ -660,6 +660,15 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
     return execs;
 }
 
+Status _runAggregate(OperationContext* opCtx,
+                     const NamespaceString& origNss,
+                     AggregateCommandRequest& request,
+                     const LiteParsedPipeline& liteParsedPipeline,
+                     const BSONObj& cmdObj,
+                     const PrivilegeVector& privileges,
+                     rpc::ReplyBuilderInterface* result,
+                     std::shared_ptr<ExternalDataSourceScopeGuard> externalDataSourceGuard);
+
 Status runAggregateOnView(OperationContext* opCtx,
                           const NamespaceString& origNss,
                           const AggregateCommandRequest& request,
@@ -723,7 +732,8 @@ Status runAggregateOnView(OperationContext* opCtx,
 
     auto status{Status::OK()};
     try {
-        status = runAggregate(opCtx, origNss, newRequest, newCmd, privileges, result);
+        status = _runAggregate(
+            opCtx, origNss, newRequest, {newRequest}, newCmd, privileges, result, nullptr);
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // Since we expect the view to be UNSHARDED, if we reached to this point there are
         // two possibilities:
@@ -749,25 +759,14 @@ Status runAggregateOnView(OperationContext* opCtx,
     return status;
 }
 
-}  // namespace
-
-Status runAggregate(OperationContext* opCtx,
-                    const NamespaceString& nss,
-                    AggregateCommandRequest& request,
-                    const BSONObj& cmdObj,
-                    const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result) {
-    return runAggregate(opCtx, nss, request, {request}, cmdObj, privileges, result, {});
-}
-
-Status runAggregate(OperationContext* opCtx,
-                    const NamespaceString& origNss,
-                    AggregateCommandRequest& request,
-                    const LiteParsedPipeline& liteParsedPipeline,
-                    const BSONObj& cmdObj,
-                    const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result,
-                    ExternalDataSourceScopeGuard externalDataSourceGuard) {
+Status _runAggregate(OperationContext* opCtx,
+                     const NamespaceString& origNss,
+                     AggregateCommandRequest& request,
+                     const LiteParsedPipeline& liteParsedPipeline,
+                     const BSONObj& cmdObj,
+                     const PrivilegeVector& privileges,
+                     rpc::ReplyBuilderInterface* result,
+                     std::shared_ptr<ExternalDataSourceScopeGuard> externalDataSourceGuard) {
 
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
@@ -808,14 +807,6 @@ Status runAggregate(OperationContext* opCtx,
 
     // The UUID of the collection for the execution namespace of this aggregation.
     boost::optional<UUID> uuid;
-
-    // All cursors share the ownership to 'extDataSrcGuard'. Once all cursors are destroyed,
-    // 'extDataSrcGuard' will also be destroyed and any virtual collections will be dropped by
-    // the destructor of ExternalDataSourceScopeGuard. We obtain a reference before taking locks so
-    // that the virtual collections will be dropped after releasing our read locks, avoiding a lock
-    // upgrade.
-    std::shared_ptr<ExternalDataSourceScopeGuard> extDataSrcGuard =
-        std::make_shared<ExternalDataSourceScopeGuard>(std::move(externalDataSourceGuard));
 
     // If emplaced, AutoGetCollectionForReadCommand will throw if the sharding version for this
     // connection is out of date. If the namespace is a view, the lock will be released before
@@ -1115,6 +1106,13 @@ Status runAggregate(OperationContext* opCtx,
             p.deleteUnderlying();
         }
     });
+
+    // We disallowed external data sources in queries with multiple plan executors due to a data
+    // race (see SERVER-85453 for more details).
+    tassert(8545301,
+            "External data sources are not currently compatible with queries that use multiple "
+            "plan executors.",
+            externalDataSourceGuard == nullptr || execs.size() == 1);
     for (auto&& exec : execs) {
         ClientCursorParams cursorParams(
             std::move(exec),
@@ -1132,7 +1130,9 @@ Status runAggregate(OperationContext* opCtx,
 
         pin->incNBatches();
         cursors.emplace_back(pin.getCursor());
-        ExternalDataSourceScopeGuard::get(pin.getCursor()) = extDataSrcGuard;
+        if (externalDataSourceGuard) {
+            ExternalDataSourceScopeGuard::get(pin.getCursor()) = externalDataSourceGuard;
+        }
         pins.emplace_back(std::move(pin));
     }
 
@@ -1217,6 +1217,40 @@ Status runAggregate(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+}  // namespace
+
+Status runAggregate(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    AggregateCommandRequest& request,
+                    const BSONObj& cmdObj,
+                    const PrivilegeVector& privileges,
+                    rpc::ReplyBuilderInterface* result) {
+    return _runAggregate(opCtx, nss, request, {request}, cmdObj, privileges, result, nullptr);
+}
+
+Status runAggregate(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    AggregateCommandRequest& request,
+    const LiteParsedPipeline& liteParsedPipeline,
+    const BSONObj& cmdObj,
+    const PrivilegeVector& privileges,
+    rpc::ReplyBuilderInterface* result,
+    const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
+        usedExternalDataSources) {
+    // Create virtual collections and drop them when aggregate command is done.
+    // If a cursor is registered, the ExternalDataSourceScopeGuard will be stored in the cursor;
+    // when the cursor is later destroyed, the scope guard will also be destroyed, and any virtual
+    // collections will be dropped by the destructor of ExternalDataSourceScopeGuard.
+    // We create this scope guard prior to taking locks in _runAggregate so that, if no cursor is
+    // registered, the virtual collections will be dropped after releasing our read locks, avoiding
+    // a lock upgrade.
+    auto extDataSrcGuard = usedExternalDataSources.size() > 0
+        ? std::make_shared<ExternalDataSourceScopeGuard>(opCtx, usedExternalDataSources)
+        : nullptr;
+    return _runAggregate(
+        opCtx, nss, request, liteParsedPipeline, cmdObj, privileges, result, extDataSrcGuard);
 }
 
 }  // namespace mongo

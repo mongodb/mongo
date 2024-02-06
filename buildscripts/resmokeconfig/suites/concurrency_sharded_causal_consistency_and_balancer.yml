@@ -99,6 +99,7 @@ selector:
   - uses_transactions
   - assumes_balancer_off
   - requires_replication
+  - assumes_against_mongod_not_mongos
   # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
   # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
   # from.

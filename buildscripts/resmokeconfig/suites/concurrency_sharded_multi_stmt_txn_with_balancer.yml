@@ -129,6 +129,7 @@ selector:
   - assumes_balancer_off
   - does_not_support_causal_consistency
   - requires_replication
+  - assumes_against_mongod_not_mongos
   # Snapshot reads in transactions are banned on capped collections.
   - requires_capped
   # Sharing cursors between state functions will fail in this suite because it will attempt to use

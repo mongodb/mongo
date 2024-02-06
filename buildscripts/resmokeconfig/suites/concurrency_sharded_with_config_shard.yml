@@ -96,6 +96,7 @@ selector:
 
   exclude_with_any_tags:
   - requires_replication
+  - assumes_against_mongod_not_mongos
   - assumes_balancer_on
   # mongos has no system.profile collection.
   - requires_profiling

@@ -167,6 +167,7 @@ selector:
   exclude_with_any_tags:
   - assumes_balancer_off
   - requires_replication
+  - assumes_against_mongod_not_mongos
   - requires_non_retryable_writes
   # Curop requires readConcern local.
   - uses_curop_agg_stage

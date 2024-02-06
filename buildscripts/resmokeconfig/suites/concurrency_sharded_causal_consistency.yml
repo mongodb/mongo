@@ -86,6 +86,7 @@ selector:
   # This suite uses secondary read preference, which isn't currently compatible with transactions.
   - uses_transactions
   - requires_replication
+  - assumes_against_mongod_not_mongos
   # Tests which use $currentOp. Running an aggregation with $currentOp and read preference
   # secondary doesn't make much sense, since there's no guarantee *which* secondary you get results
   # from.
