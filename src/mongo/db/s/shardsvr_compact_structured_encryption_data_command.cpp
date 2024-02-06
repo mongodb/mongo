@@ -56,6 +56,7 @@
 #include "mongo/db/s/compact_structured_encryption_data_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
@@ -156,6 +157,14 @@ public:
             compact.setEcocNss(namespaces.ecocNss);
             compact.setEcocRenameNss(namespaces.ecocRenameNss);
             compact.setCompactionTokens(req.getCompactionTokens().getOwned());
+
+            const bool featureFlagQERangeV2 =
+                gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
+                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
+            if (featureFlagQERangeV2) {
+                compact.setEncryptionInformation(req.getEncryptionInformation());
+                compact.setAnchorPaddingFactor(req.getAnchorPaddingFactor());
+            }
 
             return compact;
         }

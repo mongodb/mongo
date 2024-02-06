@@ -36,6 +36,7 @@ structs:
   FLECompactionOptions:
     description: "Options related to compaction or cleanup operations in Queryable Encryption
         protocol version 2"
+    strict: false
     inline_chained_structs: true
     chained_structs:
       ClusterServerParameter: clusterServerParameter
@@ -62,6 +63,13 @@ structs:
         validator:
           gt: 0
           lte: 350000 # Limit the tags in the $in query to just under 15 MB per request
+      compactAnchorPaddingFactor:
+        description: "Default value for {compactStructuredEncryptionData.anchorPaddingFactor: %f}"
+        type: double
+        optional: true
+        validator:
+            gte: 0.0
+            lte: 1.0
 
 server_parameters:
   unsupportedDangerousTestingFLEDiagnosticsEnabled:

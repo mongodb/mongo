@@ -104,7 +104,7 @@ std::vector<char> decode(StringData sd) {
     return std::vector<char>(s.data(), s.data() + s.length());
 }
 
-PrfBlock blockToArray(std::string block) {
+PrfBlock blockToArray(StringData block) {
     PrfBlock data;
     ASSERT_EQ(block.size(), data.size());
     for (size_t i = 0; i < data.size(); ++i) {
@@ -2191,8 +2191,7 @@ TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
         auto ecocDoc = ECOCCollection::parseAndDecryptV2(rawEcocDoc, ecocToken);
         ASSERT_EQ(ecocDoc.fieldName, "foo");
         ASSERT_EQ(ecocDoc.esc, escContentionToken);
-        // TODO (SERVER-85747) Extend compaction to take new token and adjust algorithm
-        // ASSERT_EQ(ecocDoc.isLeaf, optIsLeaf);
+        ASSERT_EQ(ecocDoc.isLeaf, optIsLeaf);
     }
 }
 
@@ -2861,31 +2860,100 @@ TEST(FLE_Update, GenerateUpdateToRemoveTags) {
     ASSERT_THROWS_CODE(EDCServerCollection::generateUpdateToRemoveTags({}), DBException, 7293203);
 }
 
-TEST(CompactionHelpersTest, parseCompactionTokensTest) {
-    auto result = CompactionHelpers::parseCompactionTokens(BSONObj());
+TEST(CompactionHelpersTest, parseCompactionTokensTestEmpty) {
+    const auto result = CompactionHelpers::parseCompactionTokens(BSONObj());
     ASSERT(result.empty());
+}
 
-    ECOCToken token1(
+TEST(CompactionHelpersTest, parseCompactionTokensTest) {
+    const ECOCToken token1(
         decodePrf("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb347"_sd));
-    ECOCToken token2(
+    const ECOCToken token2(
         decodePrf("6ebfb347576b4be4fe585eed96d088a0c55f3c96b50069e8a230b852a05fb4be"_sd));
-    BSONObjBuilder builder;
-    builder.appendBinData(
-        "a.b.c", token1.toCDR().length(), BinDataType::BinDataGeneral, token1.toCDR().data());
-    builder.appendBinData(
-        "x.y", token2.toCDR().length(), BinDataType::BinDataGeneral, token2.toCDR().data());
-    result = CompactionHelpers::parseCompactionTokens(builder.obj());
+    const AnchorPaddingRootToken anchor2(
+        decodePrf("7df988a08052e24dbe938c58b91ab00c812f58eabb3d4db1b047c3187d57f668"_sd));
 
-    ASSERT(result.size() == 2);
-    ASSERT(result[0].fieldPathName == "a.b.c");
-    ASSERT(result[0].token == token1);
-    ASSERT(result[1].fieldPathName == "x.y");
-    ASSERT(result[1].token == token2);
+    for (const bool ffEnabled : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagQERangeV2",
+                                                                   ffEnabled);
+        for (const bool includePaddingToken : {false, true}) {
+            BSONObjBuilder builder;
+            builder.appendBinData("a.b.c",
+                                  token1.toCDR().length(),
+                                  BinDataType::BinDataGeneral,
+                                  token1.toCDR().data());
+            if (includePaddingToken) {
+                BSONObjBuilder xy(builder.subobjStart("x.y"));
+                xy.appendBinData("ecoc",
+                                 token2.toCDR().length(),
+                                 BinDataType::BinDataGeneral,
+                                 token2.toCDR().data());
+                xy.appendBinData("anchorPaddingToken",
+                                 anchor2.toCDR().length(),
+                                 BinDataType::BinDataGeneral,
+                                 anchor2.toCDR().data());
+                xy.doneFast();
+            }
 
+            const bool expectSuccess = ffEnabled || !includePaddingToken;
+            if (!expectSuccess) {
+                ASSERT_THROWS_CODE(
+                    CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, 6346801);
+                continue;
+            }
+
+            const auto result = CompactionHelpers::parseCompactionTokens(builder.obj());
+            ASSERT_EQ(result.size(), includePaddingToken ? 2UL : 1UL);
+
+            ASSERT_EQ(result[0].fieldPathName, "a.b.c");
+            ASSERT(result[0].token == token1);
+            ASSERT(result[0].anchorPaddingToken == boost::none);
+
+            if (includePaddingToken) {
+                ASSERT_EQ(result[1].fieldPathName, "x.y");
+                ASSERT(result[1].token == token2);
+                ASSERT(result[1].anchorPaddingToken == anchor2);
+            }
+        }
+    }
+}
+
+TEST(CompactionHelpersTest, parseCompactionTokensTestInvalidType) {
     ASSERT_THROWS_CODE(CompactionHelpers::parseCompactionTokens(BSON("foo"
                                                                      << "bar")),
                        DBException,
                        6346801);
+}
+
+TEST(CompactionHelpersTest, parseCompactionTokensTestInvalidSubType) {
+    const std::array<std::uint8_t, 16> kUUID = {
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    BSONObjBuilder builder;
+    builder.appendBinData("a.b.c", kUUID.size(), BinDataType::newUUID, kUUID.data());
+    ASSERT_THROWS_CODE(
+        CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, 6346801);
+}
+
+TEST(CompactionHelpersTest, parseCompactionTokensTestTooShort) {
+    const auto kBadToken =
+        hexblob::decode("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb3"_sd);
+    constexpr auto kInvalidPrfLength = 6373501;
+
+    BSONObjBuilder builder;
+    builder.appendBinData("a.b.c", kBadToken.size(), BinDataType::BinDataGeneral, kBadToken.data());
+    ASSERT_THROWS_CODE(
+        CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, kInvalidPrfLength);
+}
+
+TEST(CompactionHelpersTest, parseCompactionTokensTestTooLong) {
+    const auto kBadToken =
+        hexblob::decode("7076c7b05fb4be4fe585eed930b852a6d088a0c55f3c96b50069e8a26ebfb34701"_sd);
+    constexpr auto kInvalidPrfLength = 6373501;
+
+    BSONObjBuilder builder;
+    builder.appendBinData("a.b.c", kBadToken.size(), BinDataType::BinDataGeneral, kBadToken.data());
+    ASSERT_THROWS_CODE(
+        CompactionHelpers::parseCompactionTokens(builder.obj()), DBException, kInvalidPrfLength);
 }
 
 TEST(CompactionHelpersTest, validateCompactionTokensTest) {
@@ -5075,4 +5143,238 @@ DEATH_TEST_REGEX(MinCoverInterfaceTest, Error_MinMaxTypeMismatch, "Tripwire asse
 
     getMinCover(spec, 1);
 }
+
+class EdgeTestFixture : public unittest::Test {
+public:
+    static constexpr int kMaxPrecisionDouble = 15;
+    static constexpr int kMaxPrecisionDecimal128 = 34;
+
+    template <typename T>
+    static QueryTypeConfig makeRangeQueryTypeConfig(T lb,
+                                                    T ub,
+                                                    const boost::optional<uint32_t>& precision,
+                                                    int sparsity) {
+        QueryTypeConfig config;
+        config.setQueryType(QueryTypeEnum::RangePreview);
+        if constexpr (std::is_same_v<T, long>) {
+            // Type aliasing gets a little weird. int64_t -> long, but Value(long) = delete, and
+            // int64_t ~= long long anyway. Ignore the distinction for the purposes of this test.
+            config.setMin(Value(static_cast<long long>(lb)));
+            config.setMax(Value(static_cast<long long>(ub)));
+        } else {
+            config.setMin(Value(lb));
+            config.setMax(Value(ub));
+        }
+        config.setSparsity(sparsity);
+        if (precision) {
+            config.setPrecision(*precision);
+        }
+        return config;
+    }
+
+    template <typename T, typename GetEdges>
+    static void assertEdgesLengthMatch(const T& lb,
+                                       const T& ub,
+                                       const boost::optional<std::uint32_t>& precision,
+                                       int sparsity,
+                                       GetEdges getEdges) {
+        const auto edges = [&] {
+            if constexpr (std::is_same_v<T, double> || std::is_same_v<T, Decimal128>) {
+                return getEdges(lb, lb, ub, precision, sparsity, 0);
+            } else {
+                return getEdges(lb, lb, ub, sparsity, 0);
+            }
+        }();
+        const auto expect = edges->get().size();
+        const auto calculated =
+            getEdgesLength(makeRangeQueryTypeConfig(lb, ub, precision, sparsity));
+        if (expect != calculated) {
+            // Context for the exception we're about to throw.
+            LOGV2(8574790,
+                  "Mismatched edge length prediction",
+                  "lb"_attr = lb,
+                  "ub"_attr = ub,
+                  "sparsity"_attr = sparsity,
+                  "precision"_attr = precision.get_value_or(-1),
+                  "leafSize"_attr = edges->getLeaf().size(),
+                  "expect"_attr = expect,
+                  "calculated"_attr = calculated);
+        }
+        ASSERT_EQ(expect, calculated);
+    }
+
+    template <typename T, typename GetEdges>
+    static void runEdgesLengthTestForFunamentalType(GetEdges getEdges) {
+        constexpr auto low = std::numeric_limits<T>::lowest();
+        constexpr auto max = std::numeric_limits<T>::max();
+
+        std::vector<T> testVals{low,
+                                low / 2,
+                                -1000000,
+                                -65537,
+                                -1000,
+                                -10,
+                                -1,
+                                0,
+                                1,
+                                10,
+                                1000,
+                                65537,
+                                1000000,
+                                max / 2,
+                                max};
+        std::vector<boost::optional<uint32_t>> testPrecisions = {boost::none};
+        if constexpr (std::is_same_v<T, double>) {
+            constexpr auto min = std::numeric_limits<T>::min();
+            testVals.push_back(min);
+            testVals.push_back(-min);
+            testVals.push_back(1.1);
+            testVals.push_back(-1.1);
+            testVals.push_back(2.71828182);
+            testVals.push_back(3.14159265);
+
+            testPrecisions.clear();
+            for (int i = 1; i <= kMaxPrecisionDouble; ++i) {
+                testPrecisions.push_back(i);
+            }
+        }
+
+        for (int sparsity = 1; sparsity <= 4; ++sparsity) {
+            for (const T lb : testVals) {
+                for (const T ub : testVals) {
+                    if (lb >= ub) {
+                        // getEdgesT has a check for min < max, tested elsewhere.
+                        continue;
+                    }
+                    for (const auto& precision : testPrecisions) {
+                        assertEdgesLengthMatch(lb, ub, precision, sparsity, getEdges);
+                    }
+                }
+            }
+        }
+    }
+};
+
+TEST_F(EdgeTestFixture, getEdgesLengthInt32) {
+    runEdgesLengthTestForFunamentalType<int32_t>(getEdgesInt32);
+}
+
+TEST_F(EdgeTestFixture, getEdgesLengthInt64) {
+    runEdgesLengthTestForFunamentalType<int64_t>(getEdgesInt64);
+}
+
+TEST_F(EdgeTestFixture, getEdgesLengthDouble) {
+    runEdgesLengthTestForFunamentalType<double>(getEdgesDouble);
+}
+
+// Decimal128 is less well templated than the fundamental types,
+// Check a smaller, but still representative sample of values.
+// Additionally, when Decimal128 is used in EncryptionInformation
+TEST_F(EdgeTestFixture, getEdgesLengthDecimal128) {
+    const Decimal128 kUInt128Max("340282366920938463463374607431768211455");
+
+    const std::vector<Decimal128> testVals{
+        Decimal128::kLargestNegative,
+        -kUInt128Max,
+        Decimal128(-1000000),
+        Decimal128(-1000),
+        Decimal128(-10),
+        Decimal128::kNormalizedZero,
+        Decimal128(10),
+        Decimal128(1000),
+        Decimal128(1000000),
+        kUInt128Max,
+        Decimal128::kLargestPositive,
+    };
+
+    for (int sparsity = 1; sparsity <= 4; ++sparsity) {
+        for (const auto& lb : testVals) {
+            for (const auto& ub : testVals) {
+                if (lb >= ub) {
+                    continue;
+                }
+                for (std::uint32_t precision = 1; precision <= kMaxPrecisionDecimal128;
+                     ++precision) {
+                    assertEdgesLengthMatch(lb, ub, precision, sparsity, getEdgesDecimal128);
+                }
+            }
+        }
+    }
+}
+
+TEST_F(EdgeTestFixture, getEdgesLengthDate) {
+    const std::vector<Date_t> testVals{
+        Date_t::min(),
+        Date_t::now() - Days{7},
+        Date_t::now(),
+        Date_t::now() + Days{7},
+        Date_t::max(),
+    };
+
+    for (int sparsity = 1; sparsity <= 4; ++sparsity) {
+        for (const auto& lb : testVals) {
+            for (const auto& ub : testVals) {
+                if (lb >= ub) {
+                    continue;
+                }
+                assertEdgesLengthMatch(lb.toMillisSinceEpoch(),
+                                       ub.toMillisSinceEpoch(),
+                                       boost::none,
+                                       sparsity,
+                                       getEdgesInt64);
+            }
+        }
+    }
+}
+
+class AnchorPaddingFixture : public unittest::Test {
+public:
+    static constexpr auto kAnchorPaddingRootHex =
+        "4312890F621FE3CA7497C3405DFD8AAF46A578C77F7404D28C12BA853A4D3327"_sd;
+
+    const AnchorPaddingRootToken _rootToken{decodePrf(kAnchorPaddingRootHex)};
+    const AnchorPaddingKeyToken _keyToken =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(_rootToken);
+    const AnchorPaddingValueToken _valueToken =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(_rootToken);
+};
+
+TEST_F(AnchorPaddingFixture, generatePaddingDocument) {
+    constexpr std::uint64_t kId = 42;
+    auto doc = ESCCollectionAnchorPadding::generatePaddingDocument(_keyToken, _valueToken, kId);
+    ASSERT_EQ(doc.nFields(), 2UL);
+
+    // _id := F_k(bot || id)
+    {
+        // kHashOf042 = SHA256_HMAC(Key, 0 || 42), numbers as 64bit LE integers
+        constexpr auto kHashOf042 =
+            "0564ba5c84f27f20dd5a0ed69cace035983c50ccb4fa94244a475ab7c1e891ee"_sd;
+        auto expectId = decodePrf(kHashOf042);
+
+        auto idElem = doc["_id"_sd];
+        ASSERT_EQ(idElem.type(), BinData);
+        ASSERT_EQ(idElem.binDataType(), BinDataGeneral);
+
+        int actualIdLen = 0;
+        const char* actualIdPtr = idElem.binData(actualIdLen);
+        ASSERT_EQ(actualIdLen, expectId.size());
+
+        PrfBlock actualId = blockToArray(StringData(actualIdPtr, actualIdLen));
+        ASSERT(expectId == actualId);
+    }
+
+    // value := Enc(0 || 0)
+    {
+        auto valueElem = doc["value"_sd];
+        ASSERT_EQ(valueElem.type(), BinData);
+        ASSERT_EQ(valueElem.binDataType(), BinDataGeneral);
+        int len = 0;
+        const char* value = valueElem.binData(len);
+        auto swDecrypt = FLEUtil::decryptData(_valueToken.toCDR(), ConstDataRange(value, len));
+        ASSERT_OK(swDecrypt.getStatus());
+        auto dec = std::move(swDecrypt.getValue());
+        ASSERT_TRUE(std::all_of(dec.begin(), dec.end(), [](auto b) { return b == 0; }));
+    }
+}
+
 }  // namespace mongo

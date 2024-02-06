@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
+    - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/basic_types.idl"
     - "mongo/db/commands/fle2_compact.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
@@ -88,6 +89,17 @@ structs:
                 description: "Statistics for the temporary ECOC collection"
                 type: ECOCStats
                 optional: true
+            encryptionInformation:
+                description: "Encryption Information required for collections with range tokens"
+                type: EncryptionInformation
+                optional: true
+            anchorPaddingFactor:
+                description: "Anchor padding ratio used for range fields during compact"
+                type: double
+                optional: true
+                validator:
+                    gte: 0.0
+                    lte: 1.0
 
     CompactStructuredEncryptionDataStatePre70Compatible:
         description: "Represents the state of the compactStructuredEncryptionData pipeline"

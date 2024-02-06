@@ -269,6 +269,8 @@ void doCompactOperation(const CompactStructuredEncryptionDataState& state,
     namespaces.ecocRenameNss = state.getEcocRenameNss();
     auto opCtx = cc().makeOperationContext();
     CompactStructuredEncryptionData request(namespaces.edcNss, state.getCompactionTokens());
+    request.setEncryptionInformation(state.getEncryptionInformation());
+    request.setAnchorPaddingFactor(state.getAnchorPaddingFactor());
 
     processFLECompactV2(
         opCtx.get(), request, &getTransactionWithRetriesForMongoS, namespaces, escStats, ecocStats);

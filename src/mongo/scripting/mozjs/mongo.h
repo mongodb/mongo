@@ -82,7 +82,6 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(unsetAutoEncryption);
         MONGO_DECLARE_JS_FUNCTION(toggleAutoEncryption);
         MONGO_DECLARE_JS_FUNCTION(isAutoEncryptionEnabled);
-
         MONGO_DECLARE_JS_FUNCTION(cursorHandleFromId);
         MONGO_DECLARE_JS_FUNCTION(find);
         MONGO_DECLARE_JS_FUNCTION(generateDataKey);
@@ -102,13 +101,14 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(isTLS);
         MONGO_DECLARE_JS_FUNCTION(isGRPC);
         MONGO_DECLARE_JS_FUNCTION(getApiParameters);
+        MONGO_DECLARE_JS_FUNCTION(_getCompactionTokens);
         MONGO_DECLARE_JS_FUNCTION(_runCommandImpl);
         MONGO_DECLARE_JS_FUNCTION(_startSession);
         MONGO_DECLARE_JS_FUNCTION(_setOIDCIdPAuthCallback);
         MONGO_DECLARE_JS_FUNCTION(_refreshAccessToken);
     };
 
-    static const JSFunctionSpec methods[30];
+    static const JSFunctionSpec methods[31];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
@@ -139,6 +139,7 @@ public:
     virtual void compact(JSContext* cx, JS::CallArgs args) = 0;
     virtual void trace(JSTracer* trc) = 0;
     virtual void getEncryptionOptions(JSContext* cx, JS::CallArgs args) = 0;
+    virtual void _getCompactionTokens(JSContext* cx, JS::CallArgs args) = 0;
 };
 
 void setEncryptionCallbacks(DBClientBase* conn, EncryptionCallbacks* callbacks);

@@ -104,6 +104,8 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
+using namespace fmt::literals;
+
 namespace mongo {
 
 namespace {
@@ -600,34 +602,53 @@ boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldCo
     return EncryptedFieldConfig::parse(IDLParserContext("encryptedFields"), efc.Obj());
 }
 
-NamespaceString validateStructuredEncryptionParams(JSContext* cx,
-                                                   JS::CallArgs args,
-                                                   StringData cmdName) {
-    if (args.length() != 1) {
-        uasserted(ErrorCodes::BadValue, str::stream() << cmdName << " requires 1 arg");
+std::tuple<NamespaceString, BSONObj> validateStructuredEncryptionParams(JSContext* cx,
+                                                                        JS::CallArgs args,
+                                                                        StringData cmdName) {
+    if ((args.length() < 1) || (args.length() > 2)) {
+        uasserted(ErrorCodes::BadValue, str::stream() << cmdName << " requires 1 or 2 args");
     }
-    if (!args.get(0).isString()) {
-        uasserted(ErrorCodes::BadValue,
-                  str::stream() << "1st param to " << cmdName << " has to be a string");
-    }
+    uassert(ErrorCodes::BadValue,
+            "1st param to {} has to be a string"_format(cmdName),
+            args.get(0).isString());
+
     std::string fullName = mozjs::ValueWriter(cx, args.get(0)).toString();
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(fullName);
 
     uassert(
         ErrorCodes::BadValue, str::stream() << "Invalid namespace: " << fullName, nss.isValid());
 
-    return nss;
+    BSONObj extra;
+    if (args.length() >= 2) {
+        uassert(ErrorCodes::BadValue,
+                "2nd param to {} has to be an object"_format(cmdName),
+                args.get(1).isObject());
+        extra = mozjs::ValueWriter(cx, args.get(1)).toBSON();
+    }
+
+    return std::tuple(nss, extra);
 }
 
 void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
-    auto nss = validateStructuredEncryptionParams(cx, args, compactCmdName);
+    auto [nss, extra] = validateStructuredEncryptionParams(cx, args, compactCmdName);
 
     BSONObjBuilder builder;
     auto efc = getEncryptedFieldConfig(nss);
 
     builder.append("compactStructuredEncryptionData", nss.coll());
-    builder.append("compactionTokens",
-                   efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
+
+    if (extra["compactionTokens"_sd].eoo()) {
+        builder.append("compactionTokens",
+                       efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
+    }
+
+    if (efc && extra["encryptionInformation"_sd].eoo()) {
+        EncryptionInformation ei;
+        ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << efc->toBSON()));
+        builder.append("encryptionInformation"_sd, ei.toBSON());
+    }
+
+    builder.appendElements(extra);
 
     BSONObj reply;
     runCommand(nss.dbName(), builder.obj(), reply, 0);
@@ -636,18 +657,35 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
 }
 
 void EncryptedDBClientBase::cleanup(JSContext* cx, JS::CallArgs args) {
-    auto nss = validateStructuredEncryptionParams(cx, args, cleanupCmdName);
+    auto [nss, extra] = validateStructuredEncryptionParams(cx, args, cleanupCmdName);
 
     BSONObjBuilder builder;
     auto efc = getEncryptedFieldConfig(nss);
 
     builder.append("cleanupStructuredEncryptionData", nss.coll());
-    builder.append("cleanupTokens",
-                   efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
+
+    if (extra["cleanupTokens"_sd].eoo()) {
+        builder.append("cleanupTokens",
+                       efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
+    }
+
+    builder.appendElements(extra);
 
     BSONObj reply;
     runCommand(nss.dbName(), builder.obj(), reply, 0);
     reply = reply.getOwned();
+    mozjs::ValueReader(cx, args.rval()).fromBSON(reply, nullptr, false);
+}
+
+void EncryptedDBClientBase::_getCompactionTokens(JSContext* cx, JS::CallArgs args) {
+    uassert(ErrorCodes::BadValue,
+            "_getCompactionTokens() expects exactly one arg of type String",
+            (args.length() == 1) && args.get(0).isString());
+
+    std::string nssStr = mozjs::ValueWriter(cx, args.get(0)).toString();
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(nssStr);
+    auto efc = getEncryptedFieldConfig(nss);
+    auto reply = efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj();
     mozjs::ValueReader(cx, args.rval()).fromBSON(reply, nullptr, false);
 }
 

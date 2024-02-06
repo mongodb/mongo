@@ -76,6 +76,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
@@ -87,6 +88,8 @@
 #include "mongo/util/murmur3.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -187,6 +190,10 @@ public:
         ESCDerivedFromDataTokenAndContentionFactorToken contentionDerived;
         ESCTwiceDerivedTagToken twiceDerivedTag;
         ESCTwiceDerivedValueToken twiceDerivedValue;
+
+        AnchorPaddingRootToken anchorPaddingRoot;
+        AnchorPaddingKeyToken anchorPaddingKey;
+        AnchorPaddingValueToken anchorPaddingValue;
     };
     struct InsertionState {
         uint64_t count{0};
@@ -337,12 +344,20 @@ FleCompactTest::ESCTestTokens FleCompactTest::getTestESCTokens(BSONObj obj) {
         FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, eltCdr);
 
     FleCompactTest::ESCTestTokens tokens;
+
     tokens.contentionDerived = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
         generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, 0);
     tokens.twiceDerivedValue =
         FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(tokens.contentionDerived);
     tokens.twiceDerivedTag =
         FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(tokens.contentionDerived);
+
+    tokens.anchorPaddingRoot = FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(escToken);
+    tokens.anchorPaddingKey =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(tokens.anchorPaddingRoot);
+    tokens.anchorPaddingValue =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(tokens.anchorPaddingRoot);
+
     return tokens;
 }
 
@@ -888,6 +903,52 @@ TEST_F(FleCompactTest, CleanupValue_NewAnchorsExist) {
     ASSERT_EQ(escDeletesCount, anchorsToDelete.size());
     assertDocumentCounts(edcCount, escCount, ecocCount);
     assertESCNullAnchorDocument(testPair, true, numAnchors, edcCount);
+}
+
+template <typename T>
+QueryTypeConfig generateQueryTypeConfigForTest(const T& min,
+                                               const T& max,
+                                               boost::optional<uint32_t> precision = boost::none,
+                                               int sparsity = 1) {
+    QueryTypeConfig config;
+    config.setQueryType(QueryTypeEnum::RangePreview);
+    config.setMin(Value(min));
+    config.setMax(Value(max));
+    if (precision) {
+        config.setPrecision(precision.get());
+    }
+    config.setSparsity(sparsity);
+
+    return config;
+}
+
+TEST_F(FleCompactTest, InjectSomeAnchorPadding) {
+    const BSONObj dataDoc = BSON("a.b.c" << 42);
+    const auto tokens = getTestESCTokens(dataDoc);
+    auto queryTypeConfig = generateQueryTypeConfigForTest(0, 100);
+
+    // Expect numPads := gamma * (pathLength * uniqueLeaves - uniqueTokens)
+    // numPads := 0.42 * (8 * 1 - 5) => 0.42 * 3 => 1.26 => 2 pads {1, 2}
+    compactOneRangeFieldPad(_queryImpl.get(),
+                            _namespaces.escNss,
+                            queryTypeConfig,
+                            0.42,
+                            1,
+                            5,
+                            tokens.anchorPaddingRoot);
+    ASSERT_EQ(_queryImpl->countDocuments(_namespaces.escNss), 2);
+}
+
+TEST_F(FleCompactTest, InjectManyAnchorPadding) {
+    const BSONObj dataDoc = BSON("a.b.c" << 42);
+    const auto tokens = getTestESCTokens(dataDoc);
+    auto queryTypeConfig = generateQueryTypeConfigForTest(0LL, 100LL);
+
+    // Expect numPads := gamma * (pathLength * uniqueLeaves - uniqueTokens)
+    // numPads := 1.0 * (8 * 5 - 25) => 40 - 25 => 15.0 => 15 pads {1..15}
+    compactOneRangeFieldPad(
+        _queryImpl.get(), _namespaces.escNss, queryTypeConfig, 1, 5, 25, tokens.anchorPaddingRoot);
+    ASSERT_EQ(_queryImpl->countDocuments(_namespaces.escNss), 15);
 }
 
 }  // namespace

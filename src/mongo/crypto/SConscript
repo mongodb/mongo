@@ -102,9 +102,10 @@ fleCryptoEnv.Library(
         "encryption_fields_util.cpp",
         "fle_crypto.cpp",
         "fle_options.idl",
-        "fle_tags.cpp",
         "fle_stats.cpp",
         "fle_stats.idl",
+        "fle_tags.cpp",
+        "fle_tokens.idl",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/secure_allocator',

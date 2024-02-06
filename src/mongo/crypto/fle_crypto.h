@@ -433,83 +433,100 @@ public:
     virtual ECStats getStats() const = 0;
 };
 
-class ESCCollection {
+template <class TagToken, class ValueToken>
+class ESCCollectionCommon {
+public:
+    /**
+     * Decrypt a regular document.
+     */
+    static StatusWith<ESCDocument> decryptDocument(const ValueToken& valueToken, BSONObj& doc);
+
+    /**
+     * Decrypt a regular document.
+     */
+    static StatusWith<ESCDocument> decryptDocument(const ValueToken& valueToken, BSONObj&& doc);
+
+    /**
+     * Generate the _id value for an anchor record
+     */
+    static PrfBlock generateAnchorId(const TagToken& tagToken, uint64_t apos);
+
+    /**
+     * Generate the _id value for a null anchor record
+     */
+    static PrfBlock generateNullAnchorId(const TagToken& tagToken);
+
+    /**
+     * Calculate AnchorBinaryHops as described in OST.
+     */
+    static boost::optional<uint64_t> anchorBinaryHops(const FLEStateCollectionReader& reader,
+                                                      const TagToken& tagToken,
+                                                      const ValueToken& valueToken,
+                                                      FLEStatusSection::EmuBinaryTracker& tracker);
+};
+
+/**
+ * Specialization of ESCollectionCommon for ESCTwiceDerived(Tag|Value)Tokens
+ * with additional methods specific to encrypted data.
+ */
+class ESCCollection
+    : public ESCCollectionCommon<ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken> {
 public:
     /**
      * Generate the _id value
      */
-    static PrfBlock generateId(ESCTwiceDerivedTagToken tagToken, boost::optional<uint64_t> index);
+    static PrfBlock generateId(const ESCTwiceDerivedTagToken& tagToken,
+                               boost::optional<uint64_t> index);
 
     /**
      * Generate a null document which will be the "first" document for a given field.
      */
-    static BSONObj generateNullDocument(ESCTwiceDerivedTagToken tagToken,
-                                        ESCTwiceDerivedValueToken valueToken,
+    static BSONObj generateNullDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                        const ESCTwiceDerivedValueToken& valueToken,
                                         uint64_t pos,
                                         uint64_t count);
 
     /**
      * Generate a insert ESC document.
      */
-    static BSONObj generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
-                                          ESCTwiceDerivedValueToken valueToken,
+    static BSONObj generateInsertDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                          const ESCTwiceDerivedValueToken& valueToken,
                                           uint64_t index,
                                           uint64_t count);
 
     /**
      * Generate a compaction placeholder ESC document.
      */
-    static BSONObj generateCompactionPlaceholderDocument(ESCTwiceDerivedTagToken tagToken,
-                                                         ESCTwiceDerivedValueToken valueToken,
-                                                         uint64_t index,
-                                                         uint64_t count);
+    static BSONObj generateCompactionPlaceholderDocument(
+        const ESCTwiceDerivedTagToken& tagToken,
+        const ESCTwiceDerivedValueToken& valueToken,
+        uint64_t index,
+        uint64_t count);
 
     /**
      * Decrypt the null document.
      */
-    static StatusWith<ESCNullDocument> decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                           BSONObj& doc);
+    static StatusWith<ESCNullDocument> decryptNullDocument(
+        const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc);
 
     /**
      * Decrypt the null document.
      */
-    static StatusWith<ESCNullDocument> decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                           BSONObj&& doc);
-
-    /**
-     * Decrypt a regular document.
-     */
-    static StatusWith<ESCDocument> decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                   BSONObj& doc);
-
-    /**
-     * Decrypt a regular document.
-     */
-    static StatusWith<ESCDocument> decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                   BSONObj&& doc);
+    static StatusWith<ESCNullDocument> decryptNullDocument(
+        const ESCTwiceDerivedValueToken& valueToken, BSONObj&& doc);
 
     /**
      * Search for the highest document id for a given field/value pair based on the token.
      */
     static boost::optional<uint64_t> emuBinary(const FLEStateCollectionReader& reader,
-                                               ESCTwiceDerivedTagToken tagToken,
-                                               ESCTwiceDerivedValueToken valueToken);
+                                               const ESCTwiceDerivedTagToken& tagToken,
+                                               const ESCTwiceDerivedValueToken& valueToken);
 
     // ===== Protocol Version 2 =====
     /**
      * Generate the _id value for a non-anchor record
      */
     static PrfBlock generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t cpos);
-
-    /**
-     * Generate the _id value for an anchor record
-     */
-    static PrfBlock generateAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t apos);
-
-    /**
-     * Generate the _id value for a null anchor record
-     */
-    static PrfBlock generateNullAnchorId(const ESCTwiceDerivedTagToken& tagToken);
 
     /**
      * Generate a non-anchor ESC document for inserts.
@@ -562,10 +579,6 @@ public:
     static EmuBinaryResult emuBinaryV2(const FLEStateCollectionReader& reader,
                                        const ESCTwiceDerivedTagToken& tagToken,
                                        const ESCTwiceDerivedValueToken& valueToken);
-    static boost::optional<uint64_t> anchorBinaryHops(const FLEStateCollectionReader& reader,
-                                                      const ESCTwiceDerivedTagToken& tagToken,
-                                                      const ESCTwiceDerivedValueToken& valueToken,
-                                                      FLEStatusSection::EmuBinaryTracker& tracker);
     static boost::optional<uint64_t> binaryHops(const FLEStateCollectionReader& reader,
                                                 const ESCTwiceDerivedTagToken& tagToken,
                                                 const ESCTwiceDerivedValueToken& valueToken,
@@ -584,6 +597,17 @@ public:
         FLETagQueryInterface::TagQueryType type);
 };
 
+/**
+ * Specialization of ESCollectionCommon for AnchorPadding(Key|Value)Tokens
+ * with a custom anchor padding document generator.
+ */
+class ESCCollectionAnchorPadding
+    : public ESCCollectionCommon<AnchorPaddingKeyToken, AnchorPaddingValueToken> {
+public:
+    static BSONObj generatePaddingDocument(const AnchorPaddingKeyToken& keyToken,
+                                           const AnchorPaddingValueToken& valueToken,
+                                           uint64_t id);
+};
 
 /**
  * ECC Collection
@@ -908,6 +932,14 @@ public:
                                                                         ConstDataRange cdr);
     StatusWith<std::vector<uint8_t>> serialize(ECOCToken token);
 
+    bool isEquality() const {
+        return isLeaf == boost::none;
+    }
+
+    bool isRange() const {
+        return isLeaf != boost::none;
+    }
+
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
     boost::optional<bool> isLeaf;
 };
@@ -922,9 +954,19 @@ struct ECOCCompactionDocumentV2 {
         return H::combine(std::move(h), doc.fieldName, doc.esc);
     }
 
+    bool isEquality() const {
+        return isLeaf == boost::none;
+    }
+
+    bool isRange() const {
+        return isLeaf != boost::none;
+    }
+
     // Id is not included as it unimportant
     std::string fieldName;
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
+    boost::optional<bool> isLeaf;
+    boost::optional<AnchorPaddingRootToken> anchorPaddingRootToken;
 };
 
 /**
@@ -1357,6 +1399,15 @@ public:
 struct CompactionToken {
     std::string fieldPathName;
     ECOCToken token;
+    boost::optional<AnchorPaddingRootToken> anchorPaddingToken;
+
+    bool isEquality() const {
+        return anchorPaddingToken == boost::none;
+    }
+
+    bool isRange() const {
+        return anchorPaddingToken != boost::none;
+    }
 };
 
 class CompactionHelpers {
@@ -1439,6 +1490,7 @@ class Edges {
 public:
     Edges(std::string leaf, int sparsity, int trimFactor);
     std::vector<StringData> get();
+    std::size_t size() const;
     const std::string& getLeaf() const {
         return _leaf;
     }
@@ -1474,6 +1526,11 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
                                           boost::optional<uint32_t> precision,
                                           int sparsity,
                                           int trimFactor);
+
+// Equivalent to a full edges calculation without creating an intemediate vector.
+// getEdgesT(min, min, max, precision, sparsity, trimFactor).size()
+std::uint64_t getEdgesLength(const QueryTypeConfig& config);
+
 /**
  * Mincover calculator
  */
@@ -1542,6 +1599,11 @@ public:
  */
 PrfBlock PrfBlockfromCDR(const ConstDataRange& block);
 
+template <typename TokenT>
+TokenT FLETokenFromCDR(const ConstDataRange& block) {
+    return TokenT(PrfBlockfromCDR(block));
+}
+
 ConstDataRange binDataToCDR(BSONElement element);
 
 template <typename T>
@@ -1564,6 +1626,8 @@ boost::optional<EncryptedBinDataType> getEncryptedBinDataType(const BSONElement&
 
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);
+
+QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 
 /**
  * Get the set of edges that minimally cover a range query specified by the given range spec and

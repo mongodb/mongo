@@ -12,12 +12,16 @@ if ((typeof DBCollection) == "undefined") {
     };
 }
 
-DBCollection.prototype.compact = function() {
-    return this._db.getMongo().compact(this._fullName);
+DBCollection.prototype.compact = function(extra = {}) {
+    return this._db.getMongo().compact(this._fullName, extra);
 };
 
 DBCollection.prototype.cleanup = function() {
     return this._db.getMongo().cleanup(this._fullName);
+};
+
+DBCollection.prototype._getCompactionTokens = function() {
+    return this._db.getMongo()._getCompactionTokens(this._fullName);
 };
 
 DBCollection.prototype.verify = function() {

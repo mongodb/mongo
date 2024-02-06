@@ -302,11 +302,11 @@ boost::multiprecision::uint128_t toInt128FromDecimal128(Decimal128 dec) {
     // This algorithm only works because it assumes we are dealing with Decimal128 numbers that are
     // valid uint128 numbers. This means the Decimal128 has to be an integer or else the result is
     // undefined.
-    invariant(dec.isFinite());
-    invariant(!dec.isNegative());
+    uassert(8574710, "Unable to convert non-finite Decimal128 to UInt128", dec.isFinite());
+    uassert(8574711, "Unable to convert negative Decimal128 to UInt128", !dec.isNegative());
 
     // If after rounding, the number has changed, we have a fraction, not an integer.
-    invariant(dec.round() == dec);
+    uassert(8574712, "Unable to convert non-integral Decimal128 to UInt128", dec.round() == dec);
 
     boost::multiprecision::uint128_t ret(dec.getCoefficientHigh());
 
@@ -325,7 +325,9 @@ boost::multiprecision::uint128_t toInt128FromDecimal128(Decimal128 dec) {
     // Round-trip our new Int128 back to Decimal128 and make sure it is equal to the original
     // Decimal128 or else.
     Decimal128 roundTrip(ret.str());
-    invariant(roundTrip == dec);
+    uassert(8574713,
+            "Conversion from Decimal128 to UInt128 did not survive round trip",
+            roundTrip == dec);
 
     return ret;
 }

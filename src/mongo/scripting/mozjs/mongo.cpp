@@ -120,6 +120,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isTLS, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isGRPC, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getApiParameters, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_getCompactionTokens, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_runCommandImpl, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_setOIDCIdPAuthCallback, MongoExternalInfo),
@@ -561,6 +562,12 @@ void MongoBase::Functions::getAutoEncryptionOptions::call(JSContext* cx, JS::Cal
         // no auto-encryption is set, so return undefined
         args.rval().setUndefined();
     }
+}
+
+void MongoBase::Functions::_getCompactionTokens::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+    auto ptr = getEncryptionCallbacks(conn);
+    ptr->_getCompactionTokens(cx, args);
 }
 
 void MongoBase::Functions::unsetAutoEncryption::call(JSContext* cx, JS::CallArgs args) {

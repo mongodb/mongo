@@ -94,6 +94,7 @@ extern "C" {
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_fields_util.h"
 #include "mongo/crypto/fle_numeric.h"
+#include "mongo/crypto/fle_tokens_gen.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -174,6 +175,7 @@ constexpr uint64_t kESCompactionRecordValue = std::numeric_limits<uint64_t>::max
 constexpr uint64_t kESCAnchorId = 0;
 constexpr uint64_t kESCNullAnchorPosition = 0;
 constexpr uint64_t kESCNonNullAnchorValuePrefix = 0;
+constexpr uint64_t kESCPaddingId = 0;
 
 constexpr auto kId = "_id";
 constexpr auto kValue = "value";
@@ -2359,16 +2361,15 @@ StatusWith<EncryptedStateCollectionTokensV2> EncryptedStateCollectionTokensV2::d
 }
 
 StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokensV2::serialize(ECOCToken token) {
-    const bool encodeLeaf = isLeaf &&
-        gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-    if (encodeLeaf) {
+    if (isLeaf) {
+        // Range
         auto escCDR = esc.toCDR();
         DataBuilder builder(escCDR.length() + 1);
         uassertStatusOK(builder.writeAndAdvance(escCDR));
         uassertStatusOK(builder.writeAndAdvance(*isLeaf));
         return encryptData(token.toCDR(), builder.getCursor());
     } else {
+        // Equality
         return encryptData(token.toCDR(), esc.toCDR());
     }
 }
@@ -2404,8 +2405,25 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
         auto collToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
         auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collToken);
         auto tokenCdr = ecocToken.toCDR();
-        tokensBuilder.appendBinData(
-            field.getPath(), tokenCdr.length(), BinDataType::BinDataGeneral, tokenCdr.data());
+        if (hasQueryType(field, QueryTypeEnum::RangePreview)) {
+            BSONObjBuilder token(tokensBuilder.subobjStart(field.getPath()));
+            token.appendBinData(CompactionTokenDoc::kECOCTokenFieldName,
+                                tokenCdr.length(),
+                                BinDataType::BinDataGeneral,
+                                tokenCdr.data());
+
+            auto escToken = FLECollectionTokenGenerator::generateESCToken(collToken);
+            auto paddingToken = FLEAnchorPaddingGenerator::generateAnchorPaddingRootToken(escToken);
+            auto paddingCdr = paddingToken.toCDR();
+            token.appendBinData(CompactionTokenDoc::kAnchorPaddingTokenFieldName,
+                                paddingCdr.length(),
+                                BinDataType::BinDataGeneral,
+                                paddingCdr.data());
+        } else {
+            // Equality
+            tokensBuilder.appendBinData(
+                field.getPath(), tokenCdr.length(), BinDataType::BinDataGeneral, tokenCdr.data());
+        }
     }
     return tokensBuilder.obj();
 }
@@ -2527,7 +2545,7 @@ void FLEClientCrypto::validateDocument(const BSONObj& doc,
             count == tags.size());
 }
 
-PrfBlock ESCCollection::generateId(ESCTwiceDerivedTagToken tagToken,
+PrfBlock ESCCollection::generateId(const ESCTwiceDerivedTagToken& tagToken,
                                    boost::optional<uint64_t> index) {
     if (index.has_value()) {
         return prf(tagToken.data, kESCNonNullId, index.value());
@@ -2541,19 +2559,22 @@ PrfBlock ESCCollection::generateNonAnchorId(const ESCTwiceDerivedTagToken& tagTo
     return FLEUtil::prf(tagToken.data, cpos);
 }
 
-PrfBlock ESCCollection::generateAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t apos) {
+template <class TagToken, class ValueToken>
+PrfBlock ESCCollectionCommon<TagToken, ValueToken>::generateAnchorId(const TagToken& tagToken,
+                                                                     uint64_t apos) {
     return prf(tagToken.data, kESCAnchorId, apos);
 }
 
-PrfBlock ESCCollection::generateNullAnchorId(const ESCTwiceDerivedTagToken& tagToken) {
-    return ESCCollection::generateAnchorId(tagToken, kESCNullAnchorPosition);
+template <class TagToken, class ValueToken>
+PrfBlock ESCCollectionCommon<TagToken, ValueToken>::generateNullAnchorId(const TagToken& tagToken) {
+    return generateAnchorId(tagToken, kESCNullAnchorPosition);
 }
 
-BSONObj ESCCollection::generateNullDocument(ESCTwiceDerivedTagToken tagToken,
-                                            ESCTwiceDerivedValueToken valueToken,
+BSONObj ESCCollection::generateNullDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                            const ESCTwiceDerivedValueToken& valueToken,
                                             uint64_t pos,
                                             uint64_t count) {
-    auto block = ESCCollection::generateId(tagToken, boost::none);
+    auto block = generateId(tagToken, boost::none);
 
     auto swCipherText = packAndEncrypt(std::tie(pos, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2570,12 +2591,30 @@ BSONObj ESCCollection::generateNullDocument(ESCTwiceDerivedTagToken tagToken,
     return builder.obj();
 }
 
+BSONObj ESCCollectionAnchorPadding::generatePaddingDocument(
+    const AnchorPaddingKeyToken& keyToken, const AnchorPaddingValueToken& valueToken, uint64_t id) {
+    auto block = prf(keyToken.data, kESCPaddingId, id);
 
-BSONObj ESCCollection::generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
-                                              ESCTwiceDerivedValueToken valueToken,
+    constexpr uint64_t dummy{0};
+    auto cipherText = uassertStatusOK(packAndEncrypt(std::tie(dummy, dummy), valueToken));
+
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    toBinData(kValue, cipherText, &builder);
+#ifdef FLE2_DEBUG_STATE_COLLECTIONS
+    builder.append(kDebugId, "NULL DOC({})"_format(id));
+    builder.append(kDebugValuePosition, 0);
+    builder.append(kDebugValueCount, 0);
+#endif
+
+    return builder.obj();
+}
+
+BSONObj ESCCollection::generateInsertDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                              const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t index,
                                               uint64_t count) {
-    auto block = ESCCollection::generateId(tagToken, index);
+    auto block = generateId(tagToken, index);
 
     auto swCipherText = packAndEncrypt(std::tie(KESCInsertRecordValue, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2591,11 +2630,12 @@ BSONObj ESCCollection::generateInsertDocument(ESCTwiceDerivedTagToken tagToken,
     return builder.obj();
 }
 
-BSONObj ESCCollection::generateCompactionPlaceholderDocument(ESCTwiceDerivedTagToken tagToken,
-                                                             ESCTwiceDerivedValueToken valueToken,
-                                                             uint64_t index,
-                                                             uint64_t count) {
-    auto block = ESCCollection::generateId(tagToken, index);
+BSONObj ESCCollection::generateCompactionPlaceholderDocument(
+    const ESCTwiceDerivedTagToken& tagToken,
+    const ESCTwiceDerivedValueToken& valueToken,
+    uint64_t index,
+    uint64_t count) {
+    auto block = generateId(tagToken, index);
 
     auto swCipherText = packAndEncrypt(std::tie(kESCompactionRecordValue, count), valueToken);
     uassertStatusOK(swCipherText);
@@ -2609,7 +2649,7 @@ BSONObj ESCCollection::generateCompactionPlaceholderDocument(ESCTwiceDerivedTagT
 
 BSONObj ESCCollection::generateNonAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
                                                  uint64_t cpos) {
-    auto block = ESCCollection::generateNonAnchorId(tagToken, cpos);
+    auto block = generateNonAnchorId(tagToken, cpos);
     BSONObjBuilder builder;
     toBinData(kId, block, &builder);
     return builder.obj();
@@ -2619,7 +2659,7 @@ BSONObj ESCCollection::generateAnchorDocument(const ESCTwiceDerivedTagToken& tag
                                               const ESCTwiceDerivedValueToken& valueToken,
                                               uint64_t apos,
                                               uint64_t cpos) {
-    auto block = ESCCollection::generateAnchorId(tagToken, apos);
+    auto block = generateAnchorId(tagToken, apos);
 
     auto swCipherText = packAndEncrypt(std::tie(kESCNonNullAnchorValuePrefix, cpos), valueToken);
     uassertStatusOK(swCipherText);
@@ -2634,7 +2674,7 @@ BSONObj ESCCollection::generateNullAnchorDocument(const ESCTwiceDerivedTagToken&
                                                   const ESCTwiceDerivedValueToken& valueToken,
                                                   uint64_t apos,
                                                   uint64_t cpos) {
-    auto block = ESCCollection::generateNullAnchorId(tagToken);
+    auto block = generateNullAnchorId(tagToken);
 
     auto swCipherText = packAndEncrypt(std::tie(apos, cpos), valueToken);
     uassertStatusOK(swCipherText);
@@ -2645,13 +2685,13 @@ BSONObj ESCCollection::generateNullAnchorDocument(const ESCTwiceDerivedTagToken&
     return builder.obj();
 }
 
-StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                               BSONObj& doc) {
-    return ESCCollection::decryptNullDocument(valueToken, std::move(doc));
+StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(
+    const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc) {
+    return decryptNullDocument(valueToken, std::move(doc));
 }
 
-StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
-                                                               BSONObj&& doc) {
+StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(
+    const ESCTwiceDerivedValueToken& valueToken, BSONObj&& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -2669,13 +2709,15 @@ StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedVa
     return ESCNullDocument{std::get<0>(value), std::get<1>(value)};
 }
 
-StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                       BSONObj& doc) {
-    return ESCCollection::decryptDocument(valueToken, std::move(doc));
+template <class TagToken, class ValueToken>
+StatusWith<ESCDocument> ESCCollectionCommon<TagToken, ValueToken>::decryptDocument(
+    const ValueToken& valueToken, BSONObj& doc) {
+    return decryptDocument(valueToken, std::move(doc));
 }
 
-StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken valueToken,
-                                                       BSONObj&& doc) {
+template <class TagToken, class ValueToken>
+StatusWith<ESCDocument> ESCCollectionCommon<TagToken, ValueToken>::decryptDocument(
+    const ValueToken& valueToken, BSONObj&& doc) {
     BSONElement encryptedValue;
     auto status = bsonExtractTypedField(doc, kValue, BinData, &encryptedValue);
     if (!status.isOK()) {
@@ -2696,12 +2738,12 @@ StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken
 
 StatusWith<ESCDocument> ESCCollection::decryptAnchorDocument(
     const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc) {
-    return ESCCollection::decryptDocument(valueToken, doc);
+    return decryptDocument(valueToken, doc);
 }
 
 boost::optional<uint64_t> ESCCollection::emuBinary(const FLEStateCollectionReader& reader,
-                                                   ESCTwiceDerivedTagToken tagToken,
-                                                   ESCTwiceDerivedValueToken valueToken) {
+                                                   const ESCTwiceDerivedTagToken& tagToken,
+                                                   const ESCTwiceDerivedValueToken& valueToken) {
     return emuBinaryCommon<ESCCollection, ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken>(
         reader, tagToken, valueToken);
 }
@@ -2777,27 +2819,28 @@ EmuBinaryResult ESCCollection::emuBinaryV2(const FLEStateCollectionReader& reade
                                            const ESCTwiceDerivedValueToken& valueToken) {
     auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
 
-    auto x = ESCCollection::anchorBinaryHops(reader, tagToken, valueToken, tracker);
-    auto i = ESCCollection::binaryHops(reader, tagToken, valueToken, x, tracker);
+    auto x = anchorBinaryHops(reader, tagToken, valueToken, tracker);
+    auto i = binaryHops(reader, tagToken, valueToken, x, tracker);
     return EmuBinaryResult{i, x};
 }
 
-boost::optional<uint64_t> ESCCollection::anchorBinaryHops(
+template <class TagToken, class ValueToken>
+boost::optional<uint64_t> ESCCollectionCommon<TagToken, ValueToken>::anchorBinaryHops(
     const FLEStateCollectionReader& reader,
-    const ESCTwiceDerivedTagToken& tagToken,
-    const ESCTwiceDerivedValueToken& valueToken,
+    const TagToken& tagToken,
+    const ValueToken& valueToken,
     FLEStatusSection::EmuBinaryTracker& tracker) {
 
     uint64_t lambda;
     boost::optional<uint64_t> x;
 
     // 1. find null anchor
-    PrfBlock nullAnchorId = ESCCollection::generateNullAnchorId(tagToken);
+    PrfBlock nullAnchorId = generateNullAnchorId(tagToken);
     BSONObj nullAnchorDoc = reader.getById(nullAnchorId);
 
     // 2. case: null anchor exists
     if (!nullAnchorDoc.isEmpty()) {
-        auto swAnchor = ESCCollection::decryptDocument(valueToken, nullAnchorDoc);
+        auto swAnchor = decryptDocument(valueToken, nullAnchorDoc);
         uassertStatusOK(swAnchor.getStatus());
         lambda = swAnchor.getValue().position;
         x = boost::none;
@@ -2813,7 +2856,7 @@ boost::optional<uint64_t> ESCCollection::anchorBinaryHops(
 
     // 5-8. perform binary searches
     auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
-        return ESCCollection::generateAnchorId(tagToken, value);
+        return generateAnchorId(tagToken, value);
     };
 
 #ifdef DEBUG_ENUM_BINARY
@@ -2839,12 +2882,11 @@ boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionRead
         i = 0;
         lambda = 0;
     } else {
-        auto id = x.has_value() ? ESCCollection::generateAnchorId(tagToken, *x)
-                                : ESCCollection::generateNullAnchorId(tagToken);
+        auto id = x.has_value() ? generateAnchorId(tagToken, *x) : generateNullAnchorId(tagToken);
         auto doc = reader.getById(id);
         uassert(7291501, "ESC anchor document not found", !doc.isEmpty());
 
-        auto swAnchor = ESCCollection::decryptDocument(valueToken, doc);
+        auto swAnchor = decryptDocument(valueToken, doc);
         uassertStatusOK(swAnchor.getStatus());
         lambda = swAnchor.getValue().count;
         i = boost::none;
@@ -2857,7 +2899,7 @@ boost::optional<uint64_t> ESCCollection::binaryHops(const FLEStateCollectionRead
     }
 
     auto idGenerator = [&tagToken](uint64_t value) -> PrfBlock {
-        return ESCCollection::generateNonAnchorId(tagToken, value);
+        return generateNonAnchorId(tagToken, value);
     };
 
 #ifdef DEBUG_ENUM_BINARY
@@ -3137,7 +3179,7 @@ ECOCCompactionDocumentV2 ECOCCollection::parseAndDecryptV2(const BSONObj& doc, E
     ECOCCompactionDocumentV2 ret;
     ret.fieldName = ecocDoc.getFieldName().toString();
     ret.esc = keys.esc;
-    // TODO (SERVER-85747) Add isLeaf to ECOCCompactionDocumentV2: ret.isLeaf = keys.isLeaf
+    ret.isLeaf = keys.isLeaf;
     return ret;
 }
 
@@ -4164,19 +4206,33 @@ ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
 
 
 std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj compactionTokens) {
+    const bool featureFlagQERangeV2 = gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
+        serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     std::vector<CompactionToken> parsed;
+    std::transform(
+        compactionTokens.begin(),
+        compactionTokens.end(),
+        std::back_inserter(parsed),
+        [featureFlagQERangeV2](const auto& token) {
+            auto fieldName = token.fieldNameStringData().toString();
 
-    for (auto& elem : compactionTokens) {
-        uassert(6346801,
-                str::stream() << "Field '" << elem.fieldNameStringData()
-                              << "' of compaction tokens must be a bindata and general subtype",
-                elem.isBinData(BinDataType::BinDataGeneral));
+            if (token.isBinData(BinDataType::BinDataGeneral)) {
+                auto ecoc = FLETokenFromCDR<ECOCToken>(token._binDataVector());
+                return CompactionToken{std::move(fieldName), std::move(ecoc), boost::none};
+            }
 
-        auto vec = elem._binDataVector();
-        auto block = PrfBlockfromCDR(vec);
+            if (featureFlagQERangeV2 && (token.type() == Object)) {
+                auto doc =
+                    CompactionTokenDoc::parse(IDLParserContext{"compactionToken"}, token.Obj());
+                return CompactionToken{
+                    std::move(fieldName), doc.getECOCToken(), doc.getAnchorPaddingToken()};
+            }
 
-        parsed.push_back({elem.fieldNameStringData().toString(), ECOCToken(std::move(block))});
-    }
+            uasserted(
+                6346801,
+                "Field '{}' of compaction tokens must be a BinData(General) or Object, got '{}'"_format(
+                    fieldName, typeName(token.type())));
+        });
     return parsed;
 }
 
@@ -4239,6 +4295,34 @@ bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {
     }
 
     return false;
+}
+
+QueryTypeConfig getQueryType(const EncryptedField& field, QueryTypeEnum queryType) {
+    uassert(8574703,
+            "Field '{}' is missing a QueryTypeConfig"_format(field.getPath()),
+            field.getQueries());
+
+    return visit(OverloadedVisitor{
+                     [&](QueryTypeConfig query) {
+                         uassert(8574704,
+                                 "Field '{}' should be of type '{}', got '{}'"_format(
+                                     field.getPath(),
+                                     QueryType_serializer(queryType),
+                                     QueryType_serializer(query.getQueryType())),
+                                 query.getQueryType() == queryType);
+                         return query;
+                     },
+                     [&](std::vector<QueryTypeConfig> queries) {
+                         for (const auto& query : queries) {
+                             if (query.getQueryType() == queryType) {
+                                 return query;
+                             }
+                         }
+                         uasserted(8674705,
+                                   "Field '{}' should be of type '{}', but no configs match"_format(
+                                       field.getPath(), QueryType_serializer(queryType)));
+                     }},
+                 field.getQueries().get());
 }
 
 EncryptedPredicateEvaluatorV2::EncryptedPredicateEvaluatorV2(
@@ -4304,6 +4388,18 @@ std::vector<StringData> Edges::get() {
     return result;
 }
 
+std::size_t Edges::size() const {
+    // Edges::get() generates "root" plus every {sparsity}'th chunk of leaf,
+    // With the full leaf being a guaranteed capture, regardless of sparsity.
+    std::size_t edges = _leaf.size() / _sparsity;
+    if ((_leaf.size() % _sparsity) != 0) {
+        // Capture full leaf in the count anyway.
+        ++edges;
+    }
+    // Also capture "root" edge.
+    return 1 + edges;
+}
+
 template <typename T>
 std::unique_ptr<Edges> getEdgesT(T value, T min, T max, int sparsity, int trimFactor) {
     static_assert(!std::numeric_limits<T>::is_signed);
@@ -4357,6 +4453,67 @@ std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
     return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
+std::uint64_t getEdgesLength(const QueryTypeConfig& config) {
+    uassert(8574707,
+            "Unable to determine field type without queryTypeConfig.min/max",
+            config.getMin() && config.getMax());
+    uassert(8574708,
+            "Range QueryTypeConfig mismatch between min and max"_format(
+                typeName(config.getMin()->getType()), typeName(config.getMax()->getType())),
+            config.getMin()->getType() == config.getMax()->getType());
+    const auto fieldType = config.getMin()->getType();
+    const auto sparsity = config.getSparsity().get_value_or(1);
+    const auto trimFactor = config.getTrimFactor().get_value_or(0);
+    const bool needsPrecision = (fieldType == NumberDouble) || (fieldType == NumberDecimal);
+    uassert(8574709,
+            "Floating point range QueryTypeConfig requires precision argument",
+            !needsPrecision || config.getPrecision());
+
+    switch (fieldType) {
+        case NumberInt: {
+            auto min = config.getMin()->getInt();
+            return getEdgesInt32(min, min, config.getMax()->getInt(), sparsity, trimFactor)->size();
+        }
+        case NumberLong: {
+            auto min = config.getMin()->getLong();
+            return getEdgesInt64(min, min, config.getMax()->getLong(), sparsity, trimFactor)
+                ->size();
+        }
+        case NumberDouble: {
+            auto min = config.getMin()->getDouble();
+            return getEdgesDouble(min,
+                                  min,
+                                  config.getMax()->getDouble(),
+                                  *config.getPrecision(),
+                                  sparsity,
+                                  trimFactor)
+                ->size();
+        }
+        case NumberDecimal: {
+            auto min = config.getMin()->getDecimal();
+            return getEdgesDecimal128(min,
+                                      min,
+                                      config.getMax()->getDecimal(),
+                                      *config.getPrecision(),
+                                      sparsity,
+                                      trimFactor)
+                ->size();
+        }
+        case Date: {
+            auto min = config.getMin()->getDate().toMillisSinceEpoch();
+            return getEdgesInt64(min,
+                                 min,
+                                 config.getMax()->getDate().toMillisSinceEpoch(),
+                                 sparsity,
+                                 trimFactor)
+                ->size();
+        }
+        default:
+            uasserted(8674710, "Invalid queryTypeConfig.type '{}'"_format(typeName(fieldType)));
+    }
+
+    MONGO_UNREACHABLE;
+}
 
 template <typename T>
 class MinCoverGenerator {
@@ -4608,4 +4765,8 @@ StatusWith<std::vector<uint8_t>> FLEUtil::decryptData(ConstDataRange key,
 
     return {out};
 }
+
+template class ESCCollectionCommon<ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken>;
+template class ESCCollectionCommon<AnchorPaddingKeyToken, AnchorPaddingValueToken>;
+
 }  // namespace mongo

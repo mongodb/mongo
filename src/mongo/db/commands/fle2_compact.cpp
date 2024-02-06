@@ -45,6 +45,7 @@
 #include <tuple>
 #include <utility>
 
+#include "mongo/base/data_builder.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -57,9 +58,11 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_options_gen.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/fle_crud.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -80,6 +83,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
+using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(fleCompactOrCleanupFailBeforeECOCRead);
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCAnchorInsert);
@@ -93,6 +97,8 @@ namespace {
 
 constexpr auto kId = "_id"_sd;
 constexpr auto kValue = "value"_sd;
+
+constexpr double kDefaultAnchorPaddingFactor = 1.0;
 
 /**
  * Wrapper class around the IDL stats types that enables easier
@@ -339,6 +345,16 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocuments(
 
         for (auto& doc : docs) {
             auto ecocDoc = ECOCCollection::parseAndDecryptV2(doc, compactionToken.token);
+            uassert(
+                8574701,
+                "Compaction token for field '{}' is of type '{}', but ECOCDocument is of type '{}'"_format(
+                    compactionToken.fieldPathName,
+                    compactionToken.isRange() ? "range"_sd : "equality"_sd,
+                    ecocDoc.isRange() ? "range"_sd : "equality"_sd),
+                ecocDoc.isRange() == compactionToken.isRange());
+            if (compactionToken.isRange()) {
+                ecocDoc.anchorPaddingRootToken = compactionToken.anchorPaddingToken;
+            }
             c.insert(std::move(ecocDoc));
         }
     }
@@ -410,6 +426,52 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
     stats.addInserts(1);
 }
 
+
+void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
+                             const NamespaceString& escNss,
+                             const QueryTypeConfig& queryTypeConfig,
+                             double anchorPaddingFactor,
+                             std::size_t uniqueLeaves,
+                             std::size_t uniqueTokens,
+                             const AnchorPaddingRootToken& anchorPaddingRootToken) {
+    // Compact 4.e, Calculate pathLength := #Edges_SPH(lb, lb, uh, prc, theta)
+    const auto pathLength = getEdgesLength(queryTypeConfig);
+    // Compact 4.f, Calculate numPads := ceil( gamma * (pathLength * uniqueLeaves - len(C_f)) )
+    const auto numPads =
+        std::ceil(anchorPaddingFactor * ((pathLength * uniqueLeaves) - uniqueTokens));
+    if (numPads <= 0) {
+        // Nothing to do.
+        return;
+    }
+
+    // Compact 4.g, Calculate S_1,d := F_s^esc_f,d(1), S_2,d := F_s^esc_f,d(2)
+    const auto anchorPaddingKeyToken =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingKeyToken(anchorPaddingRootToken);
+    const auto anchorPaddingValueToken =
+        FLEAnchorPaddingDerivedGenerator::generateAnchorPaddingValueToken(anchorPaddingRootToken);
+    // Compact 4.h, Calculate a := AnchorBinaryHops(AnchorPaddingTokenKey,
+    // AnchorPaddingTokenValue)
+    FLEStateCollectionQueryInterfaceReader reader(queryImpl, escNss);
+    auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
+    auto optA = ESCCollectionAnchorPadding::anchorBinaryHops(
+        reader, anchorPaddingKeyToken, anchorPaddingValueToken, tracker);
+
+    // TODO SERVER-85749 handle boost::none case
+    if (optA) {
+        // Compact 4.i, for all i in numPads: esc.insert(anchorPaddingDocument)
+        // {_id   : F(AnchorPaddingKeyToken, null || a + i),
+        //  value : Enc(AnchorPaddingValueToken, 0 || 0 )}
+        std::vector<BSONObj> batchWrite;
+        for (std::size_t i = 1; i <= numPads; ++i) {
+            batchWrite.push_back(ESCCollectionAnchorPadding::generatePaddingDocument(
+                anchorPaddingKeyToken, anchorPaddingValueToken, *optA + i));
+        }
+
+        StmtId stmtId = kUninitializedStmtId;
+        checkWriteErrors(uassertStatusOK(
+            queryImpl->insertDocuments(escNss, std::move(batchWrite), &stmtId, true)));
+    }
+}
 
 std::vector<PrfBlock> cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
                                                const ECOCCompactionDocumentV2& ecocDoc,
@@ -532,6 +594,53 @@ void processFLECompactV2(OperationContext* opCtx,
     auto uniqueEcocEntries = readUniqueECOCEntriesInTxn(
         opCtx, getTxn, namespaces.ecocRenameNss, request.getCompactionTokens(), ecocStats);
 
+    // Collect all Range fields, counting unique leaves and tokens.
+    struct RangeFieldInfo {
+        std::size_t uniqueLeaves{0};
+        std::size_t uniqueTokens{0};
+        boost::optional<AnchorPaddingRootToken> anchorPaddingRootToken;
+        QueryTypeConfig queryTypeConfig;
+    };
+    std::map<StringData, RangeFieldInfo> rangeFields;
+    for (auto& ecocDoc : *uniqueEcocEntries) {
+        if (!ecocDoc.isRange()) {
+            continue;
+        }
+        auto& rangeField = rangeFields[ecocDoc.fieldName];
+        ++rangeField.uniqueTokens;
+        if (ecocDoc.isLeaf.get_value_or(false)) {
+            // Compact 4.d.iv.B, count uniqueLeaves in range fields
+            ++rangeField.uniqueLeaves;
+        }
+        if (!rangeField.anchorPaddingRootToken) {
+            // Prereq for Compact 4.g, Compute F_s^esc_f,d
+            rangeField.anchorPaddingRootToken = ecocDoc.anchorPaddingRootToken;
+        }
+    }
+
+    // Validate that we have an EncryptedFieldConfig for each range field.
+    if (!rangeFields.empty()) {
+        uassert(8574702,
+                "Command '{}' requires field '{}' when range fields are present"_format(
+                    CompactStructuredEncryptionData::kCommandName,
+                    CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                request.getEncryptionInformation());
+        auto efc = EncryptionInformationHelpers::getAndValidateSchema(
+            request.getNamespace(), request.getEncryptionInformation().get());
+        const auto& efcFields = efc.getFields();
+        for (auto& rfIt : rangeFields) {
+            auto fieldConfig = std::find_if(efcFields.begin(), efcFields.end(), [&](const auto& f) {
+                return rfIt.first == f.getPath();
+            });
+            uassert(
+                8574705,
+                "Missing range field '{}' in '{}'"_format(
+                    rfIt.first, CompactStructuredEncryptionData::kEncryptionInformationFieldName),
+                fieldConfig != efcFields.end());
+            rfIt.second.queryTypeConfig = getQueryType(*fieldConfig, QueryTypeEnum::RangePreview);
+        }
+    }
+
     // Each entry in 'C_f' represents a unique field/value pair. For each field/value pair,
     // compact the ESC entries for that field/value pair in one transaction.
     for (auto& ecocDoc : *uniqueEcocEntries) {
@@ -561,6 +670,45 @@ void processFLECompactV2(OperationContext* opCtx,
 
         if (MONGO_unlikely(fleCompactFailAfterTransactionCommit.shouldFail())) {
             uasserted(7663001, "Failed due to fleCompactFailAfterTransactionCommit fail point");
+        }
+    }
+
+    // Compact Range fields.
+    if (!rangeFields.empty()) {
+        // Compact 4.e - 4.i, Compact range padding anchors
+        const double anchorPaddingFactor = request.getAnchorPaddingFactor().get_value_or(
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+                ->getValue(namespaces.escNss.tenantId())
+                .getCompactAnchorPaddingFactor()
+                .get_value_or(kDefaultAnchorPaddingFactor));
+        for (const auto& [_, rangeField] : rangeFields) {
+            // The function that handles the transaction may outlive this function so we need to use
+            // shared_ptrs
+            auto argsBlock = std::make_tuple(namespaces.escNss, anchorPaddingFactor, rangeField);
+            auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+
+            std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+            uassertStatusOK(
+                uassertStatusOK(
+                    trun->runNoThrow(
+                        opCtx,
+                        [sharedBlock](const txn_api::TransactionClient& txnClient,
+                                      ExecutorPtr txnExec) {
+                            FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+
+                            auto [escNss, anchorPaddingFactor, rangeField] = *sharedBlock.get();
+                            compactOneRangeFieldPad(&queryImpl,
+                                                    escNss,
+                                                    rangeField.queryTypeConfig,
+                                                    anchorPaddingFactor,
+                                                    rangeField.uniqueLeaves,
+                                                    rangeField.uniqueTokens,
+                                                    rangeField.anchorPaddingRootToken.get());
+
+                            return SemiFuture<void>::makeReady();
+                        }))
+                    .getEffectiveStatus());
         }
     }
 

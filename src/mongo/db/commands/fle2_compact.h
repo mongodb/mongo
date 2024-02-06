@@ -114,6 +114,17 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
 
 
 /**
+ * Performs compaction for Range fields to add additional padding edges.
+ */
+void compactOneRangeFieldPad(FLEQueryInterface* queryImpl,
+                             const NamespaceString& escNss,
+                             const QueryTypeConfig& queryTypeConfig,
+                             double anchorPaddingFactor,
+                             std::size_t uniqueLeaves,
+                             std::size_t uniqueTokens,
+                             const AnchorPaddingRootToken& anchorPaddingRootToken);
+
+/**
  * Performs cleanup of the ESC entries for the encrypted field/value pair
  * whose tokens are in the provided ECOC compaction document.
  * Returns a list of the IDs of anchors to be deleted from the ESC. The length

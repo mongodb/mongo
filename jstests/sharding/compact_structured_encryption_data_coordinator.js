@@ -1,7 +1,7 @@
 // Basic test that the CompactStructuredEncryptionDataCoordinator runs.
 // @tags: [
 //     requires_sharding,
-//     requires_fcv_70,
+//     requires_fcv_80,
 // ]
 
 import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
