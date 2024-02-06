@@ -265,16 +265,13 @@ function lookupTest(baseColl, searchColl, mockResponses) {
 }
 
 // Test all combinations of sharded/unsharded base/search collection.
-lookupTest(unshardedBaseColl,
-           unshardedSearchColl,
-           {mongos: [], primary: [kSearch, kSearch], secondary: []});
+lookupTest(unshardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
 lookupTest(unshardedBaseColl,
            shardedSearchColl,
-           {mongos: [], primary: [kPlan, kSearch, kPlan, kSearch], secondary: [kSearch, kSearch]});
+           {mongos: [], primary: [kPlan, kSearch], secondary: [kSearch]});
 
-lookupTest(
-    shardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch, kSearch], secondary: []});
+lookupTest(shardedBaseColl, unshardedSearchColl, {mongos: [], primary: [kSearch], secondary: []});
 
 lookupTest(shardedBaseColl, shardedSearchColl, {
     mongos: [],

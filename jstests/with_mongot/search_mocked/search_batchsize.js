@@ -472,14 +472,9 @@ function buildHistorySearchWithinLookupStandalone(db, mongotConn, searchLookupQu
                 }
             },
         ];
-        // We set this history once for each document in the local collection, as that is how many
-        // times the $lookup subpipeline that contains a $search stage will be executed. We need a
-        // new cursorId each time because calling setMockResponses with the same cursorId twice
-        // overwrites the first mock response.
-        for (let cursorId = 123; cursorId < 123 + docs.length; cursorId++) {
-            assert.commandWorked(mongotConn.adminCommand(
-                {setMockResponses: 1, cursorId: NumberLong(cursorId), history: history}));
-        }
+        // Only one response is needed, as $lookup executes $search once and caches the response.
+        assert.commandWorked(mongotConn.adminCommand(
+            {setMockResponses: 1, cursorId: NumberLong(123), history: history}));
     }
 }
 
@@ -570,27 +565,20 @@ function buildHistorySearchWithinLookupShardedEnv(db, stWithMock, searchLookupQu
     let cursorId = 123;
     let metaId = 2;
 
-    // There are 7 documents in the local collection on shard0 and 9 on shard1 (as determined by
-    // chunkBoundary). These responses are necessary to reflect that each shard will invoke PSS
-    // during the execution of the $lookup stage.
-    for (let i = 0; i < docs.length; i++) {
-        // The chunks were split based on the _id field, which is not 0-based so we need the "- 1"
-        // in the guard below.
-        if (i < chunkBoundary - 1) {
-            // Mock the responses for the commands resulting from parsing the local collection
-            // documents on shard0.
-            s0Mongot.setMockResponses(planShardedSearchHistory, NumberLong(cursorId++));
-        } else {
-            // Mock the responses for the commands resulting from parsing the local collection
-            // documents on shard1.
-            s1Mongot.setMockResponses(planShardedSearchHistory, NumberLong(cursorId++));
-        }
-    }
+    // Each shard will invoke PSS during execution of $search in $lookup. Only one response is
+    // necessary since $search is executed once and cached.
 
-    // There are 16 documents in the collection. As part of $lookup execution, for each of these
-    // documents, each shard will execute the search pipeline because for each document that a shard
-    // has, it will send a search command to itself and to the other shard.
-    for (let i = 0; i < docs.length; i++) {
+    // Mock the responses for the commands resulting from parsing the local collection documents on
+    // shard0.
+    s0Mongot.setMockResponses(planShardedSearchHistory, NumberLong(cursorId++));
+
+    // Mock the responses for the commands resulting from parsing the local collection
+    // documents on shard1.
+    s1Mongot.setMockResponses(planShardedSearchHistory, NumberLong(cursorId++));
+
+    // As part of $lookup execution, each shard will send a search command to itself and to the
+    // other shard. Only occurs once per shard as $search is executed once and cached.
+    for (let i = 0; i < 2; i++) {
         s0Mongot.setMockResponses(
             history(cursorId, [{_id: 1, $searchScore: 0.3}, {_id: 2, $searchScore: 0.299}]),
             NumberLong(cursorId++),

@@ -148,12 +148,9 @@ assert.sameMembers(
 
 setupMocks(17);
 setupMocks(18);
-setupMocks(19);
-setupMocks(20);
-setupMocks(21);
-setupMocks(22);
 let expected = [];
 let cursor = 17;
+
 for (let i = 1; i < 4; i++) {
     expected.push({
         "_id": i,
@@ -168,7 +165,10 @@ for (let i = 1; i < 4; i++) {
             {"_id": 3, "meta": {value: cursor + 1}},
         ],
     });
-    cursor += 2;
+    // We reset cursor to 17 here to generate the correct expected results. $lookup only executes
+    // $search once since its values are cached. "lookup1" results are associated with cursor 17
+    // and "lookup2" with cursor 18.
+    cursor = 17;
 }
 // $search present only in parent pipeline but carried through correlated $lookup subquery.
 assert.sameMembers(coll.aggregate(

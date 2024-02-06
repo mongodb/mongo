@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
+#include "mongo/db/pipeline/search/document_source_search.h"
 
 namespace mongo {
 
@@ -49,6 +50,15 @@ DocumentSourceSequentialDocumentCache::DocumentSourceSequentialDocumentCache(
 
     if (_cache->isServing()) {
         _cache->restartIteration();
+    }
+
+    // If SearchMeta was stored, it is now set in the expCtx for future stages of the subpipeline.
+    if (auto searchMetaVal = _cache->getCachedVariableValue(Variables::kSearchMetaId);
+        !searchMetaVal.missing()) {
+        tassert(6381601,
+                "SEARCH_META variable should not have been set in this expCtx yet.",
+                pExpCtx->variables.getValue(Variables::kSearchMetaId).missing());
+        pExpCtx->variables.setReservedValue(Variables::kSearchMetaId, searchMetaVal, true);
     }
 }
 
@@ -75,6 +85,14 @@ DocumentSource::GetNextResult DocumentSourceSequentialDocumentCache::doGetNext()
         if (nextResult.isEOF()) {
             _cache->freeze();
             _cacheIsEOF = true;
+
+            // SearchMeta may be set in the expCtx, and it should be persisted through the cache. If
+            // not persisted, SearchMeta will be missing when it may be needed for future executions
+            // of the pipeline.
+            if (auto searchMetaVal = pExpCtx->variables.getValue(Variables::kSearchMetaId);
+                !searchMetaVal.missing()) {
+                _cache->setCachedVariableValue(Variables::kSearchMetaId, searchMetaVal);
+            }
         } else {
             _cache->add(nextResult.getDocument());
         }
@@ -125,14 +143,21 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     // Iterate through the pipeline stages until we find one which cannot be cached.
     // A stage cannot be cached if it either:
     //  1. does not support dependency tracking, and may thus require the full object and metadata.
+    //     $search is an exception to rule 1, as it doesn't depend on other stages.
     //  2. depends on a variable defined in this scope, or
     //  3. generates random numbers.
     DocumentSource* lastPtr = nullptr;
     std::set<Variables::Id> prefixVarRefs;
     for (; prefixSplit != container->end(); ++prefixSplit) {
         (*prefixSplit)->addVariableRefs(&prefixVarRefs);
-        if (((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED) ||
-            Variables::hasVariableReferenceTo(prefixVarRefs, varIDs) || deps.needRandomGenerator) {
+
+        bool isNotSearch = ((*prefixSplit)->getSourceName() != DocumentSourceSearch::kStageName);
+        bool doesNotSupportDependencies =
+            ((*prefixSplit)->getDependencies(&deps) == DepsTracker::State::NOT_SUPPORTED);
+
+        if ((isNotSearch && doesNotSupportDependencies) ||
+            ((Variables::hasVariableReferenceTo(prefixVarRefs, varIDs) ||
+              deps.needRandomGenerator))) {
             break;
         }
 

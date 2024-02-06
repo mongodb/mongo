@@ -136,9 +136,9 @@ const makeLookupSearchPipeline = (fromColl, searchQuery, localField) =>
     makeLookupPipeline(fromColl, {$search: searchQuery}, localField);
 
 // Perform a $search query with $lookup.
-function searchWithLookup(localField) {
+function searchWithLookup({localField, times}) {
     const lookupSearchQuery = setupSearchQuery("cakes",
-                                               2,
+                                               times,
                                                [
                                                    {_id: 1, $searchScore: 0.9},
                                                    {_id: 2, $searchScore: 0.8},
@@ -158,8 +158,76 @@ function searchWithLookup(localField) {
     assert.sameMembers(lookupExpected, lookupCursor.toArray());
 }
 
-searchWithLookup(false);
-searchWithLookup(true);
+// Testing $lookup without cache optimization.
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "alwaysOn"}));
+searchWithLookup({localField: false, times: 2});
+searchWithLookup({localField: true, times: 2});
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: "disablePipelineOptimization", mode: "off"}));
+
+// Testing $lookup with optimizations on. $lookup executes $search once.
+searchWithLookup({localField: false, times: 1});
+// Cache optimization doesn't apply when $lookup contains local/foreignField.
+searchWithLookup({localField: true, times: 2});
+
+// $search with $lookup with a correlated part of the sub-pipeline ($match).
+const lookupWithMatch = setupSearchQuery("cakes",
+                                         1,
+                                         [
+                                             {_id: 1, $searchScore: 0.99},
+                                             {_id: 2, $searchScore: 0.20},
+                                             {_id: 5, $searchScore: 0.33},
+                                             {_id: 6, $searchScore: 0.38},
+                                             {_id: 8, $searchScore: 0.45}
+                                         ],
+                                         ["lookup"]);
+
+let result = assert.commandWorked(db.runCommand({
+    aggregate: collBase.getName(),
+    pipeline: [
+        {$project: {"_id": 0}},
+        {
+            $lookup: {
+                from: coll.getName(),
+                let: { local_title: "$localField" },
+                pipeline: [{$search: lookupWithMatch}, 
+                    {
+                        $match: {
+                            $expr: {
+                                $eq: ["$title", "$$local_title"]
+                            }
+                        }
+                    },
+                {
+                    $project: {
+                        "_id": 0,
+                        "ref_id": "$_id",
+                        "searchMeta": "$$SEARCH_META",
+                    }
+                }],
+                as: "cake_data",
+            }
+        }
+    ],
+    cursor: {}
+}));
+
+const lookupWithMatchExpected = [
+    {
+        "localField": "cakes",
+        "weird": false,
+        "cake_data": [{"ref_id": 1, "searchMeta": {value: "lookup"}}]
+    },
+    {
+        "localField": "cakes and kale",
+        "weird": true,
+        "cake_data": [{"ref_id": 8, "searchMeta": {value: "lookup"}}]
+    }
+
+];
+
+assert.sameMembers(result.cursor.firstBatch, lookupWithMatchExpected);
 
 const unionSearchQuery = setupSearchQuery("cakes",
                                           1,
@@ -197,7 +265,7 @@ const multiUnionSearch = setupSearchQuery("cakes",
                                           ["outer", "inner"]);
 
 // Multiple $search commands with $$SEARCH_META are allowed in a pipeline.
-let result = assert.commandWorked(db.runCommand({
+result = assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [
         {$search: multiUnionSearch},
@@ -221,14 +289,13 @@ const multiUnionExpected = [
 
 assert.sameMembers(result.cursor.firstBatch, multiUnionExpected);
 
-// Same test with $lookup.
 const multiLookupSearch = setupSearchQuery("cakes",
-                                           3,
+                                           2,
                                            [
                                                {_id: 1, $searchScore: 0.9},
                                                {_id: 2, $searchScore: 0.8},
                                            ],
-                                           ["outer", "firstLookup", "secondLookup"]);
+                                           ["outer", "inner"]);
 result = assert.commandWorked(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [
@@ -249,16 +316,16 @@ const multiLookupExpected = [
         _id: 1,
         meta: {value: "outer"},
         arr: [
-            {_id: 1, title: "cakes", meta: {value: "firstLookup"}},
-            {_id: 2, title: "cookies and cakes", meta: {value: "firstLookup"}},
+            {_id: 1, title: "cakes", meta: {value: "inner"}},
+            {_id: 2, title: "cookies and cakes", meta: {value: "inner"}},
         ]
     },
     {
         _id: 2,
         meta: {value: "outer"},
         arr: [
-            {_id: 1, title: "cakes", meta: {value: "secondLookup"}},
-            {_id: 2, title: "cookies and cakes", meta: {value: "secondLookup"}},
+            {_id: 1, title: "cakes", meta: {value: "inner"}},
+            {_id: 2, title: "cookies and cakes", meta: {value: "inner"}},
         ]
     },
 
@@ -564,7 +631,7 @@ assert.sameMembers(viewExpected, viewCursor.toArray());
 
 // $lookup of a view with $search coll.lookup(searchView, lookup-cond).
 const viewSearchQuery2 = setupSearchQuery("cakes",
-                                          2,
+                                          1,
                                           [
                                               {_id: 1, $searchScore: 0.9},
                                               {_id: 2, $searchScore: 0.8},
@@ -587,7 +654,7 @@ assert.sameMembers(lookupViewSearchExpected, lookupViewSearchCursor.toArray());
 
 // $lookup (with $search) within $lookup.
 const nestedLookupQuery = setupSearchQuery("cakes",
-                                           2,
+                                           1,
                                            [
                                                {_id: 1, $searchScore: 0.9},
                                                {_id: 2, $searchScore: 0.8},
@@ -643,7 +710,7 @@ assert.commandFailedWithCode(db.runCommand({
 
 // $lookup against trivial view($search) works.
 const lookupSearchViewQuery = setupSearchQuery("cakes",
-                                               2,
+                                               1,
                                                [
                                                    {_id: 1, $searchScore: 0.9},
                                                    {_id: 2, $searchScore: 0.8},
@@ -660,8 +727,7 @@ assert.sameMembers(
         {"localField": "cakes", "weird": false, "cake_data": [{"ref_id": 1}]},
         {"localField": "cakes and kale", "weird": true, "cake_data": [{"ref_id": 8}]}
     ],
-    collBase.aggregate(makeLookupSearchPipeline(view1.getName(), {query: "cakes", path: "title"}))
-        .toArray());
+    collBase.aggregate(makeLookupSearchPipeline(view1.getName(), lookupSearchViewQuery)).toArray());
 
 // $unionWith against non-trivial view($search) fails.
 view1.drop();
