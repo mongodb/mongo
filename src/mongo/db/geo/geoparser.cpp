@@ -504,6 +504,10 @@ Status GeoParser::parseLegacyPolygon(const BSONObj& obj, PolygonWithCRS* out) {
 
 // { "type": "Point", "coordinates": [100.0, 0.0] }
 Status GeoParser::parseGeoJSONPoint(const BSONObj& obj, PointWithCRS* out) {
+    if (obj.hasField(GEOJSON_TYPE)) {
+        GeoParser::assertValidGeoJSONType(obj);
+    }
+
     Status status = Status::OK();
     // "crs"
     status = parseGeoJSONCRS(obj, &out->crs);
@@ -840,6 +844,18 @@ GeoParser::GeoJSONType GeoParser::parseGeoJSONType(const BSONObj& obj) {
     return geoJSONTypeStringToEnum(type.checkAndGetStringData());
 }
 
+void GeoParser::assertValidGeoJSONType(const BSONObj& obj) {
+    BSONElement type = dps::extractElementAtPath(obj, GEOJSON_TYPE);
+    uassert(8459801,
+            str::stream() << "Expected valid geojson of type string, got non-string type of value "
+                          << type,
+            String == type.type());
+    auto str = type.checkAndGetStringData();
+    uassert(8459800,
+            str::stream() << "Expected valid geojson type, got " << str,
+            geoJSONTypeStringToEnum(str) != GeoParser::GEOJSON_UNKNOWN);
+}
+
 GeoParser::GeoJSONType GeoParser::geoJSONTypeStringToEnum(StringData type) {
     if (GEOJSON_TYPE_POINT == type) {
         return GeoParser::GEOJSON_POINT;
@@ -857,6 +873,28 @@ GeoParser::GeoJSONType GeoParser::geoJSONTypeStringToEnum(StringData type) {
         return GeoParser::GEOJSON_GEOMETRY_COLLECTION;
     }
     return GeoParser::GEOJSON_UNKNOWN;
+}
+
+StringData GeoParser::geoJSONTypeEnumToString(GeoParser::GeoJSONType type) {
+    switch (type) {
+        case GEOJSON_UNKNOWN:
+            return "unknown"_sd;
+        case GEOJSON_POINT:
+            return GEOJSON_TYPE_POINT;
+        case GEOJSON_LINESTRING:
+            return GEOJSON_TYPE_LINESTRING;
+        case GEOJSON_POLYGON:
+            return GEOJSON_TYPE_POLYGON;
+        case GEOJSON_MULTI_POINT:
+            return GEOJSON_TYPE_MULTI_POINT;
+        case GEOJSON_MULTI_LINESTRING:
+            return GEOJSON_TYPE_MULTI_LINESTRING;
+        case GEOJSON_MULTI_POLYGON:
+            return GEOJSON_TYPE_MULTI_POLYGON;
+        case GEOJSON_GEOMETRY_COLLECTION:
+            return GEOJSON_TYPE_GEOMETRY_COLLECTION;
+    }
+    MONGO_UNREACHABLE_TASSERT(8459802);
 }
 
 }  // namespace mongo
