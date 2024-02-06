@@ -1119,6 +1119,9 @@ functions:
         ${PREPARE_TEST_ENV}
         export WIREDTIGER_CONFIG='checkpoint_sync=0,transaction_sync=(method=none)'
         CMD='./test_checkpoint -h WT_TEST.$i.$t -t r -r 2 -W 3 -n 1000000 -k 1000000 -C "cache_size=100MB"'
+        if [ ${tiered|0} -eq 1 ]; then
+            CMD="$CMD -PT"
+        fi
 
         for i in $(seq ${times|1}); do
           for t in $(seq ${no_of_procs|1}); do
@@ -3530,8 +3533,25 @@ tasks:
           <<: *configure_flags_with_builtins
       - func: "checkpoint stress test"
         vars:
-          times: 1       # No of times to run the loop
-          no_of_procs: 10 # No of processes to run in the background
+          no_of_procs: 10 # Number of processes to run in the background
+          tiered: 0       # Don't enable tiered storage
+          times: 1        # Number of times to run the loop
+
+  - name: checkpoint-stress-test-tiered
+    exec_timeout_secs: 86400
+    commands:
+      - command: timeout.update
+        params:
+          timeout_secs: 86400
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_with_builtins
+      - func: "checkpoint stress test"
+        vars:
+          no_of_procs: 5  # Number of processes to run in the background
+          tiered: 1       # Enable tiered storage
+          times: 1        # Number of times to run the loop
 
   - name: skiplist-stress-test
     tags: ["stress-test-1", "stress-test-zseries-1"]
@@ -5291,6 +5311,7 @@ buildvariants:
     - name: ".stress-test-3"
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
+    - name: checkpoint-stress-test-tiered
     - name: format-abort-recovery-stress-test
 
 - name: cppsuite-stress-tests-ubuntu
