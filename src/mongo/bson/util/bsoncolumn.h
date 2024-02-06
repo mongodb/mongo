@@ -812,22 +812,33 @@ private:
     const char* _binary;
     size_t _size;
 
-    // Helpers for block decompress-all functions
-    template <typename T, class Buffer, typename Materialize>
+    /**
+     * Helpers for block decompress-all functions
+     * T - the type we are decompressing to
+     * Encoding - the underlying encoding (int128_t or int64_t) for Simple8b deltas
+     * Buffer - the buffer being filled by decompress()
+     * Materialize - function to convert delta decoding into T and append to Buffer
+     * Decode - the Simple8b decoder to use
+     */
+
+    template <typename T, typename Encoding, class Buffer, typename Materialize>
     requires Appendable<Buffer>
     static const char* decompressAllDelta(const char* ptr,
                                           const char* end,
                                           Buffer& buffer,
-                                          int64_t reference,
+                                          Encoding last,
+                                          const BSONElement& reference,
                                           const Materialize& materialize);
 
-    template <typename T, class Buffer, typename Materialize>
+    template <typename T, class Buffer, typename Materialize, typename Decode>
     requires Appendable<Buffer>
     static const char* decompressAllDeltaOfDelta(const char* ptr,
                                                  const char* end,
                                                  Buffer& buffer,
-                                                 int64_t reference,
-                                                 const Materialize& materialize);
+                                                 int64_t last,
+                                                 const BSONElement& reference,
+                                                 const Materialize& materialize,
+                                                 const Decode& decode);
 
     template <class Buffer>
     requires Appendable<Buffer>
@@ -863,3 +874,5 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
 
 }  // namespace bsoncolumn
 }  // namespace mongo
+
+#include "bsoncolumn.inl"
