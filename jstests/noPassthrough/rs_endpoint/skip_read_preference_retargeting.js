@@ -1,5 +1,5 @@
 /*
- * Tests that the replica set endpoint skips readPreference re-targeting for reads.
+ * Tests that the replica set endpoint skips readPreference re-targeting.
  *
  * @tags: [
  *   requires_fcv_73,
@@ -208,11 +208,46 @@ assert.commandWorked(secondary1TestDB.setProfilingLevel(2));
 }
 
 {
-    jsTest.log("Testing that the replica set endpoint does re-target writes");
+    jsTest.log("Testing that the replica set endpoint does not re-target writes");
 
-    assert.commandWorked(secondary0TestColl.insert({x: 3}));
-    rst.awaitReplication();
-    assert.neq(secondary0TestColl.findOne({x: 3}), null);
+    assert.commandFailedWithCode(secondary0TestColl.insert({x: 3}), ErrorCodes.NotWritablePrimary);
+    assert.eq(primaryTestColl.findOne({x: 3}), null);
+
+    assert.commandFailedWithCode(secondary1TestColl.update({x: 1}, {$set: {y: 1}}),
+                                 ErrorCodes.NotWritablePrimary);
+    assert.eq(primaryTestColl.findOne({x: 1}).y, null);
+
+    assert.commandFailedWithCode(secondary0TestColl.remove({x: 1}), ErrorCodes.NotWritablePrimary);
+    assert.neq(primaryTestColl.findOne({x: 1}), null);
+
+    assert.throwsWithCode(
+        () => secondary1TestColl.findAndModify({query: {x: 1}, update: {$set: {y: 1}}}),
+        ErrorCodes.NotWritablePrimary);
+    assert.eq(primaryTestColl.findOne({x: 1}).y, null);
+
+    assert.commandFailedWithCode(secondary0TestColl.createIndex({x: 1}),
+                                 ErrorCodes.NotWritablePrimary);
+    // The collection should only have the _id index.
+    assert.eq(primaryTestColl.getIndexes().length, 1);
+
+    assert.commandWorked(primaryTestColl.createIndex({x: 1}));
+    assert.eq(primaryTestColl.getIndexes().length, 2);
+    assert.commandFailedWithCode(secondary1TestColl.dropIndex({x: 1}),
+                                 ErrorCodes.NotWritablePrimary);
+    assert.eq(primaryTestColl.getIndexes().length, 2);
+
+    assert.throwsWithCode(() => secondary0TestColl.drop(), ErrorCodes.NotWritablePrimary);
+    assert.eq(primaryTestDB.getCollectionInfos({name: collName}).length, 1);
+
+    const newCollName = collName + "Other";
+    assert.commandFailedWithCode(secondary1TestDB.createCollection(newCollName),
+                                 ErrorCodes.NotWritablePrimary);
+    assert.eq(primaryTestDB.getCollectionInfos({name: newCollName}).length, 0);
+
+    assert.commandFailedWithCode(secondary0TestColl.renameCollection(newCollName),
+                                 ErrorCodes.NotWritablePrimary);
+    assert.eq(primaryTestDB.getCollectionInfos({name: collName}).length, 1);
+    assert.eq(primaryTestDB.getCollectionInfos({name: newCollName}).length, 0);
 }
 
 jsTest.log("Disabling profiler");

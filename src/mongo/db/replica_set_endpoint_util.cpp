@@ -30,6 +30,7 @@
 #include "mongo/db/replica_set_endpoint_util.h"
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -83,12 +84,26 @@ bool isTargetedCommandRequest(OperationContext* opCtx, const OpMsgRequest& opMsg
 }
 
 /**
+ * Returns the service for the specified role.
+ */
+Service* getService(OperationContext* opCtx, ClusterRole role) {
+    auto service = opCtx->getServiceContext()->getService(role);
+    invariant(service);
+    return service;
+}
+
+/**
  * Returns the router service.
  */
 Service* getRouterService(OperationContext* opCtx) {
-    auto routerService = opCtx->getServiceContext()->getService(ClusterRole::RouterServer);
-    invariant(routerService);
-    return routerService;
+    return getService(opCtx, ClusterRole::RouterServer);
+}
+
+/**
+ * Returns the shard service.
+ */
+Service* getShardService(OperationContext* opCtx) {
+    return getService(opCtx, ClusterRole::ShardServer);
 }
 
 /**
@@ -141,6 +156,26 @@ bool shouldRouteRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
     if (isInternalClient(opCtx) || isLocalDatabaseCommandRequest(opMsgReq) ||
         isTargetedCommandRequest(opCtx, opMsgReq) || !isRoutableCommandRequest(opCtx, opMsgReq)) {
         return false;
+    }
+
+
+    auto shardCommand =
+        CommandHelpers::findCommand(getShardService(opCtx), opMsgReq.getCommandName());
+    if (shardCommand &&
+        shardCommand->secondaryAllowed(opCtx->getServiceContext()) ==
+            BasicCommand::AllowedOnSecondary::kNever) {
+        // On the shard service, this is a primary-only command. Make it fail with a
+        // NotWritablePrimary error if this mongod is not the primary. This check is necessary for
+        // providing replica set user experience (i.e. writes should fail on secondaries) since by
+        // going through the router code paths the command would get routed to the primary and
+        // succeed whether or not this mongod is the primary. This check only needs to be
+        // best-effort since if this mongod steps down after the check, the write would be routed
+        // to the new primary. For this reason, just use canAcceptWritesForDatabase_UNSAFE to
+        // avoid taking the RSTL lock or the ReplicationCoordinator's mutex.
+        uassert(ErrorCodes::NotWritablePrimary,
+                "This command is only allowed on a primary",
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
+                    opCtx, opMsgReq.getDbName()));
     }
 
     // There is nothing that will prevent the cluster from becoming multi-shard (i.e. no longer

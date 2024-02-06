@@ -27,20 +27,20 @@
  *    it in the license file.
  */
 
-
-#include "mongo/bson/json.h"
-#include "mongo/db/cluster_role.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/replica_set_endpoint_util.h"
-
-#include "mongo/util/database_name_util.h"
 #include <memory>
 
+#include "mongo/db/replica_set_endpoint_util.h"
+
+#include "mongo/bson/json.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands_test_example.h"
 #include "mongo/db/commands_test_example_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/replica_set_endpoint_sharding_state.h"
 #include "mongo/db/replica_set_endpoint_test_fixture.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -51,6 +51,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -74,10 +75,18 @@ protected:
         ReplicaSetEndpointShardingState::get(getServiceContext())->setIsConfigShard(true);
         setHasTwoOrShardsClusterParameter(false);
         ASSERT_FALSE(getHasTwoOrShardsClusterParameter());
+
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+        repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
     }
 
     transport::TransportLayerMock& getTransportLayer() {
         return _transportLayer;
+    }
+
+    repl::ReplicationCoordinator* getReplicationCoordinator() {
+        return repl::ReplicationCoordinator::get(getServiceContext());
     }
 
     const std::string kTestDbName = "testDb";
@@ -143,6 +152,15 @@ TEST_F(ReplicaSetEndpointUtilTest, IsReplicaSetEndpointClient_FeatureFlagDisable
 MONGO_REGISTER_COMMAND(commands_test_example::ExampleIncrementCommand).forShard().forRouter();
 MONGO_REGISTER_COMMAND(commands_test_example::ExampleMinimalCommand).forShard();
 MONGO_REGISTER_COMMAND(commands_test_example::ExampleVoidCommand).forRouter();
+MONGO_REGISTER_COMMAND(commands_test_example::ExampleVoidCommandNeverAllowedOnSecondary)
+    .forRouter()
+    .forShard();
+MONGO_REGISTER_COMMAND(commands_test_example::ExampleVoidCommandAlwaysAllowedOnSecondary)
+    .forRouter()
+    .forShard();
+MONGO_REGISTER_COMMAND(commands_test_example::ExampleVoidCommandAllowedOnSecondaryIfOptedIn)
+    .forRouter()
+    .forShard();
 
 TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand) {
     std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
@@ -177,6 +195,55 @@ TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterOnlyCommand) {
     commands_test_example::ExampleVoid voidCmd(ns, 0);
     auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), voidCmd.toBSON({}));
 
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_NeverAllowedOnSecondary) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client = getServiceContext()->getService()->makeClient(
+        "RouterAndShardCommand_NeverAllowedOnSecondary", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
+    commands_test_example::ExampleVoidNeverAllowedOnSecondary voidCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), voidCmd.toBSON({}));
+
+    ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    ASSERT_THROWS_CODE(
+        shouldRouteRequest(opCtx.get(), opMsgRequest), DBException, ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AlwaysAllowedOnSecondary) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client = getServiceContext()->getService()->makeClient(
+        "RouterAndShardCommand_AlwaysAllowedOnSecondary", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
+    commands_test_example::ExampleVoidAlwaysAllowedOnSecondary voidCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), voidCmd.toBSON({}));
+
+    ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_SECONDARY));
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+}
+
+TEST_F(ReplicaSetEndpointUtilTest, ShouldRoute_RouterAndShardCommand_AllowedOnSecondaryIfOptedIn) {
+    std::shared_ptr<transport::Session> session = getTransportLayer().createSession();
+    auto client = getServiceContext()->getService()->makeClient(
+        "RouterAndShardCommand_AllowedOnSecondaryIfOptedIn", session);
+    auto opCtx = client->makeOperationContext();
+
+    auto ns = NamespaceString::createNamespaceString_forTest(kTestDbName, kTestCollName);
+    commands_test_example::ExampleVoidAllowedOnSecondaryIfOptedIn voidCmd(ns, 0);
+    auto opMsgRequest = mongo::OpMsgRequest::fromDBAndBody(ns.dbName(), voidCmd.toBSON({}));
+
+    ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
+    ASSERT_OK(getReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_SECONDARY));
     ASSERT(shouldRouteRequest(opCtx.get(), opMsgRequest));
 }
 

@@ -1030,6 +1030,7 @@ env.CppUnitTest(
         'auth/authmocks',
         'commands',
         'commands_test_example',
+        'repl/replmocks',
         's/sharding_catalog_manager',
         'service_context_d_test_fixture',
         'shard_role_api',

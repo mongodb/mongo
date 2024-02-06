@@ -41,7 +41,7 @@ namespace commands_test_example {
 class ExampleIncrementCommand final : public TypedCommand<ExampleIncrementCommand> {
 private:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return Command::AllowedOnSecondary::kNever;
+        return Command::AllowedOnSecondary::kAlways;
     }
 
     std::string help() const override {
@@ -176,6 +176,42 @@ public:
     };
 
     mutable std::int32_t iCapture = 0;
+};
+
+class ExampleVoidCommandNeverAllowedOnSecondary
+    : public TypedCommand<ExampleVoidCommandNeverAllowedOnSecondary> {
+private:
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kNever;
+    }
+
+public:
+    using Request = ExampleVoidNeverAllowedOnSecondary;
+    using Invocation = ExampleVoidCommand::Invocation;
+};
+
+class ExampleVoidCommandAlwaysAllowedOnSecondary
+    : public TypedCommand<ExampleVoidCommandAlwaysAllowedOnSecondary> {
+private:
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kAlways;
+    }
+
+public:
+    using Request = ExampleVoidAlwaysAllowedOnSecondary;
+    using Invocation = ExampleVoidCommand::Invocation;
+};
+
+class ExampleVoidCommandAllowedOnSecondaryIfOptedIn
+    : public TypedCommand<ExampleVoidCommandAllowedOnSecondaryIfOptedIn> {
+private:
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+        return Command::AllowedOnSecondary::kOptIn;
+    }
+
+public:
+    using Request = ExampleVoidAllowedOnSecondaryIfOptedIn;
+    using Invocation = ExampleVoidCommand::Invocation;
 };
 
 /**

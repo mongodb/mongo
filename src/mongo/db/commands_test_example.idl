@@ -47,6 +47,27 @@ commands:
     api_version: ""
     fields:
       i: int
+  exampleVoidNeverAllowedOnSecondary:
+    description: "Similar to exampleVoid, but is not allowed to run on secondaries."
+    command_name: exampleVoidNeverAllowedOnSecondary
+    namespace: concatenate_with_db
+    api_version: ""
+    fields:
+      i: int
+  exampleVoidAlwaysAllowedOnSecondary:
+    description: "Similar to exampleVoid, but is always allowed to run on secondaries."
+    command_name: exampleVoidAlwaysAllowedOnSecondary
+    namespace: concatenate_with_db
+    api_version: ""
+    fields:
+      i: int
+  exampleVoidAllowedOnSecondaryIfOptedIn:
+    description: "Similar to exampleVoid, but is allowed secondaries if opted in."
+    command_name: exampleVoidAllowedOnSecondaryIfOptedIn
+    namespace: concatenate_with_db
+    api_version: ""
+    fields:
+      i: int
   exampleMinimal:
     description: "like exampleIncrement, but use MinimalInvocationBase"
     command_name: exampleMinimal
