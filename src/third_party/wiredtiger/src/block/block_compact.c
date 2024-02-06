@@ -26,6 +26,7 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
     /* Reset the compaction state information. */
     block->compact_session_id = session->id;
+    block->compact_estimated = false;
     block->compact_pct_tenths = 0;
     block->compact_bytes_reviewed = 0;
     block->compact_bytes_rewritten = 0;
@@ -203,7 +204,8 @@ __block_compact_skip_internal(WT_SESSION_IMPL *session, WT_BLOCK *block, bool es
 
 /*
  * __block_compact_estimate_remaining_work --
- *     Estimate how much more work the compaction needs to do for the given file.
+ *     Estimate how much more work the compaction needs to do for the given file. The function
+ *     assumes that enough pages have been reviewed for the statistics to be meaningful.
  */
 static void
 __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *block)
@@ -215,15 +217,10 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
     int compact_pct_tenths, iteration;
     bool skip;
 
-    /*
-     * We must have reviewed at least some interesting number of pages for any estimates below to be
-     * worthwhile.
-     */
-    if (block->compact_pages_reviewed < WT_THOUSAND)
-        return;
-
     /* Assume that we have already checked whether this file can be skipped. */
     WT_ASSERT(session, block->compact_pct_tenths > 0);
+    /* We should estimate the work only once. */
+    WT_ASSERT(session, !block->compact_estimated);
 
     /*
      * Get the average block size that we encountered so far during compaction. Note that we are not
@@ -286,9 +283,10 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
         if (write_off >= compact_start_off)
             break;
         __wt_verbose_debug2(session, WT_VERB_COMPACT,
-          "%s: estimating -- pass %d: file size: %" PRId64 ", compact offset: %" PRId64
-          ", will move blocks from the last %d%% of the file",
-          block->name, iteration, file_size, compact_start_off, compact_pct_tenths * 10);
+          "%s: estimating -- pass %d: file size: %" PRId64 " MB (%" PRId64
+          "B), compact offset: %" PRId64 ", will move blocks from the last %d%% of the file",
+          block->name, iteration, file_size / WT_MEGABYTE, file_size, compact_start_off,
+          compact_pct_tenths * 10);
 
         /*
          * Estimate how many pages we would like to move, just using the live checkpoint. The
@@ -373,7 +371,7 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
         __wt_verbose_debug2(session, WT_VERB_COMPACT,
           "%s: estimating -- pass %d: will rewrite %" PRIu64 " pages, next write offset: %" PRId64
           ", extra space: %" PRId64,
-          block->name, iteration, pages_to_move_orig, write_off, extra_space);
+          block->name, iteration, pages_to_move_orig - pages_to_move, write_off, extra_space);
 
         /* See if we ran out of pages to move. */
         if (pages_to_move > 0)
@@ -392,6 +390,7 @@ __block_compact_estimate_remaining_work(WT_SESSION_IMPL *session, WT_BLOCK *bloc
 
     __wt_spin_unlock(session, &block->live_lock);
 
+    block->compact_estimated = true;
     block->compact_pages_rewritten_expected = block->compact_pages_rewritten + total_pages_to_move;
     __wt_verbose_debug1(session, WT_VERB_COMPACT,
       "%s: expecting to move approx. %" PRIu64 " more pages (%" PRIu64 "MB), %" PRIu64
@@ -503,10 +502,11 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
  * __compact_page_skip --
  *     Return if writing a particular page will shrink the file.
  */
-static void
+static int
 __compact_page_skip(
   WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset, uint32_t size, bool *skipp)
 {
+    WT_DECL_RET;
     WT_EXT *ext;
     WT_EXTLIST *el;
     wt_off_t limit;
@@ -541,9 +541,18 @@ __compact_page_skip(
     else
         ++block->compact_pages_rewritten;
 
-    /* Estimate how much work is left. */
-    if (block->compact_pages_rewritten_expected == 0)
+    /*
+     * We must have reviewed at least some interesting number of pages for any estimates below to be
+     * worthwhile.
+     */
+    if (!block->compact_estimated && block->compact_pages_reviewed >= WT_THOUSAND) {
         __block_compact_estimate_remaining_work(session, block);
+        /* If no potential work has been found, exit compaction. */
+        if (block->compact_pages_rewritten_expected == 0)
+            ret = ECANCELED;
+    }
+
+    return (ret);
 }
 
 /*
@@ -565,9 +574,7 @@ __wt_block_compact_page_skip(
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
-    __compact_page_skip(session, block, offset, size, skipp);
-
-    return (0);
+    return (__compact_page_skip(session, block, offset, size, skipp));
 }
 
 /*
@@ -594,7 +601,7 @@ __wt_block_compact_page_rewrite(
       session, block, addr, *addr_sizep, &objectid, &offset, &size, &checksum));
 
     /* Check if the block is worth rewriting. */
-    __compact_page_skip(session, block, offset, size, skipp);
+    WT_ERR(__compact_page_skip(session, block, offset, size, skipp));
 
     if (*skipp)
         return (0);
