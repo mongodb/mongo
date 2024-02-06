@@ -72,9 +72,8 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source,requires_latch_analyzer
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -138,9 +137,8 @@ buildvariants:
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source,requires_latch_analyzer
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
@@ -270,8 +268,7 @@ buildvariants:
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2
     multiversion_edition: enterprise
@@ -393,8 +390,7 @@ buildvariants:
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2
     multiversion_edition: enterprise
@@ -565,8 +561,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
@@ -678,8 +673,7 @@ buildvariants:
       --linker=gold
       --link-model=object
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
@@ -842,8 +836,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
@@ -958,8 +951,7 @@ buildvariants:
       --linker=gold
       --link-model=object
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
-    # TODO BUILD-13887 should fix uses_pykmip incompatibility.
-    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0,requires_external_data_source,requires_latch_analyzer
+    test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,requires_v4_0,requires_external_data_source,requires_latch_analyzer
     has_packages: true
     multiversion_platform: amazon2023
     multiversion_edition: enterprise
@@ -1060,7 +1052,7 @@ buildvariants:
   - amazon2-test
   expansions:
     test_flags: >-
-      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,uses_pykmip,requires_external_data_source,requires_latch_analyzer
+      --excludeWithAnyTags=SERVER-34286,incompatible_with_amazon_linux,requires_external_data_source,requires_latch_analyzer
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
