@@ -49,4 +49,8 @@ echo 'scan-build output differs from expected:'
 echo '<<<<<<<<<< Expected >>>>>>>>>> Current'
 echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 diff dist/s_clang_scan.diff $t_out_filtered
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+echo 'scan-build output:'
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+cat $t_out
 exit 1
