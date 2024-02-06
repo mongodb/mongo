@@ -147,7 +147,8 @@ protected:
         node->setCommandReply("ping", BSON("ok" << 1));
 
         if (node->isRunning()) {
-            const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto opmsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
             const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
             _net->scheduleSuccessfulResponse(noi, RemoteCommandResponse(reply, Milliseconds(0)));
         } else {

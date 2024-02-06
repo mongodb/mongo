@@ -133,8 +133,10 @@ protected:
         BSONObj cmdObj = fromjson(findCmd);
 
         // If there is no '$db', append it.
-        auto cmd = OpMsgRequest::fromDBAndBody(
-                       DatabaseName::createDatabaseName_forTest(boost::none, "test"), cmdObj)
+        auto cmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                       DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                       auth::ValidatedTenancyScope::get(_opCtx.get()),
+                       cmdObj)
                        .body;
         auto findCommand =
             query_request_helper::makeFromFindCommandForTests(cmd, NamespaceString());

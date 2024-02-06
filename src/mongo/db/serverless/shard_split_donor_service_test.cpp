@@ -321,7 +321,8 @@ bool processReplSetStepUpRequest(executor::NetworkInterfaceMock* net,
         if (commandName == cmdObj.firstElementFieldName() && !statusToReturn.isOK()) {
             net->scheduleErrorResponse(noi, statusToReturn);
         } else {
-            const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto opmsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
             const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
             net->scheduleSuccessfulResponse(
                 noi, executor::RemoteCommandResponse(reply, Milliseconds(0)));
@@ -356,7 +357,8 @@ void processIncomingRequest(executor::NetworkInterfaceMock* net,
         return;
     }
 
-    const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+    const auto opmsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        request.dbname, request.validatedTenancyScope(), request.cmdObj);
     const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
     net->scheduleSuccessfulResponse(noi, executor::RemoteCommandResponse(reply, Milliseconds(0)));
 }

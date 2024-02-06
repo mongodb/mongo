@@ -147,7 +147,9 @@ Future<executor::TaskExecutor::ResponseStatus> AsyncWorkScheduler::scheduleRemot
             auto start = _executor->now();
 
             auto requestOpMsg =
-                OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, commandObj).serialize();
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    DatabaseName::kAdmin, auth::ValidatedTenancyScope::get(opCtx), commandObj)
+                    .serialize();
             const auto replyOpMsg = OpMsg::parseOwned(service->getService(ClusterRole::ShardServer)
                                                           ->getServiceEntryPoint()
                                                           ->handleRequest(opCtx, requestOpMsg)

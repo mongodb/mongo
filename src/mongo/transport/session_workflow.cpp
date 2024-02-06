@@ -362,9 +362,11 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
         const auto& [cmd, firstElement] = body.firstElement();
         if (cmd != "getMore"_sd)
             return false;
-        sep->handleRequest(client->makeOperationContext().get(),
-                           OpMsgRequest::fromDBAndBody(
+        auto opCtx = client->makeOperationContext();
+        sep->handleRequest(opCtx.get(),
+                           OpMsgRequestBuilder::createWithValidatedTenancyScope(
                                inRequest.getDbName(),
+                               auth::ValidatedTenancyScope::get(opCtx.get()),
                                KillCursorsCommandRequest(
                                    NamespaceStringUtil::deserialize(inRequest.getDbName(),
                                                                     body["collection"].String()),

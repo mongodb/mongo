@@ -269,12 +269,6 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
     throw;
 }
 
-OpMsgRequest OpMsgRequest::fromDBAndBody(const DatabaseName& db,
-                                         BSONObj body,
-                                         const BSONObj& extraFields) {
-    return OpMsgRequestBuilder::create(db, std::move(body), extraFields);
-}
-
 boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
     if (auto tenant = body.getField("$tenant")) {
         return TenantId::parseFromBSON(tenant);

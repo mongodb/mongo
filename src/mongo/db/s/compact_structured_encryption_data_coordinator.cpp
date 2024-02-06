@@ -92,7 +92,10 @@ template <typename Request>
 Status doRunCommand(OperationContext* opCtx, const DatabaseName& dbname, const Request& request) {
     DBDirectClient client(opCtx);
     BSONObj cmd = request.toBSON(kMajorityWriteConcern);
-    auto reply = client.runCommand(OpMsgRequest::fromDBAndBody(dbname, cmd))->getCommandReply();
+    auto reply = client
+                     .runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                         dbname, auth::ValidatedTenancyScope::get(opCtx), cmd))
+                     ->getCommandReply();
     return getStatusFromCommandResult(reply);
 }
 

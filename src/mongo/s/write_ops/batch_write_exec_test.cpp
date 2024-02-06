@@ -114,7 +114,8 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
                                                   const executor::RemoteCommandRequest& request) {
     ASSERT_EQUALS(nss.dbName(), request.dbname);
 
-    const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+    const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        request.dbname, request.validatedTenancyScope(), request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
     ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns_forTest());
 
@@ -159,7 +160,8 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
                                                     const executor::RemoteCommandRequest& request) {
     ASSERT_EQUALS(nss.dbName(), request.dbname);
 
-    const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+    const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        request.dbname, request.validatedTenancyScope(), request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
     ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns_forTest());
 
@@ -211,7 +213,8 @@ BSONObj expectInsertsReturnTenantMigrationAbortedErrorsBase(
     int numberOfFailedOps) {
     ASSERT_EQUALS(nss.dbName(), request.dbname);
 
-    const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+    const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        request.dbname, request.validatedTenancyScope(), request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
     ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns_forTest());
 
@@ -256,7 +259,8 @@ BSONObj expectInsertsReturnCannotRefreshErrorsBase(const NamespaceString& nss,
                                                    const executor::RemoteCommandRequest& request) {
     ASSERT_EQUALS(nss.dbName(), request.dbname);
 
-    const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+    const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        request.dbname, request.validatedTenancyScope(), request.cmdObj));
     const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
     ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns_forTest());
 
@@ -355,7 +359,8 @@ public:
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQUALS(nss.dbName(), request.dbname);
 
-            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj));
             const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
             ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns_forTest());
 
@@ -410,8 +415,8 @@ public:
             try {
                 ASSERT_EQUALS(nss.dbName(), request.dbname);
 
-                const auto opMsgRequest(
-                    OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+                const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    request.dbname, request.validatedTenancyScope(), request.cmdObj));
                 const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
                 ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns_forTest());
 
@@ -567,7 +572,8 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
             response.setNModified(1);
 
             // Check that let params and runtimeConstants are propigated to shards.
-            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj));
             const auto actualBatchedUpdate(BatchedCommandRequest::parseUpdate(opMsgRequest));
             ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
             ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getLocalNow(),
@@ -666,7 +672,8 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
             response.setStatus(Status::OK());
 
             // Check that let params are propigated to shards.
-            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj));
             const auto actualBatchedUpdate(BatchedCommandRequest::parseDelete(opMsgRequest));
             ASSERT_BSONOBJ_EQ(let, actualBatchedUpdate.getLet().value_or(BSONObj()));
             ASSERT_EQUALS(actualBatchedUpdate.getLegacyRuntimeConstants()->getLocalNow(),
@@ -3793,8 +3800,8 @@ public:
     void expectInsertsReturnTransientTxnErrors(const std::vector<BSONObj>& expected) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQUALS(nss.dbName(), request.dbname);
-
-            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto opMsgRequest(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj));
             const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
             ASSERT_EQUALS(nss.toString_forTest(), actualBatchedInsert.getNS().ns_forTest());
 

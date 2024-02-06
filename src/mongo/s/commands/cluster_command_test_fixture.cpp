@@ -157,9 +157,11 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
 
     // If bulkWrite then append adminDB.
     if (cmd.firstElementFieldNameStringData() == "bulkWrite") {
-        opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, cmd);
+        opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            DatabaseName::kAdmin, auth::ValidatedTenancyScope::kNotRequired, cmd);
     } else {
-        opMsgRequest = OpMsgRequest::fromDBAndBody(kNss.dbName(), cmd);
+        opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            kNss.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), cmd);
     }
 
     AlternativeClientRegion acr(client);

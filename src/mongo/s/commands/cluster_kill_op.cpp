@@ -126,7 +126,10 @@ private:
         BSONObjBuilder bob(BSON("killOp" << 1 << "op" << opId));
         APIParameters::get(opCtx).appendInfo(&bob);
         // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, bob.obj()));
+        conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            DatabaseName::kAdmin,
+            auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+            bob.obj()));
         conn.done();
 
         // The original behavior of killOp on mongos is to always return success, regardless of

@@ -1200,16 +1200,6 @@ TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
     ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);
 }
 
-TEST(OpMsgRequest, FromDbAndBodyDoesNotCopy) {
-    auto body = fromjson("{ping: 1}");
-    const void* const bodyPtr = body.objdata();
-    auto msg = OpMsgRequest::fromDBAndBody(
-        DatabaseName::createDatabaseName_forTest(boost::none, "db"), std::move(body));
-
-    ASSERT_BSONOBJ_EQ(msg.body, fromjson("{ping: 1, $db: 'db'}"));
-    ASSERT_EQ(static_cast<const void*>(msg.body.objdata()), bodyPtr);
-}
-
 TEST(OpMsgTest, ChecksumResizesMessage) {
     auto msg = OpMsgBytes{kNoFlags,  //
                           kBodySection,

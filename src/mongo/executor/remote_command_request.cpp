@@ -116,12 +116,8 @@ RemoteCommandRequestBase::RemoteCommandRequestBase()
     : id(requestIdCounter.addAndFetch(1)), operationKey(UUID::gen()) {}
 
 RemoteCommandRequestBase::operator OpMsgRequest() const {
-    OpMsgRequest opMsgRequest =
-        OpMsgRequest::fromDBAndBody(this->dbname, std::move(this->cmdObj), this->metadata);
-    if (this->validatedTenancyScope()) {
-        opMsgRequest.validatedTenancyScope = this->validatedTenancyScope();
-    }
-    return opMsgRequest;
+    return OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        this->dbname, this->validatedTenancyScope(), std::move(this->cmdObj), this->metadata);
 }
 
 void RemoteCommandRequestBase::_updateTimeoutFromOpCtxDeadline(const OperationContext* opCtx) {

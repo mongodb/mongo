@@ -492,7 +492,10 @@ protected:
             createAddShardCmd(operationContext(), expectedShardName),
             ShardingCatalogClient::kMajorityWriteConcern);
 
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, upsertCmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            DatabaseName::kAdmin,
+            auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+            upsertCmdObj);
         expectUpdatesReturnSuccess(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    UpdateOp::parse(opMsgRequest));
@@ -507,7 +510,10 @@ protected:
             createAddShardCmd(operationContext(), expectedShardName),
             ShardingCatalogClient::kMajorityWriteConcern);
 
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, upsertCmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            DatabaseName::kAdmin,
+            auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+            upsertCmdObj);
         expectUpdatesReturnFailure(expectedHost,
                                    NamespaceString(NamespaceString::kServerConfigurationNamespace),
                                    UpdateOp::parse(opMsgRequest),
@@ -527,8 +533,8 @@ protected:
             // Check that the db name in the request matches the expected db name.
             ASSERT_EQUALS(expectedNss.dbName(), request.dbname);
 
-            const auto addShardOpMsgRequest =
-                OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto addShardOpMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
 
             auto addShardCmd =
                 AddShard::parse(IDLParserContext(AddShard::kCommandName), addShardOpMsgRequest);
@@ -536,8 +542,8 @@ protected:
             const auto& updateOpField = add_shard_util::createShardIdentityUpsertForAddShard(
                 addShardCmd, ShardingCatalogClient::kMajorityWriteConcern);
 
-            const auto updateOpMsgRequest =
-                OpMsgRequest::fromDBAndBody(request.dbname, updateOpField);
+            const auto updateOpMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), updateOpField);
 
             const auto updateOp = UpdateOp::parse(updateOpMsgRequest);
 
@@ -581,7 +587,8 @@ protected:
             // Check that the db name in the request matches the expected db name.
             ASSERT_EQUALS(expectedNss.dbName(), request.dbname);
 
-            const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
             const auto updateOp = UpdateOp::parse(opMsgRequest);
             ASSERT_EQUALS(expectedNss, expectedUpdateOp.getNamespace());
 

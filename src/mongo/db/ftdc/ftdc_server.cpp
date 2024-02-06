@@ -239,7 +239,11 @@ FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringDat
                                                                        StringData name,
                                                                        const DatabaseName& db,
                                                                        BSONObj cmdObj)
-    : _name(name.toString()), _request(OpMsgRequest::fromDBAndBody(db, std::move(cmdObj))) {
+    : _name(name.toString()),
+      _request(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+          db,
+          boost::none /* TODO SERVER-74464 investigate if tenant-aware. */,
+          std::move(cmdObj))) {
     invariant(command == _request.getCommandName());
 }
 
@@ -318,7 +322,10 @@ public:
 
         commandBuilder.done();
 
-        auto request = OpMsgRequest::fromDBAndBody(DatabaseName::kEmpty, commandBuilder.obj());
+        auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            DatabaseName::kEmpty,
+            boost::none /* TODO SERVER-74464 investigate if tenant-aware. */,
+            commandBuilder.obj());
         auto result = CommandHelpers::runCommandDirectly(opCtx, request);
 
         Status status = getStatusFromCommandResult(result);

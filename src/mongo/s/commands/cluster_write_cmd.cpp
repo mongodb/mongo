@@ -282,10 +282,10 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
 
     try {
         txn.run(opCtx,
-                [sharedBlock](const txn_api::TransactionClient& txnClient,
-                              ExecutorPtr txnExec) -> SemiFuture<void> {
+                [sharedBlock, opCtx](const txn_api::TransactionClient& txnClient,
+                                     ExecutorPtr txnExec) -> SemiFuture<void> {
                     return documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                               txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
+                               txnClient, opCtx, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
                         .thenRunOn(txnExec)
                         .then([sharedBlock](bool updatedShardKey) {
                             sharedBlock->updatedShardKey = updatedShardKey;
@@ -505,13 +505,14 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                                                          false /* isTimeseriesViewRequest */)) {
             // Explain currently cannot be run within a transaction, so each command is instead run
             // separately outside of a transaction, and we compose the results at the end.
+            auto vts = auth::ValidatedTenancyScope::get(opCtx);
             auto clusterQueryWithoutShardKeyExplainRes = [&] {
                 ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(
                     ClusterExplain::wrapAsExplain(req.toBSON(), verbosity));
                 const auto explainClusterQueryWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
                     clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
-                auto opMsg = OpMsgRequest::fromDBAndBody(nss.dbName(),
-                                                         explainClusterQueryWithoutShardKeyCmd);
+                auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), vts, explainClusterQueryWithoutShardKeyCmd);
                 return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
             }();
 
@@ -526,8 +527,9 @@ bool ClusterWriteCmd::runExplainWithoutShardKey(OperationContext* opCtx,
                     write_without_shard_key::targetDocForExplain);
                 const auto explainClusterWriteWithoutShardKeyCmd = ClusterExplain::wrapAsExplain(
                     clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
-                auto opMsg = OpMsgRequest::fromDBAndBody(nss.dbName(),
-                                                         explainClusterWriteWithoutShardKeyCmd);
+
+                auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), vts, explainClusterWriteWithoutShardKeyCmd);
                 return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
             }();
 

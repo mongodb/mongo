@@ -158,7 +158,8 @@ std::pair<DatabaseName, BSONObj> makeTargetWriteRequest(OperationContext* opCtx,
 
     // Parse into OpMsgRequest to append the $db field, which is required for command
     // parsing.
-    const auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, writeCmd);
+    const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        dbName, auth::ValidatedTenancyScope::get(opCtx), writeCmd);
 
     DatabaseName requestDbName = dbName;
     boost::optional<BulkWriteCommandRequest> bulkWriteRequest;
@@ -460,10 +461,12 @@ public:
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
             const auto shardId = ShardId(request().getShardId().toString());
+            auto vts = auth::ValidatedTenancyScope::get(opCtx);
             const auto writeCmdObj = [&] {
                 const auto explainCmdObj = request().getWriteCmd();
                 const auto opMsgRequestExplainCmd =
-                    OpMsgRequest::fromDBAndBody(ns().dbName(), explainCmdObj);
+                    OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                        ns().dbName(), vts, explainCmdObj);
                 auto explainRequest = ExplainCommandRequest::parse(
                     IDLParserContext("_clusterWriteWithoutShardKeyExplain"),
                     opMsgRequestExplainCmd.body);

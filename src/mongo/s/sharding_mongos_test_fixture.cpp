@@ -288,7 +288,9 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
         ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
 
         // If there is no '$db', append it.
-        auto cmd = OpMsgRequest::fromDBAndBody(nss.dbName(), request.cmdObj).body;
+        auto cmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                       nss.dbName(), request.validatedTenancyScope(), request.cmdObj)
+                       .body;
         auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
 
@@ -316,7 +318,8 @@ void ShardingTestFixture::expectInserts(const NamespaceString& nss,
     onCommand([&nss, &expected](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(nss.dbName(), request.dbname);
 
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto insertOp = InsertOp::parse(opMsgRequest);
         ASSERT_EQUALS(nss, insertOp.getNamespace());
 
@@ -346,7 +349,8 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
         ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
 
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(CollectionType::ConfigNS, updateOp.getNamespace());
 

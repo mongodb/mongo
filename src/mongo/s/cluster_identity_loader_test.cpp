@@ -94,7 +94,8 @@ public:
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
             ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigVersionNamespace);

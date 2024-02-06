@@ -83,9 +83,10 @@ StatusWith<OpMsgRequest> createMongoCRGetNonceCmd(const BSONObj& params) {
         return std::move(db.getStatus());
     }
 
-    return OpMsgRequest::fromDBAndBody(
+    return OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseNameUtil::deserialize(
             boost::none, db.getValue(), SerializationContext::stateDefault()),
+        auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
         kGetNonceCmd);
 }
 
@@ -120,10 +121,11 @@ OpMsgRequest createMongoCRAuthenticateCmd(const BSONObj& params, StringData nonc
         b << "key" << digestToString(d);
     }
 
-    return OpMsgRequest::fromDBAndBody(
+    return OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseNameUtil::deserialize(boost::none,
                                       uassertStatusOK(extractDBField(params)),
                                       SerializationContext::stateDefault()),
+        auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
         b.obj());
 }
 

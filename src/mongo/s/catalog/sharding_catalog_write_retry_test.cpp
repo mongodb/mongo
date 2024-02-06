@@ -173,7 +173,9 @@ TEST_F(InsertRetryTest, RetryOnNetworkErrorFails) {
 
 void assertFindRequestHasFilter(const RemoteCommandRequest& request, BSONObj filter) {
     // If there is no '$db', append it.
-    auto cmd = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj).body;
+    auto cmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                   request.dbname, request.validatedTenancyScope(), request.cmdObj)
+                   .body;
     auto query = query_request_helper::makeFromFindCommandForTests(cmd);
     ASSERT_BSONOBJ_EQ(filter, query->getFilter());
 }
@@ -302,7 +304,8 @@ TEST_F(InsertRetryTest, DuplicateKeyErrorAfterWriteConcernFailureMatch) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto insertOp = InsertOp::parse(opMsgRequest);
         ASSERT_EQUALS(kTestNamespace, insertOp.getNamespace());
 
@@ -359,7 +362,8 @@ TEST_F(UpdateRetryTest, Success) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(kTestNamespace, updateOp.getNamespace());
 
@@ -467,7 +471,8 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryOnceSuccessAfterRetry) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(kTestNamespace, updateOp.getNamespace());
 
@@ -501,7 +506,8 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(kTestNamespace, updateOp.getNamespace());
 
@@ -514,7 +520,8 @@ TEST_F(UpdateRetryTest, OperationInterruptedDueToPrimaryStepDown) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(kTestNamespace, updateOp.getNamespace());
 
@@ -548,7 +555,8 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(kTestNamespace, updateOp.getNamespace());
 
@@ -571,7 +579,8 @@ TEST_F(UpdateRetryTest, WriteConcernFailure) {
     });
 
     onCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(kTestNamespace, updateOp.getNamespace());
 

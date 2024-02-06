@@ -101,7 +101,7 @@ void BM_FIND_ONE_OP_MSG(benchmark::State& state) {
 
     auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
-        auth::ValidatedTenancyScope::kNotRequired,
+        auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
         doc);
 
     for (auto _ : state) {
@@ -169,7 +169,7 @@ void BM_INSERT_ONE_OP_MSG(benchmark::State& state) {
 
     auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
-        auth::ValidatedTenancyScope::kNotRequired,
+        auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
         doc);
     request.sequences.push_back({"documents", {getInsertDoc()}});
 
@@ -224,7 +224,7 @@ void BM_UPDATE_ONE_OP_MSG(benchmark::State& state) {
 
     auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
         DatabaseName::createDatabaseName_forTest(boost::none, "ycsb"),
-        auth::ValidatedTenancyScope::kNotRequired,
+        auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
         doc);
     request.sequences.push_back({"updates", {getUpdateDoc()}});
 

@@ -209,7 +209,10 @@ executor::RemoteCommandResponse initWireVersion(
     WireSpec::getWireSpec(getGlobalServiceContext()).appendInternalClientWireVersionIfNeeded(&bob);
 
     Date_t start{Date_t::now()};
-    auto result = conn->runCommand(OpMsgRequest::fromDBAndBody(DatabaseName::kAdmin, bob.obj()));
+    auto result = conn->runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        DatabaseName::kAdmin,
+        auth::ValidatedTenancyScope::kNotRequired /* admin is not per-tenant. */,
+        bob.obj()));
     Date_t finish{Date_t::now()};
 
     BSONObj helloObj = result->getCommandReply().getOwned();

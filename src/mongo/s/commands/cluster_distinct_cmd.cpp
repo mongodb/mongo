@@ -263,7 +263,9 @@ public:
             }
 
             auto viewAggCmd =
-                OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmdOnView.getValue()).body;
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView.getValue())
+                    .body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,

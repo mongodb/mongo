@@ -97,7 +97,8 @@ StatusWith<Shard::CommandResponse> RSLocalClient::runCommandOnce(OperationContex
         DBDirectClient client(opCtx);
 
         rpc::UniqueReply commandResponse =
-            client.runCommand(OpMsgRequest::fromDBAndBody(dbName, cmdObj));
+            client.runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                dbName, auth::ValidatedTenancyScope::get(opCtx), cmdObj));
 
         auto result = commandResponse->getCommandReply().getOwned();
         return Shard::CommandResponse(boost::none,

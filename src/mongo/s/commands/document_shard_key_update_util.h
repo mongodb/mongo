@@ -161,6 +161,7 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
  * inserted the new doc successfully.
  */
 SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txnClient,
+                                           OperationContext* opCtx,
                                            ExecutorPtr txnExec,
                                            const NamespaceString& nss,
                                            const WouldChangeOwningShardInfo& changeInfo,

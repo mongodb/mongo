@@ -82,8 +82,10 @@ public:
             bob << arg.firstElement();
         }
 
-        auto request = OpMsgRequest::fromDBAndBody(
-            DatabaseName::createDatabaseName_forTest(boost::none, kDB), bob.obj());
+        auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            DatabaseName::createDatabaseName_forTest(boost::none, kDB),
+            auth::ValidatedTenancyScope::kNotRequired,
+            bob.obj());
         return request;
     }
 

@@ -636,7 +636,8 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     // collection, the cursor yielded and while it yielded another node dropped the collection and
     // recreated it with different epoch and chunks.
     onFindCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto aggRequest = unittest::assertGet(
             aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
@@ -675,7 +676,8 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     // On the second retry attempt, return the correct set of chunks from the recreated collection
     ChunkVersion newVersion({newEpoch, newTimestamp}, {5, 0});
     onFindCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto aggRequest = unittest::assertGet(
             aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
@@ -749,7 +751,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
 
     // Return collection with a different epoch and a set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto aggRequest = unittest::assertGet(
             aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
@@ -814,7 +817,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
 
     // Return set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
-        const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto aggRequest = unittest::assertGet(
             aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();

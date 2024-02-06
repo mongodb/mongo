@@ -322,10 +322,11 @@ void handleWouldChangeOwningShardErrorTransaction(
             inlineExecutor);
 
         txn.run(opCtx,
-                [sharedBlock, fleCrudProcessed](const txn_api::TransactionClient& txnClient,
-                                                ExecutorPtr txnExec) -> SemiFuture<void> {
+                [opCtx, sharedBlock, fleCrudProcessed](const txn_api::TransactionClient& txnClient,
+                                                       ExecutorPtr txnExec) -> SemiFuture<void> {
                     return documentShardKeyUpdateUtil::updateShardKeyForDocument(
                                txnClient,
+                               opCtx,
                                txnExec,
                                sharedBlock->nss,
                                sharedBlock->changeInfo,
@@ -1003,8 +1004,10 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
         ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(cmdObjForPassthrough);
         const auto explainClusterQueryWithoutShardKeyCmd =
             ClusterExplain::wrapAsExplain(clusterQueryWithoutShardKeyCommand.toBSON({}), verbosity);
-        auto opMsg =
-            OpMsgRequest::fromDBAndBody(nss.dbName(), explainClusterQueryWithoutShardKeyCmd);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            nss.dbName(),
+            auth::ValidatedTenancyScope::get(opCtx),
+            explainClusterQueryWithoutShardKeyCmd);
         return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
     }();
 
@@ -1018,8 +1021,10 @@ void FindAndModifyCmd::_runExplainWithoutShardKey(OperationContext* opCtx,
             write_without_shard_key::targetDocForExplain);
         const auto explainClusterWriteWithoutShardKeyCmd =
             ClusterExplain::wrapAsExplain(clusterWriteWithoutShardKeyCommand.toBSON({}), verbosity);
-        auto opMsg =
-            OpMsgRequest::fromDBAndBody(nss.dbName(), explainClusterWriteWithoutShardKeyCmd);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            nss.dbName(),
+            auth::ValidatedTenancyScope::get(opCtx),
+            explainClusterWriteWithoutShardKeyCmd);
         return CommandHelpers::runCommandDirectly(opCtx, opMsg).getOwned();
     }();
 

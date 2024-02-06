@@ -76,7 +76,8 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
                                              const BSONObj& insertCmdObj,
                                              const DatabaseName& db,
                                              const bool shouldUpsert) {
-    auto deleteOpMsg = OpMsgRequest::fromDBAndBody(db, deleteCmdObj);
+    auto deleteOpMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        db, auth::ValidatedTenancyScope::get(opCtx), deleteCmdObj);
     auto deleteRequest = BatchedCommandRequest::parseDelete(deleteOpMsg);
 
     BatchedCommandResponse deleteResponse;
@@ -102,7 +103,8 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
         hangBeforeInsertOnUpdateShardKey.pauseWhileSet(opCtx);
     }
 
-    auto insertOpMsg = OpMsgRequest::fromDBAndBody(db, insertCmdObj);
+    auto insertOpMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        db, auth::ValidatedTenancyScope::get(opCtx), insertCmdObj);
     auto insertRequest = BatchedCommandRequest::parseInsert(insertOpMsg);
 
     BatchedCommandResponse insertResponse;
@@ -317,6 +319,7 @@ BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
 }
 
 SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txnClient,
+                                           OperationContext* opCtx,
                                            ExecutorPtr txnExec,
                                            const NamespaceString& nss,
                                            const WouldChangeOwningShardInfo& changeInfo,
@@ -326,14 +329,16 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
     auto deleteCmdObj = documentShardKeyUpdateUtil::constructShardKeyDeleteCmdObj(
         nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss,
         changeInfo.getPreImage().getOwned());
-    auto deleteOpMsg = OpMsgRequest::fromDBAndBody(nss.dbName(), std::move(deleteCmdObj));
+    auto vts = auth::ValidatedTenancyScope::get(opCtx);
+    auto deleteOpMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), std::move(deleteCmdObj));
     auto deleteRequest = BatchedCommandRequest::parseDelete(std::move(deleteOpMsg));
 
     // Retry history for this delete isn't necessary, but it can be part of a retryable transaction,
     // so send it with the uninitialized sentinel statement id to opt out of storing history.
     return txnClient.runCRUDOp(deleteRequest, {kUninitializedStmtId})
         .thenRunOn(txnExec)
-        .then([&txnClient, &nss, &changeInfo, fleCrudProcessed](
+        .then([&txnClient, &nss, &changeInfo, fleCrudProcessed, &vts](
                   auto deleteResponse) -> SemiFuture<BatchedCommandResponse> {
             uassertStatusOK(deleteResponse.toStatus());
 
@@ -359,7 +364,8 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
 
             auto insertCmdObj = documentShardKeyUpdateUtil::constructShardKeyInsertCmdObj(
                 nss, changeInfo.getPostImage().getOwned(), fleCrudProcessed);
-            auto insertOpMsg = OpMsgRequest::fromDBAndBody(nss.dbName(), std::move(insertCmdObj));
+            auto insertOpMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                nss.dbName(), vts, std::move(insertCmdObj));
             auto insertRequest = BatchedCommandRequest::parseInsert(std::move(insertOpMsg));
 
             // Same as for the insert, retry history isn't necessary so opt out with a sentinel

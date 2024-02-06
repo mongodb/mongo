@@ -416,8 +416,9 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // because otherwise changestreams won't receive the drop event.
                     {
                         DBDirectClient dbDirectClient(opCtx);
-                        const auto commandResponse =
-                            dbDirectClient.runCommand(OpMsgRequest::fromDBAndBody(_dbName, cmdObj));
+                        const auto commandResponse = dbDirectClient.runCommand(
+                            OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                                _dbName, auth::ValidatedTenancyScope::get(opCtx), cmdObj));
                         uassertStatusOK(
                             getStatusFromCommandResult(commandResponse->getCommandReply()));
 

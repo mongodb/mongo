@@ -469,9 +469,10 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     clearState();
 
     invariant(nss.isValid());
-
     // If there is no '$db', append it.
-    auto cmd = OpMsgRequest::fromDBAndBody(nss.dbName(), cmdObj).body;
+    auto cmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                   nss.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), cmdObj)
+                   .body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
@@ -495,7 +496,9 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     invariant(nss.isValid());
 
     // If there is no '$db', append it.
-    auto cmd = OpMsgRequest::fromDBAndBody(nss.dbName(), cmdObj).body;
+    auto cmd = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                   nss.dbName(), auth::ValidatedTenancyScope::get(opCtx.get()), cmdObj)
+                   .body;
     std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 

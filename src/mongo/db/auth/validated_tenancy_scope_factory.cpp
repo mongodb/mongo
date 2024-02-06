@@ -392,12 +392,8 @@ ValidatedTenancyScopeGuard::ValidatedTenancyScopeGuard(OperationContext* opCtx) 
 }
 
 ValidatedTenancyScopeGuard::~ValidatedTenancyScopeGuard() {
-    if (_validatedTenancyScope) {
-        ValidatedTenancyScope::set(_opCtx, _validatedTenancyScope);
-    }
-    if (_tenantProtocol) {
-        tenantProtocolDecoration(_opCtx->getClient()) = _tenantProtocol;
-    }
+    ValidatedTenancyScope::set(_opCtx, _validatedTenancyScope);
+    tenantProtocolDecoration(_opCtx->getClient()) = _tenantProtocol;
 };
 
 void ValidatedTenancyScopeGuard::runAsTenant(OperationContext* opCtx,

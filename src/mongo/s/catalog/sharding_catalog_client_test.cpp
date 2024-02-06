@@ -129,7 +129,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
             // Ensure the query is correct
@@ -208,7 +209,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigDatabasesNamespace);
@@ -346,7 +348,8 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
@@ -409,7 +412,8 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithDrainingShard) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
@@ -482,7 +486,8 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
             ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
@@ -547,7 +552,8 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
@@ -885,7 +891,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
@@ -944,7 +951,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
@@ -989,7 +997,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
@@ -1031,7 +1040,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigDatabasesNamespace);
@@ -1103,7 +1113,8 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         ASSERT_EQ(query->getNamespaceOrUUID().nss(), TagsType::ConfigNS);
@@ -1192,7 +1203,8 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const auto opMsgRequest = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        const auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         const auto updateOp = UpdateOp::parse(opMsgRequest);
         ASSERT_EQUALS(NamespaceString::kConfigDatabasesNamespace, updateOp.getNamespace());
 
@@ -1332,7 +1344,8 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
         ASSERT_EQ("config:123", request.target.toString());
         ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
 
@@ -1386,7 +1399,8 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
         ASSERT_EQ("config:123", request.target.toString());
         ASSERT_EQ(DatabaseName::kAdmin, request.dbname);
 
-        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+            request.dbname, request.validatedTenancyScope(), request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
         BSONObj expectedQuery(

@@ -101,7 +101,8 @@ protected:
             ASSERT_EQUALS(configHost, request.target);
             ASSERT_EQUALS(DatabaseName::kConfig, request.dbname);
 
-            const auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            const auto opMsg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                request.dbname, request.validatedTenancyScope(), request.cmdObj);
             const auto batchRequest(BatchedCommandRequest::parseInsert(opMsg));
             const auto& insertReq(batchRequest.getInsertRequest());
 

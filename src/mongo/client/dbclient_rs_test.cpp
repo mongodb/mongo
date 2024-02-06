@@ -151,10 +151,11 @@ void assertOneOfNodesSelected(MockReplicaSet* replSet,
     bool secondaryOk = (rp != ReadPreference::PrimaryOnly);
     auto tagSet = secondaryOk ? TagSet() : TagSet::primaryOnly();
     // We need the command to be a "SecOk command"
-    auto res = replConn.runCommand(
-        OpMsgRequest::fromDBAndBody(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
-                                    BSON("dbStats" << 1),
-                                    makeMetadata(rp, tagSet)));
+    auto res = replConn.runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+        auth::ValidatedTenancyScope::kNotRequired,
+        BSON("dbStats" << 1),
+        makeMetadata(rp, tagSet)));
     stdx::unordered_set<HostAndPort> hostSet;
     for (const auto& hostName : hostNames) {
         hostSet.emplace(hostName);
@@ -275,8 +276,9 @@ void assertRunCommandWithReadPrefThrows(MockReplicaSet* replSet, ReadPreference 
     TagSet ts = isPrimaryOnly ? TagSet::primaryOnly() : TagSet();
 
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
-    ASSERT_THROWS(replConn.runCommand(OpMsgRequest::fromDBAndBody(
+    ASSERT_THROWS(replConn.runCommand(OpMsgRequestBuilder::createWithValidatedTenancyScope(
                       DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                      auth::ValidatedTenancyScope::kNotRequired,
                       BSON("dbStats" << 1),
                       makeMetadata(rp, ts))),
                   AssertionException);

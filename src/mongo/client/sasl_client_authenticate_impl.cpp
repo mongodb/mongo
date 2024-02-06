@@ -249,7 +249,11 @@ Future<void> asyncSaslConversation(auth::RunCommandHook runCommand,
     // Asynchronously continue the conversation
     const auto dbName = DatabaseNameUtil::deserialize(
         boost::none, targetDatabase, SerializationContext::stateDefault());
-    return runCommand(OpMsgRequest::fromDBAndBody(dbName, commandBuilder.obj()))
+    return runCommand(
+               OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                   dbName,
+                   auth::ValidatedTenancyScope::kNotRequired /* TODO SERVER-86582 investigate */,
+                   commandBuilder.obj()))
         .then([runCommand, session, targetDatabase, saslLogLevel](
                   BSONObj serverResponse) -> Future<void> {
             auto status = getStatusFromCommandResult(serverResponse);

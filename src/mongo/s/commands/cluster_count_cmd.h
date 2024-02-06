@@ -161,7 +161,10 @@ public:
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             auto aggCmdOnView =
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
-            auto aggCmdOnViewObj = OpMsgRequest::fromDBAndBody(dbName, aggCmdOnView).body;
+            auto aggCmdOnViewObj =
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    dbName, auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView)
+                    .body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
@@ -174,7 +177,9 @@ public:
                 aggregation_request_helper::serializeToCommandObj(resolvedAggRequest);
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx, OpMsgRequest::fromDBAndBody(dbName, std::move(resolvedAggCmd)));
+                opCtx,
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    dbName, auth::ValidatedTenancyScope::get(opCtx), std::move(resolvedAggCmd)));
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);
@@ -282,7 +287,9 @@ public:
             }
 
             auto aggCmdOnViewObj =
-                OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmdOnView.getValue()).body;
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView.getValue())
+                    .body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,

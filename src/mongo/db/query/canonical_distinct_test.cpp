@@ -103,7 +103,9 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationNoQuery) {
     auto agg = cd.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg.getValue())
+                      .body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -141,7 +143,9 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationDottedPathNoQuery) {
     auto agg = cd.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg.getValue())
+                      .body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -192,7 +196,9 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithAllOptions) {
     auto agg = cd.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg.getValue())
+                      .body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -237,7 +243,9 @@ TEST_F(CanonicalDistinctTest, ConvertToAggregationWithQuery) {
     auto agg = cd.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg.getValue())
+                      .body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
@@ -278,7 +286,9 @@ TEST_F(CanonicalDistinctTest, ExplainNotIncludedWhenConvertingToAggregationComma
 
     ASSERT_FALSE(agg.getValue().hasField("explain"));
 
-    auto cmdObj = OpMsgRequest::fromDBAndBody(testns.dbName(), agg.getValue()).body;
+    auto cmdObj = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                      testns.dbName(), auth::ValidatedTenancyScope::kNotRequired, agg.getValue())
+                      .body;
     auto ar = aggregation_request_helper::parseFromBSONForTests(testns, cmdObj);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
