@@ -507,9 +507,9 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
     WT_ERR_NOTFOUND_OK(ret, false);
 
     if (S2C(session)->prefetch_auto_on)
-        F_SET(session, WT_SESSION_PREFETCH);
+        F_SET(session, WT_SESSION_PREFETCH_ENABLED);
     else
-        F_CLR(session, WT_SESSION_PREFETCH);
+        F_CLR(session, WT_SESSION_PREFETCH_ENABLED);
 
     /*
      * Override any connection-level pre-fetch settings if a specific session-level setting was
@@ -518,14 +518,14 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
     if (__wt_config_gets(session, cfg + 1, "prefetch.enabled", &cval) != WT_NOTFOUND) {
         if (cval.val) {
             if (!S2C(session)->prefetch_available) {
-                F_CLR(session, WT_SESSION_PREFETCH);
+                F_CLR(session, WT_SESSION_PREFETCH_ENABLED);
                 WT_ERR_MSG(session, EINVAL,
                   "pre-fetching cannot be enabled for the session if pre-fetching is configured as "
                   "unavailable");
             } else
-                F_SET(session, WT_SESSION_PREFETCH);
+                F_SET(session, WT_SESSION_PREFETCH_ENABLED);
         } else
-            F_CLR(session, WT_SESSION_PREFETCH);
+            F_CLR(session, WT_SESSION_PREFETCH_ENABLED);
     }
 
     WT_ERR_NOTFOUND_OK(ret, false);

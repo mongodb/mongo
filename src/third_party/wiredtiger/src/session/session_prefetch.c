@@ -30,7 +30,7 @@ __wt_session_prefetch_check(WT_SESSION_IMPL *session, WT_REF *ref)
      * least one page from disk. The result of this function will subsequently be checked by cursor
      * logic to determine if pre-fetching will be performed.
      */
-    if (!F_ISSET(session, WT_SESSION_PREFETCH)) {
+    if (!F_ISSET(session, WT_SESSION_PREFETCH_ENABLED)) {
         WT_STAT_CONN_INCR(session, block_prefetch_skipped);
         return (false);
     }
