@@ -201,19 +201,6 @@ tasks:
       move_outputs: "--move-output=build/install/dist-test/pretty_printer_tests.txt:build/"
   - func: "run tests"
 
-- name: tooling_metrics_test
-  tags: ["assigned_to_jira_team_devprod_correctness"]
-  depends_on: []
-  commands:
-  - func: "f_expansions_write"
-  - func: "do non-compile setup"
-  - func: "set up remote credentials"
-  - func: "f_expansions_write"
-  - func: "configure evergreen api credentials"
-  - func: "run tests"
-    vars:
-      resmoke_jobs_max: 1
-
 - <<: *gen_task_template
   name: unittest_shell_hang_analyzer_gen
   tags: ["assigned_to_jira_team_devprod_correctness"]
