@@ -1432,5 +1432,22 @@ TEST_F(AuthorizationSessionTest, MayBypassWriteBlockingModeIsSetCorrectly) {
     ASSERT_FALSE(authzSession->mayBypassWriteBlockingMode());
 }
 
+TEST_F(AuthorizationSessionTest, InternalSystemClientsBypassValidateRestrictions) {
+    // set up a direct client without transport session
+    auto client = getServiceContext()->makeClient("directClient");
+    // set Client user to be the internal __system user.
+    authzSession->grantInternalAuthorization(client.get());
+    auto opCtx = client->makeOperationContext();
+
+    // invalidate the __system user to force the next request to validate restrictions
+    (*internalSecurity.getUser())->invalidate();
+
+    // should not fail even though client does not have a transport session
+    authzSession->startRequest(opCtx.get());
+
+    User* currentUser = authzSession->getSingleUser();
+    ASSERT_OK(currentUser->validateRestrictions(opCtx.get()));
+}
+
 }  // namespace
 }  // namespace mongo
