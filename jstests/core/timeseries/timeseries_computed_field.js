@@ -332,6 +332,20 @@ TimeseriesTest.run((insert) => {
     }
 
     {
+        // Try a replaceRoot stage which remove all fields.
+        const res = coll.aggregate([
+                            {$match: {"time": {$gte: new Date(datePrefix + 200)}}},
+                            {$addFields: {}},
+                            {$project: {"measurement0": {$floor: "$topLevelScalar"}}},
+                            {$replaceRoot: {newRoot: {}}}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 2, res);
+        assert.eq(res[0], {}, res);
+        assert.eq(res[1], {}, res);
+    }
+
+    {
         const res = coll.aggregate([{
                             "$project": {
                                 "t": {

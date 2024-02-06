@@ -496,6 +496,12 @@ std::vector<PlanStageSlots::OwnedSlotName> PlanStageSlots::getRequiredNamesInOrd
     std::vector<OwnedSlotName> names(reqs._data->slotNameSet.begin(),
                                      reqs._data->slotNameSet.end());
 
+    // Always treat as required, if it present, the slot holding the bitmap with the filtered items
+    // of block values.
+    if (has(kBlockSelectivityBitmap)) {
+        names.emplace_back(kBlockSelectivityBitmap);
+    }
+
     // If this PlanStageSlots has ResultInfo and 'reqs.hasResult()' is true, then we need
     // to get the list of changed fields and add them to 'names'.
     if (reqs.hasResult() && hasResultInfo()) {
