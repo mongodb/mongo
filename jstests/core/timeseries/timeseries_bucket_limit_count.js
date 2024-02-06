@@ -32,7 +32,7 @@ TimeseriesTest.run((insert) => {
 
         let docs = [];
         for (let i = 0; i < numDocs; i++) {
-            docs.push({_id: i, [timeFieldName]: ISODate(), x: i});
+            docs.push({_id: i, [timeFieldName]: ISODate("2024-01-01T01:00:00Z"), x: i});
             if ((i + 1) % numDocsPerInsert === 0) {
                 assert.commandWorked(insert(coll, docs), 'failed to insert docs: ' + tojson(docs));
                 docs = [];
