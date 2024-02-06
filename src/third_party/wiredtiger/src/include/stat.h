@@ -409,7 +409,6 @@ struct __wt_connection_stats {
     int64_t block_prefetch_skipped_internal_session;
     int64_t block_prefetch_skipped_special_handle;
     int64_t block_prefetch_pages_fail;
-    int64_t block_prefetch_page_not_queued;
     int64_t block_prefetch_pages_queued;
     int64_t block_prefetch_pages_read;
     int64_t block_prefetch_attempts;
