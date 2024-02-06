@@ -956,18 +956,13 @@ class BSONIteratorSorted {
     BSONIteratorSorted& operator=(const BSONIteratorSorted&) = delete;
 
 public:
-    ~BSONIteratorSorted() {
-        MONGO_verify(_fields);
-    }
-
     bool more() {
-        return _cur < _nfields;
+        return _cur < static_cast<int>(_fields.size());
     }
 
     BSONElement next() {
-        MONGO_verify(_fields);
-        if (_cur < _nfields) {
-            const auto& element = _fields[_cur++];
+        if (_cur < static_cast<int>(_fields.size())) {
+            const auto& element = _fields.at(_cur++);
             return BSONElement(element.fieldName.rawData() - 1,  // Include type byte
                                element.fieldName.size() + 1,     // Add null terminator
                                element.totalSize);
@@ -981,12 +976,11 @@ protected:
     BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& cmp);
 
 private:
-    const int _nfields;
     struct Field {
         StringData fieldName;
         int totalSize;
     };
-    const std::unique_ptr<Field[]> _fields;
+    std::vector<Field> _fields;
     int _cur;
 };
 

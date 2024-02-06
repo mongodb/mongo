@@ -932,15 +932,14 @@ bool BSONIteratorSorted::ElementFieldCmp::operator()(const Field& lhs, const Fie
 }
 
 BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& cmp)
-    : _nfields(o.nFields()), _fields(std::make_unique<Field[]>(_nfields)) {
+    : _fields(o.nFields()) {
     int x = 0;
     BSONObjIterator i(o);
     while (i.more()) {
         auto elem = i.next();
-        _fields[x++] = {elem.fieldNameStringData(), elem.size()};
+        _fields.at(x++) = {elem.fieldNameStringData(), elem.size()};
     }
-    MONGO_verify(x == _nfields);
-    std::sort(_fields.get(), _fields.get() + _nfields, cmp);
+    std::sort(_fields.begin(), _fields.end(), cmp);
     _cur = 0;
 }
 
