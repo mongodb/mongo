@@ -552,7 +552,8 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
             # always get back to original directory
             os.chdir(self.origcwd)
 
-        self.pr('passed=' + str(passed))
+        if not self.skipped:
+            self.pr('passed=' + str(passed))
         self.pr('skipped=' + str(self.skipped))
 
         # Clean up unless there's a failure
@@ -579,11 +580,6 @@ class WiredTigerTestCase(abstract_test_case.AbstractWiredTigerTestCase):
             self.pr('preserving directory ' + self.testdir)
         if WiredTigerTestCase._verbose > 2:
             self.prhead('TEST COMPLETED')
-
-    # Returns None if testcase is running.  If during (or after) tearDown,
-    # will return True or False depending if the test case failed.
-    def failed(self):
-        return self._failed
 
     def backup(self, backup_dir, session=None):
         if session is None:
