@@ -51,6 +51,10 @@ public:
         return {};
     }
 
+    bool isInitialSource() const final {
+        return true;
+    }
+
     bool isDocuments() const final {
         return true;
     }
