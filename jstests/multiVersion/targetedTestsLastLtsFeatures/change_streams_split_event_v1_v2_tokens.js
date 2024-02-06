@@ -103,9 +103,8 @@ expectedEvents.push({operationType: "delete", documentKey: {_id: "b", shard: 2}}
 assert.commandWorked(
     st.s.adminCommand({refineCollectionShardKey: testColl.getFullName(), key: {shard: 1, _id: 1}}));
 
-// Produces no events on v6.0.
 assert.commandWorked(st.s.adminCommand({reshardCollection: testColl.getFullName(), key: {_id: 1}}));
-// TODO BACKPORT-17707: Add 'reshardCollection' to 'expectedEvents' here.
+expectedEvents.push({operationType: "reshardCollection"});
 
 assert.commandWorked(testColl.dropIndex({largeField: 1}));
 expectedEvents.push({operationType: "dropIndexes"});
@@ -136,11 +135,7 @@ function assertEventMatches(event, expectedEvent, errorMsg) {
 // Asserts the next change event with the given pipeline and options matches the expected event.
 // Returns the resume token of the matched event on success.
 function assertNextChangeEvent(expectedEvent, pipeline, options) {
-    // Skip 'reshardCollection' events, as they are suppressed by v6.0, but not by v7.0 (BF-30743).
-    // TODO BACKPORT-17707: Remove 'reshardCollectionFilter'.
-    const reshardCollectionFilter = {$match: {operationType: {$ne: "reshardCollection"}}};
-    const csCursor = testDB.watch([reshardCollectionFilter, ...pipeline],
-                                  {showExpandedEvents: true, ...options});
+    const csCursor = testDB.watch([...pipeline], {showExpandedEvents: true, ...options});
     const errorMsg = "could not retrieve the expected event matching " + tojson(expectedEvent);
     assert.doesNotThrow(() => assert.soon(() => csCursor.hasNext()), [], errorMsg);
     const event = csCursor.next();
