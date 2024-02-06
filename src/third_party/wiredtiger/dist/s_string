@@ -3,7 +3,8 @@
 # Check spelling in comments and quoted strings from the source files.
 
 t=__wt.$$
-trap 'rm -f $t' 0 1 2 3 13 15
+trap 'rm -f $t; exit $exit_val' 0 1 2 3 13 15
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit $?
 
 # Insulate against locale-specific sort order
 LC_ALL=C
@@ -47,14 +48,24 @@ check() {
 }
 
 # List of files to spellchk.
-l=$(cd .. &&
-    find bench examples ext src test -name '*.[chsy]' &&
-    find src -name '*.in' &&
-    find test -name '*.cpp')
+if [[ "$1" = "-F" ]]; then
+    last_commit_from_dev=$(python3 common_functions.py last_commit_from_dev)
+    l=$(cd ..
+        git diff --name-only "${last_commit_from_dev}" bench examples ext src test | grep -E '\.[chsy]$'
+        git diff --name-only "${last_commit_from_dev}" src | grep -E '\.in$'
+        git diff --name-only "${last_commit_from_dev}" test | grep -E '\.cpp$'
+    )
+else
+    l=$(cd .. &&
+        find bench examples ext src test -name '*.[chsy]' &&
+        find src -name '*.in' &&
+        find test -name '*.cpp'
+    )
+fi
 
 usage()
 {
-    echo 'usage: s_string [-r]' >&2
+    echo 'usage: s_string [-F] [-r]' >&2
     exit 1
 }
 
@@ -85,6 +96,7 @@ while :
             echo "No need to update the $custom_words list."
         fi
         shift;;
+    -F) FAST=1; shift;;
     *)
         test "$#" -eq 0 || usage
         break;;

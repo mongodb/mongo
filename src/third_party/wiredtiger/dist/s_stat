@@ -3,6 +3,8 @@
 # Complain about unused statistics fields.
 t=__wt.$$
 trap 'rm -f $t' 0 1 2 3 13 15
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")" || exit $?
+[[ `uname -s` == Darwin ]] && EGREP="./pygrep.py -E" FGREP="./pygrep.py -F" || EGREP=egrep FGREP=fgrep
 
 # List of files to search: skip stat.c, it lists all of the fields by
 # definition.
@@ -13,11 +15,11 @@ l=`sed \
     -e 's,^,../,' filelist`
 l="$l `echo ../src/include/*_inline.h ../src/include/os.h`"
 
-(
+{
 # Get the list of statistics fields.
-search=`sed \
-    -e 's/^    int64_t \([a-z_*]*\);$/\1/p' \
-    -e d ../src/include/stat.h |
+search=`sed -n '/^struct/,/^}/p' ../src/include/stat.h | sed \
+    -e 's/^    int64_t \([a-z_]*\);$/\1/p' \
+    -e d |
     sort`
 
 # There are some fields that are used, but we can't detect it.
@@ -58,7 +60,8 @@ txn_rts_upd_aborted_dryrun
 UNUSED_STAT_FIELDS
 
 echo "$search"
-fgrep -who "$search" $l) | sort | uniq -u > $t
+cat $l | $FGREP -wo "$search"
+} | sort | uniq -u > $t
 
 test -s $t && {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
