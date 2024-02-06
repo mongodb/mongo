@@ -771,9 +771,6 @@ __session_open_cursor(WT_SESSION *wt_session, const char *uri, WT_CURSOR *to_dup
         }
     }
 
-    if (config != NULL && (WT_PREFIX_MATCH(uri, "backup:") || to_dup != NULL))
-        __wt_verbose(session, WT_VERB_BACKUP, "Backup cursor config \"%s\"", config);
-
     WT_ERR(__session_open_cursor_int(
       session, uri, NULL, statjoin || dup_backup ? to_dup : NULL, cfg, hash_value, &cursor));
 
