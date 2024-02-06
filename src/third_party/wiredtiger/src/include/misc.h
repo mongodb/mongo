@@ -425,3 +425,20 @@ union __wt_rand_state {
             WT_ERR(__wt_buf_extend(session, buf, (buf)->size + __len + 1));     \
         }                                                                       \
     } while (0)
+
+/*
+ * When compiling for code coverage measurement it is necessary to ensure that inline functions in
+ * header files that are #included in multiple source files are not inlined.
+ *
+ * Otherwise, it is possible that there will be multiple copies of the function across the linked
+ * executable with the result that the code coverage counts for branch coverage (both in terms of
+ * branches in the code and the number of branches executed) will be too high and incorrect.
+ *
+ * In non-code coverage builds, preventing inlining would impact performance and so this must only
+ * take place when performing code coverage.
+ */
+#ifdef CODE_COVERAGE_MEASUREMENT
+#define NO_INLINE_FOR_CODE_COVERAGE __attribute__((noinline))
+#else
+#define NO_INLINE_FOR_CODE_COVERAGE inline
+#endif

@@ -89,12 +89,6 @@ struct __wt_cursor_backup {
     uint32_t flags;
 };
 
-/* Get the WT_BTREE from any WT_CURSOR/WT_CURSOR_BTREE. */
-#define CUR2BT(c)                                \
-    (((WT_CURSOR_BTREE *)(c))->dhandle == NULL ? \
-        NULL :                                   \
-        (WT_BTREE *)((WT_CURSOR_BTREE *)(c))->dhandle->handle)
-
 struct __wt_cursor_btree {
     WT_CURSOR iface;
 
@@ -273,6 +267,30 @@ struct __wt_cursor_btree {
 
     uint32_t flags;
 };
+
+/* Get the WT_BTREE from any WT_CURSOR/WT_CURSOR_BTREE. */
+#ifdef INLINE_FUNCTIONS_INSTEAD_OF_MACROS
+/*
+ * __wt_curbt2bt --
+ *     Safely return the WT_BTREE pointed to by the cursor_btree's dhandle.
+ */
+static NO_INLINE_FOR_CODE_COVERAGE WT_BTREE *
+__wt_curbt2bt(WT_CURSOR_BTREE *cursor_btree)
+{
+    WT_DATA_HANDLE *dhandle;
+
+    dhandle = cursor_btree->dhandle;
+
+    return (dhandle == NULL ? NULL : (WT_BTREE *)(dhandle->handle));
+}
+
+#define CUR2BT(c) __wt_curbt2bt((WT_CURSOR_BTREE *)(c))
+#else
+#define CUR2BT(c)                                \
+    (((WT_CURSOR_BTREE *)(c))->dhandle == NULL ? \
+        NULL :                                   \
+        (WT_BTREE *)((WT_CURSOR_BTREE *)(c))->dhandle->handle)
+#endif /* INLINE_FUNCTIONS_INSTEAD_OF_MACROS */
 
 struct __wt_cursor_bulk {
     WT_CURSOR_BTREE cbt;
