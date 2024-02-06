@@ -33,7 +33,6 @@ import wttest
 from wtscenario import make_scenarios
 
 # Regression tests.
-@wttest.skip_for_hook("tiered", "FIXME-WT-9954")
 class test_bug003(wttest.WiredTigerTestCase):
     types = [
         ('file', dict(uri='file:data')),

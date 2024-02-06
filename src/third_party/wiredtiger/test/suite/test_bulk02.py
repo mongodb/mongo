@@ -57,11 +57,6 @@ class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
     # Bulk-load handles are skipped by checkpoints.
     # Named and unnamed checkpoint versions.
     def test_bulkload_checkpoint(self):
-        # FIXME-WT-9954 For tiered storage, this test triggers a bug when closing a
-        # flush_tier checkpoint.
-        if self.runningHook('tiered'):
-            self.skipTest("this test does not yet work with tiered storage")
-
         # Open a bulk cursor and insert a few records.
         config = 'key_format={},value_format={}'.format(self.keyfmt, self.valfmt)
         self.session.create(self.uri, config)
