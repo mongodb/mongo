@@ -268,10 +268,7 @@ jstestfuzz/
 
 # Bazel-related work
 # (Note that each string does NOT terminate with a '/' so that gitignore works properly)
-bazel-bin
-bazel-mongo*
-bazel-out
-bazel-testlogs
+bazel-*
 bazelisk
 buildifier
 .bazelrc.local
