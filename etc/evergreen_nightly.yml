@@ -1,6 +1,7 @@
 # Similar to etc/evergreen.yml, but for release builds.
 
 include:
+- filename: etc/evergreen_yml_components/configuration.yml
 - filename: etc/evergreen_yml_components/definitions.yml
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/atlas.yml
