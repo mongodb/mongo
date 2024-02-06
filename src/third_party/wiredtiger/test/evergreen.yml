@@ -1124,6 +1124,7 @@ functions:
             eval nohup $CMD > nohup.out.$i.$t 2>&1 &
           done
 
+          failure=0
           for t in $(seq ${no_of_procs|1}); do
             ret=0
             wait -n || ret=$?
@@ -1131,9 +1132,13 @@ functions:
               # Skip the below lines from nohup output file because they are very verbose and
               # print only the errors to evergreen log file.
               grep -v "Finished verifying" nohup.out.* | grep -v "Finished a checkpoint" | grep -v "thread starting"
+              failure=1
+              fail_ret=$ret
             fi
-            exit $ret
           done
+          if [ $failure -eq 1 ]; then
+            exit $fail_ret
+          fi
         done
 
   "compatibility test":
