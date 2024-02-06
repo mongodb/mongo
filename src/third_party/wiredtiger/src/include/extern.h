@@ -2001,7 +2001,7 @@ extern void __wt_rollback_to_stable_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_root_ref_init(
   WT_SESSION_IMPL *session, WT_REF *root_ref, WT_PAGE *root, bool is_recno);
 extern void __wt_rts_progress_msg(WT_SESSION_IMPL *session, WT_TIMER *rollback_start,
-  uint64_t rollback_count, uint64_t *rollback_msg_count, bool walk);
+  uint64_t rollback_count, uint64_t max_count, uint64_t *rollback_msg_count, bool walk);
 extern void __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *l);
 extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
