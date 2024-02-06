@@ -26,7 +26,8 @@ typedef struct {
 #define WT_VRFY_DUMP(vs) \
     ((vs)->dump_address || (vs)->dump_blocks || (vs)->dump_layout || (vs)->dump_pages)
     bool dump_address; /* Configure: dump special */
-    bool dump_app_data;
+    bool dump_all_data;
+    bool dump_key_data;
     bool dump_blocks;
     bool dump_layout;
     bool dump_pages;
@@ -73,8 +74,11 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
     WT_RET(__wt_config_gets(session, cfg, "dump_address", &cval));
     vs->dump_address = cval.val != 0;
 
-    WT_RET(__wt_config_gets(session, cfg, "dump_app_data", &cval));
-    vs->dump_app_data = cval.val != 0;
+    WT_RET(__wt_config_gets(session, cfg, "dump_all_data", &cval));
+    vs->dump_all_data = cval.val != 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "dump_key_data", &cval));
+    vs->dump_key_data = cval.val != 0;
 
     WT_RET(__wt_config_gets(session, cfg, "dump_blocks", &cval));
     vs->dump_blocks = cval.val != 0;
@@ -97,6 +101,10 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
               "cannot verify against the stable timestamp if it has not been set");
         vs->stable_timestamp = txn_global->stable_timestamp;
     }
+    if (vs->dump_all_data && vs->dump_key_data)
+        WT_RET_MSG(session, ENOTSUP, "%s",
+          "dump_all_data, which unredacts all data, should not be set to true "
+          "simultaneously with dump_key_data, which unredacts only the keys");
 
 #if !defined(HAVE_DIAGNOSTIC)
     if (vs->dump_blocks || vs->dump_pages)
@@ -490,9 +498,9 @@ __verify_tree(
 #ifdef HAVE_DIAGNOSTIC
     /* Optionally dump the blocks or page in debugging mode. */
     if (vs->dump_blocks)
-        WT_RET(__wt_debug_disk(session, page->dsk, NULL, vs->dump_app_data));
+        WT_RET(__wt_debug_disk(session, page->dsk, NULL, vs->dump_all_data, vs->dump_key_data));
     if (vs->dump_pages)
-        WT_RET(__wt_debug_page(session, NULL, ref, NULL, vs->dump_app_data));
+        WT_RET(__wt_debug_page(session, NULL, ref, NULL, vs->dump_all_data, vs->dump_key_data));
 #endif
 
     /* Make sure the page we got belongs in this kind of tree. */

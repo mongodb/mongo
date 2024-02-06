@@ -1335,10 +1335,12 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_verify[] = {
     INT64_MIN, INT64_MAX, NULL},
   {"dump_address", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN, INT64_MIN,
     INT64_MAX, NULL},
-  {"dump_app_data", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN,
+  {"dump_all_data", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN,
     INT64_MIN, INT64_MAX, NULL},
   {"dump_blocks", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN, INT64_MIN,
     INT64_MAX, NULL},
+  {"dump_key_data", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN,
+    INT64_MIN, INT64_MAX, NULL},
   {"dump_layout", "boolean", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_BOOLEAN, INT64_MIN,
     INT64_MAX, NULL},
   {"dump_offsets", "list", NULL, NULL, NULL, 0, NULL, WT_CONFIG_COMPILED_TYPE_LIST, INT64_MIN,
@@ -1356,8 +1358,8 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_verify[] = {
 static const uint8_t confchk_WT_SESSION_verify_jump[WT_CONFIG_JUMP_TABLE_SIZE] = {0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7,
-  7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10};
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 8, 8,
+  8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11};
 
 static const char *confchk_verbose4_choices[] = {"write_timestamp", NULL};
 
@@ -3443,11 +3445,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
   {"WT_SESSION.timestamp_transaction_uint", "", NULL, 0, NULL},
   {"WT_SESSION.truncate", "", NULL, 0, NULL}, {"WT_SESSION.upgrade", "", NULL, 0, NULL},
   {"WT_SESSION.verify",
-    "do_not_clear_txn_id=false,dump_address=false,dump_app_data=false"
-    ",dump_blocks=false,dump_layout=false,dump_offsets=,"
-    "dump_pages=false,read_corrupt=false,stable_timestamp=false,"
-    "strict=false",
-    confchk_WT_SESSION_verify, 10, confchk_WT_SESSION_verify_jump},
+    "do_not_clear_txn_id=false,dump_address=false,dump_all_data=false"
+    ",dump_blocks=false,dump_key_data=false,dump_layout=false,"
+    "dump_offsets=,dump_pages=false,read_corrupt=false,"
+    "stable_timestamp=false,strict=false",
+    confchk_WT_SESSION_verify, 11, confchk_WT_SESSION_verify_jump},
   {"colgroup.meta",
     "app_metadata=,assert=(commit_timestamp=none,"
     "durable_timestamp=none,read_timestamp=none,write_timestamp=off),"

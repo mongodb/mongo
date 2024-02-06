@@ -514,6 +514,10 @@ Continue to the next page after encountering error during verification.
 This option allows you to specify values which you want to be displayed
 when verification is run. See the WT_SESSION::verify configuration options.
 
+\c -k
+Display only the \c key data when dumping with configuration \c dump_blocks
+or \c dump_page.
+
 \c -S
 This option enables strict mode and treats any verification problem as an error.
 
