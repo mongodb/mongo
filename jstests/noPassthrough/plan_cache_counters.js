@@ -143,7 +143,7 @@ function runCommandAndCheckPlanCacheMetric({
     },
     // IdHack queries is always is executed with the classic engine and never get cached.
     {
-        command: {find: coll.getName(), filter: {_id: 1}, comment: "query idhack"},
+        command: {find: coll.getName(), filter: {_id: 1}, comment: "query idhack", batchSize: 200},
         expectedCacheBehaviors: [cacheBehavior.skip, cacheBehavior.skip, cacheBehavior.skip],
         planCacheType: "classic"
     },

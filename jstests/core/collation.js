@@ -26,6 +26,7 @@ import {
     getSingleNodeExplain,
     getWinningPlan,
     isCollscan,
+    isIdhackOrExpress,
     isIxscan,
     planHasStage
 } from "jstests/libs/analyze_plan.js";
@@ -774,15 +775,15 @@ assert.commandWorked(coll.insert({_id: "FOO"}));
 assert.eq(2, coll.find({_id: "foo"}).collation({locale: "en_US", strength: 2}).itcount());
 
 if (!isClustered) {
-    // Find on _id should use idhack stage when query inherits collection default collation.
+    // Find on _id should use fast path when query inherits collection default collation.
     coll = testDb.collation_find10;
     coll.drop();
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
     explainRes = coll.explain("executionStats").find({_id: "foo"}).finish();
     assert.commandWorked(explainRes);
-    assert.neq(null, getPlanStage(explainRes.executionStats.executionStages, "IDHACK"), explainRes);
+    assert(isIdhackOrExpress(testDb, getWinningPlan(explainRes.queryPlanner)));
 
-    // Find on _id should use idhack stage when explicitly given query collation matches
+    // Find on _id should use fastpath when explicitly given query collation matches
     // collection default.
     coll = testDb.collation_find11;
     coll.drop();
@@ -790,18 +791,17 @@ if (!isClustered) {
     explainRes =
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "en_US"}).finish();
     assert.commandWorked(explainRes);
-    assert.neq(null, getPlanStage(explainRes.executionStats.executionStages, "IDHACK"), explainRes);
+    assert(isIdhackOrExpress(testDb, getWinningPlan(explainRes.queryPlanner)));
 
-    // Find on _id should not use idhack stage when query collation does not match collection
-    // default.
+    // Find on _id should not use fastpath when query collation does not match
+    // collection default.
     coll = testDb.collation_find12;
     coll.drop();
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
     explainRes =
         coll.explain("executionStats").find({_id: "foo"}).collation({locale: "fr_CA"}).finish();
     assert.commandWorked(explainRes);
-
-    assert.eq(null, getPlanStage(explainRes.executionStats.executionStages, "IDHACK"), explainRes);
+    assert(!isIdhackOrExpress(testDb, getWinningPlan(explainRes.queryPlanner)));
 }
 
 // Find should select compatible index when no collation specified and collection has a default

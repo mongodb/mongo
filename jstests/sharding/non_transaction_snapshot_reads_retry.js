@@ -56,8 +56,17 @@ function read(insertTS, enableCausal) {
         readConcern.afterClusterTime = insertTS;
     }
 
-    let result = assert.commandWorked(db.runCommand(
-        {find: "test", filter: {_id: 0}, singleBatch: true, readConcern: readConcern}));
+    let result = assert.commandWorked(db.runCommand({
+        find: "test",
+        filter: {_id: 0},
+        projection: {
+            _id: 1,
+            x: 1,
+            "foo.bar": 1
+        },  // use non-simple projection to avoid Express fast-path; it doesn't yield
+        singleBatch: true,
+        readConcern: readConcern
+    }));
 
     jsTestLog(`find result for enableCausal=${enableCausal}: ${tojson(result)}`);
     assert.gt(result.cursor.atClusterTime, insertTS);

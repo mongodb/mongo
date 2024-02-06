@@ -16,7 +16,7 @@
 //   tenant_migration_incompatible,
 // ]
 
-import {isClusteredIxscan} from "jstests/libs/analyze_plan.js";
+import {isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 function checkError(err) {
@@ -69,14 +69,14 @@ assert.commandWorked(db.adminCommand({setParameter: 1, notablescan: true}));
     assert.commandWorked(coll.insert({_id: 22}));
     assert.eq(1, coll.find({_id: 22}).itcount());
     let plan = coll.find({_id: 22}).explain();
-    // Make sure the plan has a clustered index scan.
-    assert(isClusteredIxscan(db, plan));
+    // Make sure the plan uses fast path
+    assert(isIdhackOrExpress(db, plan));
 
     // Make sure the same works with an aggregate.
     assert.eq(1, coll.aggregate([{$match: {_id: 22}}]).itcount());
     plan = coll.explain().aggregate([{$match: {_id: 22}}]);
-    // Make sure the plan has a clustered index scan.
-    assert(isClusteredIxscan(db, plan));
+    // Make sure the plan uses Express
+    assert(isIdhackOrExpress(db, plan));
     assert.commandWorked(
         db.runCommand({aggregate: colName, pipeline: [{$match: {_id: 22}}], cursor: {}}));
 }

@@ -50,8 +50,10 @@ import {
     getWinningPlanFromExplain,
     isClusteredIxscan,
     isCollscan,
-    isIdhack,
+    isExpress,
+    isIdhackOrExpress,
     isIxscan,
+    planHasStage,
 } from "jstests/libs/analyze_plan.js";
 import {
     ClusteredCollectionUtil
@@ -225,12 +227,11 @@ const queryPlanner = getQueryPlanner(explain);
 const winningPlan = getWinningPlan(queryPlanner);
 const collectionIsClustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 if (collectionIsClustered) {
-    assert(isClusteredIxscan(db, getWinningPlan(queryPlanner)),
-           "Expected clustered ixscan: " + tojson(explain));
+    assert(isExpress(db, getWinningPlan(queryPlanner)), "Expected Express: " + tojson(explain));
 } else {
     switch (getOptimizer(explain)) {
         case "classic":
-            assert(isIdhack(db, winningPlan), winningPlan);
+            assert(isIdhackOrExpress(db, winningPlan), winningPlan);
             break;
         case "CQF":
             // TODO SERVER-70847, how to recognize the case of an IDHACK for Bonsai?

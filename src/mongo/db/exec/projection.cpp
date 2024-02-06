@@ -302,21 +302,17 @@ ProjectionStageSimple::ProjectionStageSimple(ExpressionContext* expCtx,
     }
 }
 
-void ProjectionStageSimple::transform(WorkingSetMember* member) const {
+template <typename Container>
+BSONObj ProjectionStageSimple::transform(const BSONObj& doc,
+                                         const Container& projFields,
+                                         projection_ast::ProjectType projectType) {
     BSONObjBuilder bob;
-    // SIMPLE_DOC implies that we expect an object so it's kind of redundant.
-    // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.
-    tassert(7241736, "simple projections must have an object", member->hasObj());
+    auto nFieldsLeft = projFields.size();
 
-    // Apply the SIMPLE_DOC projection: look at every top level field in the source document and
-    // see if we should keep it.
-    auto objToProject = member->doc.value().toBson();
-    auto nFieldsLeft = _fields.size();
+    if (projectType == projection_ast::ProjectType::kInclusion) {
 
-    if (_projectType == projection_ast::ProjectType::kInclusion) {
-        for (auto&& elt : objToProject) {
-            auto fieldName{elt.fieldNameStringData()};
-            if (_fields.count(fieldName) > 0) {
+        for (const auto& elt : doc) {
+            if (projFields.contains(elt.fieldNameStringData())) {
                 bob.append(elt);
                 if (--nFieldsLeft == 0) {
                     break;
@@ -324,17 +320,32 @@ void ProjectionStageSimple::transform(WorkingSetMember* member) const {
             }
         }
     } else {
-        for (auto&& elt : objToProject) {
-            auto fieldName{elt.fieldNameStringData()};
-            if (nFieldsLeft == 0 || _fields.count(fieldName) == 0) {
+
+        for (const auto& elt : doc) {
+            if (nFieldsLeft == 0 || !projFields.contains(elt.fieldNameStringData())) {
                 bob.append(elt);
             } else {
                 --nFieldsLeft;
             }
         }
     }
+    return bob.obj();
+}
+template BSONObj ProjectionStageSimple::transform<StringSet>(
+    const BSONObj& doc, const StringSet& fields, projection_ast::ProjectType projectType);
+template BSONObj ProjectionStageSimple::transform<OrderedPathSet>(
+    const BSONObj& doc, const OrderedPathSet& fields, projection_ast::ProjectType projectType);
 
-    transitionMemberToOwnedObj(bob.obj(), member);
+void ProjectionStageSimple::transform(WorkingSetMember* member) const {
+    // SIMPLE_DOC implies that we expect an object so it's kind of redundant.
+    // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.
+    tassert(7241736, "simple projections must have an object", member->hasObj());
+
+    // Apply the SIMPLE_DOC projection: look at every top level field in the source document and
+    // see if we should keep it.
+    auto objToProject = member->doc.value().toBson();
+
+    transitionMemberToOwnedObj(transform(objToProject, _fields, _projectType), member);
 }
 
 }  // namespace mongo

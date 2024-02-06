@@ -522,8 +522,9 @@ assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
 assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
 // Queries on a collection with a hashed index that reference _id only experimentally supported,
-// tryBonsai falls back to classic engine
-assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {_id: 1}}, false);
+// tryBonsai falls back to classic engine. Use batchSize param to avoid triggering EXPRESS path.
+assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {_id: 1}, batchSize: 200},
+                                      false);
 assertSupportedByBonsaiExperimentally(
     {aggregate: coll.getName(), pipeline: [{$match: {_id: 1}}], cursor: {}});
 assertSupportedByBonsaiFully({find: coll.getName(), filter: {a: 1}});

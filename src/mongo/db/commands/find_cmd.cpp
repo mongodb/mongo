@@ -74,6 +74,8 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
+#include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -706,6 +708,7 @@ public:
 
             auto cq = parseQueryAndBeginOperation(
                 opCtx, *collectionOrView, nss, _request.body, std::move(findCommand));
+            const auto& findCommandReq = cq->getFindCommandRequest();
 
             tassert(7922501,
                     "CanonicalQuery namespace should match catalog namespace",
@@ -719,8 +722,8 @@ public:
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
-                const auto& findCommand = cq->getFindCommandRequest();
-                auto aggRequest = query_request_conversion::asAggregateCommandRequest(findCommand);
+                auto aggRequest =
+                    query_request_conversion::asAggregateCommandRequest(findCommandReq);
 
                 auto privileges = uassertStatusOK(
                     auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
@@ -738,7 +741,7 @@ public:
 
             const auto& collection = collectionOrView->getCollection();
 
-            if (!cq->getFindCommandRequest().getAllowDiskUse().value_or(true)) {
+            if (!findCommandReq.getAllowDiskUse().value_or(true)) {
                 allowDiskUseFalseCounter.increment();
             }
 
@@ -746,7 +749,7 @@ public:
             uassertStatusOK(replCoord->checkCanServeReadsFor(
                 opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-            if (cq->getFindCommandRequest().getReadOnce()) {
+            if (findCommandReq.getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan
                 // execution to assume read data will not be needed again and need not be cached.
                 shard_role_details::getRecoveryUnit(opCtx)->setReadOnce(true);

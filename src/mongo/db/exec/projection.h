@@ -178,6 +178,23 @@ public:
         return STAGE_PROJECTION_SIMPLE;
     }
 
+    static BSONObj transform(const BSONObj& doc,
+                             const StringSet& fields,
+                             projection_ast::ProjectType projectType) {
+        return transform<StringSet>(doc, fields, projectType);
+    }
+
+    static BSONObj transform(const BSONObj& doc,
+                             const OrderedPathSet& fields,
+                             projection_ast::ProjectType projectType) {
+        return transform<OrderedPathSet>(doc, fields, projectType);
+    }
+
+    template <typename Container>
+    static BSONObj transform(const BSONObj& doc,
+                             const Container& fields,
+                             projection_ast::ProjectType projectType);
+
 private:
     void transform(WorkingSetMember* member) const final;
 

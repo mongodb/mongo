@@ -57,6 +57,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
@@ -127,6 +128,7 @@
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_executor_express.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -1987,6 +1989,34 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     auto exec = [&]() -> StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> {
         invariant(canonicalQuery);
         const auto& mainColl = collections.getMainCollection();
+
+        if (isExpressEligible(opCtx, mainColl, canonicalQuery.get())) {
+            fillOutPlannerParams(opCtx, collections, canonicalQuery.get(), &plannerParams);
+            PlanExecutor::Deleter planExDeleter(opCtx);
+            boost::optional<ScopedCollectionFilter> collFilter = boost::none;
+            VariantCollectionPtrOrAcquisition collOrAcq =
+                collections.getMainCollectionPtrOrAcquisition();
+
+            planCacheCounters.incrementClassicSkippedCounter();
+
+            if (plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+                collFilter = collOrAcq.getShardingFilter(opCtx);
+                invariant(
+                    collFilter,
+                    "Attempting to use shard filter when there's no shard filter available for "
+                    "the collection");
+            }
+
+            bool isClusteredOnId = plannerParams.clusteredInfo
+                ? clustered_util::isClusteredOnId(plannerParams.clusteredInfo)
+                : false;
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec(
+                new PlanExecutorExpress(
+                    opCtx, std::move(canonicalQuery), collOrAcq, collFilter, isClusteredOnId),
+                planExDeleter);
+            return StatusWith{std::move(exec)};
+        }
+
         canonicalQuery->setSbeCompatible(isQuerySbeCompatible(&mainColl, canonicalQuery.get()));
 
         auto eligibility = determineBonsaiEligibility(opCtx, mainColl, *canonicalQuery);
@@ -3315,4 +3345,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
         opCtx, &yieldableCollection, yieldPolicy, direction, resumeAfterRecordId);
 }
 
+bool isExpressEligible(OperationContext* opCtx,
+                       const CollectionPtr& coll,
+                       const CanonicalQuery* cq) {
+    auto findCommandReq = cq->getFindCommandRequest();
+    return (coll && (cq->getProj() == nullptr || cq->getProj()->isSimple()) &&
+            isIdHackEligibleQuery(coll, findCommandReq, cq->getExpCtx()->getCollator()) &&
+            !findCommandReq.getReturnKey() && !findCommandReq.getBatchSize() &&
+            (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
+             clustered_util::isClusteredOnId(coll->getClusteredInfo())));
+}
 }  // namespace mongo

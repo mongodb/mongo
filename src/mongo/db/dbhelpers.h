@@ -87,17 +87,12 @@ struct Helpers {
                             std::unique_ptr<FindCommandRequest> qr);
 
     /**
-     * If 'indexFound' is not nullptr,  will be set to true if the query was answered using the _id
-     * index or using a clustered _id index.
-     *
      * Returns true if a matching document was found.
      */
     static bool findById(OperationContext* opCtx,
                          const NamespaceString& nss,
                          BSONObj query,
-                         BSONObj& result,
-                         bool* nsFound = nullptr,
-                         bool* indexFound = nullptr);
+                         BSONObj& result);
 
     /* TODO: should this move into Collection?
      * uasserts if no _id index.

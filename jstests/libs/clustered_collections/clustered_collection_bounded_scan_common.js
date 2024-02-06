@@ -59,7 +59,8 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         initAndPopulate(coll, clusterKey);
 
         const expl = assert.commandWorked(coll.getDB().runCommand({
-            explain: {find: coll.getName(), filter: {[clusterKeyFieldName]: 5}},
+            // use batchSize to avoid selecting EXPRESS instead of CLUSTERED_IXSCAN
+            explain: {find: coll.getName(), filter: {[clusterKeyFieldName]: 5}, batchSize: 20},
             verbosity: "executionStats"
         }));
 

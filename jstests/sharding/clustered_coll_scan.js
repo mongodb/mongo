@@ -3,7 +3,7 @@
  * (SERVER-83119)
  */
 
-import {isClusteredIxscan} from "jstests/libs/analyze_plan.js";
+import {isClusteredIxscan, isExpress} from "jstests/libs/analyze_plan.js";
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 
 const st = new ShardingTest({
@@ -25,21 +25,25 @@ assert.commandWorked(coll.insertMany([...Array(10).keys()].map(i => {
 
 {
     var explain = coll.find({_id: 2}).explain();
-    // Make sure that we have a clusteredIDXScan in the plan.
+    // Make sure that we have Express in the plan.
+    assert(isExpress(db, explain));
 
+    // Make sure that we have a clustered ixscan if Express is ineligible.
+    var explain = coll.find({_id: 2}, {"foo.bar": 3}).explain();
     assert(isClusteredIxscan(db, explain));
+
     assert.commandWorked(
         st.getPrimaryShard("test").adminCommand({setParameter: 1, notablescan: 1}));
     // Do the same thing only with notablescan enabled.
     explain = coll.find({_id: 2}).explain();
-    assert(isClusteredIxscan(db, explain));
+    assert(isExpress(db, explain));
     // Sanity count check.
     assert.eq(1, coll.find({_id: 2}).itcount());
 }
 // Test the same with aggregate.
 {
     var explain = coll.explain().aggregate([{$match: {_id: 22}}]);
-    assert(isClusteredIxscan(db, explain));
+    assert(isExpress(db, explain));
 }
 
 st.stop();

@@ -11,7 +11,7 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isIdhackOrExpress, planHasStage} from "jstests/libs/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_bucket_index;
@@ -40,11 +40,11 @@ TimeseriesTest.run((insert) => {
 
     assert.docEq(buckets, bucketsColl.find({_id: bucketId}).toArray());
     let explain = bucketsColl.find({_id: bucketId}).explain();
-    assert(planHasStage(db, explain, "CLUSTERED_IXSCAN"), explain);
+    assert(isIdhackOrExpress(db, getWinningPlan(explain.queryPlanner)), explain);
 
     assert.docEq(buckets, bucketsColl.find({"control.max.time": maxTime}).toArray());
     explain = bucketsColl.find({"control.max.time": minTime}).explain();
-    assert(planHasStage(db, explain, "IXSCAN"), explain);
+    assert(planHasStage(db, getWinningPlan(explain.queryPlanner), "IXSCAN"), explain);
 
     let res = assert.commandWorked(bucketsColl.validate());
     assert(res.valid, res);

@@ -154,29 +154,18 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 bool Helpers::findById(OperationContext* opCtx,
                        const NamespaceString& nss,
                        BSONObj query,
-                       BSONObj& result,
-                       bool* nsFound,
-                       bool* indexFound) {
+                       BSONObj& result) {
     auto collCatalog = CollectionCatalog::get(opCtx);
     const Collection* collection = collCatalog->lookupCollectionByNamespace(opCtx, nss);
     if (!collection) {
         return false;
     }
 
-    if (nsFound)
-        *nsFound = true;
-
     const IndexCatalog* catalog = collection->getIndexCatalog();
     const IndexDescriptor* desc = catalog->findIdIndex(opCtx);
 
     if (!desc) {
         if (clustered_util::isClusteredOnId(collection->getClusteredInfo())) {
-            if (indexFound) {
-                // A collection clustered on _id implicitly has an _id index but no explicit
-                // IndexDescriptor tied to it.
-                *indexFound = 1;
-            }
-
             Snapshotted<BSONObj> doc;
             if (collection->findDoc(opCtx,
                                     record_id_helpers::keyForObj(IndexBoundsBuilder::objFromElement(
@@ -189,9 +178,6 @@ bool Helpers::findById(OperationContext* opCtx,
 
         return false;
     }
-
-    if (indexFound)
-        *indexFound = 1;
 
     const IndexCatalogEntry* entry = catalog->getEntry(desc);
     auto recordId = entry->accessMethod()->asSortedData()->findSingle(

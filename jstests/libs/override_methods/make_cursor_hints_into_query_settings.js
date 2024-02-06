@@ -1,4 +1,4 @@
-import {getWinningPlan, isIdhack} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
@@ -30,7 +30,7 @@ function requestsResumeToken(cmdObj) {
 function isIdHackQuery(db, cmdObj) {
     const {hint, ...queryWithoutHint} = cmdObj;
     const explain = db.runCommand({explain: queryWithoutHint});
-    return isIdhack(db, getWinningPlan(explain.queryPlanner));
+    return isIdhackOrExpress(db, getWinningPlan(explain.queryPlanner));
 }
 
 function getInnerCommand(cmdObj) {

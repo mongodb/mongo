@@ -13,7 +13,7 @@ import {
     getOptimizer,
     getWinningPlan,
     isCollscan,
-    isIdhack,
+    isIdhackOrExpress,
     isIndexOnly,
     isIxscan
 } from "jstests/libs/analyze_plan.js";
@@ -124,7 +124,7 @@ explain = coll.find({_id: 1}, {_id: 0, "b.c": 1, "b.e": 1, c: 1}).explain("query
 
 switch (getOptimizer(explain)) {
     case "classic": {
-        assert(isIdhack(db, getWinningPlan(explain.queryPlanner)), explain);
+        assert(isIdhackOrExpress(db, getWinningPlan(explain.queryPlanner)), explain);
         break;
     }
     case "CQF":

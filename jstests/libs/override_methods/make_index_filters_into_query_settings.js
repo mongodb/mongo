@@ -1,4 +1,4 @@
-import {getWinningPlan, isIdhack} from "jstests/libs/analyze_plan.js";
+import {getWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 
 function addOptionalQueryFields(src, dst) {
@@ -50,7 +50,7 @@ function planCacheSetFilterToSetQuerySettings(conn, dbName, cmdObj) {
     // Setting index filters on idhack query is no-op for index filter command, but is a failure
     // for query settings command, therefore avoid specifying query settings and return success.
     const explain = db.runCommand({explain: queryInstance});
-    if (isIdhack(db, getWinningPlan(explain.queryPlanner))) {
+    if (isIdhackOrExpress(db, getWinningPlan(explain.queryPlanner))) {
         return {ok: 1};
     }
 
