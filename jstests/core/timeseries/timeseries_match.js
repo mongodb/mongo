@@ -181,6 +181,43 @@ TimeseriesTest.run((insert) => {
             ids: [],
             usesBlockProcessing: true
         },
+
+        {
+            pred: {
+                "$expr": {
+                    "$gt": [
+                        {
+                            "$dateDiff": {
+                                "startDate": "$time",
+                                "endDate": new Date(datePrefix + 150),
+                                "unit": "millisecond"
+                            }
+                        },
+                        0
+                    ]
+                }
+            },
+            ids: [0],
+            usesBlockProcessing: false
+        },
+        {
+            pred: {
+                "$expr": {
+                    "$gt": [
+                        {
+                            "$dateDiff": {
+                                "startDate": new Date(datePrefix + 550),
+                                "endDate": "$time",
+                                "unit": "millisecond"
+                            }
+                        },
+                        -60
+                    ]
+                }
+            },
+            ids: [4],
+            usesBlockProcessing: false
+        },
     ];
 
     // $match pushdown requires sbe to be fully enabled and featureFlagTimeSeriesInSbe to be set.

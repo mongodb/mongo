@@ -330,4 +330,42 @@ TimeseriesTest.run((insert) => {
         assert.eq(res[1], {"obj": {"newField": 456}}, res);
         assert.eq(res[2], {"obj": {}}, res);
     }
+
+    {
+        const res = coll.aggregate([{
+                            "$project": {
+                                "t": {
+                                    "$dateDiff": {
+                                        "startDate": "$time",
+                                        "endDate": new Date(datePrefix + 150),
+                                        "unit": "millisecond"
+                                    }
+                                }
+                            }
+                        }])
+                        .toArray();
+        assert.eq(res.length, 3, res);
+        assert.docEq(res[0], {_id: 0, "t": 50}, res);
+        assert.docEq(res[1], {_id: 1, "t": -50}, res);
+        assert.docEq(res[2], {_id: 2, "t": -150}, res);
+    }
+
+    {
+        const res = coll.aggregate([{
+                            "$project": {
+                                "t": {
+                                    "$dateDiff": {
+                                        "startDate": new Date(datePrefix - 10),
+                                        "endDate": "$time",
+                                        "unit": "millisecond"
+                                    }
+                                }
+                            }
+                        }])
+                        .toArray();
+        assert.eq(res.length, 3, res);
+        assert.docEq(res[0], {_id: 0, "t": 110}, res);
+        assert.docEq(res[1], {_id: 1, "t": 210}, res);
+        assert.docEq(res[2], {_id: 2, "t": 310}, res);
+    }
 });

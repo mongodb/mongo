@@ -598,13 +598,16 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                 for (size_t i = 3; i < arity; i++) {
                     functionArgs.emplace_back(std::move(*args[i].expr));
                 }
-                return {
-                    makeUnaryOp(mongo::optimizer::Operations::Neg,
-                                makeABTFunction("valueBlockDateDiff"_sd, std::move(functionArgs))),
-                    TypeSignature::kBlockType
-                        .include(getTypeSignature(sbe::value::TypeTags::NumberInt64))
-                        .include(TypeSignature::kNothingType),
-                    args[2].sourceCell};
+                return {makeABTFunction(
+                            "valueBlockSub"_sd,
+                            generateMaskArg(),
+                            makeABTConstant(sbe::value::TypeTags::NumberInt64,
+                                            sbe::value::bitcastFrom<int64_t>(0)),
+                            makeABTFunction("valueBlockDateDiff"_sd, std::move(functionArgs))),
+                        TypeSignature::kBlockType
+                            .include(getTypeSignature(sbe::value::TypeTags::NumberInt64))
+                            .include(TypeSignature::kNothingType),
+                        args[2].sourceCell};
             }
         }
 
