@@ -44,8 +44,7 @@ class test_prefetch02(wttest.WiredTigerTestCase, suite_subprocess):
 
     format_values = [
         ('col_var', dict(key_format='r', value_format='i')),
-        #FIXME-WT-12276: Re-enable FLCS scenario once prefetch bug has been identified and fixed.
-        # ('col_fix', dict(key_format='r', value_format='8t')),
+        ('col_fix', dict(key_format='r', value_format='8t')),
         ('row_int', dict(key_format='i', value_format='i')),
     ]
 
