@@ -1,7 +1,17 @@
 // Tests that aggregations with a $merge stage respect the options set on the command.
 import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
+import {reconfig} from "jstests/replsets/rslib.js"
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+const st = new ShardingTest({
+    shards: 2,
+    rs: {
+        nodes: 2,
+        // Heartbeat will be dropped when the maxTimeAlwaysTimeOut failpoint is set, so increase the
+        // heartbeat interval and the time before an election will start to avoid a stepdown during
+        // slow execution of the test.
+        settings: {heartbeatIntervalMillis: 120 * 1000, electionTimeoutMillis: 120 * 1000}
+    }
+});
 
 const mongosDB = st.s0.getDB("test");
 const source = mongosDB.getCollection("source");
