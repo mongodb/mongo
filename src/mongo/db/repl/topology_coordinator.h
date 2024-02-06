@@ -324,10 +324,10 @@ public:
     void setFollowerMode(MemberState::MS newMode);
 
     /**
-     * Scan the memberData and determine the highest last applied or last
+     * Scan the memberData and determine the highest last written or last
      * durable optime present on a majority of servers; set _lastCommittedOpTime to this
      * new entry.
-     * Whether the last applied or last durable op time is used depends on whether
+     * Whether the last written or last durable op time is used depends on whether
      * the config getWriteConcernMajorityShouldJournal is set.
      * Returns true if the _lastCommittedOpTime was changed.
      */
@@ -581,7 +581,7 @@ public:
     /*
      * Sets the last optime that this node has written oplog entry into memory. Fails with an
      * invariant if 'isRollbackAllowed' is false and we're attempting to set the optime backwards.
-     * The Date_t 'now' is used to track liveness; setting a node's applied optime updates its
+     * The Date_t 'now' is used to track liveness; setting a node's written optime updates its
      * liveness information.
      */
     void setMyLastWrittenOpTimeAndWallTime(OpTimeAndWallTime opTimeAndWallTime,

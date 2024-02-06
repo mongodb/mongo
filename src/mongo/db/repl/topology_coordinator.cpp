@@ -2911,7 +2911,7 @@ bool TopologyCoordinator::updateLastCommittedOpTimeAndWallTime() {
         return false;
     }
 
-    // Whether we use the applied or durable OpTime for the commit point is decided here.
+    // Whether we use the written or durable OpTime for the commit point is decided here.
     const bool useDurableOpTime = _rsConfig.getWriteConcernMajorityShouldJournal();
 
     std::vector<OpTimeAndWallTime> votingNodesOpTimesAndWallTimes;
@@ -2922,9 +2922,9 @@ bool TopologyCoordinator::updateLastCommittedOpTimeAndWallTime() {
         if (memberConfig.isVoter()) {
             const OpTimeAndWallTime durableOpTime = {memberData.getLastDurableOpTime(),
                                                      memberData.getLastDurableWallTime()};
-            const OpTimeAndWallTime appliedOpTime = {memberData.getLastAppliedOpTime(),
-                                                     memberData.getLastAppliedWallTime()};
-            const OpTimeAndWallTime opTime = useDurableOpTime ? durableOpTime : appliedOpTime;
+            const OpTimeAndWallTime writtenOpTime = {memberData.getLastWrittenOpTime(),
+                                                     memberData.getLastWrittenWallTime()};
+            const OpTimeAndWallTime opTime = useDurableOpTime ? durableOpTime : writtenOpTime;
             votingNodesOpTimesAndWallTimes.push_back(opTime);
         }
     }

@@ -7893,6 +7893,126 @@ TEST_F(ReplCoordTest, PopulateUnsetWriteConcernOptionsSyncModeReturnsInputIfWMod
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
 }
 
+TEST_F(ReplCoordTest,
+       UpdateLastCommittedOpTimeWithLastWrittenWhenWriteConcernMajorityJournalDefaultIsFalse) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2)
+                                          << BSON("host"
+                                                  << "node4:12345"
+                                                  << "_id" << 3 << "votes" << 0 << "priority" << 0)
+                                          << BSON("host"
+                                                  << "node5:12345"
+                                                  << "_id" << 4 << "arbiterOnly" << true))
+                            << "writeConcernMajorityJournalDefault" << false),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    OpTime zero(Timestamp(0, 0), 0);
+    OpTime time(Timestamp(100, 1), 1);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time, Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastWrittenOptime_forTest(2, 1, time));
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastWrittenOptime_forTest(2, 3, time));
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastWrittenOptime_forTest(2, 2, time));
+
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
+}
+
+TEST_F(ReplCoordTest,
+       NoUpdateLastCommittedOpTimeWithLastAppliedWhenWriteConcernMajorityJournalDefaultIsFalse) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2)
+                                          << BSON("host"
+                                                  << "node4:12345"
+                                                  << "_id" << 3 << "votes" << 0 << "priority" << 0)
+                                          << BSON("host"
+                                                  << "node5:12345"
+                                                  << "_id" << 4 << "arbiterOnly" << true))
+                            << "writeConcernMajorityJournalDefault" << false),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    OpTime zero(Timestamp(0, 0), 0);
+    OpTime time(Timestamp(100, 1), 1);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time, Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time));
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 3, time));
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 2, time));
+
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+}
+
+TEST_F(ReplCoordTest,
+       UpdateLastCommittedOpTimeWithLastDurableWhenWriteConcernMajorityJournalDefaultIsTrue) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id" << 2)
+                                          << BSON("host"
+                                                  << "node4:12345"
+                                                  << "_id" << 3 << "votes" << 0 << "priority" << 0)
+                                          << BSON("host"
+                                                  << "node5:12345"
+                                                  << "_id" << 4 << "arbiterOnly" << true))
+                            << "writeConcernMajorityJournalDefault" << true),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    OpTime zero(Timestamp(0, 0), 0);
+    OpTime time(Timestamp(100, 1), 1);
+    replCoordSetMyLastWrittenAndAppliedAndDurableOpTime(time, Date_t() + Seconds(100));
+    simulateSuccessfulV1Election();
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 1, time));
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 3, time));
+    ASSERT_EQUALS(zero, getReplCoord()->getLastCommittedOpTime());
+
+    ASSERT_OK(getReplCoord()->setLastDurableOptime_forTest(2, 2, time));
+
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
+}
+
 TEST_F(ReplCoordTest, NodeStoresElectionVotes) {
     assertStartSuccess(BSON("_id"
                             << "mySet"

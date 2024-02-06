@@ -1538,11 +1538,11 @@ private:
                              bool forInitiate = false);
 
     /**
-     * Scan the memberData and determine the highest last applied or last
+     * Scan the memberData and determine the highest last written or last
      * durable optime present on a majority of servers; set _lastCommittedOpTime to this
      * new entry.
      *
-     * Whether the last applied or last durable op time is used depends on whether
+     * Whether the last written or last durable op time is used depends on whether
      * the config getWriteConcernMajorityShouldJournal is set.
      */
     void _updateLastCommittedOpTimeAndWallTime(WithLock lk);
