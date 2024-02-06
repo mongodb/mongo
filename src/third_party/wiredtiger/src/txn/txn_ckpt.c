@@ -31,8 +31,6 @@ __checkpoint_flush_tier_wait(WT_SESSION_IMPL *session, const char **cfg)
     yield_count = 0;
     now = start = 0;
 
-    WT_STAT_CONN_SET(session, checkpoint_state, WT_CHECKPOINT_STATE_FLUSH_TIER_WAIT);
-
     /*
      * The internal thread needs the schema lock to perform its operations and flush tier also
      * acquires the schema lock. We cannot be waiting in this function while holding that lock or no
@@ -1473,6 +1471,8 @@ err:
     session->ckpt_handle_allocated = session->ckpt_handle_next = 0;
 
     session->isolation = txn->isolation = saved_isolation;
+    WT_STAT_CONN_SET(session, checkpoint_state, WT_CHECKPOINT_STATE_INACTIVE);
+
     return (ret);
 }
 
@@ -1534,7 +1534,6 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
      * begin_transaction for the checkpoint, the checkpoint code will acquire the schema lock before
      * we do that, and some implementation of WT_CURSOR::reset might need the schema lock.
      */
-    WT_STAT_CONN_SET(session, checkpoint_state, WT_CHECKPOINT_STATE_RESET_CURSORS);
     WT_RET(__wt_session_reset_cursors(session, false));
 
     /* Ensure the metadata table is open before taking any locks. */
