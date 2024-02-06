@@ -60,8 +60,7 @@
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
-
-class ElementStorage;
+using namespace bsoncolumn;
 
 /**
  * The BSONColumn class represents an implementation to interpret a BSONElement of BinDataType 7,
@@ -351,124 +350,6 @@ private:
 inline BSONColumn::Iterator::DecodingState::DecodingState() = default;
 inline BSONColumn::Iterator::DecodingState::Decoder64::Decoder64() = default;
 
-/**
- * BSONElement storage, owns materialised BSONElement returned by BSONColumn.
- * Allocates memory in blocks which double in size as they grow.
- */
-class ElementStorage
-    : public boost::intrusive_ref_counter<ElementStorage, boost::thread_unsafe_counter> {
-public:
-    /**
-     * "Writable" BSONElement. Provides access to a writable pointer for writing the value of
-     * the BSONElement. Users must write valid BSON data depending on the requested BSON type.
-     */
-    class Element {
-    public:
-        Element(char* buffer, int nameSize, int valueSize);
-
-        /**
-         * Returns a pointer for writing a BSONElement value.
-         */
-        char* value();
-
-        /**
-         * Size for the pointer returned by value()
-         */
-        int size() const;
-
-        /**
-         * Constructs a BSONElement from the owned buffer.
-         */
-        BSONElement element() const;
-
-    private:
-        char* _buffer;
-        int _nameSize;
-        int _valueSize;
-    };
-
-    /**
-     * RAII Helper to manage contiguous mode. Starts on construction and leaves on destruction.
-     */
-    class ContiguousBlock {
-    public:
-        ContiguousBlock(ElementStorage& storage);
-        ~ContiguousBlock();
-
-        // Return pointer to contigous block and the block size
-        std::pair<const char*, int> done();
-
-    private:
-        ElementStorage& _storage;
-        bool _finished = false;
-    };
-
-    /**
-     * Allocates provided number of bytes. Returns buffer that is safe to write up to that
-     * amount. Any subsequent call to allocate() or deallocate() invalidates the returned
-     * buffer.
-     */
-    char* allocate(int bytes);
-
-    /**
-     * Allocates a BSONElement of provided type and value size. Field name is set to empty
-     * string.
-     */
-    Element allocate(BSONType type, StringData fieldName, int valueSize);
-
-    /**
-     * Deallocates provided number of bytes. Moves back the pointer of used memory so it can be
-     * re-used by the next allocate() call.
-     */
-    void deallocate(int bytes);
-
-    /**
-     * Starts contiguous mode. All allocations will be in a contiguous memory block. When
-     * allocate() need to grow contents from previous memory block is copied.
-     */
-    ContiguousBlock startContiguous();
-
-    /**
-     * Returns writable pointer to the beginning of contiguous memory block. Any call to
-     * allocate() will invalidate this pointer.
-     */
-    char* contiguous() const {
-        return _block.get() + _contiguousPos;
-    }
-
-    /**
-     * Returns pointer to the end of current memory block. Any call to allocate() will
-     * invalidate this pointer.
-     */
-    const char* position() const {
-        return _block.get() + _pos;
-    }
-
-private:
-    // Starts contiguous mode
-    void _beginContiguous();
-
-    // Ends contiguous mode, returns size of block
-    int _endContiguous();
-
-    // Full memory blocks that are kept alive.
-    std::vector<std::unique_ptr<char[]>> _blocks;
-
-    // Current memory block
-    std::unique_ptr<char[]> _block;
-
-    // Capacity of current memory block
-    int _capacity = 0;
-
-    // Position to first unused byte in current memory block
-    int _pos = 0;
-
-    // Position to beginning of contiguous block if enabled.
-    int _contiguousPos = 0;
-
-    bool _contiguousEnabled = false;
-};
-
 namespace bsoncolumn {
 
 /**
@@ -511,6 +392,8 @@ concept Appendable =
     t.template append<BSONCode>(bsonVal);
     t.template append<BSONElement>(bsonVal);
 
+    t.appendPreallocated(bsonVal);
+
     t.appendMissing();
 };
 
@@ -528,9 +411,13 @@ concept Appendable =
  * ephemeral. The provided ElementStorage can be used to allocate memory with the lifetime of the
  * BSONColumn instance.
  *
- * The exception to this rule is that BSONElements passed to the materialize() methods may be
- * assumed to appear in decompressed form as-is in the BSONColumn binary data. As such they will
- * have the same lifetime as the BSONColumn with no additional allocations required.
+ * The exception to this rule is that BSONElements passed to the materialize() methods may appear in
+ * decompressed form as-is in the BSONColumn binary data. If they are as such, they will have the
+ * same lifetime as the BSONColumn, and may go away if a yield of query execution occurs.
+ * Implementers may wish to explicitly copy the value with the allocator in this case. It may also
+ * occur that decompression allocates its own BSONElements as part of its execution (e.g., when
+ * materializing whole objects from compressed scalars). In this case, decompression will invoke
+ * materializePreallocated() instead of materialize().
  */
 template <class T>
 concept Materializer = requires(T& t,
@@ -565,6 +452,7 @@ concept Materializer = requires(T& t,
     { T::template materialize<BSONBinData>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
     { T::template materialize<BSONCode>(alloc, bsonVal) } -> std::same_as<typename T::Element>;
 
+    { T::materializePreallocated(bsonVal) } -> std::same_as<typename T::Element>;
 
     { T::materializeMissing(alloc) } -> std::same_as<typename T::Element>;
 };
@@ -630,6 +518,10 @@ public:
     template <typename T>
     void append(const BSONElement& val) {
         collect(CMaterializer::template materialize<T>(*_allocator, val));
+    }
+
+    void appendPreallocated(const BSONElement& val) {
+        collect(CMaterializer::materializePreallocated(val));
     }
 
     void appendMissing() {

@@ -7083,6 +7083,10 @@ public:
         return std::monostate();
     }
 
+    static Element materializePreallocated(const BSONElement& val) {
+        return std::monostate();
+    }
+
 
     static Element materializeMissing(ElementStorage& a) {
         return std::monostate();
@@ -7214,6 +7218,11 @@ TEST_F(BSONColumnTest, TestCollector) {
     result = std::get<StringData>(collection.back());
     ASSERT_EQ(3, result.size());
     ASSERT_EQ(0, memcmp("baz", result.data(), 3));
+
+    BSONElement obj = createElementObj(BSON("x" << 1));
+    collector.appendPreallocated(obj);
+    ASSERT_EQ(collection.size(), ++expectedSize);
+    ASSERT_EQ(std::monostate(), std::get<std::monostate>(collection.back()));
 
     collector.appendMissing();
     ASSERT_EQ(collection.size(), ++expectedSize);

@@ -48,7 +48,6 @@ void assertSbeValueEquals(Element actual, Element expected, bool omitStringTypeC
         ASSERT_EQ(strActual, strExpected);
         return;
     }
-
     auto strActual = value::printTagAndVal(actual);
     auto strExpected = value::printTagAndVal(expected);
     ASSERT_EQ(strActual, strExpected);
@@ -154,7 +153,21 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerOtherTypes) {
     auto obj = BSON("" << codeWScope);
     auto bsonElem = obj.firstElement();
     auto bytes = bsonElem.value();
+
+    // Test with copy.
     collector.append<BSONElement>(bsonElem);
+    assertSbeValueEquals(
+        vec.back(),
+        Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
+    assertSbeValueEquals(vec.back(), bson::convertFrom<true /* view */>(bsonElem));
+    // Since we are making a copy and storing it in the ElementStorage, the address of the data
+    // should not be the same.
+    ASSERT_NOT_EQUALS(
+        vec.back(),
+        Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
+
+    // Test without copy by ensuring the addresses are the same.
+    collector.appendPreallocated(bsonElem);
     ASSERT_EQ(vec.back(),
               Element({value::TypeTags::bsonCodeWScope, value::bitcastFrom<const char*>(bytes)}));
     ASSERT_EQ(vec.back(), bson::convertFrom<true /* view */>(bsonElem));

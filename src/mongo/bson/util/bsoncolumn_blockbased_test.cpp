@@ -93,6 +93,33 @@ TEST_F(BSONColumnBlockBasedTest, BSONMaterializer) {
     assertRoundtrip(BSONCode{StringData{"x = 0"}});
 }
 
+TEST_F(BSONColumnBlockBasedTest, BSONMaterializerBSONElement) {
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<BSONElement> vec;
+    Collector<BSONElementMaterializer, decltype(vec)> collector{vec, allocator};
+
+    // Not all types are compressed in BSONColumn. Values of these types are just stored as
+    // uncompressed BSONElements. "Code with scope" is an example of this.
+    BSONCodeWScope codeWScope{"print(`${x}`)", BSON("x" << 10)};
+    auto obj = BSON("" << codeWScope);
+    auto bsonElem = obj.firstElement();
+
+    // Test with copying.
+    collector.append<BSONElement>(bsonElem);
+    auto elem = vec.back();
+    ASSERT(bsonElem.binaryEqual(elem));
+    // Since we are making a copy and storing it in the ElementStorage, the address of the data
+    // should not be the same.
+    ASSERT_NOT_EQUALS(elem.value(), bsonElem.value());
+
+    // Test without copying.
+    collector.appendPreallocated(bsonElem);
+    elem = vec.back();
+    ASSERT(bsonElem.binaryEqual(elem));
+    // Assert that we did not make a copy, because the address of the data is the same.
+    ASSERT_EQ(elem.value(), bsonElem.value());
+}
+
 TEST_F(BSONColumnBlockBasedTest, BSONMaterializerMissing) {
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<BSONElement> vec;
