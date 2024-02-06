@@ -42,37 +42,37 @@ __wt_cell_type_string(uint8_t type)
 {
     switch (type) {
     case WT_CELL_ADDR_DEL:
-        return ("addr/del");
+        return ("addr_del");
     case WT_CELL_ADDR_INT:
-        return ("addr/int");
+        return ("addr_int");
     case WT_CELL_ADDR_LEAF:
-        return ("addr/leaf");
+        return ("addr_leaf");
     case WT_CELL_ADDR_LEAF_NO:
-        return ("addr/leaf-no");
+        return ("addr_leaf_no_ovfl");
     case WT_CELL_DEL:
         return ("deleted");
     case WT_CELL_KEY:
         return ("key");
     case WT_CELL_KEY_PFX:
-        return ("key/pfx");
+        return ("key_pfx");
     case WT_CELL_KEY_OVFL:
-        return ("key/ovfl");
+        return ("key_ovfl");
     case WT_CELL_KEY_SHORT:
-        return ("key/short");
+        return ("key_short");
     case WT_CELL_KEY_SHORT_PFX:
-        return ("key/short,pfx");
+        return ("key_short_pfx");
     case WT_CELL_KEY_OVFL_RM:
-        return ("key/ovfl,rm");
+        return ("key_ovfl_rm");
     case WT_CELL_VALUE:
         return ("value");
     case WT_CELL_VALUE_COPY:
-        return ("value/copy");
+        return ("value_copy");
     case WT_CELL_VALUE_OVFL:
-        return ("value/ovfl");
+        return ("value_ovfl");
     case WT_CELL_VALUE_OVFL_RM:
-        return ("value/ovfl,rm");
+        return ("value_ovfl_rm");
     case WT_CELL_VALUE_SHORT:
-        return ("value/short");
+        return ("value_short");
     default:
         return ("unknown");
     }
