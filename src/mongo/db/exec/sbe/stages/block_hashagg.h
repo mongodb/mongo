@@ -29,15 +29,11 @@
 
 #pragma once
 
-#include <unordered_map>
-
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
@@ -83,6 +79,9 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
+
+    // TODO SERVER-85731: Determine what block size is optimal.
+    static const size_t kBlockOutSize = 128;
 
 protected:
     void doSaveState(bool relinquishCursor) override;
@@ -151,6 +150,8 @@ private:
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
+
+    bool _done = false;
 };
 
 }  // namespace sbe

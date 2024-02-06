@@ -29,11 +29,9 @@
 
 #include "mongo/db/exec/sbe/values/block_interface.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/stages/block_hashagg.h"
-#include "mongo/db/exec/sbe/util/spilling.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/assert_util.h"
@@ -199,6 +197,10 @@ void BlockHashAggStage::open(bool reOpen) {
     _children[0]->open(reOpen);
     _commonStats.opens++;
 
+    if (reOpen) {
+        _done = false;
+    }
+
     while (PlanState::ADVANCED == _children[0]->getNext()) {
         auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
         invariant(bitmapInTag == value::TypeTags::valueBlock);
@@ -293,39 +295,52 @@ void BlockHashAggStage::open(bool reOpen) {
 PlanState BlockHashAggStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_htIt == _ht.end()) {
-        _htIt = _ht.begin();
-    } else {
-        ++_htIt;
-    }
-
-    if (_htIt == _ht.end()) {
-        return trackPlanState(PlanState::IS_EOF);
-    }
-    // TODO SERVER-85537: Right now this is just returning blocks of size 1. We should have this
-    // return larger blocks for following BP stages.
-    const size_t kBlockOutSize = 1;
     _outIdBlock.clear();
     _outIdBlock.reserve(kBlockOutSize);
     for (auto& b : _outAggBlocks) {
         b.clear();
         b.reserve(kBlockOutSize);
     }
-    invariant(_outAggBlocks.size() == _outAggBlockAccessors.size());
-    invariant(_outAggBlocks.size() == _rowAggHtAccessors.size());
 
-    // Copy the key from the current element in the HT into the out block.
-    auto [t, v] = _idHtAccessor->copyOrMoveValue();
-    _outIdBlock.push_back(t, v);
     _outIdBlockAccessor.reset(
         false, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(&_outIdBlock));
+    size_t numRows = 0;
+    while (numRows < kBlockOutSize) {
+        if (_htIt == _ht.end()) {
+            _htIt = _ht.begin();
+        } else {
+            ++_htIt;
+        }
 
-    // Copy the values from the current element in the HT into the out block.
-    size_t i = 0;
-    for (auto& acc : _rowAggHtAccessors) {
-        auto [t, v] = acc->copyOrMoveValue();
-        _outAggBlocks[i].push_back(t, v);
-        ++i;
+        if (_done) {
+            return trackPlanState(PlanState::IS_EOF);
+        }
+
+        if (_htIt == _ht.end()) {
+            _done = true;
+            if (numRows == 0) {
+                return trackPlanState(PlanState::IS_EOF);
+            } else {
+                return trackPlanState(PlanState::ADVANCED);
+            }
+        }
+
+        invariant(_outAggBlocks.size() == _outAggBlockAccessors.size());
+        invariant(_outAggBlocks.size() == _rowAggHtAccessors.size());
+
+        // Copy the key from the current element in the HT into the out block.
+        auto [t, v] = _idHtAccessor->copyOrMoveValue();
+        _outIdBlock.push_back(t, v);
+
+        // Copy the values from the current element in the HT into the out block.
+        size_t i = 0;
+        for (auto& acc : _rowAggHtAccessors) {
+            auto [t, v] = acc->copyOrMoveValue();
+            _outAggBlocks[i].push_back(t, v);
+            ++i;
+        }
+
+        ++numRows;
     }
 
     return trackPlanState(PlanState::ADVANCED);

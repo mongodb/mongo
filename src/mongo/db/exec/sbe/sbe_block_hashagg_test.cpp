@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include <algorithm>
 #include <map>
-#include <type_traits>
 #include <vector>
 
 #include <boost/optional/optional.hpp>
@@ -44,7 +42,10 @@
 
 namespace mongo::sbe {
 
+namespace {
 typedef std::map<int32_t, std::vector<int32_t>> TestResultType;
+using TypedValue = std::pair<value::TypeTags, value::Value>;
+}  // namespace
 
 class BlockHashAggStageTest : public PlanStageTestFixture {
 public:
@@ -58,27 +59,29 @@ public:
         PlanStageTestFixture::tearDown();
     }
 
-    static std::pair<value::TypeTags, value::Value> unpackSingletonBlock(
-        std::pair<value::TypeTags, value::Value> blockPair) {
+    static std::vector<TypedValue> unpackBlock(TypedValue blockPair, size_t expectedBlockSize) {
         auto [blockTag, blockVal] = blockPair;
         ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
         auto deblocked = value::bitcastTo<value::ValueBlock*>(blockVal)->extract();
-        ASSERT_EQ(deblocked.count, 1);
-        return {deblocked.tags[0], deblocked.vals[0]};
+        ASSERT_EQ(deblocked.count, expectedBlockSize);
+        std::vector<TypedValue> res(deblocked.count);
+        for (size_t i = 0; i < deblocked.count; ++i) {
+            res[i] = deblocked[i];
+        }
+        return res;
     }
 
-    static std::vector<std::pair<value::TypeTags, value::Value>> unpackArrayOfSingleBlocks(
-        value::Value arrayVal) {
+    static std::vector<std::vector<TypedValue>> unpackArrayOfBlocks(value::Value arrayVal,
+                                                                    size_t expectedBlockSize) {
         auto arr = value::getArrayView(arrayVal);
-        std::vector<std::pair<value::TypeTags, value::Value>> result;
+        std::vector<std::vector<TypedValue>> result;
         for (size_t i = 0; i < arr->size(); i++) {
-            result.emplace_back(unpackSingletonBlock(arr->getAt(i)));
+            result.emplace_back(unpackBlock(arr->getAt(i), expectedBlockSize));
         }
         return result;
     }
 
-    static std::pair<value::TypeTags, value::Value> makeArray(
-        std::vector<std::pair<value::TypeTags, value::Value>> vals) {
+    static TypedValue makeArray(std::vector<TypedValue> vals) {
         auto [arrTag, arrVal] = value::makeNewArray();
         value::ValueGuard guard(arrTag, arrVal);
         for (auto [t, v] : vals) {
@@ -89,9 +92,7 @@ public:
     }
 
     template <typename... BlockData>
-    static std::pair<value::TypeTags, value::Value> makeInputArray(int32_t id,
-                                                                   std::vector<bool> bitset,
-                                                                   BlockData... blockData) {
+    static TypedValue makeInputArray(int32_t id, std::vector<bool> bitset, BlockData... blockData) {
         auto [arrTag, arrVal] = value::makeNewArray();
         value::ValueGuard guard(arrTag, arrVal);
         auto arr = value::getArrayView(arrVal);
@@ -110,43 +111,48 @@ public:
 
     // This helper takes an array of groupby results and compares to the expectedMap of group ID to
     // a list of accumulator results.
-    static void assertResultMatchesMap(std::pair<value::TypeTags, value::Value> result,
-                                       TestResultType expectedMap) {
+    static void assertResultMatchesMap(TypedValue result,
+                                       TestResultType expectedMap,
+                                       std::vector<size_t> expectedBlockSizes) {
         ASSERT_EQ(result.first, value::TypeTags::Array);
         auto resultArr = value::getArrayView(result.second);
+
+        size_t ebsIndex = 0;
         for (auto [subArrTag, subArrVal] : resultArr->values()) {
             ASSERT_EQ(subArrTag, value::TypeTags::Array);
-            auto subArray = value::getArrayView(subArrVal);
 
-            // Unpack the key.
-            auto [idTag, idVal] = unpackSingletonBlock(subArray->getAt(0));
-            ASSERT_EQ(idTag, value::TypeTags::NumberInt32);
-            auto key = value::bitcastTo<int32_t>(idVal);
+            // The first "row" in the vector stores the keys, and each subsequent row stores the
+            // value of each accumulator. results[0][1] gives you the {tag, val} of the second key.
+            // results[1][2] gives you the {tag, val} of the first accumlator for the third group.
+            auto results = unpackArrayOfBlocks(subArrVal, expectedBlockSizes[ebsIndex++]);
 
-            // Get the expected results for this accumulator.
-            auto expectedVals = expectedMap.at(key);
-            ASSERT_EQ(subArray->size(), expectedVals.size() + 1);
+            // Iterate over each key.
+            for (size_t i = 0; i < results[0].size(); ++i) {
+                ASSERT_EQ(results[0][i].first, value::TypeTags::NumberInt32);
+                auto key = value::bitcastTo<int32_t>(results[0][i].second);
 
-            // Now assert against our expected values.
-            for (size_t i = 0; i < expectedVals.size(); i++) {
-                auto [gbTag, gbVal] = unpackSingletonBlock(subArray->getAt(i + 1));
-                assertValuesEqual(gbTag,
-                                  gbVal,
-                                  value::TypeTags::NumberInt32,
-                                  value::bitcastTo<int32_t>(expectedVals[i]));
+                auto expectedVals = expectedMap.at(key);
+                ASSERT_EQ(results.size(), expectedVals.size() + 1);
+
+                // Check the expected results for each accumulator.
+                for (size_t j = 0; j < expectedVals.size(); j++) {
+                    assertValuesEqual(results[j + 1][i].first,
+                                      results[j + 1][i].second,
+                                      value::TypeTags::NumberInt32,
+                                      value::bitcastTo<int32_t>(expectedVals[j]));
+                }
+
+                // Delete from the expected map so we know we get the results exactly once.
+                expectedMap.erase(key);
             }
-
-            // Delete from the expected map so we know we get the results exactly once.
-            expectedMap.erase(key);
         }
         ASSERT(expectedMap.empty());
     }
 
     template <typename... BlockData>
-    static std::pair<value::TypeTags, value::Value> makeInputArray(
-        std::vector<std::pair<value::TypeTags, value::Value>> id,
-        std::vector<bool> bitset,
-        BlockData... blockData) {
+    static TypedValue makeInputArray(std::vector<TypedValue> id,
+                                     std::vector<bool> bitset,
+                                     BlockData... blockData) {
         auto [arrTag, arrVal] = value::makeNewArray();
         value::Array* arr = value::getArrayView(arrVal);
 
@@ -161,12 +167,13 @@ public:
         return {arrTag, arrVal};
     }
 
-    // Given the data input, the number of slots the stage requires, accumulators used, and expected
-    // output, runs the BlockHashAgg stage and asserts that we get correct results.
-    void runBlockHashAggTest(std::pair<value::TypeTags, value::Value> inputData,
+    // Given the data input, the number of slots the stage requires, accumulators used, and
+    // expected output, runs the BlockHashAgg stage and asserts that we get correct results.
+    void runBlockHashAggTest(TypedValue inputData,
                              size_t numScanSlots,
                              std::vector<std::pair<std::string, std::string>> accNames,
-                             TestResultType expected) {
+                             TestResultType expected,
+                             std::vector<size_t> expectedBlockSizes) {
         auto makeFn = [&](value::SlotVector scanSlots, std::unique_ptr<PlanStage> scanStage) {
             auto idSlot = scanSlots[0];
             auto bitsetInSlot = scanSlots[1];
@@ -211,7 +218,7 @@ public:
 
         auto result = runTestMulti(numScanSlots, inputData.first, inputData.second, makeFn);
         value::ValueGuard resultGuard{result};
-        assertResultMatchesMap(result, expected);
+        assertResultMatchesMap(result, expected, expectedBlockSizes);
     }
 
 private:
@@ -223,7 +230,7 @@ TEST_F(BlockHashAggStageTest, NoData) {
     // We should have an empty block with no data.
     TestResultType expected = {};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected, {});
 }
 
 TEST_F(BlockHashAggStageTest, AllDataFiltered) {
@@ -233,7 +240,7 @@ TEST_F(BlockHashAggStageTest, AllDataFiltered) {
     // We should have an empty block with no data.
     TestResultType expected = {};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected, {});
 }
 
 TEST_F(BlockHashAggStageTest, SingleAccumulatorMin) {
@@ -252,7 +259,7 @@ TEST_F(BlockHashAggStageTest, SingleAccumulatorMin) {
      */
     TestResultType expected = {{0, {20}}, {1, {10}}, {2, {30}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, Count1) {
@@ -263,7 +270,7 @@ TEST_F(BlockHashAggStageTest, Count1) {
                                            makeInputArray(1, {true, true, false})});
     TestResultType expected = {{0, {5}}, {1, {4}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockCount", "sum"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockCount", "sum"}}, expected, {2});
 }
 
 TEST_F(BlockHashAggStageTest, Sum1) {
@@ -281,7 +288,7 @@ TEST_F(BlockHashAggStageTest, Sum1) {
      */
     TestResultType expected = {{0, {3}}, {1, {24}}, {2, {39}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulators) {
@@ -307,9 +314,9 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulators) {
         std::make_pair(inputTag, inputVal),
         4,
         {{"valueBlockMin", "min"}, {"valueBlockCount", "sum"}, {"valueBlockMin", "min"}},
-        expected);
+        expected,
+        {3});
 }
-
 
 // --- Tests with block groupby key inputs ---
 
@@ -329,7 +336,7 @@ TEST_F(BlockHashAggStageTest, SumBlockGroupByKey1) {
      */
     TestResultType expected = {{0, {3}}, {1, {24}}, {2, {39}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {3});
 }
 
 // Similar to the test above, but we change the groupby keys so they are different within each
@@ -352,11 +359,11 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys2) {
      */
     TestResultType expected = {{1, {37}}, {2, {36}}, {3, {18}}, {4, {12}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {4});
 }
 
-// Similar test as above but the "2" key appears in every block but is always false, so we make sure
-// it's missing.
+// Similar test as above but the "2" key appears in every block but is always false, so we make
+// sure it's missing.
 TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
     // Each entry is ID followed by bitset followed by a block of data.
     auto [inputTag, inputVal] = makeArray(
@@ -375,7 +382,7 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
      */
     TestResultType expected = {{1, {37}}, {3, {18}}, {4, {12}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected);
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
@@ -411,6 +418,51 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
         std::make_pair(inputTag, inputVal),
         4,
         {{"valueBlockMin", "min"}, {"valueBlockCount", "sum"}, {"valueBlockMin", "min"}},
-        expected);
+        expected,
+        {3});
+}
+
+TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
+    TestResultType expected;
+    auto addToExpected = [&expected](int32_t id, bool exists, int32_t data) {
+        if (exists) {
+            expected.emplace(id, std::vector<int32_t>{0});
+            expected[id][0] += data;
+        }
+    };
+
+    std::vector<TypedValue> vals;
+    // Create kBlockOutSize * 3 + 1 group ids, so that the output is 3 blocks of size
+    // kBlockOutSize, and 1 block of size 1.
+    for (size_t id = 0; id < BlockHashAggStage::kBlockOutSize * 3 + 1; ++id) {
+        std::vector<int32_t> ids;
+        std::vector<bool> bitmap;
+        std::vector<int32_t> data;
+
+        for (size_t i = 0; i < 6; i++) {
+            // Every third entry will be false.
+            bool exists = i % 3 != 0;
+            int32_t dataPoint = i + id * 5;
+
+            // Add to our expected result map, and to our input data.
+            addToExpected(id, exists, dataPoint);
+            ids.push_back(id);
+            bitmap.push_back(exists);
+            data.push_back(dataPoint);
+        }
+
+        auto input = makeInputArray(makeInt32s(ids), bitmap, makeInt32s(data));
+        vals.push_back(input);
+    }
+
+    auto [inputTag, inputVal] = makeArray(vals);
+    runBlockHashAggTest(std::make_pair(inputTag, inputVal),
+                        3,
+                        {{"valueBlockSum", "sum"}},
+                        expected,
+                        {BlockHashAggStage::kBlockOutSize,
+                         BlockHashAggStage::kBlockOutSize,
+                         BlockHashAggStage::kBlockOutSize,
+                         1});
 }
 }  // namespace mongo::sbe
