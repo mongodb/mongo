@@ -1631,5 +1631,17 @@ TEST_F(SystemBucketsTest, CanCheckIfHasAnyPrivilegeInResourceDBForSystemBuckets)
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnAnyResourceInDB(sb_db_other));
 }
 
+TEST_F(AuthorizationSessionTest, InternalSystemClientsBypassValidateRestrictions) {
+    // set up a direct client without transport session
+    auto client = getServiceContext()->makeClient("directClient");
+    // set Client user to be the internal __system user.
+    authzSession->grantInternalAuthorization(client.get());
+    auto opCtx = client->makeOperationContext();
+
+    // should not fail even though client does not have a transport session
+    User* currentUser = authzSession->getSingleUser();
+    ASSERT_OK(currentUser->validateRestrictions(opCtx.get()));
+}
+
 }  // namespace
 }  // namespace mongo
