@@ -145,7 +145,8 @@ public:
                           const BSONObj& cmdObj) final;
     void createTempCollection(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const BSONObj& collectionOptions) final;
+                              const BSONObj& collectionOptions,
+                              boost::optional<ShardId> dataShard) final;
     void createIndexesOnEmptyCollection(OperationContext* opCtx,
                                         const NamespaceString& ns,
                                         const std::vector<BSONObj>& indexSpecs) final;
@@ -187,6 +188,15 @@ public:
                             std::unique_ptr<write_ops::InsertCommandRequest> insertCommand,
                             const WriteConcernOptions& wc,
                             boost::optional<OID> targetEpoch) final;
+
+protected:
+    /**
+     * Utility to share a common collection creation implementation.
+     */
+    void _createCollectionCommon(OperationContext* opCtx,
+                                 const DatabaseName& dbName,
+                                 const BSONObj& cmdObj,
+                                 boost::optional<ShardId> dataShard = boost::none);
 
 private:
     boost::optional<TimeseriesOptions> _getTimeseriesOptions(OperationContext* opCtx,

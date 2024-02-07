@@ -222,7 +222,8 @@ public:
 
     void createTempCollection(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const BSONObj& collectionOptions) final {
+                              const BSONObj& collectionOptions,
+                              boost::optional<ShardId> dataShard) final {
         MONGO_UNREACHABLE;
     }
 

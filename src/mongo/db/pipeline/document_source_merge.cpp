@@ -218,8 +218,7 @@ DocumentSourceMerge::DocumentSourceMerge(NamespaceString outputNs,
                                          boost::optional<std::vector<BSONObj>> pipeline,
                                          std::set<FieldPath> mergeOnFields,
                                          boost::optional<ChunkVersion> collectionPlacementVersion)
-    : DocumentSourceWriter(kStageName.rawData(), outputNs, expCtx),
-      _outputNs(std::move(outputNs)),
+    : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
       _mergeOnFields(std::move(mergeOnFields)),
       _mergeOnFieldsIncludesId(_mergeOnFields.count("_id") == 1) {
     _mergeProcessor.emplace(expCtx,

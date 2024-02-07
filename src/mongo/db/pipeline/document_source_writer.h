@@ -109,11 +109,12 @@ public:
     using BatchedObjects = std::vector<BatchObject>;
 
     DocumentSourceWriter(const char* stageName,
-                         const NamespaceString& outputNs,
+                         NamespaceString outputNs,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(stageName, expCtx),
           _writeSizeEstimator(
-              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, outputNs)) {}
+              expCtx->mongoProcessInterface->getWriteSizeEstimator(expCtx->opCtx, outputNs)),
+          _outputNs(std::move(outputNs)) {}
 
     DepsTracker::State getDependencies(DepsTracker* deps) const override {
         deps->needWholeDocument = true;
@@ -135,7 +136,9 @@ public:
         return true;
     }
 
-    virtual const NamespaceString& getOutputNs() const = 0;
+    const NamespaceString& getOutputNs() const {
+        return _outputNs;
+    }
 
 protected:
     GetNextResult doGetNext() final override;
@@ -192,6 +195,8 @@ protected:
     const std::unique_ptr<MongoProcessInterface::WriteSizeEstimator> _writeSizeEstimator;
 
 private:
+    const NamespaceString _outputNs;
+
     bool _initialized{false};
     bool _done{false};
 };

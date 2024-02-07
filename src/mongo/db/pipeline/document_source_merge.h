@@ -152,10 +152,6 @@ public:
         return kStageName.rawData();
     }
 
-    const NamespaceString& getOutputNs() const override {
-        return _outputNs;
-    }
-
     MergeProcessor* getMergeProcessor() {
         return _mergeProcessor.get_ptr();
     }
@@ -236,8 +232,6 @@ private:
     void flush(BatchedCommandRequest bcr, BatchedObjects batch) override;
 
     void waitWhileFailPointEnabled() override;
-
-    const NamespaceString _outputNs;
 
     // Holds the fields used for uniquely identifying documents. There must exist a unique index
     // with this key pattern. Default is "_id" for unsharded collections, and "_id" plus the shard

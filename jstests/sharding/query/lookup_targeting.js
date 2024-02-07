@@ -1063,7 +1063,7 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
                 assert.throwsWithCode(
                     () => {db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray()},
                     ErrorCodes.QueryPlanKilled);
-            }, kDbName, kUnsplittable1CollName, sbeLookupPipeline), st.rs1.getPrimary().port);
+            }, kDbName, kUnsplittable1CollName, sbeLookupPipeline), st.s.port);
 
         failpoint.wait();
 
@@ -1082,16 +1082,10 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         // When sharding the inner collection, the aggregate should complete successfully because we
         // will have a view of the unsplittable collection until our aggregate completes.
         let sbeLookup = startParallelShell(
-            funWithArgs(
-                function(dbName, collName, pipeline, expectedResults) {
-                    assert.eq(expectedResults,
-                              db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray());
-                },
-                kDbName,
-                kUnsplittable1CollName,
-                sbeLookupPipeline,
-                expectedResults),
-            st.rs1.getPrimary().port);
+            funWithArgs(function(dbName, collName, pipeline, expectedResults) {
+                assert.eq(expectedResults,
+                          db.getSiblingDB(dbName)[collName].aggregate(pipeline).toArray());
+            }, kDbName, kUnsplittable1CollName, sbeLookupPipeline, expectedResults), st.s.port);
 
         failpoint.wait();
 

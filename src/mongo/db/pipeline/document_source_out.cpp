@@ -108,6 +108,26 @@ DocumentSourceOut::~DocumentSourceOut() {
         });
 }
 
+StageConstraints DocumentSourceOut::constraints(Pipeline::SplitState pipeState) const {
+    StageConstraints result{StreamType::kStreaming,
+                            PositionRequirement::kLast,
+                            HostTypeRequirement::kNone,
+                            DiskUseRequirement::kWritesPersistentData,
+                            FacetRequirement::kNotAllowed,
+                            TransactionRequirement::kNotAllowed,
+                            LookupRequirement::kNotAllowed,
+                            UnionRequirement::kNotAllowed};
+    if (pipeState == Pipeline::SplitState::kSplitForMerge) {
+        // If output collection resides on a single shard, we should route $out to it to perform
+        // local writes. Note that this decision is inherently racy and subject to become stale.
+        // This is okay because either choice will work correctly, we are simply applying a
+        // heuristic optimization.
+        result.mergeShardId = pExpCtx->mongoProcessInterface->determineSpecificMergeShard(
+            pExpCtx->opCtx, getOutputNs());
+    }
+    return result;
+}
+
 DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
     const BSONElement& spec, const DatabaseName& defaultDB) {
     DocumentSourceOutSpec outSpec;
@@ -235,8 +255,13 @@ void DocumentSourceOut::initialize() {
             collectionOptions.appendElementsUnique(_originalOutOptions);
         }
 
+        // If the output collection exists, we should create the temp collection on the shard that
+        // owns the output collection.
+        auto targetShard = pExpCtx->mongoProcessInterface->determineSpecificMergeShard(
+            pExpCtx->opCtx, getOutputNs());
+
         pExpCtx->mongoProcessInterface->createTempCollection(
-            pExpCtx->opCtx, _tempNs, collectionOptions.done());
+            pExpCtx->opCtx, _tempNs, collectionOptions.done(), targetShard);
     }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -347,10 +372,10 @@ Value DocumentSourceOut::serialize(const SerializationOptions& opts) const {
     DocumentSourceOutSpec spec;
     // TODO SERVER-77000: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
     // spec.setDb(DatabaseNameUtil::serialize(
-    //     _outputNs.dbName(),
+    //     getOutputNs().dbName(),
     //     SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)));
-    spec.setDb(_outputNs.dbName().serializeWithoutTenantPrefix_UNSAFE());
-    spec.setColl(_outputNs.coll());
+    spec.setDb(getOutputNs().dbName().serializeWithoutTenantPrefix_UNSAFE());
+    spec.setColl(getOutputNs().coll());
     spec.setTimeseries(_timeseries);
     spec.serialize(&bob, opts);
     return Value(Document{{kStageName, bob.done()}});

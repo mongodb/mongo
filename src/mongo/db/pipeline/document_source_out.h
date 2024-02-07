@@ -123,16 +123,7 @@ public:
 
     ~DocumentSourceOut() override;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final override {
-        return {StreamType::kStreaming,
-                PositionRequirement::kLast,
-                HostTypeRequirement::kPrimaryShard,
-                DiskUseRequirement::kWritesPersistentData,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed};
-    }
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final override;
 
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
@@ -154,18 +145,13 @@ public:
         return kStageName.rawData();
     }
 
-    const NamespaceString& getOutputNs() const override {
-        return _outputNs;
-    }
-
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
     DocumentSourceOut(NamespaceString outputNs,
                       boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(kStageName.rawData(), outputNs, expCtx),
-          _outputNs(std::move(outputNs)),
+        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
           _writeConcern(expCtx->opCtx->getWriteConcern()),
           _timeseries(std::move(timeseries)) {}
 
@@ -213,9 +199,6 @@ private:
     boost::optional<TimeseriesOptions> validateTimeseries();
 
     NamespaceString makeBucketNsIfTimeseries(const NamespaceString& ns);
-
-    // The namespace where the output will be written to.
-    const NamespaceString _outputNs;
 
     // Stash the writeConcern of the original command as the operation context may change by the
     // time we start to flush writes. This is because certain aggregations (e.g. $exchange)

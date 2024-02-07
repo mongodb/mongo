@@ -201,7 +201,8 @@ public:
 
     void createTempCollection(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const BSONObj& collectionOptions) override {
+                              const BSONObj& collectionOptions,
+                              boost::optional<ShardId> dataShard) override {
         MONGO_UNREACHABLE;
     }
 

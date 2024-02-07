@@ -4157,10 +4157,19 @@ public:
 };
 
 TEST_F(PipelineOptimizationsShardMerger, Out) {
+    const Timestamp timestamp{1, 1};
+    const auto nss = NamespaceString::createNamespaceString_forTest("a", "outColl");
+
+    getCatalogCacheMock()->setCollectionReturnValue(
+        nss,
+        CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(
+            nss, ShardId("dbPrimary"), DatabaseVersion{UUID::gen(), timestamp}, _myShardName));
+
     doTest("[{$out: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
            "[{$out: {coll: 'outColl', db: 'a'}}]" /*mergePipeJson*/,
-           true /*needsPrimaryShardMerger*/);
+           false,
+           _myShardName /* mergeShardId */);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {

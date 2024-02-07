@@ -361,10 +361,10 @@ std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* 
                     std::make_move_iterator(indexes.end())};
         });
 }
-
-void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
-                                                   const DatabaseName& dbName,
-                                                   const BSONObj& cmdObj) {
+void ShardServerProcessInterface::_createCollectionCommon(OperationContext* opCtx,
+                                                          const DatabaseName& dbName,
+                                                          const BSONObj& cmdObj,
+                                                          boost::optional<ShardId> dataShard) {
     // TODO SERVER-85437: remove this check and keep only the 'else' branch.
     if (serverGlobalParams.upgradeBackCompat || serverGlobalParams.downgradeBackCompat) {
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
@@ -408,8 +408,11 @@ void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
 
         ShardsvrCreateCollection shardsvrCollCommand(nss);
         request.setUnsplittable(true);
-        shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
 
+        // Configure the data shard if one was requested.
+        request.setDataShard(dataShard);
+
+        shardsvrCollCommand.setShardsvrCreateCollectionRequest(request);
         sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), dbName);
         router.route(opCtx,
                      "ShardServerProcessInterface::createCollection",
@@ -419,9 +422,16 @@ void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
     }
 }
 
+void ShardServerProcessInterface::createCollection(OperationContext* opCtx,
+                                                   const DatabaseName& dbName,
+                                                   const BSONObj& cmdObj) {
+    _createCollectionCommon(opCtx, dbName, cmdObj);
+}
+
 void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
                                                        const NamespaceString& nss,
-                                                       const BSONObj& collectionOptions) {
+                                                       const BSONObj& collectionOptions,
+                                                       boost::optional<ShardId> dataShard) {
     // Insert an entry on the 'kAggTempCollections' collection on this shard to indicate that 'nss'
     // is a temporary collection that shall be garbage-collected (dropped) on the next stepup.
     BatchedCommandRequest bcr(write_ops::InsertCommandRequest{
@@ -436,7 +446,7 @@ void ShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
     BSONObjBuilder cmd;
     cmd << "create" << nss.coll();
     cmd.appendElementsUnique(collectionOptions);
-    createCollection(opCtx, nss.dbName(), cmd.done());
+    _createCollectionCommon(opCtx, nss.dbName(), cmd.done(), std::move(dataShard));
 }
 
 void ShardServerProcessInterface::createIndexesOnEmptyCollection(

@@ -262,7 +262,10 @@ void NonShardServerProcessInterface::createCollection(OperationContext* opCtx,
 
 void NonShardServerProcessInterface::createTempCollection(OperationContext* opCtx,
                                                           const NamespaceString& nss,
-                                                          const BSONObj& collectionOptions) {
+                                                          const BSONObj& collectionOptions,
+                                                          boost::optional<ShardId> dataShard) {
+    tassert(
+        7971800, "Should not specify 'dataShard' in a non-sharded context", !dataShard.has_value());
     BSONObjBuilder cmd;
     cmd << "create" << nss.coll();
     cmd << "temp" << true;

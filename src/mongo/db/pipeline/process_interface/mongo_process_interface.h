@@ -366,10 +366,14 @@ public:
      * they are annotated on the 'kAggTempCollections' collection on this shard. In both cases,
      * temporary collections are dropped (garbage-collected) on stepup (or startup in the case of
      * standalone nodes).
+     *
+     * This function accepts an optional 'dataShard' parameter that indicates the shard where the
+     * temporary collection should be created.
      */
     virtual void createTempCollection(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      const BSONObj& collectionOptions) = 0;
+                                      const BSONObj& collectionOptions,
+                                      boost::optional<ShardId> dataShard = boost::none) = 0;
     /**
      * Creates the view backing a time-series collection.
      */

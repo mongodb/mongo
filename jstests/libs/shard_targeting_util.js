@@ -143,10 +143,6 @@ export class ShardTargetingTest {
      */
     setupColl({collName, indexList, docs, collType, shardKey, chunkList, owningShard}) {
         const coll = this.db[collName];
-        if (indexList && indexList.length > 0) {
-            assert.commandWorked(coll.createIndexes(indexList));
-        }
-
         if (collType === "sharded") {
             assert(shardKey && chunkList,
                    "Must specify shard key and chunk list when setting up a sharded collection");
@@ -160,7 +156,13 @@ export class ShardTargetingTest {
             assert(false, "Unknown collection type " + tojson(collType));
         }
 
-        assert.commandWorked(coll.insertMany(docs));
+        if (indexList && indexList.length > 0) {
+            assert.commandWorked(coll.createIndexes(indexList));
+        }
+
+        if (docs && docs.length > 0) {
+            assert.commandWorked(coll.insertMany(docs));
+        }
     }
 
     /**
