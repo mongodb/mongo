@@ -316,7 +316,6 @@ void insertChunks(OperationContext* opCtx,
         return insertOp;
     }());
 
-    insertRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
     {
         auto newClient =
             opCtx->getServiceContext()->makeClient("CreateCollectionCoordinator::insertChunks");
@@ -330,6 +329,7 @@ void insertChunks(OperationContext* opCtx,
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
         auto newOpCtx = CancelableOperationContext(
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
+        newOpCtx->setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern);
         {
             auto lk = stdx::lock_guard(*newOpCtx->getClient());
             newOpCtx->setLogicalSessionId(*osi.getSessionId());
