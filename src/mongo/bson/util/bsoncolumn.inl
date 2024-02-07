@@ -154,6 +154,35 @@ const char* BSONColumnBlockBased::decompressAllDouble(const char* ptr,
 
 template <class Buffer>
 requires Appendable<Buffer>
+const char* BSONColumnBlockBased::decompressAllLiteral(const char* ptr,
+                                                       const char* end,
+                                                       Buffer& buffer,
+                                                       const BSONElement& reference) {
+    while (ptr < end) {
+        const uint8_t control = *ptr;
+        if (control == EOO || isUncompressedLiteralControlByte(control) ||
+            isInterleavedStartControlByte(control))
+            break;
+
+        uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
+        Simple8b<uint64_t> s8b(ptr + 1, size);
+        for (auto it = s8b.begin(); it != s8b.end(); ++it) {
+            const auto& delta = *it;
+            if (!delta)
+                buffer.appendMissing();
+            else if (*delta == 0)
+                buffer.template append<BSONElement>(reference);
+            else
+                uasserted(8609800, "Post literal delta blocks should only contain skip or 0");
+        }
+        ptr += 1 + size;
+    }
+
+    return ptr;
+}
+
+template <class Buffer>
+requires Appendable<Buffer>
 void BSONColumnBlockBased::decompress(Buffer& buffer) const {
     const char* ptr = _binary;
     const char* end = _binary + _size;
@@ -322,6 +351,20 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
                             buffer.append(
                                 BSONCode(StringData((const char*)string.str.data(), string.size)));
                         });
+                    break;
+                case Object:
+                case Array:
+                case Undefined:
+                case jstNULL:
+                case RegEx:
+                case DBRef:
+                case CodeWScope:
+                case Symbol:
+                case MinKey:
+                case MaxKey:
+                    // Non-delta types, deltas should only contain skip or 0
+                    buffer.template append<BSONElement>(literal);
+                    ptr = decompressAllLiteral(ptr, end, buffer, literal);
                     break;
                 default:
                     uasserted(8295704, "Type not implemented");
