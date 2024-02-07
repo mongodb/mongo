@@ -45,8 +45,7 @@ void
 kv_workload::run(kv_database &database) const
 {
     kv_workload_runner runner{database};
-    for (const operation::any &op : _operations)
-        runner.run_operation(op);
+    runner.run(*this);
 }
 
 /*
@@ -57,12 +56,7 @@ void
 kv_workload::run_in_wiredtiger(const char *home, const char *connection_config) const
 {
     kv_workload_runner_wt runner{home, connection_config};
-    runner.wiredtiger_open();
-
-    for (const operation::any &op : _operations)
-        runner.run_operation(op);
-
-    runner.wiredtiger_close();
+    runner.run(*this);
 }
 
 } /* namespace model */

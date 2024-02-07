@@ -55,6 +55,7 @@ kv_workload_generator_spec::kv_workload_generator_spec()
     truncate = 0.005;
 
     checkpoint = 0.02;
+    crash = 0.002;
     restart = 0.002;
     set_stable_timestamp = 0.2;
 
@@ -473,6 +474,13 @@ kv_workload_generator::run()
                 *p << operation::checkpoint();
                 _sequences.push_back(p);
             }
+            probability_case(_spec.crash)
+            {
+                kv_workload_sequence_ptr p =
+                  std::make_shared<kv_workload_sequence>(_sequences.size());
+                *p << operation::crash();
+                _sequences.push_back(p);
+            }
             probability_case(_spec.restart)
             {
                 kv_workload_sequence_ptr p =
@@ -564,8 +572,9 @@ kv_workload_generator::run()
         /* Validate that we filled in the timestamps in the correct order. */
         assert_timestamps(*s->sequence, op, stable);
 
-        /* If the operation resulted in a database restart, stop all started sequences. */
-        if (std::holds_alternative<operation::restart>(op)) {
+        /* If the operation resulted in a database crash or restart, stop all started sequences. */
+        if (std::holds_alternative<operation::crash>(op) ||
+          std::holds_alternative<operation::restart>(op)) {
             t.complete_all();
             continue;
         }

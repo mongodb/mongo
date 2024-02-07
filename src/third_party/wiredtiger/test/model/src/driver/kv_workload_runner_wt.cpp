@@ -26,9 +26,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <cassert>
 #include <iomanip>
 #include <iostream>
+#include <signal.h>
 #include <sstream>
+#include <unistd.h>
 #include "model/driver/kv_workload_runner_wt.h"
 #include "model/util.h"
 
@@ -92,6 +97,145 @@ kv_workload_runner_wt::~kv_workload_runner_wt()
 }
 
 /*
+ * kv_workload_runner_wt::run --
+ *     Run the workload in WiredTiger.
+ */
+void
+kv_workload_runner_wt::run(const kv_workload &workload)
+{
+    /*
+     * Initialize the shared memory state, that we will share between the controller (parent)
+     * process, and the process that will actually run the workload.
+     */
+    shared_memory shm_state(sizeof(shared_state));
+    _state = (shared_state *)shm_state.data();
+
+    /* Clean up the pointer at the end, just before the actual shared memory gets cleaned up. */
+    at_cleanup cleanup_state([this]() { _state = nullptr; });
+
+    /*
+     * Run the workload in a child process, so that we can properly handle crashes. If the child
+     * process crashes intentionally, we'll learn about it through the shared state.
+     */
+    size_t p = 0; /* Position in the workload. */
+    for (;;) {
+        bool crashed = _state->expect_crash;
+        _state->expect_crash = false;
+
+        pid_t child = fork();
+        if (child < 0)
+            throw model_exception(std::string("Could not fork the process: ") + strerror(errno) +
+              " (" + std::to_string(errno) + ")");
+
+        if (child == 0) {
+            int ret = 0;
+            try {
+                /* Subprocess. */
+                wiredtiger_open();
+
+                /* If we just crashed, we may need to recover some of the lost runtime state. */
+                if (crashed) {
+                    if (_state->num_tables >= sizeof(_state->tables) / sizeof(_state->tables[0]))
+                        throw model_exception("Invalid number of tables");
+                    for (size_t i = 0; i < _state->num_tables; i++)
+                        add_table_uri(
+                          _state->tables[i].id, _state->tables[i].uri, true /* recovery */);
+                }
+
+                /* Run (or resume) the workload. */
+                for (; p < workload.size(); p++) {
+                    const operation::any &op = workload[p];
+                    if (std::holds_alternative<operation::crash>(op)) {
+                        _state->expect_crash = true;
+                        _state->crash_index = p;
+                    }
+                    run_operation(op);
+                }
+
+                wiredtiger_close();
+            } catch (std::exception &e) {
+                _state->exception = true;
+                _state->failed_operation = p;
+                snprintf(
+                  _state->exception_message, sizeof(_state->exception_message), "%s", e.what());
+                ret = 1;
+            }
+
+            exit(ret);
+            /* Not reached. */
+        }
+
+        /* Parent process. */
+        int pid_status;
+        int ret = waitpid(child, &pid_status, 0);
+        if (ret < 0)
+            throw model_exception(std::string("Waiting for a child process failed: ") +
+              strerror(errno) + " (" + std::to_string(errno) + ")");
+
+        if (WIFEXITED(pid_status) && WEXITSTATUS(pid_status) == 0)
+            /* Clean exit. */
+            break;
+
+        if (_state->expect_crash) {
+            /* The crash was intentional. Continue the workload. */
+            if (p >= _state->crash_index)
+                throw model_exception("Workload crash did not advance the operation index");
+            p = _state->crash_index + 1;
+            continue;
+        }
+
+        if (_state->exception)
+            /* The child process died due to an exception. */
+            throw model_exception("Workload was terminated due to an exception at operation " +
+              std::to_string(_state->failed_operation) + ": " + _state->exception_message);
+
+        if (WIFEXITED(pid_status))
+            /* The child process exited with an error code. */
+            throw model_exception(
+              "The workload process exited with code " + std::to_string(WEXITSTATUS(pid_status)));
+
+        if (WIFSIGNALED(pid_status))
+            /* The child process died due to a signal. */
+            throw model_exception("The workload process was terminated with signal " +
+              std::to_string(WTERMSIG(pid_status)));
+
+        /* Otherwise the workload failed in some other way. */
+        throw model_exception("The workload process terminated in an unexpected way.");
+    }
+}
+
+/*
+ * kv_workload_runner_wt::add_table_uri --
+ *     Add a table URI.
+ */
+void
+kv_workload_runner_wt::add_table_uri(table_id_t id, std::string uri, bool recovery)
+{
+    std::unique_lock lock(_table_uris_lock);
+    if (uri.empty())
+        throw model_exception("Invalid table URI");
+
+    /* Add to the runtime map. */
+    auto iter = _table_uris.find(id);
+    if (iter != _table_uris.end())
+        throw model_exception("A table with the given ID already exists");
+    _table_uris.insert_or_assign(iter, id, uri);
+
+    /* Add to the workload recovery state. */
+    if (!recovery) {
+        size_t i = _state->num_tables;
+        if (i >= sizeof(_state->tables) / sizeof(_state->tables[0]))
+            throw model_exception("Too many tables");
+        if (uri.length() + 1 /* for the terminating byte */ > sizeof(_state->tables[i].uri))
+            throw model_exception("The table URI is too long");
+
+        _state->tables[i].id = id;
+        (void)snprintf(_state->tables[i].uri, sizeof(_state->tables[i].uri), "%s", uri.c_str());
+        _state->num_tables++;
+    }
+}
+
+/*
  * kv_workload_runner_wt::do_operation --
  *     Execute the given workload operation in WiredTiger.
  */
@@ -121,8 +265,8 @@ kv_workload_runner_wt::do_operation(const operation::checkpoint &op)
     std::ostringstream config;
     if (!op.name.empty())
         config << "name=" << op.name;
-
     std::string config_str = config.str();
+
     return session->checkpoint(session, config_str.c_str());
 }
 
@@ -133,17 +277,45 @@ kv_workload_runner_wt::do_operation(const operation::checkpoint &op)
 int
 kv_workload_runner_wt::do_operation(const operation::commit_transaction &op)
 {
-    std::shared_lock lock(_connection_lock);
-    session_context_ptr session = remove_txn_session(op.txn_id);
-
     std::ostringstream config;
     if (op.commit_timestamp != k_timestamp_none)
         config << ",commit_timestamp=" << std::hex << op.commit_timestamp;
     if (op.durable_timestamp != k_timestamp_none)
         config << ",durable_timestamp=" << std::hex << op.durable_timestamp;
-
     std::string config_str = config.str();
+
+    std::shared_lock lock(_connection_lock);
+    session_context_ptr session = remove_txn_session(op.txn_id);
+
     return session->session()->commit_transaction(session->session(), config_str.c_str());
+}
+
+/*
+ * kv_workload_runner_wt::do_operation --
+ *     Execute the given workload operation in WiredTiger.
+ */
+int
+kv_workload_runner_wt::do_operation(const operation::crash &op)
+{
+    (void)op;
+
+    /*
+     * Communicating to the parent process that this crash was intentional is done by the caller,
+     * because it knows additional information such as at which point to restart the workload, which
+     * is lost by the time we get here.
+     */
+    assert(_state->expect_crash);
+
+    /* Terminate self with a signal that doesn't produce a core file. */
+    (void)kill(getpid(), SIGKILL);
+
+    /*
+     * Well, if that somehow failed due to slow signal delivery or some weird behavior of kill,
+     * abort. This should not happen, but the person writing this code is a pessimist.
+     */
+    abort();
+
+    /* Not reached. */
 }
 
 /*
@@ -168,8 +340,8 @@ kv_workload_runner_wt::do_operation(const operation::create_table &op)
      */
     config << "log=(enabled=false)";
     config << ",key_format=" << op.key_format << ",value_format=" << op.value_format;
-
     std::string config_str = config.str();
+
     std::string uri = std::string("table:") + op.name;
     ret = session->create(session, uri.c_str(), config_str.c_str());
     if (ret == 0)
@@ -197,14 +369,14 @@ kv_workload_runner_wt::do_operation(const operation::insert &op)
 int
 kv_workload_runner_wt::do_operation(const operation::prepare_transaction &op)
 {
-    std::shared_lock lock(_connection_lock);
-    session_context_ptr session = txn_session(op.txn_id);
-
     std::ostringstream config;
     if (op.prepare_timestamp != k_timestamp_none)
         config << ",prepare_timestamp=" << std::hex << op.prepare_timestamp;
-
     std::string config_str = config.str();
+
+    std::shared_lock lock(_connection_lock);
+    session_context_ptr session = txn_session(op.txn_id);
+
     return session->session()->prepare_transaction(session->session(), config_str.c_str());
 }
 
@@ -244,8 +416,9 @@ kv_workload_runner_wt::do_operation(const operation::restart &op)
 int
 kv_workload_runner_wt::do_operation(const operation::rollback_to_stable &op)
 {
-    std::unique_lock lock(_connection_lock);
     (void)op;
+
+    std::unique_lock lock(_connection_lock);
     return _connection->rollback_to_stable(_connection, nullptr);
 }
 
@@ -268,14 +441,14 @@ kv_workload_runner_wt::do_operation(const operation::rollback_transaction &op)
 int
 kv_workload_runner_wt::do_operation(const operation::set_commit_timestamp &op)
 {
-    std::shared_lock lock(_connection_lock);
-    session_context_ptr session = txn_session(op.txn_id);
-
     std::ostringstream config;
     if (op.commit_timestamp != k_timestamp_none)
         config << ",commit_timestamp=" << std::hex << op.commit_timestamp;
-
     std::string config_str = config.str();
+
+    std::shared_lock lock(_connection_lock);
+    session_context_ptr session = txn_session(op.txn_id);
+
     return session->session()->timestamp_transaction(session->session(), config_str.c_str());
 }
 
@@ -286,11 +459,11 @@ kv_workload_runner_wt::do_operation(const operation::set_commit_timestamp &op)
 int
 kv_workload_runner_wt::do_operation(const operation::set_stable_timestamp &op)
 {
-    std::shared_lock lock(_connection_lock);
     std::ostringstream config;
     config << "stable_timestamp=" << std::hex << op.stable_timestamp;
-
     std::string config_str = config.str();
+
+    std::shared_lock lock(_connection_lock);
     return _connection->set_timestamp(_connection, config_str.c_str());
 }
 

@@ -72,6 +72,7 @@ struct kv_workload_generator_spec {
 
     /* Probabilities of special operations. */
     float checkpoint;
+    float crash;
     float restart;
     float set_stable_timestamp;
 

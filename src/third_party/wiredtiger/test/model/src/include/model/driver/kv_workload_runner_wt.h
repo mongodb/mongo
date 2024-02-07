@@ -114,13 +114,43 @@ protected:
      */
     using session_context_ptr = std::shared_ptr<session_context>;
 
+    /*
+     * shared_state --
+     *     The shared state of the child executor process, which is shared with the parent. Because
+     *     of the way this struct is used, only C types are allowed.
+     */
+    struct shared_state {
+
+        /*
+         * shared_state::table_state --
+         *     Shared table state.
+         */
+        struct table_state {
+            table_id_t id;
+            char uri[256];
+        };
+
+        /* Crash handling. */
+        size_t crash_index; /* The crash operation that resulted, well, in the crash. */
+        bool expect_crash;  /* True when the child process is expected to crash. */
+
+        /* Execution failure handling. */
+        bool exception;              /* If there was an exception. */
+        size_t failed_operation;     /* The operation that caused an exception. */
+        char exception_message[256]; /* The exception message. */
+
+        /* The map of table IDs to URIs, needed to resume the workload from a crash. */
+        size_t num_tables;
+        table_state tables[256]; /* The table states; protected by the same lock as the URI map. */
+    };
+
 public:
     /*
      * kv_workload_runner_wt::kv_workload_runner_wt --
      *     Create a new workload
      */
     inline kv_workload_runner_wt(const char *home, const char *connection_config)
-        : _connection(nullptr), _connection_config(connection_config), _home(home)
+        : _connection(nullptr), _connection_config(connection_config), _home(home), _state(nullptr)
     {
     }
 
@@ -130,6 +160,13 @@ public:
      */
     ~kv_workload_runner_wt();
 
+    /*
+     * kv_workload::run --
+     *     Run the workload in WiredTiger.
+     */
+    void run(const kv_workload &workload);
+
+protected:
     /*
      * kv_workload_runner::run_operation --
      *     Run the given operation.
@@ -173,7 +210,6 @@ public:
         wiredtiger_close_nolock();
     }
 
-protected:
     /*
      * kv_workload_runner_wt::do_operation --
      *     Execute the given workload operation in WiredTiger.
@@ -191,6 +227,12 @@ protected:
      *     Execute the given workload operation in WiredTiger.
      */
     int do_operation(const operation::commit_transaction &op);
+
+    /*
+     * kv_workload_runner_wt::crash --
+     *     Execute the given workload operation in WiredTiger.
+     */
+    int do_operation(const operation::crash &op);
 
     /*
      * kv_workload_runner_wt::do_operation --
@@ -268,15 +310,7 @@ protected:
      * kv_workload_runner_wt::add_table_uri --
      *     Add a table URI.
      */
-    inline void
-    add_table_uri(table_id_t id, std::string uri)
-    {
-        std::unique_lock lock(_table_uris_lock);
-        auto i = _table_uris.find(id);
-        if (i != _table_uris.end())
-            throw model_exception("A table with the given ID already exists");
-        _table_uris.insert_or_assign(i, id, uri);
-    }
+    void add_table_uri(table_id_t id, std::string uri, bool recovery = false);
 
     /*
      * kv_workload_runner_wt::table_uri --
@@ -332,6 +366,8 @@ protected:
 private:
     std::string _connection_config;
     std::string _home;
+
+    shared_state *_state; /* The shared state between the executor and the parent process. */
 
     mutable std::shared_mutex _connection_lock; /* Should be held for all operations. */
     WT_CONNECTION *_connection;

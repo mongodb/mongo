@@ -247,6 +247,46 @@ test_workload_restart(void)
 }
 
 /*
+ * test_workload_crash --
+ *     Test the workload executor with database crash.
+ */
+static void
+test_workload_crash(void)
+{
+    model::kv_workload workload;
+    workload << model::operation::create_table(k_table1_id, "table1", "S", "S")
+             << model::operation::begin_transaction(1) << model::operation::begin_transaction(2)
+             << model::operation::insert(k_table1_id, 1, key1, value1)
+             << model::operation::insert(k_table1_id, 2, key2, value2)
+             << model::operation::prepare_transaction(1, 10)
+             << model::operation::prepare_transaction(2, 15)
+             << model::operation::commit_transaction(1, 20, 21)
+             << model::operation::commit_transaction(2, 25, 26)
+             << model::operation::set_stable_timestamp(22) << model::operation::begin_transaction(1)
+             << model::operation::remove(k_table1_id, 1, key1) << model::operation::checkpoint()
+             << model::operation::crash() << model::operation::begin_transaction(1)
+             << model::operation::insert(k_table1_id, 1, key3, value3)
+             << model::operation::prepare_transaction(1, 23)
+             << model::operation::commit_transaction(1, 24, 25)
+             << model::operation::set_stable_timestamp(25);
+
+    /* Run the workload in the model. */
+    model::kv_database database;
+    workload.run(database);
+
+    /* Verify the contents of the model. */
+    model::kv_table_ptr table = database.table("table1");
+    testutil_assert(table->get(key1) == value1);
+    testutil_assert(table->get(key2) == model::NONE);
+    testutil_assert(table->get(key3) == value3);
+
+    /* Run the workload in WiredTiger and verify. */
+    std::string test_home = std::string(home) + DIR_DELIM_STR + "crash";
+    verify_workload(workload, opts, test_home, ENV_CONFIG);
+    verify_using_debug_log(opts, test_home.c_str()); /* May as well test this. */
+}
+
+/*
  * test_workload_generator --
  *     Test the workload generator.
  */
@@ -313,6 +353,7 @@ main(int argc, char *argv[])
         test_workload_txn();
         test_workload_prepared();
         test_workload_restart();
+        test_workload_crash();
         test_workload_generator();
     } catch (std::exception &e) {
         std::cerr << "Test failed with exception: " << e.what() << std::endl;

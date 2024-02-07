@@ -129,6 +129,30 @@ operator<<(std::ostream &out, const commit_transaction &op)
 }
 
 /*
+ * crash --
+ *     A representation of this workload operation.
+ */
+struct crash {
+
+    /*
+     * crash::crash --
+     *     Create the operation.
+     */
+    inline crash() {}
+};
+
+/*
+ * operator<< --
+ *     Human-readable output.
+ */
+inline std::ostream &
+operator<<(std::ostream &out, const crash &op)
+{
+    out << "crash()";
+    return out;
+}
+
+/*
  * create_table --
  *     A representation of this workload operation.
  */
@@ -419,8 +443,8 @@ operator<<(std::ostream &out, const truncate &op)
  * any --
  *     Any workload operation.
  */
-using any = std::variant<begin_transaction, checkpoint, commit_transaction, create_table, insert,
-  prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
+using any = std::variant<begin_transaction, checkpoint, commit_transaction, crash, create_table,
+  insert, prepare_transaction, remove, restart, rollback_to_stable, rollback_transaction,
   set_commit_timestamp, set_stable_timestamp, truncate>;
 
 /*
@@ -471,6 +495,36 @@ public:
     {
         _operations.push_back(std::move(op));
         return *this;
+    }
+
+    /*
+     * kv_workload_sequence::size --
+     *     Get the length of the sequence.
+     */
+    inline size_t
+    size() const noexcept
+    {
+        return _operations.size();
+    }
+
+    /*
+     * kv_workload_sequence::operator[] --
+     *     Get an operation in the sequence.
+     */
+    inline operation::any &
+    operator[](size_t index)
+    {
+        return _operations[index];
+    }
+
+    /*
+     * kv_workload_sequence::operator[] --
+     *     Get an operation in the sequence.
+     */
+    inline const operation::any &
+    operator[](size_t index) const
+    {
+        return _operations[index];
     }
 
     /*

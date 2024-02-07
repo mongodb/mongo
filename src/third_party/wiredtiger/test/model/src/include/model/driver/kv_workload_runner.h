@@ -64,6 +64,17 @@ public:
     }
 
     /*
+     * kv_workload_runner::run --
+     *     Run the workload in the model.
+     */
+    inline void
+    run(const kv_workload &workload)
+    {
+        for (size_t i = 0; i < workload.size(); i++)
+            run_operation(workload[i]);
+    }
+
+    /*
      * kv_workload_runner::run_operation --
      *     Run the given operation.
      */
@@ -116,6 +127,18 @@ protected:
     {
         /* Remove the transaction first, so that the map has only uncommitted transactions. */
         remove_transaction(op.txn_id)->commit(op.commit_timestamp, op.durable_timestamp);
+        return 0;
+    }
+
+    /*
+     * kv_workload_runner::do_operation --
+     *     Execute the given workload operation in the model.
+     */
+    int
+    do_operation(const operation::crash &op)
+    {
+        (void)op;
+        restart(true /* crash */);
         return 0;
     }
 
@@ -235,11 +258,11 @@ protected:
      *     Simulate database restart.
      */
     inline void
-    restart()
+    restart(bool crash = false)
     {
         std::unique_lock lock(_transactions_lock);
         _transactions.clear();
-        _database.restart();
+        _database.restart(crash);
     }
 
     /*

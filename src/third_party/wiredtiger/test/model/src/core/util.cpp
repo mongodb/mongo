@@ -26,8 +26,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -196,6 +200,87 @@ config_map::merge(const config_map &a, const config_map &b)
     std::merge(a._map.begin(), a._map.end(), b._map.begin(), b._map.end(),
       std::inserter(m._map, m._map.begin()));
     return m;
+}
+
+/*
+ * shared_memory::shared_memory --
+ *     Create a shared memory object of the given size.
+ */
+shared_memory::shared_memory(size_t size) : _data(nullptr), _size(size)
+{
+    /* Create a unique name using the PID and the memory offset of this object. */
+    std::ostringstream name_stream;
+    name_stream << "/wt-" << getpid() << "-" << this;
+    _name = name_stream.str();
+
+    /* Create the shared memory object. */
+    int fd = shm_open(_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        std::ostringstream err;
+        err << "Failed to open shared memory object \"" << _name << "\": " << strerror(errno)
+            << " (" << errno << ")";
+        throw std::runtime_error(err.str());
+    }
+
+    /* Unlink the object from the namespace, as it is no longer needed. */
+    int ret = shm_unlink(_name.c_str());
+    if (ret < 0) {
+        (void)close(fd);
+        std::ostringstream err;
+        err << "Failed to unlink shared memory object \"" << _name << "\": " << strerror(errno)
+            << " (" << errno << ")";
+        _data = nullptr;
+        throw std::runtime_error(err.str());
+    }
+
+    /* Set the initial size. */
+    ret = ftruncate(fd, (wt_off_t)size);
+    if (ret < 0) {
+        (void)close(fd);
+        throw std::runtime_error("Setting shared memory size failed");
+    }
+
+    /* Map the shared memory. */
+    _data = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (_data == MAP_FAILED) {
+        (void)close(fd);
+        std::ostringstream err;
+        err << "Failed to map shared memory object \"" << _name << "\": " << strerror(errno) << " ("
+            << errno << ")";
+        _data = nullptr;
+        throw std::runtime_error(err.str());
+    }
+
+    /* Close the handle. */
+    ret = close(fd);
+    if (ret < 0) {
+        (void)munmap(_data, _size);
+        std::ostringstream err;
+        err << "Failed to close shared memory object \"" << _name << "\": " << strerror(errno)
+            << " (" << errno << ")";
+        _data = nullptr;
+        throw std::runtime_error(err.str());
+    }
+
+    /* Zero the object. */
+    memset(_data, 0, _size);
+}
+
+/*
+ * shared_memory::~shared_memory --
+ *     Free the memory object.
+ */
+shared_memory::~shared_memory()
+{
+    if (_data == nullptr)
+        return;
+
+    if (munmap(_data, _size) < 0) {
+        /* Cannot throw an exception from out of a destructor, so just fail. */
+        std::cerr << "PANIC: Failed to unmap shared memory object \"" << _name
+                  << "\": " << strerror(errno) << " (" << errno << ")" << std::endl;
+        abort();
+    }
 }
 
 /*

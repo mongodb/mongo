@@ -30,6 +30,7 @@
 #define MODEL_UTIL_H
 
 #include <cstring>
+#include <functional>
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -318,6 +319,91 @@ private:
 
 private:
     std::unordered_map<std::string, value_t> _map;
+};
+
+/*
+ * shared_memory --
+ *     Shared memory with a child process. After creating this object, the shared memory would be
+ *     available in both the parent and the child process. The memory object will be automatically
+ *     cleaned up when it falls out of scope.
+ */
+class shared_memory {
+
+public:
+    /*
+     * shared_memory::shared_memory --
+     *     Create a shared memory object of the given size.
+     */
+    shared_memory(size_t size);
+
+    /* Delete the copy constructor. */
+    shared_memory(const shared_memory &) = delete;
+
+    /* Delete the copy operator. */
+    shared_memory &operator=(const shared_memory &) = delete;
+
+    /*
+     * shared_memory::~shared_memory --
+     *     Free the memory object.
+     */
+    ~shared_memory();
+
+    /*
+     * shared_memory::data --
+     *     Get the data pointer.
+     */
+    inline void *
+    data() noexcept
+    {
+        return _data;
+    }
+
+    /*
+     * shared_memory::size --
+     *     Get the data size.
+     */
+    inline size_t
+    size() noexcept
+    {
+        return _size;
+    }
+
+private:
+    void *_data;
+    size_t _size;
+    std::string _name;
+};
+
+/*
+ * at_cleanup --
+ *     Run an action at the time this object falls out of scope.
+ */
+class at_cleanup {
+
+public:
+    /*
+     * at_cleanup::at_cleanup --
+     *     Create the cleanup object.
+     */
+    inline at_cleanup(std::function<void()> fn) : _fn(fn){};
+
+    /* Delete the copy constructor. */
+    at_cleanup(const at_cleanup &) = delete;
+
+    /* Delete the copy operator. */
+    at_cleanup &operator=(const at_cleanup &) = delete;
+
+    /*
+     * at_cleanup::~at_cleanup --
+     *     Free the object and run the clean up function.
+     */
+    inline ~at_cleanup()
+    {
+        _fn();
+    }
+
+private:
+    std::function<void()> _fn;
 };
 
 /*
