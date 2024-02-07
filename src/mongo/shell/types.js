@@ -564,7 +564,6 @@ Map.hash = function(val) {
         case 'date':
             return val.toString();
         case 'object':
-        case 'array':
             var s = "";
             for (var k in val) {
                 s += k + val[k];
