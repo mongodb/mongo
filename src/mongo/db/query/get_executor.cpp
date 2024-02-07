@@ -770,8 +770,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
                           bool ignoreQuerySettings) {
     fillOutMainCollectionPlannerParams(
         opCtx, collections.getMainCollection(), canonicalQuery, plannerParams);
-    plannerParams->secondaryCollectionsInfo =
-        fillOutSecondaryCollectionsInformation(opCtx, collections, canonicalQuery);
+    if (!canonicalQuery->cqPipeline().empty()) {
+        plannerParams->secondaryCollectionsInfo =
+            fillOutSecondaryCollectionsInformation(opCtx, collections, canonicalQuery);
+    }
 
     // If query supports query settings or index filters, filter params.indices.
     applyQuerySettingsOrIndexFilters(
