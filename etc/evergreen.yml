@@ -5339,6 +5339,7 @@ tasks:
   - command: expansions.write
     params:
       file: src/expansions.yml
+      redacted: true
   - func: "sync repo with copybara"
 
 ## integration test suites ##
