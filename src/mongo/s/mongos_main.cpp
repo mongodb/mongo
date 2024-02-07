@@ -79,7 +79,6 @@
 #include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -1133,7 +1132,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
 
     logCommonStartupWarnings(serverGlobalParams);
 
-    setUpMultitenancyCheck(service, gMultitenancySupport);
     ShardingState::create(service);
 
     try {

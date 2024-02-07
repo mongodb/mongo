@@ -4,17 +4,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='multitenancy_check',
-    source=[
-        'multitenancy_check.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
-env.Library(
     target='serverless_types_idl',
     source=[
         'serverless_types.idl',
@@ -115,7 +104,6 @@ env.Library(
 env.CppUnitTest(
     target='db_serverless_test',
     source=[
-        'multitenancy_check_test.cpp',
         'serverless_operation_lock_registry_test.cpp',
         'shard_split_donor_op_observer_test.cpp',
         'shard_split_donor_service_test.cpp',
@@ -130,7 +118,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
         '$BUILD_DIR/mongo/dbtests/mocklib',
-        'multitenancy_check',
         'serverless_lock',
         'shard_split_donor_service',
         'shard_split_utils',

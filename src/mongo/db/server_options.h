@@ -112,8 +112,10 @@ struct ServerGlobalParams {
     AtomicWord<double> sampleRate{1.0};    // --samplerate rate at which to sample slow queries
     int defaultLocalThresholdMillis = 15;  // --localThreshold in ms to consider a node local
 
-    bool noUnixSocket = false;    // --nounixsocket
-    bool doFork = false;          // --fork
+    bool noUnixSocket = false;  // --nounixsocket
+    bool doFork = false;        // --fork
+    bool isMongoBridge = false;
+
     std::string socket = "/tmp";  // UNIX domain socket directory
 
     size_t maxConns = DEFAULT_MAX_CONN;  // Maximum number of simultaneous open connections.

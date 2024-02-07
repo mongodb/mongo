@@ -2637,7 +2637,6 @@ env.Library(
         's/sharding_commands_d',
         's/sharding_runtime_d',
         'serverinit',
-        'serverless/multitenancy_check',
         'serverless/shard_split_donor_service',
         'service_context_d',
         'session/kill_sessions',

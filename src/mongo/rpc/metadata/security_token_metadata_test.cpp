@@ -45,7 +45,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/validated_tenancy_scope_factory.h"
-#include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
@@ -78,8 +77,6 @@ class SecurityTokenMetadataTest : public ServiceContextTest {
 protected:
     void setUp() final {
         client = getServiceContext()->getService()->makeClient("test");
-
-        mongo::setUpMultitenancyCheck(getServiceContext(), false);
     }
 
     ServiceContext::UniqueClient client;

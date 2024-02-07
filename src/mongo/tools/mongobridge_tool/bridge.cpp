@@ -500,6 +500,7 @@ Future<DbResponse> ServiceEntryPointBridge::handleRequest(OperationContext* opCt
 
 int bridgeMain(int argc, char** argv) {
 
+    serverGlobalParams.isMongoBridge = true;
     registerShutdownTask([&] {
         // NOTE: This function may be called at any time. It must not
         // depend on the prior execution of mongo initializers or the

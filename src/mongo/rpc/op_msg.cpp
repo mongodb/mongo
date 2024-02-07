@@ -48,7 +48,6 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -213,12 +212,11 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
             }
 
             case Section::kSecurityToken: {
-                // MultitenancyCheck is set on mongod and mongos but not mongobridge. This allows
-                // mongobridge to forward messages with a token without requiring it to enable
-                // multitenancySupport.
+                // if op_msg is parsed by mongoBridge, bridge has a backup check since multitenancy
+                // should be false
                 uassert(ErrorCodes::Unauthorized,
                         "Unsupported Security Token provided",
-                        gMultitenancySupport || !MultitenancyCheck::getPtr());
+                        gMultitenancySupport || serverGlobalParams.isMongoBridge);
                 securityToken = sectionsBuf.readCStr();
                 break;
             }
