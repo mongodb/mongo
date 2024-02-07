@@ -38,18 +38,20 @@
 #include <deque>
 #include <functional>
 #include <iterator>
+#include <type_traits>
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/int128.h"
 
 namespace mongo {
-
-
 /**
- * Callback type to implement writing of 64 bit Simple8b words.
+ * Concept for writing 64bit simple8b blocks via a callback.
  */
-using Simple8bWriteFn = std::function<void(uint64_t)>;
+template <class F>
+concept Simple8bBlockWriter = requires(F&& f) {
+    std::invoke(std::forward<F>(f), std::declval<uint64_t>());
+};
 
 /**
  * Simple8bBuilder compresses a series of integers into chains of 64 bit Simple8b blocks.
@@ -64,7 +66,7 @@ private:
 public:
     // Callback to handle writing of finalized Simple-8b blocks. Machine Endian byte order, the
     // value need to be converted to Little Endian before persisting.
-    Simple8bBuilder(Simple8bWriteFn writeFunc = nullptr);
+    Simple8bBuilder();
     ~Simple8bBuilder();
 
     /**
@@ -73,21 +75,27 @@ public:
      *
      * A call to append may result in multiple Simple8b blocks being finalized.
      */
-    bool append(T val);
+    template <class F>
+    requires Simple8bBlockWriter<F>
+    bool append(T val, F&& writeFn);
 
     /**
      * Appends a missing value to Simple8b.
      *
      * May result in a single Simple8b being finalized.
      */
-    void skip();
+    template <class F>
+    requires Simple8bBlockWriter<F>
+    void skip(F&& writeFn);
 
     /**
      * Flushes all buffered values into finalized Simple8b blocks.
      *
      * It is allowed to continue to append values after this call.
      */
-    void flush();
+    template <class F>
+    requires Simple8bBlockWriter<F>
+    void flush(F&& writeFn);
 
     /**
      * Iterator for reading pending values in Simple8bBuilder that has not yet been written to
@@ -141,11 +149,6 @@ public:
      */
     std::reverse_iterator<PendingIterator> rbegin() const;
     std::reverse_iterator<PendingIterator> rend() const;
-
-    /**
-     * Set write callback
-     */
-    void setWriteCallback(Simple8bWriteFn writer);
 
     /**
      * Forcibly set last value so future append/skip calls may use this to construct RLE. This
@@ -232,7 +235,8 @@ private:
      * 'tryRle' indicates if we are allowed to put this skip in RLE count or not. Should only be set
      * to true when terminating RLE and we are flushing excess values.
      */
-    bool _appendValue(T value, bool tryRle);
+    template <class F>
+    bool _appendValue(T value, bool tryRle, F&& writeFn);
 
     /**
      * Appends a skip to _pendingValues and forms a new Simple8b word if there is no space.
@@ -240,19 +244,22 @@ private:
      * 'tryRle' indicates if we are allowed to put this value in RLE count or not. Should only be
      * set to true when terminating RLE and we are flushing excess values.
      */
-    void _appendSkip(bool tryRle);
+    template <class F>
+    void _appendSkip(bool tryRle, F&& writeFn);
 
     /**
      * When an RLE ends because of inconsecutive values, check if there are enough
      * consecutive values for a RLE value and/or any values to be appended to _pendingValues.
      */
-    void _handleRleTermination();
+    template <class F>
+    void _handleRleTermination(F&& writeFn);
 
     /**
      * Based on _rleCount, create a RLE Simple8b word if possible.
      * If _rleCount is not large enough, do nothing.
      */
-    void _appendRleEncoding();
+    template <class F>
+    void _appendRleEncoding(F&& writeFn);
 
     /*
      * Checks to see if RLE is possible and/or ongoing
@@ -327,9 +334,8 @@ private:
     // This holds values that have not be encoded to the simple8b buffer, but are waiting for a full
     // simple8b word to be filled before writing to buffer.
     std::deque<PendingValue> _pendingValues;
-
-    // User-defined callback to handle writing of finalized Simple-8b blocks
-    Simple8bWriteFn _writeFn;
 };
 
 }  // namespace mongo
+
+#include "mongo/bson/util/simple8b_builder.inl"

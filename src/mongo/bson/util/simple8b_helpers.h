@@ -31,6 +31,10 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
+
+#include "mongo/platform/bits.h"
+#include "mongo/platform/int128.h"
 
 namespace mongo::simple8b_internal {
 /*
@@ -221,5 +225,58 @@ constexpr std::array<std::array<uint8_t, 16>, 4> kIntsStoreForSelector = {
     std::array<uint8_t, 16>{0, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0},
     std::array<uint8_t, 16>{0, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0},
     std::array<uint8_t, 16>{0, 0, 0, 0, 0, 0, 0, 0, 6, 5, 4, 3, 2, 1, 0, 0}};
+
+// Calculates number of bits needed to store value. Must be less than
+// numeric_limits<uint64_t>::max().
+inline uint8_t countBitsWithoutLeadingZeros(uint64_t value) {
+    // All 1s is reserved for skip encoding so we add 1 to value to account for that case.
+    return 64 - countLeadingZerosNonZero64(value + 1);
+}
+
+inline uint8_t countTrailingZerosWithZero(uint64_t value) {
+    // countTrailingZeros64 returns 64 if the value is 0 but we consider this to be 0 trailing
+    // zeros.
+    return value == 0 ? 0 : countTrailingZerosNonZero64(value);
+}
+
+inline uint8_t countTrailingZerosWithZero(uint128_t value) {
+    uint64_t low = absl::Uint128Low64(value);
+    uint64_t high = absl::Uint128High64(value);
+
+    // If value == 0 then we cannot add 64
+    if (low == 0 && high != 0) {
+        return countTrailingZerosNonZero64(high) + 64;
+    } else {
+        return countTrailingZerosWithZero(low);
+    }
+}
+
+// Calculates number of bits needed to store value. Must be less than
+// numeric_limits<uint128_t>::max().
+inline uint8_t countBitsWithoutLeadingZeros(uint128_t value) {
+    uint64_t high = absl::Uint128High64(value);
+    if (high == 0) {
+        uint64_t low = absl::Uint128Low64(value);
+        // We can't call _countBitsWithoutLeadingZeros() with numeric_limits<uint64_t>::max as it
+        // would overflow and yield the wrong result. Just return the correct value instead.
+        if (low == std::numeric_limits<uint64_t>::max())
+            return 65;
+        return countBitsWithoutLeadingZeros(low);
+    } else {
+        return 128 - countLeadingZerosNonZero64(high);
+    }
+}
+
+/*
+ * This method takes a number of intsNeeded and an extensionType and returns the selector index for
+ * that type. This method should never fail as it is called when we are encoding a largest value.
+ */
+inline uint8_t getSelectorIndex(uint8_t intsNeeded, uint8_t extensionType) {
+    auto iteratorIdx = std::find_if(
+        kIntsStoreForSelector[extensionType].begin() + kMinSelector[extensionType],
+        kIntsStoreForSelector[extensionType].begin() + kMaxSelector[extensionType],
+        [intsNeeded](uint8_t intsPerSelectorIdx) { return intsNeeded >= intsPerSelectorIdx; });
+    return iteratorIdx - kIntsStoreForSelector[extensionType].begin();
+}
 
 }  // namespace mongo::simple8b_internal

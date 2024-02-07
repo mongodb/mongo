@@ -255,8 +255,8 @@ public:
     }
 
     static bool simple8bPossible(uint64_t val) {
-        Simple8bBuilder<uint64_t> b([](uint64_t block) {});
-        return b.append(val);
+        Simple8bBuilder<uint64_t> b;
+        return b.append(val, [](uint64_t block) {});
     }
 
     static uint64_t deltaOfDelta(int64_t delta, int64_t prevDelta) {
@@ -367,17 +367,18 @@ public:
     template <typename T>
     static void _appendSimple8bBlock(BufBuilder& builder, boost::optional<T> val) {
         auto prev = builder.len();
-        Simple8bBuilder<T> s8bBuilder([&builder](uint64_t block) {
+        auto writeFn = [&builder](uint64_t block) {
             builder.appendNum(block);
             return true;
-        });
+        };
+        Simple8bBuilder<T> s8bBuilder;
         if (val) {
-            s8bBuilder.append(*val);
+            s8bBuilder.append(*val, writeFn);
         } else {
-            s8bBuilder.skip();
+            s8bBuilder.skip(writeFn);
         }
 
-        s8bBuilder.flush();
+        s8bBuilder.flush(writeFn);
         ASSERT_EQ(builder.len() - prev, sizeof(uint64_t));
     }
 
@@ -394,18 +395,19 @@ public:
                                       const std::vector<boost::optional<T>>& vals,
                                       uint32_t expectedNum) {
         auto prev = builder.len();
-        Simple8bBuilder<T> s8bBuilder([&builder](uint64_t block) {
+        auto writeFn = [&builder](uint64_t block) {
             builder.appendNum(block);
             return true;
-        });
+        };
+        Simple8bBuilder<T> s8bBuilder;
         for (auto val : vals) {
             if (val) {
-                s8bBuilder.append(*val);
+                s8bBuilder.append(*val, writeFn);
             } else {
-                s8bBuilder.skip();
+                s8bBuilder.skip(writeFn);
             }
         }
-        s8bBuilder.flush();
+        s8bBuilder.flush(writeFn);
         ASSERT_EQ((builder.len() - prev) / sizeof(uint64_t), expectedNum);
     }
 
@@ -6355,18 +6357,19 @@ TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
 
     auto deltas = deltaInt64(elems.begin() + 1, elems.end(), elems.front());
     int blockCount = 0;
-    Simple8bBuilder<uint64_t> s8bBuilder([&](uint64_t block) {
+    auto writeFn = [&](uint64_t block) {
         if (blockCount++ == 16) {
             appendSimple8bControl(expected, 0b1000, 0b0000);
         }
         expected.appendNum(block);
         return true;
-    });
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
 
     for (auto delta : deltas) {
-        s8bBuilder.append(*delta);
+        s8bBuilder.append(*delta, writeFn);
     }
-    s8bBuilder.flush();
+    s8bBuilder.flush(writeFn);
     appendEOO(expected);
 
     // We should now have 16 regular Simple8b blocks and then a 17th using RLE at the end.
@@ -6416,21 +6419,22 @@ TEST_F(BSONColumnTest, NonZeroRLEInLastBlock) {
 
     auto deltas = deltaInt64(elems.begin() + 1, elems.end(), elems.front());
     int blockCount = 0;
-    Simple8bBuilder<uint64_t> s8bBuilder([&](uint64_t block) {
+    auto writeFn = [&](uint64_t block) {
         expected.appendNum(block);
         ++blockCount;
         return true;
-    });
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
 
     for (auto delta : deltas) {
-        s8bBuilder.append(*delta);
+        s8bBuilder.append(*delta, writeFn);
     }
 
     // Verify that we have not yet written the last RLE block. This will happen during flush
     // (equivalent to BSONColumn::finalize).
     ASSERT_EQ(blockCount, 15);
 
-    s8bBuilder.flush();
+    s8bBuilder.flush(writeFn);
     appendEOO(expected);
 
     // We should now have 15 regular Simple8b blocks and then a 16th using RLE at the end.

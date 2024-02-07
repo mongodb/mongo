@@ -40,7 +40,7 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
-#include "mongo/bson/util/simple8b_constants.h"
+#include "mongo/bson/util/simple8b_helpers.h"
 #include "mongo/platform/int128.h"
 
 namespace mongo {

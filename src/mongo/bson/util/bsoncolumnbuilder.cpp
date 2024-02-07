@@ -336,8 +336,8 @@ private:
     /*
      * Performs the reopen for 64 and 128 bit types respectively.
      */
-    void _reopen64BitTypes(BSONColumnBuilder::EncodingState& regular, BufBuilder& buffer) const;
-    void _reopen128BitTypes(BSONColumnBuilder::EncodingState& regular, BufBuilder& buffer) const;
+    void _reopen64BitTypes(EncodingState& regular, BufBuilder& buffer) const;
+    void _reopen128BitTypes(EncodingState& regular, BufBuilder& buffer) const;
 
     /*
      * Setup RLE state for Simple8bBuilder used to detect overflow. Returns the value needed to use
@@ -356,7 +356,7 @@ private:
     template <typename T>
     static int _appendUntilOverflow(Simple8bBuilder<T>& overflowDetector,
                                     Simple8bBuilder<T>& mainBuilder,
-                                    const bool& overflow,
+                                    bool& overflow,
                                     const boost::optional<T>& lastValForRLE,
                                     const char* s8bBlock,
                                     int index);
@@ -506,7 +506,7 @@ void BSONColumnBuilder::BinaryReopen::reopen(BSONColumnBuilder& builder) const {
     }
 }
 
-void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(BSONColumnBuilder::EncodingState& regular,
+void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(EncodingState& regular,
                                                         BufBuilder& buffer) const {
     // The main difficulty with re-initializing the compressor from a compressed binary is
     // to undo the 'finalize()' call where pending values are flushed out to simple8b
@@ -519,7 +519,7 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(BSONColumnBuilder::Encod
     const char* control = current.control;
     const char* extraS8b = nullptr;
     bool overflow = false;
-    Simple8bBuilder<uint64_t> s8bBuilder([&overflow](uint64_t block) { overflow = true; });
+    Simple8bBuilder<uint64_t> s8bBuilder;
 
     // Calculate how many simple8b blocks this control byte contains
     auto currNumBlocks = numSimple8bBlocksForControlByte(*control);
@@ -646,9 +646,13 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(BSONColumnBuilder::Encod
     auto appendPending = [&](const Simple8b<uint64_t>& s8b) {
         for (auto&& elem : s8b) {
             if (elem) {
-                regular._simple8bBuilder64.append(*elem);
+                regular._simple8bBuilder64.append(
+                    *elem,
+                    EncodingState::Simple8bBlockWriter(
+                        regular, buffer, EncodingState::NoopControlBlockWriter{}));
             } else {
-                regular._simple8bBuilder64.skip();
+                regular._simple8bBuilder64.skip(EncodingState::Simple8bBlockWriter(
+                    regular, buffer, EncodingState::NoopControlBlockWriter{}));
             }
         }
     };
@@ -702,7 +706,7 @@ void BSONColumnBuilder::BinaryReopen::_reopen64BitTypes(BSONColumnBuilder::Encod
     }
 }
 
-void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(BSONColumnBuilder::EncodingState& regular,
+void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(EncodingState& regular,
                                                          BufBuilder& buffer) const {
     // The main difficulty with re-initializing the compressor from a compressed binary is
     // to undo the 'finalize()' call where pending values are flushed out to simple8b
@@ -714,7 +718,7 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(BSONColumnBuilder::Enco
     const char* control = current.control;
     const char* extraS8b = nullptr;
     bool overflow = false;
-    Simple8bBuilder<uint128_t> s8bBuilder([&overflow](uint64_t block) { overflow = true; });
+    Simple8bBuilder<uint128_t> s8bBuilder;
 
     // Calculate how many simple8b blocks this control byte contains
     auto currNumBlocks = numSimple8bBlocksForControlByte(*control);
@@ -792,9 +796,13 @@ void BSONColumnBuilder::BinaryReopen::_reopen128BitTypes(BSONColumnBuilder::Enco
     auto appendPending = [&](const Simple8b<uint128_t>& s8b) {
         for (auto&& elem : s8b) {
             if (elem) {
-                regular._simple8bBuilder128.append(*elem);
+                regular._simple8bBuilder128.append(
+                    *elem,
+                    EncodingState::Simple8bBlockWriter(
+                        regular, buffer, EncodingState::NoopControlBlockWriter{}));
             } else {
-                regular._simple8bBuilder128.skip();
+                regular._simple8bBuilder128.skip(EncodingState::Simple8bBlockWriter(
+                    regular, buffer, EncodingState::NoopControlBlockWriter{}));
             }
         }
     };
@@ -866,10 +874,13 @@ boost::optional<T> BSONColumnBuilder::BinaryReopen::_setupRLEForOverflowDetector
 template <typename T>
 int BSONColumnBuilder::BinaryReopen::_appendUntilOverflow(Simple8bBuilder<T>& overflowDetector,
                                                           Simple8bBuilder<T>& mainBuilder,
-                                                          const bool& overflow,
+                                                          bool& overflow,
                                                           const boost::optional<T>& lastValForRLE,
                                                           const char* s8bBlock,
                                                           int index) {
+    auto writeFn = [&overflow](uint64_t block) mutable {
+        overflow = true;
+    };
     for (; index >= 0; --index) {
         Simple8b<T> s8b(s8bBlock +
                             /* offset to block at index */ index * sizeof(uint64_t) +
@@ -880,9 +891,9 @@ int BSONColumnBuilder::BinaryReopen::_appendUntilOverflow(Simple8bBuilder<T>& ov
         for (auto&& elem : s8b) {
             if (elem) {
                 last = elem;
-                overflowDetector.append(*last);
+                overflowDetector.append(*last, writeFn);
             } else {
-                overflowDetector.skip();
+                overflowDetector.skip(writeFn);
             }
         }
 
@@ -901,7 +912,6 @@ BSONColumnBuilder::BSONColumnBuilder() : BSONColumnBuilder(BufBuilder()) {}
 
 BSONColumnBuilder::BSONColumnBuilder(BufBuilder builder) : _bufBuilder(std::move(builder)) {
     _bufBuilder.reset();
-    _is.regular.init(&_bufBuilder, nullptr);
 }
 
 BSONColumnBuilder::BSONColumnBuilder(const char* binary, int size)
@@ -922,7 +932,6 @@ BSONColumnBuilder::BSONColumnBuilder(const char* binary, int size)
     if (!helper.scan(binary, size)) {
         _bufBuilder.reset();
         _is.regular = {};
-        _is.regular.init(&_bufBuilder, nullptr);
 
         BSONColumn decompressor(binary, size);
         for (auto&& elem : decompressor) {
@@ -950,7 +959,7 @@ BSONColumnBuilder& BSONColumnBuilder::append(BSONElement elem) {
         if (_is.mode != Mode::kRegular) {
             _flushSubObjMode();
         }
-        _is.regular.append(elem);
+        _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
         return *this;
     }
 
@@ -980,7 +989,7 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
 
     if (_is.mode == Mode::kRegular) {
         if (numElements == 0) {
-            _is.regular.append(elem);
+            _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -1014,7 +1023,7 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
                 // If we only contain empty subobj (no value elements) then append in regular mode
                 // instead of re-starting subobj compression.
                 if (numElements == 0) {
-                    _is.regular.append(elem);
+                    _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
                     return *this;
                 }
 
@@ -1041,7 +1050,7 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
         // If we were not compatible restart subobj compression unless our object contain no value
         // fields (just empty subobjects)
         if (numElements == 0) {
-            _is.regular.append(elem);
+            _is.regular.append(elem, _bufBuilder, EncodingState::NoopControlBlockWriter{});
         } else {
             _startDetermineSubObjReference(obj, type);
         }
@@ -1052,7 +1061,7 @@ BSONColumnBuilder& BSONColumnBuilder::_appendObj(Element elem) {
 
 BSONColumnBuilder& BSONColumnBuilder::skip() {
     if (_is.mode == Mode::kRegular) {
-        _is.regular.skip();
+        _is.regular.skip(_bufBuilder, EncodingState::NoopControlBlockWriter{});
         return *this;
     }
 
@@ -1067,7 +1076,7 @@ BSONColumnBuilder& BSONColumnBuilder::skip() {
         _is.bufferedObjElements.push_back(BSONObj());
     } else {
         for (auto&& subobj : _is.subobjStates) {
-            subobj.state.skip();
+            subobj.state.skip(subobj.buffer, subobj.controlBlockWriter());
         }
     }
 
@@ -1092,11 +1101,6 @@ std::pair<int, int> BSONColumnBuilder::intermediate(BufBuilder& buffer) {
     // Restore previous state.
     _is = std::move(stateCopy);
 
-    // Re-init any substates, required after move
-    for (auto&& sub : _is.subobjStates) {
-        sub.state.init(&sub.buffer, sub.controlBlockWriter());
-    }
-
     // Does not modify the buffer, just sets the point where future writes should occur.
     _bufBuilder.setlen(length);
 
@@ -1113,7 +1117,7 @@ std::pair<int, int> BSONColumnBuilder::intermediate(BufBuilder& buffer) {
 BSONBinData BSONColumnBuilder::finalize() {
     invariant(!_finalized);
     if (_is.mode == Mode::kRegular) {
-        _is.regular.flush();
+        _is.regular.flush(_bufBuilder, EncodingState::NoopControlBlockWriter{});
     } else {
         _flushSubObjMode();
     }
@@ -1134,28 +1138,22 @@ int BSONColumnBuilder::numInterleavedStartWritten() const {
     return _numInterleavedStartWritten;
 }
 
-bool BSONColumnBuilder::Element::operator==(const Element& rhs) const {
+namespace bsoncolumn {
+bool Element::operator==(const Element& rhs) const {
     if (type != rhs.type || size != rhs.size)
         return false;
 
     return memcmp(value.value(), rhs.value.value(), size) == 0;
 }
 
-BSONColumnBuilder::EncodingState::EncodingState()
+EncodingState::EncodingState()
     : _controlByteOffset(kNoSimple8bControl), _scaleIndex(Simple8bTypeUtil::kMemoryAsInteger) {
     // Store EOO type with empty field name as previous.
     _storePrevious(BSONElement());
 }
 
-void BSONColumnBuilder::EncodingState::init(BufBuilder* buffer,
-                                            ControlBlockWriteFn controlBlockWriter) {
-    _bufBuilder = buffer;
-    _simple8bBuilder64.setWriteCallback(_createBufferWriter());
-    _simple8bBuilder128.setWriteCallback(_createBufferWriter());
-    _controlBlockWriter = std::move(controlBlockWriter);
-}
-
-void BSONColumnBuilder::EncodingState::append(Element elem) {
+template <class F>
+void EncodingState::append(Element elem, BufBuilder& buffer, F controlBlockWriter) {
     auto type = elem.type;
     auto previous = _previous();
 
@@ -1163,9 +1161,9 @@ void BSONColumnBuilder::EncodingState::append(Element elem) {
     // and write uncompressed literal. Reset all default values.
     if (previous.type != elem.type) {
         _storePrevious(elem);
-        _simple8bBuilder128.flush();
-        _simple8bBuilder64.flush();
-        _writeLiteralFromPrevious();
+        _simple8bBuilder128.flush(Simple8bBlockWriter<F>(*this, buffer, controlBlockWriter));
+        _simple8bBuilder64.flush(Simple8bBlockWriter<F>(*this, buffer, controlBlockWriter));
+        _writeLiteralFromPrevious(buffer, controlBlockWriter);
         return;
     }
 
@@ -1173,9 +1171,10 @@ void BSONColumnBuilder::EncodingState::append(Element elem) {
     bool compressed = !usesDeltaOfDelta(type) && elem == previous;
     if (compressed) {
         if (_storeWith128) {
-            _simple8bBuilder128.append(0);
+            _simple8bBuilder128.append(0,
+                                       Simple8bBlockWriter<F>(*this, buffer, controlBlockWriter));
         } else {
-            _simple8bBuilder64.append(0);
+            _simple8bBuilder64.append(0, Simple8bBlockWriter<F>(*this, buffer, controlBlockWriter));
         }
     }
 
@@ -1185,8 +1184,10 @@ void BSONColumnBuilder::EncodingState::append(Element elem) {
                 // If previous wasn't encodable we cannot store 0 in Simple8b as that would create
                 // an ambiguity between 0 and repeat of previous
                 if (_prevEncoded128 || encoded != 0) {
-                    compressed = _simple8bBuilder128.append(Simple8bTypeUtil::encodeInt128(
-                        calcDelta(encoded, _prevEncoded128.value_or(0))));
+                    compressed = _simple8bBuilder128.append(
+                        Simple8bTypeUtil::encodeInt128(
+                            calcDelta(encoded, _prevEncoded128.value_or(0))),
+                        Simple8bBlockWriter(*this, buffer, controlBlockWriter));
                     _prevEncoded128 = encoded;
                 }
             };
@@ -1220,7 +1221,8 @@ void BSONColumnBuilder::EncodingState::append(Element elem) {
                     MONGO_UNREACHABLE;
             };
         } else if (type == NumberDouble) {
-            compressed = _appendDouble(elem.value.Double(), previous.value.Double());
+            compressed = _appendDouble(
+                elem.value.Double(), previous.value.Double(), buffer, controlBlockWriter);
         } else {
             // Variable to indicate that it was possible to encode this BSONElement as an integer
             // for storage inside Simple8b. If encoding is not possible the element is stored as
@@ -1279,7 +1281,9 @@ void BSONColumnBuilder::EncodingState::append(Element elem) {
                 _prevDelta = currentDelta;
             }
             if (encodingPossible) {
-                compressed = _simple8bBuilder64.append(Simple8bTypeUtil::encodeInt64(value));
+                compressed = _simple8bBuilder64.append(
+                    Simple8bTypeUtil::encodeInt64(value),
+                    Simple8bBlockWriter(*this, buffer, controlBlockWriter));
             }
         }
     }
@@ -1287,36 +1291,37 @@ void BSONColumnBuilder::EncodingState::append(Element elem) {
 
     // Store uncompressed literal if value is outside of range of encodable values.
     if (!compressed) {
-        _simple8bBuilder128.flush();
-        _simple8bBuilder64.flush();
-        _writeLiteralFromPrevious();
+        _simple8bBuilder128.flush(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
+        _simple8bBuilder64.flush(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
+        _writeLiteralFromPrevious(buffer, controlBlockWriter);
     }
 }
 
-void BSONColumnBuilder::EncodingState::skip() {
-    auto before = _bufBuilder->len();
+template <class F>
+void EncodingState::skip(BufBuilder& buffer, F controlBlockWriter) {
+    auto before = buffer.len();
     if (_storeWith128) {
-        _simple8bBuilder128.skip();
+        _simple8bBuilder128.skip(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
     } else {
-        _simple8bBuilder64.skip();
+        _simple8bBuilder64.skip(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
     }
     // Rescale previous known value if this skip caused Simple-8b blocks to be written
-    if (before != _bufBuilder->len() && _previous().type == NumberDouble) {
+    if (before != buffer.len() && _previous().type == NumberDouble) {
         std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
     }
 }
 
-void BSONColumnBuilder::EncodingState::flush() {
-    _simple8bBuilder128.flush();
-    _simple8bBuilder64.flush();
+template <class F>
+void EncodingState::flush(BufBuilder& buffer, F controlBlockWriter) {
+    _simple8bBuilder128.flush(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
+    _simple8bBuilder64.flush(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
 
-    if (_controlByteOffset != kNoSimple8bControl && _controlBlockWriter) {
-        _controlBlockWriter(_bufBuilder->buf() + _controlByteOffset,
-                            _bufBuilder->len() - _controlByteOffset);
+    if (_controlByteOffset != kNoSimple8bControl) {
+        controlBlockWriter(_controlByteOffset, buffer.len() - _controlByteOffset);
     }
 }
 
-boost::optional<Simple8bBuilder<uint64_t>> BSONColumnBuilder::EncodingState::_tryRescalePending(
+boost::optional<Simple8bBuilder<uint64_t>> EncodingState::_tryRescalePending(
     int64_t encoded, uint8_t newScaleIndex) {
     // Encode last value in the previous block with old and new scale index. We know that scaling
     // with the old index is possible.
@@ -1332,13 +1337,16 @@ boost::optional<Simple8bBuilder<uint64_t>> BSONColumnBuilder::EncodingState::_tr
     // Create a new Simple8bBuilder for the rescaled values. If any Simple8b block is finalized when
     // adding the new values then rescaling is less optimal than flushing with the current scale. So
     // we just record if this happens in our write callback.
-    Simple8bBuilder<uint64_t> builder([&possible](uint64_t block) { possible = false; });
+    auto writeFn = [&possible](uint64_t block) {
+        possible = false;
+    };
+    Simple8bBuilder<uint64_t> builder;
 
     // Iterate over our pending values, decode them back into double, rescale and append to our new
     // Simple8b builder
     for (const auto& pending : _simple8bBuilder64) {
         if (!pending) {
-            builder.skip();
+            builder.skip(writeFn);
             continue;
         }
 
@@ -1352,8 +1360,8 @@ boost::optional<Simple8bBuilder<uint64_t>> BSONColumnBuilder::EncodingState::_tr
             return boost::none;
 
         // Append the scaled delta
-        auto appended =
-            builder.append(Simple8bTypeUtil::encodeInt64(calcDelta(*rescaled, *prevRescaled)));
+        auto appended = builder.append(
+            Simple8bTypeUtil::encodeInt64(calcDelta(*rescaled, *prevRescaled)), writeFn);
 
         // Fail if are out of range for Simple8b or a block was written
         if (!appended || !possible)
@@ -1365,17 +1373,20 @@ boost::optional<Simple8bBuilder<uint64_t>> BSONColumnBuilder::EncodingState::_tr
 
     // Last add our new value
     auto appended =
-        builder.append(Simple8bTypeUtil::encodeInt64(calcDelta(encoded, *prevRescaled)));
+        builder.append(Simple8bTypeUtil::encodeInt64(calcDelta(encoded, *prevRescaled)), writeFn);
     if (!appended || !possible)
         return boost::none;
 
     // We managed to add all re-scaled values, this will thus compress better. Set write callback to
     // our buffer writer and return
-    builder.setWriteCallback(_createBufferWriter());
     return builder;
 }
 
-bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previous) {
+template <class F>
+bool EncodingState::_appendDouble(double value,
+                                  double previous,
+                                  BufBuilder& buffer,
+                                  F controlBlockWriter) {
     // Scale with lowest possible scale index
     auto [encoded, scaleIndex] = scaleAndEncodeDouble(value, _scaleIndex);
 
@@ -1394,10 +1405,9 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
         }
 
         // Re-scale not possible, flush and start new block with the higher scale factor
-        _simple8bBuilder64.flush();
-        if (_controlBlockWriter && _controlByteOffset != kNoSimple8bControl) {
-            _controlBlockWriter(_bufBuilder->buf() + _controlByteOffset,
-                                _bufBuilder->len() - _controlByteOffset);
+        _simple8bBuilder64.flush(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
+        if (_controlByteOffset != kNoSimple8bControl) {
+            controlBlockWriter(_controlByteOffset, buffer.len() - _controlByteOffset);
         }
         _controlByteOffset = kNoSimple8bControl;
 
@@ -1415,12 +1425,13 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
 
     // Append delta and check if we wrote a Simple8b block. If we did we may be able to reduce the
     // scale factor when starting a new block
-    auto before = _bufBuilder->len();
+    auto before = buffer.len();
     if (!_simple8bBuilder64.append(
-            Simple8bTypeUtil::encodeInt64(calcDelta(encoded, _prevEncoded64))))
+            Simple8bTypeUtil::encodeInt64(calcDelta(encoded, _prevEncoded64)),
+            Simple8bBlockWriter(*this, buffer, controlBlockWriter)))
         return false;
 
-    if (_bufBuilder->len() == before) {
+    if (buffer.len() == before) {
         _prevEncoded64 = encoded;
         return true;
     }
@@ -1431,7 +1442,7 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
     std::tie(_prevEncoded64, _scaleIndex) = scaleAndEncodeDouble(_lastValueInPrevBlock, 0);
 
     // Create a new Simple8bBuilder.
-    Simple8bBuilder<uint64_t> builder(_createBufferWriter());
+    Simple8bBuilder<uint64_t> builder;
     std::swap(_simple8bBuilder64, builder);
 
     // Iterate over previous pending values and re-add them recursively. That will increase the
@@ -1443,23 +1454,23 @@ bool BSONColumnBuilder::EncodingState::_appendDouble(double value, double previo
         if (pending) {
             prevEncoded = expandDelta(prevEncoded, Simple8bTypeUtil::decodeInt64(*pending));
             auto val = Simple8bTypeUtil::decodeDouble(prevEncoded, prevScale);
-            _appendDouble(val, prev);
+            _appendDouble(val, prev, buffer, controlBlockWriter);
             prev = val;
         } else {
-            _simple8bBuilder64.skip();
+            _simple8bBuilder64.skip(Simple8bBlockWriter(*this, buffer, controlBlockWriter));
         }
     }
     return true;
 }
 
-BSONColumnBuilder::Element BSONColumnBuilder::EncodingState::_previous() const {
+Element EncodingState::_previous() const {
     // The first two bytes are type and field name null terminator
     return {
         BSONType(*_prev.buffer.get()), BSONElementValue(_prev.buffer.get() + 2), _prev.size - 2};
 }
 
 
-void BSONColumnBuilder::EncodingState::_storePrevious(Element elem) {
+void EncodingState::_storePrevious(Element elem) {
     // Add space for type byte and field name null terminator
     auto size = elem.size + 2;
 
@@ -1478,18 +1489,15 @@ void BSONColumnBuilder::EncodingState::_storePrevious(Element elem) {
     _prev.size = size;
 }
 
-void BSONColumnBuilder::EncodingState::_writeLiteralFromPrevious() {
+template <class F>
+void EncodingState::_writeLiteralFromPrevious(BufBuilder& buffer, F controlBlockWriter) {
     // Write literal without field name and reset control byte to force new one to be written when
     // appending next value.
-    if (_controlByteOffset != kNoSimple8bControl && _controlBlockWriter) {
-        _controlBlockWriter(_bufBuilder->buf() + _controlByteOffset,
-                            _bufBuilder->len() - _controlByteOffset);
+    if (_controlByteOffset != kNoSimple8bControl) {
+        controlBlockWriter(_controlByteOffset, buffer.len() - _controlByteOffset);
     }
-    _bufBuilder->appendBuf(_prev.buffer.get(), _prev.size);
-    if (_controlBlockWriter) {
-        _controlBlockWriter(_bufBuilder->buf() + _bufBuilder->len() - _prev.size, _prev.size);
-    }
-
+    buffer.appendBuf(_prev.buffer.get(), _prev.size);
+    controlBlockWriter(buffer.len() - _prev.size, _prev.size);
 
     // Reset state
     _controlByteOffset = kNoSimple8bControl;
@@ -1502,7 +1510,7 @@ void BSONColumnBuilder::EncodingState::_writeLiteralFromPrevious() {
     _initializeFromPrevious();
 }
 
-void BSONColumnBuilder::EncodingState::_initializeFromPrevious() {
+void EncodingState::_initializeFromPrevious() {
     // Initialize previous encoded when needed
     auto previous = _previous();
     auto type = previous.type;
@@ -1532,7 +1540,8 @@ void BSONColumnBuilder::EncodingState::_initializeFromPrevious() {
     }
 }
 
-ptrdiff_t BSONColumnBuilder::EncodingState::_incrementSimple8bCount() {
+template <class F>
+ptrdiff_t EncodingState::_incrementSimple8bCount(BufBuilder& buffer, F controlBlockWriter) {
     char* byte;
     uint8_t count;
     uint8_t control = kControlByteForScaleIndex[_scaleIndex];
@@ -1540,22 +1549,20 @@ ptrdiff_t BSONColumnBuilder::EncodingState::_incrementSimple8bCount() {
     if (_controlByteOffset == kNoSimple8bControl) {
         // Allocate new control byte if we don't already have one. Record its offset so we can find
         // it even if the underlying buffer reallocates.
-        byte = _bufBuilder->skip(1);
-        _controlByteOffset = std::distance(_bufBuilder->buf(), byte);
+        byte = buffer.skip(1);
+        _controlByteOffset = std::distance(buffer.buf(), byte);
         count = 0;
     } else {
         // Read current count from previous control byte
-        byte = _bufBuilder->buf() + _controlByteOffset;
+        byte = buffer.buf() + _controlByteOffset;
 
         // If previous byte was written with a different control byte then we can't re-use and need
         // to start a new one
         if ((*byte & kControlMask) != control) {
-            if (_controlBlockWriter) {
-                _controlBlockWriter(_bufBuilder->buf() + _controlByteOffset,
-                                    _bufBuilder->len() - _controlByteOffset);
-            }
+            controlBlockWriter(_controlByteOffset, buffer.len() - _controlByteOffset);
+
             _controlByteOffset = kNoSimple8bControl;
-            _incrementSimple8bCount();
+            _incrementSimple8bCount(buffer, controlBlockWriter);
             return kNoSimple8bControl;
         }
         count = (*byte & kCountMask) + 1;
@@ -1572,43 +1579,42 @@ ptrdiff_t BSONColumnBuilder::EncodingState::_incrementSimple8bCount() {
     return kNoSimple8bControl;
 }
 
-Simple8bWriteFn BSONColumnBuilder::EncodingState::_createBufferWriter() {
-    return [this](uint64_t block) {
-        // Write/update block count
-        ptrdiff_t fullControlOffset = _incrementSimple8bCount();
+template <class F>
+void EncodingState::Simple8bBlockWriter<F>::operator()(uint64_t block) {
+    // Write/update block count
+    ptrdiff_t fullControlOffset = _encoder._incrementSimple8bCount(_buffer, _controlBlockWriter);
 
-        // Write Simple-8b block in little endian byte order
-        _bufBuilder->appendNum(block);
+    // Write Simple-8b block in little endian byte order
+    _buffer.appendNum(block);
 
-        // Write control block if this Simple-8b block made it full.
-        if (_controlBlockWriter && fullControlOffset != kNoSimple8bControl) {
-            _controlBlockWriter(_bufBuilder->buf() + fullControlOffset,
-                                _bufBuilder->len() - fullControlOffset);
-        }
+    // Write control block if this Simple-8b block made it full.
+    if (fullControlOffset != kNoSimple8bControl) {
+        _controlBlockWriter(fullControlOffset, _buffer.len() - fullControlOffset);
+    }
 
-        auto previous = _previous();
-        if (previous.type == NumberDouble) {
-            // If we are double we need to remember the last value written in the block. There could
-            // be multiple values pending still so we need to loop backwards and re-construct the
-            // value before the first value in pending.
-            auto current = _prevEncoded64;
-            for (auto it = _simple8bBuilder64.rbegin(), end = _simple8bBuilder64.rend(); it != end;
-                 ++it) {
-                if (const boost::optional<uint64_t>& encoded = *it) {
-                    // As we're going backwards we need to 'expandDelta' backwards which is the same
-                    // as 'calcDelta'.
-                    current = calcDelta(current, Simple8bTypeUtil::decodeInt64(*encoded));
-                }
+    auto previous = _encoder._previous();
+    if (previous.type == NumberDouble) {
+        // If we are double we need to remember the last value written in the block. There could
+        // be multiple values pending still so we need to loop backwards and re-construct the
+        // value before the first value in pending.
+        auto current = _encoder._prevEncoded64;
+        for (auto it = _encoder._simple8bBuilder64.rbegin(),
+                  end = _encoder._simple8bBuilder64.rend();
+             it != end;
+             ++it) {
+            if (const boost::optional<uint64_t>& encoded = *it) {
+                // As we're going backwards we need to 'expandDelta' backwards which is the same
+                // as 'calcDelta'.
+                current = calcDelta(current, Simple8bTypeUtil::decodeInt64(*encoded));
             }
-
-            _lastValueInPrevBlock = Simple8bTypeUtil::decodeDouble(current, _scaleIndex);
         }
 
-        return true;
-    };
+        _encoder._lastValueInPrevBlock =
+            Simple8bTypeUtil::decodeDouble(current, _encoder._scaleIndex);
+    }
 }
 
-BSONColumnBuilder::EncodingState::CloneableBuffer::CloneableBuffer(const CloneableBuffer& other) {
+EncodingState::CloneableBuffer::CloneableBuffer(const CloneableBuffer& other) {
     if (other.size <= 0) {
         return;
     }
@@ -1619,8 +1625,8 @@ BSONColumnBuilder::EncodingState::CloneableBuffer::CloneableBuffer(const Cloneab
     capacity = other.size;
 }
 
-BSONColumnBuilder::EncodingState::CloneableBuffer&
-BSONColumnBuilder::EncodingState::CloneableBuffer::operator=(const CloneableBuffer& rhs) {
+EncodingState::CloneableBuffer& EncodingState::CloneableBuffer::operator=(
+    const CloneableBuffer& rhs) {
     if (&rhs == this)
         return *this;
 
@@ -1636,10 +1642,9 @@ BSONColumnBuilder::EncodingState::CloneableBuffer::operator=(const CloneableBuff
     size = rhs.size;
     return *this;
 }
+}  // namespace bsoncolumn
 
-BSONColumnBuilder::InternalState::SubObjState::SubObjState() {
-    state.init(&buffer, controlBlockWriter());
-}
+BSONColumnBuilder::InternalState::SubObjState::SubObjState() {}
 
 BSONColumnBuilder::InternalState::SubObjState::SubObjState(const SubObjState& other)
     : state(other.state), controlBlocks(other.controlBlocks) {
@@ -1649,9 +1654,7 @@ BSONColumnBuilder::InternalState::SubObjState::SubObjState(const SubObjState& ot
 BSONColumnBuilder::InternalState::SubObjState::SubObjState(SubObjState&& other)
     : state(std::move(other.state)),
       buffer(std::move(other.buffer)),
-      controlBlocks(std::move(other.controlBlocks)) {
-    state.init(&buffer, controlBlockWriter());
-}
+      controlBlocks(std::move(other.controlBlocks)) {}
 
 BSONColumnBuilder::InternalState::SubObjState&
 BSONColumnBuilder::InternalState::SubObjState::operator=(const SubObjState& rhs) {
@@ -1674,17 +1677,21 @@ BSONColumnBuilder::InternalState::SubObjState::operator=(SubObjState&& rhs) {
     buffer = std::move(rhs.buffer);
     controlBlocks = std::move(rhs.controlBlocks);
 
-    state.init(&buffer, controlBlockWriter());
     return *this;
 }
 
-BSONColumnBuilder::ControlBlockWriteFn
+BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter::
+    InterleavedControlBlockWriter(std::deque<std::pair<ptrdiff_t, size_t>>& controlBlocks)
+    : _controlBlocks(controlBlocks) {}
+
+void BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter::operator()(
+    ptrdiff_t controlBlockOffset, size_t size) {
+    _controlBlocks.emplace_back(controlBlockOffset, size);
+}
+
+BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter
 BSONColumnBuilder::InternalState::SubObjState::controlBlockWriter() {
-    // We need to buffer all control blocks written by the EncodingStates
-    // so they can be added to the main buffer in the right order.
-    return [this](const char* controlBlock, size_t size) {
-        controlBlocks.emplace_back(controlBlock - buffer.buf(), size);
-    };
+    return InterleavedControlBlockWriter(controlBlocks);
 }
 
 bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
@@ -1712,9 +1719,9 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
         const auto& subelem = *subElemIt;
         auto& subobj = *statesIt;
         if (!subelem.eoo())
-            subobj.state.append(subelem);
+            subobj.state.append(subelem, subobj.buffer, subobj.controlBlockWriter());
         else
-            subobj.state.skip();
+            subobj.state.skip(subobj.buffer, subobj.controlBlockWriter());
     }
     return true;
 }
@@ -1722,7 +1729,7 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
 void BSONColumnBuilder::_startDetermineSubObjReference(const BSONObj& obj, BSONType type) {
     // Start sub-object compression. Enter DeterminingReference mode, we use this first Object
     // as the first reference
-    _is.regular.flush();
+    _is.regular.flush(_bufBuilder, EncodingState::NoopControlBlockWriter{});
     _is.regular = {};
 
     _is.referenceSubObj = obj.getOwned();
@@ -1755,9 +1762,9 @@ void BSONColumnBuilder::_finishDetermineSubObjReference() {
         subobj.state._storePrevious(ref);
         subobj.state._initializeFromPrevious();
         if (!elem.eoo()) {
-            subobj.state.append(elem);
+            subobj.state.append(elem, subobj.buffer, subobj.controlBlockWriter());
         } else {
-            subobj.state.skip();
+            subobj.state.skip(subobj.buffer, subobj.controlBlockWriter());
         }
     };
 
@@ -1783,7 +1790,7 @@ void BSONColumnBuilder::_flushSubObjMode() {
     // Flush all EncodingStates, this will cause them to write out all their elements that is
     // captured by the controlBlockWriter.
     for (auto&& subobj : _is.subobjStates) {
-        subobj.state.flush();
+        subobj.state.flush(subobj.buffer, subobj.controlBlockWriter());
     }
 
     // We now need to write all control blocks to the binary stream in the right order. This is done
@@ -1845,7 +1852,6 @@ void BSONColumnBuilder::_flushSubObjMode() {
     _bufBuilder.appendChar(EOO);
     _is.subobjStates.clear();
     _is.mode = Mode::kRegular;
-    _is.regular.init(&_bufBuilder, nullptr);
 }
 
 void BSONColumnBuilder::assertInternalStateIdentical_forTest(const BSONColumnBuilder& other) const {

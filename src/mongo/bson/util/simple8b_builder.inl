@@ -34,81 +34,16 @@
 #include <boost/cstdint.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <limits>
 #include <memory>
 #include <type_traits>
 #include <utility>
 
-#include <absl/numeric/int128.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/bson/util/simple8b_constants.h"
-#include "mongo/platform/bits.h"
-#include "mongo/platform/int128.h"
+#include "mongo/bson/util/simple8b_helpers.h"
 
 namespace mongo {
-
-namespace {
-using namespace simple8b_internal;
-
-
-// Calculates number of bits needed to store value. Must be less than
-// numeric_limits<uint64_t>::max().
-uint8_t _countBitsWithoutLeadingZeros(uint64_t value) {
-    // All 1s is reserved for skip encoding so we add 1 to value to account for that case.
-    return 64 - countLeadingZerosNonZero64(value + 1);
-}
-
-uint8_t _countTrailingZerosWithZero(uint64_t value) {
-    // countTrailingZeros64 returns 64 if the value is 0 but we consider this to be 0 trailing
-    // zeros.
-    return value == 0 ? 0 : countTrailingZerosNonZero64(value);
-}
-
-uint8_t _countTrailingZerosWithZero(uint128_t value) {
-    uint64_t low = absl::Uint128Low64(value);
-    uint64_t high = absl::Uint128High64(value);
-
-    // If value == 0 then we cannot add 64
-    if (low == 0 && high != 0) {
-        return countTrailingZerosNonZero64(high) + 64;
-    } else {
-        return _countTrailingZerosWithZero(low);
-    }
-}
-
-// Calculates number of bits needed to store value. Must be less than
-// numeric_limits<uint128_t>::max().
-uint8_t _countBitsWithoutLeadingZeros(uint128_t value) {
-    uint64_t high = absl::Uint128High64(value);
-    if (high == 0) {
-        uint64_t low = absl::Uint128Low64(value);
-        // We can't call _countBitsWithoutLeadingZeros() with numeric_limits<uint64_t>::max as it
-        // would overflow and yield the wrong result. Just return the correct value instead.
-        if (low == std::numeric_limits<uint64_t>::max())
-            return 65;
-        return _countBitsWithoutLeadingZeros(low);
-    } else {
-        return 128 - countLeadingZerosNonZero64(high);
-    }
-}
-
-/*
- * This method takes a number of intsNeeded and an extensionType and returns the selector index for
- * that type. This method should never fail as it is called when we are encoding a largest value.
- */
-uint8_t _getSelectorIndex(uint8_t intsNeeded, uint8_t extensionType) {
-    auto iteratorIdx = std::find_if(
-        kIntsStoreForSelector[extensionType].begin() + kMinSelector[extensionType],
-        kIntsStoreForSelector[extensionType].begin() + kMaxSelector[extensionType],
-        [intsNeeded](uint8_t intsPerSelectorIdx) { return intsNeeded >= intsPerSelectorIdx; });
-    return iteratorIdx - kIntsStoreForSelector[extensionType].begin();
-}
-
-}  // namespace
-
-
 // This is called in _encode while iterating through _pendingValues. For the base selector, we just
 // return val. Contains unsed vars in order to seamlessly integrate with seven and eight selector
 // extensions.
@@ -125,6 +60,8 @@ struct Simple8bBuilder<T>::BaseSelectorEncodeFunctor {
 template <typename T>
 struct Simple8bBuilder<T>::SevenSelectorEncodeFunctor {
     uint64_t operator()(const PendingValue& value) {
+        using namespace simple8b_internal;
+
         uint8_t trailingZeros = value.trailingZerosCount[kSevenSelector];
         uint64_t currWord = trailingZeros;
         // We do two shifts here to account for the case where trailingZeros is > kTrailingZero bit
@@ -142,6 +79,8 @@ template <typename T>
 template <uint8_t ExtensionType>
 struct Simple8bBuilder<T>::EightSelectorEncodeFunctor {
     uint64_t operator()(const PendingValue& value) {
+        using namespace simple8b_internal;
+
         // integer division. We have a nibble shift of size 4
         uint8_t trailingZeros = value.trailingZerosCount[ExtensionType] / kNibbleShiftSize;
         uint64_t currWord = trailingZeros;
@@ -158,14 +97,14 @@ struct Simple8bBuilder<T>::EightSelectorEncodeFunctor {
 // appended to the full simple8b word in _encode.
 template <typename T>
 struct Simple8bBuilder<T>::EightSelectorSmallEncodeFunctor
-    : public EightSelectorEncodeFunctor<kEightSelectorSmall> {};
+    : public EightSelectorEncodeFunctor<simple8b_internal::kEightSelectorSmall> {};
 
 // This is called in _encode while iterating through _pendingValues. It creates part of a simple8b
 // word according to the specifications of the eightSelectorLarge extension. This value is then
 // appended to the full simple8b word in _encode.
 template <typename T>
 struct Simple8bBuilder<T>::EightSelectorLargeEncodeFunctor
-    : public EightSelectorEncodeFunctor<kEightSelectorLarge> {};
+    : public EightSelectorEncodeFunctor<simple8b_internal::kEightSelectorLarge> {};
 
 // Base Constructor for PendingValue
 template <typename T>
@@ -245,46 +184,52 @@ bool Simple8bBuilder<T>::PendingIterator::operator!=(
 }
 
 template <typename T>
-Simple8bBuilder<T>::Simple8bBuilder(Simple8bWriteFn writeFunc) : _writeFn(std::move(writeFunc)) {}
+Simple8bBuilder<T>::Simple8bBuilder() {}
 
 template <typename T>
 Simple8bBuilder<T>::~Simple8bBuilder() = default;
 
 template <typename T>
-bool Simple8bBuilder<T>::append(T value) {
+template <class F>
+requires Simple8bBlockWriter<F>
+bool Simple8bBuilder<T>::append(T value, F&& writeFn) {
     if (_rlePossible()) {
         if (_lastValueInPrevWord.val == value) {
             ++_rleCount;
             return true;
         }
-        _handleRleTermination();
+        _handleRleTermination(writeFn);
     }
 
-    return _appendValue(value, true);
+    return _appendValue(value, true, writeFn);
 }
 
 template <typename T>
-void Simple8bBuilder<T>::skip() {
+template <class F>
+requires Simple8bBlockWriter<F>
+void Simple8bBuilder<T>::skip(F&& writeFn) {
     if (_rlePossible() && _lastValueInPrevWord.isSkip()) {
         ++_rleCount;
         return;
     }
 
-    _handleRleTermination();
-    _appendSkip(true /* tryRle */);
+    _handleRleTermination(writeFn);
+    _appendSkip(true /* tryRle */, writeFn);
 }
 
 template <typename T>
-void Simple8bBuilder<T>::flush() {
+template <class F>
+requires Simple8bBlockWriter<F>
+void Simple8bBuilder<T>::flush(F&& writeFn) {
     // Flush repeating integers that have been kept for RLE.
-    _handleRleTermination();
+    _handleRleTermination(writeFn);
     // Flush buffered values in _pendingValues.
     if (!_pendingValues.empty()) {
         // always flush with the most recent valid selector. This value is the baseSelector if we
         // have not have a valid selector yet.
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
-            _writeFn(simple8bWord);
+            writeFn(simple8bWord);
         } while (!_pendingValues.empty());
 
         // There are no more words in _pendingValues and RLE is possible.
@@ -310,13 +255,15 @@ void Simple8bBuilder<T>::setLastForRLE(boost::optional<T> val) {
 template <typename T>
 boost::optional<typename Simple8bBuilder<T>::PendingValue>
 Simple8bBuilder<T>::_calculatePendingValue(T value) {
+    using namespace simple8b_internal;
+
     // Early exit if we try to store max value. They are not handled when counting zeros.
     if (value == std::numeric_limits<T>::max())
         return boost::none;
 
-    uint8_t trailingZerosCount = _countTrailingZerosWithZero(value);
+    uint8_t trailingZerosCount = countTrailingZerosWithZero(value);
     // Initially set every selector as invalid.
-    uint8_t bitCountWithoutLeadingZeros = _countBitsWithoutLeadingZeros(value);
+    uint8_t bitCountWithoutLeadingZeros = countBitsWithoutLeadingZeros(value);
     uint8_t trailingZerosStoredInCountSeven =
         (std::min(trailingZerosCount, kTrailingZerosMaxCount[kSevenSelector]));
     uint8_t meaningfulValueBitsStoredWithSeven =
@@ -343,10 +290,10 @@ Simple8bBuilder<T>::_calculatePendingValue(T value) {
     // reuse the bitCountWithoutLeadingZeros already calculated above.
     if (trailingZerosCount == kTrailingZerosMaxCount[kSevenSelector]) {
         meaningfulValueBitsStoredWithSeven =
-            _countBitsWithoutLeadingZeros(value >> trailingZerosCount);
+            countBitsWithoutLeadingZeros(value >> trailingZerosCount);
     } else if (trailingZerosCount == kTrailingZerosMaxCount[kEightSelectorSmall]) {
         meaningfulValueBitsStoredWithEightSmall =
-            _countBitsWithoutLeadingZeros(value >> trailingZerosCount);
+            countBitsWithoutLeadingZeros(value >> trailingZerosCount);
     }
 
     // This case is specifically for 128 bit types where we have 124 zeros or max zeros
@@ -354,7 +301,7 @@ Simple8bBuilder<T>::_calculatePendingValue(T value) {
     if constexpr (std::is_same<T, uint128_t>::value) {
         if (trailingZerosCount == kTrailingZerosMaxCount[kEightSelectorLarge]) {
             meaningfulValueBitsStoredWithEightLarge =
-                _countBitsWithoutLeadingZeros(value >> trailingZerosCount);
+                countBitsWithoutLeadingZeros(value >> trailingZerosCount);
         }
     }
 
@@ -383,7 +330,8 @@ Simple8bBuilder<T>::_calculatePendingValue(T value) {
 }
 
 template <typename T>
-bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
+template <class F>
+bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle, F&& writeFn) {
     auto pendingValue = _calculatePendingValue(value);
     if (!pendingValue) {
         return false;
@@ -404,7 +352,7 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
         PendingValue lastPendingValue = _pendingValues.back();
         do {
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
-            _writeFn(simple8bWord);
+            writeFn(simple8bWord);
         } while (!(_doesIntegerFitInCurrentWord(*pendingValue)));
 
         if (tryRle && _pendingValues.empty() && lastPendingValue.val == value) {
@@ -421,7 +369,10 @@ bool Simple8bBuilder<T>::_appendValue(T value, bool tryRle) {
 }
 
 template <typename T>
-void Simple8bBuilder<T>::_appendSkip(bool tryRle) {
+template <class F>
+void Simple8bBuilder<T>::_appendSkip(bool tryRle, F&& writeFn) {
+    using namespace simple8b_internal;
+
     if (!_pendingValues.empty()) {
         bool isLastValueSkip = _pendingValues.back().isSkip();
 
@@ -430,7 +381,7 @@ void Simple8bBuilder<T>::_appendSkip(bool tryRle) {
         if (!_doesIntegerFitInCurrentWord({boost::none, kMinDataBits, {0, 0, 0, 0}})) {
             // Form simple8b word if skip can not fit with last selector
             uint64_t simple8bWord = _encodeLargestPossibleWord(_lastValidExtensionType);
-            _writeFn(simple8bWord);
+            writeFn(simple8bWord);
             _lastValidExtensionType = kBaseSelector;
         }
 
@@ -447,33 +398,37 @@ void Simple8bBuilder<T>::_appendSkip(bool tryRle) {
 }
 
 template <typename T>
-void Simple8bBuilder<T>::_handleRleTermination() {
+template <class F>
+void Simple8bBuilder<T>::_handleRleTermination(F&& writeFn) {
     if (_rleCount == 0)
         return;
 
     // Try to create a RLE Simple8b word.
-    _appendRleEncoding();
+    _appendRleEncoding(writeFn);
     // Add any values that could not be encoded in RLE.
     while (_rleCount > 0) {
         if (_lastValueInPrevWord.isSkip()) {
-            _appendSkip(false /* tryRle */);
+            _appendSkip(false /* tryRle */, writeFn);
         } else {
-            _appendValue(_lastValueInPrevWord.value(), false);
+            _appendValue(_lastValueInPrevWord.value(), false, writeFn);
         }
         --_rleCount;
     }
 }
 
 template <typename T>
-void Simple8bBuilder<T>::_appendRleEncoding() {
+template <class F>
+void Simple8bBuilder<T>::_appendRleEncoding(F&& writeFn) {
+    using namespace simple8b_internal;
+
     // This encodes a value using rle. The selector is set as 15 and the count is added in the next
     // 4 bits. The value is the previous value stored by simple8b or 0 if no previous value was
     // stored.
-    auto createRleEncoding = [this](uint8_t count) {
+    auto createRleEncoding = [&writeFn](uint8_t count) {
         uint64_t rleEncoding = kRleSelector;
         // We will store (count - 1) during encoding and execute (count + 1) during decoding.
         rleEncoding |= (count - 1) << kSelectorBits;
-        _writeFn(rleEncoding);
+        writeFn(rleEncoding);
     };
 
     uint32_t count = _rleCount / kRleMultiplier;
@@ -513,6 +468,8 @@ bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWord(const PendingValue& value)
 template <typename T>
 bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWordWithGivenSelectorType(
     const PendingValue& value, uint8_t extensionType) {
+    using namespace simple8b_internal;
+
     uint64_t numBitsWithValue =
         (std::max(_currMaxBitLen[extensionType], value.bitCount[extensionType]) +
          kTrailingZeroBitSize[extensionType]) *
@@ -531,10 +488,12 @@ bool Simple8bBuilder<T>::_doesIntegerFitInCurrentWordWithGivenSelectorType(
 
 template <typename T>
 int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
+    using namespace simple8b_internal;
+
     // Since this is always called right after _doesIntegerFitInCurrentWord fails for the first
     // time, we know all values in _pendingValues fits in the slots for the selector that can store
     // this many values. Find the smallest selector that doesn't leave any unused slots.
-    uint8_t selector = _getSelectorIndex(_pendingValues.size(), extensionType);
+    uint8_t selector = getSelectorIndex(_pendingValues.size(), extensionType);
     uint8_t integersCoded = kIntsStoreForSelector[extensionType][selector];
     uint64_t encodedWord;
     switch (extensionType) {
@@ -564,6 +523,8 @@ int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
 template <typename T>
 template <typename Func>
 uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t extensionType) {
+    using namespace simple8b_internal;
+
     uint8_t baseSelector = kExtensionToBaseSelector[extensionType][selectorIdx];
     uint8_t bitShiftExtension = kBaseSelectorToShiftSize[baseSelector];
     uint64_t encodedWord = baseSelector;
@@ -590,6 +551,8 @@ uint64_t Simple8bBuilder<T>::_encode(Func func, uint8_t selectorIdx, uint8_t ext
 
 template <typename T>
 void Simple8bBuilder<T>::_updateSimple8bCurrentState(const PendingValue& val) {
+    using namespace simple8b_internal;
+
     for (uint8_t i = 0; i < kNumOfSelectorTypes; ++i) {
         _currMaxBitLen[i] = std::max(_currMaxBitLen[i], val.bitCount[i]);
     }
@@ -618,11 +581,6 @@ std::reverse_iterator<typename Simple8bBuilder<T>::PendingIterator> Simple8bBuil
 }
 
 template <typename T>
-void Simple8bBuilder<T>::setWriteCallback(Simple8bWriteFn writer) {
-    _writeFn = std::move(writer);
-}
-
-template <typename T>
 void Simple8bBuilder<T>::assertInternalStateIdentical_forTest(
     const Simple8bBuilder<T>& other) const {
     // Verifies the pending values
@@ -638,6 +596,4 @@ void Simple8bBuilder<T>::assertInternalStateIdentical_forTest(
     invariant(isSelectorPossible == other.isSelectorPossible);
 }
 
-template class Simple8bBuilder<uint64_t>;
-template class Simple8bBuilder<uint128_t>;
 }  // namespace mongo

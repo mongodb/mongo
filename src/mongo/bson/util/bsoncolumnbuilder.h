@@ -50,6 +50,116 @@
 #include "mongo/platform/int128.h"
 
 namespace mongo {
+namespace bsoncolumn {
+/**
+ * Deconstructed BSONElement without type and fieldname in the contigous buffer.
+ */
+struct Element {
+    Element() : type(EOO), size(0) {}
+    Element(BSONElement elem) : value(elem.value()), type(elem.type()), size(elem.valuesize()) {}
+    Element(const BSONObj& obj, BSONType t) : value(obj.objdata()), type(t), size(obj.objsize()) {}
+    Element(BSONType t, BSONElementValue v, int s) : value(v), type(t), size(s) {}
+
+    // Performs binary memory compare
+    bool operator==(const Element& rhs) const;
+
+    BSONElementValue value;
+    BSONType type;
+    int size;
+};
+
+/**
+ * State for encoding scalar BSONElement as BSONColumn using delta or delta-of-delta
+ * compression. When compressing Objects one Encoding state is used per sub-field within the
+ * object to compress.
+ */
+struct EncodingState {
+    template <class F>
+    class Simple8bBlockWriter {
+    public:
+        Simple8bBlockWriter(EncodingState& encoder, BufBuilder& buffer, F controlBlockWriter)
+            : _encoder(encoder), _buffer(buffer), _controlBlockWriter(controlBlockWriter) {}
+
+        void operator()(uint64_t block);
+
+    private:
+        EncodingState& _encoder;
+        BufBuilder& _buffer;
+        F _controlBlockWriter;
+    };
+
+    struct NoopControlBlockWriter {
+        void operator()(ptrdiff_t, size_t) const {}
+    };
+
+    EncodingState();
+
+    template <class F>
+    void append(Element elem, BufBuilder& buffer, F controlBlockWriter);
+    template <class F>
+    void skip(BufBuilder& buffer, F controlBlockWriter);
+    template <class F>
+    void flush(BufBuilder& buffer, F controlBlockWriter);
+
+    Element _previous() const;
+    void _storePrevious(Element elem);
+    template <class F>
+    void _writeLiteralFromPrevious(BufBuilder& buffer, F controlBlockWriter);
+    void _initializeFromPrevious();
+    template <class F>
+    ptrdiff_t _incrementSimple8bCount(BufBuilder& buffer, F controlBlockWriter);
+
+    // Helper to append doubles to this Column builder. Returns true if append was successful
+    // and false if the value needs to be stored uncompressed.
+    template <class F>
+    bool _appendDouble(double value, double previous, BufBuilder& buffer, F controlBlockWriter);
+
+    // Tries to rescale current pending values + one additional value into a new
+    // Simple8bBuilder. Returns the new Simple8bBuilder if rescaling was possible and none
+    // otherwise.
+    boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
+                                                                  uint8_t newScaleIndex);
+
+    /**
+     * Copyable memory buffer
+     */
+    struct CloneableBuffer {
+        CloneableBuffer() = default;
+
+        CloneableBuffer(CloneableBuffer&&) = default;
+        CloneableBuffer(const CloneableBuffer&);
+
+        CloneableBuffer& operator=(CloneableBuffer&&) = default;
+        CloneableBuffer& operator=(const CloneableBuffer&);
+
+        std::unique_ptr<char[]> buffer;
+        int size = 0;
+        int capacity = 0;
+    };
+
+    // Storage for the previously appended BSONElement
+    CloneableBuffer _prev;
+
+    // This is only used for types that use delta of delta.
+    int64_t _prevDelta = 0;
+
+    // Simple-8b builder for storing compressed deltas
+    Simple8bBuilder<uint64_t> _simple8bBuilder64;
+    Simple8bBuilder<uint128_t> _simple8bBuilder128;
+
+    // Chose whether to use 128 or 64 Simple-8b builder
+    bool _storeWith128 = false;
+
+    // Offset to last Simple-8b control byte
+    std::ptrdiff_t _controlByteOffset;
+
+    // Additional variables needed for previous state
+    int64_t _prevEncoded64 = 0;
+    boost::optional<int128_t> _prevEncoded128;
+    double _lastValueInPrevBlock = 0;
+    uint8_t _scaleIndex;
+};
+}  // namespace bsoncolumn
 
 /**
  * Class to build BSON Subtype 7 (Column) binaries.
@@ -143,103 +253,6 @@ public:
     void assertInternalStateIdentical_forTest(const BSONColumnBuilder& other) const;
 
 private:
-    using ControlBlockWriteFn = std::function<void(const char*, size_t)>;
-
-    /**
-     * Deconstructed BSONElement without type and fieldname in the contigous buffer.
-     */
-    struct Element {
-        Element() : type(EOO), size(0) {}
-        Element(BSONElement elem)
-            : value(elem.value()), type(elem.type()), size(elem.valuesize()) {}
-        Element(const BSONObj& obj, BSONType t)
-            : value(obj.objdata()), type(t), size(obj.objsize()) {}
-        Element(BSONType t, BSONElementValue v, int s) : value(v), type(t), size(s) {}
-
-        // Performs binary memory compare
-        bool operator==(const Element& rhs) const;
-
-        BSONElementValue value;
-        BSONType type;
-        int size;
-    };
-
-    /**
-     * State for encoding scalar BSONElement as BSONColumn using delta or delta-of-delta
-     * compression. When compressing Objects one Encoding state is used per sub-field within the
-     * object to compress.
-     */
-    struct EncodingState {
-        EncodingState();
-
-        // Initializes this encoding state. Must be called after construction and move.
-        void init(BufBuilder* buffer, ControlBlockWriteFn controlBlockWriter);
-
-        void append(Element elem);
-        void skip();
-        void flush();
-
-        Element _previous() const;
-        void _storePrevious(Element elem);
-        void _writeLiteralFromPrevious();
-        void _initializeFromPrevious();
-        ptrdiff_t _incrementSimple8bCount();
-
-        // Helper to append doubles to this Column builder. Returns true if append was successful
-        // and false if the value needs to be stored uncompressed.
-        bool _appendDouble(double value, double previous);
-
-        // Tries to rescale current pending values + one additional value into a new
-        // Simple8bBuilder. Returns the new Simple8bBuilder if rescaling was possible and none
-        // otherwise.
-        boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
-                                                                      uint8_t newScaleIndex);
-
-        Simple8bWriteFn _createBufferWriter();
-
-        /**
-         * Copyable memory buffer
-         */
-        struct CloneableBuffer {
-            CloneableBuffer() = default;
-
-            CloneableBuffer(CloneableBuffer&&) = default;
-            CloneableBuffer(const CloneableBuffer&);
-
-            CloneableBuffer& operator=(CloneableBuffer&&) = default;
-            CloneableBuffer& operator=(const CloneableBuffer&);
-
-            std::unique_ptr<char[]> buffer;
-            int size = 0;
-            int capacity = 0;
-        };
-
-        // Storage for the previously appended BSONElement
-        CloneableBuffer _prev;
-
-        // This is only used for types that use delta of delta.
-        int64_t _prevDelta = 0;
-
-        // Simple-8b builder for storing compressed deltas
-        Simple8bBuilder<uint64_t> _simple8bBuilder64;
-        Simple8bBuilder<uint128_t> _simple8bBuilder128;
-
-        // Chose whether to use 128 or 64 Simple-8b builder
-        bool _storeWith128 = false;
-
-        // Offset to last Simple-8b control byte
-        std::ptrdiff_t _controlByteOffset;
-
-        // Additional variables needed for previous state
-        int64_t _prevEncoded64 = 0;
-        boost::optional<int128_t> _prevEncoded128;
-        double _lastValueInPrevBlock = 0;
-        uint8_t _scaleIndex;
-
-        BufBuilder* _bufBuilder;
-        ControlBlockWriteFn _controlBlockWriter;
-    };
-
     /**
      * Internal mode this BSONColumnBuilder is in.
      */
@@ -262,9 +275,22 @@ private:
         Mode mode = Mode::kRegular;
 
         // Encoding state for kRegular mode
-        EncodingState regular;
+        bsoncolumn::EncodingState regular;
 
         struct SubObjState {
+            // We need to buffer all control blocks written by the EncodingStates
+            // so they can be added to the main buffer in the right order.
+            class InterleavedControlBlockWriter {
+            public:
+                InterleavedControlBlockWriter(
+                    std::deque<std::pair<ptrdiff_t, size_t>>& controlBlocks);
+
+                void operator()(ptrdiff_t, size_t);
+
+            private:
+                std::deque<std::pair<ptrdiff_t, size_t>>& _controlBlocks;
+            };
+
             SubObjState();
             SubObjState(SubObjState&&);
             SubObjState(const SubObjState&);
@@ -272,11 +298,11 @@ private:
             SubObjState& operator=(SubObjState&&);
             SubObjState& operator=(const SubObjState&);
 
-            EncodingState state;
+            bsoncolumn::EncodingState state;
             BufBuilder buffer;
             std::deque<std::pair<ptrdiff_t, size_t>> controlBlocks;
 
-            ControlBlockWriteFn controlBlockWriter();
+            InterleavedControlBlockWriter controlBlockWriter();
         };
 
         // Encoding states when in sub-object compression mode. There should be one encoding state
@@ -300,7 +326,7 @@ private:
     class BinaryReopen;
 
     // Append helper for appending a BSONObj
-    BSONColumnBuilder& _appendObj(Element elem);
+    BSONColumnBuilder& _appendObj(bsoncolumn::Element elem);
 
     // Append Object for sub-object compression when in mode kSubObjAppending
     bool _appendSubElements(const BSONObj& obj);

@@ -50,119 +50,132 @@ BufBuilder generateIntegers() {
     std::uniform_int_distribution skip(1, 100);
 
     BufBuilder buffer;
-    Simple8bBuilder<uint64_t> s8bBuilder(
-        [&buffer](uint64_t simple8bBlock) { buffer.appendNum(simple8bBlock); });
+    auto writeFn = [&buffer](uint64_t simple8bBlock) {
+        buffer.appendNum(simple8bBlock);
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
 
     // Generate 10k integers
     for (int i = 0; i < 10000; ++i) {
         // 5% chance for missing
         if (skip(gen) <= 5) {
-            s8bBuilder.skip();
+            s8bBuilder.skip(writeFn);
         } else {
-            s8bBuilder.append(std::lround(d(gen)));
+            s8bBuilder.append(std::lround(d(gen)), writeFn);
         }
     }
 
-    s8bBuilder.flush();
+    s8bBuilder.flush(writeFn);
     return buffer;
 }
 
 void BM_increasingValues(benchmark::State& state) {
     size_t totalBytes = 0;
+    auto writeFn = [&totalBytes](uint64_t simple8bBlock) {
+        totalBytes += sizeof(simple8bBlock);
+    };
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Simple8bBuilder<uint64_t> s8bBuilder(
-            [&totalBytes](uint64_t simple8bBlock) { totalBytes += sizeof(simple8bBlock); });
+        Simple8bBuilder<uint64_t> s8bBuilder;
         for (auto j = 0; j < state.range(0); j++)
-            s8bBuilder.append((uint64_t)j);
+            s8bBuilder.append((uint64_t)j, writeFn);
 
-        s8bBuilder.flush();
+        s8bBuilder.flush(writeFn);
     }
     state.SetBytesProcessed(totalBytes);
 }
 
 void BM_rle(benchmark::State& state) {
     size_t totalBytes = 0;
+    auto writeFn = [&totalBytes](uint64_t simple8bBlock) {
+        totalBytes += sizeof(simple8bBlock);
+    };
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Simple8bBuilder<uint64_t> s8bBuilder(
-            [&totalBytes](uint64_t simple8bBlock) { totalBytes += sizeof(simple8bBlock); });
+        Simple8bBuilder<uint64_t> s8bBuilder;
         for (auto j = 0; j < state.range(0); j++)
-            s8bBuilder.append(0);
+            s8bBuilder.append(0, writeFn);
 
-        s8bBuilder.flush();
+        s8bBuilder.flush(writeFn);
     }
     state.SetBytesProcessed(totalBytes);
 }
 
 void BM_changingSmallValues(benchmark::State& state) {
     size_t totalBytes = 0;
+    auto writeFn = [&totalBytes](uint64_t simple8bBlock) {
+        totalBytes += sizeof(simple8bBlock);
+    };
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Simple8bBuilder<uint64_t> s8bBuilder(
-            [&totalBytes](uint64_t simple8bBlock) { totalBytes += sizeof(simple8bBlock); });
+        Simple8bBuilder<uint64_t> s8bBuilder;
         for (auto j = 0; j < state.range(0); j++)
-            s8bBuilder.append(j % 2);
+            s8bBuilder.append(j % 2, writeFn);
 
-        s8bBuilder.flush();
+        s8bBuilder.flush(writeFn);
     }
     state.SetBytesProcessed(totalBytes);
 }
 
 void BM_changingLargeValues(benchmark::State& state) {
     size_t totalBytes = 0;
+    auto writeFn = [&totalBytes](uint64_t simple8bBlock) {
+        totalBytes += sizeof(simple8bBlock);
+    };
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Simple8bBuilder<uint64_t> s8bBuilder(
-            [&totalBytes](uint64_t simple8bBlock) { totalBytes += sizeof(simple8bBlock); });
+        Simple8bBuilder<uint64_t> s8bBuilder;
         for (auto j = 0; j < state.range(0); j++) {
             uint64_t value = j % 2 ? 0xE0 : 0xFF;
-            s8bBuilder.append(value);
+            s8bBuilder.append(value, writeFn);
         }
 
-        s8bBuilder.flush();
+        s8bBuilder.flush(writeFn);
     }
     state.SetBytesProcessed(totalBytes);
 }
 
 void BM_selectorSeven(benchmark::State& state) {
     size_t totalBytes = 0;
+    auto writeFn = [&totalBytes](uint64_t simple8bBlock) {
+        totalBytes += sizeof(simple8bBlock);
+    };
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        Simple8bBuilder<uint64_t> s8bBuilder(
-            [&totalBytes](uint64_t simple8bBlock) { totalBytes += sizeof(simple8bBlock); });
+        Simple8bBuilder<uint64_t> s8bBuilder;
 
         for (auto j = 0; j < state.range(0); j++) {
             uint64_t value = j % 2 ? 0b1000000000000 : 0b11000000000000;
-            s8bBuilder.append(value);
+            s8bBuilder.append(value, writeFn);
         }
-        s8bBuilder.flush();
+        s8bBuilder.flush(writeFn);
     }
     state.SetBytesProcessed(totalBytes);
 }
 
 void BM_decode(benchmark::State& state) {
     size_t totalBytes = 0;
-
     BufBuilder _buffer;
-    Simple8bBuilder<uint64_t> s8bBuilder(
-        [&_buffer](uint64_t simple8bBlock) { _buffer.appendNum(simple8bBlock); });
+    auto writeFn = [&_buffer](uint64_t simple8bBlock) {
+        _buffer.appendNum(simple8bBlock);
+    };
+    Simple8bBuilder<uint64_t> s8bBuilder;
 
     // Small values.
     for (auto j = 0; j < 100; j++)
-        s8bBuilder.append(j % 2);
+        s8bBuilder.append(j % 2, writeFn);
 
     // RLE.
     for (auto j = 0; j < 200; j++)
-        s8bBuilder.append(0);
+        s8bBuilder.append(0, writeFn);
 
     // Large Values.
     for (auto j = 0; j < 100; j++) {
         uint64_t value = j % 2 ? 0xE0 : 0xFF;
-        s8bBuilder.append(value);
+        s8bBuilder.append(value, writeFn);
     }
 
-    s8bBuilder.flush();
+    s8bBuilder.flush(writeFn);
 
     auto size = _buffer.len();
     auto buf = _buffer.release();
