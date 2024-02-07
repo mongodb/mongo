@@ -2325,7 +2325,7 @@ buildvariants:
     - name: tsbs_query_high_cardinality
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
-  name: perf-1-node-replSet-longRunning.arm.aws.2023-11
+  name: perf-1-node-replSet-all-feature-flags-longRunning.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet (all feature flags) Long-Running ARM AWS 2023-11
   cron: "0 0 * * 6"  # 00:00 on every Saturday
   modules: *perf_modules
