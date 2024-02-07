@@ -738,9 +738,17 @@ bool handleGroupedInserts(OperationContext* opCtx,
     curOp.push(opCtx);
     ON_BLOCK_EXIT([&] { finishCurOp(opCtx, &curOp, LogicalOp::opInsert); });
 
+    // If we are using document sequences for documents that total >16MB then getInsertOpDesc can
+    // fail with BSONObjectTooLarge. If this happens we want to proceed with an empty BSONObj.
+    BSONObj insertDocsObj;
+    try {
+        insertDocsObj = getInsertOpDesc(insertDocs, nsIdx);
+    } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+        insertDocsObj = BSONObj();
+    }
+
     // Initialize curOp information.
-    setCurOpInfoAndEnsureStarted(
-        opCtx, &curOp, LogicalOp::opInsert, nsEntry, getInsertOpDesc(insertDocs, nsIdx));
+    setCurOpInfoAndEnsureStarted(opCtx, &curOp, LogicalOp::opInsert, nsEntry, insertDocsObj);
 
     // Handle timeseries inserts.
     TimeseriesBucketNamespace tsNs(nsString, nsEntry.getIsTimeseriesNamespace());
