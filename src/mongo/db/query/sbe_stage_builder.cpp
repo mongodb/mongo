@@ -5014,6 +5014,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         } else if (accName == "$integral" || accName == "$derivative" || accName == "$linearFill") {
             argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
             argExprs.emplace(AccArgs::kSortBy, makeVariable(getSortBySlot().first));
+        } else if (accName == "$rank" || accName == "$denseRank") {
+            auto isAscending = windowNode->sortBy->front().isAscending;
+            argExprs.emplace(AccArgs::kInput, getArgExpr(outputField.expr->input().get()));
+            argExprs.emplace(AccArgs::kRankIsAscending,
+                             makeConstant(sbe::value::TypeTags::Boolean,
+                                          sbe::value::bitcastFrom<bool>(isAscending)));
         } else if (isTopBottomN(outputField)) {
             tassert(8155715, "Root slot should be set", rootSlotOpt);
 

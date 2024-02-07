@@ -1021,17 +1021,43 @@ SbExpr::Vector buildAccumulatorDocumentNumber(const AccumulationExpression& expr
     return SbExpr::makeSeq(b.makeFunction("sum", b.makeInt64Constant(1)));
 }
 
-SbExpr::Vector buildAccumulatorRank(const AccumulationExpression& expr,
-                                    SbExpr arg,
-                                    boost::optional<sbe::value::SlotId> collatorSlot,
-                                    StageBuilderState& state) {
+SbExpr::Vector buildAccumulatorRankImpl(const StringData rankFuncName,
+                                        const StringData collRankFuncName,
+                                        const AccumulationExpression& expr,
+                                        StringDataMap<SbExpr> args,
+                                        boost::optional<sbe::value::SlotId> collatorSlot,
+                                        StageBuilderState& state) {
     SbExprBuilder b(state);
 
+    auto it = args.find(AccArgs::kInput);
+    tassert(8216801,
+            str::stream() << "Accumulator " << expr.name << " expects a '" << AccArgs::kInput
+                          << "' argument",
+            it != args.end());
+    auto input = std::move(it->second);
+
+    it = args.find(AccArgs::kRankIsAscending);
+    tassert(8216802,
+            str::stream() << "Accumulator " << expr.name << " expects a '"
+                          << AccArgs::kRankIsAscending << "' argument",
+            it != args.end());
+    auto sortOrder = std::move(it->second);
+
     if (collatorSlot) {
-        return SbExpr::makeSeq(b.makeFunction("aggRankColl", std::move(arg), SbVar{*collatorSlot}));
+        return SbExpr::makeSeq(b.makeFunction(
+            collRankFuncName, std::move(input), std::move(sortOrder), SbVar{*collatorSlot}));
     } else {
-        return SbExpr::makeSeq(b.makeFunction("aggRank", std::move(arg)));
+        return SbExpr::makeSeq(
+            b.makeFunction(rankFuncName, std::move(input), std::move(sortOrder)));
     }
+}
+
+SbExpr::Vector buildAccumulatorRank(const AccumulationExpression& expr,
+                                    StringDataMap<SbExpr> args,
+                                    boost::optional<sbe::value::SlotId> collatorSlot,
+                                    StageBuilderState& state) {
+    return buildAccumulatorRankImpl(
+        "aggRank", "aggRankColl", expr, std::move(args), collatorSlot, state);
 }
 
 SbExpr buildFinalizeRank(StageBuilderState& state,
@@ -1045,17 +1071,11 @@ SbExpr buildFinalizeRank(StageBuilderState& state,
 }
 
 SbExpr::Vector buildAccumulatorDenseRank(const AccumulationExpression& expr,
-                                         SbExpr arg,
+                                         StringDataMap<SbExpr> args,
                                          boost::optional<sbe::value::SlotId> collatorSlot,
                                          StageBuilderState& state) {
-    SbExprBuilder b(state);
-
-    if (collatorSlot) {
-        return SbExpr::makeSeq(
-            b.makeFunction("aggDenseRankColl", std::move(arg), SbVar{*collatorSlot}));
-    } else {
-        return SbExpr::makeSeq(b.makeFunction("aggDenseRank", std::move(arg)));
-    }
+    return buildAccumulatorRankImpl(
+        "aggDenseRank", "aggDenseRankColl", expr, std::move(args), collatorSlot, state);
 }
 
 SbExpr::Vector buildInitializeIntegral(SbExpr unitExpr, StageBuilderState& state) {
@@ -1254,8 +1274,6 @@ SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
         {AccumulatorExpMovingAvg::kName, &buildAccumulatorExpMovingAvg},
         {AccumulatorLocf::kName, &buildAccumulatorLocf},
         {AccumulatorDocumentNumber::kName, &buildAccumulatorDocumentNumber},
-        {AccumulatorRank::kName, &buildAccumulatorRank},
-        {AccumulatorDenseRank::kName, &buildAccumulatorDenseRank},
     };
 
     auto accExprName = acc.expr.name;
@@ -1303,6 +1321,8 @@ SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
         {AccumulatorIntegral::kName, &buildAccumulatorIntegral},
         {window_function::ExpressionDerivative::kName, &buildAccumulatorDerivative},
         {window_function::ExpressionLinearFill::kName, &buildAccumulatorLinearFill},
+        {AccumulatorRank::kName, &buildAccumulatorRank},
+        {AccumulatorDenseRank::kName, &buildAccumulatorDenseRank},
     };
 
     auto accExprName = acc.expr.name;

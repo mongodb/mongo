@@ -1,15 +1,18 @@
 /**
  * Test the rank based window functions.
  */
-import {assertErrCodeAndErrMsgContains, documentEq} from "jstests/aggregation/extras/utils.js";
-import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {assertErrCodeAndErrMsgContains} from "jstests/aggregation/extras/utils.js";
 
 const coll = db[jsTestName()];
 const numDoc = 12;
 for (let i = 0; i < numDoc; i++) {
     const doc = {_id: i, double: Math.floor(i / 2)};
-    if (i < numDoc / 3 || i >= numDoc / 3 * 2) {
+    if (i % 4 === 1) {
         doc.nullOrMissing = null;
+    } else if (i % 4 === 2) {
+        doc.nullOrMissing = [null];
+    } else if (i % 4 === 3) {
+        doc.nullOrMissing = ["abc", null];
     }
     coll.insert(doc);
 }
@@ -18,9 +21,10 @@ let origDocs = coll.find().sort({_id: 1});
 function verifyResults(results, valueFunction) {
     for (let i = 0; i < results.length; i++) {
         const correctDoc = valueFunction(i, Object.assign({}, origDocs[i]));
-        assert(documentEq(correctDoc, results[i]),
-               "Got: " + tojson(results[i]) + "\nExpected: " + tojson(correctDoc) +
-                   "\n at position " + i + "\n");
+        assert.eq(correctDoc.rank,
+                  results[i].rank,
+                  "Got: " + tojson(results[i]) + "\nExpected: " + tojson(correctDoc) +
+                      "\n at position " + i + "\n");
     }
 }
 
@@ -123,32 +127,14 @@ verifyResults(result, function(num, baseObj) {
 result = runRankBasedAccumulator({double: 1}, {$documentNumber: {}});
 verifyResults(result, noTieFunc);
 
-// Check results with null or missing fields. Ignore this test on a sharded collection, because
-// null and missing are treated the same during sorting, so the interleaving of null and missing
-// is unknown after merging shard streams. Hence the rank result is also unknown.
-// Ignore this test for replica sets as well, because in secondary read suites, null and missing
-// might be ordered different on disk due to different record id orders.
-if (!FixtureHelpers.isSharded(coll) && !FixtureHelpers.isReplSet(db)) {
-    result = runRankBasedAccumulator({nullOrMissing: 1}, {$rank: {}});
-    verifyResults(result, function(num, baseObj) {
-        if (num < numDoc / 3) {
-            baseObj.rank = 1;
-        } else if (num < numDoc / 3 * 2) {
-            baseObj.rank = numDoc / 3 + 1;
-        } else {
-            baseObj.rank = numDoc / 3 * 2 + 1;
-        }
-        return baseObj;
-    });
-    result = runRankBasedAccumulator({nullOrMissing: 1}, {$denseRank: {}});
-    verifyResults(result, function(num, baseObj) {
-        if (num < numDoc / 3) {
-            baseObj.rank = 1;
-        } else if (num < numDoc / 3 * 2) {
-            baseObj.rank = 2;
-        } else {
-            baseObj.rank = 3;
-        }
-        return baseObj;
-    });
-}
+// Check results with null or missing fields.
+result = runRankBasedAccumulator({nullOrMissing: 1}, {$rank: {}});
+verifyResults(result, function(num, baseObj) {
+    baseObj.rank = 1;
+    return baseObj;
+});
+result = runRankBasedAccumulator({nullOrMissing: 1}, {$denseRank: {}});
+verifyResults(result, function(num, baseObj) {
+    baseObj.rank = 1;
+    return baseObj;
+});

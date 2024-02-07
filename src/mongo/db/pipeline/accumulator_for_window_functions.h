@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/window_function/window_function_covariance.h"
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
@@ -94,7 +95,7 @@ public:
 
 class AccumulatorRankBase : public AccumulatorForWindowFunctions {
 public:
-    explicit AccumulatorRankBase(ExpressionContext* expCtx);
+    explicit AccumulatorRankBase(ExpressionContext* expCtx, bool isAscending);
     void reset();
 
     Value getValue(bool toBeMerged) final {
@@ -104,6 +105,7 @@ public:
 protected:
     long long _lastRank = 0;
     boost::optional<Value> _lastInput = boost::none;
+    SortKeyGenerator _sortKeyGen;
 };
 
 class AccumulatorRank : public AccumulatorRankBase {
@@ -114,9 +116,11 @@ public:
         return kName.rawData();
     }
 
-    explicit AccumulatorRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
+    explicit AccumulatorRank(ExpressionContext* const expCtx, bool isAscending)
+        : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
+                                                         bool isAscending);
     void reset() final;
 
 private:
@@ -131,10 +135,11 @@ public:
         return kName.rawData();
     }
 
-    explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx)
-        : AccumulatorRankBase(expCtx) {}
+    explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx, bool isAscending)
+        : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
+                                                         bool isAscending);
 };
 
 class AccumulatorDenseRank : public AccumulatorRankBase {
@@ -145,9 +150,11 @@ public:
         return kName.rawData();
     }
 
-    explicit AccumulatorDenseRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
+    explicit AccumulatorDenseRank(ExpressionContext* const expCtx, bool isAscending)
+        : AccumulatorRankBase(expCtx, isAscending) {}
     void processInternal(const Value& input, bool merging) final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
+                                                         bool isAscending);
 };
 
 class AccumulatorIntegral : public AccumulatorForWindowFunctions {

@@ -56,10 +56,35 @@ REGISTER_STABLE_WINDOW_FUNCTION(
     documentNumber,
     mongo::window_function::ExpressionFromRankAccumulator<AccumulatorDocumentNumber>::parse);
 
+const char* kTempSortKeyField = "sortKey";
+
+// Define sort-order compliant comparison function which uses fast pass logic for null and missing
+// and full sort key logic for arrays.
+bool isSameValue(const ValueComparator& valueComparator,
+                 SortKeyGenerator& sortKeyGen,
+                 const Value& a,
+                 const Value& b) {
+    if (a.nullish() && b.nullish()) {
+        return true;
+    }
+    if (a.isArray() || b.isArray()) {
+        auto getSortKey = [&](const Value& v) {
+            BSONObjBuilder builder;
+            v.addToBsonObj(&builder, kTempSortKeyField);
+            return sortKeyGen.computeSortKeyString(builder.obj());
+        };
+        auto aKey = getSortKey(a);
+        auto bKey = getSortKey(b);
+        return aKey.compare(bKey) == 0;
+    }
+    return valueComparator.compare(a, b) == 0;
+}
+
 void AccumulatorRank::processInternal(const Value& input, bool merging) {
     tassert(5417001, "$rank can't be merged", !merging);
     if (!_lastInput ||
-        getExpressionContext()->getValueComparator().compare(_lastInput.value(), input) != 0) {
+        !isSameValue(
+            getExpressionContext()->getValueComparator(), _sortKeyGen, _lastInput.value(), input)) {
         _lastRank += _numSameRank;
         _numSameRank = 1;
         _lastInput = input;
@@ -78,27 +103,34 @@ void AccumulatorDocumentNumber::processInternal(const Value& input, bool merging
 void AccumulatorDenseRank::processInternal(const Value& input, bool merging) {
     tassert(5417003, "$denseRank can't be merged", !merging);
     if (!_lastInput ||
-        getExpressionContext()->getValueComparator().compare(_lastInput.value(), input) != 0) {
+        !isSameValue(
+            getExpressionContext()->getValueComparator(), _sortKeyGen, _lastInput.value(), input)) {
         ++_lastRank;
         _lastInput = input;
         _memUsageTracker.set(sizeof(*this) + _lastInput->getApproximateSize() - sizeof(Value));
     }
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorRank::create(ExpressionContext* const expCtx) {
-    return new AccumulatorRank(expCtx);
+intrusive_ptr<AccumulatorState> AccumulatorRank::create(ExpressionContext* const expCtx,
+                                                        bool isAscending) {
+    return new AccumulatorRank(expCtx, isAscending);
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorDenseRank::create(ExpressionContext* const expCtx) {
-    return new AccumulatorDenseRank(expCtx);
+intrusive_ptr<AccumulatorState> AccumulatorDenseRank::create(ExpressionContext* const expCtx,
+                                                             bool isAscending) {
+    return new AccumulatorDenseRank(expCtx, isAscending);
 }
 
-intrusive_ptr<AccumulatorState> AccumulatorDocumentNumber::create(ExpressionContext* const expCtx) {
-    return new AccumulatorDocumentNumber(expCtx);
+intrusive_ptr<AccumulatorState> AccumulatorDocumentNumber::create(ExpressionContext* const expCtx,
+                                                                  bool isAscending) {
+    return new AccumulatorDocumentNumber(expCtx, isAscending);
 }
 
-AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx)
-    : AccumulatorForWindowFunctions(expCtx) {
+AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx, bool isAscending)
+    : AccumulatorForWindowFunctions(expCtx),
+      _sortKeyGen(
+          SortPattern({SortPattern::SortPatternPart{isAscending, FieldPath{kTempSortKeyField}}}),
+          expCtx->getCollator()) {
     _memUsageTracker.set(sizeof(*this));
 }
 

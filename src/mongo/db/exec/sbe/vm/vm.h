@@ -881,8 +881,17 @@ enum AggStdDevValueElems {
  * - The element at index `kLastRank` is the rank of the last value.
  * - The element at index `kSameRankCount` is how many values are of the same rank as the last
  * value.
+ * - The element at index `kSortSpec` is the sort spec object used to generate sort key for adjacent
+ * value comparison.
  */
-enum AggRankElems { kLastValue, kLastValueIsNothing, kLastRank, kSameRankCount, kRankArraySize };
+enum AggRankElems {
+    kLastValue,
+    kLastValueIsNothing,
+    kLastRank,
+    kSameRankCount,
+    kSortSpec,
+    kRankArraySize
+};
 
 /**
  * This enum defines indices into an 'Array' that returns the result of accumulators that track the

@@ -468,21 +468,31 @@ public:
             auto sortExpression = ExpressionFieldPath::createPathFromString(
                 expCtx, sortPatternPart.fieldPath->fullPath(), expCtx->variablesParseState);
             return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx, accumulatorName->toString(), std::move(sortExpression), std::move(bounds));
+                expCtx,
+                accumulatorName->toString(),
+                std::move(sortExpression),
+                sortPatternPart.isAscending,
+                std::move(bounds));
         } else {
             return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
-                expCtx, accumulatorName->toString(), sortPatternPart.expression, std::move(bounds));
+                expCtx,
+                accumulatorName->toString(),
+                sortPatternPart.expression,
+                sortPatternPart.isAscending,
+                std::move(bounds));
         }
     }
 
     ExpressionFromRankAccumulator(ExpressionContext* expCtx,
                                   std::string accumulatorName,
                                   boost::intrusive_ptr<::mongo::Expression> input,
+                                  bool isAscending,
                                   WindowBounds bounds)
-        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
+          _isAscending(isAscending) {}
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
-        return RankType::create(_expCtx);
+        return RankType::create(_expCtx, _isAscending);
     }
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
@@ -496,6 +506,9 @@ public:
         args.addField(_accumulatorName, Value(Document()));
         return args.freezeToValue();
     }
+
+private:
+    bool _isAscending;
 };
 
 class ExpressionExpMovingAvg : public Expression {

@@ -1655,7 +1655,10 @@ TEST_F(BottomRemoveTest, BottomRemoveNoUnderflow) {
 
 TEST(Accumulators, Rank) {
     auto expCtx = ExpressionContextForTest{};
-    assertExpectedResults<AccumulatorRank>(
+    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+        return AccumulatorRank::create(expCtx, true /* isAscending */);
+    };
+    assertExpectedResults(
         &expCtx,
         {
             // Document number is correct.
@@ -1673,12 +1676,16 @@ TEST(Accumulators, Rank) {
             {{Value{}, Value{}}, Value(1)},
 
         },
+        accInit,
         true /* rank can't be merged */);
 }
 
 TEST(Accumulators, DenseRank) {
     auto expCtx = ExpressionContextForTest{};
-    assertExpectedResults<AccumulatorDenseRank>(
+    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+        return AccumulatorDenseRank::create(expCtx, true /* isAscending */);
+    };
+    assertExpectedResults(
         &expCtx,
         {
             // Document number is correct.
@@ -1693,12 +1700,16 @@ TEST(Accumulators, DenseRank) {
             {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(3)},
 
         },
+        accInit,
         true /* denseRank can't be merged */);
 }
 
 TEST(Accumulators, DocumentNumberRank) {
     auto expCtx = ExpressionContextForTest{};
-    assertExpectedResults<AccumulatorDocumentNumber>(
+    auto accInit = [&](ExpressionContext* const expCtx) -> boost::intrusive_ptr<AccumulatorState> {
+        return AccumulatorDocumentNumber::create(expCtx, true /* isAscending */);
+    };
+    assertExpectedResults(
         &expCtx,
         {
             // Document number is correct.
@@ -1712,6 +1723,7 @@ TEST(Accumulators, DocumentNumberRank) {
             {{Value(1), Value(1), Value(1), Value(3), Value(3), Value(7)}, Value(6)},
 
         },
+        accInit,
         true /* denseRank can't be merged */);
 }
 
