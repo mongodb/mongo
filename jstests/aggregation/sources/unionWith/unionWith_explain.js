@@ -36,6 +36,7 @@ const executionStatsIngoredFields = [
 
 const stagesIgnoredFields = [
     "slots",
+    "optimizationTimeMillis",
 ];
 
 const mongosIgnoredFields = [
@@ -48,6 +49,7 @@ const mongosIgnoredFields = [
 
 const queryPlannerIgnoredFields = [
     "optimizedPipeline",
+    "optimizationTimeMillis",
 ].concat(stagesIgnoredFields);
 
 function getUnionWithStage(explain) {
