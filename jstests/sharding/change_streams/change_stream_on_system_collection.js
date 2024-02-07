@@ -131,4 +131,8 @@ assertNextChangeStreamEventEquals(wholeClusterCursor, {
     ns: {db: dbName, coll: "t1"},
     operationType: "insert",
 });
+
+// The temporary reshard collection must be dropped before checking metadata integrity.
+assert(systemCollection.drop());
+
 st.stop();

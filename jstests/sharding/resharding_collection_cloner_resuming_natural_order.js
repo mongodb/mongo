@@ -150,4 +150,8 @@ assert.eq(expectedDocs,
               .find({}, {padding: 0})
               .sort({_id: 1})
               .toArray());
+
+// The temporary reshard collection must be dropped before checking metadata integrity.
+assert(temporaryReshardingCollection.drop());
+
 st.stop();

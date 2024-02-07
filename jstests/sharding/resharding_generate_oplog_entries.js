@@ -17,6 +17,7 @@ const ns = dbName + '.' + collName;
 const mongos = st.s0;
 
 let testDB = mongos.getDB(dbName);
+let tempReshardingColl = "";
 
 // This function sets the environment needed to appear that we are in the middle of a resharding
 // operation. The resharding key is set as y and the split is set at 5. So, all test cases below
@@ -28,7 +29,7 @@ let testDB = mongos.getDB(dbName);
 function simulateResharding() {
     let uuid = getUUIDFromListCollections(testDB, collName);
 
-    const tempReshardingColl = "system.resharding." + extractUUIDFromObject(uuid);
+    tempReshardingColl = "system.resharding." + extractUUIDFromObject(uuid);
     const tempReshardingNss = dbName + "." + tempReshardingColl;
     assert.commandWorked(testDB.createCollection(tempReshardingColl));
     assert.commandWorked(mongos.adminCommand({shardCollection: tempReshardingNss, key: {y: 1}}));
@@ -244,5 +245,8 @@ let oplogEntries = oplog.toArray();
 
 jsTestLog("oplog: " + tojson(oplogEntries));
 jsTestLog("oplog strict: " + tostrictjson(oplogEntries));
+
+// The temporary reshard collection must be dropped before checking metadata integrity.
+assert(testDB[tempReshardingColl].drop());
 
 st.stop();

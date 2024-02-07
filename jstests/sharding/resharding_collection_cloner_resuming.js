@@ -114,4 +114,7 @@ assert.commandFailedWithCode(st.shard0.adminCommand({
 }),
                              ErrorCodes.DuplicateKey);
 
+// The temporary reshard collection must be dropped before checking metadata integrity.
+assert(temporaryReshardingCollection.drop());
+
 st.stop();
