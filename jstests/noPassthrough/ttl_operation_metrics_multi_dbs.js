@@ -63,7 +63,7 @@ const assertMetrics = (conn, assertFn) => {
 assert.commandWorked(primaryDB1[collName].createIndex({x: 1}, {expireAfterSeconds: 0}));
 assert.commandWorked(primaryDB2[collName].createIndex({x: 1}, {expireAfterSeconds: 0}));
 
-const pauseTtl = configureFailPoint(primary, 'hangTTLMonitorWithLock');
+const pauseTtl = configureFailPoint(primary, 'hangTTLMonitorBetweenPasses');
 pauseTtl.wait();
 
 clearMetrics(primary);
@@ -93,6 +93,7 @@ assertMetrics(primary, (metrics) => {
 
 // Clear metrics and wait for a TTL pass to delete the documents.
 clearMetrics(primary);
+primaryDB1.setLogLevel(1, 'index');
 pauseTtl.off();
 TTLUtil.waitForPass(primaryDB1);
 
