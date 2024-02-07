@@ -40,6 +40,7 @@ TimeseriesTest.run((insert) => {
         topLevelArray: [1, 2, 3, 4],
         arrOfObj: [{x: 1}, {x: 2}, {x: 3}, {x: 4}],
         obj: {a: 123},
+        length: 0,
     });
     insert(coll, {
         _id: 1,
@@ -49,12 +50,14 @@ TimeseriesTest.run((insert) => {
         topLevelArray: [101, 102, 103, 104],
         arrOfObj: [{x: 101}, {x: 102}, {x: 103}, {x: 104}],
         obj: {a: 456},
+        length: 23,
     });
     // Insert a document that will be placed in a different bucket.
     insert(coll, {
         _id: 2,
         [timeFieldName]: new Date(datePrefix + 300),
         [metaFieldName]: "gpu",
+        length: -2,
     })
 
     // Computing a field on a dotted path which is an array, then grouping on it. Note that the
@@ -381,5 +384,171 @@ TimeseriesTest.run((insert) => {
         assert.docEq(res[0], {_id: 0, "t": 110}, res);
         assert.docEq(res[1], {_id: 1, "t": 210}, res);
         assert.docEq(res[2], {_id: 2, "t": 310}, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {
+                                $addFields: {
+                                    "computedField": {
+                                        $dateTrunc: {
+                                            date: "$time",
+                                            unit: "second",
+                                        }
+                                    }
+                                }
+                            },
+                            {$match: {computedField: new Date(datePrefix - 440)}},
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 3, res);
+    }
+
+    {
+        const res = coll.aggregate([{$match: {topLevelScalar: {$exists: true}}}, {$count: "count"}])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([{$match: {topLevelScalar: {$lt: 456}}}, {$count: "count"}]).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([{$match: {topLevelScalar: {$lte: 456}}}, {$count: "count"}]).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([{$match: {topLevelScalar: {$gt: 123}}}, {$count: "count"}]).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([{$match: {topLevelScalar: {$gte: 123}}}, {$count: "count"}]).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([{$match: {topLevelScalar: {$eq: 123}}}, {$count: "count"}]).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([{$match: {topLevelScalar: {$ne: 123}}}, {$count: "count"}]).toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {
+                                $match: {
+                                    $or: [
+                                        {"topLevelScalar": 123},
+                                        {"topLevelScalar": 456},
+                                    ]
+                                }
+                            },
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {$addFields: {"computedField": {$and: ["$topLevelScalar", true]}}},
+                            {$match: {computedField: true}},
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {$addFields: {"computedField": {$and: ["$topLevelScalar", "$obj.a"]}}},
+                            {$match: {computedField: true}},
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {$addFields: {"computedField": {$or: ["$topLevelScalar", false]}}},
+                            {$match: {computedField: true}},
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {$addFields: {"computedField": {$or: ["$topLevelScalar", "$obj.a"]}}},
+                            {$match: {computedField: true}},
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {$addFields: {"computedField": {$not: ["$topLevelScalar"]}}},
+                            {$match: {computedField: true}},
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([
+                    {$addFields: {"computedField": {$anyElementTrue: [["$topLevelScalar"]]}}},
+                    {$match: {computedField: true}},
+                    {$count: "count"}
+                ])
+                .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 2, res);
+    }
+
+    {
+        const res =
+            coll.aggregate([
+                    {$match: {length: {$ne: 0}}},
+                    {$set: {"computedA": {$multiply: ["$topLevelScalar", "$topLevelScalar"]}}},
+                    {$addFields: {"ratio": {$divide: ["$computedA", "$length"]}}},
+                    {$match: {ratio: {$gt: 0}}},
+                ])
+                .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0]._id, 1, res);
     }
 });
