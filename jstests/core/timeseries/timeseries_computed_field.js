@@ -349,6 +349,20 @@ TimeseriesTest.run((insert) => {
     }
 
     {
+        // Try a $match that works on fields that are not projected.
+        const res =
+            coll.aggregate([
+                    {$project: {"obj.a": 1}},
+                    {$match: {$or: [{"topLevelScalar": {$gt: 10}}, {$expr: {$literal: true}}]}},
+                    {$sort: {_id: 1}},
+                    {$count: "count"}
+                ])
+                .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 3, res);
+    }
+
+    {
         const res = coll.aggregate([{
                             "$project": {
                                 "t": {

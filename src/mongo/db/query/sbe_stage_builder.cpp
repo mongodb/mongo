@@ -2455,6 +2455,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
+    // Ensure that we are not forwarding block values that the caller cannot handle.
+    if (outputs.hasBlockOutput() && (reqs.hasResult() || !reqs.getCanProcessBlockValues())) {
+        stage = buildBlockToRow(std::move(stage), outputs);
+    }
+
     return {std::move(stage), std::move(outputs)};
 }
 
