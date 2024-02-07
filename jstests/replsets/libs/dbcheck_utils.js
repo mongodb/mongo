@@ -110,7 +110,8 @@ export const checkHealthLog = (healthlog, query, numExpected, timeout = 60 * 100
             return query_count == numExpected;
         },
         "health log query returned " + query_count + " entries, expected " + numExpected +
-            "  query: " + tojson(query) + " found: " + tojson(healthlog.find(query).toArray()),
+            "  query: " + tojson(query) + " found: " + tojson(healthlog.find(query).toArray()) +
+            " HealthLog: " + tojson(healthlog.find().toArray()),
         timeout);
 };
 

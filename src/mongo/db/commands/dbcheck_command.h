@@ -152,12 +152,7 @@ private:
 
 class DbChecker {
 public:
-    DbChecker(DbCheckCollectionInfo info) : _info(info), _done(false){};
-
-    /**
-     * Returns true if the node has stepped down and dbCheck has stopped.
-     */
-    bool steppedDown();
+    DbChecker(DbCheckCollectionInfo info) : _info(info){};
 
     /**
      * Runs dbCheck on the collection specified in the DbCheckCollectionInfo struct.
@@ -229,11 +224,15 @@ private:
      */
     bool _stepdownHasOccurred(OperationContext* opCtx, const NamespaceString& nss);
 
+    /**
+     * Acquire the required locks for dbcheck to run on the given namespace.
+     */
+    std::unique_ptr<DbCheckAcquisition> _acquireDBCheckLocks(OperationContext* opCtx,
+                                                             const NamespaceString& nss);
+
     bool _shouldLogBatch(DbCheckOplogBatch& batch);
 
     DbCheckCollectionInfo _info;
-
-    bool _done;  // Set if the job cannot proceed.
 
     // Cumulative number of batches processed. Can wrap around; it's not guaranteed to be in
     // lockstep with other replica set members.

@@ -385,40 +385,6 @@ testErrorOnNonexistent();
 testErrorOnSecondary();
 testErrorOnUnreplicated();
 
-// Test stepdown.
-function testSucceedsOnStepdown() {
-    let primary = replSet.getPrimary();
-    let db = primary.getDB(dbName);
-
-    let nodeId = replSet.getNodeId(primary);
-    runDbCheck(replSet, db, multiBatchSimpleCollName);
-
-    // Step down the primary.
-    assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 0, force: true}));
-
-    // Wait for the cluster to come up.
-    replSet.awaitSecondaryNodes();
-
-    // Find the node we ran dbCheck on.
-    db = replSet.getSecondaries()
-             .filter(function isPreviousPrimary(node) {
-                 return replSet.getNodeId(node) === nodeId;
-             })[0]
-             .getDB(dbName);
-
-    // Check that it's still responding.
-    try {
-        assert.commandWorked(db.runCommand({ping: 1}), "ping failed after stepdown during dbCheck");
-    } catch (e) {
-        doassert("cannot connect after dbCheck with stepdown");
-    }
-
-    // And that our dbCheck completed.
-    assert(dbCheckCompleted(db), "dbCheck failed to terminate on stepdown");
-}
-
-testSucceedsOnStepdown();
-
 // Just add an extra document, and test that it catches it.
 function simpleTestCatchesExtra() {
     {

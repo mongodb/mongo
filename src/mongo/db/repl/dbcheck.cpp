@@ -456,6 +456,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
     // Iterate through index table.
     for (auto currEntry = indexCursor->seekForKeyString(opCtx, first); currEntry;
          currEntry = indexCursor->nextKeyString(opCtx)) {
+        iassert(opCtx->checkForInterruptNoAssert());
         const auto keyString = currEntry->keyString;
         auto keyStringBson = key_string::toBsonSafe(
             keyString.getBuffer(), keyString.getSize(), ordering, keyString.getTypeBits());
@@ -597,6 +598,7 @@ Status DbCheckHasher::hashForCollectionCheck(OperationContext* opCtx,
     // key entry is corrupt, getNext() will throw an exception and we will fail the batch.
     while (PlanExecutor::ADVANCED ==
            (lastState = _exec->getNext(&currentObjId, &currentRecordId))) {
+        iassert(opCtx->checkForInterruptNoAssert());
         SleepDbCheckInBatch.execute([opCtx](const BSONObj& data) {
             int sleepMs = data["sleepMs"].safeNumberInt();
             opCtx->sleepFor(Milliseconds(sleepMs));
