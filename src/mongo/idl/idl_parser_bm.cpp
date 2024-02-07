@@ -348,7 +348,7 @@ void BM_ArrayOfStringEnum10(benchmark::State& state) {
 
         BSONObjBuilder bob;
         arrStruct.serialize(&bob);
-        return bob.done();
+        return bob.obj();
     }();
 
     size_t totalBytes = 0;
