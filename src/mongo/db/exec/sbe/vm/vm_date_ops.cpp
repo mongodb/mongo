@@ -360,12 +360,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateTr
     invariant(arity == 7);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
-    invariant(inputTag == value::TypeTags::valueBlock);
+    tassert(8625725,
+            "Expected input argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
     // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
-    invariant(bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
+    tassert(8625726,
+            "Expected bitset argument to be of either Nothing or valueBlock type",
+            bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
 
     TimeUnit unit{TimeUnit::year};
     int64_t binSize{0u};
@@ -393,12 +397,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateDi
     invariant(arity == 6 || arity == 7);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
-    invariant(inputTag == value::TypeTags::valueBlock);
+    tassert(8625727,
+            "Expected input argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
     // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
-    invariant(bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
+    tassert(8625728,
+            "Expected bitset argument to be of either Nothing or valueBlock type",
+            bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
 
     Date_t endDate;
     TimeUnit unit{TimeUnit::year};
