@@ -124,7 +124,7 @@ static BsonsAndKeyStrings generateBsonsAndKeyStrings(BsonValueType bsonValueType
 
         result.typebits[i] = SharedBuffer::allocate(ks.getTypeBits().getSize());
         memcpy(result.typebits[i].get(), ks.getTypeBits().getBuffer(), ks.getTypeBits().getSize());
-        result.typebitsLens[i] = ks.getSize();
+        result.typebitsLens[i] = ks.getTypeBits().getSize();
     }
     return result;
 }
