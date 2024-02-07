@@ -93,7 +93,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
     auto blockedOpGuard = DiagnosticInfo::maybeMakeBlockedOpForTest(opCtx->getClient());
 #endif
 
-    for (ServiceContext::LockedClientsCursor cursor(opCtx->getClient()->getServiceContext());
+    for (Service::LockedClientsCursor cursor(opCtx->getClient()->getService());
          Client* client = cursor.next();) {
         invariant(client);
 

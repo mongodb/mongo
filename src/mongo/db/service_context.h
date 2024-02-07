@@ -867,6 +867,30 @@ public:
         return _serviceEntryPoint.get();
     }
 
+    /**
+     * Cursor for enumerating the live Client objects belonging to a Service.
+     *
+     * Lifetimes of this type are synchronized with client creation and destruction.
+     */
+    class LockedClientsCursor {
+    public:
+        /**
+         * Constructs a cursor for enumerating the clients of "service", blocking its parent
+         * ServiceContext from creating or destroying Client objects until this instance is
+         * destroyed.
+         */
+        explicit LockedClientsCursor(Service* service);
+
+        /**
+         * Returns the next client in the enumeration, or nullptr if there are no more clients.
+         */
+        Client* next();
+
+    private:
+        ServiceContext::LockedClientsCursor _serviceCtxCursor;
+        Service* _service;
+    };
+
 private:
     /**
      * Private constructor. If intending to make a Service object, use the

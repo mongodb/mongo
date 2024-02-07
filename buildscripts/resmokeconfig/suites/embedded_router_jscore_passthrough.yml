@@ -42,42 +42,6 @@ selector:
   # TODO SERVER-77578: Enable authentication testing.
   - jstests/core/**/*[aA]uth*.js
 
-  # Currentop is not supported in embedded router mode yet.
-  # TODO SERVER-81359 Enable currentOp testing.
-  - jstests/core/administrative/current_op/*.js
-  # (all of these use currentOp)
-  - jstests/core/fsync.js
-  - jstests/core/failcommand_failpoint.js
-  - jstests/core/comment_field.js
-  - jstests/core/shell/shellkillop.js
-  - jstests/core/query/awaitdata_getmore_cmd.js
-  - jstests/core/query/basic1.js
-  - jstests/core/ddl/killop_drop_collection.js
-  - jstests/core/api/api_version_pipeline_stages.js
-  - jstests/core/txns/listcollections_autocomplete.js
-  - jstests/core/views/views_all_commands.js
-  - jstests/core/timeseries/timeseries_delete_hint.js
-  - jstests/core/txns/write_conflicts_with_non_txns.js
-  - jstests/core/txns/aggregation_in_transaction.js
-  - jstests/core/txns/currentop_blocked_operations.js
-  - jstests/core/timeseries/timeseries_update_concurrent.js
-  - jstests/core/timeseries/timeseries_update_hint.js
-  - jstests/core/txns/transactions_block_ddl.js
-  - jstests/core/txns/kill_sessions_kills_transaction.js
-  - jstests/core/timeseries/timeseries_delete_with_meta_concurrent.js
-  - jstests/core/txns/abort_expired_transaction.js
-  - jstests/core/txns/transactions_profiling_with_drops.js
-  - jstests/core/txns/kill_cursors_in_transaction.js
-  - jstests/core/query/count/count10.js
-  - jstests/core/query/count/count_plan_summary.js
-  - jstests/core/administrative/current_op/currentop.js
-  - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
-  - jstests/core/administrative/current_op/currentop_predicate.js
-  - jstests/core/administrative/current_op/currentop_find.js
-  - jstests/core/administrative/current_op/currentop_cursors.js
-  - jstests/core/administrative/profile/profile_hide_index.js
-  - jstests/core/query/mr/mr_killop.js
-  - jstests/core/administrative/current_op/currentop_shell.js
   # Embedded router doesn't support correct UpdateMetrics yet.
   # TODO SERVER-82303 Remove this once we have role-aware metrics.
   - jstests/core/write/update/update_metrics.js
