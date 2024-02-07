@@ -514,7 +514,7 @@ implemented as a friend function in a class with the following signature:
 ##### Examples
 
     const AnyUserType& t = ...;
-    LOGV2(2001, "Log of user type", logAttr(t));
+    LOGV2(2001, "Log of user type", logAttrs(t));
 
 ## Multiple attributes
 
