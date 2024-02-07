@@ -5,11 +5,7 @@ set -vxeuo pipefail
 
 IMMER_GIT_URL="https://github.com/mongodb-forks/immer.git"
 
-<<<<<<< HEAD
 IMMER_GIT_REV=071f90b39267ae02dbd5b942d311e3a29b908331
-=======
-IMMER_GIT_REV=23907316b69af7571c9bb3753c7fc5ee400a8333
->>>>>>> f9b26984c1a (SERVER-77694 Import immer lib from fork containing fix to always enable exceptions)
 
 LIB_GIT_DIR=$(mktemp -d /tmp/import-immer.XXXXXX)
 trap "rm -rf $LIB_GIT_DIR" EXIT
