@@ -85,8 +85,14 @@ assert.commandWorked(st.shard2.getCollection(coll.toString()).insert({_id: 0, sk
 
 assert.commandWorked(coll.remove({_id: 0}, {justOne: true}));
 
-// Ensure _id delete goes to *all* shards
-assert.eq(null, st.shard0.getCollection(coll.toString()).findOne({x: 1}));
-assert.eq(null, st.shard2.getCollection(coll.toString()).findOne({x: 1}));
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "UpdateOneWithIdWithoutShardKey")) {
+    // Ensure _id deleteOne goes to at least one shard
+    assert(st.shard0.getCollection(coll.toString()).findOne({x: 1}) == null ||
+           st.shard2.getCollection(coll.toString()).findOne({x: 1}) == null)
+} else {
+    // Ensure _id update goes to all shards
+    assert.eq(null, st.shard0.getCollection(coll.toString()).findOne({x: 1}));
+    assert.eq(null, st.shard2.getCollection(coll.toString()).findOne({x: 1}));
+}
 
 st.stop();
