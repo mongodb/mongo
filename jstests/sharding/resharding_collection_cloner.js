@@ -138,4 +138,7 @@ testReshardCloneCollection(st.shard1, [
     {_id: "stays on shard1", oldKey: 10, newKey: 10},
 ]);
 
+// The temporary reshard collection must be dropped before checking metadata integrity.
+assert(temporaryReshardingCollection.drop());
+
 st.stop();

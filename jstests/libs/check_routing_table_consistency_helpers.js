@@ -93,7 +93,14 @@ export var RoutingTableConsistencyChecker = (function() {
      **/
     const collectPlacementMetadataByNamespace = (mongos) => {
         const pipeline = [
-            // 1.1  Current placement metadata on existing collections
+            // 1.1. Filter out temporary collections created by the resharding coordinator, as those
+            //      collections are not handled by placementHistory.
+            {
+                $match: {
+                    _id: { $not: { $regex: /^[^.]+\.system\.resharding\..+$/ } }
+                }
+            },
+            // 1.2  Current placement metadata on existing collections
             {
                 $lookup: {
                     from: "chunks",
@@ -120,7 +127,7 @@ export var RoutingTableConsistencyChecker = (function() {
                     }
                 }
             },
-            // 1.2 Current placement metadata on existing databases
+            // 1.3 Current placement metadata on existing databases
             {
                 $unionWith: {
                     coll: "databases",
