@@ -3,6 +3,7 @@
  * There is a test for sharded source collections in jstests/sharding/timeseries_out_sharded.js.
  *
  * @tags: [
+ *   references_foreign_collection,
  *   # TimeseriesAggTests doesn't handle stepdowns.
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.

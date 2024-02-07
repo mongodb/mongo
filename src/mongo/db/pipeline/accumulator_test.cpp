@@ -1875,8 +1875,8 @@ Value parseAndSerializeAccumExpr(
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto expr = func(expCtx.get(), obj.firstElement(), expCtx->variablesParseState);
     return expr->serialize(options);
@@ -1891,8 +1891,8 @@ Document parseAndSerializeAccum(
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     VariablesParseState vps = expCtx->variablesParseState;
 

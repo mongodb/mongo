@@ -1,0 +1,28 @@
+# TODO: SERVER-75596 delete this suite and run aggregation through RunQueryStats hook as well.
+test_kind: js_test
+description: |
+  This suite enables the collection of query stats metrics on a mongod server, then runs the tests in
+  aggregation as normal. This should cause each query or aggregation to compute a query
+  shape and query stats key, and record in-memory some metrics like execution time and number of
+  scanned documents.
+
+selector:
+  roots:
+  - jstests/aggregation/**/*.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  hooks:
+  # Be sure to run the hooks which depend on the fixture being alive before the CleanEveryN hook.
+  # That way the fixture restart can't cause any trouble for the other hooks.
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryStatsRateLimit: -1

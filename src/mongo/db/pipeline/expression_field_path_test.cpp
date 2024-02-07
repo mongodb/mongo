@@ -233,8 +233,8 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
 
 TEST(FieldPath, SerializeWithRedaction) {
     SerializationOptions options;
-    options.identifierHmacPolicy = applyHmacForTest;
-    options.applyHmacToIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
+    options.transformIdentifiers = true;
 
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression =

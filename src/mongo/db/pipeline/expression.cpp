@@ -2610,7 +2610,7 @@ Value ExpressionFieldPath::serialize(SerializationOptions options) const {
     auto [prefix, path] = getPrefixAndPath(_fieldPath);
     // First handles special cases for redaction of system variables. User variables will fall
     // through to the default full redaction case.
-    if (options.applyHmacToIdentifiers && prefix.length() == 2) {
+    if (options.transformIdentifiers && prefix.length() == 2) {
         if (path.getPathLength() == 1 && Variables::isBuiltin(_variable)) {
             // Nothing to redact for builtin variables.
             return Value(prefix + path.fullPath());
@@ -2981,8 +2981,8 @@ Value ExpressionLet::serialize(SerializationOptions options) const {
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {
         auto key = it->second.name;
-        if (options.applyHmacToIdentifiers) {
-            key = options.identifierHmacPolicy(key);
+        if (options.transformIdentifiers) {
+            key = options.transformIdentifiersCallback(key);
         }
         vars[key] = it->second.expression->serialize(options);
     }

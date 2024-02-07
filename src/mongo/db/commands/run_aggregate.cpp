@@ -63,6 +63,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/query/aggregate_request_shapifier.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cursor_response.h"
@@ -73,7 +74,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -840,15 +841,6 @@ Status _runAggregate(OperationContext* opCtx,
         collections.clear();
     };
 
-    auto registerTelemetry = [&]() -> void {
-        // Register telemetry. Exclude queries against collections with encrypted fields.
-        // We still collect telemetry on collection-less aggregations.
-        if (!(ctx && ctx->getCollection() &&
-              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            telemetry::registerAggRequest(request, opCtx);
-        }
-    };
-
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
@@ -929,7 +921,6 @@ Status _runAggregate(OperationContext* opCtx,
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
             initContext(auto_get_collection::ViewMode::kViewsForbidden);
-            registerTelemetry();
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             uassert(4928901,
                     str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
@@ -949,11 +940,9 @@ Status _runAggregate(OperationContext* opCtx,
             tassert(6235101,
                     "A collection-less aggregate should not take any locks",
                     ctx == boost::none);
-            registerTelemetry();
         } else {
             // This is a regular aggregation. Lock the collection or view.
             initContext(auto_get_collection::ViewMode::kViewsPermitted);
-            registerTelemetry();
             auto [collator, match] =
                 PipelineD::resolveCollator(opCtx,
                                            request.getCollation().get_value_or(BSONObj()),
@@ -1016,6 +1005,17 @@ Status _runAggregate(OperationContext* opCtx,
         curOp->beginQueryPlanningTimer();
         expCtx->stopExpressionCounters();
 
+        // Register query stats with the pre-optimized pipeline. Exclude queries against collections
+        // with encrypted fields. We still collect query stats on collection-less aggregations.
+        // TODO SERVER-75912 make sure query shape is unresolved for queries on views
+        if (!(ctx && ctx->getCollection() &&
+              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
+            query_stats::registerRequest(expCtx, nss, [&]() {
+                return std::make_unique<query_stats::AggregateRequestShapifier>(
+                    request, *pipeline, expCtx);
+            });
+        }
+
         // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
         // $$USER_ROLES for the aggregation.
         expCtx->setUserRoles();
@@ -1047,10 +1047,6 @@ Status _runAggregate(OperationContext* opCtx,
                     opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
                 request.getEncryptionInformation()->setCrudProcessed(true);
             }
-
-            // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a FLE
-            // rewrite.
-            CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
         }
 
         pipeline->optimizePipeline();
@@ -1174,11 +1170,7 @@ Status _runAggregate(OperationContext* opCtx,
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->setEndOfOpMetrics(stats.nReturned);
 
-        if (keepCursor) {
-            collectTelemetryMongod(opCtx, pins[0]);
-        } else {
-            collectTelemetryMongod(opCtx, cmdObj);
-        }
+        collectQueryStatsMongod(opCtx, pins[0]);
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.

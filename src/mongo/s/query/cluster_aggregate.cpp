@@ -56,7 +56,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -333,10 +333,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto shouldDoFLERewrite = ::mongo::shouldDoFLERewrite(request);
     auto startsWithDocuments = liteParsedPipeline.startsWithDocuments();
 
-    if (!shouldDoFLERewrite) {
-        telemetry::registerAggRequest(request, opCtx);
-    }
-
     // If the routing table is not already taken by the higher level, fill it now.
     if (!cri) {
         // If the routing table is valid, we obtain a reference to it. If the table is not valid,
@@ -406,6 +402,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         // Parse and optimize the full pipeline.
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+
+        // TODO SERVER-77325 register the request for query stats collection
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.

@@ -32,7 +32,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sort_pattern.h"
 
@@ -50,20 +49,21 @@ BSONObj representativePredicateShape(const MatchExpression* predicate) {
 }
 
 BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> identifierHmacPolicy) {
+                            std::function<std::string(StringData)> transformIdentifiersCallback) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.identifierHmacPolicy = identifierHmacPolicy;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = transformIdentifiersCallback;
+    opts.transformIdentifiers = true;
     return predicate->serialize(opts);
 }
 
-BSONObj representativePredicateShape(const MatchExpression* predicate,
-                                     std::function<std::string(StringData)> identifierHmacPolicy) {
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> transformIdentifiersCallback) {
     SerializationOptions opts;
     opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
-    opts.identifierHmacPolicy = identifierHmacPolicy;
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiersCallback = transformIdentifiersCallback;
+    opts.transformIdentifiers = true;
     return predicate->serialize(opts);
 }
 
@@ -100,27 +100,15 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
 }
 
 static std::string hintSpecialField = "$hint";
-void addLiteralFields(BSONObjBuilder* bob,
+void addShapeLiterals(BSONObjBuilder* bob,
                       const FindCommandRequest& findCommand,
                       const SerializationOptions& opts) {
-
     if (auto limit = findCommand.getLimit()) {
         opts.appendLiteral(
             bob, FindCommandRequest::kLimitFieldName, static_cast<long long>(*limit));
     }
     if (auto skip = findCommand.getSkip()) {
         opts.appendLiteral(bob, FindCommandRequest::kSkipFieldName, static_cast<long long>(*skip));
-    }
-    if (auto batchSize = findCommand.getBatchSize()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
-    }
-    if (auto maxTimeMs = findCommand.getMaxTimeMS()) {
-        opts.appendLiteral(bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
-    }
-    if (auto noCursorTimeout = findCommand.getNoCursorTimeout()) {
-        opts.appendLiteral(
-            bob, FindCommandRequest::kNoCursorTimeoutFieldName, bool(noCursorTimeout));
     }
 }
 
@@ -133,9 +121,8 @@ static std::vector<
         {FindCommandRequest::kShowRecordIdFieldName, &FindCommandRequest::getShowRecordId},
         {FindCommandRequest::kTailableFieldName, &FindCommandRequest::getTailable},
         {FindCommandRequest::kAwaitDataFieldName, &FindCommandRequest::getAwaitData},
-        {FindCommandRequest::kAllowPartialResultsFieldName,
-         &FindCommandRequest::getAllowPartialResults},
         {FindCommandRequest::kMirroredFieldName, &FindCommandRequest::getMirrored},
+        {FindCommandRequest::kOplogReplayFieldName, &FindCommandRequest::getOplogReplay},
 };
 std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandRequest&)>>>
     objArgMap = {
@@ -162,10 +149,13 @@ BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool red
     BSONObjBuilder bob;
     for (BSONElement elem : obj) {
         if (hintSpecialField.compare(elem.fieldName()) == 0) {
-            tassert(7421703,
-                    "Hinted field must be a string with $hint operator",
-                    elem.type() == BSONType::String);
-            bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            if (elem.type() == BSONType::String) {
+                bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            } else if (elem.type() == BSONType::Object) {
+                opts.appendLiteral(&bob, hintSpecialField, elem.Obj());
+            } else {
+                uasserted(ErrorCodes::FailedToParse, "$hint must be a string or an object");
+            }
             continue;
         }
 
@@ -214,13 +204,14 @@ BSONObj extractNamespaceShape(NamespaceString nss, const SerializationOptions& o
     return bob.obj();
 }
 
-BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const auto& findCmd = *findRequest.findCommandRequest;
     BSONObjBuilder bob;
     // Serialize the namespace as part of the query shape.
     {
-        auto ns = findCommand.getNamespaceOrUUID();
+        auto ns = findCmd.getNamespaceOrUUID();
         if (ns.isNamespaceString()) {
             bob.append("cmdNs", extractNamespaceShape(ns.nss(), opts));
         } else {
@@ -230,101 +221,73 @@ BSONObj extractQueryShape(const FindCommandRequest& findCommand,
         }
     }
 
-    // Redact the namespace of the command.
-    {
-        auto nssOrUUID = findCommand.getNamespaceOrUUID();
-        std::string toSerialize;
-        if (nssOrUUID.isUUID()) {
-            toSerialize = opts.serializeIdentifier(nssOrUUID.toString());
-        } else {
-            // Database is set at the command level, only serialize the collection here.
-            toSerialize = opts.serializeIdentifier(nssOrUUID.nss().coll());
-        }
-        bob.append(FindCommandRequest::kCommandName, toSerialize);
-    }
-
+    bob.append("command", "find");
     std::unique_ptr<MatchExpression> filterExpr;
     // Filter.
-    {
-        auto filter = findCommand.getFilter();
-        filterExpr = uassertStatusOKWithContext(
-            MatchExpressionParser::parse(findCommand.getFilter(),
-                                         expCtx,
-                                         ExtensionsCallbackNoop(),
-                                         MatchExpressionParser::kAllowAllSpecialFeatures),
-            "Failed to parse 'filter' option when making telemetry key");
-        bob.append(FindCommandRequest::kFilterFieldName, filterExpr->serialize(opts));
-    }
+    bob.append(FindCommandRequest::kFilterFieldName, findRequest.filter->serialize(opts));
 
     // Let Spec.
-    if (auto letSpec = findCommand.getLet()) {
+    if (auto letSpec = findCmd.getLet()) {
         auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
         auto ownedObj = redactedObj.getOwned();
         bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
     }
 
-    if (!findCommand.getProjection().isEmpty()) {
-        // Parse to Projection
-        auto projection =
-            projection_ast::parseAndAnalyze(expCtx,
-                                            findCommand.getProjection(),
-                                            filterExpr.get(),
-                                            findCommand.getFilter(),
-                                            ProjectionPolicies::findProjectionPolicies());
-
+    if (findRequest.proj) {
         bob.append(FindCommandRequest::kProjectionFieldName,
-                   projection_ast::serialize(*projection.root(), opts));
+                   projection_ast::serialize(*findRequest.proj->root(), opts));
     }
 
     // Assume the hint is correct and contains field names. It is possible that this hint
     // doesn't actually represent an index, but we can't detect that here.
     // Hint, max, and min won't serialize if the object is empty.
-    if (!findCommand.getHint().isEmpty()) {
+    if (!findCmd.getHint().isEmpty()) {
         bob.append(FindCommandRequest::kHintFieldName,
-                   extractHintShape(findCommand.getHint(), opts, false));
+                   extractHintShape(findCmd.getHint(), opts, false));
         // Max/Min aren't valid without hint.
-        if (!findCommand.getMax().isEmpty()) {
+        if (!findCmd.getMax().isEmpty()) {
             bob.append(FindCommandRequest::kMaxFieldName,
-                       extractHintShape(findCommand.getMax(), opts, true));
+                       extractHintShape(findCmd.getMax(), opts, true));
         }
-        if (!findCommand.getMin().isEmpty()) {
+        if (!findCmd.getMin().isEmpty()) {
             bob.append(FindCommandRequest::kMinFieldName,
-                       extractHintShape(findCommand.getMin(), opts, true));
+                       extractHintShape(findCmd.getMin(), opts, true));
         }
     }
 
     // Sort.
-    if (!findCommand.getSort().isEmpty()) {
-        bob.append(FindCommandRequest::kSortFieldName,
-                   query_shape::extractSortShape(findCommand.getSort(), expCtx, opts));
+    if (findRequest.sort) {
+        bob.append(
+            FindCommandRequest::kSortFieldName,
+            findRequest.sort
+                ->serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
+                .toBson());
     }
 
-    // Fields for literal redaction. Adds limit, skip, batchSize, maxTimeMS, and noCursorTimeOut
-    addLiteralFields(&bob, findCommand, opts);
+    // Fields for literal redaction. Adds limit and skip.
+    addShapeLiterals(&bob, findCmd, opts);
 
     // Add the fields that require no redaction.
-    addRemainingFindCommandFields(&bob, findCommand, opts);
+    addRemainingFindCommandFields(&bob, findCmd, opts);
 
     return bob.obj();
 }
 
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
-                          const std::vector<BSONObj>& serializedPipeline,
+                          const Pipeline& pipeline,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     BSONObjBuilder bob;
 
-    // TODO SERVER-73152 update to newest query shape definition
-
     // namespace
-    bob.append("ns", extractNamespaceShape(aggregateCommand.getNamespace(), opts));
-    bob.append(AggregateCommandRequest::kCommandName,
-               opts.serializeIdentifier(aggregateCommand.getNamespace().coll()));
+    bob.append("cmdNs", extractNamespaceShape(aggregateCommand.getNamespace(), opts));
+    bob.append("command", "aggregate");
 
     // pipeline
     {
         BSONArrayBuilder pipelineBab(
             bob.subarrayStart(AggregateCommandRequest::kPipelineFieldName));
+        auto serializedPipeline = pipeline.serializeToBson(opts);
         for (const auto& stage : serializedPipeline) {
             pipelineBab.append(stage);
         }

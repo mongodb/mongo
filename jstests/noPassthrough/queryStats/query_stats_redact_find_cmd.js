@@ -1,5 +1,5 @@
 /**
- * Test that $telemetry properly applies hmac to find commands, on mongod and mongos.
+ * Test that $queryStats properly applies hmac to find commands, on mongod and mongos.
  */
 load("jstests/libs/telemetry_utils.js");
 (function() {
@@ -17,25 +17,25 @@ function runTest(conn) {
 
     db.test.find({v: 1}).toArray();
 
-    let telemetry = getTelemetryRedacted(admin);
+    let telemetry = getQueryStatsFindCmd(admin, /*transformIdentifiers*/ true);
 
     assert.eq(1, telemetry.length);
-    assert.eq(kHashedCollName, telemetry[0].key.queryShape.find);
+    assert.eq("find", telemetry[0].key.queryShape.command);
     assert.eq({[kHashedFieldName]: {$eq: "?number"}}, telemetry[0].key.queryShape.filter);
 
     db.test.insert({v: 2});
 
     const cursor = db.test.find({v: {$gt: 0, $lt: 3}}).batchSize(1);
-    telemetry = getTelemetryRedacted(admin);
+    telemetry = getQueryStatsFindCmd(admin, /*transformIdentifiers*/ true);
     // Cursor isn't exhausted, so there shouldn't be another entry yet.
     assert.eq(1, telemetry.length);
 
     assert.commandWorked(
         db.runCommand({getMore: cursor.getId(), collection: db.test.getName(), batchSize: 2}));
 
-    telemetry = getTelemetryRedacted(admin);
+    telemetry = getQueryStatsFindCmd(admin, /*transformIdentifiers*/ true);
     assert.eq(2, telemetry.length);
-    assert.eq(kHashedCollName, telemetry[1].key.queryShape.find);
+    assert.eq("find", telemetry[1].key.queryShape.command);
     assert.eq({
         "$and": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$lt": "?number"}}]
     },
@@ -44,8 +44,8 @@ function runTest(conn) {
 
 const conn = MongoRunner.runMongod({
     setParameter: {
-        internalQueryConfigureTelemetrySamplingRate: -1,
-        featureFlagTelemetry: true,
+        internalQueryStatsRateLimit: -1,
+        featureFlagQueryStats: true,
     }
 });
 runTest(conn);
@@ -58,8 +58,8 @@ const st = new ShardingTest({
     rs: {nodes: 1},
     mongosOptions: {
         setParameter: {
-            internalQueryConfigureTelemetrySamplingRate: -1,
-            featureFlagTelemetry: true,
+            internalQueryStatsRateLimit: -1,
+            featureFlagQueryStats: true,
         }
     },
 });

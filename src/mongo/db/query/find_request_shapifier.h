@@ -30,26 +30,62 @@
 #pragma once
 
 #include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/request_shapifier.h"
-
-namespace mongo::telemetry {
+namespace mongo::query_stats {
 
 /**
  * Handles shapification for FindCommandRequests.
  */
 class FindRequestShapifier final : public RequestShapifier {
 public:
-    FindRequestShapifier(const FindCommandRequest& request,
-                         OperationContext* opCtx,
-                         const boost::optional<std::string> applicationName = boost::none)
-        : RequestShapifier(opCtx, applicationName), _request(request) {}
+    FindRequestShapifier(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                         const ParsedFindCommand& request)
+        : RequestShapifier(expCtx->opCtx),
+          _request(*request.findCommandRequest),
+          _initialQueryStatsKey(makeQueryStatsKey(
+              expCtx, request, SerializationOptions::kDefaultQueryShapeSerializeOptions)) {}
 
-    virtual ~FindRequestShapifier() = default;
+    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                              OperationContext* opCtx) const final;
 
-    BSONObj makeTelemetryKey(const SerializationOptions& opts,
-                             const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
 
 private:
-    const FindCommandRequest& _request;
+    BSONObj makeQueryStatsKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              const ParsedFindCommand& parsedRequest,
+                              const SerializationOptions& opts) const;
+
+    boost::intrusive_ptr<ExpressionContext> makeDummyExpCtx(
+        OperationContext* opCtx, const FindCommandRequest& request) const {
+        auto expCtx = make_intrusive<ExpressionContext>(
+            opCtx, request, nullptr /* collator doesn't matter here.*/, false /* mayDbProfile */);
+        expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
+        // Expression counters are reported in serverStatus to indicate how often clients use
+        // certain expressions/stages, so it's a side effect tied to parsing. We must stop
+        // expression counters before re-parsing to avoid adding to the counters more than once per
+        // a given query.
+        expCtx->stopExpressionCounters();
+        return expCtx;
+    }
+
+    FindCommandRequest _request;  // We make a copy of FindCommandRequest
+                                  // since this instance may outlive the original request once
+                                  // the RequestShapifier is moved to the query stats store.
+    // This is computed and cached upon construction until asked for once - at which point this
+    // transitions to boost::none. This both a performance and a memory optimization.
+    //
+    // On the performance side: we try to construct the query stats key by simply viewing the parse
+    // trees that we would build normally (rather than re-parsing each piece ourselves). We
+    // initialize this instance at the moment we have all the parsed AST pieces (e.g. the
+    // MatchExpression tree for the filter) necessary to do this, before the regular command
+    // processing path goes on to optimize or otherwise transform those pieces too much.
+    //
+    // On the memory side: we could just make a copy of each of the ASTs. But we chose to avoid
+    // this due to a limited memory budget and since we need to store the backing BSON used to parse
+    // the MatchExpression and other trees anyway - it would be redundant to copy everything here.
+    // We'll just re-parse on demand when asked.
+    mutable boost::optional<BSONObj> _initialQueryStatsKey;
 };
-}  // namespace mongo::telemetry
+}  // namespace mongo::query_stats

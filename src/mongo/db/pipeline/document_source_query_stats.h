@@ -31,25 +31,25 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 namespace mongo {
 
-using namespace telemetry;
+using namespace query_stats;
 
-class DocumentSourceTelemetry final : public DocumentSource {
+class DocumentSourceQueryStats final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$telemetry"_sd;
+    static constexpr StringData kStageName = "$queryStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, bool applyHmacToIdentifiers, std::string hmacKey)
+        LiteParsed(std::string parseTimeName, TransformAlgorithm algorithm, std::string hmacKey)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _applyHmacToIdentifiers(applyHmacToIdentifiers),
+              _algorithm(algorithm),
               _hmacKey(hmacKey) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -58,12 +58,12 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::telemetryRead)};
+            return {Privilege(ResourcePattern::forClusterResource(), ActionType::queryStatsRead)};
             ;
         }
 
         bool allowedToPassthroughFromMongos() const final {
-            // $telemetry must be run locally on a mongod.
+            // $queryStats must be run locally on a mongod.
             return false;
         }
 
@@ -75,7 +75,9 @@ public:
             transactionNotSupported(kStageName);
         }
 
-        bool _applyHmacToIdentifiers;
+        bool _transformIdentifiers;
+
+        TransformAlgorithm _algorithm;
 
         std::string _hmacKey;
     };
@@ -83,7 +85,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    virtual ~DocumentSourceTelemetry() = default;
+    virtual ~DocumentSourceQueryStats() = default;
 
     StageConstraints constraints(
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
@@ -114,12 +116,10 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            bool applyHmacToIdentifiers = false,
-                            std::string hmacKey = {})
-        : DocumentSource(kStageName, expCtx),
-          _applyHmacToIdentifiers(applyHmacToIdentifiers),
-          _hmacKey(hmacKey) {}
+    DocumentSourceQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                             TransformAlgorithm algorithm = kNone,
+                             std::string hmacKey = {})
+        : DocumentSource(kStageName, expCtx), _algorithm(algorithm), _hmacKey(hmacKey) {}
 
     GetNextResult doGetNext() final;
 
@@ -130,13 +130,17 @@ private:
     std::deque<Document> _materializedPartition;
 
     /**
-     * Iterator over all telemetry partitions. This is incremented when we exhaust the current
+     * Iterator over all queryStats partitions. This is incremented when we exhaust the current
      * _materializedPartition.
      */
-    TelemetryStore::PartitionId _currentPartition = -1;
+    QueryStatsStore::PartitionId _currentPartition = -1;
 
     // When true, apply hmac to field names from returned query shapes.
-    bool _applyHmacToIdentifiers;
+    bool _transformIdentifiers;
+
+    // The type of algorithm to use for transform identifiers as an enum, currently only kHmacSha256
+    // ("hmac-sha-256") is supported.
+    TransformAlgorithm _algorithm;
 
     /**
      * Key used for SHA-256 HMAC application on field names.

@@ -40,6 +40,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
+#include "mongo/db/query/request_shapifier.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/write_concern_options.h"
@@ -292,8 +293,11 @@ public:
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
     // The shape of the original query serialized with readConcern, application name, and namespace.
-    // If boost::none, telemetry should not be collected for this operation.
-    boost::optional<BSONObj> telemetryStoreKey;
+    // If boost::none, query stats should not be collected for this operation.
+    boost::optional<std::size_t> queryStatsStoreKeyHash;
+    // The RequestShapifier used by query stats to shapify the request payload into the query stats
+    // store key.
+    std::unique_ptr<query_stats::RequestShapifier> queryStatsRequestShapifier;
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
@@ -767,7 +771,7 @@ public:
         return computeElapsedTimeTotal(start, _end.load()) - _totalPausedDuration;
     }
     /**
-    * The planningTimeMicros metric, reported in the system profiler and in telemetry, is measured
+    * The planningTimeMicros metric, reported in the system profiler and in queryStats, is measured
     * using the Curop instance's _tickSource. Currently, _tickSource is only paused in places where
     logical work is being done. If this were to change, and _tickSource
     were to be paused during query planning for reasons unrelated to the work of

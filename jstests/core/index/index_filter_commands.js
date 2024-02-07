@@ -35,6 +35,7 @@
  *   does_not_support_stepdowns,
  *   # The SBE plan cache was first enabled in 6.3.
  *   requires_fcv_63,
+ *   references_foreign_collection,
  * ]
  */
 

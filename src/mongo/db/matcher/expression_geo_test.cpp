@@ -158,7 +158,7 @@ TEST(ExpressionGeoTest, GeoNearEquivalent) {
 
 TEST(ExpressionGeoTest, SerializeGeoExpressions) {
     SerializationOptions opts = {};
-    opts.applyHmacToIdentifiers = true;
+    opts.transformIdentifiers = true;
     opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     {
         BSONObj query = fromjson("{$within: {$box: [{x: 4, y: 4}, [6, 6]]}}");
@@ -320,5 +320,56 @@ TEST(ExpressionGeoTest, GeoNearNotEquivalent) {
     std::unique_ptr<GeoNearMatchExpression> gne1(makeGeoNearMatchExpression(query1)),
         gne2(makeGeoNearMatchExpression(query2));
     ASSERT(!gne1->equivalent(gne2.get()));
+}
+
+TEST(ExpressionGeoTest, SerializeWithCRSIFSpecifiedWithChangedOptions) {
+    BSONObj query1 = fromjson(
+        "{$within: {$geometry: {type: 'Polygon',"
+        "coordinates: [[[0, 0], [3, 6], [6, 1], [0, 0]]],"
+        "crs: {"
+        "type: 'name',"
+        "properties: { name: 'urn:x-mongodb:crs:strictwinding:EPSG:4326' }"
+        "}}}}");
+    std::unique_ptr<GeoMatchExpression> ge1(makeGeoMatchExpression(query1));
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
+    auto serialized = ge1->getSerializedRightHandSide(opts);
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "$within": {
+                "$geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        []
+                    ],
+                    "crs": {
+                        "type": "?",
+                        "properties": {
+                            "name": "?"
+                        }
+                    }
+                }
+            }
+        })",
+        serialized);
+    serialized = ge1->getSerializedRightHandSide(opts);
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "$within": {
+                "$geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        []
+                    ],
+                    "crs": {
+                        "type": "?",
+                        "properties": {
+                            "name": "?"
+                        }
+                    }
+                }
+            }
+        })",
+        serialized);
 }
 }  // namespace mongo

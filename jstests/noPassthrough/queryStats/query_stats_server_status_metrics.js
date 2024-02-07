@@ -1,6 +1,6 @@
 /**
  * Test the telemetry related serverStatus metrics.
- * @tags: [featureFlagTelemetry]
+ * @tags: [featureFlagQueryStats]
  */
 load('jstests/libs/analyze_plan.js');
 
@@ -23,24 +23,26 @@ function runTestWithMongodOptions(mongodOptions, test, testOptions) {
  * testOptions must include `resetCacheSize` bool field; e.g., { resetCacheSize : true }
  */
 function evictionTest(conn, testDB, coll, testOptions) {
-    const evictedBefore = testDB.serverStatus().metrics.telemetry.numEvicted;
+    const evictedBefore = testDB.serverStatus().metrics.queryStats.numEvicted;
     assert.eq(evictedBefore, 0);
-    for (var i = 0; i < 4000; i++) {
+    // Each telemetry entry is 208 bytes (key and value included). We must create at least ~5000
+    // entries to reach 1MB.
+    for (var i = 0; i < 10000; i++) {
         let query = {};
         query["foo" + i] = "bar";
         coll.aggregate([{$match: query}]).itcount();
     }
     if (!testOptions.resetCacheSize) {
-        const evictedAfter = testDB.serverStatus().metrics.telemetry.numEvicted;
+        const evictedAfter = testDB.serverStatus().metrics.queryStats.numEvicted;
         assert.gt(evictedAfter, 0);
         return;
     }
     // Make sure number of evicted entries increases when the cache size is reset, which forces out
     // least recently used entries to meet the new, smaller size requirement.
-    assert.eq(testDB.serverStatus().metrics.telemetry.numEvicted, 0);
+    assert.eq(testDB.serverStatus().metrics.queryStats.numEvicted, 0);
     assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryConfigureTelemetryCacheSize: "1MB"}));
-    const evictedAfter = testDB.serverStatus().metrics.telemetry.numEvicted;
+        testDB.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "1MB"}));
+    const evictedAfter = testDB.serverStatus().metrics.queryStats.numEvicted;
     assert.gt(evictedAfter, 0);
 }
 
@@ -49,11 +51,11 @@ function evictionTest(conn, testDB, coll, testOptions) {
  * due to rate-limiting.
  *
  * testOptions must include `samplingRate` and `numRequests` number fields;
- *  e.g., { samplingRate: 2147483647, numRequests: 20 }
+ *  e.g., { samplingRate: -1, numRequests: 20 }
  */
 function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
     const numRateLimitedRequestsBefore =
-        testDB.serverStatus().metrics.telemetry.numRateLimitedRequests;
+        testDB.serverStatus().metrics.queryStats.numRateLimitedRequests;
     assert.eq(numRateLimitedRequestsBefore, 0);
 
     coll.insert({a: 0});
@@ -65,7 +67,7 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
     }
 
     const numRateLimitedRequestsAfter =
-        testDB.serverStatus().metrics.telemetry.numRateLimitedRequests;
+        testDB.serverStatus().metrics.queryStats.numRateLimitedRequests;
 
     if (testOptions.samplingRate === 0) {
         // Telemetry should not be collected for any requests.
@@ -81,7 +83,7 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
 }
 
 function telemetryStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
-    assert.eq(testDB.serverStatus().metrics.telemetry.telemetryStoreSizeEstimateBytes, 0);
+    assert.eq(testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes, 0);
     let halfWayPointSize;
     // Only using three digit numbers (eg 100, 101) means the string length will be the same for all
     // entries and therefore the key size will be the same for all entries, which makes predicting
@@ -90,12 +92,12 @@ function telemetryStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
         coll.aggregate([{$match: {["foo" + i]: "bar"}}]).itcount();
         if (i == 150) {
             halfWayPointSize =
-                testDB.serverStatus().metrics.telemetry.telemetryStoreSizeEstimateBytes;
+                testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
         }
     }
     // Confirm that telemetry store has grown and size is non-zero.
     assert.gt(halfWayPointSize, 0);
-    const fullSize = testDB.serverStatus().metrics.telemetry.telemetryStoreSizeEstimateBytes;
+    const fullSize = testDB.serverStatus().metrics.queryStats.queryStatsStoreSizeEstimateBytes;
     assert.gt(fullSize, 0);
     // Make sure the final telemetry store size is twice as much as the halfway point size (+/- 5%)
     assert(fullSize >= halfWayPointSize * 1.95 && fullSize <= halfWayPointSize * 2.05,
@@ -109,7 +111,7 @@ function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
         return;
     }
 
-    const errorsBefore = testDB.serverStatus().metrics.telemetry.numTelemetryStoreWriteErrors;
+    const errorsBefore = testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors;
     assert.eq(errorsBefore, 0);
     for (let i = 0; i < 5; i++) {
         // Command should succeed and record the error.
@@ -119,9 +121,7 @@ function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
     }
 
     // Make sure that we recorded a write error for each run.
-    // TODO SERVER-73152 we attempt to write to the telemetry store twice for each aggregate, which
-    // seems wrong.
-    assert.eq(testDB.serverStatus().metrics.telemetry.numTelemetryStoreWriteErrors, 10);
+    assert.eq(testDB.serverStatus().metrics.queryStats.numQueryStatsStoreWriteErrors, 5);
 }
 
 /**
@@ -129,10 +129,7 @@ function telemetryStoreWriteErrorsTest(conn, testDB, coll, testOptions) {
  * eviction.
  */
 runTestWithMongodOptions({
-    setParameter: {
-        internalQueryConfigureTelemetryCacheSize: "1MB",
-        internalQueryConfigureTelemetrySamplingRate: -1
-    },
+    setParameter: {internalQueryStatsCacheSize: "1MB", internalQueryStatsRateLimit: -1},
 },
                          evictionTest,
                          {resetCacheSize: false});
@@ -140,10 +137,7 @@ runTestWithMongodOptions({
  * In this configuration, eviction is triggered only when the telemetry store size is reset.
  * */
 runTestWithMongodOptions({
-    setParameter: {
-        internalQueryConfigureTelemetryCacheSize: "4MB",
-        internalQueryConfigureTelemetrySamplingRate: -1
-    },
+    setParameter: {internalQueryStatsCacheSize: "4MB", internalQueryStatsRateLimit: -1},
 },
                          evictionTest,
                          {resetCacheSize: true});
@@ -152,7 +146,7 @@ runTestWithMongodOptions({
  * In this configuration, every query is sampled, so no requests should be rate-limited.
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 },
                          countRateLimitedRequestsTest,
                          {samplingRate: 2147483647, numRequests: 20});
@@ -162,7 +156,7 @@ runTestWithMongodOptions({
  * rate-limited.
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: 10},
+    setParameter: {internalQueryStatsRateLimit: 10},
 },
                          countRateLimitedRequestsTest,
                          {samplingRate: 10, numRequests: 20});
@@ -172,7 +166,7 @@ runTestWithMongodOptions({
  * size
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
+    setParameter: {internalQueryStatsRateLimit: -1},
 },
                          telemetryStoreSizeEstimateTest);
 
@@ -181,10 +175,7 @@ runTestWithMongodOptions({
  * are tracked.
  */
 runTestWithMongodOptions({
-    setParameter: {
-        internalQueryConfigureTelemetryCacheSize: "0.00001MB",
-        internalQueryConfigureTelemetrySamplingRate: -1
-    },
+    setParameter: {internalQueryStatsCacheSize: "0.00001MB", internalQueryStatsRateLimit: -1},
 },
                          telemetryStoreWriteErrorsTest);
 }());

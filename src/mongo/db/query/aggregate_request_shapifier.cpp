@@ -27,20 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/aggregate_request_shapifier.h"
+#include "mongo/db/query/aggregate_request_shapifier.h"
 
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/query_shape.h"
 
-namespace mongo::telemetry {
+namespace mongo::query_stats {
 
-BSONObj AggregateRequestShapifier::makeTelemetryKey(
+BSONObj AggregateRequestShapifier::makeQueryStatsKey(const SerializationOptions& opts,
+                                                     OperationContext* opCtx) const {
+    return makeQueryStatsKey(opts, makeDummyExpCtx(opCtx));
+}
+
+BSONObj AggregateRequestShapifier::makeQueryStatsKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+    if (_initialQueryStatsKey && !opts.transformIdentifiers &&
+        opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
+        auto tmp = std::move(*_initialQueryStatsKey);
+        _initialQueryStatsKey = boost::none;
+        return tmp;
+    }
+
+    auto pipeline = Pipeline::parse(_request.getPipeline(), expCtx);
+    return _makeQueryStatsKeyHelper(opts, expCtx, *pipeline);
+}
+
+BSONObj AggregateRequestShapifier::_makeQueryStatsKeyHelper(
+    const SerializationOptions& opts,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const Pipeline& pipeline) const {
     BSONObjBuilder bob;
 
-    // TODO SERVER-76557 move actually pipeline serialization into query_shape
-    auto serializedPipeline = _pipeline.serializeToBson(opts);
-    bob.append("queryShape",
-               query_shape::extractQueryShape(_request, serializedPipeline, opts, expCtx));
+    bob.append("queryShape", query_shape::extractQueryShape(_request, pipeline, opts, expCtx));
 
     // cursor
     if (auto param = _request.getCursor().getBatchSize()) {
@@ -64,13 +82,15 @@ BSONObj AggregateRequestShapifier::makeTelemetryKey(
             &bob, AggregateCommandRequest::kBypassDocumentValidationFieldName, bool(param.get()));
     }
 
-    // TODO SERVER-73152 handle comment field
+    // comment
+    if (_comment) {
+        opts.appendLiteral(&bob, "comment", *_comment);
+    }
 
-    if (_applicationName.has_value()) {
-        // TODO SERVER-73152 don't serialize appName
-        bob.append("applicationName", opts.serializeIdentifier(_applicationName.value()));
+    if (_clientMetaData) {
+        bob.append("client", *_clientMetaData);
     }
 
     return bob.obj();
 }
-}  // namespace mongo::telemetry
+}  // namespace mongo::query_stats

@@ -69,7 +69,7 @@ const char* DocumentSourceMatch::getSourceName() const {
 }
 
 Value DocumentSourceMatch::serialize(SerializationOptions opts) const {
-    if (opts.verbosity || opts.applyHmacToIdentifiers || opts.replacementForLiteralArgs) {
+    if (opts.verbosity || opts.transformIdentifiers || opts.replacementForLiteralArgs) {
         return Value(DOC(getSourceName() << Document(_expression->serialize(opts))));
     }
     return Value(DOC(getSourceName() << Document(getQuery())));

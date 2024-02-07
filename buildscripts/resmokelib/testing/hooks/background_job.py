@@ -3,6 +3,7 @@
 import sys
 import threading
 
+from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import jsfile
 
 

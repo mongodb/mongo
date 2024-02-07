@@ -166,4 +166,8 @@ bool ClusterClientCursorMock::shouldOmitDiagnosticInformation() const {
     return false;
 }
 
+std::unique_ptr<query_stats::RequestShapifier> ClusterClientCursorMock::getRequestShapifier() {
+    return nullptr;
+}
+
 }  // namespace mongo

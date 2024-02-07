@@ -21,6 +21,7 @@
 //   # This tests perform queries and expect a particular number of candidate plans to be evaluated,
 //   # creating unanticipated indexes can lead to a different number of candidate plans.
 //   assumes_no_implicit_index_creation,
+//   references_foreign_collection,
 // ]
 
 (function() {

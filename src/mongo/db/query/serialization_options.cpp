@@ -307,6 +307,10 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
 
 }  // namespace
 
+// TODO SERVER-76329 use the new policy.
+const SerializationOptions SerializationOptions::kDefaultQueryShapeSerializeOptions =
+    SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+
 // Overloads for BSONElem and Value.
 StringData debugTypeString(BSONElement e) {
     return debugTypeString<BSONElement>(e, getBSONElementType, getSubTypeFromBSONElemArray);
@@ -360,7 +364,7 @@ Value SerializationOptions::serializeLiteral(const ImplicitValue& v) const {
 }
 
 std::string SerializationOptions::serializeFieldPathFromString(StringData path) const {
-    if (applyHmacToIdentifiers) {
+    if (transformIdentifiers) {
         // Some valid field names are considered invalid as a FieldPath (for example, fields
         // like "foo.$bar" where a sub-component is prefixed with "$"). For now, if
         // serializeFieldPath errors due to an "invalid" field name, we'll serialize that field

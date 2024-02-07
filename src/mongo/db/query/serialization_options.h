@@ -70,6 +70,10 @@ enum class LiteralSerializationPolicy {
  * A struct with options for how you want to serialize a match or aggregation expression.
  */
 struct SerializationOptions {
+    // The default serialization options for a query shape. No need to redact identifiers for the
+    // this purpose. We may do that on the $queryStats read path.
+    static const SerializationOptions kDefaultQueryShapeSerializeOptions;
+
     SerializationOptions() {}
 
     SerializationOptions(bool explain_)
@@ -83,36 +87,64 @@ struct SerializationOptions {
 
     SerializationOptions(ExplainOptions::Verbosity verbosity_) : verbosity(verbosity_) {}
 
-    SerializationOptions(std::function<std::string(StringData)> identifierHmacPolicy_,
+    SerializationOptions(std::function<std::string(StringData)> transformIdentifiersCallback_,
                          boost::optional<StringData> replacementForLiteralArgs_)
         : replacementForLiteralArgs(replacementForLiteralArgs_),
-          applyHmacToIdentifiers(identifierHmacPolicy_),
-          identifierHmacPolicy(identifierHmacPolicy_) {}
+          transformIdentifiers(transformIdentifiersCallback_),
+          transformIdentifiersCallback(transformIdentifiersCallback_) {}
 
     SerializationOptions(std::function<std::string(StringData)> fieldNamesHmacPolicy_,
                          LiteralSerializationPolicy policy)
         : literalPolicy(policy),
-          applyHmacToIdentifiers(fieldNamesHmacPolicy_),
-          identifierHmacPolicy(fieldNamesHmacPolicy_) {}
+          transformIdentifiers(fieldNamesHmacPolicy_),
+          transformIdentifiersCallback(fieldNamesHmacPolicy_) {
+        // TODO SERVER-75400 Remove replacementForLiteralArgs
+        if (policy == LiteralSerializationPolicy::kToDebugTypeString) {
+            replacementForLiteralArgs = "?";
+        }
+    }
+
+    SerializationOptions(LiteralSerializationPolicy policy) : literalPolicy(policy) {
+        // TODO SERVER-75400 Remove replacementForLiteralArgs
+        if (policy == LiteralSerializationPolicy::kToDebugTypeString) {
+            replacementForLiteralArgs = "?";
+        }
+    }
+
+    /**
+     * Checks if this SerializationOptions represents the same options as another
+     * SerializationOptions. Note it cannot compare whether the two 'transformIdentifiersCallback's
+     * are the same - the language purposefully leaves the comparison operator undefined.
+     */
+    bool operator==(const SerializationOptions& other) const {
+        return this->transformIdentifiers == other.transformIdentifiers &&
+            this->includePath == other.includePath &&
+            this->replacementForLiteralArgs == other.replacementForLiteralArgs &&
+            // You cannot well determine std::function equivalence in C++, so this is the best we'll
+            // do.
+            (this->transformIdentifiersCallback == nullptr) ==
+            (other.transformIdentifiersCallback == nullptr) &&
+            this->literalPolicy == other.literalPolicy && this->verbosity == other.verbosity;
+    }
 
     // Helper function for removing identifiable information (like collection/db names).
     // Note: serializeFieldPath/serializeFieldPathFromString should be used for field
     // names.
     std::string serializeIdentifier(StringData str) const {
-        if (applyHmacToIdentifiers) {
-            return identifierHmacPolicy(str);
+        if (transformIdentifiers) {
+            return transformIdentifiersCallback(str);
         }
         return str.toString();
     }
 
     std::string serializeFieldPath(FieldPath path) const {
-        if (applyHmacToIdentifiers) {
+        if (transformIdentifiers) {
             std::stringstream hmaced;
             for (size_t i = 0; i < path.getPathLength(); ++i) {
                 if (i > 0) {
                     hmaced << ".";
                 }
-                hmaced << identifierHmacPolicy(path.getFieldName(i));
+                hmaced << transformIdentifiersCallback(path.getFieldName(i));
             }
             return hmaced.str();
         }
@@ -235,11 +267,11 @@ struct SerializationOptions {
     // so the serialization expected would be {$and: [{a: {$gt: '?'}}, {b: {$lt: '?'}}]}.
     LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged;
 
-    // If true the caller must set identifierHmacPolicy. 'applyHmacToIdentifiers' if set along with
-    // a strategy the redaction strategy will be called on any personal identifiable information
-    // (e.g., field paths/names, collection names) encountered before serializing them.
-    bool applyHmacToIdentifiers = false;
-    std::function<std::string(StringData)> identifierHmacPolicy = defaultHmacStrategy;
+    // If true the caller must set transformIdentifiersCallback. 'transformIdentifiers' if set along
+    // with a strategy the redaction strategy will be called on any personal identifiable
+    // information (e.g., field paths/names, collection names) encountered before serializing them.
+    bool transformIdentifiers = false;
+    std::function<std::string(StringData)> transformIdentifiersCallback = defaultHmacStrategy;
 
     // If set, serializes without including the path. For example {a: {$gt: 2}} would serialize
     // as just {$gt: 2}.

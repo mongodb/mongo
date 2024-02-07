@@ -3773,8 +3773,8 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
 TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = applyHmacForTest;
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
@@ -3849,8 +3849,8 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
 TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
     SerializationOptions options;
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.identifierHmacPolicy = applyHmacForTest;
-    options.applyHmacToIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
+    options.transformIdentifiers = true;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 

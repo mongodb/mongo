@@ -701,7 +701,7 @@ public:
             metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
             curOp->debug().additiveMetrics.nBatches = 1;
             curOp->setEndOfOpMetrics(numResults);
-            collectTelemetryMongod(opCtx, cursorPin);
+            collectQueryStatsMongod(opCtx, cursorPin);
 
             if (respondWithId) {
                 cursorDeleter.dismiss();

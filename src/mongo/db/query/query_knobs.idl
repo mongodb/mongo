@@ -36,7 +36,7 @@ global:
     - "mongo/db/query/ce_mode_parameter.h"
     - "mongo/db/query/explain_version_validator.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
-    - "mongo/db/query/telemetry_util.h"
+    - "mongo/db/query/query_stats_util.h"
     - "mongo/platform/atomic_proxy.h"
     - "mongo/platform/atomic_word.h"
 
@@ -59,16 +59,6 @@ enums:
             kTryBonsai: "tryBonsai"
             # Force the Bonsai optimizer for all queries.
             kForceBonsai: "forceBonsai"
-
-    QueryTelemetryFieldNameRedactionStrategy:
-        description: "Enum for possible values of queryFieldNameRedactionStrategy."
-        type: string
-        values:
-            kNoRedactionStrategy: "none"
-            # Use the constant redaction strategy.
-            kConstantRedactionStrategy: "constant"
-            # Use a prefix of sha256 redaction strategy
-            kSha256RedactionStrategy: "sha256"
 
 structs:
   InternalQueryCutoffForSampleFromRandomCursorStorage:
@@ -1038,32 +1028,32 @@ server_parameters:
     default: false
     test_only: true
 
-  internalQueryConfigureTelemetrySamplingRate:
-    description: "The maximum number of queries per second that are sampled for query telemetry.
+  internalQueryStatsRateLimit:
+    description: "The maximum number of queries per second that are sampled for query stats.
       If the rate of queries goes above this number, then rate limiting will kick in, and any
       further queries will not be sampled. To sample all queries, this can be set to -1. This can be
-      set to 0 to turn telemetry off completely."
+      set to 0 to turn queryStats off completely."
     set_at: [ startup, runtime ]
-    cpp_varname: "queryTelemetrySamplingRate"
+    cpp_varname: "internalQueryStatsRateLimit"
     cpp_vartype: AtomicWord<int>
     default: 0
     validator:
       gte: -1
-    on_update: telemetry_util::onTelemetrySamplingRateUpdate
+    on_update: query_stats_util::onQueryStatsSamplingRateUpdate
 
-  internalQueryConfigureTelemetryCacheSize:
-    description: "The maximum amount of memory that the system will allocate for the query telemetry
+  internalQueryStatsCacheSize:
+    description: "The maximum amount of memory that the system will allocate for the query queryStats
       cache. This will accept values in either of the following formats:
       1. <number>% indicates a percentage of the physical memory available to the process. E.g.: 15%.
       2. <number>(MB|GB), indicates the amount of memory in MB or GB. E.g.: 1.5GB, 100MB.
       The default value is 1%, which means 1% of the physical memory available to the process."
     set_at: [ startup, runtime ]
-    cpp_varname: "queryTelemetryStoreSize"
+    cpp_varname: "internalQueryStatsCacheSize"
     cpp_vartype: synchronized_value<std::string>
     default: "1%"
-    on_update: telemetry_util::onTelemetryStoreSizeUpdate
+    on_update: query_stats_util::onQueryStatsStoreSizeUpdate
     validator:
-      callback: telemetry_util::validateTelemetryStoreSize
+      callback: query_stats_util::validateQueryStatsStoreSize
 
   internalQueryColumnScanMinCollectionSizeBytes:
     description: "The min collection size threshold for which column scan will always be allowed. If

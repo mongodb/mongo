@@ -1,7 +1,11 @@
 /**
  * Confirms that the aggregate command accepts writeConcern regardless of whether the pipeline
  * writes or is read-only.
- * @tags: [assumes_write_concern_unchanged, does_not_support_stepdowns]
+ * @tags: [
+ *  assumes_write_concern_unchanged,
+ *  does_not_support_stepdowns,
+ *  references_foreign_collection
+ * ]
  */
 (function() {
 "use strict";

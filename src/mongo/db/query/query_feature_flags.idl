@@ -81,9 +81,9 @@ feature_flags:
       cpp_varname: gFeatureFlagSbeFull
       default: false
 
-    featureFlagTelemetry:
-      description: "Feature flag for enabling the telemetry store."
-      cpp_varname: gFeatureFlagTelemetry
+    featureFlagQueryStats:
+      description: "Feature flag for enabling the queryStats store."
+      cpp_varname: gFeatureFlagQueryStats
       default: false
 
     featureFlagBitwiseAggOperators:

@@ -44,8 +44,8 @@ std::string applyHmacForTest(StringData s) {
 
 TEST(RedactionTest, ExpressionLet) {
     SerializationOptions options;
-    options.identifierHmacPolicy = applyHmacForTest;
-    options.applyHmacToIdentifiers = true;
+    options.transformIdentifiersCallback = applyHmacForTest;
+    options.transformIdentifiers = true;
 
     auto expCtx = ExpressionContextForTest{};
 

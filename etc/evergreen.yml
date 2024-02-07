@@ -744,7 +744,8 @@ buildvariants:
   - name: .sharding .txns
   - name: sharding_auth_audit_gen
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: unittest_shell_hang_analyzer_gen
 
 - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
@@ -1323,7 +1324,8 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: .shard_merge
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1910,7 +1912,8 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: .shard_merge
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -2227,7 +2230,8 @@ buildvariants:
   - name: .serverless
   - name: .shard_split
   - name: .shard_merge
-  - name: telemetry_passthrough
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
   - name: .updatefuzzer
   - name: .watchdog
 

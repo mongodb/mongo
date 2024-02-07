@@ -40,7 +40,7 @@ constexpr StringData kLiteralArgString = "?"_sd;
 
 /**
  * Computes a BSONObj that is meant to be used to classify queries according to their shape, for the
- * purposes of collecting telemetry.
+ * purposes of collecting queryStats.
  *
  * For example, if the MatchExpression represents {a: 2}, it will return the same BSONObj as the
  * MatchExpression for {a: 1}, {a: 10}, and {a: {$eq: 2}} (identical bits but not sharing memory)
@@ -56,19 +56,20 @@ BSONObj debugPredicateShape(const MatchExpression* predicate);
 BSONObj representativePredicateShape(const MatchExpression* predicate);
 
 BSONObj debugPredicateShape(const MatchExpression* predicate,
-                            std::function<std::string(StringData)> identifierHmacPolicy);
-BSONObj representativePredicateShape(const MatchExpression* predicate,
-                                     std::function<std::string(StringData)> identifierHmacPolicy);
+                            std::function<std::string(StringData)> transformIdentifiersCallback);
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> transformIdentifiersCallback);
 
 BSONObj extractSortShape(const BSONObj& sortSpec,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          const SerializationOptions& opts);
 
-BSONObj extractQueryShape(const FindCommandRequest& findCommand,
+BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
-                          const std::vector<BSONObj>& serializedPipeline,
+                          const Pipeline& pipeline,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx);
 }  // namespace mongo::query_shape

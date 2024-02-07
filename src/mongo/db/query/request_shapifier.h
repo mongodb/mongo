@@ -30,35 +30,61 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include <memory>
 
-namespace mongo::telemetry {
+namespace mongo::query_stats {
 
 /**
- * An abstract base class to handle query shapification for telemetry. Each request type should
- * define its own shapification strategy in its implementation of makeTelemetryKey(), and then a
- * request should be registered with telemetry via telemetry::registerRequest(RequestShapifier).
+ * An abstract base class to handle query shapification for queryStats. Each request type should
+ * define its own shapification strategy in its implementation of makeQueryStatsKey(), and then a
+ * request should be registered with queryStats via query_stats::registerRequest().
  */
 class RequestShapifier {
 public:
     virtual ~RequestShapifier() = default;
-    virtual BSONObj makeTelemetryKey(
+
+    /**
+     * makeQueryStatsKey generates the query stats key representative of the specific request's
+     * payload. If there exists an ExpressionContext set up to parse and evaluate the request,
+     * makeQueryStatsKey should be called with that ExpressionContext. If not, you can call the
+     * overload that accepts the OperationContext and will construct a minimally-acceptable
+     * ExpressionContext for the sake of generating the key.
+     */
+    virtual BSONObj makeQueryStatsKey(const SerializationOptions& opts,
+                                      OperationContext* opCtx) const = 0;
+    virtual BSONObj makeQueryStatsKey(
         const SerializationOptions& opts,
         const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
 
 protected:
-    RequestShapifier(OperationContext* opCtx,
-                     const boost::optional<std::string> applicationName = boost::none)
-        : _applicationName(applicationName) {
-        if (!_applicationName) {
-            if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-                _applicationName = metadata->getApplicationName().toString();
-            }
+    RequestShapifier(OperationContext* opCtx) {
+        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+            _clientMetaData = boost::make_optional(metadata->getDocument());
+        }
+
+        if (const auto& comment = opCtx->getComment()) {
+            BSONObjBuilder commentBuilder;
+            commentBuilder.append(*comment);
+            _commentObj = commentBuilder.obj();
+            _comment = _commentObj.firstElement();
+        }
+
+        _apiParams = std::make_unique<APIParameters>(APIParameters::get(opCtx));
+
+        if (!ReadPreferenceSetting::get(opCtx).toInnerBSON().isEmpty() &&
+            !ReadPreferenceSetting::get(opCtx).usedDefaultReadPrefValue()) {
+            _readPreference = boost::make_optional(ReadPreferenceSetting::get(opCtx).toInnerBSON());
         }
     }
 
-    boost::optional<std::string> _applicationName;
+    std::unique_ptr<APIParameters> _apiParams;
+    boost::optional<BSONObj> _clientMetaData = boost::none;
+    BSONObj _commentObj;
+    boost::optional<BSONElement> _comment = boost::none;
+    boost::optional<BSONObj> _readPreference = boost::none;
 };
-}  // namespace mongo::telemetry
+}  // namespace mongo::query_stats

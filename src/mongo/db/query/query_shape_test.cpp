@@ -573,8 +573,8 @@ TEST(SortPatternShape, RespectsRedactionPolicy) {
     expCtx = make_intrusive<ExpressionContextForTest>();
     SerializationOptions opts;
     opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
-    opts.applyHmacToIdentifiers = true;
-    opts.identifierHmacPolicy = applyHmacForTest;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = applyHmacForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"REDACT_normal":1,"REDACT_y":1})",
         query_shape::extractSortShape(fromjson(R"({normal: 1, y: 1})"), expCtx, opts));
@@ -587,8 +587,8 @@ TEST(SortPatternShape, RespectsRedactionPolicy) {
 
 TEST(QueryShapeIDL, ShapifyIDLStruct) {
     SerializationOptions options;
-    options.applyHmacToIdentifiers = true;
-    options.identifierHmacPolicy = [](StringData s) -> std::string {
+    options.transformIdentifiers = true;
+    options.transformIdentifiersCallback = [](StringData s) -> std::string {
         return str::stream() << "HASH<" << s << ">";
     };
     options.replacementForLiteralArgs = "?"_sd;

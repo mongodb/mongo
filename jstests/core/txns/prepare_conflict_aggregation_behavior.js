@@ -5,7 +5,11 @@
  *
  * The test runs commands that are not allowed with security token: endSession, prepareTransaction.
  * @tags: [
- *   not_allowed_with_security_token,uses_transactions, uses_prepare_transaction]
+ *   not_allowed_with_security_token,
+ *   references_foreign_collection,
+ *   uses_transactions,
+ *   uses_prepare_transaction,
+ * ]
  */
 (function() {
 "use strict";

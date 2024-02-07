@@ -54,7 +54,7 @@
 #include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/telemetry.h"
+#include "mongo/db/query/query_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
@@ -120,6 +120,43 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
     curOp->setNS_inlock(nss);
 }
 
+/**
+ * Parses the grammar elements like 'filter', 'sort', and 'projection' from the raw
+ * 'FindCommandRequest', and tracks internal state like begining the operation's timer and recording
+ * query shape stats (if enabled).
+ */
+std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    BSONObj requestBody,
+    std::unique_ptr<FindCommandRequest> findCommand,
+    const CollectionPtr& collection) {
+    // Fill out curop information.
+    beginQueryOp(opCtx, nss, requestBody);
+    // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+
+    auto expCtx =
+        makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
+
+    auto parsedRequest = uassertStatusOK(
+        parsed_find_command::parse(expCtx,
+                                   std::move(findCommand),
+                                   extensionsCallback,
+                                   MatchExpressionParser::kAllowAllSpecialFeatures));
+
+    // Register query stats collection. Exclude queries against non-existent collections and
+    // collections with encrypted fields. It is important to do this before canonicalizing and
+    // optimizing the query, each of which would alter the query shape.
+    if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
+        query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
+            return std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedRequest);
+        });
+    }
+
+    return uassertStatusOK(
+        CanonicalQuery::canonicalize(std::move(expCtx), std::move(parsedRequest)));
+}
 /**
  * A command for running .find() queries.
  */
@@ -353,7 +390,6 @@ public:
 
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.
-            const bool isExplain = false;
             const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, cmdObj);
             CurOp::get(opCtx)->beginQueryPlanningTimer();
@@ -502,21 +538,9 @@ public:
                     findCommand->getResumeAfter(), isClusteredCollection));
             }
 
-            // Fill out curop information.
-            beginQueryOp(opCtx, nss, _request.body);
+            auto cq = parseQueryAndBeginOperation(
+                opCtx, nss, _request.body, std::move(findCommand), collection);
 
-            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
-            const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-
-            auto expCtx =
-                makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
-            auto cq = uassertStatusOK(
-                CanonicalQuery::canonicalize(opCtx,
-                                             std::move(findCommand),
-                                             isExplain,
-                                             std::move(expCtx),
-                                             extensionsCallback,
-                                             MatchExpressionParser::kAllowAllSpecialFeatures));
             // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
             // $$USER_ROLES for the find command.
             cq->getExpCtx()->setUserRoles();
@@ -563,17 +587,6 @@ public:
                 // The readOnce option causes any storage-layer cursors created during plan
                 // execution to assume read data will not be needed again and need not be cached.
                 opCtx->recoveryUnit()->setReadOnce(true);
-            }
-
-            if (collection) {
-                // Collect telemetry. Exclude queries against collections with encrypted fields.
-                if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
-                    telemetry::registerRequest(
-                        telemetry::FindRequestShapifier(cq->getFindCommandRequest(), opCtx),
-                        collection.get()->ns(),
-                        opCtx,
-                        cq->getExpCtx());
-                }
             }
 
             // Get the execution plan for the query.
@@ -783,10 +796,7 @@ public:
                     processFLEFindD(
                         opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
                 }
-                // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
-                // FLE rewrite.
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;
                 CurOp::get(opCtx)->setShouldOmitDiagnosticInformation_inlock(lk, true);
             }
 

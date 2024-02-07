@@ -13,11 +13,13 @@ class BGJob(threading.Thread):
     BGJob will call 'run_action' without any delay and expects the 'run_action' function to add some form of delay.
     """
 
-    def __init__(self, hook):
+    def __init__(self, hook, loop_delay_ms=None):
         """Initialize the background job."""
         threading.Thread.__init__(self, name=f"BGJob-{hook.__class__.__name__}")
+        self._loop_delay_ms = loop_delay_ms
         self.daemon = True
         self._hook = hook
+        self._interrupt_event = threading.Event()
         self.__is_alive = True
         self.err = None
 
@@ -29,6 +31,14 @@ class BGJob(threading.Thread):
 
             try:
                 self._hook.run_action()
+                if self._loop_delay_ms is not None:
+                    # The configured loop delay asked us to wait before running the action again. Do
+                    # that wait, but listen to see if we finish running the test or are killed in
+                    # the meantime.
+                    interrupted = self._interrupt_event.wait(self._loop_delay_ms / 1000.0)
+                    if interrupted:
+                        self._hook.logger.info("interrupted")
+                        break
             except Exception as err:  # pylint: disable=broad-except
                 self._hook.logger.error("Background thread caught exception: %s.", err)
                 self.err = err
@@ -37,6 +47,7 @@ class BGJob(threading.Thread):
     def kill(self):
         """Kill the background job."""
         self.__is_alive = False
+        self._interrupt_event.set()
 
 
 class BGHook(interface.Hook):
@@ -46,8 +57,13 @@ class BGHook(interface.Hook):
     # By default, we continuously run the background hook for the duration of the suite.
     DEFAULT_TESTS_PER_CYCLE = math.inf
 
-    def __init__(self, hook_logger, fixture, desc, tests_per_cycle=None):
-        """Initialize the background hook."""
+    def __init__(self, hook_logger, fixture, desc, tests_per_cycle=None, loop_delay_ms=None):
+        """
+        Initialize the background hook.
+
+        'tests_per_cycle' or 'loop_delay_ms' can be used to configure how often the background job
+        is restarted, and how often run_action() is called, respectively.
+        """
         interface.Hook.__init__(self, hook_logger, fixture, desc)
 
         self.logger = hook_logger
@@ -57,15 +73,21 @@ class BGHook(interface.Hook):
         self._test_num = 0
         # The number of tests we execute before restarting the background hook.
         self._tests_per_cycle = self.DEFAULT_TESTS_PER_CYCLE if tests_per_cycle is None else tests_per_cycle
+        self._loop_delay_ms = loop_delay_ms
 
     def run_action(self):
-        """Perform an action. This function will be called continuously in the BgJob."""
+        """
+        Perform an action. This function will be called continuously in the BgJob.
+
+        If a sleep_delay_ms was given, that many milliseconds of sleep will happen between each
+        invocation.
+        """
         raise NotImplementedError
 
     def before_suite(self, test_report):
         """Start the background thread."""
         self.logger.info("Starting the background thread.")
-        self._background_job = BGJob(self)
+        self._background_job = BGJob(self, self._loop_delay_ms)
         self._background_job.start()
 
     def after_suite(self, test_report, teardown_flag=None):
@@ -86,7 +108,7 @@ class BGHook(interface.Hook):
             return
 
         self.logger.info("Restarting the background thread.")
-        self._background_job = BGJob(self)
+        self._background_job = BGJob(self, self._loop_delay_ms)
         self._background_job.start()
 
     def after_test(self, test, test_report):

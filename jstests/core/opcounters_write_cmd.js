@@ -4,6 +4,7 @@
 //   not_allowed_with_security_token,
 //   uses_multiple_connections,
 //   assumes_standalone_mongod,
+//   inspects_command_opcounters,
 //   does_not_support_repeated_reads,
 // ]
 

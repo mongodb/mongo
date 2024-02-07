@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source_telemetry.h"
+#include "mongo/db/pipeline/document_source_query_stats.h"
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
@@ -38,28 +38,44 @@
 
 namespace mongo {
 namespace {
-CounterMetric telemetryHmacApplicationErrors("telemetry.numHmacApplicationErrors");
+CounterMetric queryStatsHmacApplicationErrors("queryStats.numHmacApplicationErrors");
 }
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
-                                           DocumentSourceTelemetry::LiteParsed::parse,
-                                           DocumentSourceTelemetry::createFromBson,
+REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
+                                           DocumentSourceQueryStats::LiteParsed::parse,
+                                           DocumentSourceQueryStats::createFromBson,
                                            AllowedWithApiStrict::kNeverInVersion1,
-                                           feature_flags::gFeatureFlagTelemetry);
+                                           feature_flags::gFeatureFlagQueryStats);
 
 namespace {
+
+TransformAlgorithm algFromString(std::string str) {
+    if (str == "hmac-sha-256") {
+        return kHmacSha256;
+    } else {
+        return kNone;
+    }
+}
+
 /**
- * Try to parse the applyHmacToIdentifiers property from the element.
+ * Try to parse the algorithm property from the element.
  */
-boost::optional<bool> parseApplyHmacToIdentifiers(const BSONElement& el) {
-    if (el.fieldNameStringData() == "applyHmacToIdentifiers"_sd) {
+boost::optional<TransformAlgorithm> parseAlgorithm(const BSONElement& el) {
+    if (el.fieldNameStringData() == "algorithm"_sd) {
         auto type = el.type();
         uassert(ErrorCodes::FailedToParse,
-                str::stream() << DocumentSourceTelemetry::kStageName
-                              << " applyHmacToIdentifiers parameter must be boolean. Found type: "
+                str::stream() << DocumentSourceQueryStats::kStageName
+                              << " algorithm parameter must be a string. Found type: "
                               << typeName(type),
-                type == BSONType::Bool);
-        return el.trueValue();
+                type == BSONType::String);
+        std::string algorithmStr = el.str();
+        TransformAlgorithm algorithm = algFromString(algorithmStr);
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << DocumentSourceQueryStats::kStageName
+                              << " algorithm currently supported is only 'hmac-sha-256'. Found: "
+                              << algorithmStr,
+                algorithm != TransformAlgorithm::kNone);
+        return algorithm;
     }
     return boost::none;
 }
@@ -74,14 +90,14 @@ boost::optional<std::string> parseHmacKey(const BSONElement& el) {
             int len;
             auto data = el.binData(len);
             uassert(ErrorCodes::FailedToParse,
-                    str::stream() << DocumentSourceTelemetry::kStageName
+                    str::stream() << DocumentSourceQueryStats::kStageName
                                   << "hmacKey must be greater than or equal to 32 bytes",
                     len >= 32);
             return {{data, (size_t)len}};
         }
         uasserted(ErrorCodes::FailedToParse,
                   str::stream()
-                      << DocumentSourceTelemetry::kStageName
+                      << DocumentSourceQueryStats::kStageName
                       << " hmacKey parameter must be bindata of length 32 or greater. Found type: "
                       << typeName(type));
     }
@@ -89,67 +105,84 @@ boost::optional<std::string> parseHmacKey(const BSONElement& el) {
 }
 
 /**
- * Parse the spec object calling the `ctor` with the bool applyHmacToIdentifiers and std::string
- * hmacKey arguments.
+ * Parse the spec object calling the `ctor` with the TransformAlgorithm enum algorithm and
+ * std::string hmacKey arguments.
  */
 template <typename Ctor>
 auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << DocumentSourceTelemetry::kStageName
+            str::stream() << DocumentSourceQueryStats::kStageName
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
+    BSONObj obj = spec.embeddedObject();
 
-    bool applyHmacToIdentifiers = false;
+    TransformAlgorithm algorithm = TransformAlgorithm::kNone;
     std::string hmacKey;
-    for (auto&& el : spec.embeddedObject()) {
-        if (auto maybeApplyHmacToIdentifiers = parseApplyHmacToIdentifiers(el);
-            maybeApplyHmacToIdentifiers) {
-            applyHmacToIdentifiers = *maybeApplyHmacToIdentifiers;
-        } else if (auto maybeHmacKey = parseHmacKey(el); maybeHmacKey) {
-            hmacKey = *maybeHmacKey;
+    for (auto&& subObj : obj) {
+        auto field = subObj.fieldNameStringData();
+        if (field == "transformIdentifiers"_sd) {
+            auto transformIdentifiersObj = obj.getObjectField("transformIdentifiers"_sd);
+            for (auto&& el : transformIdentifiersObj) {
+                if (auto maybeAlgorithm = parseAlgorithm(el); maybeAlgorithm) {
+                    algorithm = *maybeAlgorithm;
+                } else if (auto maybeHmacKey = parseHmacKey(el); maybeHmacKey) {
+                    hmacKey = *maybeHmacKey;
+                } else {
+                    uasserted(ErrorCodes::FailedToParse,
+                              str::stream() << DocumentSourceQueryStats::kStageName
+                                            << " parameters to 'transformIdentifiers' may only "
+                                               "contain 'algorithm' or "
+                                               "'hmacKey' options. Found: "
+                                            << el.fieldName());
+                }
+            }
+            // If transformIdentifiers is present, we must have the algorithm field.
+            uassert(
+                ErrorCodes::FailedToParse,
+                str::stream()
+                    << DocumentSourceQueryStats::kStageName
+                    << " missing value for algorithm, which is required for 'transformIdentifiers'",
+                algorithm != TransformAlgorithm::kNone);
         } else {
             uasserted(ErrorCodes::FailedToParse,
-                      str::stream()
-                          << DocumentSourceTelemetry::kStageName
-                          << " parameters object may only contain 'applyHmacToIdentifiers' or "
-                             "'hmacKey' options. Found: "
-                          << el.fieldName());
+                      str::stream() << "$queryStats parameters object may only contain "
+                                       "'transformIdentifiers'. Found: "
+                                    << field.toString());
         }
     }
-
-    return ctor(applyHmacToIdentifiers, hmacKey);
+    return ctor(algorithm, hmacKey);
 }
 
 }  // namespace
 
-std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::LiteParsed::parse(
+std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
-        return std::make_unique<DocumentSourceTelemetry::LiteParsed>(
-            spec.fieldName(), applyHmacToIdentifiers, hmacKey);
+    return parseSpec(spec, [&](TransformAlgorithm algorithm, std::string hmacKey) {
+        return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
+            spec.fieldName(), algorithm, hmacKey);
     });
 }
 
-boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
+boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
-            "$telemetry must be run against the 'admin' database with {aggregate: 1}",
+            "$queryStats must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
-    return parseSpec(spec, [&](bool applyHmacToIdentifiers, std::string hmacKey) {
-        return new DocumentSourceTelemetry(pExpCtx, applyHmacToIdentifiers, hmacKey);
+    return parseSpec(spec, [&](TransformAlgorithm algorithm, std::string hmacKey) {
+        return new DocumentSourceQueryStats(pExpCtx, algorithm, hmacKey);
     });
 }
 
-Value DocumentSourceTelemetry::serialize(SerializationOptions opts) const {
+Value DocumentSourceQueryStats::serialize(SerializationOptions opts) const {
     // This document source never contains any user information, so no need for any work when
     // applying hmac.
     return Value{Document{{kStageName, Document{}}}};
 }
 
-DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
+DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
     /**
      * We maintain nested iterators:
      * - Outer one over the set of partitions.
@@ -158,7 +191,7 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
      * When an inner iterator is present and contains more elements, we can return the next element.
      * When the inner iterator is exhausted, we move to the next element in the outer iterator and
      * create a new inner iterator. When the outer iterator is exhausted, we have finished iterating
-     * over the telemetry store entries.
+     * over the queryStats store entries.
      *
      * The inner iterator iterates over a materialized container of all entries in the partition.
      * This is done to reduce the time under which the partition lock is held.
@@ -172,17 +205,17 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
             return {std::move(doc)};
         }
 
-        TelemetryStore& _telemetryStore = getTelemetryStore(getContext()->opCtx);
+        QueryStatsStore& _queryStatsStore = getQueryStatsStore(getContext()->opCtx);
 
         // Materialized partition is exhausted, move to the next.
         _currentPartition++;
-        if (_currentPartition >= _telemetryStore.numPartitions()) {
+        if (_currentPartition >= _queryStatsStore.numPartitions()) {
             return DocumentSource::GetNextResult::makeEOF();
         }
 
         // We only keep the partition (which holds a lock) for the time needed to materialize it to
         // a set of Document instances.
-        auto&& partition = _telemetryStore.getPartition(_currentPartition);
+        auto&& partition = _queryStatsStore.getPartition(_currentPartition);
 
         // Capture the time at which reading the partition begins to indicate to the caller
         // when the snapshot began.
@@ -190,21 +223,22 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
             try {
-                auto hmacKey =
-                    metrics->applyHmacToKey(key, _applyHmacToIdentifiers, _hmacKey, pExpCtx->opCtx);
-                _materializedPartition.push_back({{"key", std::move(hmacKey)},
+                auto queryStatsKey =
+                    metrics->computeQueryStatsKey(pExpCtx->opCtx, _algorithm, _hmacKey);
+                _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics->toBSON()},
                                                   {"asOf", partitionReadTime}});
             } catch (const DBException& ex) {
-                telemetryHmacApplicationErrors.increment();
+                queryStatsHmacApplicationErrors.increment();
                 LOGV2_DEBUG(7349403,
                             3,
                             "Error encountered when applying hmac to query shape, will not publish "
-                            "telemetry for this entry.",
-                            "status"_attr = ex.toStatus());
+                            "queryStats for this entry.",
+                            "status"_attr = ex.toStatus(),
+                            "hash"_attr = key);
                 if (kDebugBuild) {
                     tasserted(7349401,
-                              "Was not able to re-parse telemetry key when reading telemetry.");
+                              "Was not able to re-parse queryStats key when reading queryStats.");
                 }
             }
         }
