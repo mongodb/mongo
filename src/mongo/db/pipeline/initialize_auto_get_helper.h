@@ -33,6 +33,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/sharding_state.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 namespace {
@@ -53,10 +54,17 @@ std::vector<ScopedSetShardRole> createScopedShardRoles(
                 "Must be an entry in criMap for namespace " + nss.toStringForErrorMsg(),
                 nssCri != criMap.end());
 
-        // TODO SERVER-85383: Set 'placementConflictTimestamp' here as well, if necessary.
         bool isTracked = nssCri->second.cm.hasRoutingTable();
-        const auto shardVersion =
-            isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNSHARDED();
+        auto shardVersion = [&] {
+            auto sv =
+                isTracked ? nssCri->second.getShardVersion(myShardId) : ShardVersion::UNSHARDED();
+            if (auto txnRouter = TransactionRouter::get(opCtx)) {
+                if (auto optOriginalPlacementConflictTime = txnRouter.getPlacementConflictTime()) {
+                    sv.setPlacementConflictTime(*optOriginalPlacementConflictTime);
+                }
+            }
+            return sv;
+        }();
         const auto dbVersion =
             isTracked ? boost::none : OperationShardingState::get(opCtx).getDbVersion(nss.dbName());
 
