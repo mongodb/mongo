@@ -493,12 +493,12 @@ SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsync(
 }
 
 void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-    OperationContext* opCtx, const std::function<bool()>& isPrimaryFn) noexcept {
+    const std::function<bool()>& isPrimaryFn) noexcept {
     if (!isPrimaryFn()) {
         return;
     }
 
-    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto executor = Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
     AsyncTry([] {
         ThreadClient tc("UpdateReplicaSetOnConfigServer",
                         getGlobalServiceContext()->getService(ClusterRole::ShardServer));

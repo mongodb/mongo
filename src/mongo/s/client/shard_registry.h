@@ -341,7 +341,7 @@ public:
      * error, retries if the mongod is still a primary.
      */
     static void scheduleReplicaSetUpdateOnConfigServerIfNeeded(
-        OperationContext* opCtx, const std::function<bool()>& isPrimaryFn) noexcept;
+        const std::function<bool()>& isPrimaryFn) noexcept;
 
     /*
      * Returns true if the given host is part of the config server replica set.
