@@ -653,12 +653,12 @@ MONGO_COMPILER_NOINLINE void msgAssertedBadType [[noreturn]] (const char* data) 
     if (!logMemory) {
         output << fmt::format("BSONElement: bad type {0:d} @ {1:p}", *data, data);
     } else {
-        // To reduce the risk of a segmentation fault, only print the bytes in the 32-bit aligned
+        // To reduce the risk of a segmentation fault, only print the bytes in the 32-byte aligned
         // block in which the address is located (i.e. round down to the lowest multiple of 32). The
         // hope is that it's safe to read memory that may fall within the same cache line. Generate
         // a mask to zero-out the last bits for a block-aligned address.
         // Ex: Inverse of 0x1F (32 - 1) looks like 0xFFFFFFE0, and ANDed with the pointer, zeroes
-        // the lowest 5 bits, giving the starting address of a 32-bit block.
+        // the lowest 5 bits, giving the starting address of a 32-byte block.
         const size_t blockSize = 32;
         const size_t mask = ~(blockSize - 1);
         const char* startAddr =

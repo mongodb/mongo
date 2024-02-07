@@ -906,7 +906,7 @@ public:
     }
 
     BSONElement next() {
-        MONGO_verify(_pos <= _theend);
+        dassert(_pos <= _theend);
         BSONElement e(_pos);
         _pos += e.size();
         return e;
@@ -930,7 +930,7 @@ public:
     }
 
     BSONElement operator*() {
-        MONGO_verify(_pos <= _theend);
+        dassert(_pos <= _theend);
         return BSONElement(_pos);
     }
 

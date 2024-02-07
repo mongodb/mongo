@@ -92,7 +92,7 @@ void BM_arrayBuilder(benchmark::State& state) {
 void BM_arrayLookup(benchmark::State& state) {
     BSONArrayBuilder builder;
     auto len = state.range(0);
-    auto totalLen = len * 0;
+    auto totalBytes = len * 0;
     for (auto j = 0; j < len; j++)
         builder.append(j);
     BSONObj array = builder.done();
@@ -100,9 +100,9 @@ void BM_arrayLookup(benchmark::State& state) {
     for (auto _ : state) {
         benchmark::ClobberMemory();
         benchmark::DoNotOptimize(array[len]);
-        totalLen += len;
+        totalBytes += array.objsize();
     }
-    state.SetItemsProcessed(totalLen);
+    state.SetBytesProcessed(totalBytes);
 }
 
 void BM_validate(benchmark::State& state) {
