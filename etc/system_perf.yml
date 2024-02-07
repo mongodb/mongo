@@ -898,6 +898,69 @@ tasks:
         vars:
           test_control: "initialsync-logkeeper"
 
+  - name: array_traversal_high_value
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: array_traversal
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/ArrayTraversal.yml
+
+  - name: filter_with_complex_logical_expression_high_value
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: filter_with_complex_logical_expression
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/FilterWithComplexLogicalExpression.yml
+
+  - name: change_streams_listen_throughput
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_listen_throughput"
+
+  - name: mixed_workloads_genny_rate_limited_high_value
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mixed_workloads_genny_rate_limited
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/MixedWorkloadsGennyRateLimited.yml
+
+  - name: load_test_high_value
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: load_test
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/LoadTest.yml
+
+  - name: majority_reads10_k_threads_high_value
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: majority_reads10_k_threads
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/MajorityReads10KThreads.yml
+
+  - name: large_indexed_ins_high_value
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: large_indexed_ins
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/LargeIndexedIns.yml
+
+  - name: expressive_queries_high_value
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: expressive_queries
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/query/ExpressiveQueries.yml
+
   # The following two initial sync logkeeper automation tasks are only used in the commented-out
   # "Linux ReplSet Initial Sync LogKeeper Snapshot Update" variant below and are only intended to be
   # run in patch builds to update FCV for logkeeper datasets.
@@ -1389,6 +1452,34 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
 
+  - name: perf-standalone.arm.aws.2023-11
+    display_name: PERF Standalone ARM AWS 2023-11
+    cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone
+      infrastructure_provisioning_release: 2023-09
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+    tasks: &standalonetasks
+      - *schedule_patch_auto_tasks_task
+      - *schedule_variant_auto_tasks_task
+      - name: array_traversal_high_value
+      - name: filter_with_complex_logical_expression_high_value
+
   # - name: atlas-M60-real-azure
   #   display_name: M60-Atlas ReplSet Azure
   #   modules: *modules
@@ -1514,7 +1605,9 @@ buildvariants:
       - name: smoke_test
       - name: mongos_workloads
       - name: mongos_large_catalog_workloads
+      - name: move_chunk_workloads
       - name: change_streams_latency
+      - name: change_streams_listen_throughput
       - name: change_streams_multi_mongos
 
   # - name: linux-3-node-replSet.2022-11
@@ -1605,6 +1698,11 @@ buildvariants:
       - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
+      - name: mixed_workloads_genny_rate_limited_high_value
+      - name: load_test_high_value
+      - name: majority_reads10_k_threads_high_value
+      - name: large_indexed_ins_high_value
+      - name: expressive_queries_high_value
 
   # - name: linux-3-node-replSet-intel.2022-11
   #   display_name: Linux 3-Node ReplSet Intel 2022-11
@@ -1659,6 +1757,7 @@ buildvariants:
       - name: smoke_test
       - name: linkbench
       - name: linkbench2
+      - name: mixed_workloads_genny_rate_limited_high_value
 
   # - name: linux-3-node-replSet-initialsync.2022-11
   #   display_name: Linux 2-Node ReplSet Initial Sync  2022-11
