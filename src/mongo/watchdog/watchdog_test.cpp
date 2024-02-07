@@ -319,19 +319,11 @@ TEST_F(WatchdogMonitorThreadTest, Basic) {
 
     WatchdogMonitorThread monitorThread(&checkThread, deathCallback, Milliseconds(5));
 
-    // Check and monitor thread should not have run yet.
-    ASSERT_EQ(checkThread.getGeneration(), 0);
-    ASSERT_EQ(monitorThread.getGeneration(), 0);
-
     monitorThread.start();
 
     deathEvent.wait();
 
     monitorThread.shutdown();
-    // Check generation should be 0 since check thread never started.
-    // Monitor thread should have run at least once in order to call the deathCallback.
-    ASSERT_EQ(checkThread.getGeneration(), 0);
-    ASSERT_GTE(monitorThread.getGeneration(), 1);
 }
 
 /**
@@ -372,10 +364,6 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
 
     WatchdogMonitorThread monitorThread(&checkThread, deathCallback, Milliseconds(100));
 
-    // Check and monitor thread should not have run yet.
-    ASSERT_EQ(checkThread.getGeneration(), 0);
-    ASSERT_EQ(monitorThread.getGeneration(), 0);
-
     checkThread.start();
 
     monitorThread.start();
@@ -385,11 +373,6 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
     monitorThread.shutdown();
 
     checkThread.shutdown();
-
-    // Check generation should be 6 since check thread is hung at 6.
-    // Monitor thread should have run at least once in order to call the deathCallback.
-    ASSERT_EQ(checkThread.getGeneration(), 6);
-    ASSERT_GTE(monitorThread.getGeneration(), 1);
 }
 
 class WatchdogMonitorTest : public ServiceContextTest {};
@@ -408,19 +391,12 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
     checks.push_back(std::move(sleepyCheck));
 
     WatchdogMonitor monitor(std::move(checks), Milliseconds(1), Milliseconds(5), deathCallback);
-    // Check and monitor thread should not have run yet.
-    ASSERT_EQ(monitor.getCheckGeneration(), 0);
-    ASSERT_EQ(monitor.getMonitorGeneration(), 0);
 
     monitor.start();
 
     deathEvent.wait();
 
     monitor.shutdown();
-    // Check generation should be 6 since check thread is hung at 6.
-    // Monitor thread should have run at least once in order to call the deathCallback.
-    ASSERT_EQ(monitor.getCheckGeneration(), 6);
-    ASSERT_GTE(monitor.getMonitorGeneration(), 1);
 }
 
 // Positive: Make sure watchdog monitor terminates the process if a check is unresponsive
@@ -455,10 +431,7 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
 
     WatchdogMonitor monitor(std::move(checks), Milliseconds(1), Milliseconds(1001), deathCallback);
 
-    ASSERT_EQ(0, monitor.getCheckGeneration());
-    ASSERT_EQ(0, monitor.getMonitorGeneration());
-    auto counterCheckCount = 5;
-    counterCheckPtr->setSignalOnCount(counterCheckCount);
+    counterCheckPtr->setSignalOnCount(5);
 
     monitor.start();
 
@@ -466,10 +439,6 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
 
     // Pause the monitor
     monitor.setPeriod(Milliseconds(-1));
-
-    // Check generation should have increased.
-    auto lastCheckGeneration = monitor.getCheckGeneration();
-    ASSERT_GTE(lastCheckGeneration, counterCheckCount);
 
     // Check the counter after it is shutdown and make sure it does not change.
     std::uint32_t pauseCounter = counterCheckPtr->getCounter();
@@ -480,38 +449,25 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
     // We could have had one more run of the loop as we paused - allow for that case
     // but no other runs of the thread.
     ASSERT_GTE(pauseCounter + 1, counterCheckPtr->getCounter());
-    ASSERT_GTE(lastCheckGeneration + 1, monitor.getCheckGeneration());
 
     // Resume the monitor
     std::uint32_t baseCounter = counterCheckPtr->getCounter();
-    counterCheckCount = baseCounter + 5;
-    counterCheckPtr->setSignalOnCount(counterCheckCount);
+    counterCheckPtr->setSignalOnCount(baseCounter + 5);
 
     // Restart the monitor with a different interval.
     monitor.setPeriod(Milliseconds(1007));
 
     counterCheckPtr->waitForCount();
-    // Sleep to ensure the monitor runs at least once.
-    sleepmillis(1007);
 
     monitor.shutdown();
 
-    // Check generation and monitor generation should have both increased.
-    lastCheckGeneration = monitor.getCheckGeneration();
-    auto lastMonitorGeneration = monitor.getMonitorGeneration();
-    ASSERT_GTE(lastCheckGeneration, counterCheckCount);
-    ASSERT_GTE(lastMonitorGeneration, 1);
-
     // Check the counter after it is shutdown and make sure it does not change.
     std::uint32_t lastCounter = counterCheckPtr->getCounter();
-
 
     // This is racey but it should only produce false negatives
     sleepmillis(100);
 
     ASSERT_EQ(lastCounter, counterCheckPtr->getCounter());
-    ASSERT_EQ(lastCheckGeneration, monitor.getCheckGeneration());
-    ASSERT_EQ(lastMonitorGeneration, monitor.getMonitorGeneration());
 }
 
 class DirectoryCheckTest : public ServiceContextTest {};

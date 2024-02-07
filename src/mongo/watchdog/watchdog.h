@@ -37,7 +37,6 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -47,7 +46,6 @@
 namespace mongo {
 
 class OperationContext;
-class ServiceContext;
 
 /**
  * WatchdogDeathCallback is used by the watchdog component to terminate the process. It is expected
@@ -227,11 +225,6 @@ public:
      */
     std::int64_t getGeneration();
 
-    /**
-     * Sets _shouldRunChecks.
-     */
-    void setShouldRunChecks(bool shouldRunChecks);
-
 private:
     void run(OperationContext* opCtx) final;
     void resetState() final;
@@ -243,9 +236,6 @@ private:
     // A counter that is incremented for each watchdog check completed, and monitored to ensure it
     // does not remain at the same value for too long.
     AtomicWord<long long> _checkGeneration{0};
-
-    // If _shouldRunChecks is false, make each check a no-op.
-    AtomicWord<bool> _shouldRunChecks{true};
 };
 
 /**
@@ -282,72 +272,6 @@ private:
     std::int64_t _lastSeenGeneration{-1};
 };
 
-/**
- * An interface for using the watchdog monitor.
- */
-class WatchdogMonitorInterface {
-public:
-    WatchdogMonitorInterface() = default;
-    virtual ~WatchdogMonitorInterface() = default;
-
-    static WatchdogMonitorInterface* get(ServiceContext* service);
-    static WatchdogMonitorInterface* get(OperationContext* ctx);
-    static WatchdogMonitorInterface* getGlobalWatchdogMonitorInterface();
-
-    static void set(ServiceContext* service,
-                    std::unique_ptr<WatchdogMonitorInterface> watchdogMonitorInterface);
-
-    /**
-     * Starts the watchdog threads.
-     */
-    virtual void start() = 0;
-
-    /**
-     * Updates the watchdog monitor period. The goal is to detect a failure in the time of the
-     * period.
-     *
-     * Does nothing if watchdog is not started. If watchdog was started, it changes the monitor
-     * period, but not the check period.
-     *
-     * Accepts Milliseconds for testing purposes while the setParameter only works with seconds.
-     */
-    virtual void setPeriod(Milliseconds duration) = 0;
-
-    /**
-     * Shutdown the watchdog.
-     */
-    virtual void shutdown() = 0;
-
-    /**
-     * Returns the current generation number of the checks.
-     *
-     * Incremented after each round of checks is run.
-     */
-    virtual std::int64_t getCheckGeneration() = 0;
-
-    /**
-     * Returns the current generation number of the checks.
-     *
-     * Incremented after each round of checks is run.
-     */
-    virtual std::int64_t getMonitorGeneration() = 0;
-
-    /**
-     * Pauses the watchdog checks by making each check a no-op.
-     */
-    virtual void pauseChecks() = 0;
-
-    /**
-     * Unpauses the watchdog checks
-     */
-    virtual void unpauseChecks() = 0;
-
-    /**
-     * Gets whether checks are paused or not. For testing purposes only.
-     */
-    virtual bool getShouldRunChecks_forTest() = 0;
-};
-
 
 /**
  * WatchdogMonitor
@@ -365,7 +289,7 @@ public:
  *                   fails to make process, WatchdogMonitor calls a callback. The callback is not
  *                   expected to do any I/O and minimize the system calls it makes.
  */
-class WatchdogMonitor final : public WatchdogMonitorInterface {
+class WatchdogMonitor {
 public:
     /**
      * Create the watchdog with specified period.
@@ -378,23 +302,40 @@ public:
                     Milliseconds monitorPeriod,
                     WatchdogDeathCallback callback);
 
-    ~WatchdogMonitor() = default;
-
+    /**
+     * Starts the watchdog threads.
+     */
     void start();
 
+    /**
+     * Updates the watchdog monitor period. The goal is to detect a failure in the time of the
+     * period.
+     *
+     * Does nothing if watchdog is not started. If watchdog was started, it changes the monitor
+     * period, but not the check period.
+     *
+     * Accepts Milliseconds for testing purposes while the setParameter only works with seconds.
+     */
     void setPeriod(Milliseconds duration);
 
+    /**
+     * Shutdown the watchdog.
+     */
     void shutdown();
 
+    /**
+     * Returns the current generation number of the checks.
+     *
+     * Incremented after each round of checks is run.
+     */
     std::int64_t getCheckGeneration();
 
+    /**
+     * Returns the current generation number of the checks.
+     *
+     * Incremented after each round of checks is run.
+     */
     std::int64_t getMonitorGeneration();
-
-    void pauseChecks();
-
-    void unpauseChecks();
-
-    bool getShouldRunChecks_forTest();
 
 private:
     /**
