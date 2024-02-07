@@ -8003,6 +8003,7 @@ tasks:
   - command: shell.exec
     params:
       shell: bash
+      silent: true
       script: |
         set -oe
         echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
@@ -8073,6 +8074,7 @@ tasks:
   - command: shell.exec
     params:
       shell: bash
+      silent: true
       script: |
         set -oe
         echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
@@ -8611,6 +8613,7 @@ tasks:
   - command: shell.exec
     params:
       shell: bash
+      silent: true
       script: |
         set -oe
         echo "${release_tools_container_registry_password}" | podman login --password-stdin --username ${release_tools_container_registry_username} ${release_tools_container_registry}
