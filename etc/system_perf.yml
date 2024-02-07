@@ -1884,6 +1884,67 @@ buildvariants:
           - name: archive_dist_test
             variant: amazon2-arm64-compile
 
+  - name: compile-amazon-linux2-arm64-mongocrypt-shlib
+    display_name: Compile mongo_crypt_v1.so for Amazon Linux 2 arm64
+    modules: *modules
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    expansions:
+      platform: linux
+      project_dir: *project_dir
+      tooltags: ""
+      use_scons_cache: true
+      compile_variant: amazon2-arm64-compile
+      compile_flags: >-
+        --separate-debug
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
+        --allocator=system
+        --enterprise-features=fle,search,vector_search
+        --js-engine=none
+        --link-model=dynamic-sdk
+        --enable-http-client=off
+        --ssl=off
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+    run_on:
+      - "amazon2-arm64-large"
+    tasks:
+      - name: compile_mongocrypt_shlib
+
+  - name: linux-shard-lite-fle.2022-11
+    display_name: Linux Shard Lite FLE 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite-fle
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: amazon2-arm64-compile
+      requires_mongocrypt_shlib: true
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on:
+      - name: package_new_compile
+        variant: amazon2-arm64-compile
+      - name: compile_mongocrypt_shlib
+        variant: compile-amazon-linux2-arm64-mongocrypt-shlib
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: medical_workload_diagnosis_50_50_high_value
+        cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+      - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
+        cron: *high-value-workload-cron
+
 #   - name: atlas-M60-real
 #     display_name: M60-Atlas ReplSet AWS
 #     cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
@@ -1915,7 +1976,7 @@ buildvariants:
 #       - *schedule_patch_auto_tasks_task
 #       - *schedule_variant_auto_tasks_task
 #       - name: industry_benchmarks
-#         cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+#         cron: *high-value-workload-cron
 #       - name: ycsb_60GB
 #       - name: tpcc
 #       - name: tpcc_majority
