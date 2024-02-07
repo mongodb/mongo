@@ -253,9 +253,6 @@ let viewsCommandTests = {
     },
     balancerCollectionStatus: {
         command: {balancerCollectionStatus: "test.view"},
-        setup: function(conn) {
-            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-        },
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,
@@ -563,9 +560,6 @@ let viewsCommandTests = {
     },
     moveCollection: {
         command: {moveCollection: "test.view", toShard: "move_collection-rs"},
-        setup: function(conn) {
-            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-        },
         expectedErrorCode: [ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,
@@ -641,9 +635,6 @@ let viewsCommandTests = {
     resetPlacementHistory: {skip: isUnrelated},
     reshardCollection: {
         command: {reshardCollection: "test.view", key: {_id: 1}},
-        setup: function(conn) {
-            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-        },
         expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,
@@ -666,9 +657,6 @@ let viewsCommandTests = {
     revokeRolesFromUser: {skip: isUnrelated},
     setAllowMigrations: {
         command: {setAllowMigrations: "test.view", allowMigrations: false},
-        setup: function(conn) {
-            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-        },
         expectedErrorCode: ErrorCodes.NamespaceNotSharded,
         skipStandalone: true,
         expectFailure: true,
@@ -695,9 +683,6 @@ let viewsCommandTests = {
     setUserWriteBlockMode: {skip: isUnrelated},
     shardCollection: {
         command: {shardCollection: "test.view", key: {_id: 1}},
-        setup: function(conn) {
-            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-        },
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,
@@ -754,9 +739,6 @@ let viewsCommandTests = {
     transitionToShardedCluster: {skip: isUnrelated},
     unshardCollection: {
         command: {unshardCollection: "test.view", toShard: "unshard_collection-rs"},
-        setup: function(conn) {
-            assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-        },
         expectedErrorCode: [ErrorCodes.NamespaceNotSharded, ErrorCodes.NamespaceNotFound],
         skipStandalone: true,
         expectFailure: true,
