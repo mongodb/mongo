@@ -4,7 +4,7 @@
 //   # Uses $where operator
 //   requires_scripting,
 //   assumes_read_concern_local,
-//   requires_fcv_73,
+//   requires_fcv_80,
 // ]
 
 let t = db.jstests_and3;

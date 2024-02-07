@@ -3,9 +3,10 @@
 // change depending on whether/how many documents are filtered out by the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
-//   requires_fcv_73,
+//   requires_fcv_80,
 // ]
-let t = db.regex6;
+const colName = jsTestName();
+let t = db.getCollection(colName);
 t.drop();
 
 t.save({name: "eliot"});

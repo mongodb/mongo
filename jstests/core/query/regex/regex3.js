@@ -1,10 +1,11 @@
 // @tags: [
 //   assumes_balancer_off,
 //   assumes_read_concern_local,
-//   requires_fcv_73,
+//   requires_fcv_80,
 // ]
 
-let t = db.regex3;
+const colName = jsTestName();
+let t = db.getCollection(colName);
 t.drop();
 
 assert.commandWorked(t.save({name: "eliot"}));

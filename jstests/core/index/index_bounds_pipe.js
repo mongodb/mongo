@@ -3,12 +3,12 @@
  * non-escaped pipe '|' characters.
  * @tags: [
  *   assumes_read_concern_local,
- *   requires_fcv_73,
+ *   requires_fcv_80,
  * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
-const collName = 'index_bounds_pipe';
+const collName = jsTestName();
 const coll = db.getCollection(collName);
 coll.drop();
 

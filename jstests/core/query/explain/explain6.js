@@ -1,13 +1,14 @@
 // @tags: [
 //   assumes_balancer_off,
 //   requires_non_retryable_writes,
-//   requires_fcv_73,
+//   requires_fcv_80,
 // ]
 
 // Basic test which checks the number of documents returned, keys examined, and documents
 // examined as reported by explain.
 
-let t = db.jstests_explain6;
+const colName = jsTestName();
+let t = db.getCollection(colName);
 t.drop();
 
 t.createIndex({a: 1, b: 1});

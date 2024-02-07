@@ -1,7 +1,7 @@
 /**
  * Tests how regex filters are satisfied with different index + query collation combinations
  * @tags: [
- *   requires_fcv_73,
+ *   requires_fcv_80,
  * ]
  */
 
@@ -20,7 +20,7 @@ function assertIXScanTightBounds(explain) {
     assert.doesNotContain("[\"\", {})", ixscan.indexBounds.value, "Unexpected full IXSCAN plan!");
 }
 
-const collName = "jstests_regex_collations"
+const collName = jsTestName();
 
 assertDropAndRecreateCollection(db, collName);
 const collection = db[collName];
