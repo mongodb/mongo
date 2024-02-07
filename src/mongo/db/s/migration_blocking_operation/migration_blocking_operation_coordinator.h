@@ -57,7 +57,8 @@ private:
 
     Phase _getCurrentPhase() const;
     bool _isFirstOperation(WithLock lk) const;
-    void _throwIfCleaningUp();
+    void _throwIfCleaningUp(WithLock lk);
+    void _recoverIfNecessary(WithLock lk, OperationContext* opCtx, bool isBeginOperation);
 
     void _insertOrUpdateStateDocument(
         WithLock lk,
@@ -68,7 +69,8 @@ private:
         MONGO_MAKE_LATCH("MigrationBlockingOperationCoordinatorInstance::_mutex");
 
     UUIDSet _operations;
-    SharedPromise<void> _completionPromise;
+    SharedPromise<void> _beginCleanupPromise;
+    bool _needsRecovery;
 };
 
 }  // namespace mongo

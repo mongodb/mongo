@@ -31,9 +31,10 @@
 
 namespace mongo {
 
-ShardingDDLCoordinatorExternalStateForTest::ShardingDDLCoordinatorExternalStateForTest(
-    MockCommandResponse* mockCommandResponse)
-    : _mockCommandResponse{mockCommandResponse} {}
+ShardingDDLCoordinatorExternalStateForTest::ShardingDDLCoordinatorExternalStateForTest() {
+    allowMigrationsResponse = MockCommandResponse();
+    migrationsAllowedResponse = MockCommandResponse();
+}
 
 void ShardingDDLCoordinatorExternalStateForTest::checkShardedDDLAllowedToStart(
     OperationContext* opCtx, const NamespaceString& nss) const {}
@@ -50,18 +51,30 @@ bool ShardingDDLCoordinatorExternalStateForTest::isShardedTimeseries(
 }
 
 void ShardingDDLCoordinatorExternalStateForTest::allowMigrations(OperationContext* opCtx,
-                                                                 NamespaceString nss,
-                                                                 bool allowMigrations) const {
-    _mockCommandResponse->getNext();
+                                                                 const NamespaceString& nss,
+                                                                 bool allowMigrations) {
+    allowMigrationsResponse.getNext();
+    migrationsAllowed = allowMigrations;
+}
+
+bool ShardingDDLCoordinatorExternalStateForTest::checkAllowMigrations(OperationContext* opCtx,
+                                                                      const NamespaceString& nss) {
+    migrationsAllowedResponse.getNext();
+    return migrationsAllowed;
 }
 
 ShardingDDLCoordinatorExternalStateFactoryForTest::
-    ShardingDDLCoordinatorExternalStateFactoryForTest(MockCommandResponse* mockCommandResponse)
-    : _mockCommandResponse{mockCommandResponse} {}
+    ShardingDDLCoordinatorExternalStateFactoryForTest(
+        std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> externalState) {
+    _externalState = std::move(externalState);
+}
 
-std::unique_ptr<ShardingDDLCoordinatorExternalState>
+std::shared_ptr<ShardingDDLCoordinatorExternalState>
 ShardingDDLCoordinatorExternalStateFactoryForTest::create() const {
-    return std::make_unique<ShardingDDLCoordinatorExternalStateForTest>(_mockCommandResponse);
+    if (_externalState != nullptr) {
+        return std::move(_externalState);
+    }
+    return std::make_shared<ShardingDDLCoordinatorExternalStateForTest>();
 }
 
 }  // namespace mongo

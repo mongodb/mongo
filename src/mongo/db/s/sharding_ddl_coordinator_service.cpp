@@ -202,7 +202,7 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
     return coord;
 }
 
-std::unique_ptr<ShardingDDLCoordinatorExternalState>
+std::shared_ptr<ShardingDDLCoordinatorExternalState>
 ShardingDDLCoordinatorService::createExternalState() const {
     return _externalStateFactory->create();
 }

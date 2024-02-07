@@ -44,8 +44,9 @@ public:
     virtual bool isShardedTimeseries(OperationContext* opCtx,
                                      const NamespaceString& bucketNss) const = 0;
     virtual void allowMigrations(OperationContext* opCtx,
-                                 NamespaceString nss,
-                                 bool allowMigrations) const = 0;
+                                 const NamespaceString& nss,
+                                 bool allowMigrations) = 0;
+    virtual bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
 private:
 };
@@ -60,20 +61,21 @@ public:
     virtual bool isShardedTimeseries(OperationContext* opCtx,
                                      const NamespaceString& bucketNss) const override;
     virtual void allowMigrations(OperationContext* opCtx,
-                                 NamespaceString nss,
-                                 bool allowMigrations) const override;
+                                 const NamespaceString& nss,
+                                 bool allowMigrations) override;
+    virtual bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) override;
 };
 
 class ShardingDDLCoordinatorExternalStateFactory {
 public:
     virtual ~ShardingDDLCoordinatorExternalStateFactory() = default;
-    virtual std::unique_ptr<ShardingDDLCoordinatorExternalState> create() const = 0;
+    virtual std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const = 0;
 };
 
 class ShardingDDLCoordinatorExternalStateFactoryImpl
     : public ShardingDDLCoordinatorExternalStateFactory {
 public:
-    virtual std::unique_ptr<ShardingDDLCoordinatorExternalState> create() const override;
+    virtual std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const override;
 };
 
 

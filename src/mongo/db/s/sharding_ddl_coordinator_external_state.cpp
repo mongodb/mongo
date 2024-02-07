@@ -68,8 +68,8 @@ bool ShardingDDLCoordinatorExternalStateImpl::isShardedTimeseries(
 }
 
 void ShardingDDLCoordinatorExternalStateImpl::allowMigrations(OperationContext* opCtx,
-                                                              NamespaceString nss,
-                                                              bool allowMigrations) const {
+                                                              const NamespaceString& nss,
+                                                              bool allowMigrations) {
     if (allowMigrations) {
         sharding_ddl_util::resumeMigrations(opCtx, nss, boost::none);
     } else {
@@ -77,9 +77,14 @@ void ShardingDDLCoordinatorExternalStateImpl::allowMigrations(OperationContext* 
     }
 }
 
-std::unique_ptr<ShardingDDLCoordinatorExternalState>
+bool ShardingDDLCoordinatorExternalStateImpl::checkAllowMigrations(OperationContext* opCtx,
+                                                                   const NamespaceString& nss) {
+    return sharding_ddl_util::checkAllowMigrations(opCtx, nss);
+}
+
+std::shared_ptr<ShardingDDLCoordinatorExternalState>
 ShardingDDLCoordinatorExternalStateFactoryImpl::create() const {
-    return std::make_unique<ShardingDDLCoordinatorExternalStateImpl>();
+    return std::make_shared<ShardingDDLCoordinatorExternalStateImpl>();
 }
 
 }  // namespace mongo

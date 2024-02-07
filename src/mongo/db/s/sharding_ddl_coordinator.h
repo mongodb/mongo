@@ -248,7 +248,7 @@ private:
     std::unique_ptr<Locker> _locker;
 
     std::stack<DDLLockManager::ScopedBaseDDLLock> _scopedLocks;
-    std::unique_ptr<ShardingDDLCoordinatorExternalState> _externalState;
+    std::shared_ptr<ShardingDDLCoordinatorExternalState> _externalState;
 
     friend class ShardingDDLCoordinatorTest;
 };

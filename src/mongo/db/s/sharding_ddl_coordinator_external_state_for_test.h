@@ -39,8 +39,7 @@ using MockCommandResponse = sharding_test_helpers::FaultGenerator;
 
 class ShardingDDLCoordinatorExternalStateForTest : public ShardingDDLCoordinatorExternalState {
 public:
-    ShardingDDLCoordinatorExternalStateForTest(MockCommandResponse* mockCommandResponse);
-
+    ShardingDDLCoordinatorExternalStateForTest();
     virtual void checkShardedDDLAllowedToStart(OperationContext* opCtx,
                                                const NamespaceString& nss) const override;
     virtual void waitForVectorClockDurable(OperationContext* opCtx) const override;
@@ -49,25 +48,26 @@ public:
     virtual bool isShardedTimeseries(OperationContext* opCtx,
                                      const NamespaceString& bucketNss) const override;
     virtual void allowMigrations(OperationContext* opCtx,
-                                 NamespaceString nss,
-                                 bool allowMigrations) const override;
+                                 const NamespaceString& nss,
+                                 bool allowMigrations) override;
+    virtual bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) override;
 
-private:
-    MockCommandResponse* _mockCommandResponse;
+    MockCommandResponse allowMigrationsResponse;
+    MockCommandResponse migrationsAllowedResponse;
+    bool migrationsAllowed = true;
 };
 
 class ShardingDDLCoordinatorExternalStateFactoryForTest
     : public ShardingDDLCoordinatorExternalStateFactory {
 public:
-    ShardingDDLCoordinatorExternalStateFactoryForTest() {
-        _mockCommandResponse = std::make_unique<MockCommandResponse>().get();
-    }
-    ShardingDDLCoordinatorExternalStateFactoryForTest(MockCommandResponse* mockCommandResponse);
+    ShardingDDLCoordinatorExternalStateFactoryForTest() {}
+    ShardingDDLCoordinatorExternalStateFactoryForTest(
+        std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> externalState);
 
-    virtual std::unique_ptr<ShardingDDLCoordinatorExternalState> create() const override;
+    virtual std::shared_ptr<ShardingDDLCoordinatorExternalState> create() const override;
 
 private:
-    MockCommandResponse* _mockCommandResponse;
+    std::shared_ptr<ShardingDDLCoordinatorExternalStateForTest> _externalState;
 };
 
 }  // namespace mongo

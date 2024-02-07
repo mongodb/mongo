@@ -93,7 +93,7 @@ public:
 
     std::shared_ptr<Instance> constructInstance(BSONObj initialState) override;
 
-    std::unique_ptr<ShardingDDLCoordinatorExternalState> createExternalState() const;
+    std::shared_ptr<ShardingDDLCoordinatorExternalState> createExternalState() const;
 
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx,
                                                   BSONObj initialState,
