@@ -23,7 +23,7 @@ import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 const coll = db.currentOp_cursor;
 coll.drop();
 
-for (let i = 0; i < 3; i++) {
+for (let i = 0; i < 100; i++) {
     assert.commandWorked(coll.insert({val: 1}));
 }
 
@@ -98,22 +98,11 @@ res = db.adminCommand({
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     // Assert currentOp truncation behavior for each shard in the cluster.
-    try {
-        assert(res.inprog.length >= 1, res);
-        res.inprog.forEach((result) => {
-            assert.eq(result.op, "getmore", res);
-            assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
-        });
-    } catch (e) {
-        const collInfo =
-            coll.getDB().getSiblingDB("config").collections.findOne({_id: coll.getFullName()});
-        const chunksInfo =
-            coll.getDB().getSiblingDB("config").chunks.find({uuid: collInfo.uuid}).toArray();
-        jsTestLog(res);
-        jsTestLog(collInfo);
-        jsTestLog(chunksInfo);
-        throw e;
-    }
+    assert(res.inprog.length >= 1, res);
+    res.inprog.forEach((result) => {
+        assert.eq(result.op, "getmore", res);
+        assert(result.cursor.originatingCommand.hasOwnProperty("$truncated"), res);
+    });
 } else {
     // Assert currentOp truncation behavior for unsharded collections.
     assert.eq(res.inprog.length, 1, res);
