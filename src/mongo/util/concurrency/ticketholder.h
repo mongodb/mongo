@@ -82,19 +82,24 @@ public:
     /**
      * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
      * 'opCtx' is killed, throwing an AssertionException. If no OperationContext is provided, then
-     * the operation is uninterruptible.
+     * the operation is uninterruptible. Outputs 'timeQueuedForTicketMicros' with time spent waiting
+     * for a ticket.
      */
-    virtual Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx);
+    virtual Ticket waitForTicket(OperationContext* opCtx,
+                                 AdmissionContext* admCtx,
+                                 Microseconds& timeQueuedForTicketMicros);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
      * acquired and 'false' if the deadline is reached, but the operation is retryable. Throws an
      * AssertionException if the OperationContext 'opCtx' is killed and no waits for tickets can
-     * proceed. If no OperationContext is provided, then the operation is uninterruptible.
+     * proceed. If no OperationContext is provided, then the operation is uninterruptible. Outputs
+     * 'timeQueuedForTicketMicros' with time spent waiting for a ticket.
      */
     virtual boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
                                                        AdmissionContext* admCtx,
-                                                       Date_t until);
+                                                       Date_t until,
+                                                       Microseconds& timeQueuedForTicketMicros);
 
     /**
      * The total number of tickets allotted to the ticket pool.
@@ -218,15 +223,18 @@ class MockTicketHolder : public TicketHolder {
 public:
     MockTicketHolder(ServiceContext* svcCtx) : TicketHolder(svcCtx, 0, true) {}
 
-    boost::optional<Ticket> tryAcquire(AdmissionContext*) override;
+    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override;
 
-    Ticket waitForTicket(OperationContext*, AdmissionContext*) override;
+    Ticket waitForTicket(OperationContext* opCtx,
+                         AdmissionContext* admCtx,
+                         Microseconds& timeQueuedForTicketMicros) override;
 
-    boost::optional<Ticket> waitForTicketUntil(OperationContext*,
-                                               AdmissionContext*,
-                                               Date_t) override;
+    boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+                                               AdmissionContext* admCtx,
+                                               Date_t until,
+                                               Microseconds& timeQueuedForTicketMicros) override;
 
-    void appendStats(BSONObjBuilder&) const override {}
+    void appendStats(BSONObjBuilder& b) const override {}
 
     void reportImmediatePriorityAdmission() override {}
 

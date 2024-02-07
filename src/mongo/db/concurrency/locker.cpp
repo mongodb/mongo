@@ -999,8 +999,11 @@ bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadl
         // hole.
         invariant(!shard_role_details::getRecoveryUnit(opCtx)->isTimestamped());
 
-        if (auto ticket = holder->waitForTicketUntil(
-                _uninterruptibleLocksRequested ? nullptr : opCtx, &_admCtx, deadline)) {
+        if (auto ticket =
+                holder->waitForTicketUntil(_uninterruptibleLocksRequested ? nullptr : opCtx,
+                                           &_admCtx,
+                                           deadline,
+                                           _timeQueuedForTicketMicros)) {
             _ticket = std::move(*ticket);
         } else {
             return false;

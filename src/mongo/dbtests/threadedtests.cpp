@@ -300,6 +300,7 @@ private:
         std::string threadName = (str::stream() << "ticketHolder" << x);
         Client::initThread(threadName.c_str(), getGlobalServiceContext()->getService());
         auto opCtx = Client::getCurrent()->makeOperationContext();
+        Microseconds timeInQueue;
 
         for (int i = 0; i < checkIns; i++) {
             AdmissionContext admCtx;
@@ -308,7 +309,7 @@ private:
                 admCtx.setPriority(AdmissionContext::Priority::kLow);
             }
 
-            auto ticket = _tickets->waitForTicket(nullptr, &admCtx);
+            auto ticket = _tickets->waitForTicket(nullptr, &admCtx, timeInQueue);
 
             _hotel.checkIn();
 

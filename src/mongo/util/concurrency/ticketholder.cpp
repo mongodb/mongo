@@ -126,8 +126,10 @@ void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
     _releaseToTicketPoolImpl(admCtx);
 }
 
-Ticket TicketHolder::waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx) {
-    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max());
+Ticket TicketHolder::waitForTicket(OperationContext* opCtx,
+                                   AdmissionContext* admCtx,
+                                   Microseconds& timeQueuedForTicketMicros) {
+    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max(), timeQueuedForTicketMicros);
     invariant(res);
     return std::move(*res);
 }
@@ -148,7 +150,8 @@ boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
 
 boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx,
                                                          AdmissionContext* admCtx,
-                                                         Date_t until) {
+                                                         Date_t until,
+                                                         Microseconds& timeQueuedForTicketMicros) {
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
 
     // Attempt a quick acquisition first.
@@ -161,8 +164,9 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx
     auto currentWaitTime = tickSource->getTicks();
     auto updateQueuedTime = [&]() {
         auto oldWaitTime = std::exchange(currentWaitTime, tickSource->getTicks());
-        auto waitDelta = tickSource->ticksTo<Microseconds>(currentWaitTime - oldWaitTime).count();
-        queueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta);
+        auto waitDelta = tickSource->ticksTo<Microseconds>(currentWaitTime - oldWaitTime);
+        timeQueuedForTicketMicros += waitDelta;
+        queueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta.count());
     };
     queueStats.totalAddedQueue.fetchAndAddRelaxed(1);
     ON_BLOCK_EXIT([&] {
@@ -238,15 +242,19 @@ boost::optional<Ticket> MockTicketHolder::tryAcquire(AdmissionContext* admCtx) {
     return Ticket{this, admCtx};
 }
 
-Ticket MockTicketHolder::waitForTicket(OperationContext*, AdmissionContext* admCtx) {
+Ticket MockTicketHolder::waitForTicket(OperationContext* opCtx,
+                                       AdmissionContext* admCtx,
+                                       Microseconds& timeQueuedForTicketMicros) {
     auto ticket = tryAcquire(admCtx);
     invariant(ticket);
     return std::move(ticket.get());
 }
 
-boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(OperationContext*,
-                                                             AdmissionContext* admCtx,
-                                                             Date_t) {
+boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(
+    OperationContext* opCtx,
+    AdmissionContext* admCtx,
+    Date_t until,
+    Microseconds& timeQueuedForTicketMicros) {
     return tryAcquire(admCtx);
 }
 

@@ -453,6 +453,9 @@ public:
     // be fulfilled.
     Milliseconds waitForWriteConcernDurationMillis{0};
 
+    // Stores the duration of time spent waiting in a queue for a ticket to be acquired.
+    Milliseconds waitForTicketDurationMillis{0};
+
     // Stores the total time an operation spends with an uncommitted oplog slot held open. Indicator
     // that an operation is holding back replication by causing oplog holes to remain open for
     // unusual amounts of time.

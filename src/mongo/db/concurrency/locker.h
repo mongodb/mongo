@@ -169,6 +169,10 @@ public:
         return _modeForTicket == MODE_IX || _modeForTicket == MODE_X;
     }
 
+    Microseconds getTimeQueuedForTicketMicros() const {
+        return _timeQueuedForTicketMicros;
+    }
+
     /**
      * This should be the first method invoked for a particular Locker object. It acquires the
      * Global lock in the specified mode and effectively indicates the mode of the operation.
@@ -784,6 +788,9 @@ protected:
 
     // This will only be valid when holding a ticket.
     boost::optional<Ticket> _ticket;
+
+    // Tracks accumulated time spent waiting for a ticket.
+    Microseconds _timeQueuedForTicketMicros{0};
 
     // Tracks the global lock modes ever acquired in this Locker's life. This value should only ever
     // be accessed from the thread that owns the Locker.

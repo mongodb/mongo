@@ -60,6 +60,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -515,6 +516,9 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
+
+    _debug.waitForTicketDurationMillis = duration_cast<Milliseconds>(
+        shard_role_details::getLocker(opCtx)->getTimeQueuedForTicketMicros());
 
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
@@ -1114,6 +1118,12 @@ void OpDebug::report(OperationContext* opCtx,
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             pAttrs->add("admissionPriority", admissionPriority);
         }
+    }
+
+    if (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        waitForTicketDurationMillis > Milliseconds::zero()) {
+        pAttrs->add("ticketWaitMillis", waitForTicketDurationMillis.count());
     }
 
     if (lockStats) {

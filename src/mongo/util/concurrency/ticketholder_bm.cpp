@@ -137,11 +137,12 @@ void BM_acquireAndRelease(benchmark::State& state) {
     for (auto _ : state) {
         Timer timer;
         Microseconds timeForAcquire;
+        Microseconds timeInQueue(0);
         AdmissionContext admCtx;
         admCtx.setPriority(priority);
         {
-            auto ticket =
-                fixture->ticketHolder->waitForTicketUntil(nullptr, &admCtx, Date_t::max());
+            auto ticket = fixture->ticketHolder->waitForTicketUntil(
+                nullptr, &admCtx, Date_t::max(), timeInQueue);
             timeForAcquire = timer.elapsed();
             state.PauseTiming();
             sleepmicros(1);
