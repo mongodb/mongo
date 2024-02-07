@@ -17,4 +17,6 @@ executor:
       global_vars:
         TestData:
           configShard: true
+          setParametersMongos:
+            featureFlagTransitionToCatalogShard: true
       nodb: ''

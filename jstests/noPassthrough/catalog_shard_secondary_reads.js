@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_fcv_70,
  *   featureFlagCatalogShard,
+ *   featureFlagTransitionToCatalogShard,
  * ]
  */
 (function() {

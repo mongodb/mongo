@@ -120,8 +120,12 @@ if (isShardSvrRst) {
         const cfg = rst.getReplSetConfigFromNode();
         cfg["configsvr"] = true;
         reconfig(rst, cfg);
-        rst.upgradeSet(Object.assign(
-            {configsvr: "", setParameter: {skipShardingConfigurationChecks: false}}, upgradeOpts));
+        rst.upgradeSet(Object.assign({
+            configsvr: "",
+            setParameter:
+                {skipShardingConfigurationChecks: false, featureFlagTransitionToCatalogShard: true}
+        },
+                                     upgradeOpts));
     }, tmpTestData);
 }
 

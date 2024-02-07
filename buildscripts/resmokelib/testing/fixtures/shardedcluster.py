@@ -395,6 +395,8 @@ class ShardedClusterFixture(interface.Fixture):
         """Return options that may be passed to a mongos."""
         mongos_options = self.mongos_options.copy()
         mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
+        if self.config_shard is not None:
+            mongos_options["set_parameters"]["featureFlagTransitionToCatalogShard"] = "true"
         mongos_options["set_parameters"] = mongos_options.get("set_parameters",
                                                               self.fixturelib.make_historic(
                                                                   {})).copy()

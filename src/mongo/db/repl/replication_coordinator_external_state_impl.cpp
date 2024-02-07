@@ -830,12 +830,15 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();
         TransactionCoordinatorService::get(_service)->onStepDown();
     }
-    if (ShardingState::get(_service)->enabled()) {
-        CatalogCacheLoader::get(_service).onStepDown();
 
+    if (ShardingState::get(_service)->enabled()) {
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Called earlier for config servers.
             TransactionCoordinatorService::get(_service)->onStepDown();
+            CatalogCacheLoader::get(_service).onStepDown();
+            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+        } else if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+            CatalogCacheLoader::get(_service).onStepDown();
         }
     }
 
@@ -941,7 +944,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
 
         // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
-        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe() &&
+            gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
             CatalogCacheLoader::get(_service).onStepUp();
         }
     }
@@ -959,11 +963,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             }
             fassert(40107, status);
 
-            CatalogCacheLoader::get(_service).onStepUp();
-
             if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 // Called earlier for config servers.
                 TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+                CatalogCacheLoader::get(_service).onStepUp();
             }
 
             const auto configsvrConnStr =

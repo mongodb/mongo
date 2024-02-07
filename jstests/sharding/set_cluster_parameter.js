@@ -358,8 +358,11 @@ if (!TestData.configShard) {
         cfg.configsvr = true;
         reconfig(configShard, cfg);
 
-        configShard.restart(
-            0, {configsvr: '', setParameter: {skipShardingConfigurationChecks: false}});
+        configShard.restart(0, {
+            configsvr: '',
+            setParameter:
+                {skipShardingConfigurationChecks: false, featureFlagTransitionToCatalogShard: true}
+        });
         configShard.awaitNodesAgreeOnPrimary();
 
         // Cluster params should still exist.

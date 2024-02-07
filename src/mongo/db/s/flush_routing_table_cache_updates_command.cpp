@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
@@ -143,6 +144,18 @@ public:
                             "Forcing remote routing table refresh",
                             logAttrs(ns()));
                 onCollectionPlacementVersionMismatch(opCtx, ns(), boost::none);
+            }
+
+            // A config server could receive this command even if not in config shard mode if the CS
+            // secondary is on an older binary version running a ShardServerCatalogCacheLoader. In
+            // that case we don't want to hit the MONGO_UNREACHABLE in
+            // ConfigServerCatalogCacheLoader::waitForCollectionFlush() but throw an error instead
+            // so that the secondaries know they don't have updated metadata yet.
+
+            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+            if (!gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe() &&
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                uasserted(8454802, "config server is not storing cached metadata");
             }
 
             CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, ns());

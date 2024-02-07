@@ -1370,7 +1370,6 @@ var ShardingTest = function(params) {
             };
 
             var setIsConfigSvr = false;
-
             if (isConfigShardMode && i == 0) {
                 otherParams.configOptions = Object.merge(
                     otherParams.configOptions, {configsvr: "", storageEngine: "wiredTiger"});
@@ -1418,8 +1417,22 @@ var ShardingTest = function(params) {
             }
 
             rsDefaults.setParameter = rsDefaults.setParameter || {};
+
+            if (typeof (rsDefaults.setParameter) === "string") {
+                var eqIdx = rsDefaults.setParameter.indexOf("=");
+                if (eqIdx != -1) {
+                    var param = rsDefaults.setParameter.substring(0, eqIdx);
+                    var value = rsDefaults.setParameter.substring(eqIdx + 1);
+                    rsDefaults.setParameter = {};
+                    rsDefaults.setParameter[param] = value;
+                }
+            }
+
             rsDefaults.setParameter.migrationLockAcquisitionMaxWaitMS =
                 otherParams.migrationLockAcquisitionMaxWaitMS;
+            if (isConfigShardMode && i == 0) {
+                rsDefaults.setParameter.featureFlagTransitionToCatalogShard = true;
+            }
 
             var rsSettings = rsDefaults.settings;
             delete rsDefaults.settings;
@@ -1713,6 +1726,10 @@ var ShardingTest = function(params) {
             options.setParameter = options.setParameter || {};
             options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown =
                 options.setParameter.mongosShutdownTimeoutMillisForSignaledShutdown || 0;
+
+            if (isConfigShardMode) {
+                options.setParameter.featureFlagTransitionToCatalogShard = true;
+            }
 
             options.port = options.port || _allocatePortForMongos();
 

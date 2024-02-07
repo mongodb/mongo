@@ -16,8 +16,16 @@ const st = new ShardingTest({
     shards: {rs0: {nodes: 1}},
 });
 const configRS = st.configRS;
-
-const newNode = ShardingStateTest.addReplSetNode({replSet: configRS, serverTypeFlag: "configsvr"});
+let newNode;
+if (TestData.configShard) {
+    newNode = ShardingStateTest.addReplSetNode({
+        replSet: configRS,
+        serverTypeFlag: "configsvr",
+        newNodeParams: "featureFlagTransitionToCatalogShard=true"
+    });
+} else {
+    newNode = ShardingStateTest.addReplSetNode({replSet: configRS, serverTypeFlag: "configsvr"});
+}
 
 jsTestLog("Checking sharding state before failover.");
 ShardingStateTest.checkShardingState(st);

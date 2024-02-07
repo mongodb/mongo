@@ -564,7 +564,8 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
         return {ConnectionString::forLocal()};
     }();
 
-    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+        mongo::gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
         CatalogCacheLoader::set(service,
                                 std::make_unique<ShardServerCatalogCacheLoader>(
                                     std::make_unique<ConfigServerCatalogCacheLoader>()));

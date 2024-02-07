@@ -65,7 +65,6 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
 
     auto collAndChunks = Grid::get(opCtx)->catalogClient()->getCollectionAndChunks(
         opCtx, nss, sinceVersion, readConcern);
-
     const auto& coll = collAndChunks.first;
     return CollectionAndChangedChunks{coll.getEpoch(),
                                       coll.getTimestamp(),
@@ -105,7 +104,7 @@ void ConfigServerCatalogCacheLoader::onStepUp() {
 }
 
 void ConfigServerCatalogCacheLoader::onReplicationRollback() {
-    MONGO_UNREACHABLE;
+    // no-op
 }
 
 void ConfigServerCatalogCacheLoader::shutDown() {
@@ -115,7 +114,7 @@ void ConfigServerCatalogCacheLoader::shutDown() {
 
 void ConfigServerCatalogCacheLoader::notifyOfCollectionPlacementVersionUpdate(
     const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    // no-op
 }
 
 void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
@@ -130,6 +129,13 @@ void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCt
 
 SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
+    // There's no need to refresh if a collection is always unsharded. Further, attempting to
+    // refresh config.collections or config.chunks would trigger recursive refreshes since a config
+    // shard can use the shard svr process interface.
+    if (nss.isNamespaceAlwaysUnsharded()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Collection " << nss.ns() << " not found");
+    }
 
     return ExecutorFuture<void>(_executor)
         .then([=]() {

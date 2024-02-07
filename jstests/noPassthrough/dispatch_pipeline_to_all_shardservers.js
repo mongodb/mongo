@@ -1,5 +1,7 @@
 // Various tests of the ability to establish a cursor on each mongod in a sharded cluster.
 
+load("jstests/libs/feature_flag_util.js");
+
 (function() {
 "use strict";
 function listMongodStats(db) {
@@ -131,12 +133,15 @@ const st = new ShardingTest({
 // This one has always worked fine.
 let results = listMongodStats(st.s.getDB(jsTestName()));
 assert.eq(4, results.length, results);
-assert.commandWorked(st.s.getDB("admin").runCommand({transitionFromDedicatedConfigServer: 1}));
-// After the above command, this once tripped an invariant failure: SERVER-79372.
-results = listMongodStats(st.s.getDB(jsTestName()));
 
-// Assert there are results from all hosts.
-assert.eq(5, results.length, results);
+if (FeatureFlagUtil.isPresentAndEnabled(st.s0, "FeatureFlagTransitionToCatalogShard")) {
+    assert.commandWorked(st.s.getDB("admin").runCommand({transitionFromDedicatedConfigServer: 1}));
+    // After the above command, this once tripped an invariant failure: SERVER-79372.
+    results = listMongodStats(st.s.getDB(jsTestName()));
+
+    // Assert there are results from all hosts.
+    assert.eq(5, results.length, results);
+}
 
 st.stop();
 }());
