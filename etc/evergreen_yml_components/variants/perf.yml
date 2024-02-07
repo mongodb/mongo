@@ -2306,11 +2306,32 @@ buildvariants:
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-longRunning.arm.aws.2023-11
   display_name: PERF 1-Node ReplSet Long-Running ARM AWS 2023-11
-  cron: "0 0 1 * *"  # 00:00 on the first of each month
+  cron: "0 0 * * 6"  # 00:00 on every Saturday
   modules: *perf_modules
   expansions:
     mongodb_setup_release: 2022-11
     mongodb_setup: single-replica
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: M60-like-single-large-volume.2023-02
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: amazon2-arm64-compile
+  run_on:
+    - "rhel70-perf-single"
+  tasks:
+    - name: tsbs_query_high_cardinality
+
+- <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: perf-1-node-replSet-longRunning.arm.aws.2023-11
+  display_name: PERF 1-Node ReplSet (all feature flags) Long-Running ARM AWS 2023-11
+  cron: "0 0 * * 6"  # 00:00 on every Saturday
+  modules: *perf_modules
+  expansions:
+    mongodb_setup_release: 2022-11
+    mongodb_setup: single-replica-all-feature-flags
     infrastructure_provisioning_release: 2023-09
     infrastructure_provisioning: M60-like-single-large-volume.2023-02
     workload_setup: 2022-11
