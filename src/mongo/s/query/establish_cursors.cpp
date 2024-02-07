@@ -234,9 +234,13 @@ void CursorEstablisher::waitForResponse() noexcept {
 
             hadValidCursor = true;
 
-            _remoteCursors.emplace_back(RemoteCursor(response.shardId.toString(),
-                                                     *response.shardHostAndPort,
-                                                     std::move(cursor.getValue())));
+            auto& cursorValue = cursor.getValue();
+            if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
+                CurOp::get(_opCtx)->debug().aggregateCursorMetrics(*cursorMetrics);
+            }
+
+            _remoteCursors.emplace_back(RemoteCursor(
+                response.shardId.toString(), *response.shardHostAndPort, std::move(cursorValue)));
         }
 
         if (response.shardHostAndPort && !hadValidCursor) {
@@ -522,8 +526,13 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
                 }
                 hadValidCursor = true;
 
+                auto& cursorValue = cursor.getValue();
+                if (const auto& cursorMetrics = cursorValue.getCursorMetrics()) {
+                    CurOp::get(opCtx)->debug().aggregateCursorMetrics(*cursorMetrics);
+                }
+
                 remoteCursors.emplace_back(
-                    RemoteCursor(shardId.toString(), hostAndPort, std::move(cursor.getValue())));
+                    RemoteCursor(shardId.toString(), hostAndPort, std::move(cursorValue)));
             }
 
             if (hadValidCursor) {

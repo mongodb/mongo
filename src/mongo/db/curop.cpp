@@ -1873,6 +1873,17 @@ CursorMetrics OpDebug::getCursorMetrics() const {
     return metrics;
 }
 
+void OpDebug::aggregateCursorMetrics(const CursorMetrics& metrics) {
+    additiveMetrics.keysExamined =
+        additiveMetrics.keysExamined.value_or(0) + metrics.getKeysExamined();
+    additiveMetrics.docsExamined =
+        additiveMetrics.docsExamined.value_or(0) + metrics.getDocsExamined();
+    hasSortStage = hasSortStage || metrics.getHasSortStage();
+    usedDisk = usedDisk || metrics.getUsedDisk();
+    fromMultiPlanner = fromMultiPlanner || metrics.getFromMultiPlanner();
+    fromPlanCache = fromPlanCache || metrics.getFromPlanCache();
+}
+
 BSONArray OpDebug::getResolvedViewsInfo() const {
     BSONArrayBuilder resolvedViewsArr;
     appendResolvedViewsInfoImpl(resolvedViewsArr, this->resolvedViews);

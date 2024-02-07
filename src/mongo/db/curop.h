@@ -293,6 +293,11 @@ public:
      */
     CursorMetrics getCursorMetrics() const;
 
+    /**
+     * Aggregate CursorMetrics (e.g., from a remote cursor) into the curop's metrics.
+     */
+    void aggregateCursorMetrics(const CursorMetrics& metrics);
+
     // -------------------
 
     // basic options
