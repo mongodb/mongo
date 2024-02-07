@@ -1114,6 +1114,14 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "aggregate_documents",
+          command: {aggregate: 1, pipeline: [{$documents: [{a: 1}]}], cursor: {}},
+          testcases: [
+              {runOnDb: firstDbName, roles: roles_all, privileges: []},
+              {runOnDb: secondDbName, roles: roles_all, privileges: []}
+          ]
+        },
+        {
           testname: "aggregate_readonly_views",
           setup: function(db) {
               assert.commandWorked(db.createView("view", "collection", [{$match: {}}]));
@@ -1687,6 +1695,71 @@ export const authCommandsLib = {
                     {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
                     {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]}
                 ]
+              }
+          ]
+        },
+        {
+          testname: "aggregate_lookup_documents",
+          command: {
+              aggregate: "foo",
+              pipeline: [{$lookup: {as: "results", pipeline: [{$documents: [{a: 1}]}]}}],
+              cursor: {}
+          },
+          setup: function(db) {
+              assert.commandWorked(db.createCollection("foo"));
+          },
+          teardown: function(db) {
+              db.foo.drop();
+          },
+          testcases: [
+              {
+                  runOnDb: firstDbName,
+                  roles: roles_read,
+                  privileges: [
+                      {resource: {db: firstDbName, collection: "foo"}, actions: ["find"]},
+                  ]
+              },
+              {
+                  runOnDb: secondDbName,
+                  roles: roles_readAny,
+                  privileges: [
+                      {resource: {db: secondDbName, collection: "foo"}, actions: ["find"]},
+                  ]
+              }
+          ]
+        },
+        {
+          // A pipeline starting with $documents still requires permissions of other document
+          // sources later in the pipeline.
+          // Skip sharding because $documents must run on mongos, while $lookup must run on shards.
+          testname: "aggregate_documents_then_lookup",
+          skipSharded: true,
+          command: {
+              aggregate: 1,
+              pipeline:
+                [{$documents: [{_id: 0}]}, {$lookup: {from: "bar", localField: "_id", foreignField: "_id", as: "results"}}],
+              cursor: {}
+          },
+          setup: function(db) {
+              assert.commandWorked(db.createCollection("bar"));
+          },
+          teardown: function(db) {
+              db.bar.drop();
+          },
+          testcases: [
+              {
+                  runOnDb: firstDbName,
+                  roles: roles_read,
+                  privileges: [
+                      {resource: {db: firstDbName, collection: "bar"}, actions: ["find"]},
+                  ]
+              },
+              {
+                  runOnDb: secondDbName,
+                  roles: roles_readAny,
+                  privileges: [
+                      {resource: {db: secondDbName, collection: "bar"}, actions: ["find"]},
+                  ]
               }
           ]
         },
