@@ -71,7 +71,7 @@ constexpr auto kBlockedOpInterruptibleName = "BlockedOpForTestInterruptible"_sd;
 
 class BlockedOp {
 public:
-    void start(Service* service);
+    void start(ServiceContext* serviceContext);
     void join();
     void setIsContended(bool value);
     void setIsWaiting(bool value);
@@ -103,15 +103,15 @@ private:
 // This function causes us to make an additional thread with a self-contended lock so that
 // $currentOp can observe its DiagnosticInfo. Note that we track each thread that called us so that
 // we can join the thread when they are gone.
-void BlockedOp::start(Service* service) {
+void BlockedOp::start(ServiceContext* serviceContext) {
     stdx::unique_lock<stdx::mutex> lk(_m);
 
     invariant(!_latchState.thread);
     invariant(!_interruptibleState.thread);
 
     _latchState.mutex.lock();
-    _latchState.thread = stdx::thread([this, service]() mutable {
-        ThreadClient tc("DiagnosticCaptureTestLatch", service);
+    _latchState.thread = stdx::thread([this, serviceContext]() mutable {
+        ThreadClient tc("DiagnosticCaptureTestLatch", serviceContext->getService());
 
         // TODO(SERVER-74659): Please revisit if this thread could be made killable.
         {
@@ -126,8 +126,8 @@ void BlockedOp::start(Service* service) {
         LOGV2(23124, "Joining currentOpSpawnsThreadWaitingForLatch thread");
     });
 
-    _interruptibleState.thread = stdx::thread([this, service]() mutable {
-        ThreadClient tc("DiagnosticCaptureTestInterruptible", service);
+    _interruptibleState.thread = stdx::thread([this, serviceContext]() mutable {
+        ThreadClient tc("DiagnosticCaptureTestInterruptible", serviceContext->getService());
 
         // TODO(SERVER-74659): Please revisit if this thread could be made killable.
         {
@@ -315,7 +315,7 @@ auto DiagnosticInfo::maybeMakeBlockedOpForTest(Client* client) -> std::unique_pt
     std::unique_ptr<BlockedOpGuard> guard;
     currentOpSpawnsThreadWaitingForLatch.executeIf(
         [&](const BSONObj&) {
-            gBlockedOp.start(client->getService());
+            gBlockedOp.start(client->getServiceContext());
             guard = std::make_unique<BlockedOpGuard>();
         },
         [&](const BSONObj& data) {

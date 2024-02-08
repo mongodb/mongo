@@ -365,20 +365,6 @@ Client* ServiceContext::LockedClientsCursor::next() {
     return result;
 }
 
-/**
- * TODO SERVER-85991 Once the _clients field in ServiceContext is moved to Service, change the
- * implementation here to just iterate over the _clients list directly.
- */
-Service::LockedClientsCursor::LockedClientsCursor(Service* service)
-    : _serviceCtxCursor(service->getServiceContext()), _service(service) {}
-
-Client* Service::LockedClientsCursor::next() {
-    Client* client = _serviceCtxCursor.next();
-    for (; client && client->getService() != _service;)
-        client = _serviceCtxCursor.next();
-    return client;
-}
-
 void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedClients) {
     stdx::lock_guard<Latch> clientLock(_mutex);
 
