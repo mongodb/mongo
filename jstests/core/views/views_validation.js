@@ -135,24 +135,33 @@ makeView("v0", "ok", [makeUnion("v1")], ErrorCodes.ViewDepthLimitExceeded);
 
 // Test that querying a view that descends more than 20 views will fail.
 
-// If this is a sharded cluster, we run the initial aggregate once. If this doesn't have the
-// necessary routing information to detect that the view is invalid, this will throw a StaleConfig
-// error instead. In doing so it will obtain the routing information for 10 of our views (one on
-// each attempt), which will allow the subsequent aggregates to discover that the view chain is 20
-// deep and fail as expected.
-// TODO SERVER-85941: This ticket aims to prevent needing an extra aggregate to get some of the
+// Run the initial aggregate 'kMaxRetries' times. If this is a sharded cluster and the targeted node
+// doesn't have the necessary routing information to detect that the view is invalid, this will
+// throw a StaleConfig error instead. In doing so it will obtain the routing information for 10 of
+// our views (one on each attempt), which will allow the subsequent aggregates to discover that the
+// view chain is 20 deep and fail as expected. We run it at most 'kMaxRetries' times in the event
+// that we have multiple nodes in our cluster that can answer this query. We expect that,
+// eventually, we'll detect a 'ViewDepthLimitExceeded' error.
+// TODO SERVER-85941: This ticket aims to prevent needing extra aggregates to get some of the
 // routing information.
-if (db.getMongo().isMongos()) {
-    assert.commandFailedWithCode(
-        viewsDb.runCommand({aggregate: "v10", pipeline: [makeUnion("v1")], cursor: {}}),
-        [ErrorCodes.ViewDepthLimitExceeded, ErrorCodes.StaleConfig]);
+function detectViewError(aggStage) {
+    const kMaxRetries = 6;
+    let detectedViewError = false;
+    for (let i = 0; i < kMaxRetries; ++i) {
+        const res = viewsDb.runCommand({aggregate: "v10", pipeline: [aggStage], cursor: {}});
+        assert.commandFailedWithCode(res,
+                                     [ErrorCodes.ViewDepthLimitExceeded, ErrorCodes.StaleConfig]);
+        if (res.code === ErrorCodes.ViewDepthLimitExceeded) {
+            detectedViewError = true;
+            break;
+        }
+    }
+    assert(detectedViewError,
+           "Did not detect view error after " + kMaxRetries + " retries of the aggregation");
 }
-assert.commandFailedWithCode(
-    viewsDb.runCommand({aggregate: "v10", pipeline: [makeUnion("v1")], cursor: {}}),
-    ErrorCodes.ViewDepthLimitExceeded);
-assert.commandFailedWithCode(
-    viewsDb.runCommand({aggregate: "v10", pipeline: [makeLookup("v1")], cursor: {}}),
-    ErrorCodes.ViewDepthLimitExceeded);
+
+detectViewError(makeUnion("v1"));
+detectViewError(makeLookup("v1"));
 
 // But adding to the middle should be ok.
 makeView("vMid", "v10");
