@@ -75,7 +75,10 @@ public:
     /**
      * Constructs this OplogWriter with specific options.
      */
-    OplogWriterImpl(ReplicationCoordinator* replCoord,
+    OplogWriterImpl(executor::TaskExecutor* executor,
+                    OplogBuffer* writeBuffer,
+                    OplogBuffer* applyBuffer,
+                    ReplicationCoordinator* replCoord,
                     StorageInterface* storageInterface,
                     ThreadPool* writerPool,
                     Observer* observer,
@@ -91,20 +94,38 @@ public:
      * If the batch write is successful, returns the optime of the last op written,
      * which should be the last op in the batch.
      *
-     * Oplog visibility and updates to replication coordinator timestamps should be
-     * handled by caller.
+     * External states such as oplog visibility, replication opTimes and journaling
+     * are not updated in this function.
      */
-    StatusWith<OpTime> writeOplogBatch(OperationContext* opCtx, std::vector<BSONObj> ops) override;
+    StatusWith<OpTime> writeOplogBatch(OperationContext* opCtx,
+                                       const std::vector<BSONObj>& ops) override;
+
+    /**
+     * Finalizes the batch after writing it to storage, which updates various external
+     * components that care about the opTime of the last op written in this batch.
+     */
+    void finalizeOplogBatch(OperationContext* opCtx,
+                            const OpTimeAndWallTime& lastOpTimeAndWallTime);
 
 private:
     using writeDocsFn = std::function<Status(OperationContext*,
                                              std::vector<InsertStatement>::const_iterator,
                                              std::vector<InsertStatement>::const_iterator)>;
 
+    /**
+     * Runs oplog write in a loop until shutdown() is called.
+     *
+     * Retrieves operations from the writeBuffer in batches that will be applied using
+     * writeOplogBatch(), after which the batches will be pushed to the applyBuffer.
+     */
+    void _run(OplogBuffer* writeBuffer) override;
+
     void _writeOplogBatchImpl(OperationContext* opCtx,
                               const std::vector<InsertStatement>& docs,
                               const NamespaceString& nss,
                               writeDocsFn&& writeDocsFn);
+
+    OplogBuffer* const _applyBuffer;
 
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;

@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/executor/task_executor.h"
 
 namespace mongo {
 namespace repl {
 
 /**
  * Writes oplog entries to the oplog and/or the change collection.
- * TODO (SERVER-85431): make this a runnable component.
  */
 class OplogWriter {
     OplogWriter(const OplogWriter&) = delete;
@@ -58,9 +59,26 @@ public:
     /**
      * Constructs this OplogWriter with specific options.
      */
-    OplogWriter(const Options& options);
+    OplogWriter(executor::TaskExecutor* executor, OplogBuffer* writeBuffer, const Options& options);
 
     virtual ~OplogWriter() = default;
+
+    /**
+     * Starts this OplogWriter.
+     * Use the Future object to be notified when this OplogWriter has finished shutting down.
+     */
+    Future<void> startup();
+
+    /**
+     * Starts the shutdown process for this OplogWriter.
+     * It is safe to call shutdown() multiple times.
+     */
+    void shutdown();
+
+    /**
+     * Returns true if this OplogWriter is shutting down.
+     */
+    bool inShutdown() const;
 
     /**
      * Writes a batch of oplog entries to the oplog and/or the change collection.
@@ -72,11 +90,33 @@ public:
      * handled by caller.
      */
     virtual StatusWith<OpTime> writeOplogBatch(OperationContext* opCtx,
-                                               std::vector<BSONObj> ops) = 0;
+                                               const std::vector<BSONObj>& ops) = 0;
 
     const Options& getOptions() const;
 
 private:
+    /**
+     * Called from startup() to run oplog write loop.
+     * Currently applicable to steady state replication only.
+     * Implemented in subclasses but not visible otherwise.
+     */
+    virtual void _run(OplogBuffer* writeBuffer) = 0;
+
+    // Protects member data of this OplogWriter.
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogWriter::_mutex");
+
+    // Used to schedule task for oplog write loop.
+    // Not owned by us.
+    executor::TaskExecutor* const _executor;
+
+    // Not owned by us.
+    OplogBuffer* const _writeBuffer;
+
+    // TODO (SERVER-86026): add the batcher.
+
+    // Set to true if shutdown() has been called.
+    bool _inShutdown = false;
+
     // Configures this OplogWriter.
     const Options _options;
 };

@@ -128,12 +128,12 @@ public:
 
     /**
      * Starts the shutdown process for this OplogApplier.
-     * It is safe to call shutdown() multiplie times.
+     * It is safe to call shutdown() multiple times.
      */
     void shutdown();
 
     /**
-     * Returns true if we are shutting down.
+     * Returns true if this OplogApplier is shutting down.
      */
     bool inShutdown() const;
 

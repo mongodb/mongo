@@ -34,6 +34,8 @@
 #include "mongo/db/repl/oplog_writer.h"
 #include "mongo/db/repl/oplog_writer_impl.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -67,10 +69,25 @@ public:
     int changeCollDocsCount = 0;
 };
 
-class OplogWriterImplTest : public ServiceContextMongoDTest {
+class JournalListenerMock : public JournalListener {
 public:
+    Token getToken(OperationContext* opCtx) {
+        return {repl::ReplicationCoordinator::get(opCtx)->getMyLastWrittenOpTimeAndWallTime(true),
+                false /* isPrimary */};
+    }
+
+    void onDurable(const Token& token) {
+        onDurableToken = token.first;
+    }
+
+    OpTimeAndWallTime onDurableToken;
+};
+
+class OplogWriterImplTest : public ServiceContextMongoDTest {
+protected:
     explicit OplogWriterImplTest(Options options = {})
-        : ServiceContextMongoDTest(options.useReplSettings(true)) {}
+        : ServiceContextMongoDTest(options.useReplSettings(true).useJournalListener(
+              std::make_unique<JournalListenerMock>())) {}
 
     void setUp() override;
     void tearDown() override;
@@ -79,8 +96,8 @@ public:
 
     ReplicationCoordinator* getReplCoord() const;
     StorageInterface* getStorageInterface() const;
+    JournalListenerMock* getJournalListener() const;
 
-protected:
     ServiceContext* _serviceContext;
     ServiceContext::UniqueOperationContext _opCtxHolder;
     std::unique_ptr<ThreadPool> _writerPool;
@@ -95,8 +112,9 @@ void OplogWriterImplTest::setUp() {
 
     ReplicationCoordinator::set(_serviceContext,
                                 std::make_unique<ReplicationCoordinatorMock>(_serviceContext));
-
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+    StorageInterface::set(_serviceContext, std::make_unique<StorageInterfaceImpl>());
 
     MongoDSessionCatalog::set(
         _serviceContext,
@@ -129,9 +147,16 @@ StorageInterface* OplogWriterImplTest::getStorageInterface() const {
     return StorageInterface::get(_serviceContext);
 }
 
+JournalListenerMock* OplogWriterImplTest::getJournalListener() const {
+    return static_cast<JournalListenerMock*>(_journalListener.get());
+}
+
 DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
     OplogWriterImpl::NoopObserver noopObserver;
-    OplogWriterImpl oplogWriter(getReplCoord(),
+    OplogWriterImpl oplogWriter(nullptr,  // executor
+                                nullptr,  // writeBuffer
+                                nullptr,  // applyBuffer
+                                getReplCoord(),
                                 getStorageInterface(),
                                 _writerPool.get(),
                                 &noopObserver,
@@ -142,7 +167,10 @@ DEATH_TEST_F(OplogWriterImplTest, WriteEmptyBatchFails, "!ops.empty()") {
 }
 
 TEST_F(OplogWriterImplTest, WriteOplogCollectionOnly) {
-    OplogWriterImpl oplogWriter(getReplCoord(),
+    OplogWriterImpl oplogWriter(nullptr,  // executor
+                                nullptr,  // writeBuffer
+                                nullptr,  // applyBuffer
+                                getReplCoord(),
                                 getStorageInterface(),
                                 _writerPool.get(),
                                 _observer.get(),
@@ -171,7 +199,10 @@ TEST_F(OplogWriterImplTest, WriteChangeCollectionOnly) {
 
     ChangeStreamChangeCollectionManager::create(_serviceContext);
 
-    OplogWriterImpl oplogWriter(getReplCoord(),
+    OplogWriterImpl oplogWriter(nullptr,  // executor
+                                nullptr,  // writeBuffer
+                                nullptr,  // applyBuffer
+                                getReplCoord(),
                                 getStorageInterface(),
                                 _writerPool.get(),
                                 _observer.get(),
@@ -200,7 +231,10 @@ TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollection) {
 
     ChangeStreamChangeCollectionManager::create(_serviceContext);
 
-    OplogWriterImpl oplogWriter(getReplCoord(),
+    OplogWriterImpl oplogWriter(nullptr,  // executor
+                                nullptr,  // writeBuffer
+                                nullptr,  // applyBuffer
+                                getReplCoord(),
                                 getStorageInterface(),
                                 _writerPool.get(),
                                 _observer.get(),
@@ -219,6 +253,41 @@ TEST_F(OplogWriterImplTest, WriteBothOplogAndChangeCollection) {
     // Verify that the batch written to both the oplog and change collection.
     ASSERT_EQ(2, _observer->oplogCollDocsCount);
     ASSERT_EQ(2, _observer->changeCollDocsCount);
+}
+
+TEST_F(OplogWriterImplTest, finalizeOplogBatchCorrectlyUpdatesOpTimes) {
+    OplogWriterImpl::NoopObserver noopObserver;
+    OplogWriterImpl oplogWriter(nullptr,  // executor
+                                nullptr,  // writeBuffer
+                                nullptr,  // applyBuffer
+                                getReplCoord(),
+                                getStorageInterface(),
+                                _writerPool.get(),
+                                &noopObserver,
+                                OplogWriter::Options());
+
+    auto curOpTime = OpTime(Timestamp(2, 2), 1);
+    auto curWallTime = Date_t::now();
+    OpTimeAndWallTime curOpTimeAndWallTime{curOpTime, curWallTime};
+
+    getReplCoord()->setMyLastWrittenOpTimeAndWallTimeForward(curOpTimeAndWallTime);
+    getReplCoord()->setMyLastAppliedOpTimeAndWallTimeForward(curOpTimeAndWallTime);
+    getReplCoord()->setMyLastDurableOpTimeAndWallTimeForward(curOpTimeAndWallTime);
+
+    OpTime newOpTime(curOpTime.getTimestamp() + 16, curOpTime.getTerm());
+    Date_t newWallTime = curWallTime + Seconds(10);
+    OpTimeAndWallTime newOpTimeAndWallTime{newOpTime, newWallTime};
+
+    oplogWriter.finalizeOplogBatch(opCtx(), newOpTimeAndWallTime);
+
+    // The finalizeOplogBatch() function only triggers the journal flusher but does not
+    // wait for it, so we sleep for a while and verify that the lastWritten opTime has
+    // been correctly updated and that the journal flusher has finished and invoked the
+    // onDurable callback. The test fixture disables periodic journal flush by default,
+    // making sure that it is finalizeOplogBatch() that triggers the journal flush.
+    sleepmillis(2000);
+    ASSERT_EQ(newOpTimeAndWallTime, getReplCoord()->getMyLastWrittenOpTimeAndWallTime());
+    ASSERT_EQ(newOpTimeAndWallTime, getJournalListener()->onDurableToken);
 }
 
 }  // namespace

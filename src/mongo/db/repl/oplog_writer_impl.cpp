@@ -33,6 +33,8 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/repl/initial_syncer.h"
+#include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/storage_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
@@ -90,19 +92,78 @@ Status insertDocsToChangeCollection(OperationContext* opCtx,
 
 }  // namespace
 
-OplogWriterImpl::OplogWriterImpl(ReplicationCoordinator* replCoord,
+OplogWriterImpl::OplogWriterImpl(executor::TaskExecutor* executor,
+                                 OplogBuffer* writeBuffer,
+                                 OplogBuffer* applyBuffer,
+                                 ReplicationCoordinator* replCoord,
                                  StorageInterface* storageInterface,
                                  ThreadPool* writerPool,
                                  Observer* observer,
                                  const OplogWriter::Options& options)
-    : OplogWriter(options),
+    : OplogWriter(executor, writeBuffer, options),
+      _applyBuffer(applyBuffer),
       _replCoord(replCoord),
       _storageInterface(storageInterface),
       _writerPool(writerPool),
       _observer(observer) {}
 
+void OplogWriterImpl::_run(OplogBuffer* writeBuffer) {
+    // We don't start data replication for arbiters at all and it's not allowed to reconfig
+    // arbiterOnly field for any member.
+    invariant(!_replCoord->getMemberState().arbiter());
+
+    const auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+
+    // Oplog writes are crucial to the stability of the replica set. We give the operations
+    // Immediate priority so that it skips waiting for ticket acquisition and flow control.
+    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
+                                            AdmissionContext::Priority::kImmediate);
+
+    while (true) {
+        // For pausing replication in tests.
+        if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
+            LOGV2(8543102,
+                  "Oplog Writer - rsSyncApplyStop fail point enabled. Blocking until fail "
+                  "point is disabled");
+            rsSyncApplyStop.pauseWhileSet(opCtx);
+        }
+
+        // Transition to SECONDARY state, if possible.
+        _replCoord->finishRecoveryIfEligible(opCtx);
+
+        // TODO (SERVER-86026): Use the real implementation.
+        std::vector<BSONObj> batch{BSONObj()};
+        if (!writeBuffer->peek(opCtx, &batch[0])) {
+            if (inShutdown()) {
+                return;
+            }
+            continue;
+        }
+
+        // Extract the opTime and wallTime of the last op in the batch.
+        auto lastOpTimeAndWallTime = invariantStatusOK(
+            OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(batch.back()));
+
+        // Write the operations in this batch. 'writeOplogBatch' returns the optime of
+        // the last op that was written, which should be the last optime in the batch.
+        auto swLastOpTime = writeOplogBatch(opCtx, batch);
+        if (swLastOpTime.getStatus().code() == ErrorCodes::InterruptedAtShutdown) {
+            return;
+        }
+        fassertNoTrace(8543103, swLastOpTime);
+        invariant(swLastOpTime.getValue() == lastOpTimeAndWallTime.opTime);
+
+        // Update various things that care about our last written optime.
+        finalizeOplogBatch(opCtx, lastOpTimeAndWallTime);
+
+        // Push the entries to the applier's buffer, may be blocked if buffer is full.
+        _applyBuffer->push(opCtx, batch.begin(), batch.end());
+    }
+}
+
 StatusWith<OpTime> OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
-                                                    std::vector<BSONObj> ops) {
+                                                    const std::vector<BSONObj>& ops) {
     invariant(!ops.empty());
     LOGV2_DEBUG(8352100, 2, "Oplog write batch size", "size"_attr = ops.size());
 
@@ -141,6 +202,21 @@ StatusWith<OpTime> OplogWriterImpl::writeOplogBatch(OperationContext* opCtx,
     }
 
     return docs.back().oplogSlot;
+}
+
+void OplogWriterImpl::finalizeOplogBatch(OperationContext* opCtx,
+                                         const OpTimeAndWallTime& lastOpTimeAndWallTime) {
+    // 1. Update oplog visibility by notifying the storage engine of the latest opTime.
+    _storageInterface->oplogDiskLocRegister(
+        opCtx, lastOpTimeAndWallTime.opTime.getTimestamp(), true /* orderedCommit */);
+
+    // 2. Advance the lastWritten opTime to the last opTime in batch.
+    _replCoord->setMyLastWrittenOpTimeAndWallTimeForward(lastOpTimeAndWallTime);
+
+    // 3. Trigger the journal flusher. This should be done after the lastWritten opTime
+    // is advanced because the journal flusher will first read lastWritten and advances
+    // lastDurable to lastWritten upon finish.
+    JournalFlusher::get(opCtx)->triggerJournalFlush();
 }
 
 void OplogWriterImpl::_writeOplogBatchImpl(OperationContext* opCtx,

@@ -29,10 +29,43 @@
 
 #include "mongo/db/repl/oplog_writer.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
+
 namespace mongo {
 namespace repl {
 
-OplogWriter::OplogWriter(const Options& options) : _options(options) {}
+using CallbackArgs = executor::TaskExecutor::CallbackArgs;
+
+OplogWriter::OplogWriter(executor::TaskExecutor* executor,
+                         OplogBuffer* writeBuffer,
+                         const Options& options)
+    : _executor(executor), _writeBuffer(writeBuffer), _options(options) {}
+
+Future<void> OplogWriter::startup() {
+    auto pf = makePromiseFuture<void>();
+
+    auto callback = [this,
+                     promise = std::move(pf.promise)](const CallbackArgs& args) mutable noexcept {
+        invariant(args.status);
+        LOGV2(8543100, "Starting oplog write");
+        _run(_writeBuffer);
+        LOGV2(8543101, "Finished oplog write");
+        promise.setWith([] {});
+    };
+    invariant(_executor->scheduleWork(std::move(callback)).getStatus());
+
+    return std::move(pf.future);
+}
+
+void OplogWriter::shutdown() {
+    stdx::lock_guard<Latch> lock(_mutex);
+    _inShutdown = true;
+}
+
+bool OplogWriter::inShutdown() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _inShutdown;
+}
 
 const OplogWriter::Options& OplogWriter::getOptions() const {
     return _options;
