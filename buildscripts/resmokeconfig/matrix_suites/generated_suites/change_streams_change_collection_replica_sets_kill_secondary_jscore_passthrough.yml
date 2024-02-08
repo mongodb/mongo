@@ -69,9 +69,17 @@ executor:
 matrix_suite: true
 selector:
   exclude_files:
-  - jstests/core/**/max_doc_size.js
-  - jstests/core/**/exhaust.js
   - jstests/core/**/geo_update_btree.js
+  - jstests/core/**/max_doc_size.js
+  - jstests/core/**/mr_bigobject.js
+  - jstests/core/**/capped_large_docs.js
+  - jstests/core/**/capped_resize.js
+  - jstests/core/**/exhaust.js
+  - jstests/core/**/explain_execution_error.js
+  - jstests/core/**/sortb.js
+  - jstests/core/**/sortg.js
+  - jstests/core/**/sortj.js
+  - jstests/core/**/column_store_index_compression.js
   - jstests/core/query/explain/explain_agg_write_concern.js
   - jstests/core/administrative/builtin_roles_external.js
   exclude_with_any_tags:
