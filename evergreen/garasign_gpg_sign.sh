@@ -3,8 +3,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 
 cd src
 
-echo "GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70}" >> "signing-envfile"
-echo "GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70}" >> "signing-envfile"
+echo "GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_80}" >> "signing-envfile"
+echo "GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_80}" >> "signing-envfile"
 
 set -o errexit
 set -o verbose
