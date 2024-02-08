@@ -43,20 +43,26 @@
 
 namespace mongo {
 namespace {
-// Returns the set of 'nsUUID's captured in the pre-images collection.
-stdx::unordered_set<UUID, UUID::Hash> getNsUUIDs(OperationContext* opCtx,
-                                                 const CollectionAcquisition& preImagesCollection) {
-    stdx::unordered_set<UUID, UUID::Hash> nsUUIDs;
-    boost::optional<UUID> currentCollectionUUID = boost::none;
-    Date_t firstWallTime{};
-    while ((currentCollectionUUID = change_stream_pre_image_util::findNextCollectionUUID(
-                opCtx,
-                &preImagesCollection.getCollectionPtr(),
-                currentCollectionUUID,
-                firstWallTime))) {
-        nsUUIDs.emplace(*currentCollectionUUID);
-    }
-    return nsUUIDs;
+
+// Acquires the pre-images collection given 'nsOrUUID'. When provided a UUID, throws
+// NamespaceNotFound if the collection is dropped.
+auto acquirePreImagesCollectionForRead(OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(std::move(nssOrUUID),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kRead),
+        MODE_IS);
+}
+auto acquirePreImagesCollectionForWrite(OperationContext* opCtx, NamespaceStringOrUUID nssOrUUID) {
+    return acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(std::move(nssOrUUID),
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 }
 
 // Truncate ranges must be consistent data - no record within a truncate range should be written
@@ -133,7 +139,7 @@ void scanToPopulate(
     const CollectionAcquisition& preImagesCollection,
     int32_t minBytesPerMarker,
     ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>& markersMap) {
-    const auto nsUUIDs = getNsUUIDs(opCtx, preImagesCollection);
+    const auto nsUUIDs = change_stream_pre_image_util::getNsUUIDs(opCtx, preImagesCollection);
     for (const auto& nsUUID : nsUUIDs) {
         auto initialSetOfMarkers = PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
             opCtx, preImagesCollection, nsUUID, minBytesPerMarker);
@@ -453,30 +459,60 @@ PreImagesTenantMarkers PreImagesTenantMarkers::createMarkers(
     boost::optional<TenantId> tenantId,
     const CollectionAcquisition& preImagesCollection) {
     invariant(preImagesCollection.exists());
-    PreImagesTenantMarkers preImagesTenantMarkers(tenantId);
+    PreImagesTenantMarkers preImagesTenantMarkers(tenantId, preImagesCollection.uuid());
     populateMarkersMap(opCtx, tenantId, preImagesCollection, preImagesTenantMarkers._markersMap);
     return preImagesTenantMarkers;
 }
 
-void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx,
-                                            const CollectionAcquisition& preImagesCollection) {
-    // TODO SERVER-81980: Don't call abandonSnapshot() while holding a CollectionAcquisition.
+void PreImagesTenantMarkers::refreshMarkers(OperationContext* opCtx) {
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
-    const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
 
-    NsUUIDToSamplesMap highestRecordIdAndWallTimeSamples;
-    sampleLastRecordPerNsUUID(opCtx, rs, highestRecordIdAndWallTimeSamples);
+    // Use writeConflictRetry since acquiring the collection can yield a WriteConflictException if
+    // it races with concurrent catalog changes.
+    writeConflictRetry(
+        opCtx, "Refreshing the pre image truncate markers in a new snapshot", _tenantNss, [&] {
+            // writeConflictRetry automatically abandon's the snapshot before retrying.
+            //
+            const auto preImagesCollection = acquirePreImagesCollectionForRead(
+                opCtx, NamespaceStringOrUUID{_tenantNss.dbName(), _tenantUUID});
+            const auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
 
-    for (const auto& [nsUUID, recordIdAndWallTimeVec] : highestRecordIdAndWallTimeSamples) {
-        const auto& [highestRid, highestWallTime] = recordIdAndWallTimeVec[0];
-        updateOnInsert(highestRid, nsUUID, highestWallTime, 0, 0);
-    }
+            NsUUIDToSamplesMap highestRecordIdAndWallTimeSamples;
+            sampleLastRecordPerNsUUID(opCtx, rs, highestRecordIdAndWallTimeSamples);
+
+            for (const auto& [nsUUID, recordIdAndWallTimeVec] : highestRecordIdAndWallTimeSamples) {
+                const auto& [highestRid, highestWallTime] = recordIdAndWallTimeVec[0];
+                updateOnInsert(highestRid, nsUUID, highestWallTime, 0, 0);
+            }
+        });
 }
 
-PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(
-    OperationContext* opCtx, const CollectionAcquisition& preImagesCollection) {
-    const auto& preImagesColl = preImagesCollection.getCollectionPtr();
+PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(OperationContext* opCtx) {
     const auto markersMapSnapshot = _markersMap.getUnderlyingSnapshot();
+
+    // Truncates are untimestamped. Allow multiple truncates to occur.
+    shard_role_details::getRecoveryUnit(opCtx)->allowAllUntimestampedWrites();
+
+    invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
+                  AdmissionContext::Priority::kImmediate,
+              "Pre-image truncation is critical to cluster health and should not be throttled");
+
+    // Acquire locks before iterating the truncate markers to prevent repeated locking and
+    // unlocking for each truncate. By making each call to truncate individually
+    // retriable, we reduce the amount of book keeping necessary to rollback truncate marker
+    // modifications after a WriteConflictException.
+    //
+    // There are 2 assumptions which make it safe to hold locks in the current scope.
+    //      (1) Since ticket acquisiton is bypassed, we don't contribute to ticket exhaustion by
+    //      wrapping each truncate in it's own 'writeConflictRetry()' (see SERVER-65418 for more
+    //      details).
+    //      (2) The locks will never be yielded by a query, thus there can't be any concurrent DDL
+    //      operations to invalidate our collection instance. This is only a risk when
+    //      'abandonSnapshot()' is called, which can invalidate the acquired collection instance,
+    //      like after a WriteConflictException.
+    const auto preImagesCollection = acquirePreImagesCollectionForWrite(
+        opCtx, NamespaceStringOrUUID{_tenantNss.dbName(), _tenantUUID});
+    const auto& preImagesColl = preImagesCollection.getCollectionPtr();
 
     // All pre-images with 'ts' <= 'maxTSEligibleForTruncate' are candidates for truncation.
     // However, pre-images with 'ts' > 'maxTSEligibleForTruncate' are unsafe to truncate, as
@@ -534,6 +570,7 @@ PreImagesTruncateStats PreImagesTenantMarkers::truncateExpiredPreImages(
                     .recordId();
 
             writeConflictRetry(opCtx, "final truncate", preImagesColl->ns(), [&] {
+                // Call creates it's own writeUnitOfWork.
                 change_stream_pre_image_util::truncateRange(
                     opCtx, preImagesColl, minRecordId, maxRecordId, 0, 0);
             });

@@ -470,9 +470,11 @@ void cleanupChangeCollectionAfterUncleanShutdown(OperationContext* opCtx,
             wuow.commit();
         });
 }
-void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
-                                                    boost::optional<TenantId> tenantId) {
-    auto currentTime = change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
+
+// Returns the timestamp at which pre-images should be truncated for recovery.
+Timestamp getPreImageTruncateTimestampForRecovery(OperationContext* opCtx,
+                                                  boost::optional<TenantId> tenantId) {
+    const auto currentTime = change_stream_pre_image_util::getCurrentTimeForPreImageRemoval(opCtx);
     auto originalExpirationDate =
         change_stream_pre_image_util::getPreImageOpTimeExpirationDate(opCtx, tenantId, currentTime);
     boost::optional<Date_t> operationTimeExpirationDate = boost::none;
@@ -497,11 +499,40 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
                               std::numeric_limits<unsigned>::max())}
         : Timestamp();
 
+    if (tenantId) {
+        // Multi-tenant environment, pre-images only expire by 'operationTime'.
+        invariant(operationTimeExpirationDate);
+        LOGV2_DEBUG(
+            7803701,
+            0,
+            "Computed timestamp to truncate pre-images at for tenant after unclean shutdown",
+            "truncateAtTimestamp"_attr = operationTimeExpirationTSEstimate,
+            "tenantId"_attr = tenantId);
+        return operationTimeExpirationTSEstimate;
+    }
+
+    // Pre-images expired when "_id.ts" < oldest oplog timestamp OR "_id.ts" <= the
+    // estimated timestamp for the 'operationTime' expiration date.
+    const auto oldestOplogTimestamp =
+        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
+    const auto expirationTimestamp =
+        std::max(oldestOplogTimestamp, operationTimeExpirationTSEstimate);
+    LOGV2_DEBUG(7803703,
+                0,
+                "Computed timestamp to truncate pre-images at after unclean shutdown",
+                "truncateAtTimestamp"_attr = expirationTimestamp,
+                "oldestOplogEntryTimestamp"_attr = oldestOplogTimestamp);
+    return expirationTimestamp;
+}
+
+void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
+                                                    boost::optional<TenantId> tenantId) {
     writeConflictRetry(
         opCtx,
         "cleanupPreImagesCollectionAfterUncleanShutdown",
         NamespaceString::makePreImageCollectionNSS(tenantId),
         [&] {
+            shard_role_details::getRecoveryUnit(opCtx)->allowAllUntimestampedWrites();
             const auto preImagesColl =
                 acquireCollection(opCtx,
                                   CollectionAcquisitionRequest(
@@ -519,44 +550,10 @@ void cleanupPreImagesCollectionAfterUncleanShutdown(OperationContext* opCtx,
                 return;
             }
 
-            if (originalExpirationDate) {
-                LOGV2_DEBUG(
-                    7803700,
-                    0,
-                    "Extending truncate range for pre-images expired by 'operationTime'",
-                    "originalExpirationDate"_attr = *originalExpirationDate,
-                    "newExpirationDate"_attr = *operationTimeExpirationDate,
-                    "expiryRangeExtensionSeconds"_attr =
-                        startup_recovery::kChangeStreamPostUncleanShutdownExpiryExtensionSeconds);
-            }
-
-            if (tenantId) {
-                // Multi-tenant environment, pre-images only expire by 'operationTime'.
-                invariant(operationTimeExpirationDate);
-                LOGV2_DEBUG(7803701,
-                            0,
-                            "About to truncate pre-images for tenant after unclean shutdown",
-                            "truncateAtTimestamp"_attr = operationTimeExpirationTSEstimate,
-                            "tenantId"_attr = tenantId);
-                change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
-                    opCtx, preImagesColl.getCollectionPtr(), operationTimeExpirationTSEstimate);
-                return;
-            }
-
-            // Pre-images expired when "_id.ts" < oldest oplog timestamp OR "_id.ts" <= the
-            // estimated timestamp for the 'operationTime' expiration date.
-            const auto oldestOplogTimestamp =
-                repl::StorageInterface::get(opCtx->getServiceContext())
-                    ->getEarliestOplogTimestamp(opCtx);
-            const auto expirationTimestamp =
-                std::max(oldestOplogTimestamp, operationTimeExpirationTSEstimate);
-            LOGV2_DEBUG(7803703,
-                        0,
-                        "About to truncate pre-images after unclean shutdown",
-                        "truncateAtTimestamp"_attr = expirationTimestamp,
-                        "oldestOplogEntryTimestamp"_attr = oldestOplogTimestamp);
+            const auto approximateExpirationTimestamp =
+                getPreImageTruncateTimestampForRecovery(opCtx, tenantId);
             change_stream_pre_image_util::truncatePreImagesByTimestampExpirationApproximation(
-                opCtx, preImagesColl.getCollectionPtr(), expirationTimestamp);
+                opCtx, preImagesColl, approximateExpirationTimestamp);
         });
 }
 

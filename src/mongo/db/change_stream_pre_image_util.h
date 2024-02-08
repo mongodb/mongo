@@ -99,7 +99,7 @@ void truncateRange(OperationContext* opCtx,
  */
 void truncatePreImagesByTimestampExpirationApproximation(
     OperationContext* opCtx,
-    const CollectionPtr& preImagesColl,
+    const CollectionAcquisition& preImagesColl,
     Timestamp expirationTimestampApproximation);
 
 UUID getPreImageNsUUID(const BSONObj& preImageObj);
@@ -113,6 +113,12 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
                                              const CollectionPtr* preImagesCollPtr,
                                              boost::optional<UUID> currentNsUUID,
                                              Date_t& firstDocWallTime);
+
+/**
+ * Returns the set of nsUUID's captured in the 'preImagesCollection'.
+ */
+stdx::unordered_set<UUID, UUID::Hash> getNsUUIDs(OperationContext* opCtx,
+                                                 const CollectionAcquisition& preImagesCollection);
 
 /**
  * Preferred method for getting the current time in pre-image removal code - in testing

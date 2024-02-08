@@ -71,14 +71,10 @@ namespace mongo {
 class PreImagesTruncateManager {
 public:
     /*
-     * Truncates expired pre-images spanning the 'preImagesColl' associated with the 'tenantId'.
-     * Performs in-memory cleanup of the tenant's truncate markers whenever an underlying 'nsUUID'
-     * associated with pre-images is dropped.
+     * Truncates expired pre-images spanning the tenant's pre-images collection.
      */
-    PreImagesTruncateStats truncateExpiredPreImages(
-        OperationContext* opCtx,
-        boost::optional<TenantId> tenantId,
-        const CollectionAcquisition& preImagesCollection);
+    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx,
+                                                    boost::optional<TenantId> tenantId);
 
     /**
      * Exclusively used when the config.preimages collection associated with 'tenantId' is dropped.
@@ -99,10 +95,19 @@ public:
 private:
     friend class PreImagesTruncateManagerTest;
 
-    std::shared_ptr<PreImagesTenantMarkers> _fetchOrCreateMarkersForPreImagesCollection(
-        OperationContext* opCtx,
-        boost::optional<TenantId> tenantId,
-        const CollectionAcquisition& preImagesCollection);
+    /**
+     * Tries to retrieve truncate markers for the tenant - or initialize the truncate markers if
+     * they don't yet exist.
+     *
+     * Returns a shared_ptr to truncate markers for the tenant's pre-images collection. If truncate
+     * markers don't exist (either the collection doesn't exist or the collection was dropped during
+     * the initialization process), returns nullptr.
+     */
+    std::shared_ptr<PreImagesTenantMarkers> _getInitializedMarkersForPreImagesCollection(
+        OperationContext* opCtx, boost::optional<TenantId> tenantId);
+
+    std::shared_ptr<PreImagesTenantMarkers> _createAndInstallMarkers(
+        OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     ConcurrentSharedValuesMap<boost::optional<TenantId>, PreImagesTenantMarkers> _tenantMap;
 };

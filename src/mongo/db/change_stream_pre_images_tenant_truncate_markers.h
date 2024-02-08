@@ -61,7 +61,9 @@ class PreImagesTenantMarkers {
 public:
     /**
      * Returns a 'PreImagesTenantMarkers' instance populated with truncate markers that span the
-     * tenant's pre-images collection.
+     * tenant's pre-images collection. However, these markers are not safe to use until
+     * 'refreshMarkers' is called to update the highest seen recordId and wall time for each nsUUID.
+     * Otherwise, pre-images would not be truncated until new inserts come in for each nsUUID.
      *
      * Note: Pre-images inserted concurrently with creation might not be covered by the resulting
      * truncate markers.
@@ -74,14 +76,13 @@ public:
      * Opens a fresh snapshot and ensures the all pre-images visible in the snapshot are
      * covered by truncate markers.
      */
-    void refreshMarkers(OperationContext* opCtx, const CollectionAcquisition& preImagesCollection);
+    void refreshMarkers(OperationContext* opCtx);
 
-    PreImagesTruncateStats truncateExpiredPreImages(
-        OperationContext* opCtx, const CollectionAcquisition& preImagesCollection);
+    PreImagesTruncateStats truncateExpiredPreImages(OperationContext* opCtx);
 
     /**
      * Updates or creates the 'PreImagesTruncateMarkersPerNsUUID' to account for a
-     * newly inserted pre-image generated from the users collection with UUID 'nsUUID'.
+     * newly inserted pre-image generated from the user's collection with UUID 'nsUUID'.
      *
      * 'numRecords' should always be 1 except for during initialization.
      *
@@ -96,9 +97,31 @@ public:
 private:
     friend class PreImagesTruncateManagerTest;
 
-    PreImagesTenantMarkers(boost::optional<TenantId> tenantId) : _tenantId{tenantId} {}
+    PreImagesTenantMarkers(boost::optional<TenantId> tenantId, const UUID& tenantUUID)
+        : _tenantId{tenantId},
+          _tenantUUID{tenantUUID},
+          _tenantNss(NamespaceString::makePreImageCollectionNSS(tenantId)) {}
 
     boost::optional<TenantId> _tenantId;
+
+    /**
+     * UUID of the tenant's pre-images collection.
+     */
+    UUID _tenantUUID;
+
+    /**
+     * Namespace of the tenant's pre-images collection.
+     */
+    NamespaceString _tenantNss;
+
+    /**
+     * The tenant's pre-images collection spans pre-images generated across all the tenant's
+     * pre-image enabled collections. The pre-images collection is sorted so that all pre-images
+     * from the same 'nsUUID' are stored consecutively. There is a separate set of truncate markers
+     * for each 'nsUUID'.
+     *
+     * Maps pre-images of a given 'nsUUID' to their truncate markers.
+     */
     ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash> _markersMap;
 };
 

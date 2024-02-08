@@ -27,25 +27,11 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <cstdint>
-#include <deque>
-#include <iterator>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
 #include <vector>
 
-#include <absl/container/flat_hash_map.h>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
@@ -56,101 +42,32 @@
 #include "mongo/db/change_stream_pre_images_truncate_manager.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_impl.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
-#include "mongo/db/storage/write_unit_of_work.h"
-#include "mongo/db/transaction_resources.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/log_attr.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/s/database_version.h"
-#include "mongo/s/shard_version.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
+
 class PreImagesTruncateManagerTest : public CatalogTestFixture {
 protected:
-    PreImagesTruncateManagerTest() : CatalogTestFixture(Options{}.useMockClock(true)) {}
-    ChangeStreamPreImage generatePreImage(const UUID& nsUUID, Timestamp ts, int64_t dataFieldSize) {
-        auto preImageId = ChangeStreamPreImageId(nsUUID, ts, 0);
-        const auto strField = std::string(dataFieldSize, 'a');
-        const BSONObj doc = BSON("dataField" << strField);
-        auto operationTime = Date_t::fromDurationSinceEpoch(Seconds{ts.getSecs()});
-        return ChangeStreamPreImage(preImageId, operationTime, doc);
-    }
+    const UUID kNsUUID0 = UUID::gen();
+    const UUID kNsUUID1 = UUID::gen();
+    const UUID kNsUUID2 = UUID::gen();
 
-    void prePopulatePreImagesCollection(const NamespaceString& preImagesNss,
-                                        const UUID& nsUUID,
-                                        int64_t dataFieldSize,
-                                        int64_t numPreImages) {
-        std::vector<ChangeStreamPreImage> preImages;
-        for (int64_t i = 0; i < numPreImages; i++) {
-            preImages.push_back(
-                generatePreImage(nsUUID, Timestamp{Date_t::now()} + i, dataFieldSize));
-        }
+    const TenantId kTenantIdA = TenantId(OID::gen());
+    const TenantId kTenantIdB = TenantId(OID::gen());
+    const boost::optional<TenantId> kNullTenantId{};
 
-        std::vector<InsertStatement> preImageInsertStatements;
-        std::transform(preImages.begin(),
-                       preImages.end(),
-                       std::back_inserter(preImageInsertStatements),
-                       [](const auto& preImage) { return InsertStatement{preImage.toBSON()}; });
-
-        auto opCtx = operationContext();
-        AutoGetCollection preImagesCollectionRaii(opCtx, preImagesNss, MODE_IX);
-        ASSERT(preImagesCollectionRaii);
-        WriteUnitOfWork wuow(opCtx);
-        auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
-
-        auto status = collection_internal::insertDocuments(opCtx,
-                                                           changeStreamPreImagesCollection,
-                                                           preImageInsertStatements.begin(),
-                                                           preImageInsertStatements.end(),
-                                                           nullptr);
-        wuow.commit();
-    }
-
-    ClockSourceMock* clockSource() {
-        return static_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource());
-    }
-
-    void ensureMarkersInitialized(const NamespaceString& preImagesCollectionNss,
-                                  boost::optional<TenantId> tenantId,
-                                  PreImagesTruncateManager& truncateManager) {
-        auto opCtx = operationContext();
-        const auto preImagesCollRAII = acquireCollection(
-            opCtx,
-            CollectionAcquisitionRequest(preImagesCollectionNss,
-                                         PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                         repl::ReadConcernArgs::get(opCtx),
-                                         AcquisitionPrerequisites::kRead),
-            MODE_IS);
-
-        truncateManager._fetchOrCreateMarkersForPreImagesCollection(
-            opCtx, tenantId, preImagesCollRAII);
-    };
-
-    void createPreImagesCollection(boost::optional<TenantId> tenantId) {
-        auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(tenantId);
-        const auto opCtx = operationContext();
-        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx,
-                                                                                     tenantId);
-    }
+    PreImagesTruncateManagerTest() : CatalogTestFixture({}) {}
 
     void setUp() override {
         CatalogTestFixture::setUp();
@@ -164,94 +81,138 @@ protected:
             std::make_unique<OpObserverImpl>(std::make_unique<OperationLoggerImpl>()));
     }
 
-    std::tuple<int64_t, int64_t> getNumRecordsAndDataSize(
-        const NamespaceString& preImagesCollectionNss) {
-        auto opCtx = operationContext();
-        const auto preImagesCollRAII = acquireCollection(
+    auto acquirePreImagesCollectionForRead(NamespaceStringOrUUID nssOrUUID) {
+        const auto opCtx = operationContext();
+        return acquireCollection(
             opCtx,
-            CollectionAcquisitionRequest(preImagesCollectionNss,
+            CollectionAcquisitionRequest(std::move(nssOrUUID),
                                          PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
                                          repl::ReadConcernArgs::get(opCtx),
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
-        // Retrieve the actual data size and number of records for the collection.
-        const auto& preImagesColl = preImagesCollRAII.getCollectionPtr();
-        return std::make_tuple(preImagesColl->numRecords(opCtx), preImagesColl->dataSize(opCtx));
     }
 
-    void validateNumRecordsInMarkers(const PreImagesTruncateManager& truncateManager,
-                                     boost::optional<TenantId> tenantId,
-                                     int64_t expectedNumRecords) {
-        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(preImagesTenantMarkers);
+    void createPreImagesCollection(boost::optional<TenantId> tenantId) {
+        const auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(tenantId);
+        const auto opCtx = operationContext();
+        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx,
+                                                                                     tenantId);
+    }
 
-        auto markersSnapshot = preImagesTenantMarkers->_markersMap.getUnderlyingSnapshot();
+    void insertPreImages(boost::optional<TenantId> tenantId,
+                         const UUID& nsUUID,
+                         int64_t numPreImages,
+                         int64_t docPaddingBytes) {
+
+        const auto opCtx = operationContext();
+        const auto preImagesNss = NamespaceString::makePreImageCollectionNSS(tenantId);
+        AutoGetCollection preImagesCollectionRaii(opCtx, preImagesNss, MODE_IX);
+        ASSERT(preImagesCollectionRaii);
+
+        // 'getNextOpTimes' requires us to be inside a WUOW.
+        WriteUnitOfWork wuow(opCtx);
+        auto opTimes = repl::getNextOpTimes(opCtx, numPreImages);
+
+        std::vector<InsertStatement> preImageInsertStatements;
+        for (const auto& opTime : opTimes) {
+            ChangeStreamPreImageId preImageId(nsUUID, opTime.getTimestamp(), 0);
+            const auto operationTime = Date_t() + Seconds(opTime.getSecs());
+            ChangeStreamPreImage preImage(std::move(preImageId),
+                                          operationTime,
+                                          BSON("padding" << std::string(docPaddingBytes, 'a')));
+            preImageInsertStatements.push_back(InsertStatement{preImage.toBSON()});
+        }
+
+        auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
+        ASSERT_OK(collection_internal::insertDocuments(opCtx,
+                                                       changeStreamPreImagesCollection,
+                                                       preImageInsertStatements.begin(),
+                                                       preImageInsertStatements.end(),
+                                                       nullptr));
+        wuow.commit();
+    }
+
+    std::shared_ptr<PreImagesTenantMarkers> getInitializedTruncateMarkers(
+        boost::optional<TenantId> tenantId) {
+        return _truncateManager._getInitializedMarkersForPreImagesCollection(operationContext(),
+                                                                             tenantId);
+    }
+
+    int64_t getNumRecordsInMarkers(std::shared_ptr<PreImagesTenantMarkers> tenantMarkers) {
+        const auto markersSnapshot = tenantMarkers->_markersMap.getUnderlyingSnapshot();
         int64_t numRecords{0};
-        for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
+        for (const auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
             for (const auto& marker : markers) {
                 numRecords = numRecords + marker.records;
             }
             numRecords = numRecords + truncateMarkersForNsUUID->currentRecords_forTest();
         }
-        ASSERT_EQ(numRecords, expectedNumRecords);
+        return numRecords;
     }
 
-    void validateNumBytesInMarkers(const PreImagesTruncateManager& truncateManager,
-                                   boost::optional<TenantId> tenantId,
-                                   int64_t expectedNumBytes) {
-        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(preImagesTenantMarkers);
-
-        auto markersSnapshot = preImagesTenantMarkers->_markersMap.getUnderlyingSnapshot();
-        int64_t numBytes{0};
-        for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
+    int64_t getBytesInMarkers(std::shared_ptr<PreImagesTenantMarkers> tenantMarkers) {
+        const auto markersSnapshot = tenantMarkers->_markersMap.getUnderlyingSnapshot();
+        int64_t bytes{0};
+        for (const auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
             for (const auto& marker : markers) {
-                numBytes = numBytes + marker.bytes;
+                bytes = bytes + marker.bytes;
             }
-            numBytes = numBytes + truncateMarkersForNsUUID->currentBytes_forTest();
+            bytes = bytes + truncateMarkersForNsUUID->currentBytes_forTest();
         }
-        ASSERT_EQ(numBytes, expectedNumBytes);
+        return bytes;
     }
 
-    void validateMarkersDontExistForNsUUID(const PreImagesTruncateManager& truncateManager,
-                                           boost::optional<TenantId> tenantId,
-                                           const UUID& nsUUID) {
-        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(preImagesTenantMarkers);
+    // Validates that the truncate markers capture the metadata for the pre-images collection
+    // accurately.
+    void validateMarkerMetadataMatchesCollection(
+        boost::optional<TenantId> tenantId,
+        const CollectionAcquisition& preImagesCollection,
+        std::shared_ptr<PreImagesTenantMarkers> tenantMarkers) {
+        ASSERT(preImagesCollection.exists());
 
-        ASSERT(!preImagesTenantMarkers->_markersMap.find(nsUUID));
+        // Also validate that the _truncateManager contains the markers we are validated.
+        ASSERT(_truncateManager._tenantMap.find(tenantId));
+
+        // Truncate markers store the UUID, nss, and tenantId corresponding the tenant's pre-images
+        // collection they were created with.
+        ASSERT_EQ(tenantMarkers->_tenantUUID, preImagesCollection.uuid());
+        ASSERT_EQ(tenantMarkers->_tenantNss, preImagesCollection.nss());
+        ASSERT_EQ(tenantMarkers->_tenantId, tenantId);
+
+        const auto& preImagesCollPtr = preImagesCollection.getCollectionPtr();
+        const auto opCtx = operationContext();
+
+        const auto numRecordsInMarkers = getNumRecordsInMarkers(tenantMarkers);
+        ASSERT_EQ(numRecordsInMarkers, preImagesCollPtr->numRecords(opCtx));
+
+        const auto bytesInMarkers = getBytesInMarkers(tenantMarkers);
+        ASSERT_EQ(bytesInMarkers, preImagesCollPtr->dataSize(opCtx));
+    }
+
+    void validateMarkersExistForNsUUID(std::shared_ptr<PreImagesTenantMarkers> tenantMarkers,
+                                       const UUID& nsUUID) {
+        ASSERT(tenantMarkers->_markersMap.find(nsUUID));
     }
 
     void validateCreationMethod(
-        const PreImagesTruncateManager& truncateManager,
-        boost::optional<TenantId> tenantId,
+        std::shared_ptr<PreImagesTenantMarkers> tenantMarkers,
         const UUID& nsUUID,
         CollectionTruncateMarkers::MarkersCreationMethod expectedCreationMethod) {
-        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(preImagesTenantMarkers);
-
-        auto nsUUIDTruncateMarkers = preImagesTenantMarkers->_markersMap.find(nsUUID);
+        auto nsUUIDTruncateMarkers = tenantMarkers->_markersMap.find(nsUUID);
         ASSERT(nsUUIDTruncateMarkers);
         ASSERT_EQ(nsUUIDTruncateMarkers->markersCreationMethod(), expectedCreationMethod);
     }
 
-    void validateMarkersExistForNsUUID(const PreImagesTruncateManager& truncateManager,
-                                       boost::optional<TenantId> tenantId,
-                                       const UUID& nsUUID) {
-        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(preImagesTenantMarkers);
-
-        ASSERT(preImagesTenantMarkers->_markersMap.find(nsUUID));
+    void validateMarkersDontExistForNsUUID(std::shared_ptr<PreImagesTenantMarkers> tenantMarkers,
+                                           const UUID& nsUUID) {
+        ASSERT(!tenantMarkers->_markersMap.find(nsUUID));
     }
 
-    void validateIncreasingRidAndWallTimesInMarkers(const PreImagesTruncateManager& truncateManager,
-                                                    boost::optional<TenantId> tenantId) {
-        auto preImagesTenantMarkers = truncateManager._tenantMap.find(tenantId);
-        ASSERT(preImagesTenantMarkers);
-
-        auto markersSnapshot = preImagesTenantMarkers->_markersMap.getUnderlyingSnapshot();
+    void validateIncreasingRidAndWallTimesInMarkers(
+        std::shared_ptr<PreImagesTenantMarkers> tenantMarkers) {
+        auto markersSnapshot = tenantMarkers->_markersMap.getUnderlyingSnapshot();
         for (auto& [nsUUID, truncateMarkersForNsUUID] : *markersSnapshot) {
             auto markers = truncateMarkersForNsUUID->getMarkers_forTest();
 
@@ -267,7 +228,7 @@ protected:
                                 "Truncate markers created for pre-images with nsUUID were not "
                                 "initialised in increasing order of highest wall time and RecordId",
                                 "nsUUID"_attr = nsUUID,
-                                "tenant"_attr = tenantId,
+                                "tenant"_attr = tenantMarkers->_tenantId,
                                 "highestSeenWallTime"_attr = highestSeenWallTime,
                                 "highestSeenRecordId"_attr = highestSeenRecordId,
                                 "markerRecordId"_attr = currentRid,
@@ -285,6 +246,9 @@ protected:
             ASSERT_GTE(partialMarkerHighestWallTime, highestSeenWallTime);
         }
     }
+
+private:
+    PreImagesTruncateManager _truncateManager;
 };
 
 TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUIDSingleTenant) {
@@ -292,30 +256,65 @@ TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUIDSingleTenant) {
     RAIIServerParameterControllerForTest minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
-    boost::optional<TenantId> nullTenantId = boost::none;
-    createPreImagesCollection(nullTenantId);
+    createPreImagesCollection(kNullTenantId);
 
-    auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(nullTenantId);
-    auto nsUUID0 = UUID::gen();
+    insertPreImages(kNullTenantId, kNsUUID0, /*numPreImages*/ 3000, /*docPaddingBytes*/ 1);
 
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID0, 1, 3000);
-    auto [preImagesRecordStoreNumRecords, preImagesRecordStoreDataSize] =
-        getNumRecordsAndDataSize(preImagesCollectionNss);
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    ASSERT(tenantMarkers);
 
-    PreImagesTruncateManager truncateManager;
-    ensureMarkersInitialized(preImagesCollectionNss, nullTenantId, truncateManager);
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
 
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID0);
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
 
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID0,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
-    validateNumRecordsInMarkers(truncateManager, nullTenantId, preImagesRecordStoreNumRecords);
-    validateNumBytesInMarkers(truncateManager, nullTenantId, preImagesRecordStoreDataSize);
+    validateMarkersExistForNsUUID(tenantMarkers, kNsUUID0);
 
-    validateIncreasingRidAndWallTimesInMarkers(truncateManager, nullTenantId);
+    validateCreationMethod(
+        tenantMarkers, kNsUUID0, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+}
+
+TEST_F(PreImagesTruncateManagerTest, ScanningSingleNsUUIDSingleTenant1Doc) {
+    auto minBytesPerMarker = 1;
+    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+        "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
+
+    createPreImagesCollection(kNullTenantId);
+
+    insertPreImages(kNullTenantId, kNsUUID0, /*numPreImages*/ 1, /*docPaddingBytes*/ 1);
+
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    ASSERT(tenantMarkers);
+
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
+
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+
+    validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
+
+    validateMarkersExistForNsUUID(tenantMarkers, kNsUUID0);
+
+    validateCreationMethod(
+        tenantMarkers, kNsUUID0, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+}
+
+TEST_F(PreImagesTruncateManagerTest, SingleTenantEmptyCollection) {
+    auto minBytesPerMarker = 1;
+    RAIIServerParameterControllerForTest minBytesPerMarkerController{
+        "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
+
+    createPreImagesCollection(kNullTenantId);
+
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    ASSERT(tenantMarkers);
+
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
+
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
 }
 
 TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDsSingleTenant) {
@@ -323,36 +322,27 @@ TEST_F(PreImagesTruncateManagerTest, ScanningTwoNsUUIDsSingleTenant) {
     RAIIServerParameterControllerForTest minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
-    boost::optional<TenantId> nullTenantId = boost::none;
-    createPreImagesCollection(nullTenantId);
+    createPreImagesCollection(kNullTenantId);
 
-    auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(nullTenantId);
-    auto nsUUID0 = UUID::gen();
-    auto nsUUID1 = UUID::gen();
+    insertPreImages(kNullTenantId, kNsUUID0, /*numPreImages*/ 10, /*docPaddingSize*/ 100);
+    insertPreImages(kNullTenantId, kNsUUID1, /*numPreImages*/ 1990, /*docPaddingSize*/ 1);
 
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID0, 100, 10);
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID1, 1, 1990);
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    ASSERT(tenantMarkers);
 
-    auto [preImagesRecordStoreNumRecords, preImagesRecordStoreDataSize] =
-        getNumRecordsAndDataSize(preImagesCollectionNss);
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
 
-    PreImagesTruncateManager truncateManager;
-    ensureMarkersInitialized(preImagesCollectionNss, nullTenantId, truncateManager);
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
 
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID0);
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID1);
+    validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID0,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID1,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
-
-    validateNumRecordsInMarkers(truncateManager, nullTenantId, preImagesRecordStoreNumRecords);
-    validateNumBytesInMarkers(truncateManager, nullTenantId, preImagesRecordStoreDataSize);
+    std::vector<UUID> nsUUIDs{kNsUUID0, kNsUUID1};
+    for (const auto& nsUUID : nsUUIDs) {
+        validateMarkersExistForNsUUID(tenantMarkers, nsUUID);
+        validateCreationMethod(
+            tenantMarkers, nsUUID, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
+    }
 }
 
 TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUIDSingleTenant) {
@@ -360,30 +350,24 @@ TEST_F(PreImagesTruncateManagerTest, SamplingSingleNsUUIDSingleTenant) {
     RAIIServerParameterControllerForTest minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
-    boost::optional<TenantId> nullTenantId = boost::none;
-    createPreImagesCollection(nullTenantId);
+    createPreImagesCollection(kNullTenantId);
 
-    auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(nullTenantId);
-    auto nsUUID0 = UUID::gen();
+    insertPreImages(kNullTenantId, kNsUUID0, /*numPreImages*/ 4000, /*docPaddingBytes*/ 1);
 
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID0, 1, 4000);
-    auto [preImagesRecordStoreNumRecords, preImagesRecordStoreDataSize] =
-        getNumRecordsAndDataSize(preImagesCollectionNss);
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    ASSERT(tenantMarkers);
 
-    PreImagesTruncateManager truncateManager;
-    ensureMarkersInitialized(preImagesCollectionNss, nullTenantId, truncateManager);
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
 
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID0);
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
 
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID0,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+    validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
-    validateNumRecordsInMarkers(truncateManager, nullTenantId, preImagesRecordStoreNumRecords);
-    validateNumBytesInMarkers(truncateManager, nullTenantId, preImagesRecordStoreDataSize);
+    validateMarkersExistForNsUUID(tenantMarkers, kNsUUID0);
 
-    validateIncreasingRidAndWallTimesInMarkers(truncateManager, nullTenantId);
+    validateCreationMethod(
+        tenantMarkers, kNsUUID0, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
 }
 
 // Tests that markers initialized from a pre-populated pre-images collection guarantee that the
@@ -395,37 +379,26 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsSingleTenant) {
     RAIIServerParameterControllerForTest minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
-    boost::optional<TenantId> nullTenantId = boost::none;
-    createPreImagesCollection(nullTenantId);
+    createPreImagesCollection(kNullTenantId);
 
-    auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(nullTenantId);
-    auto nsUUID0 = UUID::gen();
-    auto nsUUID1 = UUID::gen();
+    insertPreImages(kNullTenantId, kNsUUID0, /*numPreImages*/ 1000, /*docPaddingSize*/ 100);
+    insertPreImages(kNullTenantId, kNsUUID1, /*numPreImages*/ 1000, /*docPaddingSize*/ 1);
 
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID0, 100, 1000);
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID1, 1, 1000);
-    auto [preImagesRecordStoreNumRecords, preImagesRecordStoreDataSize] =
-        getNumRecordsAndDataSize(preImagesCollectionNss);
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
 
-    PreImagesTruncateManager truncateManager;
-    ensureMarkersInitialized(preImagesCollectionNss, nullTenantId, truncateManager);
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
 
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID0);
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID1);
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
 
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID0,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID1,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+    validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
-    validateNumRecordsInMarkers(truncateManager, nullTenantId, preImagesRecordStoreNumRecords);
-    validateNumBytesInMarkers(truncateManager, nullTenantId, preImagesRecordStoreDataSize);
-
-    validateIncreasingRidAndWallTimesInMarkers(truncateManager, nullTenantId);
+    std::vector<UUID> nsUUIDs{kNsUUID0, kNsUUID1};
+    for (const auto& nsUUID : nsUUIDs) {
+        validateMarkersExistForNsUUID(tenantMarkers, nsUUID);
+        validateCreationMethod(
+            tenantMarkers, nsUUID, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+    }
 }
 
 TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFewSingleTenant) {
@@ -433,39 +406,27 @@ TEST_F(PreImagesTruncateManagerTest, SamplingTwoNsUUIDsManyRecordsToFewSingleTen
     RAIIServerParameterControllerForTest minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
-    // For a single tenant environment.
-    boost::optional<TenantId> nullTenantId = boost::none;
-    createPreImagesCollection(nullTenantId);
+    createPreImagesCollection(kNullTenantId);
 
-    auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(nullTenantId);
-    auto nsUUID0 = UUID::gen();
-    auto nsUUID1 = UUID::gen();
+    insertPreImages(kNullTenantId, kNsUUID0, /*numPreImages*/ 1999, /*docPaddingSize*/ 100);
+    insertPreImages(kNullTenantId, kNsUUID1, /*numPreImages*/ 1, /*docPaddingSize*/ 1);
 
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID0, 100, 1999);
-    prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID1, 1, 1);
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    ASSERT(tenantMarkers);
 
-    auto [preImagesRecordStoreNumRecords, preImagesRecordStoreDataSize] =
-        getNumRecordsAndDataSize(preImagesCollectionNss);
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
 
-    PreImagesTruncateManager truncateManager;
-    ensureMarkersInitialized(preImagesCollectionNss, nullTenantId, truncateManager);
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
 
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID0);
-    validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID1);
+    validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID0,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
-    validateCreationMethod(truncateManager,
-                           nullTenantId,
-                           nsUUID1,
-                           CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
-
-    validateNumRecordsInMarkers(truncateManager, nullTenantId, preImagesRecordStoreNumRecords);
-    validateNumBytesInMarkers(truncateManager, nullTenantId, preImagesRecordStoreDataSize);
-
-    validateIncreasingRidAndWallTimesInMarkers(truncateManager, nullTenantId);
+    std::vector<UUID> nsUUIDs{kNsUUID0, kNsUUID1};
+    for (const auto& nsUUID : nsUUIDs) {
+        validateMarkersExistForNsUUID(tenantMarkers, nsUUID);
+        validateCreationMethod(
+            tenantMarkers, nsUUID, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+    }
 }
 
 TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDsSingleTenant) {
@@ -473,10 +434,8 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDsSingleTenant) {
     RAIIServerParameterControllerForTest minBytesPerMarkerController{
         "preImagesCollectionTruncateMarkersMinBytes", minBytesPerMarker};
 
-    boost::optional<TenantId> nullTenantId = boost::none;
-    createPreImagesCollection(nullTenantId);
+    createPreImagesCollection(kNullTenantId);
 
-    auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(nullTenantId);
     std::vector<UUID> nsUUIDs{};
     auto numNssUUIDs = 11;
     for (int i = 0; i < numNssUUIDs; i++) {
@@ -484,26 +443,24 @@ TEST_F(PreImagesTruncateManagerTest, SamplingManyNsUUIDsSingleTenant) {
     }
 
     for (const auto& nsUUID : nsUUIDs) {
-        prePopulatePreImagesCollection(preImagesCollectionNss, nsUUID, 100, 555);
+        insertPreImages(kNullTenantId, nsUUID, /*numPreImages*/ 555, /*docPaddingSize*/ 100);
     }
 
-    auto [preImagesRecordStoreNumRecords, preImagesRecordStoreDataSize] =
-        getNumRecordsAndDataSize(preImagesCollectionNss);
+    auto tenantMarkers = getInitializedTruncateMarkers(kNullTenantId);
+    ASSERT(tenantMarkers);
 
-    PreImagesTruncateManager truncateManager;
-    ensureMarkersInitialized(preImagesCollectionNss, nullTenantId, truncateManager);
+    const auto preImagesCollection = acquirePreImagesCollectionForRead(
+        NamespaceString::makePreImageCollectionNSS(kNullTenantId));
+
+    validateMarkerMetadataMatchesCollection(kNullTenantId, preImagesCollection, tenantMarkers);
+
+    validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
     for (const auto& nsUUID : nsUUIDs) {
-        validateMarkersExistForNsUUID(truncateManager, nullTenantId, nsUUID);
-        validateCreationMethod(truncateManager,
-                               nullTenantId,
-                               nsUUID,
-                               CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+        validateMarkersExistForNsUUID(tenantMarkers, nsUUID);
+        validateCreationMethod(
+            tenantMarkers, nsUUID, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
     }
-
-    validateNumRecordsInMarkers(truncateManager, nullTenantId, preImagesRecordStoreNumRecords);
-    validateNumBytesInMarkers(truncateManager, nullTenantId, preImagesRecordStoreDataSize);
-    validateIncreasingRidAndWallTimesInMarkers(truncateManager, nullTenantId);
 }
 
 // Test that the PreImagesTruncateManager correctly separates collection truncate markers for each
@@ -515,42 +472,37 @@ TEST_F(PreImagesTruncateManagerTest, TwoTenantsGeneratesTwoSeparateSetsOfTruncat
     RAIIServerParameterControllerForTest serverlessFeatureFlagController{
         "featureFlagServerlessChangeStreams", true};
 
-    TenantId tid1 = TenantId(OID::gen());
-    TenantId tid2 = TenantId(OID::gen());
+    std::vector<std::pair<UUID, TenantId>> tenants{{kNsUUID1, kTenantIdA}, {kNsUUID2, kTenantIdB}};
+    // Pre-populate each tenant's pre-images collection.
+    for (const auto& [nsUUID, tenantId] : tenants) {
+        createPreImagesCollection(tenantId);
+        insertPreImages(tenantId, nsUUID, /*numPreImages*/ 1000, /*docPaddingSize*/ 100);
+    }
 
-    createPreImagesCollection(tid1);
-    createPreImagesCollection(tid2);
+    // Create both sets of markers serially. This could be combined with the pre-population phase,
+    // but separating out the tasks simulates a more realistic scenario as the remover thread would
+    // initialize markers if they don't exist one after the other.
+    for (const auto& [nsUUID, tenantId] : tenants) {
+        auto tenantMarkers = getInitializedTruncateMarkers(tenantId);
+        ASSERT(tenantMarkers);
 
-    auto preImagesCollectionNss1 = NamespaceString::makePreImageCollectionNSS(tid1);
-    auto preImagesCollectionNss2 = NamespaceString::makePreImageCollectionNSS(tid2);
-    auto nsUUID1 = UUID::gen();
-    auto nsUUID2 = UUID::gen();
+        const auto preImagesCollection =
+            acquirePreImagesCollectionForRead(NamespaceString::makePreImageCollectionNSS(tenantId));
 
-    prePopulatePreImagesCollection(preImagesCollectionNss1, nsUUID1, 100, 1000);
-    prePopulatePreImagesCollection(preImagesCollectionNss2, nsUUID2, 100, 1000);
+        validateMarkerMetadataMatchesCollection(tenantId, preImagesCollection, tenantMarkers);
 
-    auto [tid1NumRecords, tid1DataSize] = getNumRecordsAndDataSize(preImagesCollectionNss1);
-    auto [tid2NumRecords, tid2DataSize] = getNumRecordsAndDataSize(preImagesCollectionNss2);
+        validateIncreasingRidAndWallTimesInMarkers(tenantMarkers);
 
-    // Initialise the truncate markers for each colleciton.
-    PreImagesTruncateManager truncateManager;
-    ensureMarkersInitialized(preImagesCollectionNss1, tid1, truncateManager);
-    ensureMarkersInitialized(preImagesCollectionNss2, tid2, truncateManager);
+        validateMarkersExistForNsUUID(tenantMarkers, nsUUID);
 
-    validateNumRecordsInMarkers(truncateManager, tid1, tid1NumRecords);
-    validateNumRecordsInMarkers(truncateManager, tid2, tid2NumRecords);
-
-    validateNumBytesInMarkers(truncateManager, tid1, tid1DataSize);
-    validateNumBytesInMarkers(truncateManager, tid2, tid2DataSize);
-
-    validateIncreasingRidAndWallTimesInMarkers(truncateManager, tid1);
-    validateIncreasingRidAndWallTimesInMarkers(truncateManager, tid2);
-
-    // Confirm that markers for each nsUUID are correctly isolated on their tenant.
-    validateMarkersExistForNsUUID(truncateManager, tid1, nsUUID1);
-    validateMarkersDontExistForNsUUID(truncateManager, tid1, nsUUID2);
-
-    validateMarkersExistForNsUUID(truncateManager, tid2, nsUUID2);
-    validateMarkersDontExistForNsUUID(truncateManager, tid2, nsUUID1);
+        // Confirm that the nsUUID for the other tenant doesn't spill into these tenantMarkers.
+        for (const auto& [nsUUIDOther, tenantIdOther] : tenants) {
+            if (tenantId != tenantIdOther) {
+                // nsUUIDOther belongs to a tenant that isn't the current tenant; thus, it should
+                // not be accounted for in the truncateMarkers.
+                validateMarkersDontExistForNsUUID(tenantMarkers, nsUUIDOther);
+            }
+        }
+    }
 }
 }  // namespace mongo

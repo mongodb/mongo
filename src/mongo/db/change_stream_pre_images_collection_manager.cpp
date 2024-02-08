@@ -98,7 +98,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
-MONGO_FAIL_POINT_DEFINE(preImagesTruncateOnlyOnSecondaries);
 
 const auto getPreImagesCollectionManager =
     ServiceContext::declareDecoration<ChangeStreamPreImagesCollectionManager>();
@@ -465,42 +464,8 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
 
 size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTruncate(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    // Change stream collections can multiply the amount of user data inserted and deleted
-    // on each node. It is imperative that removal is prioritized so it can keep up with
-    // inserts and prevent users from running out of disk space.
-    ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
-                                                        AdmissionContext::Priority::kImmediate);
-
-    // Truncate markers should track the highest seen RecordId and wall time across pre-images to
-    // guarantee all pre-images are eventually truncated.
-    //
-    // It's possible the tenant's truncate markers aren't initialized yet. Minimize the likelihood
-    // that pre-images inserted during initialization are unaccounted for by relaxing constraints
-    // (to view the most up to date data). This is safe even during secondary batch application
-    // because the truncate marker mechanism is designed to handle unserialized inserts of
-    // pre-images.
-    opCtx->setEnforceConstraints(false);
-
-    // Truncates are untimestamped. Allow multiple truncates to occur.
-    shard_role_details::getRecoveryUnit(opCtx)->allowAllUntimestampedWrites();
-
-    const auto preImagesColl = acquireCollection(
-        opCtx,
-        CollectionAcquisitionRequest(NamespaceString::makePreImageCollectionNSS(tenantId),
-                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
-                                     repl::ReadConcernArgs::get(opCtx),
-                                     AcquisitionPrerequisites::kWrite),
-        MODE_IX);
-
-
-    if (!preImagesColl.exists() ||
-        (MONGO_unlikely(preImagesTruncateOnlyOnSecondaries.shouldFail()) &&
-         repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
-             repl::MemberState::RS_PRIMARY)) {
-        return 0;
-    }
-
-    auto truncateStats = _truncateManager.truncateExpiredPreImages(opCtx, tenantId, preImagesColl);
+    const auto truncateStats =
+        _truncateManager.truncateExpiredPreImages(opCtx, std::move(tenantId));
 
     if (truncateStats.maxStartWallTime > _purgingJobStats.maxStartWallTime.loadRelaxed()) {
         _purgingJobStats.maxStartWallTime.store(truncateStats.maxStartWallTime);
