@@ -922,7 +922,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
     // Use query framework to generate index bounds
     QueryPlannerParams plannerParams;
     // Must use "shard key" index
-    plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
+    plannerParams.options = QueryPlannerParams::STRICT_NO_TABLE_SCAN;
     IndexEntry indexEntry(key,
                           indexType,
                           IndexDescriptor::kLatestIndexVersion,

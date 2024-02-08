@@ -430,6 +430,9 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
+    // The following are expensive to look up, so only do it once for each.
+    const mongo::NamespaceString nss = query.nss();
+    const bool isOplog = nss.isOplog();
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
     csn->name = query.ns();
@@ -440,6 +443,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     csn->shouldWaitForOplogVisibility =
         params.options & QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
     csn->direction = direction;
+    csn->isOplog = isOplog;
 
     if (params.clusteredInfo) {
         csn->clusteredIndex = params.clusteredInfo->getIndexSpec();

@@ -316,7 +316,11 @@ void CollectionScanNode::computeProperties() {
 
 void CollectionScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);
-    *ss << "COLLSCAN\n";
+    if (doClusteredCollectionScan()) {
+        *ss << "CLUSTERED_IDXSCAN\n";
+    } else {
+        *ss << "COLLSCAN\n";
+    }
     addIndent(ss, indent + 1);
     *ss << "ns = " << name << '\n';
     if (nullptr != filter) {
@@ -333,6 +337,9 @@ QuerySolutionNode* CollectionScanNode::clone() const {
     copy->name = this->name;
     copy->tailable = this->tailable;
     copy->direction = this->direction;
+    copy->minRecord = this->minRecord;
+    copy->maxRecord = this->maxRecord;
+    copy->clusteredIndex = this->clusteredIndex;
     copy->shouldTrackLatestOplogTimestamp = this->shouldTrackLatestOplogTimestamp;
     copy->assertTsHasNotFallenOffOplog = this->assertTsHasNotFallenOffOplog;
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;

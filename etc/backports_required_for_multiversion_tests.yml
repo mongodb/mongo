@@ -315,6 +315,10 @@ last-continuous:
     ticket: SERVER-84013
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-82353
+  - test_file: jstests/core/notablescan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/clustered_coll_scan.js
+    ticket: SERVER-83119
   suites: null
 last-lts:
   all:
@@ -676,4 +680,8 @@ last-lts:
     ticket: SERVER-84013
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-82353
+  - test_file: jstests/core/notablescan.js
+    ticket: SERVER-83119
+  - test_file: jstests/sharding/clustered_coll_scan.js
+    ticket: SERVER-83119
   suites: null

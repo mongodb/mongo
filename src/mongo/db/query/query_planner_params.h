@@ -153,6 +153,11 @@ struct QueryPlannerParams {
         // Ensure that any plan generated returns data that is "owned." That is, all BSONObjs are
         // in an "owned" state and are not pointing to data that belongs to the storage engine.
         RETURN_OWNED_DATA = 1 << 12,
+
+        // This is an extension to the NO_TABLE_SCAN parameter. This more stricter option will also
+        // avoid a CLUSTEREDIDX_SCAN which comes built into a collection scan when the collection is
+        // clustered.
+        STRICT_NO_TABLE_SCAN = 1 << 13,
     };
 
     // See Options enum above.
