@@ -2115,4 +2115,283 @@ TEST_F(SBEBlockExpressionTest, BlockCoerceToBool) {
                   });
 }
 
+TEST_F(SBEBlockExpressionTest, BlockRound) {
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor scalarAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto scalarSlot = bindAccessor(&scalarAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeNewString("abcd"));
+    block.push_back(makeInt32(-2));
+    block.push_back(makeInt32(2));
+    block.push_back(makeBool(false));
+    block.push_back(makeDouble(0.0));
+    block.push_back(makeDouble(-1234.987));
+    block.push_back(makeDouble(1987.956));
+    block.push_back(makeDouble(-1234.1234));
+    block.push_back(makeDouble(1987.1234));
+    block.push_back(makeDecimal("-1234.987"));
+    block.push_back(makeDecimal("1987.956"));
+    block.push_back(makeDecimal("1234.1234"));
+    block.push_back(makeDecimal("-1987.1234"));
+    block.push_back(makeNothing());
+    block.push_back(makeNull());
+
+    {
+        auto expr = sbe::makeE<sbe::EFunction>(
+            "valueBlockRound",
+            sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
+
+        auto compiledExpr = compileExpression(*expr);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(2));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(-2),
+            makeInt32(2),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(-1234.99),
+            makeDouble(1987.96),
+            makeDouble(-1234.12),
+            makeDouble(1987.12),
+            makeDecimal("-1234.99"),
+            makeDecimal("1987.96"),
+            makeDecimal("1234.12"),
+            makeDecimal("-1987.12"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    {
+        auto expr = sbe::makeE<sbe::EFunction>(
+            "valueBlockRound",
+            sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
+
+        auto compiledExpr = compileExpression(*expr);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-2));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(0),
+            makeInt32(0),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(-1200),
+            makeDouble(2000),
+            makeDouble(-1200),
+            makeDouble(2000),
+            makeDecimal("-1200"),
+            makeDecimal("2000"),
+            makeDecimal("1200"),
+            makeDecimal("-2000"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    {
+        auto expr =
+            sbe::makeE<sbe::EFunction>("valueBlockRound", sbe::makeEs(makeE<EVariable>(blockSlot)));
+
+        auto compiledExpr = compileExpression(*expr);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(-2),
+            makeInt32(2),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(-1235),
+            makeDouble(1988),
+            makeDouble(-1234),
+            makeDouble(1987),
+            makeDecimal("-1235"),
+            makeDecimal("1988"),
+            makeDecimal("1234"),
+            makeDecimal("-1987"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, BlockTrunc) {
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor scalarAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto scalarSlot = bindAccessor(&scalarAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeNewString("abcd"));
+    block.push_back(makeInt32(-2));
+    block.push_back(makeInt32(2));
+    block.push_back(makeBool(false));
+    block.push_back(makeDouble(0.0));
+    block.push_back(makeDouble(-1234.987));
+    block.push_back(makeDouble(1987.956));
+    block.push_back(makeDouble(-1234.1234));
+    block.push_back(makeDouble(1987.1234));
+    block.push_back(makeDecimal("-1234.987"));
+    block.push_back(makeDecimal("1987.956"));
+    block.push_back(makeDecimal("1234.1234"));
+    block.push_back(makeDecimal("-1987.1234"));
+    block.push_back(makeNothing());
+    block.push_back(makeNull());
+
+    {
+        auto expr = sbe::makeE<sbe::EFunction>(
+            "valueBlockTrunc",
+            sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
+
+        auto compiledExpr = compileExpression(*expr);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(2));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(-2),
+            makeInt32(2),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(-1234.98),
+            makeDouble(1987.95),
+            makeDouble(-1234.12),
+            makeDouble(1987.12),
+            makeDecimal("-1234.98"),
+            makeDecimal("1987.95"),
+            makeDecimal("1234.12"),
+            makeDecimal("-1987.12"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    {
+        auto expr = sbe::makeE<sbe::EFunction>(
+            "valueBlockTrunc",
+            sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
+
+        auto compiledExpr = compileExpression(*expr);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-2));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(0),
+            makeInt32(0),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(-1200),
+            makeDouble(1900),
+            makeDouble(-1200),
+            makeDouble(1900),
+            makeDecimal("-1200"),
+            makeDecimal("1900"),
+            makeDecimal("1200"),
+            makeDecimal("-1900"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    {
+        auto expr =
+            sbe::makeE<sbe::EFunction>("valueBlockTrunc", sbe::makeEs(makeE<EVariable>(blockSlot)));
+
+        auto compiledExpr = compileExpression(*expr);
+
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(-2),
+            makeInt32(2),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(-1234),
+            makeDouble(1987),
+            makeDouble(-1234),
+            makeDouble(1987),
+            makeDecimal("-1234"),
+            makeDecimal("1987"),
+            makeDecimal("1234"),
+            makeDecimal("-1987"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+}
+
 }  // namespace mongo::sbe

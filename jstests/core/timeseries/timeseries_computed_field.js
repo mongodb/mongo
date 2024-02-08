@@ -37,6 +37,7 @@ TimeseriesTest.run((insert) => {
         [timeFieldName]: new Date(datePrefix + 100),  // ISODate("1970-01-20T10:55:12.540Z")
         [metaFieldName]: "cpu",
         topLevelScalar: 123,
+        topLevelScalarDouble: 123.8778645,
         topLevelArray: [1, 2, 3, 4],
         arrOfObj: [{x: 1}, {x: 2}, {x: 3}, {x: 4}],
         obj: {a: 123},
@@ -47,6 +48,7 @@ TimeseriesTest.run((insert) => {
         [timeFieldName]: new Date(datePrefix + 200),  // ISODate("1970-01-20T10:55:12.640Z")
         [metaFieldName]: "cpu",
         topLevelScalar: 456,
+        topLevelScalarDouble: 546.76858699,
         topLevelArray: [101, 102, 103, 104],
         arrOfObj: [{x: 101}, {x: 102}, {x: 103}, {x: 104}],
         obj: {a: 456},
@@ -564,5 +566,123 @@ TimeseriesTest.run((insert) => {
                 .toArray();
         assert.eq(res.length, 1, res);
         assert.eq(res[0]._id, 1, res);
+    }
+
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$round: ["$topLevelScalarDouble", 2]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "value": 670.65}], res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$round: ["$topLevelScalarDouble"]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "value": 671}], res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$round: [2, "$topLevelScalarDouble"]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        assert.throws(() => coll.aggregate(pipeline));
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$round: ["$topLevelScalarDouble", "$topLevelScalar"]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        assert.throws(() => coll.aggregate(pipeline));
+    }
+
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$trunc: ["$topLevelScalarDouble", 2]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "value": 670.63}], res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$trunc: ["$topLevelScalarDouble"]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "value": 669}], res);
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$trunc: [2, "$topLevelScalarDouble"]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        assert.throws(() => coll.aggregate(pipeline));
+    }
+    {
+        let pipeline = [
+            {$addFields: {"computedA": {$trunc: ["$topLevelScalarDouble", "$topLevelScalar"]}}},
+            {$match: {"computedA": {$gte: 100}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "value": {$sum: "$computedA"},
+                }
+            }
+        ];
+
+        assert.throws(() => coll.aggregate(pipeline));
     }
 });

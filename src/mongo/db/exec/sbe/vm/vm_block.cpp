@@ -631,7 +631,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithm
 
     tassert(8332300,
             "First argument of block arithmetic operation must be block of values representing a "
-            "bitmask orNothing",
+            "bitmask or Nothing",
             bitsetTag == value::TypeTags::valueBlock || bitsetTag == value::TypeTags::Nothing);
     value::Value* bitsetVals = nullptr;
     value::TypeTags* bitsetTags = nullptr;
@@ -816,6 +816,50 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMult(A
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDiv(ArityType arity) {
     return builtinValueBlockArithmeticOperation<static_cast<int>(ArithmeticOp::Division)>(arity);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::blockRoundTrunc(
+    std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity) {
+    invariant(arity == 1 || arity == 2);
+    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+    tassert(8333100,
+            "First argument of " + funcName + " must be block of values.",
+            inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    int32_t place = 0;
+    if (arity == 2) {
+        const auto [placeOwn, placeTag, placeVal] = getFromStack(1);
+        if (!value::isNumber(placeTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        place = convertNumericToInt32(placeTag, placeVal);
+    }
+
+    // What should this be?
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Nothing,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+        [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
+            auto [_, resTag, resVal] = genericRoundTrunc(funcName, roundingMode, place, tag, val);
+            return {resTag, resVal};
+        });
+
+    auto res = valueBlockIn->map(cmpOp);
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockTrunc(ArityType arity) {
+    return blockRoundTrunc("$trunc", Decimal128::kRoundTowardZero, arity);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockRound(ArityType arity) {
+    return blockRoundTrunc("$round", Decimal128::kRoundTiesToEven, arity);
 }
 
 namespace {

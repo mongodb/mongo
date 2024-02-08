@@ -2572,10 +2572,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFloor(ArityType 
     return genericFloor(tagOperand, valOperand);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrunc(ArityType arity) {
-    return genericRoundTrunc("$trunc", Decimal128::kRoundTowardZero, arity);
-}
-
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExp(ArityType arity) {
     invariant(arity == 1);
 
@@ -3896,7 +3892,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTanh(ArityType a
  * argument, which is checked to be a whole number between -20 and 100, but could still be a
  * non-int32 type.
  */
-static int32_t convertNumericToInt32(const value::TypeTags tag, const value::Value val) {
+int32_t ByteCode::convertNumericToInt32(const value::TypeTags tag, const value::Value val) {
     switch (tag) {
         case value::TypeTags::NumberInt32: {
             return value::bitcastTo<int32_t>(val);
@@ -3917,21 +3913,16 @@ static int32_t convertNumericToInt32(const value::TypeTags tag, const value::Val
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericRoundTrunc(
-    std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity) {
-    invariant(arity == 1 || arity == 2);
-    int32_t place = 0;
-    const auto [numOwn, numTag, numVal] = getFromStack(0);
-    if (arity == 2) {
-        const auto [placeOwn, placeTag, placeVal] = getFromStack(1);
-        if (!value::isNumber(placeTag)) {
-            return {false, value::TypeTags::Nothing, 0};
-        }
-        place = convertNumericToInt32(placeTag, placeVal);
-    }
+    std::string funcName,
+    Decimal128::RoundingMode roundingMode,
+    int32_t place,
+    value::TypeTags numTag,
+    value::Value numVal) {
 
     // Construct 10^-precisionValue, which will be used as the quantize reference. This is passed to
     // decimal.quantize() to indicate the precision of our rounding.
     const auto quantum = Decimal128(0LL, Decimal128::kExponentBias - place, 0LL, 1LL);
+
     switch (numTag) {
         case value::TypeTags::NumberDecimal: {
             auto dec = value::bitcastTo<Decimal128>(numVal);
@@ -3952,7 +3943,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericRoundTrunc(
         case value::TypeTags::NumberInt32:
         case value::TypeTags::NumberInt64: {
             if (place >= 0) {
-                return {numOwn, numTag, numVal};
+                return {false, numTag, numVal};
             }
             auto numericArgll = numTag == value::TypeTags::NumberInt32
                 ? static_cast<int64_t>(value::bitcastTo<int32_t>(numVal))
@@ -3977,8 +3968,28 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericRoundTrunc(
     }
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::scalarRoundTrunc(
+    std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity) {
+    invariant(arity == 1 || arity == 2);
+    int32_t place = 0;
+    const auto [_, numTag, numVal] = getFromStack(0);
+    if (arity == 2) {
+        const auto [placeOwn, placeTag, placeVal] = getFromStack(1);
+        if (!value::isNumber(placeTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        place = convertNumericToInt32(placeTag, placeVal);
+    }
+
+    return genericRoundTrunc(funcName, roundingMode, place, numTag, numVal);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrunc(ArityType arity) {
+    return scalarRoundTrunc("$trunc", Decimal128::kRoundTowardZero, arity);
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType arity) {
-    return genericRoundTrunc("$round", Decimal128::kRoundTiesToEven, arity);
+    return scalarRoundTrunc("$round", Decimal128::kRoundTiesToEven, arity);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityType arity) {
@@ -9527,6 +9538,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockDateDiff(arity);
         case Builtin::valueBlockDateTrunc:
             return builtinValueBlockDateTrunc(arity);
+        case Builtin::valueBlockTrunc:
+            return builtinValueBlockTrunc(arity);
+        case Builtin::valueBlockRound:
+            return builtinValueBlockRound(arity);
         case Builtin::valueBlockSum:
             return builtinValueBlockSum(arity);
         case Builtin::valueBlockAdd:
@@ -10023,6 +10038,14 @@ std::string builtinToString(Builtin b) {
             return "valueBlockMax";
         case Builtin::valueBlockCount:
             return "valueBlockCount";
+        case Builtin::valueBlockDateDiff:
+            return "valueBlockDateDiff";
+        case Builtin::valueBlockDateTrunc:
+            return "valueBlockDateTrunc";
+        case Builtin::valueBlockTrunc:
+            return "valueBlockTrunc";
+        case Builtin::valueBlockRound:
+            return "valueBlockRound";
         case Builtin::valueBlockSum:
             return "valueBlockSum";
         case Builtin::valueBlockAdd:

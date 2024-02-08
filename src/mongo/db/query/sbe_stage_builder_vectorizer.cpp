@@ -624,6 +624,38 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
                         .include(args[1].typeSignature.intersect(TypeSignature::kNothingType)),
                     args[0].sourceCell};
         }
+
+        if (arity == 1 || arity == 2) {
+            if (op.name() == "round"s &&
+                TypeSignature::kBlockType.isSubset(args[0].typeSignature)) {
+                optimizer::ABTVector functionArgs;
+                functionArgs.reserve(arity);
+                functionArgs.emplace_back(std::move(*args[0].expr));
+                if (arity == 2) {
+                    functionArgs.emplace_back(std::move(*args[1].expr));
+                }
+                return {makeABTFunction("valueBlockRound"_sd, std::move(functionArgs)),
+                        TypeSignature::kBlockType
+                            .include(args[0].typeSignature.intersect(TypeSignature::kNumericType))
+                            .include(TypeSignature::kNothingType),
+                        args[0].sourceCell};
+            }
+
+            if (op.name() == "trunc"s &&
+                TypeSignature::kBlockType.isSubset(args[0].typeSignature)) {
+                optimizer::ABTVector functionArgs;
+                functionArgs.reserve(arity);
+                functionArgs.emplace_back(std::move(*args[0].expr));
+                if (arity == 2) {
+                    functionArgs.emplace_back(std::move(*args[1].expr));
+                }
+                return {makeABTFunction("valueBlockTrunc"_sd, std::move(functionArgs)),
+                        TypeSignature::kBlockType
+                            .include(args[0].typeSignature.intersect(TypeSignature::kNumericType))
+                            .include(TypeSignature::kNothingType),
+                        args[0].sourceCell};
+            }
+        }
     }
     // We don't support this function applied to multiple blocks at the same time.
     logUnsupportedConversion(n);
