@@ -1005,6 +1005,17 @@ tasks:
   - func: "send benchmark results"
 #  - func: "analyze benchmark results"
 
+- <<: *benchmark_template
+  name: benchmarks_bsoncolumn
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "benchmarks"]
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      suite: benchmarks_bsoncolumn
+      resmoke_jobs_max: 1
+  - func: "send benchmark results"
+
 - <<: *jstestfuzz_template
   name: move_collection_fuzzer_gen
   tags: ["assigned_to_jira_team_server_cluster_scalability", "require_npm", "random_name", "feature_flag_guarded"]

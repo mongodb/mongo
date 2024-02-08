@@ -78,6 +78,7 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/sbe_values',
         'bson_column',
     ],
 )
