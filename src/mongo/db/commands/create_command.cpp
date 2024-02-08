@@ -47,6 +47,7 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -314,28 +315,7 @@ public:
                 }
             } else {
                 // Clustered collection.
-                if (cmd.getCapped()) {
-                    uassert(ErrorCodes::Error(6127800),
-                            "Clustered capped collection only available with 'enableTestCommands' "
-                            "server parameter",
-                            getTestCommandsEnabled());
-                }
-
-                uassert(ErrorCodes::Error(6049200),
-                        str::stream() << "'size' field for capped collections is not "
-                                         "allowed on clustered collections. "
-                                      << "Did you mean 'capped: true' with 'expireAfterSeconds'?",
-                        !cmd.getSize());
-                uassert(ErrorCodes::Error(6049204),
-                        str::stream() << "'max' field for capped collections is not "
-                                         "allowed on clustered collections. "
-                                      << "Did you mean 'capped: true' with 'expireAfterSeconds'?",
-                        !cmd.getMax());
-                if (cmd.getCapped()) {
-                    uassert(ErrorCodes::Error(6049201),
-                            "A capped clustered collection requires the 'expireAfterSeconds' field",
-                            cmd.getExpireAfterSeconds());
-                }
+                clustered_util::checkCreationOptions(cmd);
             }
 
             // The 'temp' field is only allowed to be used internally and isn't available to

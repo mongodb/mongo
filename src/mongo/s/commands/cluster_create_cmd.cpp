@@ -38,6 +38,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -95,9 +96,14 @@ public:
             auto dbName = cmd.getDbName();
             cluster::createDatabase(opCtx, dbName);
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "specify size:<n> when capped is true",
-                    !cmd.getCapped() || cmd.getSize());
+            if (cmd.getClusteredIndex()) {
+                clustered_util::checkCreationOptions(cmd);
+            } else {
+                uassert(ErrorCodes::InvalidOptions,
+                        "specify size:<n> when capped is true",
+                        !cmd.getCapped() || cmd.getSize());
+            }
+
             uassert(ErrorCodes::InvalidOptions,
                     "the 'temp' field is an invalid option",
                     !cmd.getTemp());

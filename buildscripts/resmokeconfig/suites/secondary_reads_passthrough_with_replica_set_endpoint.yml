@@ -82,8 +82,7 @@ selector:
     # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on
     # sharded cluster but succeeds on replica set
     - jstests/core/views/invalid_system_views.js
-    # TODO (SERVER-84331): createCollection command for capped collections on sharded cluster requires
-    # the "size' field but the same command on replica set it doesn't.
+    # TODO (SERVER-86364): Secondary reads assertion fails.
     - jstests/core/clustered/clustered_collection_creation.js
     # TODO (SERVER-84243): Separate Shard-Role Catalog Cache and Loader. This test runs the fsync
     # command so causes catalog cache refreshes which currently involve doing noop writes to hang.

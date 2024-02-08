@@ -99,9 +99,6 @@ selector:
     # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on
     # sharded cluster but succeeds on replica set
     - jstests/core/views/invalid_system_views.js
-    # TODO (SERVER-84331): createCollection command for capped collections on sharded cluster requires
-    # the "size' field but the same command on replica set it doesn't.
-    - jstests/core/clustered/clustered_collection_creation.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

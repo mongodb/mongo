@@ -155,5 +155,28 @@ BSONObj getSortPattern(const ClusteredIndexSpec& indexSpec) {
     return indexSpec.getKey();
 }
 
+void checkCreationOptions(const CreateCommand& cmd) {
+    uassert(ErrorCodes::Error(6049200),
+            str::stream() << "'size' field for capped collections is not allowed on clustered "
+                             "collections. Did you mean 'capped: true' with 'expireAfterSeconds'?",
+            !cmd.getSize());
+
+    uassert(ErrorCodes::Error(6049204),
+            str::stream() << "'max' field for capped collections is not allowed on clustered "
+                             "collections. Did you mean 'capped: true' with 'expireAfterSeconds'?",
+            !cmd.getMax());
+
+    if (cmd.getCapped()) {
+        uassert(
+            ErrorCodes::Error(6127800),
+            "Clustered capped collection only available with 'enableTestCommands' server parameter",
+            getTestCommandsEnabled());
+
+        uassert(ErrorCodes::Error(6049201),
+                "A capped clustered collection requires the 'expireAfterSeconds' field",
+                cmd.getExpireAfterSeconds());
+    }
+}
+
 }  // namespace clustered_util
 }  // namespace mongo
