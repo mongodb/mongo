@@ -70,6 +70,7 @@ const expectedParamDefaults = {
     internalQueryDocumentSourceWriterBatchExtraReservedBytes: 0,
     internalQuerySlotBasedExecutionDisableTimeSeriesPushdown: false,
     internalQueryCollectOptimizerMetrics: false,
+    internalQueryDisablePlanCache: false,
 };
 
 function assertDefaultParameterValues() {
@@ -318,5 +319,8 @@ assertSetParameterSucceeds("internalQuerySlotBasedExecutionDisableTimeSeriesPush
 
 assertSetParameterSucceeds("internalQueryCollectOptimizerMetrics", true);
 assertSetParameterSucceeds("internalQueryCollectOptimizerMetrics", false);
+
+assertSetParameterSucceeds("internalQueryDisablePlanCache", true);
+assertSetParameterSucceeds("internalQueryDisablePlanCache", false);
 
 MongoRunner.stopMongod(conn);

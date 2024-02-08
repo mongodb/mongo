@@ -184,7 +184,7 @@ server_parameters:
 
   internalQueryDisablePlanCache:
     description:  "Disables caching of query plans for both classic and SBE engines."
-    set_at: [ startup ]
+    set_at: [ startup, runtime ]
     cpp_varname: "internalQueryDisablePlanCache"
     cpp_vartype: AtomicWord<bool>
     default: false
