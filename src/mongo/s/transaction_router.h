@@ -135,6 +135,7 @@ public:
         BSONObj attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                         BSONObj cmd,
                                         bool isFirstStatementInThisParticipant,
+                                        bool addingParticipantViaSubRouter,
                                         bool hasTxnCreatedAnyDatabase) const;
 
         // True if the participant has been chosen as the coordinator for its transaction
@@ -783,6 +784,7 @@ public:
         const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
         const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
         bool doAppendStartTransaction,
+        bool startOrContinueTransaction,
         bool hasTxnCreatedAnyDatabase);
 
     /**

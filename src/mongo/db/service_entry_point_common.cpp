@@ -946,11 +946,15 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
             try {
                 auto opObserver = opCtx->getServiceContext()->getOpObserver();
                 opObserver->onTransactionStart(opCtx);
-                auto transactionAction = sessionOptions.getStartTransaction()
-                    ? TransactionParticipant::TransactionActions::kStart
-                    : (sessionOptions.getAutocommit()
-                           ? TransactionParticipant::TransactionActions::kContinue
-                           : TransactionParticipant::TransactionActions::kNone);
+                auto transactionAction = TransactionParticipant::TransactionActions::kNone;
+                if (sessionOptions.getStartTransaction()) {
+                    transactionAction = TransactionParticipant::TransactionActions::kStart;
+                } else if (sessionOptions.getStartOrContinueTransaction()) {
+                    transactionAction =
+                        TransactionParticipant::TransactionActions::kStartOrContinue;
+                } else if (sessionOptions.getAutocommit()) {
+                    transactionAction = TransactionParticipant::TransactionActions::kContinue;
+                }
                 txnParticipant.beginOrContinue(
                     opCtx,
                     {*sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter()},

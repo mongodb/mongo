@@ -464,6 +464,7 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     OperationContext* opCtx,
     BSONObj cmd,
     bool isFirstStatementInThisParticipant,
+    bool addingParticipantViaSubRouter,
     bool hasTxnCreatedAnyDatabase) const {
     bool hasStartTxn = false;
     bool hasAutoCommit = false;
@@ -491,7 +492,8 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     auto cmdName = cmd.firstElement().fieldNameStringData();
     auto service = opCtx->getService();
     bool mustStartTransaction =
-        isFirstStatementInThisParticipant && !isTransactionCommand(service, cmdName);
+        (isFirstStatementInThisParticipant || addingParticipantViaSubRouter) &&
+        !isTransactionCommand(service, cmdName);
 
     // Strip the command of its read concern if it should not have one.
     if (!mustStartTransaction) {
@@ -509,6 +511,7 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
               sharedOptions.atClusterTimeForSnapshotReadConcern,
               sharedOptions.placementConflictTimeForNonSnapshotReadConcern,
               !hasStartTxn,
+              addingParticipantViaSubRouter,
               hasTxnCreatedAnyDatabase)
         : appendFieldsForContinueTransaction(
               std::move(cmd),
@@ -716,7 +719,11 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
                     "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
                     "shardId"_attr = shardId,
                     "request"_attr = redact(cmdObj));
-        return txnPart->attachTxnFieldsIfNeeded(opCtx, cmdObj, false, hasTxnCreatedAnyDatabase);
+        return txnPart->attachTxnFieldsIfNeeded(opCtx,
+                                                cmdObj,
+                                                false /* isFirstStatementInThisParticipant */,
+                                                false /* addingParticipantViaSubRouter */,
+                                                hasTxnCreatedAnyDatabase);
     }
 
     auto txnPart = _createParticipant(opCtx, shardId);
@@ -733,7 +740,11 @@ BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opC
         RouterTransactionsMetrics::get(opCtx)->incrementTotalContactedParticipants();
     }
 
-    return txnPart.attachTxnFieldsIfNeeded(opCtx, cmdObj, true, hasTxnCreatedAnyDatabase);
+    return txnPart.attachTxnFieldsIfNeeded(opCtx,
+                                           cmdObj,
+                                           true /* isFirstStatementInThisParticipant */,
+                                           o().subRouter,
+                                           hasTxnCreatedAnyDatabase);
 }
 
 const TransactionRouter::Participant* TransactionRouter::Router::getParticipant(
@@ -1087,7 +1098,7 @@ void TransactionRouter::Router::_beginTxn(OperationContext* opCtx,
               o().txnNumberAndRetryCounter.getTxnNumber());
 
     switch (action) {
-        case TransactionActions::kStartOrContinue:  // fall through to case kStart
+        case TransactionActions::kStartOrContinue:
         case TransactionActions::kStart: {
             _resetRouterStateForStartTransaction(opCtx, txnNumberAndRetryCounter);
             if (action == TransactionActions::kStartOrContinue) {
@@ -1155,6 +1166,7 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
         uassert(ErrorCodes::InterruptedAtShutdown,
                 "New transaction cannot be started at shutdown.",
                 !SessionCatalog::get(opCtx)->getDisallowNewTransactions());
+
         _beginTxn(opCtx, txnNumberAndRetryCounter, action);
     }
 
@@ -2161,6 +2173,7 @@ BSONObj TransactionRouter::appendFieldsForStartTransaction(
     const boost::optional<LogicalTime>& atClusterTimeForSnapshotReadConcern,
     const boost::optional<LogicalTime>& placementConflictTimeForNonSnapshotReadConcern,
     bool doAppendStartTransaction,
+    bool doAppendStartOrContinueTransaction,
     bool hasTxnCreatedAnyDatabase) {
     BSONObjBuilder cmdBob;
 
@@ -2195,9 +2208,13 @@ BSONObj TransactionRouter::appendFieldsForStartTransaction(
         databaseVersion->serialize(&dbvBuilder);
     }
 
-    if (doAppendStartTransaction) {
+    if (doAppendStartOrContinueTransaction) {
+        cmdBob.append(OperationSessionInfo::kStartOrContinueTransactionFieldName,
+                      doAppendStartOrContinueTransaction);
+    } else if (doAppendStartTransaction) {
         cmdBob.append(OperationSessionInfoFromClient::kStartTransactionFieldName, true);
     }
+
 
     return cmdBob.obj();
 }

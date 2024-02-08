@@ -62,8 +62,6 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
     for (const auto& request : requests) {
         newRequests.emplace_back(
             request.shardId,
-            // TODO SERVER-85164 txnRouter should attach startOrContinue if
-            // activeTxnParticipantAddParticipants is true
             txnRouter.attachTxnFieldsIfNeeded(opCtx, request.shardId, request.cmdObj));
     }
 
