@@ -184,7 +184,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
                                       repl::OplogApplication::Mode oplogApplicationMode) {
 
     const bool allowCollectionCreatinInPreparedTransactions =
-        feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+        feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     // Apply each the operations via repl::applyOperation.
     for (const auto& op : txnOps) {

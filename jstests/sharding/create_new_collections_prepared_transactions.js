@@ -59,7 +59,7 @@ retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
 }, txnOptions);
 
 // TODO SERVER-77915: Remove when deleting the feature flag.
-if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsOnShardingCatalog")) {
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CreateCollectionInPreparedTransactions")) {
     assert.commandWorked(session.commitTransaction_forTesting());
 
     assertDropCollection(st.s.getDB(dbNameShard0), newCollName);
