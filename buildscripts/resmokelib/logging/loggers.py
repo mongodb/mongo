@@ -242,7 +242,8 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
                     " test_id".format(test_basename))
 
             url = BUILDLOGGER_SERVER.get_test_log_url(build_id, test_id)
-            meta_logger.info("Writing output of %s to %s.", test_basename, url)
+            parsley_url = BUILDLOGGER_SERVER.get_parsley_log_url(build_id, test_id)
+            meta_logger.info("Writing output of %s to %s.", test_basename, parsley_url)
 
         return (test_id, url)
 
