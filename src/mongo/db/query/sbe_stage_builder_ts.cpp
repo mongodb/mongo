@@ -433,13 +433,8 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
     }
 
-    // Insert a BlockToRow stage and let the rest of the pipeline work on scalar values if:
-    // - we have a filter that we could not vectorize
-    // - we are supposed to return a BSON result
-    // - the caller doesn't support working on block values
-    if (eventFilter || reqs.hasResult() || !reqs.getCanProcessBlockValues()) {
-        stage = buildBlockToRow(std::move(stage), outputs);
-    }
+    // Always insert a BlockToRow stage and let the rest of the pipeline work on scalar values.
+    stage = buildBlockToRow(std::move(stage), outputs);
 
     // Add filter stage(s) for the per-event filter.
     if (eventFilter) {
