@@ -55,6 +55,7 @@ variables:
   packager_distro: amazon2
   repo_edition: enterprise
   large_distro_name: amazon2-arm64-large
+  core_analyzer_distro_name: amazon2-arm64-xlarge
   num_scons_link_jobs_available: 0.99
 
 - &amazon_linux2_arm64_dynamic_expansions
