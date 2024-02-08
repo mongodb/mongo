@@ -416,7 +416,7 @@ last-continuous:
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-79446
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-82353
+    ticket: SERVER-84723
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js
@@ -919,7 +919,7 @@ last-lts:
   - test_file: jstests/core/timeseries/timeseries_collection_uuid.js
     ticket: SERVER-79446
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
-    ticket: SERVER-82353
+    ticket: SERVER-84723
   - test_file: jstests/sharding/move_chunk_basic.js
     ticket: SERVER-81201
   - test_file: jstests/sharding/flushRoutingTableCacheUpdates_enforced_on_collections.js

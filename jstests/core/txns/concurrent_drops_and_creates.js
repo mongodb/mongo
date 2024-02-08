@@ -117,7 +117,8 @@ assert.commandWorked(testDB2.runCommand({create: collNameB}));
 // TODO SERVER-67289: Remove feature flag check.
 if (FeatureFlagUtil.getStatus(
         db, "PointInTimeCatalogLookups", /*user=*/ undefined, /*ignoreFCV=*/ true) ==
-    FeatureFlagUtil.FlagStatus.kEnabled) {
+        FeatureFlagUtil.FlagStatus.kEnabled &&
+    !FixtureHelpers.isMongos(db)) {
     // We can insert to collection B in the transaction as the transaction does not have a
     // collection on this namespace (even as it exist at latest). A collection will be implicitly
     // created and we will fail to commit this transaction with a WriteConflict error.

@@ -768,6 +768,18 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
         }
     }
 
+    const auto receivedShardVersion{
+        OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
+    if (receivedShardVersion) {
+        auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
+        scopedCss->checkShardVersionOrThrow(opCtx);
+
+        if (receivedShardVersion == ShardVersion::UNSHARDED()) {
+            auto_get_collection::checkLocalCatalogIsValidForUnshardedShardVersion(
+                opCtx, *catalog, _coll, _resolvedNss);
+        }
+    }
+
     if (_coll) {
         // Fetch and store the sharding collection description data needed for use during the
         // operation. The shardVersion will be checked later if the shard filtering metadata is
@@ -776,8 +788,6 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
         //
         // Note: sharding versioning for an operation has no concept of multiple collections.
         auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
-        scopedCss->checkShardVersionOrThrow(opCtx);
-
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
             _coll.setShardKeyPattern(collDesc.getKeyPattern());
@@ -800,9 +810,6 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
     }
 
     // No Collection found, try and lookup view.
-    const auto receivedShardVersion{
-        OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
-
     if (!options._expectedUUID) {
         // We only need to look up a view if an expected collection UUID was not provided. If this
         // namespace were a view, the collection UUID mismatch check would have failed above.

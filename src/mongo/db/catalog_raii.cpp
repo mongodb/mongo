@@ -338,6 +338,9 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                               verifyWriteEligible);
     }
 
+    const auto receivedShardVersion{
+        OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
+
     if (_coll) {
         // Fetch and store the sharding collection description data needed for use during the
         // operation. The shardVersion will be checked later if the shard filtering metadata is
@@ -355,11 +358,18 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
         checkCollectionUUIDMismatch(opCtx, catalog, _resolvedNss, _coll, options._expectedUUID);
 
+        if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNSHARDED()) {
+            auto_get_collection::checkLocalCatalogIsValidForUnshardedShardVersion(
+                opCtx, *catalog, _coll, _resolvedNss);
+        }
+
         return;
     }
 
-    const auto receivedShardVersion{
-        OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
+    if (receivedShardVersion && *receivedShardVersion == ShardVersion::UNSHARDED()) {
+        auto_get_collection::checkLocalCatalogIsValidForUnshardedShardVersion(
+            opCtx, *catalog, _coll, _resolvedNss);
+    }
 
     if (!options._expectedUUID) {
         // We only need to look up a view if an expected collection UUID was not provided. If this
@@ -722,5 +732,42 @@ AutoGetChangeCollection::operator bool() const {
     return _coll && _coll->getCollection().get();
 }
 
+void auto_get_collection::checkLocalCatalogIsValidForUnshardedShardVersion(
+    OperationContext* opCtx,
+    const CollectionCatalog& stashedCatalog,
+    const CollectionPtr& collectionPtr,
+    const NamespaceString& nss) {
+    if (opCtx->inMultiDocumentTransaction()) {
+        // The latest catalog.
+        const auto latestCatalog = CollectionCatalog::latest(opCtx);
+
+        const auto makeErrorMessage = [&nss]() {
+            std::string errmsg = str::stream()
+                << "Collection " << nss.toStringForErrorMsg()
+                << " has undergone a catalog change and no longer satisfies the "
+                   "requirements for the current transaction.";
+            return errmsg;
+        };
+
+        if (collectionPtr) {
+            // The transaction sees a collection exists.
+            uassert(ErrorCodes::SnapshotUnavailable,
+                    makeErrorMessage(),
+                    latestCatalog->containsCollection(opCtx, collectionPtr.get()));
+        } else if (const auto currentView = stashedCatalog.lookupView(opCtx, nss)) {
+            // The transaction sees a view exists.
+            uassert(ErrorCodes::SnapshotUnavailable,
+                    makeErrorMessage(),
+                    currentView == latestCatalog->lookupView(opCtx, nss));
+        } else {
+            // The transaction sees neither a collection nor a view exist. Make sure that the latest
+            // catalog looks the same.
+            uassert(ErrorCodes::SnapshotUnavailable,
+                    makeErrorMessage(),
+                    !latestCatalog->lookupCollectionByNamespace(opCtx, nss) &&
+                        !latestCatalog->lookupView(opCtx, nss));
+        }
+    }
+}
 
 }  // namespace mongo
