@@ -45,13 +45,15 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
-#include "mongo/db/query/plan_enumerator_explain_info.h"
+#include "mongo/db/query/plan_enumerator/memo.h"
+#include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
+namespace plan_enumerator {
 
 struct PlanEnumeratorParams {
     PlanEnumeratorParams()
@@ -106,8 +108,6 @@ public:
      */
     PlanEnumerator(const PlanEnumeratorParams& params);
 
-    ~PlanEnumerator();
-
     /**
      * Returns OK and performs a sanity check on the input parameters and prepares the
      * internal state so that getNext() can be called. Returns an error status with a
@@ -135,18 +135,6 @@ private:
     //
     // Memoization strategy
     //
-
-
-    // Everything is really a size_t but it's far more readable to impose a type via typedef.
-
-    // An ID we use to index into _memo.  An entry in _memo is a NodeAssignment.
-    typedef size_t MemoID;
-
-    // An index in _indices.
-    typedef size_t IndexID;
-
-    // The position of a field in a possibly compound index.
-    typedef size_t IndexPosition;
 
     /**
      * Represents the route that an outside predicate has taken during the PlanEnumerator's
@@ -193,7 +181,7 @@ private:
      * Traverses the match expression and generates the memo structure from it.
      * Returns true if the provided node uses an index, false otherwise.
      */
-    bool prepMemo(MatchExpression* node, PrepMemoContext context);
+    bool prepMemo(MatchExpression* node, const PrepMemoContext& context);
 
     /**
      * Traverses the memo structure and annotates the tree with IndexTags for the chosen
@@ -234,97 +222,13 @@ private:
      * have been pushed down through OR nodes.
      */
 
-    struct OrAssignment {
-        OrAssignment() : counter(0) {}
-
-        // Each child of an OR must be indexed for the OR to be indexed. When an OR moves to a
-        // subsequent state it just asks all its children to move their states forward.
-
-        // Must use all of subnodes.
-        std::vector<MemoID> subnodes;
-
-        // The number of OR states that we've enumerated so far.
-        size_t counter;
-    };
-
-    struct LockstepOrAssignment {
-        struct PreferFirstSubNode {
-            MemoID memoId;
-            size_t iterationCount;
-            boost::optional<size_t> maxIterCount;
-        };
-        std::vector<PreferFirstSubNode> subnodes;
-
-        bool exhaustedLockstepIteration = false;
-        size_t totalEnumerated = 0;
-
-        /**
-         * Returns true if 'totalEnumerated' matches the total number of expected plans for this
-         * assignment.
-         */
-        bool shouldResetBeforeProceeding(size_t totalEnumerated, size_t orLimit) const;
-
-        /**
-         * Returns true if each sub node is at the same iterationCount.
-         */
-        bool allIdentical() const;
-    };
-
-    // This is used by AndAssignment and is not an actual assignment.
-    struct OneIndexAssignment {
-        // 'preds[i]' is uses index 'index' at position 'positions[i]'
-        std::vector<MatchExpression*> preds;
-        std::vector<IndexPosition> positions;
-        IndexID index;
-
-        // True if the bounds on 'index' for the leaf expressions in 'preds' can be intersected
-        // and/or compounded, and false otherwise. If 'canCombineBounds' is set to false and
-        // multiple predicates are assigned to the same position of a multikey index, then the
-        // access planner should generate a self-intersection plan.
-        bool canCombineBounds = true;
-
-        // The expressions that should receive an OrPushdownTag when this assignment is made.
-        std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> orPushdowns;
-    };
-
-    struct AndEnumerableState {
-        std::vector<OneIndexAssignment> assignments;
-        std::vector<MemoID> subnodesToIndex;
-    };
-
-    struct AndAssignment {
-        AndAssignment() : counter(0) {}
-
-        std::vector<AndEnumerableState> choices;
-
-        // We're on the counter-th member of state.
-        size_t counter;
-    };
-
-    struct ArrayAssignment {
-        ArrayAssignment() : counter(0) {}
-        std::vector<MemoID> subnodes;
-        size_t counter;
-    };
-
-    /**
-     * Associates indices with predicates.
-     */
-    struct NodeAssignment {
-        std::unique_ptr<OrAssignment> orAssignment;
-        std::unique_ptr<LockstepOrAssignment> lockstepOrAssignment;
-        std::unique_ptr<AndAssignment> andAssignment;
-        std::unique_ptr<ArrayAssignment> arrayAssignment;
-        std::string toString() const;
-    };
-
     /**
      * Allocates a NodeAssignment and associates it with the provided 'expr'.
      *
      * The unique MemoID of the new assignment is outputted in '*id'.
      * The out parameter '*slot' points to the newly allocated NodeAssignment.
      */
-    void allocateAssignment(MatchExpression* expr, NodeAssignment** slot, MemoID* id);
+    std::pair<MemoID, NodeAssignment*> allocateAssignment(MatchExpression* expr);
 
     /**
      * Predicates inside $elemMatch's that are semantically "$and of $and"
@@ -343,7 +247,7 @@ private:
      * Returns false if the AND cannot be indexed. Otherwise returns true.
      */
     void getIndexedPreds(MatchExpression* node,
-                         PrepMemoContext context,
+                         const PrepMemoContext& context,
                          std::vector<MatchExpression*>* indexOut);
 
     /**
@@ -354,7 +258,7 @@ private:
      * to stop enumerating alternatives for an indexed OR.
      */
     bool prepSubNodes(MatchExpression* node,
-                      PrepMemoContext context,
+                      const PrepMemoContext& context,
                       std::vector<MemoID>* subnodesOut,
                       std::vector<MemoID>* mandatorySubnodes);
 
@@ -476,7 +380,7 @@ private:
      *   the single index {a: 1, b: 1} via compounding.
      */
     bool alreadyCompounded(const std::set<MatchExpression*>& ixisectAssigned,
-                           const AndAssignment* andAssignment);
+                           const AndAssignment* andAssignment) const;
 
     struct CmpByIndexID {
         bool operator()(IndexID a, IndexID b) const {
@@ -547,7 +451,7 @@ private:
      * Returns the position that 'predicate' can use in the key pattern for 'indexEntry'. It is
      * illegal to call this if 'predicate' does not have a RelevantTag, or it cannot use the index.
      */
-    size_t getPosition(const IndexEntry& indexEntry, MatchExpression* predicate);
+    size_t getPosition(const IndexEntry& indexEntry, MatchExpression* predicate) const;
 
     /**
      * Adds 'pred' to 'indexAssignment', using 'position' as its position in the index. If 'pred' is
@@ -572,20 +476,20 @@ private:
      * Return the memo entry for 'node'.  Does some sanity checking to ensure that a memo entry
      * actually exists.
      */
-    MemoID memoIDForNode(MatchExpression* node);
+    MemoID memoIDForNode(MatchExpression* node) const;
 
     /**
      * Helper for advancing the enumeration for a LockstepOrAssignment node.
      */
     bool _nextMemoForLockstepOrAssignment(LockstepOrAssignment*);
 
-    std::string dumpMemo();
+    std::string dumpMemo() const;
 
     // Map from expression to its MemoID.
     stdx::unordered_map<MatchExpression*, MemoID> _nodeToId;
 
     // Map from MemoID to its precomputed solution info.
-    stdx::unordered_map<MemoID, NodeAssignment*> _memo;
+    stdx::unordered_map<MemoID, std::unique_ptr<NodeAssignment>> _memo;
 
     // If true, there are no further enumeration states, and getNext should return false.
     // We could be _done immediately after init if we're unable to output an indexed plan.
@@ -618,4 +522,5 @@ private:
     const bool _disableOrPushdown;
 };
 
+}  // namespace plan_enumerator
 }  // namespace mongo

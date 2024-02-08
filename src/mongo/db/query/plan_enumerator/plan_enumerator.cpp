@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/query/plan_enumerator.h"
+#include "mongo/db/query/plan_enumerator/plan_enumerator.h"
 
 #include <absl/meta/type_traits.h>
 // IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
@@ -51,6 +51,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/plan_enumerator/memo.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -67,6 +68,7 @@
 namespace {
 
 using namespace mongo;
+using namespace plan_enumerator;
 using std::endl;
 using std::set;
 using std::string;
@@ -113,9 +115,8 @@ bool isPathOutsideElemMatch(const RelevantTag* rt, size_t component) {
 
 using PossibleFirstAssignment = std::vector<MatchExpression*>;
 
-void getPossibleFirstAssignments(const IndexEntry& thisIndex,
-                                 const vector<MatchExpression*>& predsOverLeadingField,
-                                 std::vector<PossibleFirstAssignment>* possibleFirstAssignments) {
+std::vector<PossibleFirstAssignment> getPossibleFirstAssignments(
+    const IndexEntry& thisIndex, const vector<MatchExpression*>& predsOverLeadingField) {
     tassert(6811402,
             "Failed procondition in query plan enumerator",
             thisIndex.multikey && !thisIndex.multikeyPaths.empty());
@@ -124,14 +125,14 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
         // No prefix of the leading index field causes the index to be multikey. In other words, the
         // index isn't multikey as a result of the leading index field. We can then safely assign
         // all predicates on it to the index and the access planner will intersect the bounds.
-        *possibleFirstAssignments = {predsOverLeadingField};
-        return;
+        return {predsOverLeadingField};
     }
 
     // At least one prefix of the leading index field causes the index to be multikey. We can't
     // intersect bounds on the leading index field unless the predicates are joined by an
     // $elemMatch.
     std::map<MatchExpression*, std::vector<MatchExpression*>> predsByElemMatchExpr;
+    std::vector<PossibleFirstAssignment> possibleFirstAssignments;
     for (auto* pred : predsOverLeadingField) {
         tassert(6811403, "Failed procondition in query plan enumerator", pred->getTag());
         RelevantTag* rt = static_cast<RelevantTag*>(pred->getTag());
@@ -139,7 +140,7 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
         if (rt->elemMatchExpr == nullptr) {
             // 'pred' isn't part of an $elemMatch, so we can't assign any other predicates on the
             // leading index field to the index.
-            possibleFirstAssignments->push_back({pred});
+            possibleFirstAssignments.push_back({pred});
         } else {
             // 'pred' is part of an $elemMatch, so we group it together with any other leaf
             // expressions in the same $elemMatch context.
@@ -174,17 +175,18 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
             // The root of the $elemMatch is the longest prefix of the leading index field that
             // causes the index to be multikey, so we can assign all of the leaf expressions in the
             // $elemMatch to the index.
-            possibleFirstAssignments->push_back(elemMatchExprIt.second);
+            possibleFirstAssignments.push_back(elemMatchExprIt.second);
         } else {
             // There is a path longer than the root of the $elemMatch that causes the index to be
             // multikey, so we can only assign one of the leaf expressions in the $elemMatch to the
             // index. Since we don't know which one is the most selective, we generate a plan for
             // each predicate and rank them against each other.
             for (auto* predCannotIntersect : elemMatchExprIt.second) {
-                possibleFirstAssignments->push_back({predCannotIntersect});
+                possibleFirstAssignments.push_back({predCannotIntersect});
             }
         }
     }
+    return possibleFirstAssignments;
 }
 
 /**
@@ -255,30 +257,30 @@ bool canAssignPredToIndex(const RelevantTag* rt,
  */
 void tagForSort(MatchExpression* tree) {
     if (!Indexability::nodeCanUseIndexOnOwnField(tree)) {
-        const IndexTag* myIndexTag = nullptr;
+        const IndexTag* indexTag = nullptr;
         for (size_t i = 0; i < tree->numChildren(); ++i) {
             MatchExpression* child = tree->getChild(i);
             tagForSort(child);
             if (child->getTag() &&
                 child->getTag()->getType() == MatchExpression::TagData::Type::IndexTag) {
                 auto childTag = static_cast<const IndexTag*>(child->getTag());
-                if (!myIndexTag || myIndexTag->index > childTag->index) {
-                    myIndexTag = childTag;
+                if (!indexTag || indexTag->index > childTag->index) {
+                    indexTag = childTag;
                 }
             } else if (child->getTag() &&
                        child->getTag()->getType() ==
                            MatchExpression::TagData::Type::OrPushdownTag) {
                 OrPushdownTag* childTag = static_cast<OrPushdownTag*>(child->getTag());
                 if (childTag->getIndexTag()) {
-                    auto indexTag = static_cast<const IndexTag*>(childTag->getIndexTag());
-                    if (!myIndexTag || myIndexTag->index > indexTag->index) {
-                        myIndexTag = indexTag;
+                    auto childIndexTag = static_cast<const IndexTag*>(childTag->getIndexTag());
+                    if (!indexTag || indexTag->index > childIndexTag->index) {
+                        indexTag = childIndexTag;
                     }
                 }
             }
         }
-        if (myIndexTag) {
-            tree->setTag(new IndexTag(*myIndexTag));
+        if (indexTag) {
+            tree->setTag(new IndexTag(*indexTag));
         }
     }
 }
@@ -297,13 +299,6 @@ PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
       _intersectLimit(params.maxIntersectPerAnd),
       _disableOrPushdown(params.disableOrPushdown) {}
 
-PlanEnumerator::~PlanEnumerator() {
-    typedef stdx::unordered_map<MemoID, NodeAssignment*> MemoMap;
-    for (MemoMap::iterator it = _memo.begin(); it != _memo.end(); ++it) {
-        delete it->second;
-    }
-}
-
 Status PlanEnumerator::init() {
     // Fill out our memo structure from the tagged _root.
     _done = !prepMemo(_root, PrepMemoContext());
@@ -314,85 +309,18 @@ Status PlanEnumerator::init() {
     return Status::OK();
 }
 
-std::string PlanEnumerator::dumpMemo() {
+std::string PlanEnumerator::dumpMemo() const {
     str::stream ss;
 
     // Note that this needs to be kept in sync with allocateAssignment which assigns memo IDs.
     for (size_t i = 1; i <= _memo.size(); ++i) {
-        ss << "[Node #" << i << "]: " << _memo[i]->toString() << "\n";
+        ss << "[Node #" << i << "]: " << _memo.at(i)->toString() << "\n";
     }
     return ss;
 }
 
-string PlanEnumerator::NodeAssignment::toString() const {
-    if (nullptr != andAssignment) {
-        str::stream ss;
-        ss << "AND enumstate counter " << andAssignment->counter;
-        for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
-            ss << "\n\tchoice " << i << ":\n";
-            const AndEnumerableState& state = andAssignment->choices[i];
-            ss << "\t\tsubnodes: ";
-            for (size_t j = 0; j < state.subnodesToIndex.size(); ++j) {
-                ss << state.subnodesToIndex[j] << " ";
-            }
-            ss << '\n';
-            for (size_t j = 0; j < state.assignments.size(); ++j) {
-                const OneIndexAssignment& oie = state.assignments[j];
-                ss << "\t\tidx[" << oie.index << "]\n";
-
-                for (size_t k = 0; k < oie.preds.size(); ++k) {
-                    ss << "\t\t\tpos " << oie.positions[k] << " pred "
-                       << oie.preds[k]->debugString();
-                }
-
-                for (auto&& pushdown : oie.orPushdowns) {
-                    ss << "\t\torPushdownPred: " << pushdown.first->debugString();
-                }
-            }
-        }
-        return ss;
-    } else if (nullptr != arrayAssignment) {
-        str::stream ss;
-        ss << "ARRAY SUBNODES enumstate " << arrayAssignment->counter << "/ ONE OF: [ ";
-        for (size_t i = 0; i < arrayAssignment->subnodes.size(); ++i) {
-            ss << arrayAssignment->subnodes[i] << " ";
-        }
-        ss << "]";
-        return ss;
-    } else if (nullptr != orAssignment) {
-        str::stream ss;
-        ss << "ALL OF: [ ";
-        for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
-            ss << orAssignment->subnodes[i] << " ";
-        }
-        ss << "]";
-        return ss;
-    } else if (nullptr != lockstepOrAssignment) {
-        str::stream ss;
-        ss << "ALL OF (lockstep): {";
-        ss << "\n\ttotalEnumerated: " << lockstepOrAssignment->totalEnumerated;
-        ss << "\n\texhaustedLockstepIteration: "
-           << lockstepOrAssignment->exhaustedLockstepIteration;
-        ss << "\n\tsubnodes: [ ";
-        for (auto&& node : lockstepOrAssignment->subnodes) {
-            ss << "\n\t\t{";
-            ss << "memoId: " << node.memoId << ", ";
-            ss << "iterationCount: " << node.iterationCount << ", ";
-            if (node.maxIterCount) {
-                ss << "maxIterCount: " << node.maxIterCount;
-            } else {
-                ss << "maxIterCount: none";
-            }
-            ss << "},";
-        }
-        ss << "\n]";
-        return ss;
-    }
-    MONGO_UNREACHABLE;
-}
-
-PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
-    stdx::unordered_map<MatchExpression*, MemoID>::iterator it = _nodeToId.find(node);
+MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) const {
+    auto it = _nodeToId.find(node);
 
     if (_nodeToId.end() == it) {
         LOGV2_ERROR(20945, "Trying to look up memo entry for node, none found");
@@ -423,24 +351,20 @@ unique_ptr<MatchExpression> PlanEnumerator::getNext() {
 // Structure creation
 //
 
-void PlanEnumerator::allocateAssignment(MatchExpression* expr,
-                                        NodeAssignment** assign,
-                                        MemoID* id) {
+std::pair<MemoID, NodeAssignment*> PlanEnumerator::allocateAssignment(MatchExpression* expr) {
     // We start at 1 so that the lookup of any entries not explicitly allocated
     // will refer to an invalid memo slot.
-    size_t newID = _memo.size() + 1;
+    MemoID newID = _memo.size() + 1;
 
     // Shouldn't be anything there already.
     MONGO_verify(_nodeToId.end() == _nodeToId.find(expr));
     _nodeToId[expr] = newID;
     MONGO_verify(_memo.end() == _memo.find(newID));
-    NodeAssignment* newAssignment = new NodeAssignment();
-    _memo[newID] = newAssignment;
-    *assign = newAssignment;
-    *id = newID;
+    _memo[newID] = std::make_unique<NodeAssignment>();
+    return {newID, _memo[newID].get()};
 }
 
-bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
+bool PlanEnumerator::prepMemo(MatchExpression* node, const PrepMemoContext& context) {
     PrepMemoContext childContext;
     childContext.elemMatchExpr = context.elemMatchExpr;
     childContext.outsidePreds = context.outsidePreds;
@@ -485,28 +409,25 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         }
 
         // If we're here we're fully indexed and can be in the memo.
-        size_t myMemoID;
-        NodeAssignment* assign;
-        allocateAssignment(node, &assign, &myMemoID);
-
+        auto [memoID, assign] = allocateAssignment(node);
         if (_enumerateOrChildrenLockstep) {
-            LockstepOrAssignment* newOrAssign = new LockstepOrAssignment();
+            LockstepOrAssignment newOrAssign;
             for (size_t i = 0; i < node->numChildren(); ++i) {
-                newOrAssign->subnodes.push_back({memoIDForNode(node->getChild(i)), 0, boost::none});
+                newOrAssign.subnodes.push_back({memoIDForNode(node->getChild(i)), 0, boost::none});
             }
-            assign->lockstepOrAssignment.reset(newOrAssign);
+            assign->assignment = std::move(newOrAssign);
         } else {
-            OrAssignment* orAssignment = new OrAssignment();
+            OrAssignment orAssignment;
             for (size_t i = 0; i < node->numChildren(); ++i) {
-                orAssignment->subnodes.push_back(memoIDForNode(node->getChild(i)));
+                orAssignment.subnodes.push_back(memoIDForNode(node->getChild(i)));
             }
-            assign->orAssignment.reset(orAssignment);
+            assign->assignment = std::move(orAssignment);
         }
         return true;
     } else if (Indexability::arrayUsesIndexOnChildren(node)) {
         // Add each of our children as a subnode.  We enumerate through each subnode one at a
         // time until it's exhausted then we move on.
-        unique_ptr<ArrayAssignment> aa(new ArrayAssignment());
+        ArrayAssignment aa;
 
         if (MatchExpression::ELEM_MATCH_OBJECT == node->matchType()) {
             childContext.elemMatchExpr = node;
@@ -516,19 +437,16 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         // For an OR to be indexed, all its children must be indexed.
         for (size_t i = 0; i < node->numChildren(); ++i) {
             if (prepMemo(node->getChild(i), childContext)) {
-                aa->subnodes.push_back(memoIDForNode(node->getChild(i)));
+                aa.subnodes.push_back(memoIDForNode(node->getChild(i)));
             }
         }
 
-        if (0 == aa->subnodes.size()) {
+        if (aa.subnodes.empty()) {
             return false;
         }
 
-        size_t myMemoID;
-        NodeAssignment* assign;
-        allocateAssignment(node, &assign, &myMemoID);
-
-        assign->arrayAssignment = std::move(aa);
+        auto [memoID, assign] = allocateAssignment(node);
+        assign->assignment = std::move(aa);
         return true;
     } else if (Indexability::nodeCanUseIndexOnOwnField(node) ||
                Indexability::isBoundsGeneratingNot(node) ||
@@ -643,13 +561,10 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
             return false;
         }
 
-        AndAssignment* andAssignment = new AndAssignment();
-
-        size_t myMemoID;
-        NodeAssignment* nodeAssignment;
-        allocateAssignment(node, &nodeAssignment, &myMemoID);
+        auto [memoID, nodeAssignment] = allocateAssignment(node);
         // Takes ownership.
-        nodeAssignment->andAssignment.reset(andAssignment);
+        nodeAssignment->assignment = AndAssignment{};
+        AndAssignment* andAssignment = &std::get<AndAssignment>(nodeAssignment->assignment);
 
         // Predicates which must use an index might be buried inside
         // a subnode. Handle that case here.
@@ -881,12 +796,10 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                     std::find(indexAssign.preds.begin(), indexAssign.preds.end(), mandatoryPred));
 
         // Output the assignments for this index.
-        AndEnumerableState state;
-        state.assignments.push_back(std::move(indexAssign));
-        andAssignment->choices.push_back(std::move(state));
+        andAssignment->choices.push_back(AndEnumerableState::makeSingleton(std::move(indexAssign)));
     }
 
-    return andAssignment->choices.size() > 0;
+    return !andAssignment->choices.empty();
 }
 
 void PlanEnumerator::assignPredicate(
@@ -992,8 +905,8 @@ void PlanEnumerator::enumerateOneIndex(
             // the index to be multikey, we may not be able to assign all of predicates to the
             // index. Since we don't know which set of predicates is the most selective, we generate
             // multiple plans and rank them against each other.
-            std::vector<PossibleFirstAssignment> possibleFirstAssignments;
-            getPossibleFirstAssignments(thisIndex, it->second, &possibleFirstAssignments);
+            std::vector<PossibleFirstAssignment> possibleFirstAssignments =
+                getPossibleFirstAssignments(thisIndex, it->second);
 
             // Output an assignment for each of the possible assignments on the leading index field.
             for (const auto& firstAssignment : possibleFirstAssignments) {
@@ -1013,9 +926,8 @@ void PlanEnumerator::enumerateOneIndex(
 
                 // Do not output this assignment if it consists only of outside predicates.
                 if (!indexAssign.preds.empty()) {
-                    AndEnumerableState state;
-                    state.assignments.push_back(std::move(indexAssign));
-                    andAssignment->choices.push_back(std::move(state));
+                    andAssignment->choices.push_back(
+                        AndEnumerableState::makeSingleton(std::move(indexAssign)));
                 }
             }
         } else if (thisIndex.multikey) {
@@ -1052,9 +964,8 @@ void PlanEnumerator::enumerateOneIndex(
 
                 // Do not output this assignment if it consists only of outside predicates.
                 if (!indexAssign.preds.empty()) {
-                    AndEnumerableState state;
-                    state.assignments.push_back(std::move(indexAssign));
-                    andAssignment->choices.push_back(std::move(state));
+                    andAssignment->choices.push_back(
+                        AndEnumerableState::makeSingleton(std::move(indexAssign)));
                 }
             }
         } else {
@@ -1083,9 +994,8 @@ void PlanEnumerator::enumerateOneIndex(
             tassert(6811424,
                     "Failed procondition in query plan enumerator",
                     !indexAssign.preds.empty());
-            AndEnumerableState state;
-            state.assignments.push_back(std::move(indexAssign));
-            andAssignment->choices.push_back(std::move(state));
+            andAssignment->choices.push_back(
+                AndEnumerableState::makeSingleton(std::move(indexAssign)));
         }
     }
 }
@@ -1103,7 +1013,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
     //   1. Assign predicates which prefix idx1 to idx1.
     //   2. Add assigned predicates to a set of predicates---the "already
     //   assigned set".
-    //   3. Assign predicates which prefix idx2 to idx2, as long as they
+    //   3. Assign predicates which prefix idx2 to idx2, as long as they haven't
     //   been assigned to idx1 already. Add newly assigned predicates to
     //   the "already assigned set".
     //   4. Try to assign predicates to idx1 by compounding.
@@ -1151,9 +1061,8 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
                 oneAssign.preds.resize(kMaxSelfIntersections);
                 oneAssign.positions.resize(kMaxSelfIntersections);
             }
-            AndEnumerableState state;
-            state.assignments.push_back(std::move(oneAssign));
-            andAssignment->choices.push_back(std::move(state));
+            andAssignment->choices.push_back(
+                AndEnumerableState::makeSingleton(std::move(oneAssign)));
             continue;
         }
 
@@ -1265,7 +1174,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
 
             // Every predicate that would use this index is already assigned in
             // firstAssign.
-            if (0 == secondAssign.preds.size()) {
+            if (secondAssign.preds.empty()) {
                 continue;
             }
 
@@ -1353,7 +1262,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
 }
 
 void PlanEnumerator::getIndexedPreds(MatchExpression* node,
-                                     PrepMemoContext context,
+                                     const PrepMemoContext& context,
                                      std::vector<MatchExpression*>* indexedPreds) {
     if (Indexability::nodeCanUseIndexOnOwnField(node)) {
         RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
@@ -1397,7 +1306,7 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
 }
 
 bool PlanEnumerator::prepSubNodes(MatchExpression* node,
-                                  PrepMemoContext context,
+                                  const PrepMemoContext& context,
                                   vector<MemoID>* subnodesOut,
                                   vector<MemoID>* mandatorySubnodes) {
     for (size_t i = 0; i < node->numChildren(); ++i) {
@@ -1622,7 +1531,7 @@ void PlanEnumerator::assignMultikeySafePredicates(
 }
 
 bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssigned,
-                                       const AndAssignment* andAssignment) {
+                                       const AndAssignment* andAssignment) const {
     for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
         const AndEnumerableState& state = andAssignment->choices[i];
 
@@ -1663,7 +1572,7 @@ bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssig
     return false;
 }
 
-size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, MatchExpression* predicate) {
+size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, MatchExpression* predicate) const {
     tassert(6811436, "Failed procondition in query plan enumerator", predicate->getTag());
     RelevantTag* relevantTag = static_cast<RelevantTag*>(predicate->getTag());
     size_t position = 0;
@@ -1720,99 +1629,62 @@ void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
 
 void PlanEnumerator::tagMemo(size_t id) {
     LOGV2_DEBUG(20944, 5, "Tagging memoID", "id"_attr = id);
-    NodeAssignment* assign = _memo[id];
+    NodeAssignment* assign = _memo.at(id).get();
     MONGO_verify(nullptr != assign);
-
-    if (nullptr != assign->orAssignment) {
-        OrAssignment* oa = assign->orAssignment.get();
-        for (size_t i = 0; i < oa->subnodes.size(); ++i) {
-            tagMemo(oa->subnodes[i]);
-        }
-    } else if (nullptr != assign->lockstepOrAssignment) {
-        LockstepOrAssignment* oa = assign->lockstepOrAssignment.get();
-        for (auto&& node : oa->subnodes) {
-            tagMemo(node.memoId);
-        }
-    } else if (nullptr != assign->arrayAssignment) {
-        ArrayAssignment* aa = assign->arrayAssignment.get();
-        tagMemo(aa->subnodes[aa->counter]);
-    } else if (nullptr != assign->andAssignment) {
-        AndAssignment* aa = assign->andAssignment.get();
-        MONGO_verify(aa->counter < aa->choices.size());
-
-        const AndEnumerableState& aes = aa->choices[aa->counter];
-
-        for (size_t j = 0; j < aes.subnodesToIndex.size(); ++j) {
-            tagMemo(aes.subnodesToIndex[j]);
-        }
-
-        for (size_t i = 0; i < aes.assignments.size(); ++i) {
-            const OneIndexAssignment& assign = aes.assignments[i];
-
-            for (size_t j = 0; j < assign.preds.size(); ++j) {
-                MatchExpression* pred = assign.preds[j];
-                if (pred->getTag()) {
-                    OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(pred->getTag());
-                    orPushdownTag->setIndexTag(
-                        new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));
-                } else {
-                    pred->setTag(
-                        new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));
+    return visit(
+        OverloadedVisitor{
+            [&](const OrAssignment& oa) {
+                for (size_t i = 0; i < oa.subnodes.size(); ++i) {
+                    tagMemo(oa.subnodes[i]);
                 }
-            }
-
-            // Add all OrPushdownTags for this index assignment.
-            for (const auto& orPushdown : assign.orPushdowns) {
-                auto expr = orPushdown.first;
-                if (!expr->getTag()) {
-                    expr->setTag(new OrPushdownTag());
+            },
+            [&](const LockstepOrAssignment& la) {
+                for (auto&& node : la.subnodes) {
+                    tagMemo(node.memoId);
                 }
-                OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
-                orPushdownTag->addDestination(orPushdown.second.clone());
-            }
-        }
-    } else {
-        MONGO_verify(0);
-    }
+            },
+            [&](const ArrayAssignment& aa) { tagMemo(aa.subnodes[aa.counter]); },
+            [&](const AndAssignment& aa) {
+                MONGO_verify(aa.counter < aa.choices.size());
+
+                const AndEnumerableState& aes = aa.choices[aa.counter];
+
+                for (size_t j = 0; j < aes.subnodesToIndex.size(); ++j) {
+                    tagMemo(aes.subnodesToIndex[j]);
+                }
+
+                for (size_t i = 0; i < aes.assignments.size(); ++i) {
+                    const OneIndexAssignment& assign = aes.assignments[i];
+
+                    for (size_t j = 0; j < assign.preds.size(); ++j) {
+                        MatchExpression* pred = assign.preds[j];
+                        if (pred->getTag()) {
+                            OrPushdownTag* orPushdownTag =
+                                static_cast<OrPushdownTag*>(pred->getTag());
+                            orPushdownTag->setIndexTag(new IndexTag(
+                                assign.index, assign.positions[j], assign.canCombineBounds));
+                        } else {
+                            pred->setTag(new IndexTag(
+                                assign.index, assign.positions[j], assign.canCombineBounds));
+                        }
+                    }
+
+                    // Add all OrPushdownTags for this index assignment.
+                    for (const auto& orPushdown : assign.orPushdowns) {
+                        auto expr = orPushdown.first;
+                        if (!expr->getTag()) {
+                            expr->setTag(new OrPushdownTag());
+                        }
+                        OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
+                        orPushdownTag->addDestination(orPushdown.second.clone());
+                    }
+                }
+            },
+        },
+        assign->assignment);
 }
 
-bool PlanEnumerator::LockstepOrAssignment::allIdentical() const {
-    const auto firstCounter = subnodes[0].iterationCount;
-    for (auto&& subnode : subnodes) {
-        if (subnode.iterationCount != firstCounter) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool PlanEnumerator::LockstepOrAssignment::shouldResetBeforeProceeding(size_t totalEnumerated,
-                                                                       size_t orLimit) const {
-    if (totalEnumerated == 0 || !exhaustedLockstepIteration) {
-        return false;
-    }
-
-    size_t totalPossibleEnumerations = 1;
-    for (auto&& subnode : subnodes) {
-        if (!subnode.maxIterCount) {
-            return false;  // Haven't yet looped over this child entirely, not ready yet.
-        }
-        totalPossibleEnumerations *= subnode.maxIterCount.value();
-        // If 'totalPossibleEnumerations' reaches the limit, we can just shortcut it. Otherwise,
-        // 'totalPossibleEnumerations' could overflow if we have a large $or.
-        if (totalPossibleEnumerations >= orLimit) {
-            return false;
-        }
-    }
-
-    // If we're able to compute a total number expected enumerations, we must have already cycled
-    // through each of the subnodes at least once. So if we've done that and then iterated all
-    // possible enumerations, we're about to repeat ourselves.
-    return totalEnumerated % totalPossibleEnumerations == 0;
-}
-
-bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
-    PlanEnumerator::LockstepOrAssignment* assignment) {
+bool PlanEnumerator::_nextMemoForLockstepOrAssignment(LockstepOrAssignment* assignment) {
 
     if (!assignment->exhaustedLockstepIteration) {
         // We have not yet finished advancing all children simultaneously, so we'll loop over
@@ -1901,82 +1773,79 @@ bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
 }
 
 bool PlanEnumerator::nextMemo(size_t id) {
-    NodeAssignment* assign = _memo[id];
+    NodeAssignment* assign = _memo.at(id).get();
     MONGO_verify(nullptr != assign);
+    return visit(OverloadedVisitor{
+                     [&](OrAssignment& oa) {
+                         // Limit the number of OR enumerations.
+                         oa.counter++;
+                         if (oa.counter >= _orLimit) {
+                             LOGV2_DEBUG(3639300,
+                                         1,
+                                         "plan enumerator exceeded threshold for OR enumerations",
+                                         "orEnumerationLimit"_attr = _orLimit);
+                             _explainInfo.hitIndexedOrLimit = true;
+                             return true;
+                         }
 
-    if (nullptr != assign->orAssignment) {
-        OrAssignment* oa = assign->orAssignment.get();
+                         // OR just walks through telling its children to move forward.
+                         for (size_t i = 0; i < oa.subnodes.size(); ++i) {
+                             // If there's no carry, we just stop. If there's a carry, we move the
+                             // next child forward.
+                             if (!nextMemo(oa.subnodes[i])) {
+                                 return false;
+                             }
+                         }
+                         // If we're here, the last subnode had a carry, therefore the OR has a
+                         // carry.
+                         return true;
+                     },
+                     [&](LockstepOrAssignment& assignment) {
+                         // Limit the number of OR enumerations.
+                         ++assignment.totalEnumerated;
+                         if (assignment.totalEnumerated >= _orLimit) {
+                             LOGV2_DEBUG(3639301,
+                                         1,
+                                         "plan enumerator exceeded threshold for OR enumerations",
+                                         "orEnumerationLimit"_attr = _orLimit);
+                             _explainInfo.hitIndexedOrLimit = true;
+                             return true;
+                         }
+                         return _nextMemoForLockstepOrAssignment(&assignment);
+                     },
+                     [&](ArrayAssignment& aa) {
+                         // moving to next on current subnode is OK
+                         if (!nextMemo(aa.subnodes[aa.counter])) {
+                             return false;
+                         }
+                         // Move to next subnode.
+                         ++aa.counter;
+                         if (aa.counter < aa.subnodes.size()) {
+                             return false;
+                         }
+                         aa.counter = 0;
+                         return true;
+                     },
+                     [&](AndAssignment& aa) {
+                         // One of our subnodes might have to move on to its next enumeration state.
+                         const AndEnumerableState& aes = aa.choices[aa.counter];
+                         for (size_t i = 0; i < aes.subnodesToIndex.size(); ++i) {
+                             if (!nextMemo(aes.subnodesToIndex[i])) {
+                                 return false;
+                             }
+                         }
 
-        // Limit the number of OR enumerations.
-        oa->counter++;
-        if (oa->counter >= _orLimit) {
-            LOGV2_DEBUG(3639300,
-                        1,
-                        "plan enumerator exceeded threshold for OR enumerations",
-                        "orEnumerationLimit"_attr = _orLimit);
-            _explainInfo.hitIndexedOrLimit = true;
-            return true;
-        }
-
-        // OR just walks through telling its children to move forward.
-        for (size_t i = 0; i < oa->subnodes.size(); ++i) {
-            // If there's no carry, we just stop. If there's a carry, we move the next child
-            // forward.
-            if (!nextMemo(oa->subnodes[i])) {
-                return false;
-            }
-        }
-        // If we're here, the last subnode had a carry, therefore the OR has a carry.
-        return true;
-    } else if (nullptr != assign->lockstepOrAssignment) {
-        LockstepOrAssignment* assignment = assign->lockstepOrAssignment.get();
-
-        // Limit the number of OR enumerations.
-        ++assignment->totalEnumerated;
-        if (assignment->totalEnumerated >= _orLimit) {
-            LOGV2_DEBUG(3639301,
-                        1,
-                        "plan enumerator exceeded threshold for OR enumerations",
-                        "orEnumerationLimit"_attr = _orLimit);
-            _explainInfo.hitIndexedOrLimit = true;
-            return true;
-        }
-        return _nextMemoForLockstepOrAssignment(assignment);
-    } else if (nullptr != assign->arrayAssignment) {
-        ArrayAssignment* aa = assign->arrayAssignment.get();
-        // moving to next on current subnode is OK
-        if (!nextMemo(aa->subnodes[aa->counter])) {
-            return false;
-        }
-        // Move to next subnode.
-        ++aa->counter;
-        if (aa->counter < aa->subnodes.size()) {
-            return false;
-        }
-        aa->counter = 0;
-        return true;
-    } else if (nullptr != assign->andAssignment) {
-        AndAssignment* aa = assign->andAssignment.get();
-
-        // One of our subnodes might have to move on to its next enumeration state.
-        const AndEnumerableState& aes = aa->choices[aa->counter];
-        for (size_t i = 0; i < aes.subnodesToIndex.size(); ++i) {
-            if (!nextMemo(aes.subnodesToIndex[i])) {
-                return false;
-            }
-        }
-
-        // None of the subnodes had another enumeration state, so we move on to the
-        // next top-level choice.
-        ++aa->counter;
-        if (aa->counter < aa->choices.size()) {
-            return false;
-        }
-        aa->counter = 0;
-        return true;
-    } else {
-        MONGO_UNREACHABLE;
-    }
+                         // None of the subnodes had another enumeration state, so we move on to the
+                         // next top-level choice.
+                         ++aa.counter;
+                         if (aa.counter < aa.choices.size()) {
+                             return false;
+                         }
+                         aa.counter = 0;
+                         return true;
+                     },
+                 },
+                 assign->assignment);
 }
 
 }  // namespace mongo
