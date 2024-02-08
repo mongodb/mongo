@@ -2323,6 +2323,7 @@ buildvariants:
     - "rhel70-perf-single"
   tasks:
     - name: tsbs_query_high_cardinality
+    - name: tsbs_query_medium_cardinality
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-1-node-replSet-all-feature-flags-longRunning.arm.aws.2023-11
@@ -2344,6 +2345,7 @@ buildvariants:
     - "rhel70-perf-single"
   tasks:
     - name: tsbs_query_high_cardinality
+    - name: tsbs_query_medium_cardinality
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-arm-3-shard-resharding.arm.aws.2023-11

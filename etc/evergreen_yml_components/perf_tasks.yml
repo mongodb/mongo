@@ -360,6 +360,14 @@ tasks:
         vars:
           test_control: "tsbs_query_high_cardinality"
 
+  - name: tsbs_query_medium_cardinality
+    priority: 5
+    exec_timeout_secs: 86400 # 1 day
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: "tsbs_query_medium_cardinality"
+
   - name: tsbs_query_sharded
     priority: 5
     commands:
