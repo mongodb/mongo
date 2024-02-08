@@ -419,6 +419,10 @@ tasks:
   tags: ["assigned_to_jira_team_server_repl", "multiversion", "no_multiversion_generate_tasks"]
   commands:
   - func: "generate resmoke tasks"
+    vars:
+      # This task sometimes has outliers that will hit the default exec timeout set by the
+      # historical data. We manually increase the timeout above the historical timeout to avoid this
+      exec_timeout_secs: 900 # 15 mins
 
 ## initial sync generational fuzzer ##
 - <<: *jstestfuzz_template
