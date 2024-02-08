@@ -63,10 +63,8 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
  * Set the minimum required compatibility based on the 'featureFlagSbeFull' and the
  * query framework control knob. If 'featureFlagSbeFull' is true, set the compatibility to
  * 'requiresSbeFull'; otherwise,  if query framework control knob is 'trySbeEngine', set
- * compatibility to 'requiresTrySbe'; otherwise set it to 'noRequirements'. For search queries, the
- * miminum required compaitibility is always set to requiresTrySbe.
+ * compatibility to 'requiresTrySbe'; otherwise set it to 'noRequirements'.
  */
 SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
-                                                bool isSearchQuery,
                                                 bool sbeFullEnabled);
 }  // namespace mongo

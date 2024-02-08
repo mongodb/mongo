@@ -399,7 +399,7 @@ bool findSbeCompatibleStagesForPushdown(
     const bool sbeFullEnabled = feature_flags::gFeatureFlagSbeFull.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
-        queryKnob.getInternalQueryFrameworkControlForOp(), cq->isSearchQuery(), sbeFullEnabled);
+        queryKnob.getInternalQueryFrameworkControlForOp(), sbeFullEnabled);
 
     auto meetsRequirements = [&minRequiredCompatibility, &cq](SbeCompatibility stageCompatibility) {
         return stageCompatibility >= minRequiredCompatibility;
@@ -512,12 +512,10 @@ void attachPipelineStages(const MultipleCollectionAccessor& collections,
 };
 
 SbeCompatibility getMinRequiredSbeCompatibility(QueryFrameworkControlEnum currentQueryKnobFramework,
-                                                bool isSearchQuery,
                                                 bool sbeFullEnabled) {
     if (sbeFullEnabled) {
         return SbeCompatibility::requiresSbeFull;
-    } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine ||
-               isSearchQuery) {
+    } else if (currentQueryKnobFramework == QueryFrameworkControlEnum::kTrySbeEngine) {
         return SbeCompatibility::requiresTrySbe;
     }
     return SbeCompatibility::noRequirements;

@@ -3,6 +3,7 @@
  * from mongot.
  * @tags: [requires_fcv_71]
  */
+import {checkSbeRestricted} from "jstests/libs/sbe_util.js";
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {
     mockPlanShardedSearchResponse,
@@ -30,6 +31,15 @@ const st = stWithMock.st;
 
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
+
+// Skip the test if running in 'trySbeRestricted' mode. In this mode, $search will be pushed down to
+// SBE, but $limit will not.
+if (checkSbeRestricted(testDB)) {
+    jsTest.log("Skipping test because trySbeRestricted is enabled.");
+    stWithMock.stop();
+    quit();
+}
+
 const testColl = testDB.getCollection(collName);
 
 // Shard the test collection, split it at {_id: 10}, and move the higher chunk to shard1.

@@ -1955,8 +1955,8 @@ bool shouldUseRegularSbe(OperationContext* opCtx, const CanonicalQuery& cq, cons
 
     // Return true if all the expressions in the CanonicalQuery's filter and projection are SBE
     // compatible.
-    SbeCompatibility minRequiredCompatibility = getMinRequiredSbeCompatibility(
-        queryKnob.getInternalQueryFrameworkControlForOp(), cq.isSearchQuery(), sbeFull);
+    SbeCompatibility minRequiredCompatibility =
+        getMinRequiredSbeCompatibility(queryKnob.getInternalQueryFrameworkControlForOp(), sbeFull);
     return cq.getExpCtx()->sbeCompatibility >= minRequiredCompatibility;
 }
 
