@@ -512,11 +512,11 @@ std::vector<PlanStageSlots::OwnedSlotName> PlanStageSlots::getRequiredNamesInOrd
     return names;
 }
 
-std::vector<TypedSlot> PlanStageSlots::getRequiredSlotsInOrder(const PlanStageReqs& reqs) const {
+TypedSlotVector PlanStageSlots::getRequiredSlotsInOrder(const PlanStageReqs& reqs) const {
     auto names = getRequiredNamesInOrder(reqs);
 
     // Build the list of corresponding slots.
-    std::vector<TypedSlot> result;
+    TypedSlotVector result;
     for (const auto& name : names) {
         auto it = _data->slotNameToIdMap.find(name);
         tassert(8146615,
@@ -530,25 +530,13 @@ std::vector<TypedSlot> PlanStageSlots::getRequiredSlotsInOrder(const PlanStageRe
     return result;
 }
 
-struct TypedSlotLt {
-    bool operator()(const TypedSlot& lhs, const TypedSlot& rhs) const {
-        return lhs.slotId < rhs.slotId;
-    }
-};
-
-struct TypedSlotEq {
-    bool operator()(const TypedSlot& lhs, const TypedSlot& rhs) const {
-        return lhs.slotId == rhs.slotId;
-    }
-};
-
 struct NameTypedSlotPairLt {
     using UnownedSlotName = PlanStageSlots::UnownedSlotName;
     using PairType = std::pair<UnownedSlotName, TypedSlot>;
 
     bool operator()(const PairType& lhs, const PairType& rhs) const {
         return lhs.first != rhs.first ? lhs.first < rhs.first
-                                      : TypedSlotLt()(lhs.second, rhs.second);
+                                      : TypedSlot::Less()(lhs.second, rhs.second);
     }
 };
 
@@ -557,14 +545,14 @@ struct NameTypedSlotPairEq {
     using PairType = std::pair<UnownedSlotName, TypedSlot>;
 
     bool operator()(const PairType& lhs, const PairType& rhs) const {
-        return lhs.first == rhs.first && TypedSlotEq()(lhs.second, rhs.second);
+        return lhs.first == rhs.first && TypedSlot::EqualTo()(lhs.second, rhs.second);
     }
 };
 
-std::vector<TypedSlot> PlanStageSlots::getRequiredSlotsUnique(const PlanStageReqs& reqs) const {
+TypedSlotVector PlanStageSlots::getRequiredSlotsUnique(const PlanStageReqs& reqs) const {
     auto names = getRequiredNamesInOrder(reqs);
 
-    std::vector<TypedSlot> result;
+    TypedSlotVector result;
 
     // Build the list of corresponding slots.
     for (const auto& name : names) {
@@ -578,9 +566,9 @@ std::vector<TypedSlot> PlanStageSlots::getRequiredSlotsUnique(const PlanStageReq
     }
 
     // Sort and de-dup the list by SlotId.
-    std::sort(result.begin(), result.end(), TypedSlotLt());
+    std::sort(result.begin(), result.end(), TypedSlot::Less());
 
-    auto newEnd = std::unique(result.begin(), result.end(), TypedSlotEq());
+    auto newEnd = std::unique(result.begin(), result.end(), TypedSlot::EqualTo());
     if (newEnd != result.end()) {
         result.erase(newEnd, result.end());
     }
@@ -602,8 +590,8 @@ PlanStageSlots::getAllNameSlotPairsInOrder() const {
     return nameSlotPairs;
 }
 
-std::vector<TypedSlot> PlanStageSlots::getAllSlotsInOrder() const {
-    std::vector<TypedSlot> result;
+TypedSlotVector PlanStageSlots::getAllSlotsInOrder() const {
+    TypedSlotVector result;
 
     auto nameSlotPairs = getAllNameSlotPairsInOrder();
 
@@ -1030,7 +1018,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto filterExpr = generateFilter(_state,
                                          vsn->filter.get(),
                                          TypedSlot{resultSlot, TypeSignature::kAnyScalarType},
-                                         &outputs);
+                                         outputs);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(_state), vsn->nodeId());
@@ -1502,7 +1490,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Generate post assembly filter.
     if (csn->postAssemblyFilter) {
         auto filterExpr = generateFilter(
-            _state, csn->postAssemblyFilter.get(), TypedSlot{reconstructedRecordSlot}, &outputs);
+            _state, csn->postAssemblyFilter.get(), TypedSlot{reconstructedRecordSlot}, outputs);
 
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
@@ -1609,7 +1597,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (fn->filter) {
-        auto filterExpr = generateFilter(_state, fn->filter.get(), resultSlot, &outputs);
+        auto filterExpr = generateFilter(_state, fn->filter.get(), resultSlot, outputs);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(_state), root->nodeId());
@@ -2402,7 +2390,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto childResultSlot =
             needChildResultDoc ? boost::make_optional(outputs.getResultObj()) : boost::none;
 
-        SbExpr filterExpr = generateFilter(_state, mn->filter.get(), childResultSlot, &outputs);
+        SbExpr filterExpr = generateFilter(_state, mn->filter.get(), childResultSlot, outputs);
 
         if (!filterExpr.isNull()) {
             // Try to vectorize if the stage received blocked input from children.
@@ -2416,7 +2404,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     // The last step was to convert the block to row. Generate the filter expression
                     // again to use the scalar slots instead of the block slots.
                     SbExpr filterScalarExpr =
-                        generateFilter(_state, mn->filter.get(), childResultSlot, &outputs);
+                        generateFilter(_state, mn->filter.get(), childResultSlot, outputs);
                     VariableTypes varTypes = buildVariableTypes(outputs);
                     stage = sbe::makeS<sbe::FilterStage<false>>(
                         std::move(stage),
@@ -2686,7 +2674,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto newRootVar = SbVar{frameId, 0};
 
     auto newRootABT =
-        generateExpression(_state, rrn->newRoot.get(), outputs.getResultObjIfExists(), &outputs);
+        generateExpression(_state, rrn->newRoot.get(), outputs.getResultObjIfExists(), outputs);
 
     auto validatedNewRootExpr = b.makeLet(
         frameId,
@@ -3721,7 +3709,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         for (size_t i = 0; i < numExprs; ++i) {
             if (!exprSlots[i].has_value()) {
-                SbExpr e = generateExpression(_state, exprs[i], resultObjSlot, &outputs);
+                SbExpr e = generateExpression(_state, exprs[i], resultObjSlot, outputs);
 
                 if (vectorizeExprs && !e.isSlotExpr()) {
                     // Attempt to vectorize.
@@ -3747,7 +3735,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
 
         // Create the ProjectStage and get the list of slots that were projected to.
-        auto [outStage, outSlots] = b.makeProject(std::move(stage), outputs, std::move(projects));
+        auto [outStage, outSlots] =
+            b.makeProject(std::move(stage), buildVariableTypes(outputs), std::move(projects));
         stage = std::move(outStage);
 
         size_t outSlotsIdx = 0;
@@ -3788,7 +3777,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         if (numExprsProcessed != numExprs || !reqs.getCanProcessBlockValues() ||
             planType != BuildProjectionPlan::kDoNotMakeResult) {
             // Store all the slots from 'exprSlots' into the 'individualSlots' vector.
-            std::vector<TypedSlot> individualSlots;
+            TypedSlotVector individualSlots;
             for (size_t i = 0; i < numExprs; ++i) {
                 if (exprSlots[i]) {
                     individualSlots.push_back(*exprSlots[i]);
@@ -3796,7 +3785,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             }
 
             // Create a BlockToRowStage.
-            auto [outStage, outSlots] = buildBlockToRow(std::move(stage), outputs, individualSlots);
+            auto [outStage, outSlots] =
+                buildBlockToRow(std::move(stage), outputs, std::move(individualSlots));
             stage = std::move(outStage);
 
             // For each slot that was in 'exprSlots', replace all occurrences of the original
@@ -4004,7 +3994,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (orn->filter) {
         auto resultSlot = outputs.getResultObjIfExists();
 
-        auto filterExpr = generateFilter(_state, orn->filter.get(), resultSlot, &outputs);
+        auto filterExpr = generateFilter(_state, orn->filter.get(), resultSlot, outputs);
 
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
@@ -4727,7 +4717,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         ensureSlotInBuffer(partitionSlot);
         partitionSlotCount++;
         auto partitionExpr =
-            generateExpression(_state, windowNode->partitionBy->get(), rootSlotOpt, &outputs);
+            generateExpression(_state, windowNode->partitionBy->get(), rootSlotOpt, outputs);
 
         // Assert partition slot is not an array.
         auto frameId = _state.frameId();
@@ -4778,7 +4768,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             auto expCtx = _cq.getExpCtxRaw();
             auto fieldPathExpr = ExpressionFieldPath::createPathFromString(
                 expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
-            auto sortByExpr = generateExpression(_state, fieldPathExpr.get(), rootSlotOpt, &outputs)
+            auto sortByExpr = generateExpression(_state, fieldPathExpr.get(), rootSlotOpt, outputs)
                                   .extractExpr(_state);
             stage = makeProjectStage(
                 std::move(stage), windowNode->nodeId(), *sortBySlot, std::move(sortByExpr));
@@ -4912,9 +4902,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                          outputField.expr.get())));
             } else if (isAccumulatorN(outputField)) {
                 auto nExprPtr = getNExprFromAccumulatorN(outputField);
-                initExprArgs.emplace(AccArgs::kMaxSize,
-                                     generateExpression(_state, nExprPtr, rootSlotOpt, &outputs)
-                                         .extractExpr(_state));
+                initExprArgs.emplace(
+                    AccArgs::kMaxSize,
+                    generateExpression(_state, nExprPtr, rootSlotOpt, outputs).extractExpr(_state));
                 initExprArgs.emplace(AccArgs::kIsGroupAccum,
                                      makeConstant(sbe::value::TypeTags::Boolean,
                                                   sbe::value::bitcastFrom<bool>(false)));
@@ -4942,7 +4932,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         };
         auto getArgExpr = [&](Expression* arg) {
             auto argExpr =
-                generateExpression(_state, arg, rootSlotOpt, &outputs).extractExpr(_state);
+                generateExpression(_state, arg, rootSlotOpt, outputs).extractExpr(_state);
             return getArgExprFromSBEExpression(std::move(argExpr));
         };
         if (accName == "$covarianceSamp" || accName == "$covariancePop") {
@@ -5013,7 +5003,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                 for (auto& [key, value] : expObj->getChildExpressions()) {
                     if (key == AccumulatorN::kFieldNameOutput) {
                         auto outputExpr =
-                            generateExpression(_state, value.get(), rootSlotOpt, &outputs);
+                            generateExpression(_state, value.get(), rootSlotOpt, outputs);
                         argExprs.emplace(AccArgs::kTopBottomNValue,
                                          getArgExprFromSBEExpression(
                                              makeFillEmptyNull(outputExpr.extractExpr(_state))));
@@ -5327,6 +5317,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                 window.windowExprSlots,
                                 std::move(finalArgExprs),
                                 collatorSlot)
+                      .extractExpr(_state)
                 : buildFinalize(_state, accStmt, window.windowExprSlots, collatorSlot)
                       .extractExpr(_state);
         }

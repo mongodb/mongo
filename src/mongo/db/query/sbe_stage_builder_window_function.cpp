@@ -261,7 +261,7 @@ std::unique_ptr<sbe::EExpression> buildWindowFinalizeDerivative(
     StringDataMap<std::unique_ptr<sbe::EExpression>> args,
     boost::optional<sbe::value::SlotId> collatorSlot) {
     auto accStmt = createFakeAccumulationStatement(state, stmt);
-    return buildFinalize(state, accStmt, slots, std::move(args), collatorSlot);
+    return buildFinalize(state, accStmt, slots, std::move(args), collatorSlot).extractExpr(state);
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildWindowAddStdDev(

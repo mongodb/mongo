@@ -119,20 +119,15 @@ optimizer::ABT makeVariable(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::Variable>(std::move(var));
 }
 
-VariableTypes buildVariableTypes(const PlanStageSlots& outputs,
-                                 boost::optional<TypeSignature> typesToExclude) {
-    VariableTypes varTypes;
+void addVariableTypesHelper(VariableTypes& varTypes, const PlanStageSlots& outputs) {
+    auto slots = outputs.getAllSlotsInOrder();
+    addVariableTypesHelper(varTypes, slots.begin(), slots.end());
+}
 
-    for (const SbSlot& slot : outputs.getAllSlotsInOrder()) {
-        if (auto typeSig = slot.getTypeSignature()) {
-            if (typesToExclude) {
-                typeSig = typeSig->exclude(*typesToExclude);
-            }
-
-            varTypes.emplace(getABTVariableName(slot), *typeSig);
-        }
+VariableTypes excludeTypes(VariableTypes varTypes, TypeSignature typesToExclude) {
+    for (auto& [_, typeSig] : varTypes) {
+        typeSig = typeSig.exclude(typesToExclude);
     }
-
     return varTypes;
 }
 

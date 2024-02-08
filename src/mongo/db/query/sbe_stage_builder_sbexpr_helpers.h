@@ -34,12 +34,7 @@
 #include "mongo/db/query/sbe_stage_builder_sbexpr.h"
 
 namespace mongo::stage_builder {
-using SbExprOptSbSlotPair = std::pair<SbExpr, boost::optional<sbe::value::SlotId>>;
-
-using SbExprOptSbSlotVector = std::vector<SbExprOptSbSlotPair>;
-
 namespace {
-template <typename SbExprOptSbSlotVector>
 inline void makeSbExprOptSbSlotVecHelper(SbExprOptSbSlotVector& result) {}
 
 template <typename... Ts>
@@ -233,56 +228,95 @@ public:
         _nodeId = nodeId;
     }
 
-    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
-                                                               SbExprOptSbSlotVector projects) {
-        return makeProjectImpl(std::move(stage), std::move(projects));
+    inline std::pair<SbStage, SbSlotVector> makeProject(SbStage stage,
+                                                        SbExprOptSbSlotVector projects) {
+        return makeProject(std::move(stage), nullptr, std::move(projects));
     }
 
-    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
-                                                               const PlanStageSlots& outputs,
-                                                               SbExprOptSbSlotVector projects) {
-        return makeProjectImpl(std::move(stage), std::move(projects), &outputs);
-    }
-
-    template <typename... Args>
-    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
-                                                               SbExpr arg,
-                                                               Args&&... args) {
-        return makeProjectImpl(std::move(stage),
-                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
-    }
-
-    template <typename T, typename... Args>
-    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
-                                                               std::pair<SbExpr, T> arg,
-                                                               Args&&... args) {
-        return makeProjectImpl(std::move(stage),
-                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
+    inline std::pair<SbStage, SbSlotVector> makeProject(SbStage stage,
+                                                        const VariableTypes& varTypes,
+                                                        SbExprOptSbSlotVector projects) {
+        return makeProject(std::move(stage), &varTypes, std::move(projects));
     }
 
     template <typename... Args>
-    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
-                                                               const PlanStageSlots& outputs,
-                                                               SbExpr arg,
-                                                               Args&&... args) {
-        return makeProjectImpl(std::move(stage),
-                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...),
-                               &outputs);
+    inline std::pair<SbStage, SbSlotVector> makeProject(SbStage stage, SbExpr arg, Args&&... args) {
+        return makeProject(std::move(stage),
+                           nullptr,
+                           makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
     }
 
     template <typename T, typename... Args>
-    inline std::pair<SbStage, std::vector<SbSlot>> makeProject(SbStage stage,
-                                                               const PlanStageSlots& outputs,
-                                                               std::pair<SbExpr, T> arg,
-                                                               Args&&... args) {
-        return makeProjectImpl(std::move(stage),
-                               makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...),
-                               &outputs);
+    inline std::pair<SbStage, SbSlotVector> makeProject(SbStage stage,
+                                                        std::pair<SbExpr, T> arg,
+                                                        Args&&... args) {
+        return makeProject(std::move(stage),
+                           nullptr,
+                           makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
     }
 
-protected:
-    std::pair<SbStage, std::vector<SbSlot>> makeProjectImpl(
-        SbStage stage, SbExprOptSbSlotVector projects, const PlanStageSlots* outputs = nullptr);
+    template <typename... Args>
+    inline std::pair<SbStage, SbSlotVector> makeProject(SbStage stage,
+                                                        const VariableTypes& varTypes,
+                                                        SbExpr arg,
+                                                        Args&&... args) {
+        return makeProject(std::move(stage),
+                           &varTypes,
+                           makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
+    }
+
+    template <typename T, typename... Args>
+    inline std::pair<SbStage, SbSlotVector> makeProject(SbStage stage,
+                                                        const VariableTypes& varTypes,
+                                                        std::pair<SbExpr, T> arg,
+                                                        Args&&... args) {
+        return makeProject(std::move(stage),
+                           &varTypes,
+                           makeSbExprOptSbSlotVec(std::move(arg), std::forward<Args>(args)...));
+    }
+
+    std::pair<SbStage, SbSlotVector> makeProject(SbStage stage,
+                                                 const VariableTypes* varTypes,
+                                                 SbExprOptSbSlotVector projects);
+
+    std::pair<SbStage, SbSlotVector> makeHashAgg(SbStage stage,
+                                                 const SbSlotVector& gbs,
+                                                 SbAggExprVector sbAggExprs,
+                                                 boost::optional<sbe::value::SlotId> collatorSlot,
+                                                 bool allowDiskUse,
+                                                 SbExprSbSlotVector mergingExprs) {
+        return makeHashAgg(std::move(stage),
+                           nullptr,
+                           gbs,
+                           std::move(sbAggExprs),
+                           collatorSlot,
+                           allowDiskUse,
+                           std::move(mergingExprs));
+    }
+
+    std::pair<SbStage, SbSlotVector> makeHashAgg(SbStage stage,
+                                                 const VariableTypes& varTypes,
+                                                 const SbSlotVector& gbs,
+                                                 SbAggExprVector sbAggExprs,
+                                                 boost::optional<sbe::value::SlotId> collatorSlot,
+                                                 bool allowDiskUse,
+                                                 SbExprSbSlotVector mergingExprs) {
+        return makeHashAgg(std::move(stage),
+                           &varTypes,
+                           gbs,
+                           std::move(sbAggExprs),
+                           collatorSlot,
+                           allowDiskUse,
+                           std::move(mergingExprs));
+    }
+
+    std::pair<SbStage, SbSlotVector> makeHashAgg(SbStage stage,
+                                                 const VariableTypes* varTypes,
+                                                 const SbSlotVector& gbs,
+                                                 SbAggExprVector sbAggExprs,
+                                                 boost::optional<sbe::value::SlotId> collatorSlot,
+                                                 bool allowDiskUse,
+                                                 SbExprSbSlotVector mergingExprs);
 
     PlanNodeId _nodeId;
 };
