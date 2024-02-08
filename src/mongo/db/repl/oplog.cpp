@@ -909,7 +909,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           BSONObj indexSpec = cmd.removeField("createIndexes");
           Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
           boost::optional<Lock::CollectionLock> collLock;
-          if (mongo::feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+          if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
                   serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
               opCtx->inMultiDocumentTransaction()) {
               // During initial sync we could have the following three scenarios:
@@ -2314,7 +2314,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
             return false;
         }
 
-        if (mongo::feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+        if (mongo::feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
             shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork()) {
             // Do not assign timestamps to non-replicated commands that have a wrapping

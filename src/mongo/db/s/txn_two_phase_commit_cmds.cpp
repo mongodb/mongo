@@ -156,7 +156,7 @@ public:
                         "sessionId"_attr = opCtx->getLogicalSessionId()->toBSON(),
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
-            if (!feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
+            if (!feature_flags::gCreateCollectionInPreparedTransactions.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
                 uassert(ErrorCodes::OperationNotSupportedInTransaction,
                         "Cannot create new collections inside distributed transactions",

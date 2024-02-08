@@ -2,7 +2,8 @@
  * Tests collection creation inside a multi-document transaction.
  *
  * @tags: [
- *  featureFlagTrackUnshardedCollectionsOnShardingCatalog,
+ *  # Tries to create collections in prepared transactions
+ *  featureFlagCreateCollectionInPreparedTransactions,
  *  requires_sharding,
  *  uses_transactions,
  * ]
