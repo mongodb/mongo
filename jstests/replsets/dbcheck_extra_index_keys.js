@@ -11,7 +11,6 @@ import {
     awaitDbCheckCompletion,
     checkHealthLog,
     resetAndInsert,
-    resetAndInsertTwoFields,
     runDbCheck
 } from "jstests/replsets/libs/dbcheck_utils.js";
 (function() {
@@ -790,94 +789,7 @@ function hashingInconsistentExtraKeyOnPrimary(
         checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
     } else {
         jsTestLog("Checking primary for record not found error");
-        checkHealthLog(primaryHealthLog,
-                       {...recordNotFoundQuery, "data.context.keyString.a": {$exists: true}},
-                       nDocsChecked);
-        jsTestLog("Checking secondary for record not found error, should have 0");
-        checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
-
-        // No other errors on primary.
-        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, nDocsChecked);
-    }
-
-    jsTestLog("Checking for correct number of batches on primary");
-    checkNumBatchesAndSnapshots(primaryHealthLog, nDocsChecked, batchSize, snapshotSize);
-    jsTestLog("Checking for correct number of inconsistent batches on secondary");
-    checkNumBatchesAndSnapshots(
-        secondaryHealthLog, nDocsChecked, batchSize, snapshotSize, true /* inconsistentBatch */);
-
-    skipUnindexingDocumentWhenDeleted.off();
-    resetSnapshotSize();
-}
-
-function hashingInconsistentExtraKeyOnPrimaryCompoundIndex(
-    nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start = null, end = null) {
-    clearRawMongoProgramOutput();
-    jsTestLog(
-        "Testing that an extra key on only the primary with compound index will log an inconsistent batch health log entry: " +
-        nDocs + "docs, batchSize: " + batchSize + ", snapshotSize: " + snapshotSize +
-        ", skipLookupForExtraKeys: " + skipLookupForExtraKeys + ", docSuffix: " + docSuffix +
-        ", start:" + start + ", end:" + end);
-
-    setSnapshotSize(snapshotSize);
-    const primaryColl = primaryDB.getCollection(collName);
-    resetAndInsertTwoFields(replSet, primaryDB, collName, nDocs, docSuffix);
-    assert.commandWorked(primaryDB.runCommand({
-        createIndexes: collName,
-        indexes: [{key: {a: 1, b: 1}, name: 'a_1b_1'}],
-    }));
-    replSet.awaitReplication();
-    assert.eq(primaryColl.find({}).count(), nDocs);
-
-    // Set up inconsistency.
-    const skipUnindexingDocumentWhenDeleted =
-        configureFailPoint(primaryDB, "skipUnindexingDocumentWhenDeleted", {indexName: "a_1b_1"});
-    jsTestLog("Deleting docs");
-    assert.commandWorked(primaryColl.deleteMany({}));
-
-    replSet.awaitReplication();
-    assert.eq(primaryColl.find({}).count(), 0);
-    assert.eq(secondaryDB.getCollection(collName).find({}).count(), 0);
-
-    let dbCheckParameters = {
-        validateMode: "extraIndexKeysCheck",
-        secondaryIndex: "a_1b_1",
-        maxDocsPerBatch: batchSize,
-        batchWriteConcern: writeConcern,
-        skipLookupForExtraKeys: skipLookupForExtraKeys
-    };
-    if (start != null) {
-        if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start.toString() + docSuffix} }
-        } else {
-            dbCheckParameters = {...dbCheckParameters, start: {a: start} }
-        }
-    }
-    if (end != null) {
-        if (docSuffix) {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end.toString() + docSuffix} }
-        } else {
-            dbCheckParameters = {...dbCheckParameters, end: {a: end} }
-        }
-    }
-    runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
-
-    const nDocsChecked = getNumDocsChecked(nDocs, start, end, docSuffix);
-    if (skipLookupForExtraKeys) {
-        jsTestLog("Checking primary for errors");
-        checkHealthLog(primaryHealthLog, allErrorsOrWarningsQuery, 0);
-
-        jsTestLog("Checking secondary for record not found error, should have 0");
-        checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
-    } else {
-        jsTestLog("Checking primary for record not found error");
-        checkHealthLog(primaryHealthLog,
-                       {
-                           ...recordNotFoundQuery,
-                           "data.context.keyString.a": {$exists: true},
-                           "data.context.keyString.b": {$exists: true}
-                       },
-                       nDocsChecked);
+        checkHealthLog(primaryHealthLog, recordNotFoundQuery, nDocsChecked);
         jsTestLog("Checking secondary for record not found error, should have 0");
         checkHealthLog(secondaryHealthLog, recordNotFoundQuery, 0);
 
@@ -904,8 +816,6 @@ function runMainTests(nDocs, batchSize, snapshotSize, docSuffix, start = null, e
         recordNotFound(
             nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
         hashingInconsistentExtraKeyOnPrimary(
-            nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
-        hashingInconsistentExtraKeyOnPrimaryCompoundIndex(
             nDocs, batchSize, snapshotSize, skipLookupForExtraKeys, docSuffix, start, end);
     });
 }

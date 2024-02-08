@@ -463,8 +463,7 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         LOGV2_DEBUG(7844907,
                     3,
                     "hasher adding keystring to hash",
-                    "keyString"_attr =
-                        key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson),
+                    "keyString"_attr = keyStringBson,
                     "indexName"_attr = indexName);
         // Append the keystring to the hash without the recordId at end.
         size_t sizeWithoutRecordId = [&] {
@@ -493,15 +492,14 @@ Status DbCheckHasher::hashForExtraIndexKeysCheck(OperationContext* opCtx,
         _last = _maxKey;
     }
 
-    LOGV2_DEBUG(
-        7844904,
-        3,
-        "Finished hashing one batch in hasher",
-        "firstKeyString"_attr = key_string::rehydrateKey(indexDescriptor->keyPattern(), firstBson),
-        "lastKeyString"_attr = key_string::rehydrateKey(indexDescriptor->keyPattern(), lastBson),
-        "keysHashed"_attr = _countKeysSeen,
-        "bytesHashed"_attr = _bytesSeen,
-        "indexName"_attr = indexName);
+    LOGV2_DEBUG(7844904,
+                3,
+                "Finished hashing one batch in hasher",
+                "firstKeyString"_attr = firstBson,
+                "lastKeyString"_attr = lastBson,
+                "keysHashed"_attr = _countKeysSeen,
+                "bytesHashed"_attr = _bytesSeen,
+                "indexName"_attr = indexName);
 
     return Status::OK();
 }
