@@ -1962,11 +1962,10 @@ TransactionOperations* TransactionParticipant::Participant::retrieveCompletedTra
     return &(p().transactionOperations);
 }
 
-TxnResponseMetadata TransactionParticipant::Participant::getResponseMetadata() {
-    // Currently the response metadata only contains a single field, which is whether or not the
-    // transaction is read-only so far.
-    return {o().txnState.isInSet(TransactionState::kInProgress) &&
-            p().transactionOperations.isEmpty()};
+BSONObj TransactionParticipant::Participant::getResponseMetadata() {
+    return BSON(TxnResponseMetadata::kReadOnlyFieldName
+                << (o().txnState.isInSet(TransactionState::kInProgress) &&
+                    p().transactionOperations.isEmpty()));
 }
 
 void TransactionParticipant::Participant::clearOperationsInMemory(OperationContext* opCtx) {

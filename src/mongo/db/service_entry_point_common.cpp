@@ -461,7 +461,9 @@ void appendAdditionalParticipants(OperationContext* opCtx,
 
             std::vector<BSONObj> participantArray;
             for (auto& element : shardIdsFromFpData) {
-                auto participant = BSON("shardId" << ShardId(element.valueStringData().toString()));
+                // TODO SERVER-81568 Get readOnly value from TransactionRouter
+                auto participant = BSON("shardId" << ShardId(element.valueStringData().toString())
+                                                  << "readOnly" << false);
                 participantArray.emplace_back(participant);
             }
             auto additionalParticipants = BSON("additionalParticipants" << participantArray);
@@ -854,7 +856,7 @@ Future<void> CheckoutSessionAndInvokeCommand::run() {
             _stashTransaction(txnParticipant);
 
             auto txnResponseMetadata = txnParticipant.getResponseMetadata();
-            txnResponseMetadata.serialize(_ecd->getExtraFieldsBuilder());
+            (_ecd->getExtraFieldsBuilder())->appendElements(txnResponseMetadata);
             return status;
         })
         .tapError([this](Status status) { _tapError(status); })
@@ -1101,7 +1103,7 @@ Future<void> CheckoutSessionAndInvokeCommand::_commitInvocation() {
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             auto txnResponseMetadata = txnParticipant.getResponseMetadata();
             auto bodyBuilder = replyBuilder->getBodyBuilder();
-            txnResponseMetadata.serialize(&bodyBuilder);
+            bodyBuilder.appendElements(txnResponseMetadata);
         }
     }
 

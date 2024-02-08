@@ -3541,8 +3541,7 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
 
         // Because this is the transaction-specific fixture, return transaction metadata in
         // the response.
-        TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
-        txnResponseMetadata.serialize(&bob);
+        bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 
         return bob.obj();
     });
@@ -3701,8 +3700,7 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
 
         // Because this is the transaction-specific fixture, return transaction metadata in
         // the response.
-        TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
-        txnResponseMetadata.serialize(&bob);
+        bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 
         return bob.obj();
     });
@@ -3716,8 +3714,7 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
 
         // Because this is the transaction-specific fixture, return transaction metadata in
         // the response.
-        TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
-        txnResponseMetadata.serialize(&bob);
+        bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 
         return bob.obj();
     });
@@ -3772,8 +3769,7 @@ public:
 
             // Because this is the transaction-specific fixture, return transaction metadata in
             // the response.
-            TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
-            txnResponseMetadata.serialize(&bob);
+            bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 
             return bob.obj();
         });
@@ -3788,8 +3784,7 @@ public:
 
             // Because this is the transaction-specific fixture, return transaction metadata in
             // the response.
-            TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
-            txnResponseMetadata.serialize(&bob);
+            bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 
             return bob.obj();
         });
@@ -3822,8 +3817,7 @@ public:
 
             // Because this is the transaction-specific fixture, return transaction metadata in
             // the response.
-            TxnResponseMetadata txnResponseMetadata(false /* readOnly */);
-            txnResponseMetadata.serialize(&bob);
+            bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 
             return bob.obj();
         });

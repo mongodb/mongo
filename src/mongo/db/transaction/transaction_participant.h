@@ -681,9 +681,10 @@ public:
         TransactionOperations* retrieveCompletedTransactionOperations(OperationContext* opCtx);
 
         /**
-         * Returns an object containing transaction-related metadata to append on responses.
+         * Returns an object containing the transaction-related metadata known by this participant
+         * to append on responses.
          */
-        TxnResponseMetadata getResponseMetadata();
+        BSONObj getResponseMetadata();
 
         /**
          * Clears the stored operations for an multi-document (non-autocommit) transaction, marking

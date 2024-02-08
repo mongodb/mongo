@@ -33,6 +33,20 @@ imports:
     - "mongo/s/sharding_types.idl"
 
 structs:
+    AdditionalParticipantInfo:
+        description: "Contains information about a participant added to the transaction by
+                      another participant"
+        strict: false
+        fields:
+            shardId:
+                description: "The name of the shard that was added as a participant"
+                type: shard_id
+            readOnly:
+                description: "True if the shard has the transaction in progress but has not done a
+                              write for it"
+                optional: true
+                type: bool
+
     TxnResponseMetadata:
         description: "Contains fields a participant attaches in responses to successful transaction
                       statements"
@@ -41,11 +55,12 @@ structs:
             readOnly:
                 description: "True if the shard has the transaction in progress but has not done a
                               write for it"
+                optional: true
                 type: bool
             additionalParticipants:
                 description: "Additional participants in the transaction"
                 optional: true
-                type: array<object>
+                type: array<AdditionalParticipantInfo>
 
     TxnRecoveryToken:
         description: "Contains info for retrying the commit of a sharded transaction"

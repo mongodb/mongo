@@ -405,8 +405,7 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
 
 void ClusterCommandTestFixture::appendTxnResponseMetadata(BSONObjBuilder& bob) {
     // Set readOnly to false to avoid opting in to the read-only optimization.
-    TxnResponseMetadata txnResponseMetadata(false);
-    txnResponseMetadata.serialize(&bob);
+    bob.append(TxnResponseMetadata::kReadOnlyFieldName, false);
 }
 
 // Satisfies dependency from StoreSASLOPtions.

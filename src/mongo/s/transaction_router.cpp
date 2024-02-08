@@ -584,10 +584,102 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
         return;
     }
 
+    auto txnResponseMetadata =
+        TxnResponseMetadata::parse(IDLParserContext{"processParticipantResponse"}, responseObj);
+
+    auto setReadOnly = [&](const ShardId& shardIdToUpdate,
+                           Participant::ReadOnly readOnlyCurrent,
+                           boost::optional<bool> readOnlyResponse) {
+        uassert(8516900,
+                str::stream() << "readOnly is missing from participant " << shardIdToUpdate
+                              << " response metadata",
+                readOnlyResponse);
+        if (*readOnlyResponse) {
+            if (readOnlyCurrent == Participant::ReadOnly::kUnset) {
+                LOGV2_DEBUG(22880,
+                            3,
+                            "Marking shard as read-only participant",
+                            "sessionId"_attr = _sessionId(),
+                            "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                            "txnRetryCounter"_attr =
+                                o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                            "shardId"_attr = shardIdToUpdate);
+
+                _setReadOnlyForParticipant(
+                    opCtx, shardIdToUpdate, Participant::ReadOnly::kReadOnly);
+                return;
+            }
+
+            uassert(51113,
+                    str::stream() << "Participant shard " << shardIdToUpdate
+                                  << " claimed to be read-only for a transaction after previously "
+                                     "claiming to have done a write for the transaction",
+                    readOnlyCurrent == Participant::ReadOnly::kReadOnly);
+            return;
+        }
+
+        // The shard reported readOnly:false on this statement.
+
+        if (readOnlyCurrent != Participant::ReadOnly::kNotReadOnly) {
+            LOGV2_DEBUG(22881,
+                        3,
+                        "Marking shard has having done a write",
+                        "sessionId"_attr = _sessionId(),
+                        "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                        "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                        "shardId"_attr = shardIdToUpdate);
+
+            _setReadOnlyForParticipant(opCtx, shardIdToUpdate, Participant::ReadOnly::kNotReadOnly);
+
+            if (!p().recoveryShardId) {
+                LOGV2_DEBUG(22882,
+                            3,
+                            "Choosing shard as recovery shard",
+                            "sessionId"_attr = _sessionId(),
+                            "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
+                            "txnRetryCounter"_attr =
+                                o().txnNumberAndRetryCounter.getTxnRetryCounter(),
+                            "shardId"_attr = shardIdToUpdate);
+                p().recoveryShardId = shardIdToUpdate;
+            }
+        }
+    };
+
+    auto processAdditionalParticipants = [&](bool okResponse) {
+        auto additionalParticipants = txnResponseMetadata.getAdditionalParticipants();
+        if (!additionalParticipants)
+            return;
+
+        for (auto&& participantElem : *additionalParticipants) {
+            auto participantToAdd = participantElem.getShardId();
+
+            Participant::ReadOnly currentReadOnly;
+            auto existingParticipant = getParticipant(participantToAdd);
+            if (!existingParticipant) {
+                auto createdParticipant = _createParticipant(opCtx, participantToAdd);
+                currentReadOnly = createdParticipant.readOnly;
+            } else {
+                currentReadOnly = existingParticipant->readOnly;
+            }
+
+            if (okResponse)
+                setReadOnly(participantToAdd, currentReadOnly, participantElem.getReadOnly());
+
+            if (!p().isRecoveringCommit) {
+                // Don't update participant stats during recovery since the participant list isn't
+                // known.
+                RouterTransactionsMetrics::get(opCtx)->incrementTotalContactedParticipants();
+            }
+        }
+    };
+
     auto commandStatus = getStatusFromCommandResult(responseObj);
     // WouldChangeOwningShard errors don't abort their transaction and the responses containing them
     // include transaction metadata, so we treat them as successful responses.
     if (!commandStatus.isOK() && commandStatus != ErrorCodes::WouldChangeOwningShard) {
+        // We should still add any participants added to the transaction to ensure they will be
+        // aborted
+        processAdditionalParticipants(false /* okResponse */);
         return;
     }
 
@@ -599,71 +691,11 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
             participant->readOnly != Participant::ReadOnly::kUnset);
     }
 
-    auto txnResponseMetadata =
-        TxnResponseMetadata::parse(IDLParserContext{"processParticipantResponse"}, responseObj);
+    // Set readOnly for this participant
+    setReadOnly(shardId, participant->readOnly, txnResponseMetadata.getReadOnly());
 
-    if (txnResponseMetadata.getReadOnly()) {
-        if (participant->readOnly == Participant::ReadOnly::kUnset) {
-            LOGV2_DEBUG(22880,
-                        3,
-                        "Marking shard as read-only participant",
-                        "sessionId"_attr = _sessionId(),
-                        "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-                        "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-                        "shardId"_attr = shardId);
-            _setReadOnlyForParticipant(opCtx, shardId, Participant::ReadOnly::kReadOnly);
-            return;
-        }
-
-        uassert(51113,
-                str::stream() << "Participant shard " << shardId
-                              << " claimed to be read-only for a transaction after previously "
-                                 "claiming to have done a write for the transaction",
-                participant->readOnly == Participant::ReadOnly::kReadOnly);
-        return;
-    }
-
-    // The shard reported readOnly:false on this statement.
-
-    if (participant->readOnly != Participant::ReadOnly::kNotReadOnly) {
-        LOGV2_DEBUG(22881,
-                    3,
-                    "Marking shard has having done a write",
-                    "sessionId"_attr = _sessionId(),
-                    "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-                    "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-                    "shardId"_attr = shardId);
-
-        _setReadOnlyForParticipant(opCtx, shardId, Participant::ReadOnly::kNotReadOnly);
-
-        if (!p().recoveryShardId) {
-            LOGV2_DEBUG(22882,
-                        3,
-                        "Choosing shard as recovery shard",
-                        "sessionId"_attr = _sessionId(),
-                        "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
-                        "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-                        "shardId"_attr = shardId);
-            p().recoveryShardId = shardId;
-        }
-    }
-
-    if (txnResponseMetadata.getAdditionalParticipants()) {
-        auto additionalParticipants = *txnResponseMetadata.getAdditionalParticipants();
-        for (auto&& participantElem : additionalParticipants) {
-            mongo::ShardId addingParticipant = ShardId(std::string(
-                participantElem.getField(StringData{"shardId"}).checkAndGetStringData()));
-            _createParticipant(opCtx, addingParticipant);
-            _setReadOnlyForParticipant(
-                opCtx, addingParticipant, Participant::ReadOnly::kNotReadOnly);
-
-            if (!p().isRecoveringCommit) {
-                // Don't update participant stats during recovery since the participant list isn't
-                // known.
-                RouterTransactionsMetrics::get(opCtx)->incrementTotalContactedParticipants();
-            }
-        }
-    }
+    // Create any participants added by the shard 'shardId'
+    processAdditionalParticipants(true /* okResponse */);
 }
 
 LogicalTime TransactionRouter::AtClusterTime::getTime() const {
@@ -1265,7 +1297,6 @@ BSONObj TransactionRouter::Router::commitTransaction(
 
     const auto isFirstCommitAttempt = !p().terminationInitiated;
     p().terminationInitiated = true;
-
     auto commitRes = _commitTransaction(opCtx, recoveryToken, isFirstCommitAttempt);
 
     auto commitStatus = getStatusFromCommandResult(commitRes);
@@ -1295,7 +1326,6 @@ BSONObj TransactionRouter::Router::_commitTransaction(
     OperationContext* opCtx,
     const boost::optional<TxnRecoveryToken>& recoveryToken,
     bool isFirstCommitAttempt) {
-
     if (p().isRecoveringCommit) {
         uassert(50940,
                 "Cannot recover the transaction decision without a recoveryToken",
