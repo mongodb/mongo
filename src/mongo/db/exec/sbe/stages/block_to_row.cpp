@@ -152,7 +152,9 @@ void BlockToRowStage::prepareDeblock() {
 
     for (auto acc : _blockAccessors) {
         auto [tag, val] = acc->getViewOfValue();
-        invariant(tag == value::TypeTags::valueBlock || tag == value::TypeTags::cellBlock);
+        tassert(8625724,
+                "Expected a valueBlock or cellBlock",
+                tag == value::TypeTags::valueBlock || tag == value::TypeTags::cellBlock);
 
         auto* valueBlock = tag == value::TypeTags::valueBlock
             ? value::getValueBlock(val)

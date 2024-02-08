@@ -70,7 +70,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockExists
     invariant(arity == 1);
     auto [inputOwned, inputTag, inputVal] = getFromStack(0);
 
-    invariant(inputTag == value::TypeTags::valueBlock);
+    tassert(8625700,
+            "Expected argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto out = valueBlockIn->exists();
@@ -93,7 +95,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
     }
 
     auto [blockOwned, blockTag, blockVal] = getFromStack(0);
-    invariant(blockTag == value::TypeTags::valueBlock);
+    tassert(8625701,
+            "Expected argument to be of valueBlock type",
+            blockTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(blockVal);
 
     auto out = valueBlockIn->fillEmpty(fillTag, fillVal);
@@ -193,11 +197,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMin(Ar
     invariant(arity == 2);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
-    invariant(inputTag == value::TypeTags::valueBlock);
+    tassert(8625702,
+            "Expected input argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    invariant(bitsetTag == value::TypeTags::valueBlock);
+    tassert(8625703,
+            "Expected bitset argument to be of valueBlock type",
+            bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
     return valueBlockMinMaxImpl<true /* less */>(valueBlockIn, bitsetBlock);
@@ -212,11 +220,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMax(Ar
     invariant(arity == 2);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
-    invariant(inputTag == value::TypeTags::valueBlock);
+    tassert(8625704,
+            "Expected input argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
     auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    invariant(bitsetTag == value::TypeTags::valueBlock);
+    tassert(8625705,
+            "Expected bitset argument to be of valueBlock type",
+            bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
     return valueBlockMinMaxImpl<false /* less */>(valueBlockIn, bitsetBlock);
@@ -230,7 +242,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCount(
     invariant(arity == 1);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    invariant(bitsetTag == value::TypeTags::valueBlock);
+    tassert(8625706,
+            "Expected bitset argument to be of valueBlock type",
+            bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
     auto bitset = bitsetBlock->extract();
@@ -257,11 +271,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSum(Ar
     invariant(arity == 2);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
-    invariant(inputTag == value::TypeTags::valueBlock);
+    tassert(8625707,
+            "Expected input argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
     auto* inputBlock = value::bitcastTo<value::ValueBlock*>(inputVal);
 
     auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
-    invariant(bitsetTag == value::TypeTags::valueBlock);
+    tassert(8625708,
+            "Expected bitset argument to be of valueBlock type",
+            bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
     auto block = inputBlock->extract();
@@ -372,7 +390,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmpSca
     ArityType arity) {
     invariant(arity == 2);
     auto [blockOwned, blockTag, blockVal] = getFromStack(0);
-    invariant(blockTag == value::TypeTags::valueBlock);
+    tassert(8625709,
+            "Expected argument to be of valueBlock type",
+            blockTag == value::TypeTags::valueBlock);
     auto [valueOwned, valueTag, valueVal] = getFromStack(1);
 
     auto blockView = value::getValueBlock(blockVal);
@@ -415,7 +435,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNeqSca
     const auto notOp = value::makeColumnOp<notOpType>(
         [&](value::TypeTags tag, value::Value val) { return genericNot(tag, val); });
 
-    invariant(blockTag == value::TypeTags::valueBlock);
+    tassert(8625710,
+            "Expected argument to be of valueBlock type",
+            blockTag == value::TypeTags::valueBlock);
 
     auto res = value::getValueBlock(blockVal)->map(notOp);
     return {
@@ -436,7 +458,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmp3wS
     ArityType arity) {
     invariant(arity == 2);
     auto [blockOwned, blockTag, blockVal] = getFromStack(0);
-    invariant(blockTag == value::TypeTags::valueBlock);
+    tassert(8625711,
+            "Expected argument to be of valueBlock type",
+            blockTag == value::TypeTags::valueBlock);
     auto value = getFromStack(1);
 
     auto blockView = value::getValueBlock(blockVal);
@@ -641,7 +665,7 @@ std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
         }
 
         if (allSame(boolOut)) {
-            invariant(boolOut.size() > 0);
+            tassert(8625712, "Expected boolOut vector to be non-empty", boolOut.size() > 0);
             // All resulting bools were the same so we can return a MonoBlock.
             return std::make_unique<value::MonoBlock>(
                 left.size(), value::TypeTags::Boolean, value::bitcastFrom<bool>(boolOut[0]));
@@ -668,7 +692,7 @@ std::unique_ptr<value::ValueBlock> applyBoolBinOp(value::ValueBlock* leftBlock,
         }
 
         if (allSame(boolOut)) {
-            invariant(boolOut.size() > 0);
+            tassert(8625713, "Expected boolOut vector to be non-empty", boolOut.size() > 0);
             // All resulting bools were the same so we can return a MonoBlock.
             return std::make_unique<value::MonoBlock>(
                 left.count, value::TypeTags::Boolean, value::bitcastFrom<bool>(boolOut[0]));
@@ -683,11 +707,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     invariant(arity == 2);
 
     auto [leftOwned, leftTag, leftVal] = getFromStack(1);
-    invariant(leftTag == value::TypeTags::valueBlock);
+    tassert(8625714,
+            "Expected 'left' argument to be of valueBlock type",
+            leftTag == value::TypeTags::valueBlock);
     auto* leftValueBlock = value::bitcastTo<value::ValueBlock*>(leftVal);
 
     auto [rightOwned, rightTag, rightVal] = getFromStack(0);
-    invariant(rightTag == value::TypeTags::valueBlock);
+    tassert(8625715,
+            "Expected 'right' argument to be of valueBlock type",
+            rightTag == value::TypeTags::valueBlock);
     auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
 
     auto leftMonoBlock = leftValueBlock->as<value::MonoBlock>();
@@ -723,11 +751,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
     invariant(arity == 2);
 
     auto [leftOwned, leftTag, leftVal] = getFromStack(1);
-    invariant(leftTag == value::TypeTags::valueBlock);
+    tassert(8625716,
+            "Expected 'left' argument to be of valueBlock type",
+            leftTag == value::TypeTags::valueBlock);
     auto* leftValueBlock = value::bitcastTo<value::ValueBlock*>(leftVal);
 
     auto [rightOwned, rightTag, rightVal] = getFromStack(0);
-    invariant(rightTag == value::TypeTags::valueBlock);
+    tassert(8625717,
+            "Expected 'right' argument to be of valueBlock type",
+            rightTag == value::TypeTags::valueBlock);
     auto* rightValueBlock = value::bitcastTo<value::ValueBlock*>(rightVal);
 
     auto leftMonoBlock = leftValueBlock->as<value::MonoBlock>();
@@ -847,11 +879,15 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F(ArityType arity) {
     auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(0);
-    invariant(valBlockTag == value::TypeTags::valueBlock);
+    tassert(8625718,
+            "Expected argument to be of valueBlock type",
+            valBlockTag == value::TypeTags::valueBlock);
     auto* valueBlock = value::bitcastTo<value::ValueBlock*>(valBlockVal);
 
     auto [cellOwned, cellTag, cellVal] = getFromStack(1);
-    invariant(cellTag == value::TypeTags::cellBlock);
+    tassert(8625719,
+            "Expected argument to be of cellBlock type",
+            cellTag == value::TypeTags::cellBlock);
     auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
 
     auto valsExtracted = valueBlock->extract();
@@ -901,10 +937,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_P(ArityType arity) {
     auto [valBlockOwned, valBlockTag, valBlockVal] = getFromStack(0);
-    invariant(valBlockTag == value::TypeTags::valueBlock);
+    tassert(8625720,
+            "Expected argument to be of valueBlock type",
+            valBlockTag == value::TypeTags::valueBlock);
 
     auto [cellOwned, cellTag, cellVal] = getFromStack(1);
-    invariant(cellTag == value::TypeTags::cellBlock);
+    tassert(8625721,
+            "Expected argument to be of cellBlock type",
+            cellTag == value::TypeTags::cellBlock);
     auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
 
     const auto& positionInfo = cellBlock->filterPositionInfo();
