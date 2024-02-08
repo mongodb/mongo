@@ -87,8 +87,8 @@ selector:
   - src/mongo/db/modules/enterprise/jstests/audit/audit_config_upgrade_downgrade.js
   - src/mongo/db/modules/enterprise/jstests/audit/set_audit_config_cluster_parameter.js
   - src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cluster_server_parameters.js
-  # TODO SERVER-84183 Embedded router doesn't support FLE yet.
-  - src/mongo/db/modules/enterprise/jstests/fle2/**/*.js
+  - src/mongo/db/modules/enterprise/jstests/fle2/cleanup_collection.js
+  - src/mongo/db/modules/enterprise/jstests/fle2/compact_collection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

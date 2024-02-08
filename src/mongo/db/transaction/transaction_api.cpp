@@ -128,13 +128,14 @@ SyncTransactionWithRetries::SyncTransactionWithRetries(
           opCtx,
           _sleepExec,
           opCtx->getCancellationToken(),
-          txnClient ? std::move(txnClient)
-                    : std::make_unique<details::SEPTransactionClient>(
-                          opCtx,
-                          inlineExecutor,
-                          _sleepExec,
-                          _cleanupExecutor,
-                          std::make_unique<details::DefaultSEPTransactionClientBehaviors>()))) {
+          txnClient
+              ? std::move(txnClient)
+              : std::make_unique<details::SEPTransactionClient>(
+                    opCtx,
+                    inlineExecutor,
+                    _sleepExec,
+                    _cleanupExecutor,
+                    std::make_unique<details::DefaultSEPTransactionClientBehaviors>(opCtx)))) {
     // Callers should always provide a yielder when using the API with a session checked out,
     // otherwise commands run by the API won't be able to check out that session.
     invariant(!OperationContextSession::get(opCtx) || _resourceYielder);
@@ -459,8 +460,7 @@ void primeInternalClient(Client* client) {
 
 Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
     OperationContext* opCtx, const Message& request) const {
-    auto serviceEntryPoint = opCtx->getService()->getServiceEntryPoint();
-    return serviceEntryPoint->handleRequest(opCtx, request);
+    return _service->getServiceEntryPoint()->handleRequest(opCtx, request);
 }
 
 ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& dbName,
@@ -470,7 +470,8 @@ ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& db
     BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
     _hooks->runRequestHook(&cmdBuilder);
 
-    auto client = _serviceContext->getService()->makeClient("SEP-internal-txn-client");
+    auto client = _behaviors->getService()->makeClient("SEP-internal-txn-client");
+
     AlternativeClientRegion clientRegion(client);
 
     // Note that _token is only cancelled once the caller of the transaction no longer cares about

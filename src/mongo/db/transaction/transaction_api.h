@@ -283,6 +283,13 @@ public:
      * Returns if the client is eligible to run cluster operations.
      */
     virtual bool runsClusterOperations() const = 0;
+
+    Service* getService() {
+        return _service;
+    }
+
+protected:
+    Service* _service;
 };
 
 /**
@@ -291,6 +298,10 @@ public:
  */
 class DefaultSEPTransactionClientBehaviors : public SEPTransactionClientBehaviors {
 public:
+    DefaultSEPTransactionClientBehaviors(OperationContext* opCtx) {
+        _service = opCtx->getService();
+    }
+
     BSONObj maybeModifyCommand(BSONObj cmdObj) const override {
         return cmdObj;
     }

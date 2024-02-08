@@ -45,7 +45,7 @@ namespace mongo::txn_api::details {
  */
 class ClusterSEPTransactionClientBehaviors : public SEPTransactionClientBehaviors {
 public:
-    ClusterSEPTransactionClientBehaviors(ServiceContext* service) {}
+    ClusterSEPTransactionClientBehaviors(OperationContext* opCtx);
 
     BSONObj maybeModifyCommand(BSONObj cmdObj) const override;
 
@@ -57,6 +57,10 @@ public:
         // it is safe to use this client within a caller's operation with shard versions.
         return true;
     }
+
+private:
+    // Flag to check if routing capabilities are enabled.
+    bool _isRouterEnabled = false;
 };
 
 }  // namespace mongo::txn_api::details
