@@ -100,17 +100,13 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
         auto indexCursor = iam->newCursor(opCtx, /*forward*/ true);
 
         const BSONObj& keyPattern = indexDescriptor->keyPattern();
-        const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
         const auto ordering = Ordering::make(keyPattern);
-        key_string::Builder firstKeyString(
-            version, BSONObj(), ordering, key_string::Discriminator::kExclusiveBefore);
 
         LOGV2(51810,
               "[Debugging] {keyPattern_str} index table entries:",
               "keyPattern_str"_attr = keyPattern);
 
-        for (auto keyStringEntry = indexCursor->seekForKeyString(firstKeyString.getValueCopy());
-             keyStringEntry;
+        for (auto keyStringEntry = indexCursor->nextKeyString(); keyStringEntry;
              keyStringEntry = indexCursor->nextKeyString()) {
             auto keyString = key_string::toBsonSafe(keyStringEntry->keyString.getBuffer(),
                                                     keyStringEntry->keyString.getSize(),

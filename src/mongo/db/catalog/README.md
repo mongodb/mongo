@@ -1299,7 +1299,7 @@ ambiguous types are encountered.
 For indexes other than `_id` , the `RecordId` is appended to the end of the `KeyString` to ensure
 uniqueness. In older versions of MongoDB we didn't do that, but that lead to problems during
 secondary oplog application and [initial sync][] where the uniqueness constraint may be violated
-temporarily. Indexes store key value pairs where they key is the `KeyString`. Current WiredTiger
+temporarily. Indexes store key value pairs where the key is the `KeyString`. Current WiredTiger
 secondary unique indexes may have a mix of the old and new representations described below.
 
 | Index type                   | (Key, Value)                                                                                                                        | Data Format Version            |

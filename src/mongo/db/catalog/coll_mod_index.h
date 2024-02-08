@@ -77,14 +77,10 @@ void processCollModIndexRequest(OperationContext* opCtx,
 
 /**
  * Scans index to return the record ids of duplicates.
- * Performs a scan on the whole index if 'firstKeyString' is not provided. Otherwise, only scans
- * documents with 'firstKeyString'.
  */
-std::list<std::set<RecordId>> scanIndexForDuplicates(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const IndexDescriptor* idx,
-    boost::optional<key_string::Value> firstKeyString = {});
+std::list<std::set<RecordId>> scanIndexForDuplicates(OperationContext* opCtx,
+                                                     const CollectionPtr& collection,
+                                                     const IndexDescriptor* idx);
 
 /**
  * Builds a BSONArray of the violations with duplicate index keys and returns the formatted error

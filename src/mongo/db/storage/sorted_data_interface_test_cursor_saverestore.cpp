@@ -89,9 +89,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
-             entry;
-             i++, entry = cursor->next()) {
+        for (auto entry = cursor->next(); entry; i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -143,9 +141,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithEndPositio
         cursor->setEndPosition(BSON("" << std::numeric_limits<double>::infinity()), true);
 
         int i = 0;
-        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
-             entry;
-             i++, entry = cursor->next()) {
+        for (auto entry = cursor->next(); entry; i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -196,10 +192,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry =
-                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
-             entry;
-             i--, entry = cursor->next()) {
+        for (auto entry = cursor->next(); entry; i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -249,10 +242,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorOnIdIndex) {
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry =
-                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
-             entry;
-             i--, entry = cursor->next()) {
+        for (auto entry = cursor->next(); entry; i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -302,10 +292,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversedOnIdIn
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry =
-                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
-             entry;
-             i--, entry = cursor->next()) {
+        for (auto entry = cursor->next(); entry; i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(BSON("" << i), RecordId(42, i * 2)));
 
@@ -356,9 +343,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
-        for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
-             entry;
-             i++, entry = cursor->next()) {
+        for (auto entry = cursor->next(); entry; i++, entry = cursor->next()) {
             ASSERT_LT(i, nToInsert);
             ASSERT_EQ(entry, IndexKeyEntry(key1, RecordId(42, i * 2)));
 
@@ -410,10 +395,7 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
-        for (auto entry =
-                 cursor->seek(makeKeyStringForSeek(sorted.get(), kMaxBSONKey, false, true));
-             entry;
-             i--, entry = cursor->next()) {
+        for (auto entry = cursor->next(); entry; i--, entry = cursor->next()) {
             ASSERT_GTE(i, 0);
             ASSERT_EQ(entry, IndexKeyEntry(key1, RecordId(42, i * 2)));
 

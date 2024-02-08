@@ -273,7 +273,7 @@ public:
 
         /**
          * Moves forward and returns the new data or boost::none if there is no more data.
-         * If not positioned, returns boost::none.
+         * If not positioned, returns the first entry or boost::none.
          */
         virtual boost::optional<IndexKeyEntry> next(
             KeyInclusion keyInclusion = KeyInclusion::kInclude) = 0;

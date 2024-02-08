@@ -352,25 +352,11 @@ void processCollModIndexRequest(OperationContext* opCtx,
     }
 }
 
-std::list<std::set<RecordId>> scanIndexForDuplicates(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const IndexDescriptor* idx,
-    boost::optional<key_string::Value> firstKeyString) {
+std::list<std::set<RecordId>> scanIndexForDuplicates(OperationContext* opCtx,
+                                                     const CollectionPtr& collection,
+                                                     const IndexDescriptor* idx) {
     auto entry = idx->getEntry();
     auto accessMethod = entry->accessMethod()->asSortedData();
-    // Only scans for the duplicates on one key if 'firstKeyString' is provided.
-    bool scanOneKey = static_cast<bool>(firstKeyString);
-
-    // Starting point of index traversal.
-    if (!firstKeyString) {
-        auto keyStringVersion = accessMethod->getSortedDataInterface()->getKeyStringVersion();
-        key_string::Builder firstKeyStringBuilder(keyStringVersion,
-                                                  BSONObj(),
-                                                  entry->ordering(),
-                                                  key_string::Discriminator::kExclusiveBefore);
-        firstKeyString = firstKeyStringBuilder.getValueCopy();
-    }
 
     // Scans index for duplicates, comparing consecutive index entries.
     // KeyStrings will be in strictly increasing order because all keys are sorted and they are
@@ -381,7 +367,8 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     boost::optional<KeyStringEntry> prevIndexEntry;
     std::list<std::set<RecordId>> duplicateRecordsList;
     std::set<RecordId> duplicateRecords;
-    for (auto indexEntry = indexCursor.seekForKeyString(opCtx, *firstKeyString); indexEntry;
+
+    for (auto indexEntry = indexCursor.nextKeyString(opCtx); indexEntry;
          indexEntry = indexCursor.nextKeyString(opCtx)) {
         if (prevIndexEntry &&
             (indexEntry->loc.isLong()
@@ -397,9 +384,6 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
                 // Adds the current group of violations with the same duplicate value.
                 duplicateRecordsList.push_back(duplicateRecords);
                 duplicateRecords.clear();
-                if (scanOneKey) {
-                    break;
-                }
             }
         }
         prevIndexEntry = indexEntry;

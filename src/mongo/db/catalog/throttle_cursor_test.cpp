@@ -301,8 +301,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOff) {
     setMaxMbPerSec(0);
     Date_t start = getTime();
 
-    ASSERT_TRUE(cursor.seek(opCtx, kMinKeyString));
-    int numRecords = 1;
+    int numRecords = 0;
 
     while (cursor.next(opCtx)) {
         numRecords++;
@@ -331,8 +330,7 @@ TEST_F(ThrottleCursorTest, TestSortedDataInterfaceThrottleCursorOn) {
         setMaxMbPerSec(1);
         Date_t start = getTime();
 
-        ASSERT_TRUE(cursor.seek(opCtx, kMinKeyString));
-        int numRecords = 1;
+        int numRecords = 0;
 
         while (cursor.next(opCtx)) {
             numRecords++;
@@ -384,8 +382,7 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOff) {
     setMaxMbPerSec(10);
     Date_t start = getTime();
 
-    ASSERT_TRUE(indexCursor.seek(opCtx, kMinKeyString));
-    int numRecords = 1;
+    int numRecords = 0;
 
     while (indexCursor.next(opCtx)) {
         numRecords++;
@@ -427,12 +424,14 @@ TEST_F(ThrottleCursorTest, TestMixedCursorsWithSharedThrottleOn) {
         setMaxMbPerSec(2);
         Date_t start = getTime();
 
-        ASSERT_TRUE(indexCursor.seek(opCtx, kMinKeyString));
-        ASSERT_TRUE(recordCursor.seekExact(opCtx, RecordId(1)));
-        int numRecords = 2;
+        int numRecords = 0;
 
         while (indexCursor.next(opCtx)) {
-            ASSERT_TRUE(recordCursor.next(opCtx));
+            if (numRecords == 0) {
+                ASSERT_TRUE(recordCursor.seekExact(opCtx, RecordId(1)));
+            } else {
+                ASSERT_TRUE(recordCursor.next(opCtx));
+            }
             numRecords += 2;
         }
 

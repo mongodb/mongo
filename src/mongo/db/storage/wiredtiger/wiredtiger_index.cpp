@@ -384,16 +384,8 @@ int64_t WiredTigerIndex::numEntries(OperationContext* opCtx) const {
 
     auto keyInclusion =
         TRACING_ENABLED ? Cursor::KeyInclusion::kInclude : Cursor::KeyInclusion::kExclude;
-    key_string::Value keyStringForSeek =
-        IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(BSONObj(),
-                                                              getKeyStringVersion(),
-                                                              getOrdering(),
-                                                              true, /* forward */
-                                                              true  /* inclusive */
-        );
-
     auto cursor = newCursor(opCtx);
-    for (auto kv = cursor->seek(keyStringForSeek, keyInclusion); kv; kv = cursor->next()) {
+    for (auto kv = cursor->next(keyInclusion); kv; kv = cursor->next(keyInclusion)) {
         LOGV2_TRACE_INDEX(20095, "numEntries", "kv"_attr = kv);
         count++;
     }
@@ -1349,7 +1341,7 @@ protected:
     // false by any operation that moves the cursor, other than subsequent save/restore pairs.
     bool _lastMoveSkippedKey = false;
 
-    bool _eof = true;
+    bool _eof = false;
 };
 }  // namespace
 
