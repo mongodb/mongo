@@ -56,7 +56,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv !.feature_flag_guarded
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.encrypt
+  - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
@@ -136,7 +136,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.uninitialized_fcv !.feature_flag_guarded
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.gcm
+  - name: .sharding .common !.csrs !.gcm !.feature_flag_guarded
   - name: .ssl
   - name: .stitch
   - name: .updatefuzzer

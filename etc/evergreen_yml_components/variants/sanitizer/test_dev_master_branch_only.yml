@@ -785,7 +785,7 @@ buildvariants:
   # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
   # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  - name: .sharding .common
+  - name: .sharding .common !.feature_flag_guarded
   # - name: .crypt # Doesn't pass on v4
   #   distros:
   #   - rhel80-xlarge

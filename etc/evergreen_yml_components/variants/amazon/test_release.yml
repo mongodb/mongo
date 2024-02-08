@@ -49,7 +49,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-  - name: .sharding .common !.csrs !.encrypt
+  - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .sharding .txns
   - name: .ssl
@@ -235,7 +235,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
@@ -345,7 +345,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
-  - name: .sharding .common
+  - name: .sharding .common !.feature_flag_guarded
   - name: .stitch
   - name: .crypt
     distros:
@@ -467,7 +467,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
-  - name: .sharding .common
+  - name: .sharding .common !.feature_flag_guarded
   - name: .stitch
   - name: .crypt
     distros:
@@ -533,7 +533,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
@@ -632,7 +632,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
-  - name: .sharding .common !.multiversion
+  - name: .sharding .common !.multiversion !.feature_flag_guarded
   - name: .stitch
   - name: .crypt
     distros:
@@ -742,7 +742,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
-  - name: .sharding .common !.multiversion
+  - name: .sharding .common !.multiversion !.feature_flag_guarded
   # TODO: SERVER-79886 Fix broken .crypt task
   # - name: .crypt
   #   distros:
@@ -808,7 +808,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
@@ -910,7 +910,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
-  - name: .sharding .common !.multiversion
+  - name: .sharding .common !.multiversion !.feature_flag_guarded
   - name: .stitch
   - name: .crypt
     distros:
@@ -1026,7 +1026,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
-  - name: .sharding .common !.multiversion
+  - name: .sharding .common !.multiversion !.feature_flag_guarded
   # TODO: SERVER-79886 Fix broken .crypt task
   # - name: .crypt
   #   distros:

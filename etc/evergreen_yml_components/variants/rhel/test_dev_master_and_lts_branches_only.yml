@@ -71,7 +71,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.feature_flag_guarded
-  - name: .sharding .common !.multiversion !.csrs !.encrypt
+  - name: .sharding .common !.multiversion !.csrs !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .updatefuzzer

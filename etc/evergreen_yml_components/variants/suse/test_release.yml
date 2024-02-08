@@ -54,7 +54,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.encrypt
+  - name: .sharding .common !.csrs !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
@@ -228,7 +228,7 @@ buildvariants:
   - name: replica_sets_gen
   - name: .replica_sets .common
   - name: .sharding .txns
-  - name: .sharding .common !.csrs !.multiversion !.encrypt
+  - name: .sharding .common !.csrs !.multiversion !.encrypt !.feature_flag_guarded
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .stitch
