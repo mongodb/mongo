@@ -108,6 +108,7 @@ struct OplogLink {
     OplogLink() = default;
 
     OpTime prevOpTime;
+    MultiOplogEntryType multiOpType = MultiOplogEntryType::kLegacyMultiOpType;
 };
 
 /**

@@ -159,25 +159,6 @@ DEATH_TEST_REGEX_F(BatchedWriteContextTest,
     bwc.addBatchedOperation(opCtx, op);
 }
 
-DEATH_TEST_REGEX_F(BatchedWriteContextTest,
-                   TestDoesNotSupportRetryableWrites,
-                   "Invariant failure.*!opCtx->getTxnNumber()") {
-    auto opCtxRaii = makeOperationContext();
-    auto opCtx = opCtxRaii.get();
-    opCtx->setLogicalSessionId(LogicalSessionId(makeLogicalSessionIdForTest()));
-    opCtx->setTxnNumber(TxnNumber{1});
-
-    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
-    auto& bwc = BatchedWriteContext::get(opCtx);
-    // Need to explicitly set writes are batched to simulate op observer starting batched write.
-    bwc.setWritesAreBatched(true);
-
-    const NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest(boost::none, "test", "coll");
-    auto op = repl::MutableOplogEntry::makeDeleteOperation(nss, UUID::gen(), BSON("_id" << 0));
-    bwc.addBatchedOperation(opCtx, op);
-}
-
 TEST_F(BatchedWriteContextTest, TestAcceptedBatchOperationsSucceeds) {
     auto opCtxRaii = makeOperationContext();
     auto opCtx = opCtxRaii.get();

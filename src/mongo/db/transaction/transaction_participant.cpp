@@ -362,10 +362,11 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
             auto stmtIds = entry.getStatementIds();
 
-            if (isInternalSessionForRetryableWrite(lsid)) {
+            if (isInternalSessionForRetryableWrite(lsid) ||
+                entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps) {
                 uassert(5875605,
-                        "Found an oplog entry for retryable internal transaction with top-level "
-                        "'stmtId' field",
+                        "Found an oplog entry for retryable internal transaction or applyOps with "
+                        "top-level 'stmtId' field",
                         stmtIds.empty());
 
                 if (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction) {

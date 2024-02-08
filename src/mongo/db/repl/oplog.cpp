@@ -612,7 +612,13 @@ void appendOplogEntryChainInfo(OperationContext* opCtx,
     invariant(txnParticipant);
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    oplogEntry->setStatementIds(stmtIds);
+    // If this is a multi-operation retryable oplog entry, the statement IDs should not be included
+    // because they were included in the individual operations.
+    if (oplogLink->multiOpType != MultiOplogEntryType::kLegacyMultiOpType) {
+        oplogEntry->setMultiOpType(oplogLink->multiOpType);
+    } else {
+        oplogEntry->setStatementIds(stmtIds);
+    }
     if (oplogLink->prevOpTime.isNull()) {
         oplogLink->prevOpTime = txnParticipant.getLastWriteOpTime();
     }

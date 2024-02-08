@@ -63,10 +63,13 @@ constexpr auto kOplogEntrySizeLimitBytes = static_cast<std::size_t>(BSONObjMaxUs
 const auto kWallClockTime = Date_t::now();
 
 // Placeholder TransactionOperations::LogApplyOpsFn implementation.
-auto doNothingLogApplyOpsFn =
-    [](repl::MutableOplogEntry* oplogEntry, bool, bool, std::vector<StmtId>) {
-        return repl::OpTime();
-    };
+auto doNothingLogApplyOpsFn = [](repl::MutableOplogEntry* oplogEntry,
+                                 bool,
+                                 bool,
+                                 std::vector<StmtId>,
+                                 WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
+    return repl::OpTime();
+};
 
 TEST(TransactionOperationsTest, Basic) {
     TransactionOperations ops;
@@ -524,13 +527,21 @@ TEST(TransactionOperationsTest, LogOplogEntriesDoesNothingOnEmptyOperations) {
     ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
-    auto brokenLogApplyOpsFn = [](repl::MutableOplogEntry*, bool, bool, std::vector<StmtId>) {
+    auto brokenLogApplyOpsFn = [](repl::MutableOplogEntry*,
+                                  bool,
+                                  bool,
+                                  std::vector<StmtId>,
+                                  WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         FAIL("logApplyOps() should not be called");
         return repl::OpTime();
     };
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    auto numEntries =
-        ops.logOplogEntries(oplogSlots, info, kWallClockTime, brokenLogApplyOpsFn, &imageToWrite);
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::kDontGroup,
+                                          brokenLogApplyOpsFn,
+                                          &imageToWrite);
     ASSERT_EQ(numEntries, 0);
 }
 
@@ -566,10 +577,12 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
     ASSERT_FALSE(info.prepare);
 
     // Check applyOps oplog entry to ensure it has all the basic details.
-    auto logApplyOpsFn = [op, oplogSlots](repl::MutableOplogEntry* entry,
-                                          bool firstOp,
-                                          bool lastOp,
-                                          std::vector<StmtId> stmtIdsWritten) {
+    auto logApplyOpsFn = [op,
+                          oplogSlots](repl::MutableOplogEntry* entry,
+                                      bool firstOp,
+                                      bool lastOp,
+                                      std::vector<StmtId> stmtIdsWritten,
+                                      WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         ASSERT(entry) << "tried to log null applyOps oplog entry";
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
         ASSERT_EQ(
@@ -592,8 +605,12 @@ TEST(TransactionOperationsTest, LogOplogEntriesSingleOperation) {
         return oplogSlots.back();
     };
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    auto numEntries =
-        ops.logOplogEntries(oplogSlots, info, kWallClockTime, logApplyOpsFn, &imageToWrite);
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::kDontGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite);
     ASSERT_EQ(numEntries, 1U);
 }
 
@@ -651,10 +668,12 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
 
     // Check applyOps oplog entry to ensure it has all the basic details.
     std::size_t numEntriesLogged = 0;
-    auto logApplyOpsFn = [&numEntriesLogged, oplogSlots, ops](repl::MutableOplogEntry* entry,
-                                                              bool firstOp,
-                                                              bool lastOp,
-                                                              std::vector<StmtId> stmtIdsWritten) {
+    auto logApplyOpsFn = [&numEntriesLogged, oplogSlots, ops](
+                             repl::MutableOplogEntry* entry,
+                             bool firstOp,
+                             bool lastOp,
+                             std::vector<StmtId> stmtIdsWritten,
+                             WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         ASSERT(entry) << "tried to log null applyOps oplog entry";
 
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
@@ -714,8 +733,12 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsCommitUnprepare
         return expectedOpTime;
     };
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    auto numEntries =
-        ops.logOplogEntries(oplogSlots, info, kWallClockTime, logApplyOpsFn, &imageToWrite);
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::kDontGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite);
     ASSERT_EQ(numEntries, 3U);
 }
 
@@ -773,10 +796,12 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
 
     // Check applyOps oplog entry to ensure it has all the basic details.
     std::size_t numEntriesLogged = 0;
-    auto logApplyOpsFn = [&numEntriesLogged, oplogSlots, ops](repl::MutableOplogEntry* entry,
-                                                              bool firstOp,
-                                                              bool lastOp,
-                                                              std::vector<StmtId> stmtIdsWritten) {
+    auto logApplyOpsFn = [&numEntriesLogged, oplogSlots, ops](
+                             repl::MutableOplogEntry* entry,
+                             bool firstOp,
+                             bool lastOp,
+                             std::vector<StmtId> stmtIdsWritten,
+                             WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         ASSERT(entry) << "tried to log null applyOps oplog entry";
         ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
         ASSERT_EQ(
@@ -837,8 +862,134 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsPreparedTransac
         return expectedOpTime;
     };
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    auto numEntries =
-        ops.logOplogEntries(oplogSlots, info, kWallClockTime, logApplyOpsFn, &imageToWrite);
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::kDontGroup,
+                                          logApplyOpsFn,
+                                          &imageToWrite);
+    ASSERT_EQ(numEntries, 3U);
+}
+
+TEST(TransactionOperationsTest, LogOplogEntriesMultipleOperationsRetryableWrite) {
+    TransactionOperations ops;
+
+    // The Tenant ID contained in the generated applyOps oplog entry should match that
+    // of the first operation.
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+    auto tenant = TenantId(OID::gen());
+
+    // Add three operations. This helps us check fields for the first, middle, and last entries
+    // in the applyOps chain.
+    TransactionOperations::TransactionOperation op1;
+    op1.setOpType(repl::OpTypeEnum::kInsert);
+    op1.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+    op1.setObject(BSON("_id" << 1 << "x" << 1));
+    op1.setTid(tenant);
+    std::vector<StmtId> stmtIds1 = {1};
+    op1.setStatementIds(stmtIds1);
+    ASSERT_OK(ops.addOperation(op1));
+
+    TransactionOperations::TransactionOperation op2;
+    op2.setOpType(repl::OpTypeEnum::kInsert);
+    op2.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+    op2.setObject(BSON("_id" << 2 << "x" << 2));
+    op2.setTid(tenant);
+    std::vector<StmtId> stmtIds2 = {2};
+    op2.setStatementIds(stmtIds2);
+    ASSERT_OK(ops.addOperation(op2));
+
+    TransactionOperations::TransactionOperation op3;
+    op3.setOpType(repl::OpTypeEnum::kInsert);
+    op3.setNss(NamespaceString::createNamespaceString_forTest("test.t"));
+    op3.setObject(BSON("_id" << 3 << "x" << 3));
+    op3.setTid(tenant);
+    std::vector<StmtId> stmtIds3 = {3};
+    op3.setStatementIds(stmtIds3);
+    ASSERT_OK(ops.addOperation(op3));
+
+    std::vector<OplogSlot> oplogSlots;
+    oplogSlots.push_back(OplogSlot{Timestamp(1, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(2, 0), /*term=*/1LL});
+    oplogSlots.push_back(OplogSlot{Timestamp(3, 0), /*term=*/1LL});
+
+    auto info = ops.getApplyOpsInfo(oplogSlots,
+                                    1U,  // one operation per applyOps entry
+                                    kOplogEntrySizeLimitBytes,
+                                    /*prepare=*/false);
+    ASSERT_EQ(info.numberOfOplogSlotsUsed, 3U);
+    ASSERT_EQ(info.applyOpsEntries.size(), 3U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
+    ASSERT_FALSE(info.prepare);
+
+    // Check applyOps oplog entry to ensure it has all the basic details.
+    std::size_t numEntriesLogged = 0;
+    auto logApplyOpsFn = [&numEntriesLogged, oplogSlots, ops](
+                             repl::MutableOplogEntry* entry,
+                             bool firstOp,
+                             bool lastOp,
+                             std::vector<StmtId> stmtIdsWritten,
+                             WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
+        ASSERT(entry) << "tried to log null applyOps oplog entry";
+
+        ASSERT_EQ(entry->getOpType(), repl::OpTypeEnum::kCommand);
+        ASSERT_EQ(
+            entry->getNss(),
+            NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS());
+
+        auto expectedOpTime = oplogSlots[numEntriesLogged];
+        ASSERT_EQ(entry->getOpTime(), expectedOpTime);
+
+        // First entry should have a null op time. Following entries should match the result
+        // this function returned previously.
+        const auto& prevWriteOpTime = entry->getPrevWriteOpTimeInTransaction();
+        ASSERT(prevWriteOpTime);
+        if (numEntriesLogged == 0) {
+            ASSERT(prevWriteOpTime->isNull());
+        } else {
+            ASSERT_EQ(*prevWriteOpTime, oplogSlots[numEntriesLogged - 1]);
+        }
+
+        ASSERT_EQ(entry->getWallClockTime(), kWallClockTime);
+
+        auto op = ops.getOperationsForTest()[numEntriesLogged];
+        auto tid = entry->getTid();
+        ASSERT(tid) << entry->toBSON();
+        ASSERT_EQ(*tid, *op.getTid());
+
+        // We expect neither "count" nor "partialTxn", as these applyOps should not be treated as a
+        // single atomic operation.
+        ASSERT_BSONOBJ_EQ(entry->getObject(), BSON("applyOps" << BSON_ARRAY(op.toBSON())));
+
+        // Statement ids should be present on all applyOps.
+        if (numEntriesLogged == 0) {
+            ASSERT(firstOp);
+            ASSERT_FALSE(lastOp);
+            ASSERT_EQ(stmtIdsWritten.size(), 1U);
+            ASSERT_EQ(stmtIdsWritten[0], ops.getOperationsForTest()[0].getStatementIds()[0]);
+        } else if (numEntriesLogged < (ops.numOperations() - 1U)) {
+            ASSERT_FALSE(firstOp);
+            ASSERT_FALSE(lastOp);
+            ASSERT_EQ(stmtIdsWritten.size(), 1U);
+            ASSERT_EQ(stmtIdsWritten[0], ops.getOperationsForTest()[1].getStatementIds()[0]);
+        } else {
+            ASSERT_FALSE(firstOp);
+            ASSERT(lastOp);
+            ASSERT_EQ(stmtIdsWritten.size(), 1U);
+            ASSERT_EQ(stmtIdsWritten[0], ops.getOperationsForTest()[2].getStatementIds()[0]);
+        }
+
+        numEntriesLogged++;
+        return expectedOpTime;
+    };
+    boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
+    auto numEntries = ops.logOplogEntries(oplogSlots,
+                                          info,
+                                          kWallClockTime,
+                                          WriteUnitOfWork::kGroupForPossiblyRetryableOperations,
+                                          logApplyOpsFn,
+                                          &imageToWrite);
     ASSERT_EQ(numEntries, 3U);
 }
 
@@ -863,7 +1014,12 @@ DEATH_TEST(TransactionOperationsTest,
 
     // This should set off a tripwire assertion.
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    ops.logOplogEntries(oplogSlots, info, kWallClockTime, doNothingLogApplyOpsFn, &imageToWrite);
+    ops.logOplogEntries(oplogSlots,
+                        info,
+                        kWallClockTime,
+                        WriteUnitOfWork::kDontGroup,
+                        doNothingLogApplyOpsFn,
+                        &imageToWrite);
 }
 
 // During normal operation, the grouping of operations passed to logOplogEntries()
@@ -900,8 +1056,12 @@ TEST(TransactionOperationsTest,
     ASSERT_FALSE(info.prepare);
 
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    ASSERT_THROWS(ops.logOplogEntries(
-                      oplogSlots, info, kWallClockTime, doNothingLogApplyOpsFn, &imageToWrite),
+    ASSERT_THROWS(ops.logOplogEntries(oplogSlots,
+                                      info,
+                                      kWallClockTime,
+                                      WriteUnitOfWork::kDontGroup,
+                                      doNothingLogApplyOpsFn,
+                                      &imageToWrite),
                   ExceptionFor<ErrorCodes::TransactionTooLarge>);
 }
 
@@ -936,10 +1096,16 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPreImage) {
     auto logApplyOps = [writeOpTime](repl::MutableOplogEntry*,
                                      bool firstOp,
                                      bool lastOp,
-                                     std::vector<StmtId> stmtIdsWritten) {
+                                     std::vector<StmtId> stmtIdsWritten,
+                                     WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         return writeOpTime;
     };
-    ASSERT_EQ(ops.logOplogEntries(oplogSlots, info, kWallClockTime, logApplyOps, &imageToWrite),
+    ASSERT_EQ(ops.logOplogEntries(oplogSlots,
+                                  info,
+                                  kWallClockTime,
+                                  WriteUnitOfWork::kDontGroup,
+                                  logApplyOps,
+                                  &imageToWrite),
               info.numberOfOplogSlotsUsed);
 
     // Check image bundle.
@@ -981,10 +1147,16 @@ TEST(TransactionOperationsTest, LogOplogEntriesExtractsPostImage) {
     auto logApplyOps = [writeOpTime](repl::MutableOplogEntry*,
                                      bool firstOp,
                                      bool lastOp,
-                                     std::vector<StmtId> stmtIdsWritten) {
+                                     std::vector<StmtId> stmtIdsWritten,
+                                     WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
         return writeOpTime;
     };
-    ASSERT_EQ(ops.logOplogEntries(oplogSlots, info, kWallClockTime, logApplyOps, &imageToWrite),
+    ASSERT_EQ(ops.logOplogEntries(oplogSlots,
+                                  info,
+                                  kWallClockTime,
+                                  WriteUnitOfWork::kDontGroup,
+                                  logApplyOps,
+                                  &imageToWrite),
               info.numberOfOplogSlotsUsed);
 
     // Check image bundle.
@@ -1031,8 +1203,12 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInSameEntry)
     ASSERT_FALSE(info.prepare);
 
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    ASSERT_THROWS_CODE(ops.logOplogEntries(
-                           oplogSlots, info, kWallClockTime, doNothingLogApplyOpsFn, &imageToWrite),
+    ASSERT_THROWS_CODE(ops.logOplogEntries(oplogSlots,
+                                           info,
+                                           kWallClockTime,
+                                           WriteUnitOfWork::kDontGroup,
+                                           doNothingLogApplyOpsFn,
+                                           &imageToWrite),
                        AssertionException,
                        6054001);
 }
@@ -1078,8 +1254,12 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInDifferentE
     ASSERT_FALSE(info.prepare);
 
     boost::optional<TransactionOperations::TransactionOperation::ImageBundle> imageToWrite;
-    ASSERT_THROWS_CODE(ops.logOplogEntries(
-                           oplogSlots, info, kWallClockTime, doNothingLogApplyOpsFn, &imageToWrite),
+    ASSERT_THROWS_CODE(ops.logOplogEntries(oplogSlots,
+                                           info,
+                                           kWallClockTime,
+                                           WriteUnitOfWork::kDontGroup,
+                                           doNothingLogApplyOpsFn,
+                                           &imageToWrite),
                        AssertionException,
                        6054002);
 }

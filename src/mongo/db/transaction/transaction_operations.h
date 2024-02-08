@@ -82,14 +82,21 @@ public:
      * the last entry ('lastOp' == true). It may also be empty if there are no statement ids
      * contained in any of the replicated operations.
      *
+     * The 'oplogGroupingFormat' indicates whether these applyOps make up a multi-document
+     * transaction (kDontGroup), a potentially multi-oplog-entry transactional batched wrote
+     * (kGroupForTransaction), or a multi-oplog-entry potentially retryable write
+     * (kGroupForPossiblyRetryableOperations)
+     *
      * This is based on the signature of the logApplyOps() function within the OpObserverImpl
      * implementation, which takes a few more arguments that can be derived from the caller's
      * context.
      */
-    using LogApplyOpsFn = std::function<repl::OpTime(repl::MutableOplogEntry* oplogEntry,
-                                                     bool firstOp,
-                                                     bool lastOp,
-                                                     std::vector<StmtId> stmtIdsWritten)>;
+    using LogApplyOpsFn =
+        std::function<repl::OpTime(repl::MutableOplogEntry* oplogEntry,
+                                   bool firstOp,
+                                   bool lastOp,
+                                   std::vector<StmtId> stmtIdsWritten,
+                                   WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat)>;
 
     /**
      * Contains "applyOps" oplog entries for a transaction. "applyOps" entries are not actual
@@ -237,6 +244,12 @@ public:
      * The 'applyOpsOperationAssignment' contains BSON serialized transaction statements, their
      * assignment to "applyOps" oplog entries for a transaction.
      *
+     * The 'oplogGroupingFormat' indicates whether these applyOps make up a multi-document
+     * transaction (kDontGroup), a potentially multi-oplog-entry transactional batched wrote
+     * (kGroupForTransaction), or a multi-oplog-entry potentially retryable write
+     * (kGroupForPossiblyRetryableOperations)
+     *
+     *
      * In the case of writing entries for a prepared transaction, the last oplog entry
      * (i.e. the implicit prepare) will always be written using the last oplog slot given,
      * even if this means skipping over some reserved slots.
@@ -250,6 +263,7 @@ public:
     std::size_t logOplogEntries(const std::vector<OplogSlot>& oplogSlots,
                                 const ApplyOpsInfo& applyOpsOperationAssignment,
                                 Date_t wallClockTime,
+                                WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
                                 LogApplyOpsFn logApplyOpsFn,
                                 boost::optional<TransactionOperation::ImageBundle>*
                                     prePostImageToWriteToImageCollection) const;

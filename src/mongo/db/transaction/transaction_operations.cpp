@@ -291,6 +291,7 @@ std::size_t TransactionOperations::logOplogEntries(
     const std::vector<OplogSlot>& oplogSlots,
     const ApplyOpsInfo& applyOpsOperationAssignment,
     Date_t wallClockTime,
+    WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
     LogApplyOpsFn logApplyOpsFn,
     boost::optional<TransactionOperation::ImageBundle>* prePostImageToWriteToImageCollection)
     const {
@@ -313,7 +314,9 @@ std::size_t TransactionOperations::logOplogEntries(
     // termination condition.
     auto stmtsIter = _transactionOperations.begin();
     auto applyOpsIter = applyOpsOperationAssignment.applyOpsEntries.begin();
-    auto prepare = applyOpsOperationAssignment.prepare;
+    const bool prepare = applyOpsOperationAssignment.prepare;
+    const bool applyOpsAppliedSeparately =
+        oplogGroupingFormat == WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
     while (stmtsIter != _transactionOperations.end()) {
         tassert(6278509,
                 "Not enough \"applyOps\" entries",
@@ -336,7 +339,7 @@ std::size_t TransactionOperations::logOplogEntries(
         auto lastOp = nextStmt == _transactionOperations.end();
 
         auto implicitPrepare = lastOp && prepare;
-        auto isPartialTxn = !lastOp;
+        auto isPartialTxn = !lastOp && !applyOpsAppliedSeparately;
 
         if (imageToWrite) {
             uassert(6054002,
@@ -365,7 +368,7 @@ std::size_t TransactionOperations::logOplogEntries(
         // the number of operations can be derived from the length of the array in the
         // 'applyOps' field.
         // See SERVER-40676 and SERVER-40678.
-        if (lastOp && !firstOp) {
+        if (lastOp && !firstOp && !applyOpsAppliedSeparately) {
             applyOpsBuilder.append("count", static_cast<long long>(_transactionOperations.size()));
         }
 
@@ -385,7 +388,9 @@ std::size_t TransactionOperations::logOplogEntries(
             logApplyOpsFn(&oplogEntry,
                           firstOp,
                           lastOp,
-                          (lastOp ? std::move(stmtIdsWritten) : std::vector<StmtId>{}));
+                          (lastOp || applyOpsAppliedSeparately ? std::move(stmtIdsWritten)
+                                                               : std::vector<StmtId>{}),
+                          oplogGroupingFormat);
 
         hangAfterLoggingApplyOpsForTransaction.pauseWhileSet();
 

@@ -1135,13 +1135,16 @@ TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
             kNss, collUUID, BSON("_id" << 1 << "x" << 11), BSON("_id" << 1));
         auto insert2 = repl::MutableOplogEntry::makeInsertOperation(
             kNss, collUUID, BSON("_id" << 2 << "x" << 12), BSON("_id" << 2));
+        insert0.setStatementIds({0});
+        insert1.setStatementIds({1});
+        insert2.setStatementIds({2});
         auto entry0 = makeApplyOpsOplogEntry(
             repl::OpTime(Timestamp(100, 0), 0),  // optime
             repl::OpTypeEnum::kCommand,          // op type
             {insert0, insert1, insert2},         // operations
             osi,                                 // session info
             Date_t::now(),                       // wall clock time
-            {0, 1, 2},                           // statement ids
+            {},                                  // statement ids (at top level, should be empty)
             repl::OpTime(),  // optime of previous write within same retryable write
             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
@@ -1189,6 +1192,12 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
             kNss, collUUID, BSON("_id" << 4 << "x" << 14), BSON("_id" << 4));
         auto insert5 = repl::MutableOplogEntry::makeInsertOperation(
             kNss, collUUID, BSON("_id" << 5 << "x" << 15), BSON("_id" << 5));
+        insert0.setStatementIds({0});
+        insert1.setStatementIds({1});
+        insert2.setStatementIds({2});
+        insert3.setStatementIds({4});
+        insert4.setStatementIds({5});
+        insert5.setStatementIds({6});
         const repl::OpTime firstOpTime(Timestamp(100, 1), 1);
         const repl::OpTime lastOpTime(Timestamp(100, 2), 1);
         auto entry0 = makeApplyOpsOplogEntry(
@@ -1197,7 +1206,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
             {insert0, insert1, insert2},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
-            {0, 1, 2},                    // statement ids
+            {},                           // statement ids (at top level, should be empty)
             repl::OpTime(),               // optime of previous write within same retryable write
             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
@@ -1207,7 +1216,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
             {insert3, insert4, insert5},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
-            {4, 5, 6},                    // statement ids
+            {},                           // statement ids (at top level, should be empty)
             firstOpTime,                  // optime of previous write within same retryable write
             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
@@ -1261,6 +1270,12 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
             kNss, collUUID, BSON("_id" << 4 << "x" << 14), BSON("_id" << 4));
         auto insert5 = repl::MutableOplogEntry::makeInsertOperation(
             kNss, collUUID, BSON("_id" << 5 << "x" << 15), BSON("_id" << 5));
+        insert0.setStatementIds({0});
+        insert1.setStatementIds({1});
+        insert2.setStatementIds({2});
+        insert3.setStatementIds({4});
+        insert4.setStatementIds({5});
+        insert5.setStatementIds({6});
         const repl::OpTime firstOpTime(Timestamp(100, 1), 1);
         const repl::OpTime secondOpTime(Timestamp(100, 2), 1);
         const repl::OpTime lastOpTime(Timestamp(100, 3), 1);
@@ -1270,7 +1285,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
             {insert0, insert1, insert2},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
-            {0, 1, 2},                    // statement ids
+            {},                           // statement ids (at top level, should be empty)
             repl::OpTime(),               // optime of previous write within same retryable write
             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
@@ -1280,7 +1295,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
             {insert3, insert4, insert5},  // operations
             osi,                          // session info
             Date_t::now(),                // wall clock time
-            {4, 5, 6},                    // statement ids
+            {},                           // statement ids (at top level, should be empty)
             firstOpTime,                  // optime of previous write within same retryable write
             repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
 
