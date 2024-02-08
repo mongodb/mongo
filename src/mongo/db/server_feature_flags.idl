@@ -153,6 +153,11 @@ feature_flags:
         cpp_varname: gFeatureFlagQERangeV2
         default: false
         shouldBeFCVGated: true
+    featureFlagOnlineTransitionToSharded:
+        description: "Feature flag to transition a replica set into a one shard cluster (config shard)."
+        cpp_varname: gFeatureFlagOnlineTransitionToSharded
+        default: false
+        shouldBeFCVGated: true
     featureFlagIngressAdmissionControl:
         description: "Feature flag to enable data node ingress admission control"
         cpp_varname: gFeatureFlagIngressAdmissionControl
