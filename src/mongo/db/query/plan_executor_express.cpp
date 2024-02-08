@@ -40,6 +40,7 @@ PlanExecutorExpress::PlanExecutorExpress(OperationContext* opCtx,
                                          bool isClusteredOnId)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
+      _isClusteredOnId{isClusteredOnId},
       _coll(coll),
       _commonStats("EXPRESS"),
       _nss(_cq->nss()),
@@ -91,7 +92,7 @@ bool PlanExecutorExpress::findById(const BSONObj& query, BSONObj& result, Record
     Snapshotted<BSONObj> snapDoc;
     const auto& collptr = _coll.getCollectionPtr();
 
-    if (_planExplainer.isClusteredOnId()) {
+    if (_isClusteredOnId) {
         RecordId rid = record_id_helpers::keyForObj(
             IndexBoundsBuilder::objFromElement(query["_id"], collptr->getDefaultCollator()));
         if (!rid.isNull() && collptr->findDoc(_opCtx, rid, &snapDoc)) {

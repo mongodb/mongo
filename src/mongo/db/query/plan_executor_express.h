@@ -190,9 +190,10 @@ private:
     std::unique_ptr<CanonicalQuery> _cq;
     bool _isDisposed{false};
     bool _done{false};
+    const bool _isClusteredOnId;
     VariantCollectionPtrOrAcquisition _coll;
     mongo::CommonStats _commonStats;
-    NamespaceString _nss;
+    const NamespaceString _nss;
     Status _killStatus = Status::OK();
     PlanExplainerExpress _planExplainer;
     std::vector<NamespaceStringOrUUID> _secondaryNss;

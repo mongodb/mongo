@@ -73,7 +73,7 @@ public:
 
 private:
     const mongo::CommonStats* _stats;
-    bool _isClusteredOnId;
+    const bool _isClusteredOnId;
 };
 
 }  // namespace mongo

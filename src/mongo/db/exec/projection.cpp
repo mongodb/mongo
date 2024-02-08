@@ -312,7 +312,7 @@ BSONObj ProjectionStageSimple::transform(const BSONObj& doc,
     if (projectType == projection_ast::ProjectType::kInclusion) {
 
         for (const auto& elt : doc) {
-            if (projFields.contains(elt.fieldNameStringData())) {
+            if (projFields.count(elt.fieldNameStringData()) > 0) {
                 bob.append(elt);
                 if (--nFieldsLeft == 0) {
                     break;
@@ -322,7 +322,7 @@ BSONObj ProjectionStageSimple::transform(const BSONObj& doc,
     } else {
 
         for (const auto& elt : doc) {
-            if (nFieldsLeft == 0 || !projFields.contains(elt.fieldNameStringData())) {
+            if (nFieldsLeft == 0 || projFields.count(elt.fieldNameStringData()) == 0) {
                 bob.append(elt);
             } else {
                 --nFieldsLeft;
