@@ -210,7 +210,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const {
+    StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
+        const BSONObj& bucketsDoc) const {
         MONGO_UNREACHABLE;
     }
 

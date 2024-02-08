@@ -17,6 +17,12 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/core/administrative/*[aA]uth*.js
 
+  # These tests insert an uncompressed time-series bucket. Even though the tests subsequently remove
+  # this bucket, it may end up not being removed on the donor. If this happens, collection
+  # validation will fail due to the uncompressed bucket.
+  - jstests/core/timeseries/timeseries_insert_mixed_schema_bucket.js
+  - jstests/core/timeseries/timeseries_update_mixed_schema_bucket.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.

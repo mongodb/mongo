@@ -12,6 +12,8 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
 function debug(x) {
     // printjson( x );
 }
@@ -131,3 +133,15 @@ assert.commandFailed(
 // Fails with an unknown key pattern.
 assert.commandFailed(db.runCommand(
     {collMod: coll, index: {keyPattern: {doesnotexist: 1}, expireAfterSeconds: 100}}));
+
+// TODO (SERVER-86366): Always check timeseriesBucketsMayHaveMixedSchemaData.
+if (FeatureFlagUtil.isPresentAndEnabled(db, "CollModTimeseriesBucketsMayHaveMixedSchemaData")) {
+    // The timeseriesBucketsMayHaveMixedSchemaData option can only be used on time-series
+    // collections.
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: true}),
+        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(
+        db.runCommand({collMod: coll, timeseriesBucketsMayHaveMixedSchemaData: false}),
+        ErrorCodes.InvalidOptions);
+}
