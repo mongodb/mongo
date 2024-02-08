@@ -67,10 +67,6 @@ optimizer::ABT makeABTVariable(SbSlot s);
 using VariableTypes = stdx::
     unordered_map<optimizer::ProjectionName, TypeSignature, optimizer::ProjectionName::Hasher>;
 
-// Collect the type information of the slots declared in the provided stage output.
-VariableTypes buildVariableTypes(const PlanStageSlots& outputs,
-                                 boost::optional<TypeSignature> typesToExclude = boost::none);
-
 // Run constant folding on the provided ABT tree and return its type signature. If the type
 // information for the visible slots is available in the slotInfo argument, it is used to perform a
 // more precise type checking optimization. On return, the abt argument points to the modified tree.
@@ -84,6 +80,17 @@ TypeSignature constantFold(optimizer::ABT& abt,
  */
 struct SbSlot {
     using SlotId = sbe::value::SlotId;
+
+    struct Less {
+        bool operator()(const SbSlot& lhs, const SbSlot& rhs) const {
+            return lhs.slotId < rhs.slotId;
+        }
+    };
+    struct EqualTo {
+        bool operator()(const SbSlot& lhs, const SbSlot& rhs) const {
+            return lhs.slotId == rhs.slotId;
+        }
+    };
 
     SbSlot() = default;
 
@@ -122,14 +129,6 @@ struct SbSlot {
     SlotId slotId{0};
     OptTypeSignature typeSig;
 };
-
-/**
- * In the past, "SbSlot" used to be named "TypedSlot". For now we have this type alias so that code
- * that refers to "TypedSlot" still works.
- *
- * TODO SERVER-84559: Remove this type alias when it's no longer needed.
- */
-using TypedSlot = SbSlot;
 
 /**
  * The SbLocalVar class is used to represent local variables in the SBE stage builder. "SbLocalVar"
@@ -521,6 +520,10 @@ public:
      */
     EExpr extractExpr(StageBuilderState& state, const VariableTypes* slotInfo = nullptr);
 
+    EExpr extractExpr(StageBuilderState& state, const VariableTypes& slotInfo) {
+        return extractExpr(state, &slotInfo);
+    }
+
     bool canExtractABT() const noexcept {
         return holdsAbtInternal() || isVarExpr() || isConstantExpr();
     }
@@ -550,6 +553,10 @@ public:
     // in place. The type information for the visible slots provided in the slotInfo argument
     // is forwarded to the constant folding operation and to the typechecker (if it's not null).
     void optimize(StageBuilderState& state, const VariableTypes* slotInfo = nullptr);
+
+    void optimize(StageBuilderState& state, const VariableTypes& slotInfo) {
+        optimize(state, &slotInfo);
+    }
 
     bool isFinishedOptimizing() const {
         return holds_alternative<OptimizedAbt>(_storage);
@@ -588,6 +595,101 @@ private:
  */
 using SbStage = std::unique_ptr<sbe::PlanStage>;
 
+/**
+ * For a number of EExpression-related structures, we have corresponding "SbExpr" versions
+ * of these structures. Here is a list:
+ *    EExpression::Vector -> SbExpr::Vector
+ *    SlotVector          -> SbSlotVector
+ *    SlotExprPairVector  -> SbExprSbSlotVector or SbExprOptSbSlotVector
+ *    AggExprPair         -> SbAggExpr
+ *    AggExprVector       -> SbAggExprVector
+ */
+using SbSlotVector = absl::InlinedVector<SbSlot, 2>;
+
+using SbExprSbSlotPair = std::pair<SbExpr, SbSlot>;
+using SbExprSbSlotVector = std::vector<SbExprSbSlotPair>;
+
+using SbExprOptSbSlotPair = std::pair<SbExpr, boost::optional<SbSlot>>;
+using SbExprOptSbSlotVector = std::vector<SbExprOptSbSlotPair>;
+
+struct SbAggExpr {
+    SbExpr init;
+    SbExpr blockAgg;
+    SbExpr agg;
+};
+
+using SbAggExprVector = std::vector<std::pair<SbAggExpr, boost::optional<SbSlot>>>;
+
+inline void addVariableTypesHelper(VariableTypes& varTypes, SbSlot slot) {
+    if (auto typeSig = slot.getTypeSignature()) {
+        varTypes[getABTVariableName(slot)] = *typeSig;
+    }
+}
+
+inline void addVariableTypesHelper(VariableTypes& varTypes, boost::optional<SbSlot> slot) {
+    if (slot) {
+        if (auto typeSig = slot->getTypeSignature()) {
+            varTypes[getABTVariableName(*slot)] = *typeSig;
+        }
+    }
+}
+
+template <typename IterT>
+inline void addVariableTypesHelper(VariableTypes& varTypes, IterT it, IterT endIt) {
+    for (; it != endIt; ++it) {
+        addVariableTypesHelper(varTypes, *it);
+    }
+}
+
+void addVariableTypesHelper(VariableTypes& varTypes, const PlanStageSlots& outputs);
+
+inline void buildVariableTypesHelper(VariableTypes& varTypes) {
+    return;
+}
+
+template <typename... Args>
+inline void buildVariableTypesHelper(VariableTypes& varTypes,
+                                     const PlanStageSlots& outputs,
+                                     Args&&... args) {
+    addVariableTypesHelper(varTypes, outputs);
+    buildVariableTypesHelper(varTypes, std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+inline void buildVariableTypesHelper(VariableTypes& varTypes, SbSlot slot, Args&&... args) {
+    addVariableTypesHelper(varTypes, slot);
+    buildVariableTypesHelper(varTypes, std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+inline void buildVariableTypesHelper(VariableTypes& varTypes,
+                                     const SbSlotVector& slots,
+                                     Args&&... args) {
+    addVariableTypesHelper(varTypes, slots.begin(), slots.end());
+    buildVariableTypesHelper(varTypes, std::forward<Args>(args)...);
+}
+
+template <typename... Args>
+inline void buildVariableTypesHelper(VariableTypes& varTypes,
+                                     const std::vector<SbSlot>& slots,
+                                     Args&&... args) {
+    addVariableTypesHelper(varTypes, slots.begin(), slots.end());
+    buildVariableTypesHelper(varTypes, std::forward<Args>(args)...);
+}
+
+// Collect the type information of the slots declared in the provided stage output.
+template <typename... Args>
+inline VariableTypes buildVariableTypes(Args&&... args) {
+    VariableTypes varTypes;
+    buildVariableTypesHelper(varTypes, std::forward<Args>(args)...);
+
+    return varTypes;
+}
+
+// This function takes a VariableTypes object ('varTypes'), changes the type of each variable
+// from 'T' to 'T.exclude(typesToExclude)', and then returns the updated VariableTypes object.
+VariableTypes excludeTypes(VariableTypes varTypes, TypeSignature typesToExclude);
+
 // Given an expression built on top of scalar processing, along with the definition of the
 // visible slots (some of which could be marked as holding block of values), produce an
 // expression tree that can be executed directly on top of them. Returns an empty result if the
@@ -596,5 +698,14 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
                            SbExpr scalarExpression,
                            PlanStageSlots& outputs,
                            bool forFilterStage);
+
+/**
+ * In the past, "SbSlot" used to be named "TypedSlot". For now we have this type alias so that code
+ * that refers to "TypedSlot" still works.
+ *
+ * TODO SERVER-84559: Remove these type aliases when they're no longer needed.
+ */
+using TypedSlot = SbSlot;
+using TypedSlotVector = SbSlotVector;
 
 }  // namespace mongo::stage_builder
