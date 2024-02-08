@@ -1581,10 +1581,19 @@ Status ShardingCatalogManager::_pullClusterTimeKeys(
 }
 
 void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCtx,
-                                                          const boost::optional<TenantId>& tenantId,
                                                           const std::vector<BSONObj>& parameters) {
     DBDirectClient client(opCtx);
     ClusterParameterDBClientService dbService(client);
+    const auto tenantId = [&]() -> boost::optional<TenantId> {
+        const auto vts = auth::ValidatedTenancyScope::get(opCtx);
+        invariant(!vts || vts->hasTenantId());
+
+        if (vts && vts->hasTenantId()) {
+            return vts->tenantId();
+        }
+        return boost::none;
+    }();
+
     for (auto& parameter : parameters) {
         SetClusterParameter setClusterParameterRequest(
             BSON(parameter["_id"].String() << parameter.filterFieldsUndotted(
@@ -1648,8 +1657,10 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
     for (const auto& tenantId : tenantIds) {
         uassertStatusOK(fetchers[i]->join(opCtx));
         uassertStatusOK(statuses[i]);
-        _setClusterParametersLocally(opCtx, tenantId, allParameters[i]);
 
+        auth::ValidatedTenancyScopeGuard::runAsTenant(opCtx, tenantId, [&]() -> void {
+            _setClusterParametersLocally(opCtx, allParameters[i]);
+        });
         i++;
     }
 }

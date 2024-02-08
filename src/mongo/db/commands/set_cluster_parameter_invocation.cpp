@@ -91,7 +91,8 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     LOGV2_DEBUG(
         6432603, 2, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
 
-    auto result = _dbService.updateParameterOnDisk(query, update, writeConcern, tenantId);
+    auto result = _dbService.updateParameterOnDisk(
+        query, update, writeConcern, auth::ValidatedTenancyScope::get(opCtx));
     auto resultStatus = result.toStatus();
 
     // When 'previousTime' is provided, it is added to the 'query' part of the upsert command to
@@ -171,23 +172,27 @@ BatchedCommandResponse ClusterParameterDBClientService::updateParameterOnDisk(
     BSONObj query,
     BSONObj update,
     const WriteConcernOptions& writeConcern,
-    const boost::optional<TenantId>& tenantId) {
+    const boost::optional<auth::ValidatedTenancyScope>& validatedTenancyScope) {
     const auto writeConcernObj =
         BSON(WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
+    const auto tenantId = (validatedTenancyScope && validatedTenancyScope->hasTenantId())
+        ? boost::make_optional(validatedTenancyScope->tenantId())
+        : boost::none;
     const auto nss = NamespaceString::makeClusterParametersNSS(tenantId);
+    auto request = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        nss.dbName(), validatedTenancyScope, [&] {
+            write_ops::UpdateCommandRequest updateOp(nss);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(query);
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+                entry.setMulti(false);
+                entry.setUpsert(true);
+                return entry;
+            }()});
 
-    auto request = OpMsgRequestBuilder::create(nss.dbName(), [&] {
-        write_ops::UpdateCommandRequest updateOp(nss);
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(query);
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-            entry.setMulti(false);
-            entry.setUpsert(true);
-            return entry;
-        }()});
-        return updateOp.toBSON(writeConcernObj);
-    }());
+            return updateOp.toBSON(writeConcernObj);
+        }());
 
     BSONObj res = _dbClient.runCommand(request)->getCommandReply();
     BatchedCommandResponse response;

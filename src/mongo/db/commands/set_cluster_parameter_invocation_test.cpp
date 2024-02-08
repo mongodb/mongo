@@ -109,9 +109,9 @@ private:
 
 class DBClientMock : public DBClientService {
 public:
-    DBClientMock(
-        std::function<BatchedCommandResponse(BSONObj, BSONObj, const boost::optional<TenantId>&)>
-            updateParameterOnDiskMock) {
+    DBClientMock(std::function<BatchedCommandResponse(
+                     BSONObj, BSONObj, const boost::optional<auth::ValidatedTenancyScope>&)>
+                     updateParameterOnDiskMock) {
         this->updateParameterOnDiskMockImpl = updateParameterOnDiskMock;
     }
 
@@ -119,8 +119,8 @@ public:
         BSONObj query,
         BSONObj update,
         const WriteConcernOptions&,
-        const boost::optional<TenantId>& tenantId) override {
-        return updateParameterOnDiskMockImpl(query, update, tenantId);
+        const boost::optional<auth::ValidatedTenancyScope>& vts) override {
+        return updateParameterOnDiskMockImpl(query, update, vts);
     }
 
     Timestamp getUpdateClusterTime(OperationContext*) override {
@@ -129,7 +129,8 @@ public:
     }
 
 private:
-    std::function<BatchedCommandResponse(BSONObj, BSONObj, const boost::optional<TenantId>&)>
+    std::function<BatchedCommandResponse(
+        BSONObj, BSONObj, const boost::optional<auth::ValidatedTenancyScope>&)>
         updateParameterOnDiskMockImpl;
 };
 
@@ -150,29 +151,33 @@ MockServerParameter alwaysInvalidatingServerParameter(StringData name) {
 }
 
 DBClientMock alwaysSucceedingDbClient() {
-    DBClientMock dbServiceMock([&](BSONObj, BSONObj, const boost::optional<TenantId>&) {
-        BatchedCommandResponse result;
-        result.setStatus(Status::OK());
-        return result;
-    });
+    DBClientMock dbServiceMock(
+        [&](BSONObj, BSONObj, const boost::optional<auth::ValidatedTenancyScope>&) {
+            BatchedCommandResponse result;
+            result.setStatus(Status::OK());
+            return result;
+        });
 
     return dbServiceMock;
 }
 
 DBClientMock tenantIdReportingDbClient() {
-    DBClientMock dbServiceMock([&](BSONObj, BSONObj, const boost::optional<TenantId>& tenantId) {
-        uasserted(ErrorCodes::UnknownError, tenantId ? tenantId->toString() : "");
-        return BatchedCommandResponse();
-    });
+    DBClientMock dbServiceMock(
+        [&](BSONObj, BSONObj, const boost::optional<auth::ValidatedTenancyScope>& vts) {
+            uasserted(ErrorCodes::UnknownError,
+                      (vts && vts->hasTenantId()) ? vts->tenantId().toString() : "");
+            return BatchedCommandResponse();
+        });
 
     return dbServiceMock;
 }
 
 DBClientMock alwaysFailingDbClient() {
-    DBClientMock dbServiceMock([&](BSONObj, BSONObj, const boost::optional<TenantId>&) {
-        uasserted(ErrorCodes::UnknownError, "DB Client Update Failed");
-        return BatchedCommandResponse();
-    });
+    DBClientMock dbServiceMock(
+        [&](BSONObj, BSONObj, const boost::optional<auth::ValidatedTenancyScope>&) {
+            uasserted(ErrorCodes::UnknownError, "DB Client Update Failed");
+            return BatchedCommandResponse();
+        });
 
     return dbServiceMock;
 }
@@ -367,11 +372,15 @@ TEST(SetClusterParameterCommand, TenantIdPassesThrough) {
     SetClusterParameter testCmdWithTenant(obj);
     testCmdWithTenant.setDbName(NamespaceString::makeClusterParametersNSS(tenantId).dbName());
 
-    ASSERT_THROWS_CODE_AND_WHAT(
-        fixture.invoke(&spyCtx, testCmdWithTenant, boost::none, boost::none, kMajorityWriteConcern),
-        DBException,
-        ErrorCodes::UnknownError,
-        tenantId.toString());
+    // Prepare the tenant operation context with tenant scope.
+    auth::ValidatedTenancyScopeGuard::runAsTenant(&spyCtx, tenantId, [&]() {
+        ASSERT_THROWS_CODE_AND_WHAT(
+            fixture.invoke(
+                &spyCtx, testCmdWithTenant, boost::none, boost::none, kMajorityWriteConcern),
+            DBException,
+            ErrorCodes::UnknownError,
+            tenantId.toString());
+    });
 }
 
 }  // namespace

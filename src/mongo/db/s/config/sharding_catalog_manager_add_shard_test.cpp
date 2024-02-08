@@ -311,18 +311,20 @@ protected:
         const std::vector<boost::optional<TenantId>>& tenantsOnTarget = {boost::none}) {
         DBDirectClient client(operationContext());
         for (const auto& tenantId : tenantsOnTarget) {
-            FindCommandRequest findCmd(NamespaceString::makeClusterParametersNSS(tenantId));
-            auto cursor = client.find(std::move(findCmd));
-            std::vector<BSONObj> results;
-            while (cursor->more()) {
-                results.push_back(cursor->next());
-            }
-            ASSERT_EQ(results.size(), 1);
-            ASSERT_EQ(results[0]["_id"].String(), "testStrClusterParameter");
-            ASSERT_EQ(results[0]["strData"].String(),
-                      DatabaseName::createDatabaseName_forTest(tenantId,
-                                                               DatabaseName::kConfig.db(omitTenant))
-                          .toStringWithTenantId_forTest());
+            auth::ValidatedTenancyScopeGuard::runAsTenant(operationContext(), tenantId, [&]() {
+                FindCommandRequest findCmd(NamespaceString::makeClusterParametersNSS(tenantId));
+                auto cursor = client.find(std::move(findCmd));
+                std::vector<BSONObj> results;
+                while (cursor->more()) {
+                    results.push_back(cursor->next());
+                }
+                ASSERT_EQ(results.size(), 1);
+                ASSERT_EQ(results[0]["_id"].String(), "testStrClusterParameter");
+                ASSERT_EQ(results[0]["strData"].String(),
+                          DatabaseName::createDatabaseName_forTest(
+                              tenantId, DatabaseName::kConfig.db(omitTenant))
+                              .toStringWithTenantId_forTest());
+            });
         }
     }
 
@@ -378,16 +380,20 @@ protected:
                 SetClusterParameter setClusterParameterRequest(param);
                 setClusterParameterRequest.setDbName(DatabaseName::createDatabaseName_forTest(
                     tenantId, DatabaseName::kAdmin.db(omitTenant)));
-                DBDirectClient client(operationContext());
-                ClusterParameterDBClientService dbService(client);
-                std::unique_ptr<ServerParameterService> parameterService =
-                    std::make_unique<ClusterParameterService>();
-                SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
-                invocation.invoke(operationContext(),
-                                  setClusterParameterRequest,
-                                  boost::none,
-                                  boost::none,
-                                  ShardingCatalogClient::kLocalWriteConcern);
+
+                auth::ValidatedTenancyScopeGuard::runAsTenant(operationContext(), tenantId, [&]() {
+                    DBDirectClient client(operationContext());
+                    ClusterParameterDBClientService dbService(client);
+                    std::unique_ptr<ServerParameterService> parameterService =
+                        std::make_unique<ClusterParameterService>();
+                    SetClusterParameterInvocation invocation{std::move(parameterService),
+                                                             dbService};
+                    invocation.invoke(operationContext(),
+                                      setClusterParameterRequest,
+                                      boost::none,
+                                      boost::none,
+                                      ShardingCatalogClient::kLocalWriteConcern);
+                });
             }
         }
     }
@@ -426,6 +432,8 @@ protected:
     void expectFindClusterParameterDocs(const HostAndPort& target,
                                         std::vector<DatabaseName> dbnamesOnTarget) {
         int n = dbnamesOnTarget.size();
+        auto serializationCtx = SerializationContext::stateCommandReply();
+        serializationCtx.setPrefixState(false);
         while (n-- > 0) {
             onCommandForAddShard([&](const RemoteCommandRequest& request) {
                 ASSERT_EQ(request.target, target);
@@ -445,7 +453,8 @@ protected:
                         {BSON("_id"
                               << "testStrClusterParameter"
                               << "strData" << request.dbname.toStringWithTenantId_forTest())});
-                return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
+                return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse,
+                                        serializationCtx);
             });
         }
     }

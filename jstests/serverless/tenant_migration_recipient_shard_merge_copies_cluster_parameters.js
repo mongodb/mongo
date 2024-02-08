@@ -13,8 +13,11 @@
  * ]
  */
 
-import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {
+    makeUnsignedSecurityToken,
+    runCommandWithSecurityToken
+} from "jstests/libs/multitenancy_utils.js"
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 
@@ -32,10 +35,12 @@ const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
 const tenantId = ObjectId();
+const tenantToken = makeUnsignedSecurityToken(tenantId, {expectPrefix: false});
 
 // Set a cluster parameter before the migration starts.
-assert.commandWorked(donorPrimary.getDB("admin").runCommand(tenantCommand(
-    {setClusterParameter: {"changeStreams": {"expireAfterSeconds": 7200}}}, tenantId)));
+assert.commandWorked(runCommandWithSecurityToken(tenantToken, donorPrimary.getDB("admin"), {
+    setClusterParameter: {"changeStreams": {"expireAfterSeconds": 7200}}
+}));
 
 const fpBeforeMarkingCloneSuccess =
     configureFailPoint(recipientPrimary, "fpBeforeMarkingCloneSuccess", {action: "hang"});
@@ -52,15 +57,18 @@ assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 fpBeforeMarkingCloneSuccess.wait();
 
 // Set another cluster parameter so that oplog entries are applied during oplog catchup.
-assert.commandWorked(donorPrimary.getDB("admin").runCommand(tenantCommand(
-    {setClusterParameter: {"testStrClusterParameter": {"strData": "sleep"}}}, tenantId)));
+assert.commandWorked(runCommandWithSecurityToken(tenantToken, donorPrimary.getDB("admin"), {
+    setClusterParameter: {"testStrClusterParameter": {"strData": "sleep"}}
+}));
 
 fpBeforeMarkingCloneSuccess.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
-const {clusterParameters} = assert.commandWorked(recipientPrimary.getDB("admin").runCommand(
-    tenantCommand({getClusterParameter: ["changeStreams", "testStrClusterParameter"]}, tenantId)));
+const {clusterParameters} = assert.commandWorked(runCommandWithSecurityToken(
+    tenantToken,
+    recipientPrimary.getDB("admin"),
+    {getClusterParameter: ["changeStreams", "testStrClusterParameter"]}));
 const [changeStreamsClusterParameter, testStrClusterParameter] = clusterParameters;
 assert.eq(changeStreamsClusterParameter.expireAfterSeconds, 7200);
 assert.eq(testStrClusterParameter.strData, "sleep");

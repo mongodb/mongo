@@ -116,6 +116,14 @@ public:
     ValidatedTenancyScopeGuard(const ValidatedTenancyScopeGuard&) = delete;
     void operator=(const ValidatedTenancyScopeGuard&) = delete;
 
+    /**
+     * Run the provided work within a tenant context, establishing an operation context with a
+     * validated tenancy scope for handling inner requests.
+     */
+    static void runAsTenant(OperationContext* opCtx,
+                            const boost::optional<TenantId>& tenantId,
+                            std::function<void()> workFunc);
+
 private:
     OperationContext* _opCtx{nullptr};
     boost::optional<ValidatedTenancyScope> _validatedTenancyScope;

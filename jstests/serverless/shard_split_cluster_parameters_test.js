@@ -3,7 +3,10 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
-import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
+import {
+    makeUnsignedSecurityToken,
+    runCommandWithSecurityToken
+} from "jstests/libs/multitenancy_utils.js"
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 const tenantIds = [ObjectId(), ObjectId()];
@@ -18,10 +21,12 @@ test.addRecipientNodes({nodeOptions});
 test.donor.awaitSecondaryNodes();
 
 const donorPrimary = test.getDonorPrimary();
+const tenantToken0 = makeUnsignedSecurityToken(tenantIds[0], {expectPrefix: false});
 
 // Set a cluster parameter before the split starts.
-assert.commandWorked(donorPrimary.getDB("admin").runCommand(tenantCommand(
-    {setClusterParameter: {"changeStreams": {"expireAfterSeconds": 7200}}}, tenantIds[0])));
+assert.commandWorked(runCommandWithSecurityToken(tenantToken0, donorPrimary.getDB("admin"), {
+    setClusterParameter: {"changeStreams": {"expireAfterSeconds": 7200}}
+}));
 
 const operation = test.createSplitOperation(tenantIds);
 assert.commandWorked(operation.commit());
@@ -32,8 +37,9 @@ operation.forget();
 const recipientRst = test.getRecipient();
 
 const {clusterParameters} =
-    assert.commandWorked(recipientRst.getPrimary().getDB("admin").runCommand(
-        tenantCommand({getClusterParameter: ["changeStreams"]}, tenantIds[0])));
+    assert.commandWorked(runCommandWithSecurityToken(tenantToken0,
+                                                     recipientRst.getPrimary().getDB("admin"),
+                                                     {getClusterParameter: ["changeStreams"]}));
 const [changeStreamsClusterParameter] = clusterParameters;
 assert.eq(changeStreamsClusterParameter.expireAfterSeconds, 7200);
 

@@ -397,4 +397,18 @@ ValidatedTenancyScopeGuard::~ValidatedTenancyScopeGuard() {
     }
 };
 
+void ValidatedTenancyScopeGuard::runAsTenant(OperationContext* opCtx,
+                                             const boost::optional<TenantId>& tenantId,
+                                             std::function<void()> workFunc) {
+    auth::ValidatedTenancyScopeGuard tenancyStasher(opCtx);
+    const auto vts = tenantId
+        ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
+              *tenantId, auth::ValidatedTenancyScopeFactory::TrustedForInnerOpMsgRequestTag{}))
+        : boost::none;
+    auth::ValidatedTenancyScope::set(opCtx, vts);
+
+    workFunc();
+}
+
+
 }  // namespace mongo::auth

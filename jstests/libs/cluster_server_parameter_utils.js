@@ -17,6 +17,10 @@
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {
+    makeUnsignedSecurityToken,
+    runCommandWithSecurityToken
+} from "jstests/libs/multitenancy_utils.js";
 
 export const kNonTestOnlyClusterParameters = {
     changeStreamOptions: {
@@ -177,14 +181,18 @@ export function runSetClusterParameter(conn, update, tenantId) {
     };
 
     const adminDB = conn.getDB('admin');
-    assert.commandWorked(
-        adminDB.runCommand(tenantCommand({setClusterParameter: setClusterParameterDoc}, tenantId)));
+    const tenantToken =
+        tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
+    assert.commandWorked(runCommandWithSecurityToken(
+        tenantToken, adminDB, {setClusterParameter: setClusterParameterDoc}));
 }
 
 // Runs getClusterParameter on a specific mongod or mongos node and returns true/false depending
 // on whether the expected values were returned.
 export function runGetClusterParameterNode(
     conn, getClusterParameterArgs, expectedClusterParameters, tenantId) {
+    const tenantToken =
+        tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
     const adminDB = conn.getDB('admin');
 
     // Filter out parameters that we don't care about.
@@ -198,8 +206,8 @@ export function runGetClusterParameterNode(
 
     const actualClusterParameters =
         assert
-            .commandWorked(adminDB.runCommand(
-                tenantCommand({getClusterParameter: getClusterParameterArgs}, tenantId)))
+            .commandWorked(runCommandWithSecurityToken(
+                tenantToken, adminDB, {getClusterParameter: getClusterParameterArgs}))
             .clusterParameters;
 
     // Reindex actual based on name, and remove irrelevant field.
@@ -418,25 +426,32 @@ export function testValidServerlessClusterParameterCommands(conn) {
 
 // Assert that explicitly getting a disabled cluster server parameter fails on a node.
 export function testExplicitDisabledGetClusterParameter(conn, tenantId) {
+    const tenantToken =
+        tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
     const adminDB = conn.getDB('admin');
-    assert.commandFailedWithCode(adminDB.runCommand(tenantCommand(
-                                     {getClusterParameter: "testIntClusterParameter"}, tenantId)),
-                                 ErrorCodes.BadValue);
     assert.commandFailedWithCode(
-        adminDB.runCommand(tenantCommand(
-            {getClusterParameter: ["changeStreamOptions", "testIntClusterParameter"]}, tenantId)),
+        runCommandWithSecurityToken(
+            tenantToken, adminDB, {getClusterParameter: "testIntClusterParameter"}),
+        ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        runCommandWithSecurityToken(tenantToken, adminDB, {
+            getClusterParameter: ["changeStreamOptions", "testIntClusterParameter"]
+        }),
         ErrorCodes.BadValue);
 }
 
 // Tests that disabled cluster server parameters return errors or are filtered out as appropriate
 // by get/setClusterParameter.
 export function testDisabledClusterParameters(conn, tenantId) {
+    const tenantToken =
+        tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
     if (conn instanceof ReplSetTest) {
         // Assert that explicitly setting a disabled cluster server parameter fails.
         const adminDB = conn.getPrimary().getDB('admin');
         assert.commandFailedWithCode(
-            adminDB.runCommand(tenantCommand(
-                {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {testIntClusterParameter: {intData: 5}}
+            }),
             ErrorCodes.BadValue);
 
         // Assert that explicitly getting a disabled cluster server parameter fails on the primary.
@@ -454,8 +469,9 @@ export function testDisabledClusterParameters(conn, tenantId) {
         // Assert that explicitly setting a disabled cluster server parameter fails.
         const adminDB = conn.s0.getDB('admin');
         assert.commandFailedWithCode(
-            adminDB.runCommand(tenantCommand(
-                {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {testIntClusterParameter: {intData: 5}}
+            }),
             ErrorCodes.BadValue);
 
         // Assert that explicitly getting a disabled cluster server parameter fails on mongos.
@@ -484,8 +500,9 @@ export function testDisabledClusterParameters(conn, tenantId) {
         // Assert that explicitly setting a disabled cluster server parameter fails.
         const adminDB = conn.getDB('admin');
         assert.commandFailedWithCode(
-            adminDB.runCommand(tenantCommand(
-                {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+            runCommandWithSecurityToken(tenantToken, adminDB, {
+                setClusterParameter: {testIntClusterParameter: {intData: 5}}
+            }),
             ErrorCodes.BadValue);
 
         // Assert that explicitly getting a disabled cluster server parameter fails.
@@ -500,25 +517,32 @@ export function testDisabledClusterParameters(conn, tenantId) {
 
 // Tests that invalid uses of getClusterParameter fails on a given node.
 export function testInvalidGetClusterParameter(conn, tenantId) {
+    const tenantToken =
+        tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
     const adminDB = conn.getDB('admin');
     // Assert that specifying a nonexistent parameter returns an error.
     assert.commandFailedWithCode(
-        adminDB.runCommand(tenantCommand({getClusterParameter: "nonexistentParam"}, tenantId)),
+        runCommandWithSecurityToken(
+            tenantToken, adminDB, {getClusterParameter: "nonexistentParam"}),
         ErrorCodes.NoSuchKey);
     assert.commandFailedWithCode(
-        adminDB.runCommand(tenantCommand({getClusterParameter: ["nonexistentParam"]}, tenantId)),
+        runCommandWithSecurityToken(
+            tenantToken, adminDB, {getClusterParameter: ["nonexistentParam"]}),
         ErrorCodes.NoSuchKey);
     assert.commandFailedWithCode(
-        adminDB.runCommand(tenantCommand(
-            {getClusterParameter: ["testIntClusterParameter", "nonexistentParam"]}, tenantId)),
+        runCommandWithSecurityToken(tenantToken, adminDB, {
+            getClusterParameter: ["testIntClusterParameter", "nonexistentParam"]
+        }),
         ErrorCodes.NoSuchKey);
     assert.commandFailedWithCode(
-        adminDB.runCommand(tenantCommand({getClusterParameter: []}, tenantId)),
+        runCommandWithSecurityToken(tenantToken, adminDB, {getClusterParameter: []}),
         ErrorCodes.BadValue);
 }
 
 // Tests that invalid uses of set/getClusterParameter fail with the appropriate errors.
 export function testInvalidClusterParameterCommands(conn, tenantId) {
+    const tenantToken =
+        tenantId ? makeUnsignedSecurityToken(tenantId, {expectPrefix: false}) : undefined;
     if (conn instanceof ReplSetTest) {
         const adminDB = conn.getPrimary().getDB('admin');
 
@@ -526,19 +550,20 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
         testInvalidGetClusterParameter(conn.getPrimary(), tenantId);
 
         // Assert that setting a nonexistent parameter on the primary returns an error.
-        assert.commandFailed(adminDB.runCommand(
-            tenantCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId)));
+        assert.commandFailed(runCommandWithSecurityToken(
+            tenantToken, adminDB, {setClusterParameter: {nonexistentParam: {intData: 5}}}));
 
         // Assert that running setClusterParameter with a scalar value fails.
-        assert.commandFailed(adminDB.runCommand(
-            tenantCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId)));
+        assert.commandFailed(runCommandWithSecurityToken(
+            tenantToken, adminDB, {setClusterParameter: {testIntClusterParameter: 5}}));
 
         conn.getSecondaries().forEach(function(secondary) {
             // Assert that setClusterParameter cannot be run on a secondary.
             const secondaryAdminDB = secondary.getDB('admin');
             assert.commandFailedWithCode(
-                secondaryAdminDB.runCommand(tenantCommand(
-                    {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+                runCommandWithSecurityToken(tenantToken, secondaryAdminDB, {
+                    setClusterParameter: {testIntClusterParameter: {intData: 5}}
+                }),
                 ErrorCodes.NotWritablePrimary);
             // Assert that invalid uses of getClusterParameter fail on secondaries.
             testInvalidGetClusterParameter(secondary, tenantId);
@@ -557,20 +582,21 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
         testInvalidGetClusterParameter(conn.s0, tenantId);
 
         // Assert that setting a nonexistent parameter on the mongos returns an error.
-        assert.commandFailed(adminDB.runCommand(
-            tenantCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId)));
+        assert.commandFailed(runCommandWithSecurityToken(
+            tenantToken, adminDB, {setClusterParameter: {nonexistentParam: {intData: 5}}}));
 
         // Assert that running setClusterParameter with a scalar value fails.
-        assert.commandFailed(adminDB.runCommand(
-            tenantCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId)));
+        assert.commandFailed(runCommandWithSecurityToken(
+            tenantToken, adminDB, {setClusterParameter: {testIntClusterParameter: 5}}));
 
         const shards = [conn.rs0, conn.rs1, conn.rs2];
         shards.forEach(function(shard) {
             // Assert that setClusterParameter cannot be run directly on a shard primary.
             const shardPrimaryAdmin = shard.getPrimary().getDB('admin');
             assert.commandFailedWithCode(
-                shardPrimaryAdmin.runCommand(tenantCommand(
-                    {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+                runCommandWithSecurityToken(tenantToken, shardPrimaryAdmin, {
+                    setClusterParameter: {testIntClusterParameter: {intData: 5}}
+                }),
                 ErrorCodes.NotImplemented);
             // Assert that invalid forms of getClusterParameter fail on the shard primary.
             testInvalidGetClusterParameter(shard.getPrimary(), tenantId);
@@ -578,8 +604,9 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
                 // Assert that setClusterParameter cannot be run on a shard secondary.
                 const shardSecondaryAdmin = secondary.getDB('admin');
                 assert.commandFailedWithCode(
-                    shardSecondaryAdmin.runCommand(tenantCommand(
-                        {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+                    runCommandWithSecurityToken(tenantToken, shardSecondaryAdmin, {
+                        setClusterParameter: {testIntClusterParameter: {intData: 5}}
+                    }),
                     ErrorCodes.NotWritablePrimary);
                 // Assert that invalid forms of getClusterParameter fail on shard secondaries.
                 testInvalidGetClusterParameter(secondary, tenantId);
@@ -590,8 +617,9 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
         const configRS = conn.configRS;
         const configPrimaryAdmin = configRS.getPrimary().getDB('admin');
         assert.commandFailedWithCode(
-            configPrimaryAdmin.runCommand(tenantCommand(
-                {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+            runCommandWithSecurityToken(tenantToken, configPrimaryAdmin, {
+                setClusterParameter: {testIntClusterParameter: {intData: 5}}
+            }),
             ErrorCodes.NotImplemented);
         // Assert that invalid forms of getClusterParameter fail on the configsvr primary.
         testInvalidGetClusterParameter(configRS.getPrimary(), tenantId);
@@ -599,8 +627,9 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
             // Assert that setClusterParameter cannot be run on a configsvr secondary.
             const configSecondaryAdmin = secondary.getDB('admin');
             assert.commandFailedWithCode(
-                configSecondaryAdmin.runCommand(tenantCommand(
-                    {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
+                runCommandWithSecurityToken(tenantToken, configSecondaryAdmin, {
+                    setClusterParameter: {testIntClusterParameter: {intData: 5}}
+                }),
                 ErrorCodes.NotWritablePrimary);
             // Assert that invalid forms of getClusterParameter fail on configsvr secondaries.
             testInvalidGetClusterParameter(secondary, tenantId);
@@ -625,12 +654,12 @@ export function testInvalidClusterParameterCommands(conn, tenantId) {
         testInvalidGetClusterParameter(conn, tenantId);
 
         // Assert that setting a nonexistent parameter returns an error.
-        assert.commandFailed(adminDB.runCommand(
-            tenantCommand({setClusterParameter: {nonexistentParam: {intData: 5}}}, tenantId)));
+        assert.commandFailed(runCommandWithSecurityToken(
+            tenantToken, adminDB, {setClusterParameter: {nonexistentParam: {intData: 5}}}));
 
         // Assert that running setClusterParameter with a scalar value fails.
-        assert.commandFailed(adminDB.runCommand(
-            tenantCommand({setClusterParameter: {testIntClusterParameter: 5}}, tenantId)));
+        assert.commandFailed(runCommandWithSecurityToken(
+            tenantToken, adminDB, {setClusterParameter: {testIntClusterParameter: 5}}));
 
         // Assert that invalid direct writes to <tenantId>_config.clusterParameters fail.
         assert.commandFailed(conn.getDB("config").clusterParameters.insert({
