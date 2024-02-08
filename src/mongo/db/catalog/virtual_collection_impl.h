@@ -273,7 +273,8 @@ public:
         unimplementedTasserted();
     }
 
-    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const final {
+    StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
+        const BSONObj& bucketsDoc) const final {
         unimplementedTasserted();
         return false;
     }

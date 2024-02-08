@@ -323,7 +323,8 @@ public:
             tsOptions->getBucketMaxSpanSeconds() == tsOptions->getBucketRoundingSeconds();
     }
 
-    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const override {
+    StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
+        const BSONObj& bucketsDoc) const override {
         return _coll->doesTimeseriesBucketsDocContainMixedSchemaData(bucketsDoc);
     }
 

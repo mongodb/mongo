@@ -247,7 +247,8 @@ public:
     void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
                                                  boost::optional<bool> value) final;
 
-    bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const final;
+    StatusWith<bool> doesTimeseriesBucketsDocContainMixedSchemaData(
+        const BSONObj& bucketsDoc) const final;
 
     bool getRequiresTimeseriesExtendedRangeSupport() const final;
     void setRequiresTimeseriesExtendedRangeSupport(OperationContext* opCtx) const final;
