@@ -109,8 +109,7 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_ese
   - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common
-  - name: noPassthrough_gen
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: noPassthroughWithMongod_gen
   - name: .replica_sets .common
   - name: .replica_sets .multi_oplog !.gcm

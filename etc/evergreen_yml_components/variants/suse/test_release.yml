@@ -49,7 +49,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: .jscore .common !.decimal !.feature_flag_guarded
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common
@@ -111,7 +111,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
@@ -168,7 +168,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
@@ -223,7 +223,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: .jscore .common !.decimal !.feature_flag_guarded
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: multiversion_gen
   - name: replica_sets_gen
   - name: .replica_sets .common

@@ -52,7 +52,7 @@ buildvariants:
   - name: external_auth_aws
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: libunwind_tests
   - name: .ocsp
   - name: replica_sets_auth_gen

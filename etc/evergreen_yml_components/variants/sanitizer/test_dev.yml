@@ -240,7 +240,7 @@ buildvariants:
     - name: compile_test_serial_TG
     - name: compile_test_parallel_unittest_stream_TG
     - name: .aggfuzzer .common !.feature_flag_guarded
-    - name: .jstestfuzz !.initsync
+    - name: .jstestfuzz !.initsync !.feature_flag_guarded
     - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel80-debug-asan

@@ -202,7 +202,7 @@ buildvariants:
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
-  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: .jstestfuzz !.feature_flag_guarded !.flow_control  # Flow control jstestfuzz take longer.
   - name: libunwind_tests
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -356,7 +356,7 @@ buildvariants:
     - rhel80-medium
   - name: .encrypt
   - name: .jscore .common !jsCore !.sbe_only
-  - name: .jstestfuzz !.flow_control
+  - name: .jstestfuzz !.feature_flag_guarded !.flow_control
   - name: .misc_js
   - name: .multi_shard
   - name: .query_fuzzer !.cqf_only

@@ -47,7 +47,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: json_schema
-  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
+  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns !.feature_flag_guarded
   - name: multiversion_gen
   - name: multiversion_auth_gen
   - name: .query_fuzzer !.feature_flag_guarded
@@ -127,7 +127,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .jscore .common !.auth !.feature_flag_guarded
   - name: json_schema
-  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
+  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns !.feature_flag_guarded
   - name: multiversion_gen
   - name: multiversion_auth_gen
   - name: .query_fuzzer !.feature_flag_guarded

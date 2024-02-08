@@ -155,7 +155,7 @@ variables:
   - name: external_auth_aws
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: libunwind_tests
   - name: .ocsp
   - name: replica_sets_auth_gen
@@ -466,7 +466,7 @@ buildvariants:
   - name: external_auth_oidc
   - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: libunwind_tests
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough_gen
@@ -1099,7 +1099,7 @@ buildvariants:
     - rhel80-medium
   - name: .encrypt
   - name: .jscore .common !jsCore !.sbe_only
-  - name: .jstestfuzz !.flow_control
+  - name: .jstestfuzz !.feature_flag_guarded !.flow_control
   - name: .misc_js
   - name: .multi_shard
   - name: .query_fuzzer !.cqf_only

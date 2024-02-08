@@ -180,7 +180,7 @@ buildvariants:
     distros:
     - windows-2016-dc
   - name: .jscore .common !.sharding
-  - name: .jstestfuzz .common
+  - name: .jstestfuzz .common !.feature_flag_guarded
   - name: replica_sets_auth_gen
   - name: sasl
   - name: sharding_auth_audit_gen
