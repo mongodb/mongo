@@ -192,11 +192,11 @@ protected:
         ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
         auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
         auto extracted = block->extract();
-        ASSERT_EQ(expected.size(), extracted.count);
+        ASSERT_EQ(expected.size(), extracted.count());
 
-        for (size_t i = 0; i < extracted.count; ++i) {
+        for (size_t i = 0; i < extracted.count(); ++i) {
             auto [t, v] = value::compareValue(
-                extracted.tags[i], extracted.vals[i], expected[i].first, expected[i].second);
+                extracted.tags()[i], extracted.vals()[i], expected[i].first, expected[i].second);
             // ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
             // ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
             ASSERT_THAT((std::pair{t, v}), ValueEq(std::pair{value::TypeTags::NumberInt32, 0}))

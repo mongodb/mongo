@@ -33,8 +33,8 @@ namespace mongo::sbe::value {
 
 template <class Stream>
 Stream& streamInsertionImpl(Stream& s, const DeblockedTagVals& deblocked) {
-    for (size_t i = 0; i < deblocked.count; ++i) {
-        s << std::pair(deblocked.tags[i], deblocked.vals[i]) << " ";
+    for (size_t i = 0; i < deblocked.count(); ++i) {
+        s << std::pair(deblocked.tags()[i], deblocked.vals()[i]) << " ";
     }
     return s;
 }
@@ -107,14 +107,15 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
 
     auto extracted = extract();
 
-    if (extracted.count == 0) {
+    if (extracted.count() == 0) {
         return std::make_unique<HeterogeneousBlock>();
     }
 
-    std::vector<TypeTags> tags(extracted.count, TypeTags::Nothing);
-    std::vector<Value> vals(extracted.count, Value{0u});
+    std::vector<TypeTags> tags(extracted.count(), TypeTags::Nothing);
+    std::vector<Value> vals(extracted.count(), Value{0u});
 
-    op.processBatch(extracted.tags, extracted.vals, tags.data(), vals.data(), extracted.count);
+    op.processBatch(
+        extracted.tags(), extracted.vals(), tags.data(), vals.data(), extracted.count());
 
     bool isDense = std::all_of(
         tags.begin(), tags.end(), [](TypeTags tag) { return tag != TypeTags::Nothing; });
@@ -147,15 +148,16 @@ TokenizedBlock ValueBlock::tokenize() {
     auto extracted = extract();
     std::vector<TypeTags> tokenTags;
     std::vector<Value> tokenVals;
-    std::vector<size_t> idxs(extracted.count, 0);
+    std::vector<size_t> idxs(extracted.count(), 0);
 
     size_t uniqueCount = 0;
     auto tokenMap = ValueMapType<size_t>{0, value::ValueHash(), value::ValueEq()};
-    for (size_t i = 0; i < extracted.count; ++i) {
-        auto [it, inserted] = tokenMap.insert({extracted.tags[i], extracted.vals[i]}, uniqueCount);
+    for (size_t i = 0; i < extracted.count(); ++i) {
+        auto [it, inserted] =
+            tokenMap.insert({extracted.tags()[i], extracted.vals()[i]}, uniqueCount);
         if (inserted) {
             uniqueCount++;
-            auto [cpyTag, cpyVal] = value::copyValue(extracted.tags[i], extracted.vals[i]);
+            auto [cpyTag, cpyVal] = value::copyValue(extracted.tags()[i], extracted.vals()[i]);
             tokenTags.push_back(cpyTag), tokenVals.push_back(cpyVal);
         }
         idxs[i] = it->second;
@@ -248,15 +250,15 @@ std::unique_ptr<ValueBlock> ValueBlock::fillEmpty(TypeTags fillTag, Value fillVa
     }
 
     auto deblocked = extract();
-    std::vector<TypeTags> tags(deblocked.count);
-    std::vector<Value> vals(deblocked.count);
-    for (size_t i = 0; i < deblocked.count; ++i) {
-        if (deblocked.tags[i] == value::TypeTags::Nothing) {
+    std::vector<TypeTags> tags(deblocked.count());
+    std::vector<Value> vals(deblocked.count());
+    for (size_t i = 0; i < deblocked.count(); ++i) {
+        if (deblocked.tags()[i] == value::TypeTags::Nothing) {
             auto [tag, val] = value::copyValue(fillTag, fillVal);
             tags[i] = tag;
             vals[i] = val;
         } else {
-            auto [tag, val] = value::copyValue(deblocked.tags[i], deblocked.vals[i]);
+            auto [tag, val] = value::copyValue(deblocked.tags()[i], deblocked.vals()[i]);
             tags[i] = tag;
             vals[i] = val;
         }
@@ -303,9 +305,9 @@ std::unique_ptr<ValueBlock> ValueBlock::exists() {
             *tryCount(), TypeTags::Boolean, value::bitcastFrom<bool>(true));
     }
     auto extracted = extract();
-    std::vector<Value> vals(extracted.count);
-    for (size_t i = 0; i < extracted.count; ++i) {
-        vals[i] = value::bitcastFrom<bool>(extracted.tags[i] != TypeTags::Nothing);
+    std::vector<Value> vals(extracted.count());
+    for (size_t i = 0; i < extracted.count(); ++i) {
+        vals[i] = value::bitcastFrom<bool>(extracted.tags()[i] != TypeTags::Nothing);
     }
     return std::make_unique<BoolBlock>(std::move(vals));
 }

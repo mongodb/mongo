@@ -61,8 +61,10 @@ public:
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotId groupSlotId,
                       value::SlotId blockBitsetInSlotId,
+                      value::SlotVector blockDataInSlotIds,
                       value::SlotId rowAccSlotId,
                       value::SlotId accumulatorBitsetSlotId,
+                      value::SlotVector accumulatorDataSlotIds,
                       BlockAndRowAggs aggs,
                       PlanNodeId planNodeId,
                       bool participateInTrialRunTracking = true);
@@ -80,6 +82,15 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+    /*
+     * TODO SERVER-85731 tune this parameter.
+     * The partition approach is essentially O(partition_size*block_size).
+     * The elementwise approach is O(block_size).
+     * So we could tune this with some constant, or make a possibly smarter decision based on the
+     * ratio of block size to number of partitions. If the "num_partitions/block_size" is high, we
+     * choose element-wise approach. If it's low, we choose the partition approach.
+     */
+    static const size_t kMaxNumPartitionsForTokenizedPath = 5;
     // TODO SERVER-85731: Determine what block size is optimal.
     static const size_t kBlockOutSize = 128;
 
@@ -93,6 +104,27 @@ protected:
         TrialRunTracker* tracker, TrialRunTrackerAttachResultMask childrenAttachResult) override;
 
 private:
+    /*
+     * Given the groupby key, looks up the entry in our hash table and runs the block and row
+     * accumulators. Assumes that our input slots to these accumulators are already setup.
+     */
+    void executeAccumulatorCode(value::MaterializedRow key);
+
+    /*
+     * Finds the unique values in our input key blocks and processes them in together. For example
+     * if half of the keys are 1 and the other half are 2, we can avoid many hash table lookups and
+     * accumulator calls by processing the data with the same keys together. This is best if there
+     * are only a few partitions.
+     */
+    void runAccumulatorsTokenized(size_t nPartitions,
+                                  value::DeblockedTagVals deblockedTokens,
+                                  value::TokenizedBlock tokenInfo);
+    /*
+     * Runs the accumulators on each element of the inputs, one at a time. This is best if the
+     * number of unique keys is high so the partitioning approach would be quadratic.
+     */
+    void runAccumulatorsElementWise();
+
     using TableType = stdx::unordered_map<value::MaterializedRow,
                                           value::MaterializedRow,
                                           value::MaterializedRowHasher,
@@ -109,9 +141,18 @@ private:
     const value::SlotId _blockBitsetInSlotId;
     value::SlotAccessor* _blockBitsetInAccessor = nullptr;
 
+    // Input slots for data, eventually passed to the accumulator data slots.
+    value::SlotVector _blockDataInSlotIds;
+    std::vector<value::SlotAccessor*> _blockDataInAccessors;
+
     // Slot for bitset used by block accumulators.
     const value::SlotId _accumulatorBitsetSlotId;
     value::OwnedValueAccessor _accumulatorBitsetAccessor;
+
+    // Slots that the accumulators read to process their data. We must set these values before
+    // running the accumulators.
+    const value::SlotVector _accumulatorDataSlotIds;
+    std::vector<value::OwnedValueAccessor> _accumulatorDataAccessors;
 
     // Used for accumulation after block-level accumulators are run.
     const value::SlotId _rowAccSlotId;

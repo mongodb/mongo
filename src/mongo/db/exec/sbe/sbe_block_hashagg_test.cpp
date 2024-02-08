@@ -63,9 +63,10 @@ public:
         auto [blockTag, blockVal] = blockPair;
         ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
         auto deblocked = value::bitcastTo<value::ValueBlock*>(blockVal)->extract();
-        ASSERT_EQ(deblocked.count, expectedBlockSize);
-        std::vector<TypedValue> res(deblocked.count);
-        for (size_t i = 0; i < deblocked.count; ++i) {
+
+        ASSERT_EQ(deblocked.count(), expectedBlockSize);
+        std::vector<TypedValue> res(deblocked.count());
+        for (size_t i = 0; i < deblocked.count(); ++i) {
             res[i] = deblocked[i];
         }
         return res;
@@ -179,6 +180,9 @@ public:
             auto bitsetInSlot = scanSlots[1];
             value::SlotVector outputSlots{idSlot};
 
+            value::SlotVector dataInSlots;
+            value::SlotVector accDataSlots;
+
             auto accumulatorBitset = generateSlotId();
             auto internalSlot = generateSlotId();
             BlockHashAggStage::BlockAndRowAggs aggs;
@@ -191,10 +195,12 @@ public:
                     blockAccFunc =
                         stage_builder::makeFunction(blockAcc, makeE<EVariable>(accumulatorBitset));
                 } else {
-                    blockAccFunc =
-                        stage_builder::makeFunction(blockAcc,
-                                                    makeE<EVariable>(accumulatorBitset),
-                                                    makeE<EVariable>(scanSlots[scanSlotIdx]));
+                    dataInSlots.push_back(scanSlots[scanSlotIdx]);
+                    auto dataSlot = generateSlotId();
+                    accDataSlots.push_back(dataSlot);
+                    blockAccFunc = stage_builder::makeFunction(
+                        blockAcc, makeE<EVariable>(accumulatorBitset), makeE<EVariable>(dataSlot));
+
                     scanSlotIdx++;
                 }
                 aggs.emplace(
@@ -208,8 +214,10 @@ public:
             auto outStage = makeS<BlockHashAggStage>(std::move(scanStage),
                                                      idSlot,
                                                      bitsetInSlot,
+                                                     dataInSlots,
                                                      internalSlot,
                                                      accumulatorBitset,
+                                                     accDataSlots,
                                                      std::move(aggs),
                                                      kEmptyPlanNodeId,
                                                      true);
@@ -366,11 +374,18 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys2) {
 // sure it's missing.
 TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
     // Each entry is ID followed by bitset followed by a block of data.
+    // Mix blocks with a high number of unique keys and blocks with a low number of unique keys.
     auto [inputTag, inputVal] = makeArray(
-        {makeInputArray(makeInt32s({1, 2, 3}), {true, false, false}, makeInt32s({1, 2, 3})),
+        {makeInputArray(makeInt32s({1, 2, 3, 5, 6, 7}),
+                        {true, false, false, true, true, true},
+                        makeInt32s({1, 2, 3, 4, 5, 6})),
          makeInputArray(makeInt32s({2, 2, 2}), {false, false, false}, makeInt32s({4, 5, 6})),
-         makeInputArray(makeInt32s({3, 2, 1}), {true, false, true}, makeInt32s({7, 8, 9})),
-         makeInputArray(makeInt32s({2, 3, 4}), {false, true, true}, makeInt32s({10, 11, 12})),
+         makeInputArray(makeInt32s({3, 2, 1, 7, 6, 5}),
+                        {true, false, true, false, true, true},
+                        makeInt32s({7, 8, 9, 1, 2, 3})),
+         makeInputArray(makeInt32s({2, 3, 4, 6, 7, 5}),
+                        {false, true, true, true, true, false},
+                        makeInt32s({10, 11, 12, 15, 15, 15})),
          makeInputArray(makeInt32s({2, 3, 4}), {false, false, false}, makeInt32s({0, 5, 4})),
          makeInputArray(makeInt32s({1, 1, 2}), {true, true, false}, makeInt32s({13, 14, 15}))});
 
@@ -379,10 +394,13 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
      * 2 -> missing
      * 3 -> 7+11       = 18
      * 4 -> 12         = 12
+     * 5 -> 4+3        = 7
+     * 6 -> 5+2+15     = 22
+     * 7 -> 6+15       = 21
      */
-    TestResultType expected = {{1, {37}}, {3, {18}}, {4, {12}}};
+    TestResultType expected = {{1, {37}}, {3, {18}}, {4, {12}}, {5, {7}}, {6, {22}}, {7, {21}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {3});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {6});
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
@@ -464,5 +482,51 @@ TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
                          BlockHashAggStage::kBlockOutSize,
                          BlockHashAggStage::kBlockOutSize,
                          1});
+}
+
+TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentPartitionSizes) {
+    // Test blocks of partition size three below the limit to three above the limit. For more
+    // interesting data we'll use blocks that are two times this size, so there will be two entries
+    // per key. For example for partitionSize=3 we would have [1,2,3,1,2,3].
+    const size_t lowPartitionSize = BlockHashAggStage::kMaxNumPartitionsForTokenizedPath - 3;
+    const size_t highPartitionSize = BlockHashAggStage::kMaxNumPartitionsForTokenizedPath + 3;
+
+    TestResultType expected;
+    auto addToExpected = [&expected](int32_t id, bool exists, int32_t data) {
+        if (exists) {
+            expected.emplace(id, std::vector<int32_t>{0});
+            expected[id][0] += data;
+        }
+    };
+
+    std::vector<std::pair<value::TypeTags, value::Value>> vals;
+    size_t i = 0;
+    for (size_t partitionSize = lowPartitionSize; partitionSize <= highPartitionSize;
+         partitionSize++) {
+        std::vector<int32_t> ids;
+        std::vector<bool> bitmap;
+        std::vector<int32_t> data;
+        for (size_t dupRound = 0; dupRound < 2; dupRound++) {
+            for (size_t blockIndex = 0; blockIndex < partitionSize; blockIndex++) {
+                int32_t id = blockIndex;
+                // Every third entry will be false.
+                bool exists = i % 3 != 0;
+                int32_t dataPoint = partitionSize * 2 + dupRound * 3 + blockIndex * 5;
+
+                // Add to our expected result map, and to our input data.
+                addToExpected(id, exists, dataPoint);
+                ids.push_back(id);
+                bitmap.push_back(exists);
+                data.push_back(dataPoint);
+                i++;
+            }
+        }
+        auto input = makeInputArray(makeInt32s(ids), bitmap, makeInt32s(data));
+        vals.push_back(input);
+    }
+
+    auto [inputTag, inputVal] = makeArray(vals);
+    runBlockHashAggTest(
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {8});
 }
 }  // namespace mongo::sbe

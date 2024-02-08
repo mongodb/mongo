@@ -59,11 +59,11 @@ public:
         ASSERT_EQ(blockTag, value::TypeTags::valueBlock);
         auto* block = value::bitcastTo<value::ValueBlock*>(blockVal);
         auto extracted = block->extract();
-        ASSERT_EQ(expected.size(), extracted.count);
+        ASSERT_EQ(expected.size(), extracted.count());
 
-        for (size_t i = 0; i < extracted.count; ++i) {
+        for (size_t i = 0; i < extracted.count(); ++i) {
             auto [t, v] = value::compareValue(
-                extracted.tags[i], extracted.vals[i], expected[i].first, expected[i].second);
+                extracted.tags()[i], extracted.vals()[i], expected[i].first, expected[i].second);
             ASSERT_EQ(t, value::TypeTags::NumberInt32) << extracted;
             ASSERT_EQ(value::bitcastTo<int32_t>(v), 0)
                 << "Got " << extracted[i] << " expected " << expected[i]
@@ -93,16 +93,16 @@ public:
         std::unique_ptr<value::ValueBlock> rightBlock) {
         auto left = leftBlock->extract();
         auto right = rightBlock->extract();
-        ASSERT_EQ(left.count, right.count);
+        ASSERT_EQ(left.count(), right.count());
 
         std::vector<bool> andRes;
         std::vector<bool> orRes;
 
-        for (size_t i = 0; i < left.count; ++i) {
-            ASSERT_EQ(left.tags[i], value::TypeTags::Boolean);
-            ASSERT_EQ(right.tags[i], value::TypeTags::Boolean);
-            auto leftBool = value::bitcastTo<bool>(left.vals[i]);
-            auto rightBool = value::bitcastTo<bool>(right.vals[i]);
+        for (size_t i = 0; i < left.count(); ++i) {
+            ASSERT_EQ(left.tags()[i], value::TypeTags::Boolean);
+            ASSERT_EQ(right.tags()[i], value::TypeTags::Boolean);
+            auto leftBool = value::bitcastTo<bool>(left.vals()[i]);
+            auto rightBool = value::bitcastTo<bool>(right.vals()[i]);
             andRes.push_back(leftBool && rightBool);
             orRes.push_back(leftBool || rightBool);
         }
@@ -1012,8 +1012,8 @@ void SBEBlockExpressionTest::testCmpScalar(EPrimBinary::Op scalarOp,
         scalarOp, makeE<EVariable>(scalarSlotLhs), makeE<EVariable>(scalarSlotRhs));
     auto compiledScalarExpr = compileExpression(*scalarExpr);
 
-    for (size_t i = 0; i < deblocked.count; ++i) {
-        scalarAccessorRhs.reset(deblocked.tags[i], deblocked.vals[i]);
+    for (size_t i = 0; i < deblocked.count(); ++i) {
+        scalarAccessorRhs.reset(deblocked.tags()[i], deblocked.vals()[i]);
 
         // Run the block expression and get the result.
         auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
@@ -1023,11 +1023,11 @@ void SBEBlockExpressionTest::testCmpScalar(EPrimBinary::Op scalarOp,
         auto* resultValBlock = value::getValueBlock(runVal);
         auto resultExtracted = resultValBlock->extract();
 
-        ASSERT_EQ(resultExtracted.count, deblocked.count);
+        ASSERT_EQ(resultExtracted.count(), deblocked.count());
 
-        for (size_t j = 0; j < resultExtracted.count; ++j) {
+        for (size_t j = 0; j < resultExtracted.count(); ++j) {
             // Determine the expected result.
-            scalarAccessorLhs.reset(deblocked.tags[j], deblocked.vals[j]);
+            scalarAccessorLhs.reset(deblocked.tags()[j], deblocked.vals()[j]);
             auto [expectedTag, expectedVal] = runCompiledExpression(compiledScalarExpr.get());
             value::ValueGuard guard(expectedTag, expectedVal);
 
@@ -1135,9 +1135,9 @@ void SBEBlockExpressionTest::testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp
     // run the same operations using the scalar version of the operation
     auto leftExtractedValues = leftBlock->extract();
     auto rightExtractedValues = rightBlock->extract();
-    auto resNum = leftExtractedValues.count;
+    auto resNum = leftExtractedValues.count();
 
-    ASSERT_EQ(resBlockExtractedValues.count, resNum);
+    ASSERT_EQ(resBlockExtractedValues.count(), resNum);
 
     value::ViewOfValueAccessor leftScalarAccessor;
     value::ViewOfValueAccessor rightScalarAccessor;
@@ -1153,27 +1153,29 @@ void SBEBlockExpressionTest::testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp
     if (bitsetBlock) {
         auto bitsetExtractedValues = bitsetBlock->extract();
         for (size_t i = 0; i < resNum; ++i) {
-            if (bitsetExtractedValues.tags[i] != value::TypeTags::Boolean ||
-                !value::bitcastTo<bool>(bitsetExtractedValues.vals[i])) {
+            if (bitsetExtractedValues.tags()[i] != value::TypeTags::Boolean ||
+                !value::bitcastTo<bool>(bitsetExtractedValues.vals()[i])) {
                 // skip
                 continue;
             }
 
-            leftScalarAccessor.reset(leftExtractedValues.tags[i], leftExtractedValues.vals[i]);
-            rightScalarAccessor.reset(rightExtractedValues.tags[i], rightExtractedValues.vals[i]);
+            leftScalarAccessor.reset(leftExtractedValues.tags()[i], leftExtractedValues.vals()[i]);
+            rightScalarAccessor.reset(rightExtractedValues.tags()[i],
+                                      rightExtractedValues.vals()[i]);
             auto [scalarTag, scalarVal] = runCompiledExpression(scalarCompiledExpr.get());
 
-            ASSERT_EQ(scalarTag, resBlockExtractedValues.tags[i]);
-            ASSERT_EQ(scalarVal, resBlockExtractedValues.vals[i]);
+            ASSERT_EQ(scalarTag, resBlockExtractedValues.tags()[i]);
+            ASSERT_EQ(scalarVal, resBlockExtractedValues.vals()[i]);
         }
     } else {
         for (size_t i = 0; i < resNum; ++i) {
-            leftScalarAccessor.reset(leftExtractedValues.tags[i], leftExtractedValues.vals[i]);
-            rightScalarAccessor.reset(rightExtractedValues.tags[i], rightExtractedValues.vals[i]);
+            leftScalarAccessor.reset(leftExtractedValues.tags()[i], leftExtractedValues.vals()[i]);
+            rightScalarAccessor.reset(rightExtractedValues.tags()[i],
+                                      rightExtractedValues.vals()[i]);
             auto [scalarTag, scalarVal] = runCompiledExpression(scalarCompiledExpr.get());
 
-            ASSERT_EQ(scalarTag, resBlockExtractedValues.tags[i]);
-            ASSERT_EQ(scalarVal, resBlockExtractedValues.vals[i]);
+            ASSERT_EQ(scalarTag, resBlockExtractedValues.tags()[i]);
+            ASSERT_EQ(scalarVal, resBlockExtractedValues.vals()[i]);
         }
     }
 }
@@ -1240,10 +1242,10 @@ void SBEBlockExpressionTest::testBlockScalarArithmeticOp(
 
     // verify the results against the scalar operation
     auto extractedValues = block->extract();
-    auto resNum = extractedValues.count;
+    auto resNum = extractedValues.count();
 
-    ASSERT_EQ(resScalarBlockExtractedValues.count, resNum);
-    ASSERT_EQ(resBlockScalarExtractedValues.count, resNum);
+    ASSERT_EQ(resScalarBlockExtractedValues.count(), resNum);
+    ASSERT_EQ(resBlockScalarExtractedValues.count(), resNum);
 
     value::ViewOfValueAccessor leftScalarAccessor;
     value::ViewOfValueAccessor rightScalarAccessor;
@@ -1259,45 +1261,45 @@ void SBEBlockExpressionTest::testBlockScalarArithmeticOp(
     if (bitsetBlock) {
         auto bitsetExtractedValues = bitsetBlock->extract();
         for (size_t i = 0; i < resNum; ++i) {
-            if (bitsetExtractedValues.tags[i] != value::TypeTags::Boolean ||
-                !value::bitcastTo<bool>(bitsetExtractedValues.vals[i])) {
+            if (bitsetExtractedValues.tags()[i] != value::TypeTags::Boolean ||
+                !value::bitcastTo<bool>(bitsetExtractedValues.vals()[i])) {
                 // skip
                 continue;
             }
 
             // scalar - block
             leftScalarAccessor.reset(scalar.first, scalar.second);
-            rightScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            rightScalarAccessor.reset(extractedValues.tags()[i], extractedValues.vals()[i]);
             auto [scalarSBTag, scalarSBVal] = runCompiledExpression(scalarCompiledExpr.get());
 
-            ASSERT_EQ(scalarSBTag, resScalarBlockExtractedValues.tags[i]);
-            ASSERT_EQ(scalarSBVal, resScalarBlockExtractedValues.vals[i]);
+            ASSERT_EQ(scalarSBTag, resScalarBlockExtractedValues.tags()[i]);
+            ASSERT_EQ(scalarSBVal, resScalarBlockExtractedValues.vals()[i]);
 
             // block - scalar
-            leftScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            leftScalarAccessor.reset(extractedValues.tags()[i], extractedValues.vals()[i]);
             rightScalarAccessor.reset(scalar.first, scalar.second);
             auto [scalarBSTag, scalarBSVal] = runCompiledExpression(scalarCompiledExpr.get());
 
-            ASSERT_EQ(scalarBSTag, resBlockScalarExtractedValues.tags[i]);
-            ASSERT_EQ(scalarBSVal, resBlockScalarExtractedValues.vals[i]);
+            ASSERT_EQ(scalarBSTag, resBlockScalarExtractedValues.tags()[i]);
+            ASSERT_EQ(scalarBSVal, resBlockScalarExtractedValues.vals()[i]);
         }
     } else {
         for (size_t i = 0; i < resNum; ++i) {
             // scalar - block
             leftScalarAccessor.reset(scalar.first, scalar.second);
-            rightScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            rightScalarAccessor.reset(extractedValues.tags()[i], extractedValues.vals()[i]);
             auto [scalarSBTag, scalarSBVal] = runCompiledExpression(scalarCompiledExpr.get());
 
-            ASSERT_EQ(scalarSBTag, resScalarBlockExtractedValues.tags[i]);
-            ASSERT_EQ(scalarSBVal, resScalarBlockExtractedValues.vals[i]);
+            ASSERT_EQ(scalarSBTag, resScalarBlockExtractedValues.tags()[i]);
+            ASSERT_EQ(scalarSBVal, resScalarBlockExtractedValues.vals()[i]);
 
             // block - scalar
-            leftScalarAccessor.reset(extractedValues.tags[i], extractedValues.vals[i]);
+            leftScalarAccessor.reset(extractedValues.tags()[i], extractedValues.vals()[i]);
             rightScalarAccessor.reset(scalar.first, scalar.second);
             auto [scalarBSTag, scalarBSVal] = runCompiledExpression(scalarCompiledExpr.get());
 
-            ASSERT_EQ(scalarBSTag, resBlockScalarExtractedValues.tags[i]);
-            ASSERT_EQ(scalarBSVal, resBlockScalarExtractedValues.vals[i]);
+            ASSERT_EQ(scalarBSTag, resBlockScalarExtractedValues.tags()[i]);
+            ASSERT_EQ(scalarBSVal, resBlockScalarExtractedValues.vals()[i]);
         }
     }
 }

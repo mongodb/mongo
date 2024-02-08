@@ -761,7 +761,7 @@ void BlockStagesTest::testBlockToBitmap(
         auto& bitset = bitsets[blockIdx];
 
         auto extracted = valBlock->extract();
-        invariant(extracted.count == bitset.size());
+        invariant(extracted.count() == bitset.size());
 
         value::HeterogeneousBlock bitsetBlock;
         for (size_t i = 0; i < bitset.size(); ++i) {

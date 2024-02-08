@@ -256,7 +256,7 @@ namespace {
 FastTuple<bool, value::TypeTags, value::Value> makeNothingBlock(value::ValueBlock* valueBlockIn) {
     auto count = valueBlockIn->tryCount();
     if (!count) {
-        count = valueBlockIn->extract().count;
+        count = valueBlockIn->extract().count();
     }
     auto out =
         std::make_unique<value::MonoBlock>(*count, value::TypeTags::Nothing, value::Value{0u});

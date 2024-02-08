@@ -72,8 +72,8 @@ TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
     auto checkBlockIsValid = [](value::ValueBlock& valBlock) {
         {
             auto extractedVals = valBlock.extract();
-            ASSERT(extractedVals.count == 4);
-            for (size_t i = 0; i < extractedVals.count; ++i) {
+            ASSERT(extractedVals.count() == 4);
+            for (size_t i = 0; i < extractedVals.count(); ++i) {
                 auto expectedT = value::TypeTags::NumberDouble;
                 auto expectedV = value::bitcastFrom<double>(double(i));
 

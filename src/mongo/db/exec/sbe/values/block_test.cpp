@@ -61,7 +61,7 @@ TEST_F(SbeValueTest, SbeValueBlockTypeIsCopyable) {
     auto cpy = value::getValueBlock(cpyValue);
 
     auto extracted = cpy->extract();
-    ASSERT_EQ(extracted.count, 1);
+    ASSERT_EQ(extracted.count(), 1);
 }
 
 // Tests that copyValue() behaves correctly when given a TypeTags::valueBlock. Uses MonoBlock as
@@ -77,7 +77,7 @@ TEST_F(SbeValueTest, SbeCellBlockTypeIsCopyable) {
 
     auto& vals = cpy->getValueBlock();
     auto extracted = vals.extract();
-    ASSERT_EQ(extracted.count, 1);
+    ASSERT_EQ(extracted.count(), 1);
 }
 
 namespace {
@@ -95,9 +95,9 @@ struct PathTestCase {
 BSONObj blockToBsonArr(value::ValueBlock& block) {
     auto extracted = block.extract();
     BSONArrayBuilder arr;
-    for (size_t i = 0; i < extracted.count; ++i) {
-        auto tag = extracted.tags[i];
-        auto val = extracted.vals[i];
+    for (size_t i = 0; i < extracted.count(); ++i) {
+        auto tag = extracted.tags()[i];
+        auto val = extracted.vals()[i];
 
         BSONObjBuilder tmp;
 

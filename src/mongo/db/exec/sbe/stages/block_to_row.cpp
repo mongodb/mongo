@@ -139,9 +139,9 @@ void BlockToRowStage::prepareDeblock() {
         auto bitmapBlock = value::getValueBlock(bitmapValue);
         auto extractedBitmap = bitmapBlock->extract();
 
-        selectivityVector.resize(extractedBitmap.count);
+        selectivityVector.resize(extractedBitmap.count());
         onesInBitset = 0;
-        for (size_t i = 0; i < extractedBitmap.count; ++i) {
+        for (size_t i = 0; i < extractedBitmap.count(); ++i) {
             auto [t, v] = extractedBitmap[i];
             tassert(8044672, "Bitmap must contain only booleans", t == value::TypeTags::Boolean);
             auto idxPasses = value::bitcastTo<bool>(v);
@@ -163,15 +163,15 @@ void BlockToRowStage::prepareDeblock() {
         auto deblocked = valueBlock->extract();
         tassert(8044674,
                 "Bitmap must be same size as data blocks",
-                selectivityVector.empty() || deblocked.count == selectivityVector.size());
+                selectivityVector.empty() || deblocked.count() == selectivityVector.size());
 
         // Apply the selectivity vector here, only taking the values which are included.
         std::vector<std::pair<value::TypeTags, value::Value>> tvVec;
-        tvVec.resize(onesInBitset.get_value_or(deblocked.count));
+        tvVec.resize(onesInBitset.get_value_or(deblocked.count()));
 
         {
             size_t idxInTvVec = 0;
-            for (size_t i = 0; i < deblocked.count; ++i) {
+            for (size_t i = 0; i < deblocked.count(); ++i) {
                 if (selectivityVector.empty() || selectivityVector[i]) {
                     tvVec[idxInTvVec++] = std::pair(deblocked[i].first, deblocked[i].second);
                 }
@@ -182,7 +182,7 @@ void BlockToRowStage::prepareDeblock() {
 
         tassert(7962151, "Block's count must always be same as count of deblocked values", [&] {
             if (auto optCnt = valueBlock->tryCount()) {
-                return *optCnt == deblocked.count;
+                return *optCnt == deblocked.count();
             } else {
                 return true;
             }

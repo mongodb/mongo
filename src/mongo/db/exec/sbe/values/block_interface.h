@@ -45,28 +45,51 @@ namespace mongo::sbe::value {
  *
  * Note: Deblocked values are read-only and must not be modified.
  */
-struct DeblockedTagVals {
+class DeblockedTagVals {
+public:
+    DeblockedTagVals() {}
+
     // 'tags' and 'vals' point to an array of 'count' elements respectively.
-    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
-        : count(count), tags(tags), vals(vals) {
-        tassert(7949501, "Values must exist", count > 0 && tags != nullptr && vals != nullptr);
+    DeblockedTagVals(size_t count, TypeTags* tags, Value* vals)
+        : _count(count), _tags(tags), _vals(vals) {
+        tassert(7949501, "Values must exist", _count > 0 && _tags != nullptr && _vals != nullptr);
+    }
+
+    DeblockedTagVals& operator=(const DeblockedTagVals& other) {
+        _count = other._count;
+        _tags = other._tags;
+        _vals = other._vals;
+        return *this;
     }
 
     std::pair<TypeTags, Value> operator[](size_t idx) const {
-        return {tags[idx], vals[idx]};
+        return {_tags[idx], _vals[idx]};
     }
 
     std::span<const TypeTags> tagsSpan() const {
-        return std::span(tags, count);
+        return std::span(_tags, _count);
     }
 
     std::span<const Value> valsSpan() const {
-        return std::span(vals, count);
+        return std::span(_vals, _count);
     }
 
-    const size_t count;
-    const TypeTags* const tags;
-    const Value* const vals;
+    size_t count() const {
+        return _count;
+    }
+
+    const TypeTags* tags() const {
+        return _tags;
+    }
+
+    const Value* vals() const {
+        return _vals;
+    }
+
+private:
+    size_t _count = 0;
+    TypeTags* _tags = nullptr;
+    Value* _vals = nullptr;
 };
 
 // Bitset representation used to indicate present or missing values. DynamicBitset from
@@ -567,6 +590,7 @@ public:
 
     void clear() noexcept {
         _vals.clear();
+        _presentBitset.clear();
     }
 
     void reserve(size_t n) {

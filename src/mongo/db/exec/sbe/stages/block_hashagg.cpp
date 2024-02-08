@@ -46,7 +46,7 @@ bool allFalse(std::pair<value::TypeTags, value::Value> bitset) {
     invariant(bitset.first == value::TypeTags::valueBlock);
     // TODO SERVER-85739 use special cases for different types of blocks.
     const auto& deblocked = value::bitcastTo<value::ValueBlock*>(bitset.second)->extract();
-    for (size_t i = 0; i < deblocked.count; i++) {
+    for (size_t i = 0; i < deblocked.count(); i++) {
         invariant(deblocked[i].first == value::TypeTags::Boolean);
         if (value::bitcastTo<bool>(deblocked[i].second)) {
             return false;
@@ -73,36 +73,78 @@ std::unique_ptr<value::ValueBlock> bitAnd(value::ValueBlock* bitset1, value::Val
     // TODO SERVER-85738 Implement efficient bitAnd operation on blocks.
     auto vals1 = bitset1->extract();
     auto vals2 = bitset2->extract();
-    invariant(vals1.count == vals2.count);
+    invariant(vals1.count() == vals2.count());
 
     std::vector<bool> vecResult;
-    vecResult.resize(vals1.count);
-    for (size_t i = 0; i < vals1.count; i++) {
-        auto [tag1, val1] = vals1[i];
-        auto [tag2, val2] = vals2[i];
-        invariant(tag1 == value::TypeTags::Boolean && tag2 == value::TypeTags::Boolean);
-        vecResult[i] = value::bitcastTo<bool>(val1) && value::bitcastTo<bool>(val2);
+    vecResult.resize(vals1.count());
+    for (size_t i = 0; i < vals1.count(); i++) {
+        invariant(vals1[i].first == value::TypeTags::Boolean &&
+                  vals2[i].first == value::TypeTags::Boolean);
+        vecResult[i] =
+            value::bitcastTo<bool>(vals1[i].second) && value::bitcastTo<bool>(vals2[i].second);
     }
     return std::make_unique<value::BoolBlock>(std::move(vecResult));
 }
+
+/*
+ * Block that holds a view of a single value. It does not take ownership of the given value. This is
+ * used because the block accumulators expect block inputs, but in some cases we may need to provide
+ * is scalars that we do not own.
+ * Used only for BlockHashAgg.
+ */
+class SingletonViewBlock final : public value::ValueBlock {
+public:
+    SingletonViewBlock() {}
+
+    SingletonViewBlock(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
+
+    void setTagVal(std::pair<value::TypeTags, value::Value> tagVal) {
+        _tag = tagVal.first;
+        _val = tagVal.second;
+    }
+
+    std::unique_ptr<ValueBlock> clone() const override {
+        return std::make_unique<SingletonViewBlock>(_tag, _val);
+    }
+
+    boost::optional<size_t> tryCount() const override {
+        return 1;
+    }
+
+    value::DeblockedTagVals deblock(
+        boost::optional<value::DeblockedTagValStorage>& storage) override {
+        return {1, &_tag, &_val};
+    }
+
+private:
+    value::TypeTags _tag;
+    value::Value _val;
+};
 }  // namespace
 
 BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotId groupSlotId,
                                      value::SlotId blockBitsetInSlotId,
+                                     value::SlotVector blockDataInSlotIds,
                                      value::SlotId rowAccSlotId,
                                      value::SlotId accumulatorBitsetSlotId,
+                                     value::SlotVector accumulatorDataSlotIds,
                                      BlockAndRowAggs aggs,
                                      PlanNodeId planNodeId,
                                      bool participateInTrialRunTracking)
     : PlanStage("block_hashagg"_sd, planNodeId, participateInTrialRunTracking),
       _groupSlot(groupSlotId),
       _blockBitsetInSlotId(blockBitsetInSlotId),
+      _blockDataInSlotIds(std::move(blockDataInSlotIds)),
       _accumulatorBitsetSlotId(accumulatorBitsetSlotId),
+      _accumulatorDataSlotIds(std::move(accumulatorDataSlotIds)),
       _rowAccSlotId(rowAccSlotId),
       _blockRowAggs(std::move(aggs)) {
+    invariant(_blockDataInSlotIds.size() == _accumulatorDataSlotIds.size());
     _children.emplace_back(std::move(input));
     _outAggBlocks.resize(_blockRowAggs.size());
+    _blockDataInAccessors.resize(_blockDataInSlotIds.size());
+    _accumulatorDataAccessors.resize(_accumulatorDataSlotIds.size());
 }
 
 std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
@@ -115,8 +157,10 @@ std::unique_ptr<PlanStage> BlockHashAggStage::clone() const {
     return std::make_unique<BlockHashAggStage>(_children[0]->clone(),
                                                _groupSlot,
                                                _blockBitsetInSlotId,
+                                               _blockDataInSlotIds,
                                                _rowAccSlotId,
                                                _accumulatorBitsetSlotId,
+                                               _accumulatorDataSlotIds,
                                                std::move(blockRowAggs),
                                                _commonStats.nodeId,
                                                _participateInTrialRunTracking);
@@ -138,6 +182,10 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
     invariant(_idAccessorIn);
     _blockBitsetInAccessor = _children[0]->getAccessor(ctx, _blockBitsetInSlotId);
     invariant(_blockBitsetInAccessor);
+    for (size_t i = 0; i < _blockDataInSlotIds.size(); i++) {
+        _blockDataInAccessors[i] = _children[0]->getAccessor(ctx, _blockDataInSlotIds[i]);
+        invariant(_blockDataInAccessors[i]);
+    }
 
     value::SlotSet dupCheck;
     auto throwIfDupSlot = [&dupCheck](value::SlotId slot) {
@@ -188,7 +236,147 @@ value::SlotAccessor* BlockHashAggStage::getAccessor(CompileCtx& ctx, value::Slot
         } else if (_accumulatorBitsetSlotId == slot) {
             return &_accumulatorBitsetAccessor;
         }
+        for (size_t i = 0; i < _accumulatorDataSlotIds.size(); i++) {
+            if (_accumulatorDataSlotIds[i] == slot) {
+                return &_accumulatorDataAccessors[i];
+            }
+        }
         return _children[0]->getAccessor(ctx, slot);
+    }
+}
+
+void BlockHashAggStage::executeAccumulatorCode(value::MaterializedRow key) {
+    // If all bits are false, there's no work to do. We don't want to make an erroneous
+    // entry in our hash map.
+    if (allFalse(_accumulatorBitsetAccessor.getViewOfValue())) {
+        return;
+    }
+
+    _htIt = _ht.find(key);
+    if (_htIt == _ht.end()) {
+        // New key we haven't seen before.
+        key.makeOwned();
+        auto [it, _] = _ht.emplace(std::move(key), value::MaterializedRow{0});
+        // Initialize accumulators.
+        it->second.resize(_rowAggHtAccessors.size());
+        _htIt = it;
+    }
+
+    // Now run the block level accumulators followed by the row level accumulators.
+    size_t i = 0;
+    for (auto& blockAccum : _blockLevelAggCodes) {
+        auto [owned, tag, val] = _bytecode.run(blockAccum.get());
+
+        // Now run the row level accumulator.
+        _rowAccAccessor.reset(owned, tag, val);
+        auto [rowOwned, rowTag, rowVal] = _bytecode.run(_aggCodes[i].get());
+        _rowAggHtAccessors[i]->reset(rowOwned, rowTag, rowVal);
+        ++i;
+    }
+}
+
+void BlockHashAggStage::runAccumulatorsTokenized(size_t nPartitions,
+                                                 value::DeblockedTagVals deblockedTokens,
+                                                 value::TokenizedBlock tokenInfo) {
+    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
+    invariant(bitmapInTag == value::TypeTags::valueBlock);
+
+    // Process the accumulators for each partition rather than one element at a time.
+    for (size_t partition = 0; partition < nPartitions; ++partition) {
+        value::MaterializedRow key{1};
+        auto [idTag, idVal] = deblockedTokens[partition];
+        key.reset(0, false, idTag, idVal);
+
+        // The accumulators use `_accumulatorBitsetAccessor` to determine which values to
+        // accumulate. If we have multiple partitions, we need some additional logic to
+        // indicate which partition we're processing.
+        if (nPartitions > 1) {
+            // TODO SERVER-85739 we can avoid allocating a new bitset for every input. We
+            // can potentially reuse the same bitset. It also might not be worth the
+            // additional code complexity.
+            auto partitionBitset = computeBitmapForPartition(tokenInfo.idxs, partition);
+            // AND the partition bitmap and input bitmap together. `bitAnd` returns a new
+            // bitmap so the accessor must own it.
+            auto accBitset =
+                bitAnd(partitionBitset.get(), value::bitcastTo<value::ValueBlock*>(bitmapInVal));
+            _accumulatorBitsetAccessor.reset(
+                true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(accBitset.release()));
+        } else {
+            _accumulatorBitsetAccessor.reset(false, bitmapInTag, bitmapInVal);
+        }
+
+        for (size_t i = 0; i < _blockDataInAccessors.size(); i++) {
+            auto [dataTag, dataVal] = _blockDataInAccessors[i]->getViewOfValue();
+            _accumulatorDataAccessors[i].reset(false, dataTag, dataVal);
+        }
+
+        executeAccumulatorCode(std::move(key));
+    }
+}
+
+void BlockHashAggStage::runAccumulatorsElementWise() {
+    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
+    invariant(bitmapInTag == value::TypeTags::valueBlock);
+    auto extractedBitmap = value::bitcastTo<value::ValueBlock*>(bitmapInVal)->extract();
+
+    auto [gbInputTag, gbInputVal] = _idAccessorIn->getViewOfValue();
+    invariant(gbInputTag == value::TypeTags::valueBlock);
+    auto extractedGbInput = value::bitcastTo<value::ValueBlock*>(gbInputVal)->extract();
+
+    const size_t numDataInputs = _accumulatorDataSlotIds.size();
+
+    // Extract each data block into this array for when we process them element-wise.
+    std::vector<value::DeblockedTagVals> extractedDataIn;
+    extractedDataIn.resize(numDataInputs);
+    for (size_t i = 0; i < numDataInputs; i++) {
+        auto [dataTag, dataVal] = _blockDataInAccessors[i]->getViewOfValue();
+        invariant(dataTag == value::TypeTags::valueBlock);
+        extractedDataIn[i] = value::bitcastTo<value::ValueBlock*>(dataVal)->extract();
+    }
+
+    // Create bitmap and blocks to hold in accessors. We update these blocks as we loop through the
+    // data in the blocks. For the bitmap, we can avoid the overhead of running the accumulators by
+    // checking the input bit first. We can hold a singular `true` in the accumulator bitmap slot
+    // since we know it'll be true.
+    value::BoolBlock singletonBitmap(std::vector<bool>{true});
+    _accumulatorBitsetAccessor.reset(false,
+                                     value::TypeTags::valueBlock,
+                                     value::bitcastFrom<value::ValueBlock*>(&singletonBitmap));
+
+    std::vector<SingletonViewBlock> singletonDataBlocks;
+    singletonDataBlocks.resize(numDataInputs);
+    for (size_t i = 0; i < numDataInputs; i++) {
+        _accumulatorDataAccessors[i].reset(
+            false,
+            value::TypeTags::valueBlock,
+            value::bitcastFrom<value::ValueBlock*>(&singletonDataBlocks[i]));
+    }
+
+    for (size_t blockIndex = 0; blockIndex < extractedBitmap.count(); ++blockIndex) {
+        value::MaterializedRow key{1};
+        auto [idTag, idVal] = extractedGbInput[blockIndex];
+        key.reset(0, false, idTag, idVal);
+
+        // Update our accessors (via the blocks) with the current value.
+        auto [bitTag, bitVal] = extractedBitmap[blockIndex];
+        invariant(bitTag == value::TypeTags::Boolean);
+        if (!value::bitcastTo<bool>(bitVal)) {
+            continue;
+        }
+
+        for (size_t i = 0; i < numDataInputs; i++) {
+            singletonDataBlocks[i].setTagVal(extractedDataIn[i][blockIndex]);
+        }
+
+        // Run the accumulators to update the hash map.
+        executeAccumulatorCode(std::move(key));
+    }
+
+    _accumulatorBitsetAccessor.reset(false, value::TypeTags::Nothing, 0);
+    for (size_t i = 0; i < numDataInputs; i++) {
+        _accumulatorDataAccessors[i].reset(false, value::TypeTags::Nothing, 0);
     }
 }
 
@@ -202,9 +390,6 @@ void BlockHashAggStage::open(bool reOpen) {
     }
 
     while (PlanState::ADVANCED == _children[0]->getNext()) {
-        auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
-        invariant(bitmapInTag == value::TypeTags::valueBlock);
-
         auto [gbInputTag, gbInputVal] = _idAccessorIn->getViewOfValue();
         value::TokenizedBlock tokenInfo;
         if (gbInputTag == value::TypeTags::valueBlock) {
@@ -218,63 +403,12 @@ void BlockHashAggStage::open(bool reOpen) {
         }
 
         auto deblockedTokens = tokenInfo.tokens->extract();
-        const auto nPartitions = deblockedTokens.count;
+        const auto nPartitions = deblockedTokens.count();
 
-        // Process the accumulators for each partition rather than one element at a time.
-        for (size_t partition = 0; partition < nPartitions; ++partition) {
-            value::MaterializedRow key{1};
-            auto [idTag, idVal] = deblockedTokens[partition];
-            key.reset(0, false, idTag, idVal);
-
-            // The accumulators use `_accumulatorBitsetAccessor` to determine which values to
-            // accumulate. If we have multiple partitions, we need some additional logic to
-            // indicate which partition we're processing.
-            if (nPartitions > 1) {
-                // TODO SERVER-85669 handle large number of partitions more efficiently.
-
-                // TODO SERVER-85739 we can avoid allocating a new bitset for every input. We can
-                // potentially reuse the same bitset. It also might not be worth the additional code
-                // complexity.
-                auto partitionBitset = computeBitmapForPartition(tokenInfo.idxs, partition);
-                // AND the partition bitmap and input bitmap together. `bitAnd` returns a new
-                // bitmap so the accessor must own it.
-                auto accBitset = bitAnd(partitionBitset.get(),
-                                        value::bitcastTo<value::ValueBlock*>(bitmapInVal));
-                _accumulatorBitsetAccessor.reset(
-                    true,
-                    value::TypeTags::valueBlock,
-                    value::bitcastFrom<value::ValueBlock*>(accBitset.release()));
-            } else {
-                _accumulatorBitsetAccessor.reset(false, bitmapInTag, bitmapInVal);
-            }
-
-            // If all bits are false, there's no work to do. We don't want to make an erroneous
-            // entry in our hash map.
-            if (allFalse(_accumulatorBitsetAccessor.getViewOfValue())) {
-                continue;
-            }
-
-            _htIt = _ht.find(key);
-            if (_htIt == _ht.end()) {
-                // New key we haven't seen before.
-                key.makeOwned();
-                auto [it, _] = _ht.emplace(std::move(key), value::MaterializedRow{0});
-                // Initialize accumulators.
-                it->second.resize(_rowAggHtAccessors.size());
-                _htIt = it;
-            }
-
-            // Now run the block level accumulators followed by the row level accumulators.
-            size_t i = 0;
-            for (auto& blockAccum : _blockLevelAggCodes) {
-                auto [owned, tag, val] = _bytecode.run(blockAccum.get());
-
-                // Now run the row level accumulator.
-                _rowAccAccessor.reset(owned, tag, val);
-                auto [rowOwned, rowTag, rowVal] = _bytecode.run(_aggCodes[i].get());
-                _rowAggHtAccessors[i]->reset(rowOwned, rowTag, rowVal);
-                ++i;
-            }
+        if (nPartitions <= kMaxNumPartitionsForTokenizedPath) {
+            runAccumulatorsTokenized(nPartitions, std::move(deblockedTokens), std::move(tokenInfo));
+        } else {
+            runAccumulatorsElementWise();
         }
 
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {

@@ -193,7 +193,7 @@ TsBucketPathExtractor::extractCellBlocks(const BSONObj& bucketObj) {
         // that BSON to produce the results for nested paths.
 
         auto extracted = tsBlock->extract();
-        invariant(extracted.count == static_cast<size_t>(noOfMeasurements));
+        invariant(extracted.count() == static_cast<size_t>(noOfMeasurements));
 
         std::vector<CellBlock::PathRequest> reqs;
         for (auto idx : nonTopLevelIdxesForCurrentField) {
@@ -316,26 +316,26 @@ boost::optional<DeblockedHomogeneousVals> TsBlock::extractHomogeneous() {
     bool foundNonNothing = false;
     TypeTags acc = TypeTags::Nothing;
     HomogeneousBlockBitset bitset;
-    bitset.resize(deblocked.count, true);
+    bitset.resize(deblocked.count(), true);
     std::vector<Value> vals;
-    vals.resize(deblocked.count);
+    vals.resize(deblocked.count());
     size_t valsIdx = 0;
-    for (size_t i = 0; i < deblocked.count; ++i) {
-        if (deblocked.tags[i] == TypeTags::Nothing) {
+    for (size_t i = 0; i < deblocked.count(); ++i) {
+        if (deblocked.tags()[i] == TypeTags::Nothing) {
             bitset[i] = false;
             continue;
         } else if (!foundNonNothing) {
             // TODO SERVER-83799 Remove check for Boolean
-            if (!DeblockedHomogeneousVals::validHomogeneousType(deblocked.tags[i]) ||
-                deblocked.tags[i] == TypeTags::Boolean) {
+            if (!DeblockedHomogeneousVals::validHomogeneousType(deblocked.tags()[i]) ||
+                deblocked.tags()[i] == TypeTags::Boolean) {
                 return boost::none;
             }
             foundNonNothing = true;
-            acc = deblocked.tags[i];
-        } else if (foundNonNothing && deblocked.tags[i] != acc) {
+            acc = deblocked.tags()[i];
+        } else if (foundNonNothing && deblocked.tags()[i] != acc) {
             return boost::none;
         }
-        vals[valsIdx++] = deblocked.vals[i];
+        vals[valsIdx++] = deblocked.vals()[i];
     }
     // Resize vals in case there were Nothings present in the block.
     vals.resize(valsIdx);
