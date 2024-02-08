@@ -86,3 +86,13 @@ let cmdRes =
 assert.commandFailedWithCode(cmdRes, ErrorCodes.BadValue, cmdRes);
 var regex = new RegExp("hint provided does not correspond to an existing index");
 assert(regex.test(cmdRes.errmsg));
+
+// Make sure $natural hints are applied to distinct.
+if (!isCursorHintsToQuerySettings) {
+    // Query settings for distinct have different semantics. $natural in that case is _only_ a hint
+    // and may not be enforced if there are better query plans available.
+    let explain = db.coll.explain().distinct("a", {}, {hint: {$natural: 1}});
+    let scanStage = getPlanStage(explain, "COLLSCAN");
+    assert(scanStage, tojson(explain));
+    assert.eq(explain.command.hint, {$natural: 1});
+}

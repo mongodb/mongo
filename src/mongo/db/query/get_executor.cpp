@@ -3129,7 +3129,8 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                                                    const CollectionPtr& collection,
                                                    size_t plannerOptions,
                                                    const CanonicalDistinct& canonicalDistinct,
-                                                   bool flipDistinctScanDirection) {
+                                                   bool flipDistinctScanDirection,
+                                                   bool ignoreQuerySettings) {
     QueryPlannerParams plannerParams(QueryPlannerParams::NO_TABLE_SCAN | plannerOptions);
 
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
@@ -3200,7 +3201,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
     applyQuerySettingsOrIndexFilters(MultipleCollectionAccessor(collection),
                                      *canonicalQuery,
                                      &plannerParams,
-                                     /* ignoreQuerySettings */ false);
+                                     ignoreQuerySettings);
 
     // If there exists an index filter, we ignore all hints. Else, we only keep the index specified
     // by the hint. Since we cannot have an index with name $natural, that case will clear the
@@ -3296,18 +3297,27 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
             "distinct command is not eligible for bonsai",
             !isEligibleForBonsai(opCtx, collectionPtr, *canonicalDistinct->getQuery()));
 
-    auto plannerParams = fillOutPlannerParamsForDistinct(
-        opCtx, collectionPtr, plannerOptions, *canonicalDistinct, flipDistinctScanDirection);
+    auto getQuerySolution = [&](bool ignoreQuerySettings) -> std::unique_ptr<QuerySolution> {
+        auto plannerParams = fillOutPlannerParamsForDistinct(opCtx,
+                                                             collectionPtr,
+                                                             plannerOptions,
+                                                             *canonicalDistinct,
+                                                             flipDistinctScanDirection,
+                                                             ignoreQuerySettings);
 
-    // 'fillOutPlannerParamsForDistinct()' might consider as suitable an index that later might not
-    // pass all the necessary conditions for distinct scan, but if it fills no suitable indexes at
-    // all, it's for sure that distinct scan cannot be used.
-    if (plannerParams.indices.empty()) {
-        return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
+        // Can't create a DISTINCT_SCAN stage if no suitable indexes are present.
+        if (plannerParams.indices.empty()) {
+            return nullptr;
+        }
+        return createDistinctScanSolution(
+            canonicalDistinct, plannerParams, flipDistinctScanDirection);
+    };
+
+    auto soln = getQuerySolution(/* ignoreQuerySettings */ false);
+    if (!soln) {
+        // Try again this time without query settings applied.
+        soln = getQuerySolution(/* ignoreQuerySettings */ true);
     }
-
-    std::unique_ptr<QuerySolution> soln =
-        createDistinctScanSolution(canonicalDistinct, plannerParams, flipDistinctScanDirection);
     if (!soln) {
         return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
