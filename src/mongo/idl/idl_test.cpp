@@ -3626,6 +3626,27 @@ TEST(IDLChainedStruct, TestInline) {
     }
 }
 
+TEST(IDLChainedStruct, TestInlinedGettersAndSetters) {
+    IDLParserContext ctxt("root");
+
+    auto testDoc = BSON("stringField"
+                        << "bar"
+                        << "field3"
+                        << "foo");
+
+    auto testStruct = Chained_struct_inline::parse(ctxt, testDoc);
+    ASSERT_EQUALS(testStruct.getStringField(), "bar");
+    ASSERT_EQUALS(testStruct.getChained_string_inline_basic_type().getStringField(), "bar");
+
+    testStruct.getChained_string_inline_basic_type().setStringField("foo");
+    ASSERT_EQUALS(testStruct.getStringField(), "foo");
+    ASSERT_EQUALS(testStruct.getChained_string_inline_basic_type().getStringField(), "foo");
+
+    testStruct.setStringField("baz");
+    ASSERT_EQUALS(testStruct.getStringField(), "baz");
+    ASSERT_EQUALS(testStruct.getChained_string_inline_basic_type().getStringField(), "baz");
+}
+
 TEST(IDLValidatedField, Int_basic_ranges) {
     // Explicitly call setters.
     Int_basic_ranges obj0;

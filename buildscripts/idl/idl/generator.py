@@ -724,9 +724,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         param_type = cpp_type_info.get_getter_setter_type()
         is_serial = _is_required_serializer_field(field)
         memfn = _get_field_member_setter_name(field)
-        body = cpp_type_info.get_setter_body(
-            _get_field_member_name(field),
-            _get_field_member_validator_name(field) if field.validator is not None else '')
+        if field.chained_struct_field:
+            body = "{}.{}(std::move(value));".format(
+                _get_field_member_name(field.chained_struct_field),
+                _get_field_member_setter_name(field))
+        else:
+            body = cpp_type_info.get_setter_body(
+                _get_field_member_name(field),
+                _get_field_member_validator_name(field) if field.validator is not None else '')
         set_has = _gen_mark_present(field.cpp_name) if is_serial else ''
 
         with self._block(f'void {memfn}({param_type} value) {{', '}'):
@@ -1273,10 +1278,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             if field.description:
                                 self.gen_description_comment(field.description)
                             self.gen_getter(struct, field)
-                            if not field.chained_struct_field:
-                                if not struct.immutable or (field.type
-                                                            and field.type.internal_only):
-                                    self.gen_setter(field)
+                            if not struct.immutable or (field.type and field.type.internal_only):
+                                self.gen_setter(field)
 
                     # Generate getters for any constexpr/compile-time struct data
                     self.write_empty_line()
