@@ -2432,3 +2432,60 @@ buildvariants:
     - name: filter_with_complex_logical_expression_high_value
     - name: tsbs_query
     - name: mongos_workloads
+
+- &3node-query-stats-rate-limit
+  <<: *amazon_linux2_arm64_compile_variant_dependency
+  name: perf-3-node-replSet-limited-1-query-stats.arm.aws.2023-11
+  display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 1) ARM AWS 2023-11
+  cron: *high-value-workload-cron
+  modules: *perf_modules
+  expansions: &3node-query-stats-rate-limit-expansions
+    mongodb_setup_release: 2022-11
+    mongodb_setup: replica-query-stats-rate-limit
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: replica
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: amazon2-arm64-compile
+    config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 1}'
+  run_on:
+    - "rhel70-perf-replset"
+  tasks:
+    - *schedule_patch_auto_tasks_task
+    - name: schedule_variant_auto_tasks
+    - name: ycsb.2023-09
+    - name: ycsb_60GB.2023-09
+    - name: ycsb_60GB.long.2023-09
+    - name: tpcc_majority
+    - name: linkbench2
+    - name: mixed_workloads_genny_rate_limited_high_value
+    - name: majority_reads10_k_threads_high_value
+    - name: bestbuy_agg
+    - name: large_indexed_ins_high_value
+    - name: expressive_queries_high_value
+    - name: time_series_sort_high_value
+    - name: tsbs_query
+
+- <<: *3node-query-stats-rate-limit
+  name: perf-3-node-replSet-limited-10-query-stats.arm.aws.2023-11
+  display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 10) ARM AWS 2023-11
+  expansions:
+    <<: *3node-query-stats-rate-limit-expansions
+    config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 10}'
+
+- <<: *3node-query-stats-rate-limit
+  name: perf-3-node-replSet-limited-1000-query-stats.arm.aws.2023-11
+  display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 1000) ARM AWS 2023-11
+  expansions:
+    <<: *3node-query-stats-rate-limit-expansions
+    config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 1000}'
+
+- <<: *3node-query-stats-rate-limit
+  name: perf-3-node-replSet-limited-10000-query-stats.arm.aws.2023-11
+  display_name: PERF 3-Node ReplSet (QueryStats, Rate Limited with 10000) ARM AWS 2023-11
+  expansions:
+    <<: *3node-query-stats-rate-limit-expansions
+    config_params_json: '{"v": 0, "internalQueryStatsRateLimit": 10000}'
