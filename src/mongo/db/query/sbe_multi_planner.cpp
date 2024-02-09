@@ -287,8 +287,11 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
             str::stream() << "winning candidate returned an error: " << winner.status,
             winner.status.isOK());
 
-    LOGV2_DEBUG(
-        4822875, 5, "Winning solution", "bestSolution"_attr = redact(winner.solution->toString()));
+    LOGV2_DEBUG(4822875,
+                5,
+                "Winning solution",
+                "bestSolution"_attr = redact(winner.solution->toString()),
+                "bestSolutionHash"_attr = winner.solution->hash());
 
     auto explainer = plan_explainer_factory::make(
         winner.root.get(), &winner.data.stageData, winner.solution.get());

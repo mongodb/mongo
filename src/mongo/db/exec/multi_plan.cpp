@@ -271,8 +271,11 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     const auto& alreadyProduced = bestCandidate.results;
     const auto& bestSolution = bestCandidate.solution;
 
-    LOGV2_DEBUG(
-        20590, 5, "Winning solution", "bestSolution"_attr = redact(bestSolution->toString()));
+    LOGV2_DEBUG(20590,
+                5,
+                "Winning solution",
+                "bestSolution"_attr = redact(bestSolution->toString()),
+                "bestSolutionHash"_attr = bestSolution->hash());
 
     auto explainer =
         plan_explainer_factory::make(bestCandidate.root, bestSolution->_enumeratorExplainInfo);
