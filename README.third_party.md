@@ -56,7 +56,7 @@ a notice will be included in
 | [TomCrypt]                 | Public Domain     | 1.18.2            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 8.0.0             |          ✗           |                ✗                |
 | [libunwind]                | MIT               | 1.6.2 + changes   |                      |                ✗                |
-| [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.17.0 | |             ✗                |
+| [Valgrind]                 | BSD-4-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.17.0 | |             ✗                |
 | [wiredtiger]               |                   | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> | ✗ |  ✗                |
 | [yaml-cpp]                 | MIT               | 0.6.3             |                      |                ✗                |
 | [Zlib]                     | Zlib              | 1.3               |          ✗           |                ✗                |
