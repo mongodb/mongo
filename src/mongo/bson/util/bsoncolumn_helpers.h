@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -83,12 +85,16 @@ public:
     class ContiguousBlock {
     public:
         ContiguousBlock(ElementStorage& storage);
+        ContiguousBlock(ContiguousBlock&& other);
+        ContiguousBlock(const ContiguousBlock&) = delete;
+
         ~ContiguousBlock();
 
         // Return pointer to contigous block and the block size
         std::pair<const char*, int> done();
 
     private:
+        bool _active = true;
         ElementStorage& _storage;
         bool _finished = false;
     };
@@ -117,6 +123,10 @@ public:
      * allocate() need to grow contents from previous memory block is copied.
      */
     ContiguousBlock startContiguous();
+
+    bool contiguousEnabled() const {
+        return _contiguousEnabled;
+    }
 
     /**
      * Returns writable pointer to the beginning of contiguous memory block. Any call to
@@ -214,6 +224,157 @@ private:
     BSONType _rootType;
 };
 
+struct NoopSubObjectFinisher {
+    void finish(const char* elemBytes, int fieldNameSize, int totalSize) {}
+};
+
+/**
+ * Helper RAII class that assists with materializing BSONElements that contain objects or arrays.
+ * Its constructor will take care of writing the header bytes of an object to the allocator,
+ * including the field name and space for the length of the object.
+ *
+ * During this object's lifetime it's expected that the fields will be written to the allocator.
+ *
+ * In the destructor, SubObjectAllocator take care of filling in the value for the object, and
+ * appending the final terminating EOO.
+ *
+ * If the passed-in allocator is not in contiguous mode, SubObjectAllocator will start contiguous
+ * mode in the constructor. In this case, it will use the Finisher to complete the object and end
+ * contiguous mode in the destructor.
+ */
+template <typename Finisher = NoopSubObjectFinisher>
+struct SubObjectAllocator {
+public:
+    SubObjectAllocator(ElementStorage& allocator,
+                       StringData fieldName,
+                       const BSONObj& obj,
+                       BSONType type,
+                       Finisher state = Finisher{})
+        : _active(true),
+          _allocator(allocator),
+          _contiguousBlock(
+              // If the allocator is not in contiguous mode, then start it now.
+              allocator.contiguousEnabled()
+                  ? boost::none
+                  : boost::optional<ElementStorage::ContiguousBlock>(allocator.startContiguous())),
+          _finisher(std::move(state)) {
+        invariant(_allocator.contiguousEnabled());
+
+        // Remember size of field name for this subobject in case it ends up being an empty
+        // subobject and we need to 'deallocate' it.
+        _fieldNameSize = fieldName.size();
+        // We can allow an empty subobject if it existed in the reference object
+        _allowEmpty = obj.isEmpty();
+
+        // Start the subobject, allocate space for the field in the parent which is BSON type byte +
+        // field name + null terminator
+        char* objdata = _allocator.allocate(2 + _fieldNameSize);
+        objdata[0] = type;
+        if (_fieldNameSize > 0) {
+            memcpy(objdata + 1, fieldName.rawData(), _fieldNameSize);
+        }
+        objdata[_fieldNameSize + 1] = '\0';
+
+        // BSON Object type begins with a 4 byte count of number of bytes in the object. Reserve
+        // space for this count and remember the offset so we can set it later when the size is
+        // known. Storing offset over pointer is needed in case we reallocate to a new memory block.
+        _sizeOffset = _allocator.position() - _allocator.contiguous();
+        _allocator.allocate(4);
+    }
+
+    /**
+     * Move constructor. Make sure that only the destination remains active to enforce RAII
+     * semantics.
+     */
+    SubObjectAllocator(SubObjectAllocator&& other)
+        : _active(other._active),
+          _allocator(other._allocator),
+          _contiguousBlock(std::move(other._contiguousBlock)),
+          _finisher(std::move(other._finisher)),
+          _sizeOffset(other._sizeOffset),
+          _fieldNameSize(other._fieldNameSize),
+          _allowEmpty(other._allowEmpty) {
+        other._active = false;
+    }
+
+    SubObjectAllocator(const SubObjectAllocator&) = delete;
+
+    ~SubObjectAllocator() {
+        if (_active) {
+            invariant(_allocator.contiguousEnabled());
+            // Check if we wrote no subfields in which case we are an empty subobject that needs to
+            // be omitted
+            if (!_allowEmpty &&
+                _allocator.position() == _allocator.contiguous() + _sizeOffset + 4) {
+                _allocator.deallocate(_fieldNameSize + 6);
+                return;
+            }
+
+            // Write the EOO byte to end the object and fill out the first 4 bytes for the size that
+            // we reserved in the constructor.
+            auto eoo = _allocator.allocate(1);
+            *eoo = '\0';
+            int32_t size = _allocator.position() - _allocator.contiguous() - _sizeOffset;
+            DataView(_allocator.contiguous() + _sizeOffset).write<LittleEndian<uint32_t>>(size);
+
+            if (_contiguousBlock) {
+                // If we started contiguous mode upon construction, finish the object.
+                auto [ptr, size] = _contiguousBlock->done();
+                _finisher.finish(ptr, _fieldNameSize + 1, size);
+            }
+        }
+    }
+
+
+private:
+    // Whether or not this object is active. Will be false if this was moved.
+    bool _active;
+
+    // Allocator to which to write the subobject.
+    ElementStorage& _allocator;
+
+    // ContiguousBlock RAII object for starting/stopping contiguous mode in allocator.
+    boost::optional<ElementStorage::ContiguousBlock> _contiguousBlock = boost::none;
+
+    // Finisher to invoke when exiting contiguous mode.
+    Finisher _finisher;
+
+    // Location (relative to start of contiguous mode) for size prefix of object.
+    int _sizeOffset;
+
+    // Size of the field name (not including terminating null byte)
+    int _fieldNameSize;
+
+    // Whether or not to allow creation of an empty object.
+    bool _allowEmpty;
+};
+
+/**
+ * We are often dealing with vectors of buffers below, but there is almost always only one buffer.
+ */
+template <typename T>
+using BufferVector = boost::container::small_vector<T, 1>;
+
+/**
+ * Helper class that will append a sub-object to a buffer once it's complete.
+ */
+template <typename Buffer>
+struct BlockBasedSubObjectFinisher {
+
+    BlockBasedSubObjectFinisher(BufferVector<Buffer*>& buffers) : _buffers(buffers) {}
+
+    void finish(const char* elemBytes, int fieldNameSize, int totalSize) {
+        BSONElement elem{elemBytes, fieldNameSize, totalSize, BSONElement::TrustedInitTag{}};
+        for (auto&& buffer : _buffers) {
+            // use preallocated method here to indicate that the element does not need to be
+            // copied to longer-lived memory.
+            buffer->appendPreallocated(elem);
+        }
+    }
+
+    const BufferVector<Buffer*>& _buffers;
+};
+
 /**
  * A helper class for block-based decompression of object data.
  */
@@ -236,71 +397,146 @@ public:
         bool traverseArrays = *control == bsoncolumn::kInterleavedStartControlByte ||
             *control == bsoncolumn::kInterleavedStartArrayRootControlByte;
 
-        // Create a map of fields in the reference object to the buffers to where those fields are
-        // to be decompressed.
+        // The reference object will appear right after the control byte that starts interleaved
+        // mode.
         BSONObj refObj{control + 1};
-        absl::flat_hash_map<const char*, std::vector<Buffer>> elemToBuffer;
-        for (auto&& path : paths) {
-            for (const char* valueAddr : path.first.elementsToMaterialize(refObj)) {
-                elemToBuffer[valueAddr].push_back(path.second);
-            }
-        }
 
-        // Initialize decoding state for each scalar field of the reference object.
-        std::vector<DecodingState> states;
-        BSONObjTraversal trInit{
-            traverseArrays,
-            rootType,
-            [&elemToBuffer](StringData fieldName, const BSONObj& obj, BSONType type) {
-                invariant(!elemToBuffer.contains(obj.objdata()),
-                          "materializing non-scalars not unsupported yet");
-                return true;
-            },
-            [&elemToBuffer, &states](const BSONElement& elem) {
-                states.emplace_back();
-                states.back().loadUncompressed(elem);
-                return true;
-            }};
-        trInit.traverse(refObj);
+        // A vector that maps the ordinal position of the pre-order traversal of the reference
+        // object to the buffers where that element should be materialized. The length of the vector
+        // will be the same as the number of elements in the reference object, with empty vectors
+        // for those elements that aren't being materialized.
+        //
+        // Use BufferVector, which is optimized for one element, because there will almost always be
+        // just one buffer.
+        std::vector<BufferVector<Buffer*>> posToBuffers;
+
+        // Decoding states for each scalar field appearing in the refence object, in pre-order
+        // traversal order.
+        std::vector<DecodingState> decoderStates;
+
+        {
+            absl::flat_hash_map<const char*, BufferVector<Buffer*>> elemToBuffer;
+            for (auto&& path : paths) {
+                for (const char* valueAddr : path.first.elementsToMaterialize(refObj)) {
+                    elemToBuffer[valueAddr].push_back(&path.second);
+                }
+            }
+
+            BSONObjTraversal trInit{
+                traverseArrays,
+                rootType,
+                [&](StringData fieldName, const BSONObj& obj, BSONType type) {
+                    if (auto it = elemToBuffer.find(obj.objdata()); it != elemToBuffer.end()) {
+                        posToBuffers.push_back(std::move(it->second));
+                    } else {
+                        // An empty list to indicate that this element isn't being materialized.
+                        posToBuffers.push_back({});
+                    }
+
+                    return true;
+                },
+                [&](const BSONElement& elem) {
+                    decoderStates.emplace_back();
+                    decoderStates.back().loadUncompressed(elem);
+                    if (auto it = elemToBuffer.find(elem.value()); it != elemToBuffer.end()) {
+                        posToBuffers.push_back(std::move(it->second));
+                    } else {
+                        // An empty list to indicate that this element isn't being materialized.
+                        posToBuffers.push_back({});
+                    }
+                    return true;
+                }};
+            trInit.traverse(refObj);
+        }
 
         // Advance past the reference object to the compressed data of the first field.
         control += refObj.objsize() + 1;
         invariant(control < end);
 
-        int idx = 0;
+        using SOAlloc = SubObjectAllocator<BlockBasedSubObjectFinisher<Buffer>>;
+        using OptionalSOAlloc = boost::optional<SOAlloc>;
+        static_assert(std::is_move_constructible<OptionalSOAlloc>::value,
+                      "must be able to move a sub-object allocator to ensure that RAII properties "
+                      "are followed");
+
+        /*
+         * Each traversal of the reference object can potentially produce a value for each path
+         * passed in by the caller. For the root object or sub-objects that are to be materialized,
+         * we create an instance of SubObjectAllocator to create the object.
+         */
+        int scalarIdx = 0;
+        int nodeIdx = 0;
         BSONObjTraversal trDecompress{
             traverseArrays,
             rootType,
-            [](StringData fieldName, const BSONObj& obj, BSONType type) { return true; },
+            [&posToBuffers, &allocator, &nodeIdx](
+                StringData fieldName, const BSONObj& obj, BSONType type) -> OptionalSOAlloc {
+                auto& buffers = posToBuffers[nodeIdx];
+                ++nodeIdx;
+
+                if (!buffers.empty() || allocator.contiguousEnabled()) {
+                    // If we have already entered contiguous mode, but there are buffers
+                    // corresponding to this subobject, that means caller has requested nested
+                    // paths, e.g., "a" and "a.b".
+                    //
+                    // TODO(SERVER-86220): Nested paths dosn't seem like they would be common, but
+                    // we should be able to handle it.
+                    invariant(
+                        buffers.empty() || !allocator.contiguousEnabled(),
+                        "decompressing paths with a nested relationship is not yet supported");
+
+                    // Either caller requested that this sub-object be materialized to a
+                    // container, or we are already materializing this object because it is
+                    // contained by such a sub-object.
+                    return SOAlloc(
+                        allocator, fieldName, obj, type, BlockBasedSubObjectFinisher{buffers});
+                }
+
+                return boost::none;
+            },
             [&](const BSONElement& referenceField) {
-                auto& state = states[idx];
-                ++idx;
+                auto& state = decoderStates[scalarIdx];
+                ++scalarIdx;
+
+                auto& buffers = posToBuffers[nodeIdx];
+                ++nodeIdx;
+
                 invariant(
                     (std::holds_alternative<typename DecodingState::Decoder64>(state.decoder)),
                     "only supporting 64-bit encoding for now");
                 auto& d64 = std::get<typename DecodingState::Decoder64>(state.decoder);
 
                 // Get the next element for this scalar field.
-                typename DecodingState::Elem elem;
+                typename DecodingState::Elem decodingStateElem;
                 if (d64.pos.valid() && (++d64.pos).more()) {
                     // We have an iterator into a block of deltas
-                    elem = state.loadDelta(allocator, d64);
+                    decodingStateElem = state.loadDelta(allocator, d64);
                 } else if (*control == EOO) {
                     // End of interleaved mode. Stop object traversal early by returning false.
                     return false;
                 } else {
-                    // No more deltas for this scalar field. The next control byte is guaranteed to
-                    // belong to this scalar field, since traversal order is fixed.
+                    // No more deltas for this scalar field. The next control byte is guaranteed
+                    // to belong to this scalar field, since traversal order is fixed.
                     auto result = state.loadControl(allocator, control);
                     control += result.size;
                     invariant(control < end);
-                    elem = result.element;
+                    decodingStateElem = result.element;
                 }
 
                 // If caller has requested materialization of this field, do it.
-                if (auto it = elemToBuffer.find(referenceField.value()); it != elemToBuffer.end()) {
-                    auto& buffers = it->second;
-                    appendToBuffers(buffers, elem);
+                if (allocator.contiguousEnabled()) {
+                    // TODO(SERVER-86220): Nested paths dosn't seem like they would be common, but
+                    // we should be able to handle it.
+                    invariant(
+                        buffers.empty(),
+                        "decompressing paths with a nested relationship is not yet supported");
+
+                    // We must write a BSONElement to ElementStorage since this scalar is part
+                    // of an object being materialized.
+                    BSONElement elem = writeToElementStorage(
+                        allocator, decodingStateElem, referenceField.fieldNameStringData());
+                } else if (buffers.size() > 0) {
+                    appendToBuffers(buffers, decodingStateElem);
                 }
 
                 return true;
@@ -308,7 +544,8 @@ public:
 
         bool more = true;
         while (more || *control != EOO) {
-            idx = 0;
+            scalarIdx = 0;
+            nodeIdx = 0;
             more = trDecompress.traverse(refObj);
         }
 
@@ -320,17 +557,65 @@ public:
 private:
     struct DecodingState;
 
+    /**
+     * Given an element that is being materialized as part of a sub-object, write it to the
+     * allocator as a BSONElement with the appropriate field name.
+     */
+    static BSONElement writeToElementStorage(ElementStorage& allocator,
+                                             typename DecodingState::Elem elem,
+                                             StringData fieldName) {
+        return visit(
+            OverloadedVisitor{
+                [&](BSONElement& bsonElem) {
+                    ElementStorage::Element esElem =
+                        allocator.allocate(bsonElem.type(), fieldName, bsonElem.valuesize());
+                    memcpy(esElem.value(), bsonElem.value(), bsonElem.valuesize());
+                    return esElem.element();
+                },
+                [&](std::pair<BSONType, int64_t> elem) {
+                    switch (elem.first) {
+                        case NumberInt: {
+                            ElementStorage::Element esElem =
+                                allocator.allocate(elem.first, fieldName, 4);
+                            DataView(esElem.value()).write<LittleEndian<int32_t>>(elem.second);
+                            return esElem.element();
+                        } break;
+                        case NumberLong: {
+                            ElementStorage::Element esElem =
+                                allocator.allocate(elem.first, fieldName, 8);
+                            DataView(esElem.value()).write<LittleEndian<int64_t>>(elem.second);
+                            return esElem.element();
+                        } break;
+                        case Bool: {
+                            ElementStorage::Element esElem =
+                                allocator.allocate(elem.first, fieldName, 1);
+                            DataView(esElem.value()).write<LittleEndian<bool>>(elem.second);
+                            return esElem.element();
+                        } break;
+                        default:
+                            invariant(false, "attempt to materialize unsupported type");
+                    }
+                    return BSONElement{};
+                },
+                [&](std::pair<BSONType, int128_t>) {
+                    invariant(false, "tried to materialize a 128-bit type");
+                    return BSONElement{};
+                },
+            },
+            elem);
+    }
+
     template <class Buffer>
-    static void appendToBuffers(std::vector<Buffer>& buffers, typename DecodingState::Elem elem) {
+    static void appendToBuffers(BufferVector<Buffer*>& buffers, typename DecodingState::Elem elem) {
         visit(OverloadedVisitor{
                   [&](BSONElement& bsonElem) {
                       if (bsonElem.eoo()) {
-                          for (auto&& c : buffers) {
-                              c.appendMissing();
+                          for (auto&& b : buffers) {
+                              b->appendMissing();
                           }
                       } else {
-                          for (auto&& c : buffers) {
-                              c.template append<BSONElement>(bsonElem);
+                          for (auto&& b : buffers) {
+                              b->template append<BSONElement>(bsonElem);
                           }
                       }
                   },
@@ -357,9 +642,9 @@ private:
     }
 
     template <typename Buffer, typename T>
-    static void appendEncodedToBuffers(std::vector<Buffer>& buffers, int64_t encoded) {
-        for (auto b : buffers) {
-            b.append(static_cast<T>(encoded));
+    static void appendEncodedToBuffers(BufferVector<Buffer*>& buffers, int64_t encoded) {
+        for (auto&& b : buffers) {
+            b->append(static_cast<T>(encoded));
         }
     }
 

@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe::bsoncolumn {
+using ElementStorage = mongo::bsoncolumn::ElementStorage;
 
 /**
  * Implementation of the Materializer concept that allows BSONColumn to decompress to SBE values.

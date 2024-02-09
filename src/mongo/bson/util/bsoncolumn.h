@@ -335,8 +335,6 @@ private:
      */
     void _initialValidate();
 
-    struct SubObjectAllocator;
-
     const char* _binary;
     int _size;
 

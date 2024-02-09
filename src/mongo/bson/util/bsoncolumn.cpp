@@ -96,8 +96,13 @@ ElementStorage::ContiguousBlock::ContiguousBlock(ElementStorage& storage) : _sto
     _storage._beginContiguous();
 }
 
+ElementStorage::ContiguousBlock::ContiguousBlock(ContiguousBlock&& other)
+    : _active(other._active), _storage(other._storage), _finished(other._finished) {
+    other._active = false;
+}
+
 ElementStorage::ContiguousBlock::~ContiguousBlock() {
-    if (!_finished) {
+    if (_active && !_finished) {
         _storage._endContiguous();
     }
 }
@@ -180,58 +185,6 @@ ElementStorage::Element ElementStorage::allocate(BSONType type,
     // Construct the Element, current block will have enough size at this point
     return Element(block, fieldNameSize, valueSize);
 }
-
-struct BSONColumn::SubObjectAllocator {
-public:
-    SubObjectAllocator(ElementStorage& allocator,
-                       StringData fieldName,
-                       const BSONObj& obj,
-                       BSONType type)
-        : _allocator(allocator) {
-        // Remember size of field name for this subobject in case it ends up being an empty
-        // subobject and we need to 'deallocate' it.
-        _fieldNameSize = fieldName.size();
-        // We can allow an empty subobject if it existed in the reference object
-        _allowEmpty = obj.isEmpty();
-
-        // Start the subobject, allocate space for the field in the parent which is BSON type byte +
-        // field name + null terminator
-        char* objdata = _allocator.allocate(2 + _fieldNameSize);
-        objdata[0] = type;
-        if (_fieldNameSize > 0) {
-            memcpy(objdata + 1, fieldName.rawData(), _fieldNameSize);
-        }
-        objdata[_fieldNameSize + 1] = '\0';
-
-        // BSON Object type begins with a 4 byte count of number of bytes in the object. Reserve
-        // space for this count and remember the offset so we can set it later when the size is
-        // known. Storing offset over pointer is needed in case we reallocate to a new memory block.
-        _sizeOffset = _allocator.position() - _allocator.contiguous();
-        _allocator.allocate(4);
-    }
-
-    ~SubObjectAllocator() {
-        // Check if we wrote no subfields in which case we are an empty subobject that needs to be
-        // omitted
-        if (!_allowEmpty && _allocator.position() == _allocator.contiguous() + _sizeOffset + 4) {
-            _allocator.deallocate(_fieldNameSize + 6);
-            return;
-        }
-
-        // Write the EOO byte to end the object and fill out the first 4 bytes for the size that we
-        // reserved in the constructor.
-        auto eoo = _allocator.allocate(1);
-        *eoo = '\0';
-        int32_t size = _allocator.position() - _allocator.contiguous() - _sizeOffset;
-        DataView(_allocator.contiguous() + _sizeOffset).write<LittleEndian<uint32_t>>(size);
-    }
-
-private:
-    ElementStorage& _allocator;
-    int _sizeOffset;
-    int _fieldNameSize;
-    bool _allowEmpty;
-};
 
 BSONColumn::Iterator::Iterator(boost::intrusive_ptr<ElementStorage> allocator,
                                const char* pos,
