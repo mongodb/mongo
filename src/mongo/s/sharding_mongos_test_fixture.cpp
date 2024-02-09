@@ -421,7 +421,9 @@ void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,
     ASSERT_EQ(Object, readConcernElem.type());
 
     auto readConcernObj = readConcernElem.Obj();
-    ASSERT_EQ("majority", readConcernObj[repl::ReadConcernArgs::kLevelFieldName].str());
+    using namespace unittest::match;
+    ASSERT_THAT(readConcernObj[repl::ReadConcernArgs::kLevelFieldName].str(),
+                AnyOf(Eq("majority"), Eq("snapshot")));
 
     auto afterOpTimeElem = readConcernObj[repl::ReadConcernArgs::kAfterOpTimeFieldName];
     auto afterClusterTimeElem = readConcernObj[repl::ReadConcernArgs::kAfterClusterTimeFieldName];
