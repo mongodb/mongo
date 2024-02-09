@@ -567,6 +567,10 @@ public:
         return _comment ? boost::optional<BSONElement>(_comment->firstElement()) : boost::none;
     }
 
+    boost::optional<BSONObj> getCommentOwnedCopy() const {
+        return _comment.has_value() ? boost::optional<BSONObj>{_comment->copy()} : boost::none;
+    }
+
     /**
      * Sets whether this operation is an exhaust command.
      */

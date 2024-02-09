@@ -215,7 +215,8 @@ Value DocumentSourceChangeStreamOplogMatch::serialize(SerializationOptions opts)
         sub.done();
     } else {
         BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (opts.replacementForLiteralArgs || opts.transformIdentifiers) {
+        if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged ||
+            opts.transformIdentifiers) {
             sub.append(DocumentSourceChangeStreamOplogMatchSpec::kFilterFieldName,
                        getMatchExpression()->serialize(opts));
         } else {

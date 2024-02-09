@@ -50,9 +50,9 @@ void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
     _debugStringAttachTagInfo(&debug);
 }
 
-BSONObj InternalSchemaStrLengthMatchExpression::getSerializedRightHandSide(
-    SerializationOptions opts) const {
-    return BSON(_name << opts.serializeLiteral(_strLen));
+void InternalSchemaStrLengthMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, SerializationOptions opts) const {
+    opts.appendLiteral(bob, _name, _strLen);
 }
 
 bool InternalSchemaStrLengthMatchExpression::equivalent(const MatchExpression* other) const {

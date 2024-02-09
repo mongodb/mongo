@@ -60,7 +60,7 @@ public:
      */
     virtual const fts::FTSQuery& getFTSQuery() const = 0;
 
-    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
+    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final {
         MONGO_UNREACHABLE;
     }
 

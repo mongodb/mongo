@@ -205,7 +205,7 @@ public:
     }
 
     /**
-     * Returns a BSONObj that represents the right-hand-side of a PathMatchExpression. Used for
+     * Constructs a BSONObj that represents the right-hand-side of a PathMatchExpression. Used for
      * serialization of PathMatchExpression in cases where we do not want to serialize the path in
      * line with the expression. For example {x: {$not: {$eq: 1}}}, where $eq is the
      * PathMatchExpression.
@@ -215,7 +215,14 @@ public:
      * in the example above), should be "shapified" (e.g. "?number"). 'literal' here is in contrast
      * to another expression, if that is possible syntactically.
      */
-    virtual BSONObj getSerializedRightHandSide(SerializationOptions opts = {}) const = 0;
+    virtual void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                               SerializationOptions opts = {}) const = 0;
+
+    BSONObj getSerializedRightHandSide(SerializationOptions opts = {}) const {
+        BSONObjBuilder bob;
+        appendSerializedRightHandSide(&bob, opts);
+        return bob.obj();
+    }
 
 private:
     // ElementPath holds a FieldRef, which owns the underlying path string.

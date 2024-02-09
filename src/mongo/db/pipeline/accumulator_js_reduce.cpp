@@ -197,11 +197,8 @@ void AccumulatorInternalJsReduce::reset() {
 Document AccumulatorInternalJsReduce::serialize(boost::intrusive_ptr<Expression> initializer,
                                                 boost::intrusive_ptr<Expression> argument,
                                                 SerializationOptions options) const {
-    if (options.replacementForLiteralArgs) {
-        return DOC(kName << DOC("data" << argument->serialize(options) << "eval"
-                                       << *options.replacementForLiteralArgs));
-    }
-    return DOC(kName << DOC("data" << argument->serialize(options) << "eval" << _funcSource));
+    return DOC(kName << DOC("data" << argument->serialize(options) << "eval"
+                                   << options.serializeLiteral(_funcSource)));
 }
 
 REGISTER_ACCUMULATOR(accumulator, AccumulatorJs::parse);
@@ -242,21 +239,13 @@ Document AccumulatorJs::serialize(boost::intrusive_ptr<Expression> initializer,
                                   SerializationOptions options) const {
     MutableDocument args;
 
-    args.addField("init",
-                  options.replacementForLiteralArgs ? Value(*options.replacementForLiteralArgs)
-                                                    : Value(_init));
-    args.addField("initArgs", Value(initializer->serialize(options)));
-    args.addField("accumulate",
-                  options.replacementForLiteralArgs ? Value(*options.replacementForLiteralArgs)
-                                                    : Value(_accumulate));
-    args.addField("accumulateArgs", Value(argument->serialize(options)));
-    args.addField("merge",
-                  options.replacementForLiteralArgs ? Value(*options.replacementForLiteralArgs)
-                                                    : Value(_merge));
+    args.addField("init", options.serializeLiteral(_init));
+    args.addField("initArgs", initializer->serialize(options));
+    args.addField("accumulate", options.serializeLiteral(_accumulate));
+    args.addField("accumulateArgs", argument->serialize(options));
+    args.addField("merge", options.serializeLiteral(_merge));
     if (_finalize) {
-        args.addField("finalize",
-                      options.replacementForLiteralArgs ? Value(*options.replacementForLiteralArgs)
-                                                        : Value(*_finalize));
+        args.addField("finalize", options.serializeLiteral(*_finalize));
     }
     args.addField("lang", Value("js"_sd));
     return DOC(kName << args.freeze());

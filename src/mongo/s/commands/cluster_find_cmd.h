@@ -39,8 +39,9 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/find_request_shapifier.h"
+#include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_find_key_generator.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -214,8 +215,13 @@ public:
             auto& parsedFind = parsedFindResult.second;
 
             if (!_didDoFLERewrite) {
-                query_stats::registerRequest(expCtx, expCtx->ns, [&]() {
-                    return std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedFind);
+                BSONObj queryShape = query_shape::extractQueryShape(
+                    *parsedFind,
+                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                    expCtx);
+                query_stats::registerRequest(opCtx, expCtx->ns, [&]() {
+                    return std::make_unique<query_stats::FindKeyGenerator>(
+                        expCtx, *parsedFind, std::move(queryShape));
                 });
             }
             auto cq = uassertStatusOK(CanonicalQuery::canonicalize(expCtx, std::move(parsedFind)));

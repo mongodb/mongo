@@ -97,10 +97,12 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj ElemMatchObjectMatchExpression::getSerializedRightHandSide(
-    SerializationOptions opts) const {
+void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, SerializationOptions opts) const {
+    BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
     opts.includePath = true;
-    return BSON("$elemMatch" << _sub->serialize(opts));
+    _sub->serialize(&elemMatchBob, opts);
+    elemMatchBob.doneFast();
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOptimizer() const {
@@ -164,15 +166,14 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     }
 }
 
-BSONObj ElemMatchValueMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    BSONObjBuilder emBob;
-
+void ElemMatchValueMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                                  SerializationOptions opts) const {
+    BSONObjBuilder emBob = bob->subobjStart("$elemMatch");
     opts.includePath = false;
     for (auto&& child : _subs) {
         child->serialize(&emBob, opts);
     }
-
-    return BSON("$elemMatch" << emBob.obj());
+    emBob.doneFast();
 }
 
 MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptimizer() const {
@@ -206,8 +207,9 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
     _debugStringAttachTagInfo(&debug);
 }
 
-BSONObj SizeMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    return BSON("$size" << opts.serializeLiteral(_size));
+void SizeMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                                        SerializationOptions opts) const {
+    opts.appendLiteral(bob, "$size", _size);
 }
 
 bool SizeMatchExpression::equivalent(const MatchExpression* other) const {

@@ -69,11 +69,17 @@ public:
      *
      * Field names are validated using uassertValidFieldName().
      */
-    /* implicit */ FieldPath(std::string inputPath, bool precomputeHashes = false);
-    /* implicit */ FieldPath(StringData inputPath, bool precomputeHashes = false)
-        : FieldPath(inputPath.toString(), precomputeHashes) {}
-    /* implicit */ FieldPath(const char* inputPath, bool precomputeHashes = false)
-        : FieldPath(std::string(inputPath), precomputeHashes) {}
+    /* implicit */ FieldPath(std::string inputPath,
+                             bool precomputeHashes = false,
+                             bool validateFieldNames = true);
+    /* implicit */ FieldPath(StringData inputPath,
+                             bool precomputeHashes = false,
+                             bool validateFieldNames = true)
+        : FieldPath(inputPath.toString(), precomputeHashes, validateFieldNames) {}
+    /* implicit */ FieldPath(const char* inputPath,
+                             bool precomputeHashes = false,
+                             bool validateFieldNames = true)
+        : FieldPath(std::string(inputPath), precomputeHashes, validateFieldNames) {}
 
     /**
      * Returns the number of path elements in the field path.

@@ -813,7 +813,7 @@ TEST_F(DocumentSourceGraphLookUpTest, RedactionStartWithSingleField) {
                 "connectFromField": "HASH<c>.HASH<d>",
                 "startWith": "$HASH<a>.HASH<b>",
                 "depthField": "HASH<y>",
-                "maxDepth": "?",
+                "maxDepth": "?number",
                 "restrictSearchWithMatch": {
                     "$and": [
                         {

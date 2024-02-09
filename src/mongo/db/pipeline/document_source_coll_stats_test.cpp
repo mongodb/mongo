@@ -49,7 +49,7 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
     spec.setQueryExecStats(BSONObj());
     stage = make_intrusive<DocumentSourceCollStats>(getExpCtx(), spec);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$collStats":{"count":"?","queryExecStats":"?"}})",
+        R"({"$collStats":{"count":"?object","queryExecStats":"?object"}})",
         redact(*stage));
 
     auto latencyStats = LatencyStatsSpec();
@@ -62,8 +62,8 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                 "latencyStats": {
                     "histograms": true
                 },
-                "count": "?",
-                "queryExecStats": "?"
+                "count": "?object",
+                "queryExecStats": "?object"
             }
         })",
         redact(*stage));
@@ -80,13 +80,13 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                     "histograms": true
                 },
                 "storageStats": {
-                    "scale": "?",
+                    "scale": "?number",
                     "verbose": true,
                     "waitForLock": true,
                     "numericOnly": false
                 },
-                "count": "?",
-                "queryExecStats": "?"
+                "count": "?object",
+                "queryExecStats": "?object"
             }
         })",
         redact(*stage));
@@ -102,13 +102,13 @@ TEST_F(DocumentSourceCollStatsTest, QueryShape) {
                     "histograms": true
                 },
                 "storageStats": {
-                    "scale": "?",
+                    "scale": "?number",
                     "verbose": true,
                     "waitForLock": false,
                     "numericOnly": false
                 },
-                "count": "?",
-                "queryExecStats": "?"
+                "count": "?object",
+                "queryExecStats": "?object"
             }
         })",
         redact(*stage));

@@ -1,7 +1,7 @@
 /**
- * Test that $queryStats properly applies hmac to find commands, on mongod and mongos.
+ * Test that $queryStats properly tokenizes find commands, on mongod and mongos.
  */
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 
@@ -17,29 +17,29 @@ function runTest(conn) {
 
     db.test.find({v: 1}).toArray();
 
-    let telemetry = getQueryStatsFindCmd(admin, /*transformIdentifiers*/ true);
+    let queryStats = getQueryStatsFindCmd(admin, {transformIdentifiers: true});
 
-    assert.eq(1, telemetry.length);
-    assert.eq("find", telemetry[0].key.queryShape.command);
-    assert.eq({[kHashedFieldName]: {$eq: "?number"}}, telemetry[0].key.queryShape.filter);
+    assert.eq(1, queryStats.length);
+    assert.eq("find", queryStats[0].key.queryShape.command);
+    assert.eq({[kHashedFieldName]: {$eq: "?number"}}, queryStats[0].key.queryShape.filter);
 
     db.test.insert({v: 2});
 
     const cursor = db.test.find({v: {$gt: 0, $lt: 3}}).batchSize(1);
-    telemetry = getQueryStatsFindCmd(admin, /*transformIdentifiers*/ true);
+    queryStats = getQueryStatsFindCmd(admin, {transformIdentifiers: true});
     // Cursor isn't exhausted, so there shouldn't be another entry yet.
-    assert.eq(1, telemetry.length);
+    assert.eq(1, queryStats.length);
 
     assert.commandWorked(
         db.runCommand({getMore: cursor.getId(), collection: db.test.getName(), batchSize: 2}));
 
-    telemetry = getQueryStatsFindCmd(admin, /*transformIdentifiers*/ true);
-    assert.eq(2, telemetry.length);
-    assert.eq("find", telemetry[1].key.queryShape.command);
+    queryStats = getQueryStatsFindCmd(admin, {transformIdentifiers: true});
+    assert.eq(2, queryStats.length);
+    assert.eq("find", queryStats[1].key.queryShape.command);
     assert.eq({
         "$and": [{[kHashedFieldName]: {"$gt": "?number"}}, {[kHashedFieldName]: {"$lt": "?number"}}]
     },
-              telemetry[1].key.queryShape.filter);
+              queryStats[1].key.queryShape.filter);
 }
 
 const conn = MongoRunner.runMongod({

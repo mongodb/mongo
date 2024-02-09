@@ -57,6 +57,7 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_aggregate_key_generator.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -100,7 +101,7 @@ namespace {
 // definition. It's okay that this is incorrect, we will repopulate the real namespace map on the
 // mongod. Note that this function must be called before forwarding an aggregation command on an
 // unsharded collection, in order to verify that the involved namespaces are allowed to be sharded.
-auto resolveInvolvedNamespaces(stdx::unordered_set<NamespaceString> involvedNamespaces) {
+auto resolveInvolvedNamespaces(const stdx::unordered_set<NamespaceString>& involvedNamespaces) {
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     for (auto&& nss : involvedNamespaces) {
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
@@ -278,6 +279,58 @@ std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(
     return newPipeline;
 }
 
+/**
+ * Builds an expCtx with which to parse the request's pipeline, then parses the pipeline and
+ * registers the pre-optimized pipeline with query stats collection.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
+    OperationContext* opCtx,
+    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
+    const NamespaceString& executionNss,
+    AggregateCommandRequest& request,
+    boost::optional<CollectionRoutingInfo> cri,
+    bool hasChangeStream,
+    bool shouldDoFLERewrite) {
+    // Populate the collection UUID and the appropriate collation to use.
+    auto [collationObj, uuid] = [&]() -> std::pair<BSONObj, boost::optional<UUID>> {
+        // If this is a change stream, take the user-defined collation if one exists, or an
+        // empty BSONObj otherwise. Change streams never inherit the collection's default
+        // collation, and since collectionless aggregations generally run on the 'admin'
+        // database, the standard logic would attempt to resolve its non-existent UUID and
+        // collation by sending a specious 'listCollections' command to the config servers.
+        if (hasChangeStream) {
+            return {request.getCollation().value_or(BSONObj()), boost::none};
+        }
+
+        return cluster_aggregation_planner::getCollationAndUUID(
+            opCtx,
+            cri ? boost::make_optional(cri->cm) : boost::none,
+            executionNss,
+            request.getCollation().value_or(BSONObj()));
+    }();
+
+    // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
+    // includes all involved namespaces, and creates a shared MongoProcessInterface for use by
+    // the pipeline's stages.
+    boost::intrusive_ptr<ExpressionContext> expCtx =
+        makeExpressionContext(opCtx,
+                              request,
+                              collationObj,
+                              uuid,
+                              resolveInvolvedNamespaces(involvedNamespaces),
+                              hasChangeStream);
+
+    auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+    // Skip query stats recording for queryable encryption queries.
+    if (!shouldDoFLERewrite) {
+        query_stats::registerRequest(opCtx, executionNss, [&]() {
+            return std::make_unique<query_stats::AggregateKeyGenerator>(
+                request, *pipeline, expCtx, involvedNamespaces, executionNss);
+        });
+    }
+    return pipeline;
+}
+
 }  // namespace
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -372,38 +425,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const auto pipelineBuilder = [&]() {
-        // Populate the collection UUID and the appropriate collation to use.
-        auto [collationObj, uuid] = [&]() -> std::pair<BSONObj, boost::optional<UUID>> {
-            // If this is a change stream, take the user-defined collation if one exists, or an
-            // empty BSONObj otherwise. Change streams never inherit the collection's default
-            // collation, and since collectionless aggregations generally run on the 'admin'
-            // database, the standard logic would attempt to resolve its non-existent UUID and
-            // collation by sending a specious 'listCollections' command to the config servers.
-            if (hasChangeStream) {
-                return {request.getCollation().value_or(BSONObj()), boost::none};
-            }
-
-            return cluster_aggregation_planner::getCollationAndUUID(
-                opCtx,
-                cri ? boost::make_optional(cri->cm) : boost::none,
-                namespaces.executionNss,
-                request.getCollation().value_or(BSONObj()));
-        }();
-
-        // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
-        // resolves all involved namespaces, and creates a shared MongoProcessInterface for use by
-        // the pipeline's stages.
-        expCtx = makeExpressionContext(opCtx,
-                                       request,
-                                       collationObj,
-                                       uuid,
-                                       resolveInvolvedNamespaces(involvedNamespaces),
-                                       hasChangeStream);
-
-        // Parse and optimize the full pipeline.
-        auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-
-        // TODO SERVER-77325 register the request for query stats collection
+        auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
+                                                           involvedNamespaces,
+                                                           namespaces.executionNss,
+                                                           request,
+                                                           cri,
+                                                           hasChangeStream,
+                                                           shouldDoFLERewrite);
+        expCtx = pipeline->getContext();
 
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
@@ -452,15 +481,30 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kMongosRequired);
 
     if (!expCtx) {
-        // When the AggregationTargeter chooses a "passthrough" policy, it does not call the
-        // 'pipelineBuilder' function, so we never get an expression context. Because this is a
-        // passthrough, we only need a bare minimum expression context anyway.
+        // When the AggregationTargeter chooses a "passthrough" or "specific shard only"
+        // policy, it does not call the 'pipelineBuilder' function, so we've yet to construct an
+        // expression context or register query stats. Because this is a passthrough, we only need a
+        // bare minimum expression context on mongos.
         invariant(targeter.policy ==
                       cluster_aggregation_planner::AggregationTargeter::kPassthrough ||
                   targeter.policy ==
                       cluster_aggregation_planner::AggregationTargeter::kSpecificShardOnly);
+
         expCtx = make_intrusive<ExpressionContext>(
             opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
+        expCtx->addResolvedNamespaces(involvedNamespaces);
+
+        // Skip query stats recording for queryable encryption queries.
+        if (!shouldDoFLERewrite) {
+            // We want to hold off parsing the pipeline until it's clear we must. Because of that,
+            // we wait to parse the pipeline until this callback is invoked within
+            // query_stats::registerRequest.
+            query_stats::registerRequest(opCtx, namespaces.executionNss, [&]() {
+                auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+                return std::make_unique<query_stats::AggregateKeyGenerator>(
+                    request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
+            });
+        }
     }
 
     if (request.getExplain()) {

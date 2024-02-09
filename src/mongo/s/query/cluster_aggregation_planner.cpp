@@ -367,7 +367,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     opDebug.additiveMetrics.nBatches = 1;
     CurOp::get(opCtx)->setEndOfOpMetrics(responseBuilder.numDocs());
     if (exhausted) {
-        collectQueryStatsMongos(opCtx, ccc->getRequestShapifier());
+        collectQueryStatsMongos(opCtx, ccc->getKeyGenerator());
     } else {
         collectQueryStatsMongos(opCtx, ccc);
     }

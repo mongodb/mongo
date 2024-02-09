@@ -78,7 +78,7 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
-    BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final;
 
     bool equivalent(const MatchExpression* other) const final;
 

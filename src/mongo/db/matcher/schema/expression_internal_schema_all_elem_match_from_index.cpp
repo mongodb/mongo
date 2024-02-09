@@ -76,10 +76,11 @@ void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuild
     _expression->getFilter()->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj InternalSchemaAllElemMatchFromIndexMatchExpression::getSerializedRightHandSide(
-    SerializationOptions opts) const {
-    return BSON(kName << BSON_ARRAY(opts.serializeLiteral(_index)
-                                    << _expression->getFilter()->serialize(opts)));
+void InternalSchemaAllElemMatchFromIndexMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, SerializationOptions opts) const {
+    bob->append(
+        kName,
+        BSON_ARRAY(opts.serializeLiteral(_index) << _expression->getFilter()->serialize(opts)));
 }
 
 MatchExpression::ExpressionOptimizerFunc

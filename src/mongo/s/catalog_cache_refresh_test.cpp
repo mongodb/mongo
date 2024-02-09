@@ -29,6 +29,7 @@
 
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"

@@ -103,12 +103,13 @@ feature_flags:
       cpp_varname: gFeatureFlagShardedSearchCustomSort
       default: true
       version: 7.0
-
+    
     featureFlagUserRoles:
       description: "Feature flag to enable usage of $$USER_ROLES."
       cpp_varname: gFeatureFlagUserRoles
       default: true
       version: 7.0
+
 
     featureFlagApproxPercentiles:
       description: "Feature flag to enable approximate $percentile accumulator/expression."

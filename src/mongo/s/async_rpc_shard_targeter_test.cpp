@@ -30,6 +30,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_rpc_shard_targeter.h"

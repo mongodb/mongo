@@ -187,22 +187,13 @@ Value DocumentSourceChangeStreamCheckInvalidate::serialize(SerializationOptions 
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
         sub.done();
-    } else {
-        BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (_startAfterInvalidate) {
-            if (opts.replacementForLiteralArgs) {
-                sub.append(
-                    DocumentSourceChangeStreamCheckInvalidateSpec::kStartAfterInvalidateFieldName,
-                    *opts.replacementForLiteralArgs);
-            } else {
-                DocumentSourceChangeStreamCheckInvalidateSpec spec;
-                spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
-                spec.serialize(&sub);
-            }
-        }
-        sub.done();
     }
-    return Value(builder.obj());
+    DocumentSourceChangeStreamCheckInvalidateSpec spec;
+    if (_startAfterInvalidate) {
+        spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
+    }
+    return Value(
+        Document{{DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON(opts)}});
 }
 
 }  // namespace mongo

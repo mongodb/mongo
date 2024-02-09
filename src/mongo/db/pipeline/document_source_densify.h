@@ -246,18 +246,18 @@ public:
 
     Value serialize(SerializationOptions opts) const {
         MutableDocument spec;
-        spec[kArgStep] = opts.serializeLiteralValue(_step);
+        spec[kArgStep] = opts.serializeLiteral(_step);
         spec[kArgBounds] = stdx::visit(
             OverloadedVisitor{[&](Full) { return Value(kValFull); },
                               [&](Partition) { return Value(kValPartition); },
                               [&](ExplicitBounds bounds) {
                                   return Value(std::vector<Value>(
-                                      {opts.serializeLiteralValue(bounds.first.toValue()),
-                                       opts.serializeLiteralValue(bounds.second.toValue())}));
+                                      {opts.serializeLiteral(bounds.first.toValue()),
+                                       opts.serializeLiteral(bounds.second.toValue())}));
                               }},
             _bounds);
         if (_unit)
-            spec[kArgUnit] = opts.serializeLiteralValue(serializeTimeUnit(*_unit));
+            spec[kArgUnit] = opts.serializeLiteral(serializeTimeUnit(*_unit));
         return spec.freezeToValue();
     }
 

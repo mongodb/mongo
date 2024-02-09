@@ -693,6 +693,7 @@ public:
         return getCollection();
     }
     const CollectionPtr& getCollection() const;
+    StringData getCollectionType() const;
     const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
     bool isAnySecondaryNamespaceAViewOrSharded() const;

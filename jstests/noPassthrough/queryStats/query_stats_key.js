@@ -2,7 +2,7 @@
  * This test confirms that telemetry store key fields are properly nested and none are missing.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 
@@ -60,6 +60,7 @@ function confirmAllFieldsPresent(queryStatsEntries) {
         "apiDeprecationErrors",
         "apiVersion",
         "apiStrict",
+        "collectionType",
         "client"
     ];
 
@@ -127,7 +128,7 @@ let commandObj = {
 };
 
 assert.commandWorked(testDB.runCommand(commandObj));
-let telemetry = getTelemetry(conn);
+let telemetry = getQueryStats(conn);
 assert.eq(1, telemetry.length);
 confirmAllFieldsPresent(telemetry);
 

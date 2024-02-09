@@ -33,7 +33,7 @@
 #include <functional>
 #include <queue>
 
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/query/query_stats_key_generator.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 
@@ -119,7 +119,7 @@ public:
 
     bool shouldOmitDiagnosticInformation() const final;
 
-    std::unique_ptr<query_stats::RequestShapifier> getRequestShapifier() final;
+    std::unique_ptr<query_stats::KeyGenerator> getKeyGenerator() final;
 
 private:
     bool _killed = false;

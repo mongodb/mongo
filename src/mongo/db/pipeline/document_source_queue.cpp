@@ -86,7 +86,7 @@ Value DocumentSourceQueue::serialize(SerializationOptions opts) const {
         vals << elem.getDocument().getOwned();
     }
     // We treat the queue's documents as one literal in the context of redaction.
-    return Value(DOC(kStageName << opts.serializeLiteralValue(vals.done())));
+    return Value(DOC(kStageName << opts.serializeLiteral(vals.done())));
 }
 
 }  // namespace mongo

@@ -301,35 +301,32 @@ Value DocumentSourceCurrentOp::serialize(SerializationOptions opts) const {
          Document{
              {kIdleConnectionsFieldName,
               _includeIdleConnections.has_value()
-                  ? opts.serializeLiteralValue(_includeIdleConnections.value() ==
-                                               ConnMode::kIncludeIdle)
+                  ? opts.serializeLiteral(_includeIdleConnections.value() == ConnMode::kIncludeIdle)
                   : Value()},
              {kIdleSessionsFieldName,
               _includeIdleSessions.has_value()
-                  ? opts.serializeLiteralValue(_includeIdleSessions.value() ==
-                                               SessionMode::kIncludeIdle)
+                  ? opts.serializeLiteral(_includeIdleSessions.value() == SessionMode::kIncludeIdle)
                   : Value()},
              {kAllUsersFieldName,
               _includeOpsFromAllUsers.has_value()
-                  ? opts.serializeLiteralValue(_includeOpsFromAllUsers.value() ==
-                                               UserMode::kIncludeAll)
+                  ? opts.serializeLiteral(_includeOpsFromAllUsers.value() == UserMode::kIncludeAll)
                   : Value()},
              {kLocalOpsFieldName,
               _showLocalOpsOnMongoS.has_value()
-                  ? opts.serializeLiteralValue(_showLocalOpsOnMongoS.value() ==
-                                               LocalOpsMode::kLocalMongosOps)
+                  ? opts.serializeLiteral(_showLocalOpsOnMongoS.value() ==
+                                          LocalOpsMode::kLocalMongosOps)
                   : Value()},
              {kTruncateOpsFieldName,
               _truncateOps.has_value()
-                  ? opts.serializeLiteralValue(_truncateOps.value() == TruncationMode::kTruncateOps)
+                  ? opts.serializeLiteral(_truncateOps.value() == TruncationMode::kTruncateOps)
                   : Value()},
              {kIdleCursorsFieldName,
               _idleCursors.has_value()
-                  ? opts.serializeLiteralValue(_idleCursors.value() == CursorMode::kIncludeCursors)
+                  ? opts.serializeLiteral(_idleCursors.value() == CursorMode::kIncludeCursors)
                   : Value()},
              {kBacktraceFieldName,
-              _backtrace.has_value() ? opts.serializeLiteralValue(_backtrace.value() ==
-                                                                  BacktraceMode::kIncludeBacktrace)
-                                     : Value()}}}});
+              _backtrace.has_value()
+                  ? opts.serializeLiteral(_backtrace.value() == BacktraceMode::kIncludeBacktrace)
+                  : Value()}}}});
 }
 }  // namespace mongo

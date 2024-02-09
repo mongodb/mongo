@@ -29,33 +29,51 @@
 
 #pragma once
 
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+
 namespace mongo::query_stats {
 
-/**
- * Handles shapification for FindCommandRequests.
- */
-class FindRequestShapifier final : public RequestShapifier {
+class FindKeyGenerator final : public KeyGenerator {
 public:
-    FindRequestShapifier(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const ParsedFindCommand& request)
-        : RequestShapifier(expCtx->opCtx),
-          _request(*request.findCommandRequest),
-          _initialQueryStatsKey(makeQueryStatsKey(
-              expCtx, request, SerializationOptions::kDefaultQueryShapeSerializeOptions)) {}
+    FindKeyGenerator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     const ParsedFindCommand& request,
+                     BSONObj parseableQueryShape,
+                     boost::optional<StringData> collectionType = boost::none)
+        : KeyGenerator(expCtx->opCtx, parseableQueryShape, collectionType),
+          _readConcern(
+              request.findCommandRequest->getReadConcern().has_value()
+                  ? boost::optional<BSONObj>(request.findCommandRequest->getReadConcern()->copy())
+                  : boost::none),
+          _allowPartialResults(request.findCommandRequest->getAllowPartialResults()),
+          _noCursorTimeout(request.findCommandRequest->getNoCursorTimeout()),
+          _maxTimeMS(request.findCommandRequest->getMaxTimeMS()),
+          _batchSize(request.findCommandRequest->getBatchSize()) {}
 
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              OperationContext* opCtx) const final;
 
-    BSONObj makeQueryStatsKey(const SerializationOptions& opts,
-                              const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    BSONObj generate(OperationContext* opCtx,
+                     boost::optional<SerializationOptions::TokenizeIdentifierFunc>) const final;
+
+protected:
+    int64_t doGetSize() const final {
+        return sizeof(*this) + optionalObjSize(_readConcern);
+    }
 
 private:
     BSONObj makeQueryStatsKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const ParsedFindCommand& parsedRequest,
                               const SerializationOptions& opts) const;
+
+
+    void appendCommandSpecificComponents(BSONObjBuilder& bob,
+                                         const SerializationOptions& opts) const final override;
+
+    std::unique_ptr<FindCommandRequest> reparse(OperationContext* opCtx) const;
 
     boost::intrusive_ptr<ExpressionContext> makeDummyExpCtx(
         OperationContext* opCtx, const FindCommandRequest& request) const {
@@ -70,22 +88,19 @@ private:
         return expCtx;
     }
 
-    FindCommandRequest _request;  // We make a copy of FindCommandRequest
-                                  // since this instance may outlive the original request once
-                                  // the RequestShapifier is moved to the query stats store.
-    // This is computed and cached upon construction until asked for once - at which point this
-    // transitions to boost::none. This both a performance and a memory optimization.
-    //
-    // On the performance side: we try to construct the query stats key by simply viewing the parse
-    // trees that we would build normally (rather than re-parsing each piece ourselves). We
-    // initialize this instance at the moment we have all the parsed AST pieces (e.g. the
-    // MatchExpression tree for the filter) necessary to do this, before the regular command
-    // processing path goes on to optimize or otherwise transform those pieces too much.
-    //
-    // On the memory side: we could just make a copy of each of the ASTs. But we chose to avoid
-    // this due to a limited memory budget and since we need to store the backing BSON used to parse
-    // the MatchExpression and other trees anyway - it would be redundant to copy everything here.
-    // We'll just re-parse on demand when asked.
-    mutable boost::optional<BSONObj> _initialQueryStatsKey;
+    // Preserved literal.
+    boost::optional<BSONObj> _readConcern;
+
+    // Preserved literal.
+    OptionalBool _allowPartialResults;
+
+    // Shape.
+    OptionalBool _noCursorTimeout;
+
+    // Shape.
+    boost::optional<int32_t> _maxTimeMS;
+
+    // Shape.
+    boost::optional<int64_t> _batchSize;
 };
 }  // namespace mongo::query_stats

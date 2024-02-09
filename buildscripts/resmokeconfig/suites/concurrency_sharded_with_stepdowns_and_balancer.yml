@@ -103,6 +103,7 @@ selector:
   - jstests/concurrency/fsm_workloads/indexed_insert_upsert.js
   - jstests/concurrency/fsm_workloads/indexed_insert_where.js
   - jstests/concurrency/fsm_workloads/list_indexes.js
+  - jstests/concurrency/fsm_workloads/query_stats_concurrent.js
   - jstests/concurrency/fsm_workloads/reindex.js
   - jstests/concurrency/fsm_workloads/reindex_background.js
   - jstests/concurrency/fsm_workloads/reindex_writeconflict.js

@@ -1052,7 +1052,7 @@ TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
                     {
                         "$bucketAuto": {
                             "groupBy": "$HASH<bar>.HASH<baz>",
-                            "buckets": "?",
+                            "buckets": "?number",
                             "output": {
                                 "HASH<count>": {
                                     "$sum": "?number"

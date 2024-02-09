@@ -76,8 +76,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsStoreKeyHash(CurOp::get(opCtx)->debug().queryStatsStoreKeyHash),
-      _queryStatsRequestShapifier(
-          std::move(CurOp::get(opCtx)->debug().queryStatsRequestShapifier)) {
+      _queryStatsKeyGenerator(std::move(CurOp::get(opCtx)->debug().queryStatsKeyGenerator)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -97,8 +96,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
       _queryHash(CurOp::get(opCtx)->debug().queryHash),
       _shouldOmitDiagnosticInformation(CurOp::get(opCtx)->getShouldOmitDiagnosticInformation()),
       _queryStatsStoreKeyHash(CurOp::get(opCtx)->debug().queryStatsStoreKeyHash),
-      _queryStatsRequestShapifier(
-          std::move(CurOp::get(opCtx)->debug().queryStatsRequestShapifier)) {
+      _queryStatsKeyGenerator(std::move(CurOp::get(opCtx)->debug().queryStatsKeyGenerator)) {
     dassert(!_params.compareWholeSortKeyOnRouter ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sortToApplyOnRouter == AsyncResultsMerger::kWholeSortKeySortPattern));
@@ -147,8 +145,9 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     if (_queryStatsStoreKeyHash && opCtx) {
         query_stats::writeQueryStats(opCtx,
                                      _queryStatsStoreKeyHash,
-                                     std::move(_queryStatsRequestShapifier),
+                                     std::move(_queryStatsKeyGenerator),
                                      _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                     _firstResponseExecutionTime.value_or(Microseconds{0}).count(),
                                      _metrics.nreturned.value_or(0));
     }
 
@@ -287,8 +286,8 @@ bool ClusterClientCursorImpl::shouldOmitDiagnosticInformation() const {
     return _shouldOmitDiagnosticInformation;
 }
 
-std::unique_ptr<query_stats::RequestShapifier> ClusterClientCursorImpl::getRequestShapifier() {
-    return std::move(_queryStatsRequestShapifier);
+std::unique_ptr<query_stats::KeyGenerator> ClusterClientCursorImpl::getKeyGenerator() {
+    return std::move(_queryStatsKeyGenerator);
 }
 
 }  // namespace mongo

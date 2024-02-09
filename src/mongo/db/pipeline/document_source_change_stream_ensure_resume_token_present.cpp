@@ -158,12 +158,12 @@ Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
-        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument())
+        opts.serializeLiteral(ResumeToken(_tokenFromClient).toDocument())
             .addToBsonObj(&sub, "resumeToken"_sd);
         sub.done();
     } else {
         BSONObjBuilder sub(builder.subobjStart(kStageName));
-        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument())
+        opts.serializeLiteral(ResumeToken(_tokenFromClient).toDocument())
             .addToBsonObj(&sub, "resumeToken"_sd);
         sub.done();
     }

@@ -1583,6 +1583,20 @@ const NamespaceString& AutoGetCollectionForReadCommandMaybeLockFree::getNss() co
     }
 }
 
+StringData AutoGetCollectionForReadCommandMaybeLockFree::getCollectionType() const {
+    if (auto&& view = getView()) {
+        if (view->timeseries())
+            return "timeseries"_sd;
+        return "view"_sd;
+    }
+    auto&& collection = getCollection();
+    if (!collection) {
+        return "nonExistent"_sd;
+    }
+    return "collection"_sd;
+}
+
+
 bool AutoGetCollectionForReadCommandMaybeLockFree::isAnySecondaryNamespaceAViewOrSharded() const {
     return _autoGet ? _autoGet->isAnySecondaryNamespaceAViewOrSharded()
                     : _autoGetLockFree->isAnySecondaryNamespaceAViewOrSharded();

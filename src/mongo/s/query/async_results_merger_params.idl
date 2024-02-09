@@ -86,7 +86,7 @@ structs:
                     When 'compareWholeSortKey' is true, $sortKey is a scalar value, rather than an
                     object. We extract the sort key {$sortKey: <value>}. The sort key pattern is
                     verified to be {$sortKey: 1}.
-            remotes: 
+            remotes:
                 type: array<RemoteCursor>
                 query_shape: literal
             tailableMode:
@@ -99,7 +99,7 @@ structs:
                 optional: true
                 description: The batch size for this cursor.
                 query_shape: literal
-            nss: 
+            nss:
                 type: namespacestring
                 query_shape: custom
             allowPartialResults:

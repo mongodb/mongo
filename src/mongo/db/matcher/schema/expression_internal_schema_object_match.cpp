@@ -62,9 +62,9 @@ void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
     _sub->debugString(debug, indentationLevel + 1);
 }
 
-BSONObj InternalSchemaObjectMatchExpression::getSerializedRightHandSide(
-    SerializationOptions opts) const {
-    return BSON(kName << _sub->serialize(opts));
+void InternalSchemaObjectMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, SerializationOptions opts) const {
+    bob->append(kName, _sub->serialize(opts));
 }
 
 bool InternalSchemaObjectMatchExpression::equivalent(const MatchExpression* other) const {

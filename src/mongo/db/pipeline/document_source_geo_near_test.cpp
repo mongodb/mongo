@@ -132,14 +132,14 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONPoint) {
             "$geoNear": {
                 "near": "?object",
                 "distanceField": "HASH<a>",
-                "maxDistance": "?",
-                "minDistance": "?",
+                "maxDistance": "?number",
+                "minDistance": "?number",
                 "query": {
                     "HASH<foo>": {
                         "$eq": "?string"
                     }
                 },
-                "spherical": "?"
+                "spherical": "?bool"
             }
         })",
         redact(*docSource));
@@ -162,9 +162,9 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONLineString) {
             "$geoNear": {
                 "near": "?object",
                 "distanceField": "HASH<a>",
-                "minDistance": "?",
+                "minDistance": "?number",
                 "query": {},
-                "spherical": "?"
+                "spherical": "?bool"
             }
         })",
         redact(*docSource));
@@ -196,8 +196,8 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithLegacyCoordinates) {
                         "$gt": "?number"
                     }
                 },
-                "spherical": "?",
-                "distanceMultiplier": "?",
+                "spherical": "?bool",
+                "distanceMultiplier": "?number",
                 "includeLocs": "HASH<bar>.HASH<baz>"
             }
         })",

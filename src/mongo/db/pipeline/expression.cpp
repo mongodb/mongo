@@ -87,7 +87,7 @@ Value ExpressionConstant::serializeConstant(const SerializationOptions& opts, Va
     // Other serialization policies need to include this $const in order to be unambiguous for
     // re-parsing this output later. If for example the constant was '$cashMoney' - we don't want to
     // misinterpret it as a field path when parsing.
-    return opts.serializeLiteral(Value(DOC("$const" << val)));
+    return Value(DOC("$const" << opts.serializeLiteral(val)));
 }
 
 /* --------------------------- Expression ------------------------------ */

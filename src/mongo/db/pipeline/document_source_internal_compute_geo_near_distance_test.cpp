@@ -161,7 +161,14 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, RedactsCorrectly) {
         computeGeoSpec.firstElement(), getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({$_internalComputeGeoNearDistance: {near: "?", key: "HASH<loc>", distanceField: "HASH<dist>", distanceMultiplier: "?"}})",
+        R"({
+            "$_internalComputeGeoNearDistance": {
+                "near": "?object",
+                "key": "HASH<loc>",
+                "distanceField": "HASH<dist>",
+                "distanceMultiplier": "?number"
+            }
+        })",
         redact(*geoDist, true));
 }
 

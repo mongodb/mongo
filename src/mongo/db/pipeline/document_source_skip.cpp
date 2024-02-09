@@ -73,7 +73,7 @@ DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
 }
 
 Value DocumentSourceSkip::serialize(SerializationOptions opts) const {
-    return Value(DOC(getSourceName() << opts.serializeLiteralValue(_nToSkip)));
+    return Value(DOC(getSourceName() << opts.serializeLiteral(_nToSkip)));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {

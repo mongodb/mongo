@@ -216,19 +216,14 @@ Value DocumentSourceChangeStreamCheckResumability::serialize(SerializationOption
     if (opts.verbosity) {
         BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
         sub.append("stage"_sd, kStageName);
-        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument().toBson())
+        opts.serializeLiteral(ResumeToken(_tokenFromClient).toDocument().toBson())
             .addToBsonObj(&sub, "resumeToken"_sd);
         sub.done();
     } else {
-        BSONObjBuilder sub(builder.subobjStart(kStageName));
-        if (opts.replacementForLiteralArgs) {
-            sub.append(DocumentSourceChangeStreamCheckResumabilitySpec::kResumeTokenFieldName,
-                       *opts.replacementForLiteralArgs);
-        } else {
+        builder.append(
+            kStageName,
             DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
-                .serialize(&sub);
-        }
-        sub.done();
+                .toBSON(opts));
     }
     return Value(builder.obj());
 }

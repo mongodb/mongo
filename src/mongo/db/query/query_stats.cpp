@@ -63,20 +63,6 @@ namespace mongo {
 
 namespace query_stats {
 
-/**
- * Redacts all BSONObj field names as if they were paths, unless the field name is a special hint
- * operator.
- */
-namespace {
-
-boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
-    if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-        return metadata->getApplicationName().toString();
-    }
-    return boost::none;
-}
-}  // namespace
-
 CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
 
 namespace {
@@ -242,11 +228,12 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     }
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() <= 0) {
+    auto samplingRate = queryStatsRateLimiter(serviceCtx)->getSamplingRate();
+    if (samplingRate <= 0) {
         return false;
     }
     // Check if rate limiting allows us to collect queryStats for this request.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() < INT_MAX &&
+    if (samplingRate < INT_MAX &&
         !queryStatsRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         queryStatsRateLimitedRequestsMetric.increment();
         return false;
@@ -260,8 +247,6 @@ std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
     return hashed.toString();
 }
 
-static const StringData replacementForLiteralArgs = "?"_sd;
-
 std::size_t hash(const BSONObj& obj) {
     return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
 }
@@ -269,30 +254,19 @@ std::size_t hash(const BSONObj& obj) {
 }  // namespace
 
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              TransformAlgorithm algorithm,
+                                              TransformAlgorithmEnum algorithm,
                                               std::string hmacKey) const {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementForLiteralArgs;
-    switch (algorithm) {
-        case TransformAlgorithm::kHmacSha256:
-            options.transformIdentifiers = true;
-            options.transformIdentifiersCallback = [&](StringData sd) {
-                return sha256HmacStringDataHasher(hmacKey, sd);
-            };
-            break;
-        case TransformAlgorithm::kNone:
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-    return requestShapifier->makeQueryStatsKey(options, opCtx);
+    return keyGenerator->generate(
+        opCtx,
+        algorithm == TransformAlgorithmEnum::kHmacSha256
+            ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
+                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
+            : boost::none);
 }
 
-void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<RequestShapifier>(void)> makeShapifier) {
-    auto opCtx = expCtx->opCtx;
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
     }
@@ -305,13 +279,20 @@ void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementForLiteralArgs;
     auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryStatsRequestShapifier = makeShapifier();
-    opDebug.queryStatsStoreKeyHash =
-        hash(opDebug.queryStatsRequestShapifier->makeQueryStatsKey(options, expCtx));
+
+    if (opDebug.queryStatsKeyGenerator) {
+        // A find() request may have already registered the shapifier. Ie, it's a find command over
+        // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
+        LOGV2_DEBUG(7198700,
+                    2,
+                    "Query stats request shapifier already registered",
+                    "collection"_attr = collection);
+        return;
+    }
+
+    opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
@@ -324,8 +305,9 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     std::unique_ptr<KeyGenerator> keyGenerator,
                      const uint64_t queryExecMicros,
+                     const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
     if (!queryStatsKeyHash) {
         return;
@@ -351,12 +333,11 @@ void writeQueryStats(OperationContext* opCtx,
         metrics = *statusWithMetrics.getValue();
     } else {
         tassert(7315200,
-                "requestShapifier cannot be null when writing a new entry to the telemetry store",
-                requestShapifier != nullptr);
+                "keyGenerator cannot be null when writing a new entry to the telemetry store",
+                keyGenerator != nullptr);
         size_t numEvicted =
             queryStatsStore.put(*queryStatsKeyHash,
-                                std::make_shared<QueryStatsEntry>(std::move(requestShapifier),
-                                                                  CurOp::get(opCtx)->getNSS()),
+                                std::make_shared<QueryStatsEntry>(std::move(keyGenerator)),
                                 partitionLock);
         queryStatsEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*queryStatsKeyHash);
@@ -375,9 +356,11 @@ void writeQueryStats(OperationContext* opCtx,
         metrics = newMetrics.getValue()->second;
     }
 
+    metrics->latestSeenTimestamp = Date_t::now();
     metrics->lastExecutionMicros = queryExecMicros;
     metrics->execCount++;
-    metrics->queryExecMicros.aggregate(queryExecMicros);
+    metrics->totalExecMicros.aggregate(queryExecMicros);
+    metrics->firstResponseExecMicros.aggregate(firstResponseExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
 }
 }  // namespace query_stats

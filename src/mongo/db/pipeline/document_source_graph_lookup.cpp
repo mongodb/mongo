@@ -602,11 +602,12 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
     }
 
     if (_maxDepth) {
-        spec["maxDepth"] = Value(opts.serializeLiteralValue(*_maxDepth));
+        spec["maxDepth"] = Value(opts.serializeLiteral(*_maxDepth));
     }
 
     if (_additionalFilter) {
-        if (opts.transformIdentifiers || opts.replacementForLiteralArgs) {
+        if (opts.transformIdentifiers ||
+            opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
             auto matchExpr =
                 uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
             spec["restrictSearchWithMatch"] = Value(matchExpr->serialize(opts));
@@ -620,7 +621,7 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
         spec["unwinding"] =
             Value(DOC("preserveNullAndEmptyArrays"
-                      << opts.serializeLiteralValue((*_unwind)->preserveNullAndEmptyArrays())
+                      << opts.serializeLiteral((*_unwind)->preserveNullAndEmptyArrays())
                       << "includeArrayIndex"
                       << (indexPath ? Value(opts.serializeFieldPath(*indexPath)) : Value())));
     }

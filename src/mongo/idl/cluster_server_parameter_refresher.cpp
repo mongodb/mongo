@@ -32,6 +32,7 @@
 #include "mongo/idl/cluster_server_parameter_refresher.h"
 
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/list_databases_for_all_tenants_gen.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/idl/cluster_server_parameter_common.h"

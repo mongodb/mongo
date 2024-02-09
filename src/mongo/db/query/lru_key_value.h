@@ -114,7 +114,7 @@ public:
         clear();
     }
 
-    typedef std::pair<K, V> KVListEntry;
+    typedef std::pair<const K*, V> KVListEntry;
 
     typedef std::list<KVListEntry> KVList;
     typedef typename KVList::iterator KVListIt;
@@ -145,8 +145,9 @@ public:
         }
 
         _budgetTracker.onAdd(key, entry);
-        _kvList.push_front(std::make_pair(key, std::move(entry)));
+        _kvList.push_front(std::make_pair(nullptr, std::move(entry)));
         _kvMap[key] = _kvList.begin();
+        _kvList.begin()->first = &(_kvMap.find(key)->first);
 
         return evict();
     }
@@ -164,10 +165,11 @@ public:
         KVListIt found = i->second;
 
         // Promote the kv-store entry to the front of the list. It is now the most recently used.
-        _kvList.push_front(std::make_pair(key, std::move(found->second)));
+        _kvList.push_front(std::make_pair(nullptr, std::move(found->second)));
         _kvMap.erase(i);
         _kvList.erase(found);
         _kvMap[key] = _kvList.begin();
+        _kvList.begin()->first = &(_kvMap.find(key)->first);
 
         return _kvList.begin();
     }
@@ -196,9 +198,9 @@ public:
     size_t removeIf(KeyValuePredicate predicate) {
         size_t removed = 0;
         for (auto it = _kvList.begin(); it != _kvList.end();) {
-            if (predicate(it->first, *it->second)) {
-                _budgetTracker.onRemove(it->first, it->second);
-                _kvMap.erase(it->first);
+            if (predicate(*it->first, *it->second)) {
+                _budgetTracker.onRemove(*it->first, it->second);
+                _kvMap.erase(*it->first);
                 it = _kvList.erase(it);
                 ++removed;
             } else {
@@ -261,8 +263,8 @@ private:
         while (_budgetTracker.isOverBudget()) {
             invariant(!_kvList.empty());
 
-            _budgetTracker.onRemove(_kvList.back().first, _kvList.back().second);
-            _kvMap.erase(_kvList.back().first);
+            _budgetTracker.onRemove(*_kvList.back().first, _kvList.back().second);
+            _kvMap.erase(*_kvList.back().first);
             _kvList.pop_back();
 
             ++nEvicted;

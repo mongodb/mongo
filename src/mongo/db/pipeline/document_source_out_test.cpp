@@ -139,8 +139,8 @@ TEST_F(DocumentSourceOutTest, RedactionTimeseries) {
                 db: "foo",
                 coll: "bar",
                 timeseries: {
-                    timeField: "time", 
-                    metaField: "meta", 
+                    timeField: "time",
+                    metaField: "meta",
                     granularity: "minutes",
                     bucketRoundingSeconds: 300,
                     bucketMaxSpanSeconds: 300
@@ -150,15 +150,15 @@ TEST_F(DocumentSourceOutTest, RedactionTimeseries) {
     auto docSource = DocumentSourceOut::createFromBson(spec.firstElement(), getExpCtx());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
-            $out: {
-                coll: "HASH<bar>",
-                db: "HASH<foo>",
-                timeseries: {
-                    timeField: "HASH<time>",
-                    metaField: "HASH<meta>",
-                    granularity: "minutes",
-                    bucketRoundingSeconds: "?",
-                    bucketMaxSpanSeconds: "?"
+            "$out": {
+                "coll": "HASH<bar>",
+                "db": "HASH<foo>",
+                "timeseries": {
+                    "timeField": "HASH<time>",
+                    "metaField": "HASH<meta>",
+                    "granularity": "minutes",
+                    "bucketRoundingSeconds": "?number",
+                    "bucketMaxSpanSeconds": "?number"
                 }
             }
         })",

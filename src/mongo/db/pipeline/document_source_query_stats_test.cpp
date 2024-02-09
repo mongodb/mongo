@@ -81,7 +81,7 @@ TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfUnrecognisedParameterSpe
     ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(
                            fromjson("{$queryStats: {foo: true}}").firstElement(), getExpCtx()),
                        AssertionException,
-                       ErrorCodes::FailedToParse);
+                       40415);
 }
 
 TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {
@@ -92,5 +92,44 @@ TEST_F(DocumentSourceQueryStatsTest, ParseAndSerialize) {
     ASSERT_DOCUMENT_EQ(queryStatsOp->serialize().getDocument(), expected);
 }
 
+TEST_F(DocumentSourceQueryStatsTest, ShouldFailToParseIfAlgorithmIsNotSupported) {
+    auto obj = fromjson(R"({
+        $queryStats: {
+            transformIdentifiers: {
+                algorithm: "randomalgo"
+            }
+        }
+    })");
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceQueryStatsTest,
+       ShouldFailToParseIfTransformIdentifiersSpecifiedButEmptyAlgorithm) {
+    auto obj = fromjson(R"({
+        $queryStats: {
+            transformIdentifiers: {
+                algorithm: ""
+            }
+        }
+    })");
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceQueryStatsTest,
+       ShouldFailToParseIfTransformIdentifiersSpecifiedButNoAlgorithm) {
+    auto obj = fromjson(R"({
+        $queryStats: {
+            transformIdentifiers: {
+            }
+        }
+    })");
+    ASSERT_THROWS_CODE(DocumentSourceQueryStats::createFromBson(obj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       40414);
+}
 }  // namespace
 }  // namespace mongo

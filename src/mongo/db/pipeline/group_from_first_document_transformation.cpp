@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/group_from_first_document_transformation.h"
 
+#include "mongo/db/pipeline/expression_dependencies.h"
+
 namespace mongo {
 Document GroupFromFirstDocumentTransformation::applyTransformation(const Document& input) {
     MutableDocument output(_accumulatorExprs.size());

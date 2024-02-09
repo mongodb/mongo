@@ -74,7 +74,7 @@ string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
     return str::stream() << prefix << "." << suffix;
 }
 
-FieldPath::FieldPath(std::string inputPath, bool precomputeHashes)
+FieldPath::FieldPath(std::string inputPath, bool precomputeHashes, bool validateFieldNames)
     : _fieldPath(std::move(inputPath)), _fieldPathDotPosition{string::npos} {
     uassert(40352, "FieldPath cannot be constructed with empty string", !_fieldPath.empty());
     uassert(40353, "FieldPath must not end with a '.'.", _fieldPath[_fieldPath.size() - 1] != '.');
@@ -97,7 +97,9 @@ FieldPath::FieldPath(std::string inputPath, bool precomputeHashes)
     _fieldHash.reserve(pathLength);
     for (size_t i = 0; i < pathLength; ++i) {
         const auto& fieldName = getFieldName(i);
-        uassertValidFieldName(fieldName);
+        if (validateFieldNames) {
+            uassertValidFieldName(fieldName);
+        }
         _fieldHash.push_back(precomputeHashes ? FieldNameHasher()(fieldName) : kHashUninitialized);
     }
 }
@@ -106,7 +108,6 @@ void FieldPath::uassertValidFieldName(StringData fieldName) {
     uassert(15998, "FieldPath field names may not be empty strings.", !fieldName.empty());
 
     const auto dotsAndDollarsHint = " Consider using $getField or $setField.";
-
     if (fieldName[0] == '$' && !kAllowedDollarPrefixedFields.count(fieldName)) {
         uasserted(16410,
                   str::stream() << "FieldPath field names may not start with '$'."

@@ -71,10 +71,10 @@ void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
     _debugStringAttachTagInfo(&debug);
 }
 
-BSONObj InternalSchemaFmodMatchExpression::getSerializedRightHandSide(
-    SerializationOptions opts) const {
-    return BSON("$_internalSchemaFmod"_sd << BSON_ARRAY(opts.serializeLiteral(_divisor)
-                                                        << opts.serializeLiteral(_remainder)));
+void InternalSchemaFmodMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, SerializationOptions opts) const {
+    bob->append("$_internalSchemaFmod"_sd,
+                BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }
 
 bool InternalSchemaFmodMatchExpression::equivalent(const MatchExpression* other) const {

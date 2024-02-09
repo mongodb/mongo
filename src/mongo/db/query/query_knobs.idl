@@ -1055,6 +1055,14 @@ server_parameters:
     validator:
       callback: query_stats_util::validateQueryStatsStoreSize
 
+  internalQueryStatsErrorsAreCommandFatal:
+    description: "Whether errors in the $queryStats stage cause the aggregation pipeline to
+      immediately fail and report the error. Note that this is always the case for debug builds."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryStatsErrorsAreCommandFatal"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
   internalQueryColumnScanMinCollectionSizeBytes:
     description: "The min collection size threshold for which column scan will always be allowed. If
       the value is -1, decision will be made based on the size of available memory. If it is set to

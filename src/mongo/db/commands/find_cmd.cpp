@@ -51,10 +51,11 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_find_key_generator.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
@@ -127,6 +128,7 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
  */
 std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     OperationContext* opCtx,
+    const AutoGetCollectionForReadCommandMaybeLockFree& ctx,
     const NamespaceString& nss,
     BSONObj requestBody,
     std::unique_ptr<FindCommandRequest> findCommand,
@@ -145,12 +147,20 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
                                    extensionsCallback,
                                    MatchExpressionParser::kAllowAllSpecialFeatures));
 
-    // Register query stats collection. Exclude queries against non-existent collections and
-    // collections with encrypted fields. It is important to do this before canonicalizing and
-    // optimizing the query, each of which would alter the query shape.
-    if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
-        query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
-            return std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedRequest);
+    // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
+    // $$USER_ROLES for the find command.
+    expCtx->setUserRoles();
+    // Register query stats collection. Exclude queries against collections with encrypted fields.
+    // It is important to do this before canonicalizing and optimizing the query, each of which
+    // would alter the query shape.
+    if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
+        query_stats::registerRequest(opCtx, nss, [&]() {
+            BSONObj queryShape = query_shape::extractQueryShape(
+                *parsedRequest,
+                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                expCtx);
+            return std::make_unique<query_stats::FindKeyGenerator>(
+                expCtx, *parsedRequest, std::move(queryShape), ctx.getCollectionType());
         });
     }
 
@@ -539,11 +549,7 @@ public:
             }
 
             auto cq = parseQueryAndBeginOperation(
-                opCtx, nss, _request.body, std::move(findCommand), collection);
-
-            // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
-            // $$USER_ROLES for the find command.
-            cq->getExpCtx()->setUserRoles();
+                opCtx, *ctx, nss, _request.body, std::move(findCommand), collection);
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.

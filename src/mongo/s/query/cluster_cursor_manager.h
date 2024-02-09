@@ -605,7 +605,7 @@ private:
  * getMore requests), so these should only be called from those request paths.
  */
 void collectQueryStatsMongos(OperationContext* opCtx,
-                             std::unique_ptr<query_stats::RequestShapifier> requestShapifier);
+                             std::unique_ptr<query_stats::KeyGenerator> keyGenerator);
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor);
 void collectQueryStatsMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor);
 

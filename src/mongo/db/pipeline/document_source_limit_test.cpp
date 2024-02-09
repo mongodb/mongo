@@ -163,13 +163,9 @@ TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
 
 TEST_F(DocumentSourceLimitTest, RedactsCorrectly) {
     auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = "?"_sd;
-    std::vector<Value> vec;
-    limit->serializeToArray(vec, opts);
     ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$limit: \"?\"}",
-        vec[0]);
+        "{ $limit: \"?number\" }",
+        redact(*limit));
 }
 
 }  // namespace

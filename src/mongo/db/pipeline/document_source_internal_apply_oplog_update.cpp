@@ -99,7 +99,7 @@ DocumentSource::GetNextResult DocumentSourceInternalApplyOplogUpdate::doGetNext(
 
 Value DocumentSourceInternalApplyOplogUpdate::serialize(SerializationOptions opts) const {
     return Value(Document{
-        {kStageName, Document{{kOplogUpdateFieldName, opts.serializeLiteralValue(_oplogUpdate)}}}});
+        {kStageName, Document{{kOplogUpdateFieldName, opts.serializeLiteral(_oplogUpdate)}}}});
 }
 
 }  // namespace mongo

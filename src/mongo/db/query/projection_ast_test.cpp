@@ -779,7 +779,6 @@ std::string applyHmacForTest(StringData s) {
 
 TEST_F(ProjectionASTTest, TestASTRedaction) {
     SerializationOptions options;
-    options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.transformIdentifiers = true;
     options.transformIdentifiersCallback = applyHmacForTest;
@@ -822,14 +821,14 @@ TEST_F(ProjectionASTTest, TestASTRedaction) {
     proj = fromjson("{a: {$slice: 1}}");
     output = projection_ast::serialize(*parseWithFindFeaturesEnabled(proj).root(), options);
     ASSERT_BSONOBJ_EQ_AUTO(  //
-        R"({"HASH<a>":{"$slice":"?"}})",
+        R"({"HASH<a>":{"$slice":"?number"}})",
         output);
 
     // Slice (second form)
     proj = fromjson("{a: {$slice: [1, 3]}}");
     output = projection_ast::serialize(*parseWithFindFeaturesEnabled(proj).root(), options);
     ASSERT_BSONOBJ_EQ_AUTO(  //
-        R"({"HASH<a>":{"$slice":["?","?"]}})",
+        R"({"HASH<a>":{"$slice":["?number","?number"]}})",
         output);
 
     /// $meta projection

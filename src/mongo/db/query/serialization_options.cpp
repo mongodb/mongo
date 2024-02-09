@@ -307,8 +307,10 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
 
 }  // namespace
 
-// TODO SERVER-76329 use the new policy.
-const SerializationOptions SerializationOptions::kDefaultQueryShapeSerializeOptions =
+const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerializeOptions =
+    SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+
+const SerializationOptions SerializationOptions::kDebugQueryShapeSerializeOptions =
     SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
 // Overloads for BSONElem and Value.
@@ -365,24 +367,17 @@ Value SerializationOptions::serializeLiteral(const ImplicitValue& v) const {
 
 std::string SerializationOptions::serializeFieldPathFromString(StringData path) const {
     if (transformIdentifiers) {
-        // Some valid field names are considered invalid as a FieldPath (for example, fields
-        // like "foo.$bar" where a sub-component is prefixed with "$"). For now, if
-        // serializeFieldPath errors due to an "invalid" field name, we'll serialize that field
-        // name with this placeholder.
-        // TODO SERVER-75623 Implement full redaction for all field names and remove placeholder
         try {
-            return serializeFieldPath(path);
+            return serializeFieldPath(FieldPath(path, false, false));
         } catch (DBException& ex) {
-            LOGV2_DEBUG(
-                7549808,
-                1,
-                "Failed to convert a path string to a FieldPath, so replacing with placeholder",
-                "pathString"_attr = path,
-                "failure"_attr = ex.toStatus());
-            return serializeFieldPath("dollarPlaceholder");
+            LOGV2_DEBUG(7549808,
+                        1,
+                        "Failed to convert a path string to a FieldPath",
+                        "pathString"_attr = path,
+                        "failure"_attr = ex.toStatus());
+            return serializeFieldPath("invalidFieldPathPlaceholder");
         }
     }
     return path.toString();
 }
-
 }  // namespace mongo

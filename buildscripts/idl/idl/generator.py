@@ -2164,7 +2164,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             'builder->append(${field_name}, ${expression});')
                     elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
                         self._writer.write_template(
-                            'options.serializeLiteralValue(${expression}).serializeForIDL(${field_name}, builder);'
+                            'options.serializeLiteral(${expression}).serializeForIDL(${field_name}, builder);'
                         )
                     elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
                         self._writer.write_template(
@@ -2321,7 +2321,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                 'builder->append(${field_name}, ${expression});')
                         elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
                             self._writer.write_template(
-                                'options.serializeLiteralValue(${expression}).serializeForIDL(${field_name}, builder);'
+                                'options.serializeLiteral(${expression}).serializeForIDL(${field_name}, builder);'
                             )
                         elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
                             self._writer.write_template(
@@ -2335,7 +2335,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                 'idl::idlSerialize(builder, ${field_name}, value);')
                         elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
                             self._writer.write_template(
-                                'options.serializeLiteralValue(value).serializeForIDL(${field_name}, builder);'
+                                'options.serializeLiteral(value).serializeForIDL(${field_name}, builder);'
                             )
                         elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
                             self._writer.write_template(
@@ -2381,9 +2381,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             'builder->append(%s, %s);' % (_get_field_constant_name(field),
                                                           _access_member(field)))
                     elif field.query_shape == ast.QueryShapeFieldType.LITERAL:
+                        # serializeLiteral expects an ImplicitValue, which can't be constructed with an int64_t
+                        expression_cast = ""
+                        if field.type.cpp_type == "std::int64_t":
+                            expression_cast = "(long long)"
                         self._writer.write_line(
-                            'options.serializeLiteralValue(%s).serializeForIDL(%s, builder);' %
-                            (_access_member(field), _get_field_constant_name(field)))
+                            'options.serializeLiteral(%s%s).serializeForIDL(%s, builder);'
+                            % (expression_cast, _access_member(field),
+                               _get_field_constant_name(field)))
                     elif field.query_shape == ast.QueryShapeFieldType.ANONYMIZE:
                         self._writer.write_line(
                             'builder->append(%s, options.serializeFieldPathFromString(%s));' %

@@ -84,7 +84,7 @@ DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
 }
 
 Value DocumentSourceSample::serialize(SerializationOptions opts) const {
-    return Value(DOC(kStageName << DOC("size" << opts.serializeLiteralValue(_size))));
+    return Value(DOC(kStageName << DOC("size" << opts.serializeLiteral(_size))));
 }
 
 namespace {

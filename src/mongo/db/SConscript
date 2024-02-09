@@ -1586,6 +1586,7 @@ env.Library(
         'matcher/expression_array.cpp',
         'matcher/expression_expr.cpp',
         'matcher/expression_geo.cpp',
+        'matcher/expression_geo_serializer.cpp',
         'matcher/expression_internal_bucket_geo_within.cpp',
         'matcher/expression_leaf.cpp',
         'matcher/expression_parameterization.cpp',

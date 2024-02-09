@@ -146,7 +146,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
 }
 
 Value DocumentSourceSampleFromRandomCursor::serialize(SerializationOptions opts) const {
-    return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteralValue(_size))));
+    return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteral(_size))));
 }
 
 DepsTracker::State DocumentSourceSampleFromRandomCursor::getDependencies(DepsTracker* deps) const {

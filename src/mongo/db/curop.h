@@ -40,7 +40,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/query/query_stats_key_generator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/write_concern_options.h"
@@ -295,9 +295,8 @@ public:
     // The shape of the original query serialized with readConcern, application name, and namespace.
     // If boost::none, query stats should not be collected for this operation.
     boost::optional<std::size_t> queryStatsStoreKeyHash;
-    // The RequestShapifier used by query stats to shapify the request payload into the query stats
-    // store key.
-    std::unique_ptr<query_stats::RequestShapifier> queryStatsRequestShapifier;
+    // The KeyGenerator used by query stats to generate the query stats store key.
+    std::unique_ptr<query_stats::KeyGenerator> queryStatsKeyGenerator;
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};

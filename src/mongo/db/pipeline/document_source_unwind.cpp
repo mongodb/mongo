@@ -297,7 +297,7 @@ Value DocumentSourceUnwind::serialize(SerializationOptions opts) const {
     return Value(DOC(
         getSourceName() << DOC(
             "path" << opts.serializeFieldPathWithPrefix(_unwindPath) << "preserveNullAndEmptyArrays"
-                   << (_preserveNullAndEmptyArrays ? opts.serializeLiteralValue(true) : Value())
+                   << (_preserveNullAndEmptyArrays ? opts.serializeLiteral(true) : Value())
                    << "includeArrayIndex"
                    << (_indexPath ? Value(opts.serializeFieldPath(*_indexPath)) : Value()))));
 }

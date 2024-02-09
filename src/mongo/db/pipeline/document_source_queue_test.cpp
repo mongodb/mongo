@@ -83,9 +83,7 @@ TEST_F(QueueStageTest, RedactsCorrectly) {
     auto queueStage = DocumentSourceQueue::createFromBson(queueDoc.firstElement(), getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            $queue: "?"
-        })",
+        R"({"$queue":"?array<?object>"})",
         redact(*queueStage));
 }
 

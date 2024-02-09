@@ -503,9 +503,9 @@ public:
         MutableDocument subObj;
         tassert(5433604, "ExpMovingAvg neither N nor alpha was set", _N || _alpha);
         if (_N) {
-            subObj[kNArg] = opts.serializeLiteralValue(_N.get());
+            subObj[kNArg] = opts.serializeLiteral(_N.get());
         } else {
-            subObj[kAlphaArg] = opts.serializeLiteralValue(_alpha.get());
+            subObj[kAlphaArg] = opts.serializeLiteral(_alpha.get());
         }
         subObj[kInputArg] = _input->serialize(opts);
         MutableDocument outerObj;

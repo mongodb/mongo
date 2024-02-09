@@ -193,10 +193,10 @@ TEST_F(DocumentSourceCurrentOpTest,
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$currentOp": {
-                "idleConnections": "?",
-                "idleSessions": "?",
-                "allUsers": "?",
-                "localOps": "?"
+                "idleConnections": "?bool",
+                "idleSessions": "?bool",
+                "allUsers": "?bool",
+                "localOps": "?bool"
             }
         })",
         redact(*docSource));

@@ -1,8 +1,8 @@
 /**
- * Test that applicationName and namespace appear in telemetry for the find command.
+ * Test that applicationName and namespace appear in queryStats for the find command.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 
@@ -10,7 +10,7 @@ const kApplicationName = "MongoDB Shell";
 const kHashedCollName = "w6Ax20mVkbJu4wQWAMjL8Sl+DfXAr2Zqdc3kJRB7Oo0=";
 const kHashedFieldName = "lU7Z0mLRPRUL+RfAD5jhYPRRpXBsZBxS/20EzDwfOG4=";
 
-// Turn on the collecting of telemetry metrics.
+// Turn on the collecting of queryStats metrics.
 let options = {
     setParameter: {internalQueryStatsRateLimit: -1},
 };
@@ -27,13 +27,13 @@ coll.insert({v: 3});
 
 coll.find({v: 1}).toArray();
 
-let telemetry = getTelemetry(conn);
-assert.eq(1, telemetry.length, telemetry);
-assert.eq(kApplicationName, telemetry[0].key.client.application.name, telemetry);
+let queryStats = getQueryStats(conn);
+assert.eq(1, queryStats.length, queryStats);
+assert.eq(kApplicationName, queryStats[0].key.client.application.name, queryStats);
 
-telemetry = getQueryStatsFindCmd(conn, true);
-assert.eq(1, telemetry.length, telemetry);
-assert.eq(kApplicationName, telemetry[0].key.client.application.name, telemetry);
+queryStats = getQueryStatsFindCmd(conn, {transformIdentifiers: true});
+assert.eq(1, queryStats.length, queryStats);
+assert.eq(kApplicationName, queryStats[0].key.client.application.name, queryStats);
 
 MongoRunner.stopMongod(conn);
 }());

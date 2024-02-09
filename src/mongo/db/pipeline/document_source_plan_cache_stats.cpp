@@ -62,7 +62,8 @@ void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
     if (opts.verbosity) {
         tassert(7513100,
                 "$planCacheStats is not equipped to serialize in explain mode with redaction on",
-                !opts.transformIdentifiers && !opts.replacementForLiteralArgs);
+                !opts.transformIdentifiers &&
+                    opts.literalPolicy == LiteralSerializationPolicy::kUnchanged);
         array.push_back(Value{
             Document{{kStageName,
                       Document{{"match"_sd,

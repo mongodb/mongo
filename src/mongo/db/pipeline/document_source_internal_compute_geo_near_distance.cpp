@@ -144,13 +144,13 @@ DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext()
 Value DocumentSourceInternalGeoNearDistance::serialize(SerializationOptions opts) const {
     MutableDocument out;
     out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName,
-                 opts.serializeLiteralValue(_coords));
+                 opts.serializeLiteral(_coords));
     out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName,
                  Value(opts.serializeFieldPathFromString(_key)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName,
                  Value(opts.serializeFieldPath(_distanceField)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName,
-                 opts.serializeLiteralValue(_distanceMultiplier));
+                 opts.serializeLiteral(_distanceMultiplier));
 
     return Value(DOC(getSourceName() << out.freeze()));
 }

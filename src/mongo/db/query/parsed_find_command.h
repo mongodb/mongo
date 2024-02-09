@@ -42,6 +42,19 @@ namespace mongo {
  * still raw BSONObj on the FindCommandRequest type.
  */
 struct ParsedFindCommand {
+    ParsedFindCommand() = default;
+
+    /**
+     * This API adds the ability to construct from a pre-parsed filter. The other arguments will be
+     * re-parsed again from BSON on the 'findCommandRequest' argument, since we don't have a good
+     * way of cloning them.
+     */
+    static StatusWith<std::unique_ptr<ParsedFindCommand>> withExistingFilter(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::unique_ptr<CollatorInterface> collator,
+        std::unique_ptr<MatchExpression> filter,
+        std::unique_ptr<FindCommandRequest> findCommandRequest);
+
     std::unique_ptr<CollatorInterface> collator;
     std::unique_ptr<MatchExpression> filter;
     boost::optional<projection_ast::Projection> proj;
@@ -80,7 +93,6 @@ namespace parsed_find_command {
  */
 StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
                                         const FindCommandRequest& findCommand);
-
 
 /**
  * Parses each big component of the input 'findCommand.' Throws exceptions if failing to parse.

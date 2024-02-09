@@ -70,7 +70,7 @@ Value serializeBound(const WindowBounds::Bound<T>& bound, SerializationOptions o
             [&](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
             [&](const T& n) {
                 // If not "unbounded" or "current", n must be a literal constant
-                return opts.serializeLiteralValue(n);
+                return opts.serializeLiteral(n);
             },
         },
         bound);
@@ -239,8 +239,8 @@ void WindowBounds::serialize(MutableDocument& args, SerializationOptions opts) c
                             serializeBound(rangeBounds.upper, opts),
                         }};
                         if (rangeBounds.unit) {
-                            args[kArgUnit] = Value{
-                                opts.serializeLiteralValue(serializeTimeUnit(*rangeBounds.unit))};
+                            args[kArgUnit] =
+                                opts.serializeLiteral(serializeTimeUnit(*rangeBounds.unit));
                         }
                     },
                 },

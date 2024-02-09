@@ -145,8 +145,11 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::makeForSubplanner(
     // Make the CQ we'll hopefully return.
     auto cq = std::make_unique<CanonicalQuery>();
     cq->setExplain(baseQuery.getExplain());
-
-    auto swParsedFind = parsed_find_command::parse(baseQuery.getExpCtx(), std::move(findCommand));
+    auto swParsedFind = ParsedFindCommand::withExistingFilter(
+        baseQuery.getExpCtx(),
+        baseQuery.getCollator() ? baseQuery.getCollator()->clone() : nullptr,
+        root->clone(),
+        std::move(findCommand));
     if (!swParsedFind.isOK()) {
         return swParsedFind.getStatus();
     }

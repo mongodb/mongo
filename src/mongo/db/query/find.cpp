@@ -127,7 +127,7 @@ void endQueryOp(OperationContext* opCtx,
     if (cursor) {
         collectQueryStatsMongod(opCtx, *cursor);
     } else {
-        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsRequestShapifier));
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKeyGenerator));
     }
 
     if (collection) {

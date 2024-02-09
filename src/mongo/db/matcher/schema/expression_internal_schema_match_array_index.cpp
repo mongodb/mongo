@@ -66,13 +66,13 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
         _expression->equivalent(other->_expression.get());
 }
 
-BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide(
-    SerializationOptions opts) const {
-    return BSON(
-        kName << BSON(
-            "index" << opts.serializeLiteral(_index) << "namePlaceholder"
-                    << opts.serializeFieldPathFromString(_expression->getPlaceholder().value_or(""))
-                    << "expression" << _expression->getFilter()->serialize(opts)));
+void InternalSchemaMatchArrayIndexMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, SerializationOptions opts) const {
+    bob->append(kName,
+                BSON("index" << opts.serializeLiteral(_index) << "namePlaceholder"
+                             << opts.serializeFieldPathFromString(
+                                    _expression->getPlaceholder().value_or(""))
+                             << "expression" << _expression->getFilter()->serialize(opts)));
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::clone() const {

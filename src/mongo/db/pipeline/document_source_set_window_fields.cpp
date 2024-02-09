@@ -307,14 +307,14 @@ Value DocumentSourceInternalSetWindowFields::serialize(SerializationOptions opts
         MutableDocument md;
 
         for (auto&& [fieldName, function] : _executableOutputs) {
-            md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteralValue(
+            md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteral(
                 static_cast<long long>(_memoryTracker[fieldName].maxMemoryBytes()));
         }
 
         out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
         out["maxTotalMemoryUsageBytes"] =
-            opts.serializeLiteralValue(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
-        out["usedDisk"] = opts.serializeLiteralValue(_iterator.usedDisk());
+            opts.serializeLiteral(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
+        out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());
     }
 
     return Value(out.freezeToValue());

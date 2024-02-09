@@ -3822,7 +3822,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
         R"({
             "field": {
                 "$getField": {
-                    "field": "HASH<dollarPlaceholder>",
+                    "field": "HASH<a>.HASH<$b>.HASH<c>",
                     "input": "$$CURRENT"
                 }
             }
@@ -3838,7 +3838,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
         R"({
             "field": {
                 "$getField": {
-                    "field": "HASH<dollarPlaceholder>",
+                    "field": "HASH<invalidFieldPathPlaceholder>",
                     "input": "$$CURRENT"
                 }
             }

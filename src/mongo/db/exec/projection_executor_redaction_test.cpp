@@ -64,7 +64,6 @@ std::string applyHmacForTest(StringData s) {
 
 TEST(Redaction, ProjectionTest) {
     SerializationOptions options;
-    options.replacementForLiteralArgs = "?";
     options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.transformIdentifiers = true;
 

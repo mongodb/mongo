@@ -507,17 +507,17 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
         out.addField(timeseries::kMetaFieldName,
                      Value{opts.serializeFieldPathFromString(*spec.metaField())});
     }
-    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteralValue(Value{_bucketMaxSpanSeconds}));
+    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteral(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
         out.addField(kAssumeNoMixedSchemaData,
-                     opts.serializeLiteralValue(Value(_assumeNoMixedSchemaData)));
+                     opts.serializeLiteral(Value(_assumeNoMixedSchemaData)));
 
     if (spec.usesExtendedRange()) {
         // Include this flag so that 'explain' is more helpful.
         // But this is not so useful for communicating from one process to another,
         // because mongos and/or the primary shard don't know whether any other shard
         // has extended-range data.
-        out.addField(kUsesExtendedRange, opts.serializeLiteralValue(Value{true}));
+        out.addField(kUsesExtendedRange, opts.serializeLiteral(Value{true}));
     }
 
     if (!spec.computedMetaProjFields().empty())
@@ -535,11 +535,11 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
 
     if (_bucketUnpacker.includeMinTimeAsMetadata()) {
         out.addField(kIncludeMinTimeAsMetadata,
-                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
     }
     if (_bucketUnpacker.includeMaxTimeAsMetadata()) {
         out.addField(kIncludeMaxTimeAsMetadata,
-                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
+                     opts.serializeLiteral(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
     }
 
     if (_wholeBucketFilter) {
@@ -558,8 +558,8 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     } else {
         if (_sampleSize) {
             out.addField("sample",
-                         opts.serializeLiteralValue(Value{static_cast<long long>(*_sampleSize)}));
-            out.addField("bucketMaxCount", opts.serializeLiteralValue(Value{_bucketMaxCount}));
+                         opts.serializeLiteral(Value{static_cast<long long>(*_sampleSize)}));
+            out.addField("bucketMaxCount", opts.serializeLiteral(Value{_bucketMaxCount}));
         }
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
     }

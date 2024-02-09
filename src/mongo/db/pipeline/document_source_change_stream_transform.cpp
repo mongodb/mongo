@@ -113,7 +113,7 @@ void serializeSpecField(BSONObjBuilder* builder,
                         const StringData& fieldName,
                         const boost::optional<T>& value) {
     if (value) {
-        opts.serializeLiteralValue((*value).toBSON()).addToBsonObj(builder, fieldName);
+        opts.serializeLiteral((*value).toBSON()).addToBsonObj(builder, fieldName);
     }
 }
 
@@ -123,7 +123,7 @@ void serializeSpecField(BSONObjBuilder* builder,
                         const StringData& fieldName,
                         const boost::optional<Timestamp>& value) {
     if (value) {
-        opts.serializeLiteralValue(*value).addToBsonObj(builder, fieldName);
+        opts.serializeLiteral(*value).addToBsonObj(builder, fieldName);
     }
 }
 
@@ -132,7 +132,7 @@ void serializeSpecField(BSONObjBuilder* builder,
                         SerializationOptions opts,
                         const StringData& fieldName,
                         const T& value) {
-    opts.serializeLiteralValue(value).addToBsonObj(builder, fieldName);
+    opts.appendLiteral(builder, fieldName, value);
 }
 
 template <>
@@ -141,11 +141,7 @@ void serializeSpecField(BSONObjBuilder* builder,
                         const StringData& fieldName,
                         const mongo::OptionalBool& value) {
     if (value.has_value()) {
-        if (opts.replacementForLiteralArgs) {
-            builder->append(fieldName, *opts.replacementForLiteralArgs);
-        } else {
-            value.serializeToBSON(fieldName, builder);
-        }
+        opts.appendLiteral(builder, fieldName, value.value_or(true));
     }
 }
 
@@ -204,20 +200,14 @@ void serializeSpec(const DocumentSourceChangeStreamSpec& spec,
 }  // namespace
 
 Value DocumentSourceChangeStreamTransform::serialize(SerializationOptions opts) const {
-    BSONObjBuilder builder;
     if (opts.verbosity) {
-        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
-        sub.append("stage"_sd, kStageName);
-        BSONObjBuilder options(sub.subobjStart("options"_sd));
-        serializeSpec(_changeStreamSpec, opts, &options);
-        options.done();
-        sub.done();
-    } else {
-        BSONObjBuilder sub(builder.subobjStart(kStageName));
-        serializeSpec(_changeStreamSpec, opts, &sub);
-        sub.done();
+        return Value(Document{{DocumentSourceChangeStream::kStageName,
+                               Document{{"stage"_sd, "internalTransform"_sd},
+                                        {"options"_sd, _changeStreamSpec.toBSON(opts)}}}});
     }
-    return Value(builder.obj());
+
+    return Value(Document{
+        {DocumentSourceChangeStreamTransform::kStageName, _changeStreamSpec.toBSON(opts)}});
 }
 
 DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTracker* deps) const {

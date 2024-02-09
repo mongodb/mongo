@@ -61,18 +61,11 @@ public:
     void visit(const ProjectionSliceASTNode* node) override {
         BSONObjBuilder sub(_builders.top().subobjStart(getFieldName()));
         if (node->skip()) {
-            if (_options.replacementForLiteralArgs) {
-                const auto rep = _options.replacementForLiteralArgs.value();
-                sub.appendArray("$slice", BSON_ARRAY(rep << rep));
-            } else {
-                sub.appendArray("$slice", BSON_ARRAY(*node->skip() << node->limit()));
-            }
+            sub.appendArray("$slice",
+                            BSON_ARRAY(_options.serializeLiteral(*node->skip())
+                                       << _options.serializeLiteral(node->limit())));
         } else {
-            if (_options.replacementForLiteralArgs) {
-                sub.append("$slice", _options.replacementForLiteralArgs.value());
-            } else {
-                sub.appendNumber("$slice", node->limit());
-            }
+            _options.appendLiteral(&sub, "$slice", node->limit());
         }
     }
 

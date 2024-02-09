@@ -53,11 +53,9 @@ bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression*
     return path() == other->path();
 }
 
-BSONObj InternalSchemaUniqueItemsMatchExpression::getSerializedRightHandSide(
-    SerializationOptions opts) const {
-    BSONObjBuilder bob;
-    bob.append(kName, true);
-    return bob.obj();
+void InternalSchemaUniqueItemsMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, SerializationOptions opts) const {
+    bob->append(kName, true);
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::clone() const {

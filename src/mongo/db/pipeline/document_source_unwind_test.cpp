@@ -830,7 +830,7 @@ TEST_F(UnwindStageTest, Redaction) {
         R"({
             "$unwind": {
                 "path": "$HASH<foo>.HASH<bar>",
-                "preserveNullAndEmptyArrays": "?",
+                "preserveNullAndEmptyArrays": "?bool",
                 "includeArrayIndex": "HASH<foo>.HASH<baz>"
             }
         })",
