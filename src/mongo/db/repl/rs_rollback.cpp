@@ -1636,32 +1636,11 @@ void syncFixUp(OperationContext* opCtx,
                                 // Would be faster but requires index:
                                 // RecordId loc = Helpers::findById(nsd, pattern);
                                 if (!loc.isNull()) {
-                                    try {
-                                        writeConflictRetry(
-                                            opCtx, "cappedTruncateAfter", collection.nss(), [&] {
-                                                collection_internal::cappedTruncateAfter(
-                                                    opCtx,
-                                                    collection.getCollectionPtr(),
-                                                    loc,
-                                                    true);
-                                            });
-                                    } catch (const DBException& e) {
-                                        if (e.code() == 13415) {
-                                            // hack: need to just make cappedTruncate do this...
-                                            CollectionWriter collectionWriter(opCtx, &collection);
-                                            writeConflictRetry(
-                                                opCtx, "truncate", collection.nss(), [&] {
-                                                    WriteUnitOfWork wunit(opCtx);
-                                                    uassertStatusOK(
-                                                        collectionWriter
-                                                            .getWritableCollection(opCtx)
-                                                            ->truncate(opCtx));
-                                                    wunit.commit();
-                                                });
-                                        } else {
-                                            throw;
-                                        }
-                                    }
+                                    writeConflictRetry(
+                                        opCtx, "cappedTruncateAfter", collection.nss(), [&] {
+                                            collection_internal::cappedTruncateAfter(
+                                                opCtx, collection.getCollectionPtr(), loc, true);
+                                        });
                                 }
                             } catch (const DBException& e) {
                                 // Replicated capped collections have many ways to become
