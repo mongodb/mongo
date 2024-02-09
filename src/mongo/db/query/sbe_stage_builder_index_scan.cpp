@@ -793,7 +793,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     if (ixn->filter) {
         const bool isOverIxscan = true;
         auto filterExpr =
-            generateFilter(state, ixn->filter.get(), {}, outputs, filterFields, isOverIxscan);
+            generateFilter(state, ixn->filter.get(), {}, &outputs, filterFields, isOverIxscan);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(state), ixn->nodeId());
@@ -1051,7 +1051,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     if (ixn->filter) {
         const bool isOverIxscan = true;
         auto filterExpr =
-            generateFilter(state, ixn->filter.get(), {}, outputs, filterFields, isOverIxscan);
+            generateFilter(state, ixn->filter.get(), {}, &outputs, filterFields, isOverIxscan);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(state), ixn->nodeId());

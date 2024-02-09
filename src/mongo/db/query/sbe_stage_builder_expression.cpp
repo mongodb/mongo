@@ -4350,8 +4350,8 @@ private:
 SbExpr generateExpression(StageBuilderState& state,
                           const Expression* expr,
                           boost::optional<TypedSlot> rootSlot,
-                          const PlanStageSlots& slots) {
-    ExpressionVisitorContext context(state, std::move(rootSlot), &slots);
+                          const PlanStageSlots* slots) {
+    ExpressionVisitorContext context(state, std::move(rootSlot), slots);
 
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};

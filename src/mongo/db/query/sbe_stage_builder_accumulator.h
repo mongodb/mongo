@@ -77,13 +77,13 @@ const StringData kDefaultVal = "defaultVal"_sd;
 SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
                                 SbExpr argExpr,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
-                                StageBuilderState& state);
+                                StageBuilderState&);
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     const AccumulationStatement& acc,
     std::unique_ptr<sbe::EExpression> argExpr,
     boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state);
+    StageBuilderState&);
 
 /**
  * Similar to above but takes multiple arguments.
@@ -91,13 +91,13 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
 SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
                                 StringDataMap<SbExpr> argExprs,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
-                                StageBuilderState& state);
+                                StageBuilderState&);
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     const AccumulationStatement& acc,
     StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
     boost::optional<sbe::value::SlotId> collatorSlot,
-    StageBuilderState& state);
+    StageBuilderState&);
 
 /**
  * When SBE hash aggregation spills to disk, it spills partial aggregates which need to be combined
@@ -107,7 +107,7 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
  * 'inputSlots'.
  */
 SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
-                                             const SbSlotVector& inputSlots,
+                                             const sbe::value::SlotVector& inputSlots,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState&);
 
@@ -115,7 +115,7 @@ SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
  * Similar to above but takes multiple arguments.
  */
 SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
-                                             const SbSlotVector& inputSlots,
+                                             const sbe::value::SlotVector& inputSlots,
                                              StringDataMap<SbExpr> argExprs,
                                              boost::optional<sbe::value::SlotId> collatorSlot,
                                              StageBuilderState&);
@@ -127,11 +127,6 @@ SbExpr::Vector buildCombinePartialAggregates(const AccumulationStatement& acc,
  */
 SbExpr buildFinalize(StageBuilderState& state,
                      const AccumulationStatement& acc,
-                     const SbSlotVector& aggSlots,
-                     boost::optional<sbe::value::SlotId> collatorSlot);
-
-SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
                      const sbe::value::SlotVector& aggSlots,
                      boost::optional<sbe::value::SlotId> collatorSlot);
 
@@ -140,15 +135,16 @@ SbExpr buildFinalize(StageBuilderState& state,
  */
 SbExpr buildFinalize(StageBuilderState& state,
                      const AccumulationStatement& acc,
-                     const SbSlotVector& aggSlots,
+                     const sbe::value::SlotVector& aggSlots,
                      StringDataMap<SbExpr> argExprs,
                      boost::optional<sbe::value::SlotId> collatorSlot);
 
-SbExpr buildFinalize(StageBuilderState& state,
-                     const AccumulationStatement& acc,
-                     const sbe::value::SlotVector& aggSlots,
-                     StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
-                     boost::optional<sbe::value::SlotId> collatorSlot);
+std::unique_ptr<sbe::EExpression> buildFinalize(
+    StageBuilderState& state,
+    const AccumulationStatement& acc,
+    const sbe::value::SlotVector& aggSlots,
+    StringDataMap<std::unique_ptr<sbe::EExpression>> argExprs,
+    boost::optional<sbe::value::SlotId> collatorSlot);
 
 /**
  * Translates an input AccumulationStatement into an SBE EExpression for the initialization of the

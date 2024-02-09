@@ -379,7 +379,7 @@ SbStage makeProject(SbStage stage, PlanNodeId nodeId, Ts&&... pack) {
 }
 
 SbStage makeHashAgg(SbStage stage,
-                    const sbe::value::SlotVector& gbs,
+                    sbe::value::SlotVector gbs,
                     sbe::AggExprVector aggs,
                     boost::optional<sbe::value::SlotId> collatorSlot,
                     bool allowDiskUse,
@@ -1115,7 +1115,7 @@ std::pair<std::vector<std::string>, std::vector<ProjectNode>> getProjectNodes(
  *
  * The order of slots in 'outSlots' will match the order of field paths in 'fields'.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> projectFieldsToSlots(
+std::pair<std::unique_ptr<sbe::PlanStage>, std::vector<TypedSlot>> projectFieldsToSlots(
     std::unique_ptr<sbe::PlanStage> stage,
     const std::vector<std::string>& fields,
     TypedSlot resultSlot,

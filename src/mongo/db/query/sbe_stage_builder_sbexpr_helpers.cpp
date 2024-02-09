@@ -382,11 +382,18 @@ SbExpr SbExprBuilder::generateInvalidRoundPlaceArgCheck(SbVar var) {
     return abt::wrap(stage_builder::generateInvalidRoundPlaceArgCheck(var.getABTName()));
 }
 
-std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(SbStage stage,
-                                                        const VariableTypes* varTypes,
-                                                        SbExprOptSbSlotVector projects) {
+std::pair<SbStage, std::vector<SbSlot>> SbBuilder::makeProjectImpl(SbStage stage,
+                                                                   SbExprOptSbSlotVector projects,
+                                                                   const PlanStageSlots* outputs) {
+    boost::optional<VariableTypes> variableTypes;
+    if (outputs) {
+        variableTypes.emplace(buildVariableTypes(*outputs));
+    }
+
+    VariableTypes* varTypes = variableTypes ? &*variableTypes : nullptr;
+
     sbe::SlotExprPairVector slotExprPairs;
-    SbSlotVector outSlots;
+    std::vector<SbSlot> outSlots;
 
     for (auto& [expr, optSlot] : projects) {
         expr.optimize(_state, varTypes);
@@ -400,7 +407,7 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(SbStage stage,
             // Otherwise, allocate a slot if needed, add a project to 'slotExprPairs' for this
             // update, and then store the SbSlot (annotated with the type signature from 'expr')
             // into 'outSlots'.
-            sbe::value::SlotId slot = optSlot ? optSlot->getId() : _state.slotId();
+            sbe::value::SlotId slot = optSlot ? *optSlot : _state.slotId();
             outSlots.emplace_back(slot, expr.getTypeSignature());
             slotExprPairs.emplace_back(slot, expr.extractExpr(_state));
         }
@@ -412,58 +419,5 @@ std::pair<SbStage, SbSlotVector> SbBuilder::makeProject(SbStage stage,
     }
 
     return {std::move(stage), std::move(outSlots)};
-}
-
-std::pair<SbStage, SbSlotVector> SbBuilder::makeHashAgg(
-    SbStage stage,
-    const VariableTypes* varTypes,
-    const SbSlotVector& gbs,
-    SbAggExprVector sbAggExprs,
-    boost::optional<sbe::value::SlotId> collatorSlot,
-    bool allowDiskUse,
-    SbExprSbSlotVector mergingExprs) {
-    // In debug builds or when we explicitly set the query knob, we artificially force frequent
-    // spilling. This makes sure that our tests exercise the spilling algorithm and the associated
-    // logic for merging partial aggregates which otherwise would require large data sizes to
-    // exercise.
-    const bool forceIncreasedSpilling = allowDiskUse &&
-        (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
-
-    sbe::value::SlotVector gbsVec;
-    for (const auto& sbSlot : gbs) {
-        gbsVec.emplace_back(sbSlot.getId());
-    }
-
-    sbe::AggExprVector aggExprsVec;
-    SbSlotVector aggSlots;
-    for (auto& [sbAggExpr, optSbSlot] : sbAggExprs) {
-        auto sbSlot = optSbSlot ? *optSbSlot : SbSlot{_state.slotId()};
-        aggSlots.emplace_back(sbSlot);
-
-        auto exprPair = sbe::AggExprPair{sbAggExpr.init.extractExpr(_state, varTypes),
-                                         sbAggExpr.agg.extractExpr(_state, varTypes)};
-
-        aggExprsVec.emplace_back(std::pair(sbSlot.getId(), std::move(exprPair)));
-    }
-
-    sbe::SlotExprPairVector mergingExprsVec;
-    for (auto& [sbExpr, sbSlot] : mergingExprs) {
-        mergingExprsVec.emplace_back(
-            std::pair(sbSlot.getId(), sbExpr.extractExpr(_state, varTypes)));
-    }
-
-    stage = sbe::makeS<sbe::HashAggStage>(std::move(stage),
-                                          std::move(gbsVec),
-                                          std::move(aggExprsVec),
-                                          sbe::makeSV(),
-                                          true /* optimized close */,
-                                          collatorSlot,
-                                          allowDiskUse,
-                                          std::move(mergingExprsVec),
-                                          _nodeId,
-                                          true /* participateInTrialRunTracking */,
-                                          forceIncreasedSpilling);
-
-    return {std::move(stage), std::move(aggSlots)};
 }
 }  // namespace mongo::stage_builder

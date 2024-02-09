@@ -442,7 +442,7 @@ SbExpr evaluateProjection(StageBuilderState& state,
                 context.pushKeepOrDrop(node->value->getBool());
             } else if (node->value->isExpr()) {
                 context.pushValueArg(
-                    generateExpression(state, node->value->getExpr(), rootSlot, *context.slots));
+                    generateExpression(state, node->value->getExpr(), rootSlot, context.slots));
             } else if (node->value->isSbExpr()) {
                 context.pushValueArg(node->value->extractSbExpr());
             } else if (node->value->isSlice()) {

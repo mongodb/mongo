@@ -365,13 +365,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
                                                csn->resumeAfterRecordId.has_value());
     }
 
-    PlanStageSlots outputs;
-    outputs.setResultObj(resultSlot);
-    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
-    for (size_t i = 0; i < scanFieldNames.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kField, scanFieldNames[i]), scanFieldSlots[i]);
-    }
-
     // When the start and/or end scan bounds are from an expression, ScanStage::getNext() treats
     // them both as inclusive, and 'csn->filter' will enforce any exclusions. If the bound(s) came
     // from the "min" (always inclusive) and/or "max" (always exclusive) keywords, there may be no
@@ -379,10 +372,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     // getNext()'s default behavior, but max's exclusivity does not and thus is enforced by the
     // includeScanEndRecordId argument to the ScanStage constructor above.
     SbExpr filterExpr = generateFilter(
-        state, csn->filter.get(), TypedSlot{resultSlot, TypeSignature::kAnyScalarType}, outputs);
+        state, csn->filter.get(), TypedSlot{resultSlot, TypeSignature::kAnyScalarType}, nullptr);
     if (!filterExpr.isNull()) {
         stage = sbe::makeS<sbe::FilterStage<false>>(
             std::move(stage), filterExpr.extractExpr(state), csn->nodeId());
+    }
+
+    PlanStageSlots outputs;
+    outputs.setResultObj(resultSlot);
+    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+    for (size_t i = 0; i < scanFieldNames.size(); ++i) {
+        outputs.set(std::make_pair(PlanStageSlots::kField, scanFieldNames[i]), scanFieldSlots[i]);
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -489,7 +489,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         auto filterExpr = generateFilter(state,
                                          csn->filter.get(),
                                          TypedSlot{resultSlot, TypeSignature::kAnyScalarType},
-                                         outputs);
+                                         &outputs);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
                 std::move(stage), filterExpr.extractExpr(state), csn->nodeId());

@@ -331,7 +331,7 @@ SbStage makeProject(SbStage stage, sbe::SlotExprPairVector projects, PlanNodeId 
 }
 
 SbStage makeHashAgg(SbStage stage,
-                    const sbe::value::SlotVector& gbs,
+                    sbe::value::SlotVector gbs,
                     sbe::AggExprVector aggs,
                     boost::optional<sbe::value::SlotId> collatorSlot,
                     bool allowDiskUse,
@@ -344,7 +344,7 @@ SbStage makeHashAgg(SbStage stage,
     const bool forceIncreasedSpilling = allowDiskUse &&
         (kDebugBuild || internalQuerySlotBasedExecutionHashAggForceIncreasedSpilling.load());
     return sbe::makeS<sbe::HashAggStage>(std::move(stage),
-                                         gbs,
+                                         std::move(gbs),
                                          std::move(aggs),
                                          sbe::makeSV(),
                                          true /* optimized close */,
@@ -845,7 +845,7 @@ struct ProjectFieldsNodeValue {
     bool incrementedDepth{false};
 };
 
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> projectFieldsToSlots(
+std::pair<std::unique_ptr<sbe::PlanStage>, std::vector<TypedSlot>> projectFieldsToSlots(
     std::unique_ptr<sbe::PlanStage> stage,
     const std::vector<std::string>& fields,
     TypedSlot resultSlot,
@@ -854,7 +854,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> projectFieldsToSlots
     StageBuilderState& state,
     const PlanStageSlots* slots) {
     // 'outputSlots' will match the order of 'fields'. Bail out early if 'fields' is empty.
-    TypedSlotVector outputSlots;
+    std::vector<TypedSlot> outputSlots;
     if (fields.empty()) {
         return {std::move(stage), std::move(outputSlots)};
     }

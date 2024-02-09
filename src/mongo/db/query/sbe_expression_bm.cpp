@@ -141,13 +141,10 @@ public:
             false /* allowDiskUse */
         };
 
-        auto rootSlot =
-            stage_builder::TypedSlot{_inputSlotId, stage_builder::TypeSignature::kAnyScalarType};
-
-        stage_builder::PlanStageSlots slots;
-        slots.setResultObj(rootSlot);
-
-        auto evalExpr = stage_builder::generateExpression(state, expression.get(), rootSlot, slots);
+        auto evalExpr = stage_builder::generateExpression(
+            state,
+            expression.get(),
+            stage_builder::TypedSlot{_inputSlotId, stage_builder::TypeSignature::kAnyScalarType});
 
         LOGV2_DEBUG(6979801,
                     1,

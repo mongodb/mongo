@@ -156,14 +156,14 @@ void printPlan(const sbe::PlanStage& stage) {
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildBlockToRow(
     std::unique_ptr<sbe::PlanStage> stage, PlanStageSlots& outputs) {
-    auto [outStage, _] = buildBlockToRow(std::move(stage), outputs, TypedSlotVector{});
+    auto [outStage, _] = buildBlockToRow(std::move(stage), outputs, std::vector<TypedSlot>{});
     return std::move(outStage);
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> SlotBasedStageBuilder::buildBlockToRow(
-    std::unique_ptr<sbe::PlanStage> stage,
-    PlanStageSlots& outputs,
-    TypedSlotVector individualSlots) {
+std::pair<std::unique_ptr<sbe::PlanStage>, std::vector<TypedSlot>>
+SlotBasedStageBuilder::buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
+                                       PlanStageSlots& outputs,
+                                       std::vector<TypedSlot> individualSlots) {
     // For this stage we output the 'topLevelSlots' (i.e. kField) and NOT the 'traversedSlots' (i.e.
     // kFilterCellField).
     using UnownedSlotName = PlanStageSlots::UnownedSlotName;
@@ -209,7 +209,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> SlotBasedStageBuilde
     // If there aren't any required block slots, use the default block slot as a fallback.
     if (blockSlots.empty()) {
         invariant(outputs.getBlockSlot());
-        auto slot = *outputs.getBlockSlot();
+        auto [_, slot] = *outputs.getBlockSlot();
 
         blockSlots.push_back(slot.slotId);
         unpackedSlots.push_back(_slotIdGenerator.generate());
@@ -281,7 +281,7 @@ SbExpr buildVectorizedExpr(StageBuilderState& state,
     // 'variableTypes' because optimize() doesn't need it.
     auto typesToExclude = TypeSignature::kBlockType.include(TypeSignature::kCellType);
     boost::optional<VariableTypes> variableTypes = !scalarExpression.isConstantExpr()
-        ? boost::make_optional(excludeTypes(buildVariableTypes(outputs), typesToExclude))
+        ? boost::make_optional(buildVariableTypes(outputs, typesToExclude))
         : boost::none;
     VariableTypes* varTypes = variableTypes ? &*variableTypes : nullptr;
 
@@ -423,7 +423,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         }
         if (!outputs.hasBlockOutput()) {
             // Initalize the fallback block slot id.
-            outputs.setBlockSlot(slot);
+            outputs.setBlockSlot(key, slot);
         }
     }
     // Declare the traversed fields which can be used for evaluating $match.
@@ -461,7 +461,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
     boost::optional<sbe::value::SlotId> bitmapSlotId;
     if (eventFilter) {
         auto eventFilterSbExpr =
-            generateFilter(_state, eventFilter, boost::none /* rootSlot */, outputs);
+            generateFilter(_state, eventFilter, /*rootSlot*/ boost::none, &outputs);
 
         auto [newStage, isVectorised] = buildVectorizedFilterExpr(
             std::move(stage), reqs, std::move(eventFilterSbExpr), outputs, unpackNode->nodeId());
@@ -471,7 +471,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
             // The last step was to convert the block to row. Generate the filter expression
             // again to use the scalar slots instead of the block slots.
             auto eventFilterSbExpr =
-                generateFilter(_state, eventFilter, boost::none /* rootSlot */, outputs);
+                generateFilter(_state, eventFilter, boost::none /* rootSlot */, &outputs);
             if (!eventFilterSbExpr.isNull()) {
                 stage = sbe::makeS<sbe::FilterStage<false>>(
                     std::move(stage), eventFilterSbExpr.extractExpr(_state), unpackNode->nodeId());

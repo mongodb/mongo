@@ -210,7 +210,7 @@ public:
 
         // When engaged, this stores a slot which is guaranteed to hold a block. If not engaged, we
         // are not currently in a block portion of the stage tree.
-        boost::optional<TypedSlot> blockSlot;
+        boost::optional<std::pair<OwnedSlotName, TypedSlot>> blockSlot;
     };
 
     static std::unique_ptr<Data> cloneData(const std::unique_ptr<Data>& other) {
@@ -469,12 +469,12 @@ public:
         _data->resultInfoChanges.emplace();
     }
 
-    void setBlockSlot(TypedSlot slot) {
+    void setBlockSlot(OwnedSlotName name, TypedSlot slot) {
         tassert(8542200, "Cannot override an initialized blockSlot", !_data->blockSlot);
-        _data->blockSlot = slot;
+        _data->blockSlot = std::make_pair(name, slot);
     }
 
-    const boost::optional<TypedSlot>& getBlockSlot() const {
+    const boost::optional<std::pair<OwnedSlotName, TypedSlot>>& getBlockSlot() const {
         return _data->blockSlot;
     }
 
@@ -508,12 +508,12 @@ public:
 
     // Returns a list of slots that correspond pairwise to the list of names produced by calling
     // 'getRequiredNamesInOrder(reqs)'.
-    TypedSlotVector getRequiredSlotsInOrder(const PlanStageReqs& reqs) const;
+    std::vector<TypedSlot> getRequiredSlotsInOrder(const PlanStageReqs& reqs) const;
 
     // This method returns a de-dupped list of all the slots that correspond to the names produced
     // calling by 'getRequiredNamesInOrder(reqs)'. The list returned by this method is sorted by
     // slot ID.
-    TypedSlotVector getRequiredSlotsUnique(const PlanStageReqs& reqs) const;
+    std::vector<TypedSlot> getRequiredSlotsUnique(const PlanStageReqs& reqs) const;
 
     // Returns a sorted list of all the name->slot mappings in this PlanStageSlots, sorted by
     // slot name.
@@ -521,7 +521,7 @@ public:
 
     // This method calls getAllNameSlotPairsInOrder() and then returns a list of the slots only,
     // sorted by slot name.
-    TypedSlotVector getAllSlotsInOrder() const;
+    std::vector<TypedSlot> getAllSlotsInOrder() const;
 
     // This method computes the list of required names 'L = getRequiredNamesInOrder(reqs)', and
     // then it adds a mapping 'N->NothingSlot' for each name N in list L where 'has(N)' is false.
@@ -1094,10 +1094,10 @@ private:
     std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
                                                     PlanStageSlots& outputs);
 
-    std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
+    std::pair<std::unique_ptr<sbe::PlanStage>, std::vector<TypedSlot>> buildBlockToRow(
         std::unique_ptr<sbe::PlanStage> stage,
         PlanStageSlots& outputs,
-        TypedSlotVector individualSlots);
+        std::vector<TypedSlot> individualSlots);
 
     /**
      * Given a scalar filter Expression it tries to produced the vectorised stage. If this is
