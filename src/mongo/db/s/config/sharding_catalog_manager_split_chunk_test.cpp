@@ -350,6 +350,71 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     test(_nss2, Timestamp(42));
 }
 
+TEST_F(SplitChunkTest, Idempotency) {
+    auto test = [&](const NamespaceString& nss,
+                    const Timestamp& collTimestamp,
+                    BSONObj chunkMin,
+                    BSONObj chunkMax,
+                    const std::vector<BSONObj>& splitPoints) {
+        const auto collEpoch = OID::gen();
+        const auto collUuid = UUID::gen();
+
+        ChunkType chunk;
+        chunk.setName(OID::gen());
+        chunk.setCollectionUUID(collUuid);
+
+        auto origVersion = ChunkVersion({collEpoch, collTimestamp}, {1, 0});
+        chunk.setVersion(origVersion);
+        chunk.setShard(ShardId(_shardName));
+
+        chunk.setMin(chunkMin);
+        chunk.setMax(chunkMax);
+
+        setupCollection(nss, _keyPattern, {chunk});
+
+        const auto doSplit = [&]() {
+            return ShardingCatalogManager::get(operationContext())
+                ->commitChunkSplit(operationContext(),
+                                   nss,
+                                   collEpoch,
+                                   collTimestamp,
+                                   ChunkRange(chunkMin, chunkMax),
+                                   splitPoints,
+                                   "shard0000");
+        };
+
+        // Split.
+        ASSERT_OK(doSplit());
+        // Retry.
+        ASSERT_OK(doSplit());
+
+        const auto verifyChunk = [&](BSONObj min, BSONObj max) {
+            auto chunkDocStatus =
+                getChunkDoc(operationContext(), collUuid, min, collEpoch, collTimestamp);
+            ASSERT_OK(chunkDocStatus.getStatus());
+
+            auto chunkDoc = chunkDocStatus.getValue();
+            ASSERT_BSONOBJ_EQ(max, chunkDoc.getMax());
+        };
+
+        // Sanity check.
+        std::vector<BSONObj> expectedChunkBounds;
+        expectedChunkBounds.push_back(chunkMin);
+        expectedChunkBounds.insert(
+            expectedChunkBounds.end(), splitPoints.begin(), splitPoints.end());
+        expectedChunkBounds.push_back(chunkMax);
+
+        for (auto minIt = expectedChunkBounds.begin(); minIt != expectedChunkBounds.end() - 1;
+             ++minIt) {
+            auto maxIt = minIt + 1;
+            verifyChunk(*minIt, *maxIt);
+        }
+    };
+
+    test(_nss1, Timestamp(42), BSON("a" << 1), BSON("a" << 10), {BSON("a" << 5)});
+    test(_nss2, Timestamp(42), BSON("a" << 1), BSON("a" << 10), {BSON("a" << 3), BSON("a" << 7)});
+}
+
 TEST_F(SplitChunkTest, PreConditionFailErrors) {
     auto test = [&](const NamespaceString& nss, const Timestamp& collTimestamp) {
         const auto collEpoch = OID::gen();

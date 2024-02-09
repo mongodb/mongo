@@ -894,12 +894,8 @@ private:
                                    std::shared_ptr<std::vector<ChunkType>> chunksToMerge);
 
     struct SplitChunkInTransactionResult {
-        SplitChunkInTransactionResult(const ChunkVersion& currentMaxVersion_,
-                                      std::shared_ptr<std::vector<ChunkType>> newChunks_)
-            : currentMaxVersion(currentMaxVersion_), newChunks(newChunks_) {}
-
         ChunkVersion currentMaxVersion;
-        std::shared_ptr<std::vector<ChunkType>> newChunks;
+        std::vector<ChunkType> newChunks;
     };
 
     /**
