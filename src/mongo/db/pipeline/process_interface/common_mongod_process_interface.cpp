@@ -825,12 +825,6 @@ std::unique_ptr<CollatorInterface> CommonMongodProcessInterface::_getCollectionD
     return collator ? collator->clone() : nullptr;
 }
 
-std::unique_ptr<ResourceYielder> CommonMongodProcessInterface::getResourceYielder(
-    StringData cmdName) const {
-    return TransactionParticipantResourceYielder::make(cmdName);
-}
-
-
 std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
 CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

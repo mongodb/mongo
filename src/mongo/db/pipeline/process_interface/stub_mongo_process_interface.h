@@ -337,10 +337,6 @@ public:
         uasserted(51019, "Unexpected check of routing table");
     }
 
-    std::unique_ptr<ResourceYielder> getResourceYielder(StringData cmdName) const override {
-        return nullptr;
-    }
-
     std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
     ensureFieldsUniqueOrResolveDocumentKey(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

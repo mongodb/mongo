@@ -41,6 +41,7 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/s/query/cluster_query_result.h"
+#include "mongo/s/resource_yielders.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -98,7 +99,8 @@ void DocumentSourceMergeCursors::populateMerger() {
         // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code which
         // relies on this parameter does not distinguish/care about the difference so we simply
         // always pass 'aggregate'.
-        pExpCtx->mongoProcessInterface->getResourceYielder("aggregate"_sd));
+        ResourceYielderFactory::get(*pExpCtx->opCtx->getService())
+            .make(pExpCtx->opCtx, "aggregate"_sd));
     _armParams = boost::none;
     // '_blockingResultsMerger' now owns the cursors.
     _ownCursors = false;

@@ -148,6 +148,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/resource_yielders.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_state.h"
@@ -757,7 +758,8 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
                 // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code
                 // which relies on this parameter does not distinguish/care about the difference so
                 // we simply always pass 'aggregate'.
-                expCtx->mongoProcessInterface->getResourceYielder("aggregate"_sd));
+                ResourceYielderFactory::get(*expCtx->opCtx->getService())
+                    .make(expCtx->opCtx, "aggregate"_sd));
             pipelines.emplace_back(Pipeline::create({consumer}, expCtx));
         }
     } else {

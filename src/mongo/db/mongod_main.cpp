@@ -257,6 +257,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
+#include "mongo/s/resource_yielders.h"
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/sharding_state.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
@@ -890,6 +891,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         if (storageEngine->supportsCappedCollections()) {
             logStartup(startupOpCtx.get());
         }
+
+        ResourceYielderFactory::initialize(serviceContext);
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
             serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {

@@ -556,6 +556,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/async_request_executor',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
         '$BUILD_DIR/mongo/s/query_analysis_sampler',
+        '$BUILD_DIR/mongo/s/resource_yielders',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/net/http_client',

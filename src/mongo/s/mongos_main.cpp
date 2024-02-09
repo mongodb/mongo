@@ -125,6 +125,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
+#include "mongo/s/resource_yielders.h"
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sessions_collection_sharded.h"
@@ -856,6 +857,10 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     // Keep listener alive until shutdown.
     std::shared_ptr<ReplicaSetChangeNotifier::Listener> replicaSetChangeListener;
+
+    // Only initialize Router ResourceYielder Factory since we do not have a Shard role.
+    ResourceYielderFactory::set(*serviceContext->getService(ClusterRole::RouterServer),
+                                std::make_unique<RouterResourceYielderFactory>());
 
     try {
         uassertStatusOK(

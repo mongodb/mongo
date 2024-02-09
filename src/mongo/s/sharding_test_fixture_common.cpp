@@ -47,6 +47,7 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/resource_yielders.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/unittest/assert.h"
@@ -69,6 +70,8 @@ ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
 
 void ShardingTestFixtureCommon::setUp() {
     _opCtxHolder = makeOperationContext();
+
+    ResourceYielderFactory::initialize(getServiceContext());
 }
 
 void ShardingTestFixtureCommon::tearDown() {

@@ -73,6 +73,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/s/resource_yielders',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'async_results_merger',
     ],

@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/resource_yielders.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util_core.h"
@@ -103,9 +104,7 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
               (opCtx->isActiveTransactionParticipant() && opCtx->inMultiDocumentTransaction())),
           readPreference,
           retryPolicy,
-          // TODO SERVER-85526 Construct TransactionParticipantResourceYielder if
-          // is an active TransactionParticipant
-          TransactionRouterResourceYielder::makeForRemoteCommand(),
+          ResourceYielderFactory::get(*opCtx->getService()).make(opCtx, "request-sender"),
           designatedHostsMap)) {}
 
 MultiStatementTransactionRequestsSender::~MultiStatementTransactionRequestsSender() {

@@ -84,6 +84,16 @@ env.Library(
 )
 
 env.Library(
+    target='resource_yielders',
+    source=[
+        'resource_yielders.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='sharding_router_api',
     source=[
         'cluster_commands_helpers.cpp',
@@ -117,6 +127,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/session/sessions_collection',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
+        'resource_yielders',
     ],
 )
 
@@ -555,6 +566,7 @@ env.Library(
         'mongos_initializers',
         'mongos_topology_coordinator',
         'query/cluster_cursor_cleanup_job',
+        'resource_yielders',
         'sessions_collection_sharded',
         'sharding_initialization',
         'sharding_router_api',
@@ -625,6 +637,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/transaction/transaction',
+        'resource_yielders',
+        'sharding_router_api',
     ],
 )
 
@@ -645,6 +660,7 @@ env.Library(
         'sharding_test_fixture_common',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/transaction/transaction',
         'sharding_initialization',
     ],
 )

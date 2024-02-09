@@ -316,10 +316,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::unique_ptr<ResourceYielder> getResourceYielder(StringData cmdName) const override {
-        return nullptr;
-    }
-
     std::pair<std::set<FieldPath>, boost::optional<ChunkVersion>>
     ensureFieldsUniqueOrResolveDocumentKey(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
