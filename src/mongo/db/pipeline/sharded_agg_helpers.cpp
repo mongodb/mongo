@@ -78,7 +78,7 @@ MONGO_FAIL_POINT_DEFINE(shardedAggregateHangBeforeEstablishingShardCursors);
  * {aggregate: "myCollection", pipeline: [], ...},
  *
  * produces the corresponding explain command:
- * {explain: {aggregate: "myCollection", pipline: [], ...}, $queryOptions: {...}, verbosity: ...}
+ * {explain: {aggregate: "myCollection", pipeline: [], ...}, $queryOptions: {...}, verbosity: ...}
  */
 Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity verbosity) {
     MutableDocument explainCommandBuilder;
@@ -100,10 +100,13 @@ Document wrapAggAsExplain(Document aggregateCommand, ExplainOptions::Verbosity v
 }
 
 /**
- * Open a $changeStream cursor on the 'config.shards' collection to watch for new shards.
+ * Open a $changeStream cursor on the 'config.shards' collection to watch for new shards. The
+ * 'generateV2ResumeTokens' parameter requests the change stream cursor to generate v2 resume
+ * tokens.
  */
 RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                             Timestamp startMonitoringAtTime) {
+                                             Timestamp startMonitoringAtTime,
+                                             bool generateV2ResumeTokens) {
     const auto& configShard = Grid::get(expCtx->opCtx)->shardRegistry()->getConfigShard();
     // Pipeline: {$changeStream: {startAtOperationTime: [now], allowToRunOnConfigDB: true}}
     AggregateCommandRequest aggReq(
@@ -115,9 +118,11 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     aggReq.setFromMongos(true);
     aggReq.setNeedsMerge(true);
 
+    // If on mongos, propagate the '$_generateV2ResumeTokens' value to the new shard monitor change
+    // stream request.
     // TODO SERVER-65370: from 6.1 onwards, we will default to v2 and this block should be removed.
     if (isMongos()) {
-        aggReq.setGenerateV2ResumeTokens(expCtx->changeStreamTokenVersion == 2);
+        aggReq.setGenerateV2ResumeTokens(generateV2ResumeTokens);
     }
 
     SimpleCursorOptions cursor;
@@ -1206,7 +1211,12 @@ DispatchShardPipelineResults dispatchShardPipeline(
         // For $changeStream, we must open an extra cursor on the 'config.shards' collection, so
         // that we can monitor for the addition of new shards inline with real events.
         if (hasChangeStream && expCtx->ns.db() != ShardType::ConfigNS.db()) {
-            cursors.emplace_back(openChangeStreamNewShardMonitor(expCtx, shardRegistryReloadTime));
+            auto generateV2ResumeTokens =
+                serializedCommand[AggregateCommandRequest::kGenerateV2ResumeTokensFieldName];
+            cursors.emplace_back(openChangeStreamNewShardMonitor(
+                expCtx,
+                shardRegistryReloadTime,
+                !generateV2ResumeTokens.missing() && generateV2ResumeTokens.getBool()));
         }
     }
 
@@ -1275,7 +1285,7 @@ AsyncResultsMergerParams buildArmParams(boost::intrusive_ptr<ExpressionContext> 
     return armParams;
 }
 
-// Anonnymous namespace for helpers of partitionCursorsAndAddMergeCursors.
+// Anonymous namespace for helpers of partitionCursorsAndAddMergeCursors.
 namespace {
 /**
  * Given the owned cursors vector, partitions the cursors into either one or two vectors. If
@@ -1553,7 +1563,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
         // which needs to actually get a cursor attached or not.
         const auto* firstStage = *hasFirstStage;
         invariant(!dynamic_cast<const DocumentSourceMergeCursors*>(firstStage));
-        // Here we check the hostRequirment because there is at least one stage ($indexStats) which
+        // Here we check the hostRequirement because there is at least one stage ($indexStats) which
         // does not require input data, but is still expected to fan out and contact remote shards
         // nonetheless.
         if (auto constraints = firstStage->constraints(); !constraints.requiresInputDocSource &&
