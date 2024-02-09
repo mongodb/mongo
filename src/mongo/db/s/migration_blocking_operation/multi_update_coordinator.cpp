@@ -189,8 +189,10 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_performUpdate() {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto opMsgRequest =
-                OpMsgRequestBuilder::create(_metadata.getNss().dbName(), modifiedCmdObj);
+            auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                _metadata.getNss().dbName(),
+                auth::ValidatedTenancyScope::kNotRequired,
+                modifiedCmdObj);
             auto requestMessage = opMsgRequest.serialize();
 
             return _externalState->sendClusterUpdateCommandToShards(opCtx, requestMessage);

@@ -413,9 +413,11 @@ OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
         : SerializationContext::stateCommandRequest();
 
     OpMsgRequest request;
-    request.body = appendDollarDbAndTenant(
-        dbName, std::move(body), sc, validatedTenancyScope != boost::none, extraFields);
-    request.validatedTenancyScope = validatedTenancyScope;
+    const bool hasValidVts = validatedTenancyScope && validatedTenancyScope->isValid();
+    request.body = appendDollarDbAndTenant(dbName, std::move(body), sc, hasValidVts, extraFields);
+    if (hasValidVts) {
+        request.validatedTenancyScope = std::move(validatedTenancyScope);
+    }
 
     return request;
 }

@@ -342,7 +342,9 @@ public:
             uassertStatusOK(aggCmdOnView.getStatus());
 
             auto viewAggCmd =
-                OpMsgRequest::fromDBAndBody(nss.dbName(), aggCmdOnView.getValue()).body;
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView.getValue())
+                    .body;
             auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
@@ -359,7 +361,9 @@ public:
             }
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx, OpMsgRequestBuilder::create(dbName, std::move(resolvedAggCmd)));
+                opCtx,
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    dbName, auth::ValidatedTenancyScope::get(opCtx), std::move(resolvedAggCmd)));
 
             ViewResponseFormatter formatter(aggResult);
             auto formatStatus = formatter.appendAsDistinctResponse(&result, boost::none);

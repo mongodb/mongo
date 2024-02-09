@@ -47,9 +47,17 @@ namespace auth {
 
 class ValidatedTenancyScope {
 public:
+    /**
+     * For use in methods where we are absolutely sure we do not need to consider tenant domain.
+     *
+     * @note Please use this very carefully, ensuring it's intentionally omitted for the specific
+     * use case.
+     */
+    static const ValidatedTenancyScope kNotRequired;
+
     enum class TenantProtocol { kDefault, kAtlasProxy };
 
-    ValidatedTenancyScope() = delete;
+    ValidatedTenancyScope() = default;
     ValidatedTenancyScope(const ValidatedTenancyScope&) = default;
 
     bool operator==(const ValidatedTenancyScope& rhs) const {
@@ -62,6 +70,10 @@ public:
     bool hasAuthenticatedUser() const;
 
     const UserName& authenticatedUser() const;
+
+    bool isValid() const {
+        return !std::holds_alternative<std::monostate>(_tenantOrUser) && !_originalToken.empty();
+    }
 
     bool hasTenantId() const {
         return visit(OverloadedVisitor{

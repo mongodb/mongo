@@ -284,8 +284,9 @@ public:
             Client::initThread("test-insert-thread", getGlobalServiceContext()->getService());
             auto innerOpCtx = Client::getCurrent()->makeOperationContext();
 
-            auto opMsgRequest = OpMsgRequestBuilder::create(
+            auto opMsgRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
                 DatabaseName::createDatabaseName_forTest(boost::none, "test_unused_dbname"),
+                auth::ValidatedTenancyScope::kNotRequired,
                 insertBuilder.obj(),
                 BSONObj());
             auto osi = OperationSessionInfoFromClient::parse(

@@ -49,6 +49,8 @@ const auto validatedTenancyScopeDecoration =
 
 }  // namespace
 
+const ValidatedTenancyScope ValidatedTenancyScope::kNotRequired{};
+
 bool ValidatedTenancyScope::hasAuthenticatedUser() const {
     return holds_alternative<UserName>(_tenantOrUser);
 }

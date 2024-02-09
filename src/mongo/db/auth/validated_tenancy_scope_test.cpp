@@ -268,6 +268,13 @@ TEST_F(ValidatedTenancyScopeTestFixture, VTSCreateWithInnerRequestTag) {
     ASSERT_EQUALS(vts.tenantId(), kTenantId);
     ASSERT(ValidatedTenancyScopeFactory::parse(client.get(), {}, vts.getOriginalToken()));
 }
+
+TEST(ValidatedTenancyScopeTest, VTSKNotRequired) {
+    const auto& vts = auth::ValidatedTenancyScope::kNotRequired;
+    ASSERT_FALSE(vts.isValid());
+    ASSERT_FALSE(vts.hasTenantId());
+}
+
 }  // namespace
 }  // namespace auth
 }  // namespace mongo
