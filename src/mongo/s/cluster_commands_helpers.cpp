@@ -720,6 +720,10 @@ void createShardDatabase(OperationContext* opCtx, StringData dbName) {
         }
 
         dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
+
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter.annotateCreatedDatabase(dbName);
+        }
     }
 
     uassertStatusOKWithContext(dbStatus, str::stream() << "Database " << dbName << " not found");

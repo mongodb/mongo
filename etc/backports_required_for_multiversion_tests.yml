@@ -173,6 +173,8 @@ all:
   ticket: SERVER-77506
 - test_file: jstests/change_streams/dbcheck_oplog_entry.js
   ticket: SERVER-85156
+- test_file: jstests/sharding/transaction_detects_move_primary_conflicts.js
+  ticket: SERVER-82353
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null
@@ -214,3 +216,5 @@ suites:
     ticket: SERVER-78793
   - test_file: jstests/sharding/fsync_lock_unlock.js
     ticket: SERVER-78149
+  - test_file: jstests/sharding/transaction_detects_move_primary_conflicts.js
+    ticket: SERVER-82353

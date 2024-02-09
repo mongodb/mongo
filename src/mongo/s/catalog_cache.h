@@ -71,6 +71,9 @@ public:
 
     bool shardingEnabled() const;
     DatabaseVersion databaseVersion() const;
+    boost::optional<Timestamp> getLastMovedTimestamp() const {
+        return _dbt.getLastMovedTimestamp();
+    }
 
 private:
     friend class CatalogCache;

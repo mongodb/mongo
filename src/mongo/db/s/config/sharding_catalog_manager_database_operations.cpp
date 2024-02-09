@@ -35,6 +35,7 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/server_options.h"
@@ -159,9 +160,14 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                 primaryShard.isValid() ? primaryShard
                                        : selectShardForNewDatabase(opCtx, shardRegistry)));
 
+            const auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+
             // Pick a primary shard for the new database.
-            DatabaseType db(
-                dbName.toString(), shardPtr->getId(), false, databaseVersion::makeNew());
+            DatabaseType db(dbName.toString(),
+                            shardPtr->getId(),
+                            false,
+                            databaseVersion::makeNew(),
+                            clusterTime);
 
             LOGV2(21938,
                   "Registering new database {db} in sharding catalog",
@@ -316,6 +322,9 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     auto const currentDatabaseVersion = dbType.getVersion();
 
     newDbType.setVersion(databaseVersion::makeIncremented(currentDatabaseVersion));
+
+    const auto clusterTime = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+    newDbType.setLastMovedTimestamp(clusterTime);
 
     auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << dbname));
     updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion.toBSON());
