@@ -259,6 +259,10 @@ Status insertDocumentsImpl(OperationContext* opCtx,
                 record_id_helpers::keyForDoc(doc,
                                              collection->getClusteredInfo()->getIndexSpec(),
                                              collection->getDefaultCollator()));
+        } else if (!it->replRid.isNull()) {
+            // The 'replRid' being set indicates that this insert belongs to a replicated
+            // recordId collection, and we need to use the given recordId while inserting.
+            recordId = it->replRid;
         } else if (!it->recordId.isNull()) {
             // This case would only normally be called in a testing circumstance to avoid
             // automatically generating record ids for capped collections.

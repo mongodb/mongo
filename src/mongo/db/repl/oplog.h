@@ -94,6 +94,10 @@ public:
     std::vector<StmtId> stmtIds = {kUninitializedStmtId};
     OplogSlot oplogSlot;
     RecordId recordId;
+
+    // Holds the replicated recordId during secondary oplog application.
+    RecordId replRid;
+
     BSONObj doc;
 };
 

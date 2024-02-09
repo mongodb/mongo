@@ -1630,6 +1630,19 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
                 }
 
+                // If an oplog entry has a recordId, this means that the collection is a
+                // recordIdReplicated collection, and therefore we should use the recordId
+                // present.
+                // Because this code is run on secondaries as well as on primaries that use
+                // applyOps, this has the effect of preserving recordIds when applyOps is run,
+                // which is intentional.
+                for (size_t i = 0; i < insertObjs.size(); i++) {
+                    if (insertOps[i]->getDurableReplOperation().getRecordId()) {
+                        insertObjs[i].replRid =
+                            *insertOps[i]->getDurableReplOperation().getRecordId();
+                    }
+                }
+
                 OpDebug* const nullOpDebug = nullptr;
                 Status status = collection_internal::insertDocuments(opCtx,
                                                                      collection,
@@ -1714,6 +1727,13 @@ Status applyOperation_inlock(OperationContext* opCtx,
                         auto oplogInfo = LocalOplogInfo::get(opCtx);
                         auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
                         insertStmt.oplogSlot = oplogSlots.front();
+                    }
+
+                    // If an oplog entry has a recordId, this means that the collection is a
+                    // recordIdReplicated collection, and therefore we should use the recordId
+                    // present.
+                    if (op.getDurableReplOperation().getRecordId()) {
+                        insertStmt.replRid = *op.getDurableReplOperation().getRecordId();
                     }
 
                     OpDebug* const nullOpDebug = nullptr;
