@@ -52,12 +52,12 @@ public:
         return std::make_unique<ScalarMonoCellBlock>(_block);
     }
 
-    const std::vector<char>& filterPositionInfo() override {
+    const std::vector<int32_t>& filterPositionInfo() override {
         return emptyPositionInfo;
     }
 
 private:
     MonoBlock _block;
-    std::vector<char> emptyPositionInfo;
+    std::vector<int32_t> emptyPositionInfo;
 };
 }  // namespace mongo::sbe::value

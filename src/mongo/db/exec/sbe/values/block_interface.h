@@ -50,17 +50,17 @@ public:
     DeblockedTagVals() {}
 
     // 'tags' and 'vals' point to an array of 'count' elements respectively.
-    DeblockedTagVals(size_t count, TypeTags* tags, Value* vals)
+    DeblockedTagVals(size_t count, const TypeTags* tags, const Value* vals)
         : _count(count), _tags(tags), _vals(vals) {
-        tassert(7949501, "Values must exist", _count > 0 && _tags != nullptr && _vals != nullptr);
+        tassert(7949501, "Values must exist", count > 0 || (tags == nullptr && vals == nullptr));
     }
-
     DeblockedTagVals& operator=(const DeblockedTagVals& other) {
         _count = other._count;
         _tags = other._tags;
         _vals = other._vals;
         return *this;
     }
+
 
     std::pair<TypeTags, Value> operator[](size_t idx) const {
         return {_tags[idx], _vals[idx]};
@@ -88,8 +88,8 @@ public:
 
 private:
     size_t _count = 0;
-    TypeTags* _tags = nullptr;
-    Value* _vals = nullptr;
+    const TypeTags* _tags = nullptr;
+    const Value* _vals = nullptr;
 };
 
 // Bitset representation used to indicate present or missing values. DynamicBitset from
@@ -112,9 +112,7 @@ struct DeblockedHomogeneousVals {
                 "NumberDouble, or Date",
                 tag == TypeTags::NumberInt32 || tag == TypeTags::NumberInt64 ||
                     tag == TypeTags::Date || tag == TypeTags::NumberDouble);
-        tassert(8407201,
-                "Values must exist",
-                this->bitset.size() && (!vals.empty() || (bitset.none() && vals.empty())));
+        tassert(8407201, "Empty block cannot have values", this->bitset.size() || (vals.empty()));
     }
 
     // TODO SERVER-83799 Remove TypeTags::Boolean
