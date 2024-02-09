@@ -1918,5 +1918,127 @@ TEST(VectorizerTest, ConvertTrunc) {
             *processed.expr);
     }
 }
+
+TEST(VectorizerTest, ConvertMod) {
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "inputVar"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    {
+        auto tree =
+            make<FunctionCall>("mod", makeSeq(make<Variable>("inputVar"), Constant::int32(10)));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockMod\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 10\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+
+    {
+        bindings.emplace(
+            "inputVar2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        auto tree = make<FunctionCall>(
+            "mod", makeSeq(make<Variable>("inputVar"), make<Variable>("inputVar2")));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_FALSE(processed.expr);
+    }
+
+    {
+        auto tree =
+            make<FunctionCall>("mod", makeSeq(Constant::int32(10), make<Variable>("inputVar")));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_FALSE(processed.expr.has_value());
+    }
+}
+
+TEST(VectorizerTest, ConvertNumConvert) {
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "inputVar"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    {
+        auto tree =
+            make<FunctionCall>("convert", makeSeq(make<Variable>("inputVar"), Constant::int32(2)));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockConvert\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 2\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+
+    {
+        bindings.emplace(
+            "inputVar2"_sd,
+            std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                           boost::none));
+        auto tree = make<FunctionCall>(
+            "convert", makeSeq(make<Variable>("inputVar"), make<Variable>("inputVar2")));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_FALSE(processed.expr);
+    }
+
+    {
+        auto tree =
+            make<FunctionCall>("convert", makeSeq(Constant::int32(2), make<Variable>("inputVar")));
+
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(
+            tree, bindings, boost::none);
+
+        ASSERT_FALSE(processed.expr.has_value());
+    }
+}
 }  // namespace
 }  // namespace mongo::stage_builder

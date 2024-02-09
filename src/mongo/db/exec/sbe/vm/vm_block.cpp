@@ -1616,4 +1616,71 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCoerce
         true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMod(ArityType arity) {
+    invariant(arity == 2);
+    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+
+    tassert(8332900,
+            "First argument of $mod must be block of values.",
+            inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto mod = getFromStack(1);
+    if (!value::isNumber(mod.b)) {
+        auto nothingBlock = std::make_unique<value::MonoBlock>(
+            valueBlockIn->tryCount().get_value_or(valueBlockIn->extract().count()),
+            value::TypeTags::Nothing,
+            0);
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(nothingBlock.release())};
+    }
+
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Nothing,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+        [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
+            auto [_, resTag, resVal] = genericMod(tag, val, mod.b, mod.c);
+            return {resTag, resVal};
+        });
+
+    auto res = valueBlockIn->map(cmpOp);
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockConvert(ArityType arity) {
+    invariant(arity == 2);
+    auto [inputOwned, inputTag, inputVal] = getFromStack(0);
+
+    tassert(8332901,
+            "First argument of convert must be block of values.",
+            inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto target = getFromStack(1);
+    // Numeric convert expects always a numeric type as target. However, it does not check for it
+    // and throws if the value is not numeric. We let genericNumConvert do this check and we do not
+    // make any checks here.
+    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
+                                                   value::TypeTags::Nothing,
+                                                   value::TypeTags::Nothing,
+                                                   ColumnOpType::ReturnNothingOnMissing{}};
+
+    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+        [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
+            auto [_, resTag, resVal] = value::genericNumConvert(tag, val, target.b);
+            return {resTag, resVal};
+        });
+
+    auto res = valueBlockIn->map(cmpOp);
+
+    return {
+        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(res.release())};
+}
+
 }  // namespace mongo::sbe::vm

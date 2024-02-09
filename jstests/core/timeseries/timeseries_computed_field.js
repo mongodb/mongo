@@ -685,4 +685,69 @@ TimeseriesTest.run((insert) => {
 
         assert.throws(() => coll.aggregate(pipeline));
     }
+
+    {
+        let pipeline = [
+            {$addFields: {md: {$mod: ["$topLevelScalar", 5]}}},
+            {
+                $group: {
+                    "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
+                    "total1": {$sum: "$md"},
+                    "total2": {$sum: "$topLevelScalar"}
+                }
+            }
+        ];
+
+        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 4, "total2": 579}],
+                     coll.aggregate(pipeline).toArray());
+    }
+
+    {
+        let pipeline = [
+            {$addFields: {md: {$mod: [500, "$topLevelScalar"]}}},
+            {
+                $group: {
+                    "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
+                    "total1": {$sum: "$md"},
+                    "total2": {$sum: "$topLevelScalar"}
+                }
+            }
+        ];
+
+        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 52, "total2": 579}],
+                     coll.aggregate(pipeline).toArray());
+    }
+
+    {
+        let pipeline = [
+            {$addFields: {md: {$mod: ["$topLevelScalar", "$topLevelScalar"]}}},
+            {
+                $group: {
+                    "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
+                    "total1": {$sum: "$md"},
+                    "total2": {$sum: "$topLevelScalar"}
+                }
+            }
+        ];
+
+        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 0, "total2": 579}],
+                     coll.aggregate(pipeline).toArray());
+    }
+
+    {
+        let pipeline = [
+            {$addFields: {md: {$mod: ["$topLevelScalar", 5]}}},
+            {$match: {md: {$mod: [4, 1]}}},
+            {
+                $group: {
+                    "_id": {$dateTrunc: {"date": "$time", "unit": "minute"}},
+                    "total1": {$sum: "$md"},
+                    "total2": {$sum: "$topLevelScalar"}
+                }
+            }
+        ];
+
+        assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 1, "total2": 456}],
+                     coll.aggregate(pipeline).toArray());
+    }
 });

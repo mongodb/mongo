@@ -2394,4 +2394,337 @@ TEST_F(SBEBlockExpressionTest, BlockTrunc) {
     }
 }
 
+TEST_F(SBEBlockExpressionTest, BlockMod) {
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor scalarAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto scalarSlot = bindAccessor(&scalarAccessor);
+
+    value::HeterogeneousBlock block;
+    block.push_back(value::makeNewString("abcd"));
+    block.push_back(makeInt32(-2));
+    block.push_back(makeInt32(2));
+    block.push_back(makeBool(false));
+    block.push_back(makeDouble(0.0));
+    block.push_back(makeDouble(-1234.987));
+    block.push_back(makeDouble(1987.956));
+    block.push_back(makeDecimal("-1234.987"));
+    block.push_back(makeDecimal("1987.956"));
+    block.push_back(makeInt64(-54687));
+    block.push_back(makeInt64(25166));
+    block.push_back(makeNothing());
+    block.push_back(makeNull());
+
+    auto expr = sbe::makeE<sbe::EFunction>(
+        "valueBlockMod", sbe::makeEs(makeE<EVariable>(blockSlot), makeE<EVariable>(scalarSlot)));
+
+    auto compiledExpr = compileExpression(*expr);
+
+    // mod is positive int32
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(5));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(-2),
+            makeInt32(2),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(-1234.987)),
+                numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(5)))),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(1987.956)),
+                numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(5)))),
+            makeDecimal("-4.987"),
+            makeDecimal("2.956"),
+            makeInt64(-2),
+            makeInt64(1),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    // mod is negative int32
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-5));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeInt32(-2),
+            makeInt32(2),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(-1234.987)),
+                numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-5)))),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(1987.956)),
+                numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-5)))),
+            makeDecimal("-4.987"),
+            makeDecimal("2.956"),
+            makeInt64(-2),
+            makeInt64(1),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    // mod is positive double
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.2));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeDouble(
+                fmod(numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-2)),
+                     numericCast<double>(value::TypeTags::NumberDouble,
+                                         value::bitcastFrom<double>(1.2)))),
+            makeDouble(
+                fmod(numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(2)),
+                     numericCast<double>(value::TypeTags::NumberDouble,
+                                         value::bitcastFrom<double>(1.2)))),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(fmod(numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(-1234.987)),
+                            numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(1.2)))),
+            makeDouble(fmod(numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(1987.956)),
+                            numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(1.2)))),
+            makeDecimal("-0.187"),
+            makeDecimal("0.756"),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberInt64, value::bitcastFrom<int>(-54687)),
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(1.2)))),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberInt64, value::bitcastFrom<int>(25166)),
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(1.2)))),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    // mod is negative double
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-1.2));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeDouble(
+                fmod(numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(-2)),
+                     numericCast<double>(value::TypeTags::NumberDouble,
+                                         value::bitcastFrom<double>(-1.2)))),
+            makeDouble(
+                fmod(numericCast<double>(value::TypeTags::NumberInt32, value::bitcastFrom<int>(2)),
+                     numericCast<double>(value::TypeTags::NumberDouble,
+                                         value::bitcastFrom<double>(-1.2)))),
+            makeNothing(),  // bool
+            makeDouble(0.0),
+            makeDouble(fmod(numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(-1234.987)),
+                            numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(-1.2)))),
+            makeDouble(fmod(numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(1987.956)),
+                            numericCast<double>(value::TypeTags::NumberDouble,
+                                                value::bitcastFrom<double>(-1.2)))),
+            makeDecimal("-0.187"),
+            makeDecimal("0.756"),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberInt64, value::bitcastFrom<int>(-54687)),
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(-1.2)))),
+            makeDouble(fmod(
+                numericCast<double>(value::TypeTags::NumberInt64, value::bitcastFrom<int>(25166)),
+                numericCast<double>(value::TypeTags::NumberDouble,
+                                    value::bitcastFrom<double>(-1.2)))),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    // mod is positive decimal
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto dec = makeDecimal("8.56");
+        value::ValueGuard decGuard(dec.first, dec.second);
+        scalarAccessor.reset(dec.first, dec.second);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeDecimal("-2.00"),
+            makeDecimal("2.00"),
+            makeNothing(),  // bool
+            makeDecimal("0.00"),
+            makeDecimal("-2.347"),
+            makeDecimal("2.036"),
+            makeDecimal("-2.347"),
+            makeDecimal("2.036"),
+            makeDecimal("-5.72"),
+            makeDecimal("8.16"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    // mod is negative decimal
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto dec = makeDecimal("-8.56");
+        value::ValueGuard decGuard(dec.first, dec.second);
+        scalarAccessor.reset(dec.first, dec.second);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            makeNothing(),  // string
+            makeDecimal("-2.00"),
+            makeDecimal("2.00"),
+            makeNothing(),  // bool
+            makeDecimal("0.00"),
+            makeDecimal("-2.347"),
+            makeDecimal("2.036"),
+            makeDecimal("-2.347"),
+            makeDecimal("2.036"),
+            makeDecimal("-5.72"),
+            makeDecimal("8.16"),
+            makeNothing(),  // Nothing
+            makeNothing(),  // Null
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    // mod is string
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto md = value::makeSmallString("abc"_sd);
+        value::ValueGuard mdGuard(md.first, md.second);
+        scalarAccessor.reset(md.first, md.second);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults =
+            std::vector<std::pair<value::TypeTags, value::Value>>(13, makeNothing());
+
+        assertBlockEq(runTag, runVal, expectedResults);
+
+        for (size_t i = 0; i < expectedResults.size(); ++i) {
+            releaseValue(expectedResults[i].first, expectedResults[i].second);
+        }
+    }
+
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int>(0));
+
+        ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                           DBException,
+                           4848403);  // mod with zero
+    }
+
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int>(0));
+
+        ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                           DBException,
+                           4848403);  // mod with zero
+    }
+
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        scalarAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0));
+
+        ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                           DBException,
+                           4848403);  // mod with zero
+    }
+
+    {
+        blockAccessor.reset(sbe::value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(&block));
+        auto md = makeDecimal("0");
+        value::ValueGuard mdGuard(md.first, md.second);
+        scalarAccessor.reset(md.first, md.second);
+
+        ASSERT_THROWS_CODE(runCompiledExpression(compiledExpr.get()),
+                           DBException,
+                           4848403);  // mod with zero
+    }
+}
+
 }  // namespace mongo::sbe

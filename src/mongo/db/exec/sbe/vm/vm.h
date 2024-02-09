@@ -742,6 +742,8 @@ enum class Builtin : uint16_t {
     valueBlockNone,
     valueBlockIsMember,
     valueBlockCoerceToBool,
+    valueBlockMod,
+    valueBlockConvert,
 
     cellFoldValues_F,
     cellFoldValues_P,
@@ -2043,6 +2045,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockNone(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCoerceToBool(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMod(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockConvert(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_F(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellFoldValues_P(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCellBlockGetFlatValuesBlock(
