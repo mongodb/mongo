@@ -1,6 +1,7 @@
 /**
  * Test that plans with $group and $lookup lowered to SBE are cached and invalidated correctly.
  * @tags: [
+ *   cqf_experimental_incompatible,
  *   featureFlagSbeFull
  * ]
  */
@@ -8,9 +9,10 @@ import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 import {getLatestProfilerEntry} from "jstests/libs/profiler.js";
 
 const conn = MongoRunner.runMongod();
-const db = conn.getDB("test");
-const coll = db.plan_cache_pipeline;
-const foreignColl = db.plan_cache_pipeline_foreign;
+const db = conn.getDB(jsTestName());
+const colName = jsTestName();
+const coll = db.getCollection(colName);
+const foreignColl = db.getCollection(colName + "_foreign");
 
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, a1: 1}));
@@ -39,7 +41,7 @@ function assertCacheUsage(
     // When running under Bonsai, the `fromMultiPlanner` field is not returned in profiled objects.
     // Note that some of the queries in the test may "fall back" to classic+SBE but we don't check
     // for that when Bonsai is enabled.
-    if (checkCascadesOptimizerEnabled(db)) {
+    if (!checkCascadesOptimizerEnabled(db)) {
         assert.eq(fromMultiPlanner, !!profileObj.fromMultiPlanner, profileObj);
     }
 
