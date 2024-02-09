@@ -48,12 +48,18 @@ const BSONField<std::string> DatabaseType::name("_id");
 const BSONField<std::string> DatabaseType::primary("primary");
 const BSONField<bool> DatabaseType::sharded("partitioned");
 const BSONField<BSONObj> DatabaseType::version("version");
+const BSONField<Timestamp> DatabaseType::lastMovedTimestampPre50("lastMovedTimestamp");
 
 DatabaseType::DatabaseType(const std::string& dbName,
                            const ShardId& primaryShard,
                            bool sharded,
-                           DatabaseVersion version)
-    : _name(dbName), _primary(primaryShard), _sharded(sharded), _version(version) {}
+                           DatabaseVersion version,
+                           boost::optional<Timestamp> lastMovedTimestampPre50)
+    : _name(dbName),
+      _primary(primaryShard),
+      _sharded(sharded),
+      _version(version),
+      _lastMovedTimestampPre50(lastMovedTimestampPre50) {}
 
 StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
     std::string dbtName;
@@ -87,8 +93,22 @@ StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
     }
     DatabaseVersion dbtVersion(versionField);
 
-    return DatabaseType{
-        std::move(dbtName), std::move(dbtPrimary), dbtSharded, std::move(dbtVersion)};
+    boost::optional<Timestamp> lastMovedTimestamp;
+    if (source.hasField(lastMovedTimestampPre50.name())) {
+        Timestamp timestamp;
+        Status status =
+            bsonExtractTimestampField(source, lastMovedTimestampPre50.name(), &timestamp);
+        if (!status.isOK())
+            return status;
+
+        lastMovedTimestamp.emplace(timestamp);
+    }
+
+    return DatabaseType{std::move(dbtName),
+                        std::move(dbtPrimary),
+                        dbtSharded,
+                        std::move(dbtVersion),
+                        lastMovedTimestamp};
 }
 
 Status DatabaseType::validate() const {
@@ -111,6 +131,11 @@ BSONObj DatabaseType::toBSON() const {
     builder.append(primary.name(), _primary.toString());
     builder.append(sharded.name(), _sharded);
     builder.append(version.name(), _version.toBSON());
+
+    // Optional fields.
+    if (_lastMovedTimestampPre50) {
+        builder.append(lastMovedTimestampPre50.name(), *_lastMovedTimestampPre50);
+    }
 
     return builder.obj();
 }
@@ -136,5 +161,11 @@ void DatabaseType::setSharded(bool sharded) {
 void DatabaseType::setVersion(const DatabaseVersion& version) {
     _version = version;
 }
+
+void DatabaseType::setLastMovedTimestampPre50(
+    const boost::optional<Timestamp>& lastMovedTimestampPre50) {
+    _lastMovedTimestampPre50 = lastMovedTimestampPre50;
+}
+
 
 }  // namespace mongo

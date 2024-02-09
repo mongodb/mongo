@@ -55,7 +55,8 @@ public:
     DatabaseType(const std::string& dbName,
                  const ShardId& primaryShard,
                  bool sharded,
-                 DatabaseVersion dbVersion);
+                 DatabaseVersion dbVersion,
+                 boost::optional<Timestamp> lastMovedTimestampPre50 = boost::none);
 
     DatabaseType() = default;
 
@@ -66,6 +67,7 @@ public:
     static const BSONField<std::string> primary;
     static const BSONField<bool> sharded;
     static const BSONField<BSONObj> version;
+    static const BSONField<Timestamp> lastMovedTimestampPre50;
 
     /**
      * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
@@ -108,11 +110,20 @@ public:
     }
     void setVersion(const DatabaseVersion& version);
 
+    const boost::optional<Timestamp>& getLastMovedTimestampPre50() const {
+        return _lastMovedTimestampPre50;
+    }
+    void setLastMovedTimestampPre50(const boost::optional<Timestamp>& lastMovedTimestampPre50);
+
 private:
     std::string _name;
     ShardId _primary;
     bool _sharded{false};
     DatabaseVersion _version;
+
+    // Optional field, used on pre-v5.0 metadata. Reflects the time at which this database instance
+    // was created or last moved.
+    boost::optional<Timestamp> _lastMovedTimestampPre50;
 };
 
 }  // namespace mongo

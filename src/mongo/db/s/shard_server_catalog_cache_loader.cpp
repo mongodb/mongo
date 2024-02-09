@@ -936,6 +936,9 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_schedulePrimaryGetDatab
         return swDatabaseType;
     }
 
+    // Do not persist 'lastMovedTimestamp', since this field is not needed by shards.
+    swDatabaseType.getValue().setLastMovedTimestampPre50(boost::none);
+
     _ensureMajorityPrimaryAndScheduleDbTask(opCtx, dbName, DBTask{swDatabaseType, termScheduled});
 
     LOGV2_FOR_CATALOG_REFRESH(24110,

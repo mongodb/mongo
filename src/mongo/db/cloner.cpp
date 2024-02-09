@@ -71,6 +71,7 @@ namespace mongo {
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 MONGO_FAIL_POINT_DEFINE(movePrimaryFailPoint);
+MONGO_FAIL_POINT_DEFINE(movePrimaryClonerHangBeforeStartCloneDocuments);
 
 BSONElement getErrField(const BSONObj& o);
 
@@ -566,6 +567,8 @@ Status Cloner::copyDb(OperationContext* opCtx,
                      collectionIndexSpecs[params.collectionName],
                      conn.get());
     }
+
+    movePrimaryClonerHangBeforeStartCloneDocuments.pauseWhileSet();
 
     for (auto&& params : createCollectionParams) {
         if (params.shardedColl) {

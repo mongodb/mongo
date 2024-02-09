@@ -664,7 +664,7 @@ private:
 
     /**
      * Creates a 'version.timestamp' for each one of the entries in the config server's
-     * config.databases where it didn't already exist before.
+     * config.databases where it didn't already exist before. Also deletes 'lastMovedTimestamp'.
      *
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */

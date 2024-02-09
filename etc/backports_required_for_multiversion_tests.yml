@@ -133,6 +133,8 @@ last-continuous:
     ticket: SERVER-82129
   - test_file: jstests/change_streams/dbcheck_oplog_entry.js
     ticket: SERVER-85156
+  - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    ticket: SERVER-82353
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -328,6 +330,8 @@ last-lts:
     ticket: SERVER-82129
   - test_file: jstests/change_streams/dbcheck_oplog_entry.js
     ticket: SERVER-85156
+  - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
+    ticket: SERVER-82353
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

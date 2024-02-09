@@ -627,9 +627,11 @@ public:
     ChunkManager(ShardId dbPrimary,
                  DatabaseVersion dbVersion,
                  RoutingTableHistoryValueHandle rt,
-                 boost::optional<Timestamp> clusterTime)
+                 boost::optional<Timestamp> clusterTime,
+                 boost::optional<Timestamp> databaseLastMovedTimestampPre50 = boost::none)
         : _dbPrimary(std::move(dbPrimary)),
           _dbVersion(std::move(dbVersion)),
+          _databaseLastMovedTimestampPre50(std::move(databaseLastMovedTimestampPre50)),
           _rt(std::move(rt)),
           _clusterTime(std::move(clusterTime)) {}
 
@@ -651,6 +653,10 @@ public:
 
     const DatabaseVersion& dbVersion() const {
         return _dbVersion;
+    }
+
+    const boost::optional<Timestamp> getDatabaseLastMovedTimestampPre50() const {
+        return _databaseLastMovedTimestampPre50;
     }
 
     int numChunks() const {
@@ -860,6 +866,7 @@ public:
 private:
     ShardId _dbPrimary;
     DatabaseVersion _dbVersion;
+    boost::optional<Timestamp> _databaseLastMovedTimestampPre50;
 
     RoutingTableHistoryValueHandle _rt;
 

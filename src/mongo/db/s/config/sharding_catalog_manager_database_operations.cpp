@@ -202,17 +202,21 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
             FixedFCVRegion fcvRegion(opCtx);
 
-            boost::optional<Timestamp> clusterTime;
+            const auto now = VectorClock::get(opCtx)->getTime();
+            boost::optional<Timestamp> dbVersionTimestamp;
+            boost::optional<Timestamp> dbLastMovedTimestampPre50;
             if (DatabaseEntryFormat::get(fcvRegion) == DatabaseEntryFormat::kUUIDandTimestamp) {
-                const auto now = VectorClock::get(opCtx)->getTime();
-                clusterTime = now.clusterTime().asTimestamp();
+                dbVersionTimestamp = now.clusterTime().asTimestamp();
+            } else {
+                dbLastMovedTimestampPre50 = now.clusterTime().asTimestamp();
             }
 
             // Pick a primary shard for the new database.
             DatabaseType db(dbName.toString(),
                             shardPtr->getId(),
                             enableSharding,
-                            DatabaseVersion(UUID::gen(), clusterTime));
+                            DatabaseVersion(UUID::gen(), dbVersionTimestamp),
+                            dbLastMovedTimestampPre50);
 
             LOGV2(21938,
                   "Registering new database {db} in sharding catalog",
@@ -299,8 +303,12 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     newDbType.setPrimary(toShard);
 
     auto const currentDatabaseVersion = dbType.getVersion();
-
     newDbType.setVersion(currentDatabaseVersion.makeUpdated());
+
+    // ShardingCatalogManager::commitMovePrimary is only executed on pre-v5.0 FCV, so we use
+    // pre-v5.0 metadata ('lastMovedTimestamp').
+    const auto now = VectorClock::get(opCtx)->getTime();
+    newDbType.setLastMovedTimestampPre50(now.clusterTime().asTimestamp());
 
     auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << dbname));
     updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion.toBSON());

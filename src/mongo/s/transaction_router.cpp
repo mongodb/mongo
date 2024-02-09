@@ -627,9 +627,10 @@ void TransactionRouter::Router::_checkForPlacementConflict(OperationContext* opC
     // is more recent than the timestamp the current transaction started with. If
     // so, we throw a MigrationConflict error to force the client to retry so the
     // storage engine uses an up to date snapshot.
+    // No need to check it when using snapshot readConcern.
     const auto cm =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    if (cm.isSharded() &&
+    if (!_atClusterTimeHasBeenSet() && cm.isSharded() &&
         (getPlacementConflictTime().asTimestamp() < cm.getMaxValidAfter(shardId))) {
         uasserted(ErrorCodes::MigrationConflict,
                   str::stream() << "Collection " << nss
@@ -640,16 +641,55 @@ void TransactionRouter::Router::_checkForPlacementConflict(OperationContext* opC
                                 << getPlacementConflictTime().asTimestamp().toBSON()
                                 << ". Transaction will be aborted.");
     }
+
+    // For dbVersion, the router needs to check when using both snapshot and non-snapshot read
+    // concerns.
+    if (!cm.isSharded()) {
+        const boost::optional<Timestamp> dbLastMovedTimestamp =
+            [&]() -> boost::optional<Timestamp> {
+            // Get the logical timestamp at which this database placement became valid. How we can
+            // know this depends on the metadata format:
+            // -  If databaseVersion has 'timestamp', then use that (this is the case for FCV 5.0).
+            // -  If databaseVersion does not have 'timestamp', but the database metadata has
+            // 'lastMovedTimestamp', then use that instead (that's the case for FCV lower than 5.0,
+            // for certain binary versions that include this fix).
+            // - If there's neither, then TransactionRouter cannot check for placement conflicts.
+            if (cm.dbVersion().getTimestamp()) {
+                return cm.dbVersion().getTimestamp();
+            } else if (cm.getDatabaseLastMovedTimestampPre50()) {
+                return cm.getDatabaseLastMovedTimestampPre50();
+            } else {
+                return boost::none;
+            }
+        }();
+
+        if (dbLastMovedTimestamp) {
+            const auto txnConflictTimestamp = _atClusterTimeHasBeenSet()
+                ? getSelectedAtClusterTime().asTimestamp()
+                : getPlacementConflictTime().asTimestamp();
+
+            bool dbWasCreatedByThisTransaction = !p().createdDatabases.empty() &&
+                p().createdDatabases.count(nss.db().toString()) > 0;
+            if (txnConflictTimestamp < *dbLastMovedTimestamp && !dbWasCreatedByThisTransaction) {
+                uasserted(ErrorCodes::MigrationConflict,
+                          str::stream()
+                              << "Database " << nss.db()
+                              << " has undergone a catalog change operation at time "
+                              << dbLastMovedTimestamp->toBSON()
+                              << " and no longer satisfies the "
+                                 "requirements for the current transaction which requires "
+                              << txnConflictTimestamp.toBSON() << ". Transaction will be aborted.");
+            }
+        }
+    }
 }
 
 BSONObj TransactionRouter::Router::attachTxnFieldsIfNeeded(OperationContext* opCtx,
                                                            const ShardId& shardId,
                                                            const BSONObj& cmdObj,
                                                            const StringData& dbName) {
-    // Skip the placement check if we are not running a transaction or if we are using snapshot read
-    // concern.
+    // Skip the placement check if we are not running a transaction.
     if (!((opCtx->getTxnNumber() && !opCtx->inMultiDocumentTransaction()) ||
-          _atClusterTimeHasBeenSet() ||
           MONGO_unlikely(skipConflictPlacementTimestampCheck.shouldFail()))) {
         // For commands only against a db and not a collection, skip the placementConflict check.
         if (auto nss = NamespaceString(CommandHelpers::parseNsFromCommand(dbName, cmdObj));
@@ -1430,6 +1470,7 @@ void TransactionRouter::Router::_resetRouterState(OperationContext* opCtx,
     o(lk).abortCause = std::string();
     o(lk).metricsTracker.emplace(opCtx->getServiceContext());
     p().terminationInitiated = false;
+    p().createdDatabases.clear();
 
     auto tickSource = opCtx->getServiceContext()->getTickSource();
     o(lk).metricsTracker->trySetActive(tickSource, tickSource->getTicks());

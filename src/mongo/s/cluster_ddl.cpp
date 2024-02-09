@@ -35,6 +35,7 @@
 
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/transaction_router.h"
 
 namespace mongo {
 namespace cluster {
@@ -93,6 +94,10 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
         request.setDbName(NamespaceString::kAdminDb);
         if (suggestedPrimaryId)
             request.setPrimaryShardId(StringData(suggestedPrimaryId->toString()));
+
+        if (auto txnRouter = TransactionRouter::get(opCtx)) {
+            txnRouter.annotateCreatedDatabase(dbName);
+        }
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
         auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(

@@ -809,7 +809,8 @@ void ShardingCatalogManager::_upgradeDatabasesEntriesTo50(OperationContext* opCt
             DatabaseType::ConfigNS,
             BSON(DatabaseType::name << name),
             BSON("$set" << BSON(DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName
-                                << clusterTime)),
+                                << clusterTime)
+                        << "$unset" << BSON(DatabaseType::lastMovedTimestampPre50() << 1)),
             false /* upsert */,
             false /* multi*/);
     }

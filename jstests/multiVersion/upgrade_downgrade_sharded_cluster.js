@@ -116,9 +116,12 @@ function testTimestampFieldSetup() {
 function testTimestampFieldChecksAfterUpgrade() {
     let configDB = st.s.getDB('config');
 
-    // Check that 'timestamp' has been created in configsvr config.databases
-    let dbTimestampInConfigSvr = configDB.databases.findOne({_id: 'sharded'}).version.timestamp;
+    // Check that 'timestamp' has been created in configsvr config.databases, and that
+    // 'lastMovedTimestamp' has been deleted.
+    const dbMetadata = configDB.databases.findOne({_id: 'sharded'});
+    const dbTimestampInConfigSvr = dbMetadata.version.timestamp;
     assert.neq(null, dbTimestampInConfigSvr);
+    assert.eq(null, dbMetadata.lastMovedTimestamp);
 
     let primaryShard = st.getPrimaryShard('sharded');
 

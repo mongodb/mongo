@@ -359,8 +359,19 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
     }
 
     auto const newDbVersion = [&]() {
-        auto version = originalDbType.getVersion();
-        return version.makeUpdated();
+        auto newVersion = originalDbType.getVersion().makeUpdated();
+
+        // Only bump timestamp if the current database version already had a 'timestamp' field.
+        if (newVersion.getTimestamp()) {
+            const auto now = VectorClock::get(opCtx)->getTime();
+            const auto clusterTime = now.clusterTime().asTimestamp();
+            newVersion.setTimestamp(clusterTime);
+            tassert(8235300,
+                    "New database timestamp must be newer than previous one",
+                    newVersion.getTimestamp() > originalDbType.getVersion().getTimestamp());
+        }
+
+        return newVersion;
     }();
 
     auto getDottedVersionField = [](const StringData& fieldName) {
@@ -373,10 +384,25 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
                                 << newDbVersion.getUuid()
                                 << getDottedVersionField(DatabaseVersion::kLastModFieldName)
                                 << originalDbType.getVersion().getLastMod());
-    auto const update =
-        BSON("$set" << BSON(DatabaseType::primary
-                            << _toShard << getDottedVersionField(DatabaseVersion::kLastModFieldName)
-                            << newDbVersion.getLastMod()));
+
+    const auto update = [&]() {
+        BSONObjBuilder bob;
+        bob.append(DatabaseType::primary.name(), _toShard);
+        bob.append(getDottedVersionField(DatabaseVersion::kLastModFieldName),
+                   newDbVersion.getLastMod());
+        if (newDbVersion.getTimestamp()) {
+            bob.append(getDottedVersionField(DatabaseVersion::kTimestampFieldName),
+                       *newDbVersion.getTimestamp());
+        } else {
+            // If database version has no timestamp, this is pre-5.0 metadata format. Bump
+            // 'lastMovedTimestamp' instead.
+            const auto now = VectorClock::get(opCtx)->getTime();
+            const auto clusterTime = now.clusterTime().asTimestamp();
+            bob.append(DatabaseType::lastMovedTimestampPre50.name(), clusterTime);
+        }
+
+        return BSON("$set" << bob.done());
+    }();
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,

@@ -306,7 +306,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                 return ChunkManager(dbInfo.primaryId(),
                                     dbInfo.databaseVersion(),
                                     collEntryFuture.get(opCtx),
-                                    atClusterTime);
+                                    atClusterTime,
+                                    dbInfo.getDatabaseType().getLastMovedTimestampPre50());
             } else {
                 return Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
                               "Routing info refresh did not complete"};
@@ -327,7 +328,8 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                 return ChunkManager(dbInfo.primaryId(),
                                     dbInfo.databaseVersion(),
                                     std::move(collEntry),
-                                    atClusterTime);
+                                    atClusterTime,
+                                    dbInfo.getDatabaseType().getLastMovedTimestampPre50());
             } catch (const DBException& ex) {
                 bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
                     ex.code() == ErrorCodes::ConflictingOperationInProgress ||
