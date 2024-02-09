@@ -57,6 +57,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 #include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
@@ -65,6 +66,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_test_optimizations.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -3222,6 +3224,36 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPre
     ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline->getSources().back().get()));
 }
 
+TEST(PipelineOptimizationTest, ChangeStreamHandleTopologyChangeSwapsWithRedact) {
+    QueryTestServiceContext testServiceContext;
+    auto opCtx = testServiceContext.makeOperationContext();
+
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(kTestNss));
+    expCtx->opCtx = opCtx.get();
+    expCtx->uuid = UUID::gen();
+    expCtx->inMongos = true;  // To enforce the $_internalChangeStreamHandleTopologyChange stage.
+    setMockReplicationCoordinatorOnOpCtx(expCtx->opCtx);
+
+    auto stages = DocumentSourceChangeStream::createFromBson(
+        fromjson("{$changeStream: {showExpandedEvents: true}}").firstElement(), expCtx);
+
+    // Assert that the last stage is $_internalChangeStreamHandleTopologyChange.
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamHandleTopologyChange*>(stages.back().get()));
+
+    // Add $redact as the last stage.
+    stages.push_back(DocumentSourceRedact::createFromBson(
+        fromjson("{$redact: '$$PRUNE'}").firstElement(), expCtx));
+
+    auto pipeline = Pipeline::create(stages, expCtx);
+    pipeline->optimizePipeline();
+
+    // Assert that $redact swaps with $_internalChangeStreamHandleTopologyChange after optimization.
+    ASSERT(dynamic_cast<DocumentSourceRedact*>(
+        std::prev(std::prev(pipeline->getSources().end()))->get()));
+    ASSERT(dynamic_cast<DocumentSourceChangeStreamHandleTopologyChange*>(
+        pipeline->getSources().back().get()));
+}
+
 TEST(PipelineOptimizationTest, SortLimProjLimBecomesTopKSortProj) {
     std::string inputPipe =
         "[{$sort: {a: 1}}"
@@ -4723,6 +4755,55 @@ TEST_F(PipelineValidateTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
     ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
     ASSERT_THROWS_CODE(Pipeline::parse(rawPipeline, ctx), AssertionException, 40600);
+}
+
+TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsValid) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+                                              fromjson("{$changeStreamSplitLargeEvent: {}}")};
+    auto ctx = getExpCtx();
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
+    Pipeline::parse(rawPipeline, ctx);
+}
+
+TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsNotValidWithoutChangeStream) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStreamSplitLargeEvent: {}}")};
+    auto ctx = getExpCtx();
+    ctx->changeStreamSpec = boost::none;
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
+    ASSERT_THROWS_CODE(
+        Pipeline::parse(rawPipeline, ctx), DBException, ErrorCodes::IllegalOperation);
+}
+
+TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsNotLastStage) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+                                              fromjson("{$changeStreamSplitLargeEvent: {}}"),
+                                              fromjson("{$match: {}}")};
+    auto ctx = getExpCtx();
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
+    ASSERT_THROWS_CODE(Pipeline::parse(rawPipeline, ctx), DBException, 7182802);
+}
+
+TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsValidAfterMatch) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+                                              fromjson("{$match: {custom: 'filter'}}"),
+                                              fromjson("{$changeStreamSplitLargeEvent: {}}")};
+    auto ctx = getExpCtx();
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
+    Pipeline::parse(rawPipeline, ctx);
+}
+
+TEST_F(PipelineValidateTest, ChangeStreamSplitLargeEventIsValidAfterRedact) {
+    const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}"),
+                                              fromjson("{$redact: '$$PRUNE'}"),
+                                              fromjson("{$changeStreamSplitLargeEvent: {}}")};
+    auto ctx = getExpCtx();
+    setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
+    ctx->ns = NamespaceString::createNamespaceString_forTest("a.collection");
+    Pipeline::parse(rawPipeline, ctx);
 }
 
 class DocumentSourceDisallowedInTransactions : public DocumentSourceMock {

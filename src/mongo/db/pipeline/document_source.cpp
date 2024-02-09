@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_redact.h"
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -208,6 +209,25 @@ bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
                 container->insert(std::next(itr), std::move(splitMatch.second));
             }
 
+            return true;
+        }
+    }
+    return false;
+}
+
+bool DocumentSource::pushRedactBefore(Pipeline::SourceContainer::iterator itr,
+                                      Pipeline::SourceContainer* container) {
+    if (constraints().canSwapWithRedact) {
+        auto nextItr = std::next(itr);
+        if (auto redactStage = dynamic_cast<DocumentSourceRedact*>(nextItr->get())) {
+            LOGV2_DEBUG(8584800,
+                        5,
+                        "Swapping a $redact stage in front of another stage: ",
+                        "redactStage"_attr = redact(redactStage->serializeToBSONForDebug()),
+                        "thisStage"_attr = redact(serializeToBSONForDebug()));
+
+            // Swap 'itr' and 'nextItr' list nodes.
+            container->splice(itr, *container, nextItr);
             return true;
         }
     }
