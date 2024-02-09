@@ -1166,6 +1166,13 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
 
 // ----------------------------------------
 // Tests with stale router
+
+// Make sure mongos0 has cached routing tables for all involved collections.
+db[kUnsplittable1CollName].find().itcount();
+db[kUnsplittable2CollName].find().itcount();
+db[kShardedColl1Name].find().itcount();
+db[kShardedColl2Name].find().itcount();
+
 // Router believes outer and inner are not collocated, but they are.
 {
     // Move kUnsplittable2CollName from shard2 to shard1. Use a mongos1 so that mongos0 is left
@@ -1182,13 +1189,27 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
         {_id: 2, a: 101, unsplittable: 1, out: [{_id: 2, a: 101, unsplittable: 2}]},
     ];
 
-    // Check that router routes optimally for the new placement.
+    // Run the aggregation one first time to let the router gossip in the new placement for the
+    // inner collection. Expect correct results, but sub-optimal pipeline splitting choice (pipeline
+    // gets split in this run).
+    shardTargetingTest.assertShardTargeting({
+        pipeline: pipeline,
+        targetCollName: kUnsplittable1CollName,
+        explainAssertionObj: {
+            expectedMergingShard: shard2,
+            expectedMergingStages: ["$mergeCursors", "$lookup"],
+        },
+        expectedResults: expectedResults,
+        comment: "outer_unsplittable_1_inner_unsplittable_2_collocated_but_stale_router_1",
+    });
+
+    // Check that router now routes optimally for the new placement.
     shardTargetingTest.assertShardTargeting({
         pipeline: pipeline,
         targetCollName: kUnsplittable1CollName,
         explainAssertionObj: {
             expectedShard: shard1,
-            assertSBELookupPushdown: true,
+            assertSBELookupPushdown: checkSbeRestrictedOrFullyEnabled(db),
         },
         expectedResults: expectedResults,
         comment: "outer_unsplittable_1_inner_unsplittable_2_collocated_but_stale_router_2",
