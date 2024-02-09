@@ -2975,7 +2975,7 @@ bool TopologyCoordinator::advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTim
 
     // Arbiters don't have data so they always advance their commit point via heartbeats.
     if (!_selfConfig().isArbiter() &&
-        getMyLastAppliedOpTime().getTerm() != committedOpTime.opTime.getTerm()) {
+        getMyLastWrittenOpTime().getTerm() != committedOpTime.opTime.getTerm()) {
         if (fromSyncSource) {
             committedOpTime = std::min(committedOpTime, getMyLastAppliedOpTimeAndWallTime());
         } else {

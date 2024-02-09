@@ -1767,7 +1767,6 @@ TEST_F(ReplCoordHBV1Test,
     auto opTime2 = OpTime({11, 1}, 2);  // In higher term.
     auto commitPoint = OpTime({15, 1}, 2);
     replCoordSetMyLastWrittenOpTime(opTime1, Date_t() + Seconds(100));
-    replCoordSetMyLastAppliedOpTime(opTime1, Date_t() + Seconds(100));
 
     // Node 1 is the current primary. The commit point has a higher term than lastApplied.
     rpc::ReplSetMetadata metadata(
@@ -1808,7 +1807,6 @@ TEST_F(ReplCoordHBV1Test,
 
     // Update lastWritten and lastApplied, so commit point can be advanced.
     replCoordSetMyLastWrittenOpTime(opTime2, Date_t() + Seconds(100));
-    replCoordSetMyLastAppliedOpTime(opTime2, Date_t() + Seconds(100));
     {
         net->enterNetwork();
         net->runUntil(net->now() + config.getHeartbeatInterval());
@@ -1845,7 +1843,6 @@ TEST_F(ReplCoordHBV1Test, LastCommittedOpTimeOnlyUpdatesFromHeartbeatIfNotInStar
     auto lastAppliedOpTime = OpTime({11, 1}, 2);
     auto commitPoint = OpTime({15, 1}, 2);
     replCoordSetMyLastWrittenOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
-    replCoordSetMyLastAppliedOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
 
     // Node 1 is the current primary.
     rpc::ReplSetMetadata metadata(
@@ -1922,7 +1919,6 @@ TEST_F(ReplCoordHBV1Test, DoNotAttemptToUpdateLastCommittedOpTimeFromHeartbeatIf
     auto lastAppliedOpTime = OpTime({11, 1}, 2);
     auto commitPoint = OpTime({15, 1}, 2);
     replCoordSetMyLastWrittenOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
-    replCoordSetMyLastAppliedOpTime(lastAppliedOpTime, Date_t() + Seconds(100));
 
     // Node 1 is the current primary.
     rpc::ReplSetMetadata metadata(

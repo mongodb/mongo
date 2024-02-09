@@ -1890,6 +1890,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     Timestamp electionTime(1, 2);
     OpTime oplogProgress(Timestamp(3, 1), 20);
     Date_t appliedWallTime = Date_t() + Seconds(oplogProgress.getSecs());
+    Date_t writtenWallTime = appliedWallTime;
     OpTime oplogDurable(Timestamp(1, 1), 19);
     Date_t durableWallTime = Date_t() + Seconds(oplogDurable.getSecs());
     OpTime lastCommittedOpTime(Timestamp(5, 1), 20);
@@ -1909,7 +1910,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     hb.setElectionTime(electionTime);
     hb.setDurableOpTimeAndWallTime({oplogDurable, durableWallTime});
     hb.setAppliedOpTimeAndWallTime({oplogProgress, appliedWallTime});
-    hb.setWrittenOpTimeAndWallTime({oplogProgress, appliedWallTime});
+    hb.setWrittenOpTimeAndWallTime({oplogProgress, writtenWallTime});
     StatusWith<ReplSetHeartbeatResponse> hbResponseGood = StatusWith<ReplSetHeartbeatResponse>(hb);
 
     updateConfig(BSON("_id" << setName << "version" << 1 << "members"
@@ -1944,7 +1945,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     getTopoCoord().processHeartbeatResponse(
         heartbeatTime, Milliseconds(4000), member, hbResponseGood);
     makeSelfPrimary(electionTime);
-    topoCoordSetMyLastAppliedOpTime(oplogProgress, startupTime, false, appliedWallTime);
+    topoCoordSetMyLastWrittenOpTime(oplogProgress, startupTime, false, writtenWallTime);
     topoCoordSetMyLastDurableOpTime(oplogDurable, startupTime, false, durableWallTime);
     topoCoordAdvanceLastCommittedOpTime(lastCommittedOpTime, lastCommittedWallTime, false);
 
@@ -1976,8 +1977,6 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
         const auto optimes = rsStatus["optimes"].Obj();
         ASSERT_BSONOBJ_EQ(readConcernMajorityOpTime.toBSON(),
                           optimes["readConcernMajorityOpTime"].Obj());
-        ASSERT_BSONOBJ_EQ(oplogProgress.toBSON(), optimes["appliedOpTime"].Obj());
-        ASSERT_EQUALS(appliedWallTime, optimes["lastAppliedWallTime"].Date());
         ASSERT_BSONOBJ_EQ((oplogDurable).toBSON(), optimes["durableOpTime"].Obj());
         ASSERT_EQUALS(durableWallTime, optimes["lastDurableWallTime"].Date());
         ASSERT_BSONOBJ_EQ(lastCommittedOpTime.toBSON(), optimes["lastCommittedOpTime"].Obj());
@@ -2051,10 +2050,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].numberInt());
     ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(), selfStatus["stateStr"].str());
     ASSERT_EQUALS(durationCount<Seconds>(uptimeSecs), selfStatus["uptime"].numberInt());
-    ASSERT_BSONOBJ_EQ(oplogProgress.toBSON(), selfStatus["optime"].Obj());
     ASSERT_TRUE(selfStatus.hasField("optimeDate"));
-    ASSERT_EQUALS(Date_t::fromMillisSinceEpoch(oplogProgress.getSecs() * 1000ULL),
-                  selfStatus["optimeDate"].Date());
     ASSERT_FALSE(selfStatus.hasField("lastStableRecoveryTimestamp"));
     ASSERT_EQUALS(electionTime, selfStatus["electionTime"].timestamp());
     ASSERT_FALSE(selfStatus.hasField("pingMs"));
