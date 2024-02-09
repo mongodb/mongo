@@ -13,52 +13,62 @@ const tsColl = testDB.clustered_index_options;
 const tsCollName = tsColl.getName();
 const bucketsCollName = 'system.buckets.' + tsCollName;
 
-assert.commandWorked(testDB.dropDatabase());
+function testInvalidCreateBucketsCollectionOptions(invalidOptions, expectedErrorCodes) {
+    assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, invalidOptions),
+                                 expectedErrorCodes);
+}
 
-assert.commandWorked(testDB.createCollection(bucketsCollName, {clusteredIndex: false}));
-assert.commandWorked(testDB.dropDatabase());
+// Tests time-series creation can be (somewhat)round-tripped to time-series buckets collection
+// creation. Specifically, tests the 'listCollections' output on a time-series collection can be
+// used to create a time-series buckets collection.
+//
+// Returns the options round-tripped from 'listCollections' to time-series buckets collection
+// creation.
+function roundTripTimeseriesToBucketsCreateOptions() {
+    assert.commandWorked(testDB.dropDatabase());
 
-assert.commandWorked(testDB.createCollection(bucketsCollName, {clusteredIndex: true}));
-assert.commandWorked(testDB.dropDatabase());
+    assert.commandWorked(testDB.createCollection(
+        tsCollName, {timeseries: {timeField: 'time'}, expireAfterSeconds: 10}));
+    let res = assert.commandWorked(
+        testDB.runCommand({listCollections: 1, filter: {name: bucketsCollName}}));
+    const options = res.cursor.firstBatch[0].options;
+    // Ensure the 'clusteredIndex' legacy format is used {'clusteredIndex': true>}.
+    assert.eq(tojson(options.clusteredIndex), tojson(true));
+    assert(tsColl.drop());
 
-assert.commandWorked(
-    testDB.createCollection(bucketsCollName, {clusteredIndex: true, expireAfterSeconds: 10}));
-assert.commandWorked(testDB.dropDatabase());
+    assert.commandWorked(testDB.createCollection(bucketsCollName, options));
+    res = assert.commandWorked(
+        testDB.runCommand({listCollections: 1, filter: {name: bucketsCollName}}));
+    assert.eq(options, res.cursor.firstBatch[0].options);
+    assert.commandWorked(testDB.dropDatabase());
+    return options;
+}
 
-// Round-trip creating a time-series collection.  Use the output of listCollections to re-create
-// the buckets collection.
-assert.commandWorked(
-    testDB.createCollection(tsCollName, {timeseries: {timeField: 'time'}, expireAfterSeconds: 10}));
+const options = roundTripTimeseriesToBucketsCreateOptions();
 
-let res =
-    assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: bucketsCollName}}));
-let options = res.cursor.firstBatch[0].options;
-assert(options.clusteredIndex);
-assert(tsColl.drop());
+// Validate time-series buckets collection creation requires 'clusteredIndex' to be specified in the
+// following format {'clusteredIndex': true}.
+testInvalidCreateBucketsCollectionOptions({...options, clusteredIndex: {}},
+                                          ErrorCodes.IDLFailedToParse);
+testInvalidCreateBucketsCollectionOptions({...options, clusteredIndex: 'a'},
+                                          ErrorCodes.TypeMismatch);
+testInvalidCreateBucketsCollectionOptions({...options, clusteredIndex: false},
+                                          ErrorCodes.InvalidOptions);
 
-assert.commandWorked(testDB.createCollection(bucketsCollName, options));
-res =
-    assert.commandWorked(testDB.runCommand({listCollections: 1, filter: {name: bucketsCollName}}));
-assert.eq(options, res.cursor.firstBatch[0].options);
-assert.commandWorked(testDB.dropDatabase());
+// Test the time-series buckets collection cannot be created with the generalized 'clusteredIndex'
+// format used to create standard clustered collections.
+testInvalidCreateBucketsCollectionOptions(
+    {...options, clusteredIndex: {key: {_id: 1}, unique: true}}, 5979703);
 
-assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: {}}),
-                             [ErrorCodes.TypeMismatch, ErrorCodes.IDLFailedToParse]);
-assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: 'a'}),
-                             ErrorCodes.TypeMismatch);
-assert.commandFailedWithCode(
-    testDB.createCollection(bucketsCollName,
-                            {clusteredIndex: true, idIndex: {key: {_id: 1}, name: '_id_'}}),
-    ErrorCodes.InvalidOptions);
+// Validate additional 'idIndex' field fails to create the buckets collection when added to
+// otherwise valid create options.
+testInvalidCreateBucketsCollectionOptions({...options, idIndex: {key: {_id: 1}, name: '_id_'}},
+                                          ErrorCodes.InvalidOptions);
 
-assert.commandFailedWithCode(testDB.createCollection(tsCollName, {clusteredIndex: true}),
-                             [ErrorCodes.InvalidOptions, 5979703]);
-assert.commandFailedWithCode(testDB.createCollection('test', {clusteredIndex: true}),
-                             [ErrorCodes.InvalidOptions, 5979703]);
-
-// Using the 'expireAfterSeconds' option on any namespace other than a time-series namespace or a
-// clustered time-series buckets namespace should fail.
+// Using the 'expireAfterSeconds' option on any namespace other than a time-series namespace or
+// time-series buckets collection namespace should fail.
+//
+// TODO SERVER-79630: Test that 'expireAfterSeconds' is only accepted when alongside other options
+// required to create a true time-series buckets collection.
 assert.commandFailedWithCode(testDB.createCollection('test', {expireAfterSeconds: 10}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {expireAfterSeconds: 10}),
                              ErrorCodes.InvalidOptions);

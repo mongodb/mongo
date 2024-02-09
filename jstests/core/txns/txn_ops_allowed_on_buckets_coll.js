@@ -7,52 +7,77 @@
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+
+function incrementOID(oid) {
+    const prefix = oid.toString().substr(10, 16);
+    const suffix = oid.toString().substr(26, 8);
+
+    const number = parseInt(suffix, 16) + 1;
+    const incremented = number.toString(16).padStart(8, '0');
+
+    return ObjectId(prefix + incremented);
+}
 
 const session = db.getMongo().startSession();
+const sessionDB = session.getDatabase(jsTestName());
+assert.commandWorked(sessionDB.dropDatabase());
 
-// Use a custom database, to avoid conflict with other tests that use the system.buckets.foo
-// collection.
-const testDB = session.getDatabase("timeseries_buckets_writes_in_txn");
-assert.commandWorked(testDB.dropDatabase());
+const tsCollName = "t";
+const timeFieldName = 'time';
+const metaFieldName = 'meta';
+const tsColl = assertDropAndRecreateCollection(
+    sessionDB, tsCollName, {timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
+const bucketsColl = sessionDB.getCollection(TimeseriesTest.getBucketsCollName(tsCollName));
 
-// Access a collection prefixed with system.buckets, to mimic doing a
-// transaction on a timeseries buckets collection.
-const systemColl = testDB.getCollection(TimeseriesTest.getBucketsCollName("foo"));
-
-// Ensure that a collection exists with at least one document.
-assert.commandWorked(systemColl.insert({name: 0}, {writeConcern: {w: "majority"}}));
+assert.commandWorked(
+    tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 1}));
+assert.commandWorked(
+    tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 2}));
+assert.commandWorked(
+    tsColl.insert({[timeFieldName]: ISODate("2023-08-01T00:00:00.000Z"), [metaFieldName]: 3}));
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 
-jsTestLog("Test writing to the collection.");
-
 jsTestLog("Testing findAndModify.");
+assert.commandWorked(sessionDB.runCommand({
+    findAndModify: bucketsColl.getName(),
+    query: {[metaFieldName]: 1},
+    update: {$set: {[metaFieldName]: 100}},
+}));
 
-// These findAndModify operations would throw if they failed.
-systemColl.findAndModify({query: {}, update: {}});
-systemColl.findAndModify({query: {}, remove: true});
+assert.commandWorked(sessionDB.runCommand({
+    findAndModify: bucketsColl.getName(),
+    query: {[metaFieldName]: 100},
+    remove: true,
+}));
 
 jsTestLog("Testing insert.");
-assert.commandWorked(systemColl.insert({name: "new"}));
+const bogusBucket = bucketsColl.findOne({[metaFieldName]: 3});
+assert(bogusBucket);
+const id3 = bogusBucket._id;
+bogusBucket._id = incrementOID(id3);
+assert.commandWorked(bucketsColl.insert(bogusBucket));
 
 jsTestLog("Testing update.");
-assert.commandWorked(systemColl.update({name: 0}, {$set: {name: "foo"}}));
+assert.commandWorked(bucketsColl.update({_id: bogusBucket._id}, {$set: {[metaFieldName]: 4}}));
 assert.commandWorked(
-    systemColl.update({name: "nonexistent"}, {$set: {name: "foo"}}, {upsert: true}));
+    bucketsColl.update({[metaFieldName]: 65},
+                       {$set: {"control": bogusBucket.control, "data": bogusBucket.data}},
+                       {upsert: true}));
 
 jsTestLog("Testing remove.");
-assert.commandWorked(systemColl.remove({name: 0}));
-assert.commandWorked(systemColl.remove({_id: {$exists: true}}));
+assert.commandWorked(bucketsColl.remove({[metaFieldName]: 65}));
+assert.commandWorked(bucketsColl.remove({_id: {$exists: true}}));
 
-// Insert a document to be read by the subsequent commands.
-assert.commandWorked(systemColl.insert({name: "new"}));
+jsTestLog("Testing find");
+assert.eq(bucketsColl.find().itcount(), 0);
 
-jsTestLog("Test reading from the collection.");
-
-jsTestLog("Testing find.");
-assert.eq(systemColl.find().itcount(), 1);
+// Insert the bogusBucket again to test aggregate.
+assert.commandWorked(bucketsColl.insert(bogusBucket));
+assert.eq(bucketsColl.find().itcount(), 1);
 
 jsTestLog("Testing aggregate.");
-assert.eq(systemColl.aggregate([{$match: {}}]).itcount(), 1);
+assert.eq(bucketsColl.aggregate([{$match: {}}]).itcount(), 1);
 
 assert.commandWorked(session.commitTransaction_forTesting());

@@ -123,8 +123,6 @@ export var ClusteredCollectionUtil = class {
             }
         }
 
-        // This section is based on jstests/core/timeseries/clustered_index_crud.js with
-        // specific additions for general-purpose (non-timeseries) clustered collections
         assert.commandWorked(coll.insert({[clusterKey]: 0, a: 1}));
         assert.commandWorked(coll.insert({[clusterKey]: 1, a: 1}));
         assert.eq(1, coll.find({[clusterKey]: 0}).itcount());
