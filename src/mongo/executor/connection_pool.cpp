@@ -83,6 +83,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(refreshConnectionAfterEveryCommand);
 MONGO_FAIL_POINT_DEFINE(forceExecutorConnectionPoolTimeout);
 MONGO_FAIL_POINT_DEFINE(connectionPoolReturnsErrorOnGet);
+MONGO_FAIL_POINT_DEFINE(connectionPoolDropConnectionsBeforeGetConnection);
+MONGO_FAIL_POINT_DEFINE(connectionPoolDoesNotFulfillRequests);
 
 auto makeSeveritySuppressor() {
     return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
@@ -300,9 +302,7 @@ public:
      * Gets a connection from the specific pool. Sinks a unique_lock from the
      * parent to preserve the lock on _mutex
      */
-    Future<ConnectionHandle> getConnection(Milliseconds timeout,
-                                           bool lease,
-                                           ErrorCodes::Error timeoutCode);
+    Future<ConnectionHandle> getConnection(Milliseconds timeout, bool lease);
 
     /**
      * Triggers the shutdown procedure. This function sets isShutdown to true
@@ -425,7 +425,6 @@ private:
         Promise<ConnectionHandle> promise;
         // Whether or not the requested connection should be "leased".
         bool lease;
-        ErrorCodes::Error timeoutCode;
     };
 
     struct RequestComparator {
@@ -658,20 +657,18 @@ void ConnectionPool::retrieve_forTest(RetrieveConnection retrieve, GetConnection
 
 void ConnectionPool::get_forTest(const HostAndPort& hostAndPort,
                                  Milliseconds timeout,
-                                 ErrorCodes::Error timeoutCode,
                                  GetConnectionCallback cb) {
-    auto getConnectionFunc = [this, hostAndPort, timeout, timeoutCode]() mutable {
-        return get(hostAndPort, transport::kGlobalSSLMode, timeout, timeoutCode);
+    auto getConnectionFunc = [this, hostAndPort, timeout]() mutable {
+        return get(hostAndPort, transport::kGlobalSSLMode, timeout);
     };
     retrieve_forTest(getConnectionFunc, std::move(cb));
 }
 
 void ConnectionPool::lease_forTest(const HostAndPort& hostAndPort,
                                    Milliseconds timeout,
-                                   ErrorCodes::Error timeoutCode,
                                    GetConnectionCallback cb) {
-    auto getConnectionFunc = [this, hostAndPort, timeout, timeoutCode]() mutable {
-        return lease(hostAndPort, transport::kGlobalSSLMode, timeout, timeoutCode);
+    auto getConnectionFunc = [this, hostAndPort, timeout]() mutable {
+        return lease(hostAndPort, transport::kGlobalSSLMode, timeout);
     };
     retrieve_forTest(getConnectionFunc, std::move(cb));
 }
@@ -679,8 +676,7 @@ void ConnectionPool::lease_forTest(const HostAndPort& hostAndPort,
 SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndPort& hostAndPort,
                                                                   transport::ConnectSSLMode sslMode,
                                                                   Milliseconds timeout,
-                                                                  bool lease,
-                                                                  ErrorCodes::Error timeoutCode) {
+                                                                  bool lease) {
     auto connRequestedAt = _factory->now();
 
     stdx::lock_guard lk(_mutex);
@@ -694,7 +690,24 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndP
 
     invariant(pool);
 
-    auto connFuture = pool->getConnection(timeout, lease, timeoutCode);
+    if (MONGO_unlikely(connectionPoolDropConnectionsBeforeGetConnection.shouldFail())) {
+        if (auto sfp = connectionPoolDropConnectionsBeforeGetConnection.scoped();
+            MONGO_unlikely(sfp.isActive())) {
+            std::string nameToTimeout = sfp.getData()["instance"].String();
+            if (_name.substr(0, nameToTimeout.size()) == nameToTimeout) {
+                // Drop all connections so new connections can be set up via getConnection.
+                pool->processFailure(Status(ErrorCodes::HostUnreachable,
+                                            "Test dropping connections before initial handshake"));
+            }
+        }
+    }
+
+    // In case of no timeout, set timeout to the refresh timeout.
+    if (timeout < Milliseconds(0)) {
+        timeout = _controller->pendingTimeout();
+    }
+
+    auto connFuture = pool->getConnection(timeout, lease);
     pool->updateState();
 
     // Only count connections being checked-out for ordinary use, not lease, towards cumulative wait
@@ -808,7 +821,7 @@ size_t ConnectionPool::SpecificPool::requestsPending() const {
 }
 
 Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnection(
-    Milliseconds timeout, bool lease, ErrorCodes::Error timeoutCode) {
+    Milliseconds timeout, bool lease) {
     if (MONGO_unlikely(connectionPoolReturnsErrorOnGet.shouldFail())) {
         return Future<ConnectionPool::ConnectionHandle>::makeReady(
             Status(ErrorCodes::SocketException, "test"));
@@ -818,30 +831,24 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     auto now = _parent->_factory->now();
     _lastActiveTime = now;
 
-    auto pendingTimeout = _parent->_controller->pendingTimeout();
-    if (timeout < Milliseconds(0) || timeout > pendingTimeout) {
-        timeout = pendingTimeout;
-        // If controller's pending timeout is closest, timeoutCode is rewritten to the internal time
-        // limit error
-        timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit;
-    }
-
     if (auto sfp = forceExecutorConnectionPoolTimeout.scoped(); MONGO_unlikely(sfp.isActive())) {
-        if (const Milliseconds failpointTimeout{sfp.getData()["timeout"].numberInt()};
-            failpointTimeout > Milliseconds{0}) {
-            auto pf = makePromiseFuture<ConnectionHandle>();
-            auto request = std::make_shared<Request>();
-            request->expiration = now + failpointTimeout;
-            request->promise = std::move(pf.promise);
-            request->timeoutCode = timeoutCode;
-            auto timeoutTimer = _parent->_factory->makeTimer();
-            timeoutTimer->setTimeout(failpointTimeout, [request, timeoutTimer]() mutable {
-                request->promise.setError(Status(
-                    request->timeoutCode,
-                    "Connection timed out due to forceExecutorConnectionPoolTimeout failpoint"));
-            });
-            return std::move(pf.future);
+        const Milliseconds failpointTimeout{sfp.getData()["timeout"].numberInt()};
+        const Status failpointStatus{
+            ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
+            "Connection timed out due to forceExecutorConnectionPoolTimeout failpoint"};
+        if (failpointTimeout == Milliseconds(0)) {
+            return Future<ConnectionPool::ConnectionHandle>::makeReady(failpointStatus);
         }
+        auto pf = makePromiseFuture<ConnectionHandle>();
+        auto request = std::make_shared<Request>();
+        request->expiration = now + failpointTimeout;
+        request->promise = std::move(pf.promise);
+        auto timeoutTimer = _parent->_factory->makeTimer();
+        timeoutTimer->setTimeout(failpointTimeout,
+                                 [request, timeoutTimer, failpointStatus]() mutable {
+                                     request->promise.setError(failpointStatus);
+                                 });
+        return std::move(pf.future);
     }
 
     // If we do not have requests, then we can fulfill immediately
@@ -866,7 +873,7 @@ Future<ConnectionPool::ConnectionHandle> ConnectionPool::SpecificPool::getConnec
     const auto expiration = now + timeout;
     auto pf = makePromiseFuture<ConnectionHandle>();
 
-    _requests.push_back({expiration, std::move(pf.promise), lease, timeoutCode});
+    _requests.push_back({expiration, std::move(pf.promise), lease});
     std::push_heap(begin(_requests), end(_requests), RequestComparator{});
 
     return std::move(pf.future);
@@ -936,20 +943,6 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
 
     // If we're in shutdown, we don't need refreshed connections
     if (_health.isShutdown) {
-        return;
-    }
-
-    // If we've exceeded the time limit, start a new connect,
-    // rather than failing all operations.  We do this because the
-    // various callers have their own time limit which is unrelated
-    // to our internal one.
-    if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
-        LOGV2_DEBUG(22562,
-                    kDiagnosticLogLevel,
-                    "Pending connection did not complete within the timeout, "
-                    "retrying with a new connection",
-                    "hostAndPort"_attr = _hostAndPort,
-                    "numOpenConns"_attr = openConnections());
         return;
     }
 
@@ -1183,6 +1176,13 @@ void ConnectionPool::SpecificPool::processFailure(const Status& status) {
 
 // fulfills as many outstanding requests as possible
 void ConnectionPool::SpecificPool::fulfillRequests() {
+    if (auto sfp = connectionPoolDoesNotFulfillRequests.scoped(); MONGO_unlikely(sfp.isActive())) {
+        std::string nameToTimeout = sfp.getData()["instance"].String();
+        if (_parent->_name.substr(0, nameToTimeout.size()) == nameToTimeout) {
+            return;
+        }
+    }
+
     while (_requests.size()) {
         // Marking this as our newest active time
         _lastActiveTime = _parent->_factory->now();
@@ -1364,7 +1364,8 @@ void ConnectionPool::SpecificPool::updateEventTimer() {
 
             auto& request = _requests.back();
             request.promise.setError(
-                Status(request.timeoutCode, "Couldn't get a connection within the time limit"));
+                Status(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit,
+                       "Couldn't get a connection within the time limit"));
             _requests.pop_back();
 
             // Since we've failed a request, we've interacted with external users

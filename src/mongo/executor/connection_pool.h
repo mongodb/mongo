@@ -277,17 +277,14 @@ public:
      */
     void setKeepOpen(const HostAndPort& hostAndPort, bool keepOpen) override;
 
-    inline SemiFuture<ConnectionHandle> get(
-        const HostAndPort& hostAndPort,
-        transport::ConnectSSLMode sslMode,
-        Milliseconds timeout,
-        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit) {
-        return _get(hostAndPort, sslMode, timeout, false /*lease*/, timeoutCode);
+    inline SemiFuture<ConnectionHandle> get(const HostAndPort& hostAndPort,
+                                            transport::ConnectSSLMode sslMode,
+                                            Milliseconds timeout) {
+        return _get(hostAndPort, sslMode, timeout, false /*lease*/);
     }
 
     void get_forTest(const HostAndPort& hostAndPort,
                      Milliseconds timeout,
-                     ErrorCodes::Error timeoutCode,
                      GetConnectionCallback cb);
 
     /**
@@ -297,17 +294,14 @@ public:
      * their lease and are reported separately in metrics. Otherwise, this method behaves similarly
      * to `ConnectionPool::get`.
      */
-    inline SemiFuture<ConnectionHandle> lease(
-        const HostAndPort& hostAndPort,
-        transport::ConnectSSLMode sslMode,
-        Milliseconds timeout,
-        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit) {
-        return _get(hostAndPort, sslMode, timeout, true /*lease*/, timeoutCode);
+    inline SemiFuture<ConnectionHandle> lease(const HostAndPort& hostAndPort,
+                                              transport::ConnectSSLMode sslMode,
+                                              Milliseconds timeout) {
+        return _get(hostAndPort, sslMode, timeout, true /*lease*/);
     }
 
     void lease_forTest(const HostAndPort& hostAndPort,
                        Milliseconds timeout,
-                       ErrorCodes::Error timeoutCode,
                        GetConnectionCallback cb);
 
     void appendConnectionStats(ConnectionPoolStats* stats) const;
@@ -321,12 +315,10 @@ public:
 private:
     ClockSource* _getFastClockSource() const;
 
-    SemiFuture<ConnectionHandle> _get(
-        const HostAndPort& hostAndPort,
-        transport::ConnectSSLMode sslMode,
-        Milliseconds timeout,
-        bool leased,
-        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit);
+    SemiFuture<ConnectionHandle> _get(const HostAndPort& hostAndPort,
+                                      transport::ConnectSSLMode sslMode,
+                                      Milliseconds timeout,
+                                      bool leased);
 
     void retrieve_forTest(RetrieveConnection retrieve, GetConnectionCallback cb);
 

@@ -196,7 +196,7 @@ void ConnectionImpl::setup(Milliseconds timeout, SetupCallback cb, std::string) 
 
     _timer.setTimeout(timeout, [this] {
         auto setupCb = std::move(_setupCallback);
-        setupCb(this, Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, "timeout"));
+        setupCb(this, Status(ErrorCodes::HostUnreachable, "timeout"));
     });
 
     _setupQueue.push_back(this);
@@ -211,7 +211,7 @@ void ConnectionImpl::refresh(Milliseconds timeout, RefreshCallback cb) {
 
     _timer.setTimeout(timeout, [this] {
         auto refreshCb = std::move(_refreshCallback);
-        refreshCb(this, Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, "timeout"));
+        refreshCb(this, Status(ErrorCodes::HostUnreachable, "timeout"));
     });
 
     _refreshQueue.push_back(this);

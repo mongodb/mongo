@@ -533,10 +533,12 @@ error_codes:
     - {code: 405, name: CannotCreateChunkDistribution}
 
     - {code: 406, name: MigrationBlockingOperationCoordinatorCleaningUp}
+    
+    - {code: 407,name: PooledConnectionAcquisitionExceededTimeLimit,categories: [ExceededTimeLimitError,RetriableError]}
 
-    - {code: 407, name: TimeseriesBucketCompressionFailed, extra: 'timeseries::BucketCompressionFailure'}
+    - {code: 408, name: TimeseriesBucketCompressionFailed, extra: 'timeseries::BucketCompressionFailure'}
 
-    - {code: 408, name: CannotInsertTimeseriesBucketsWithMixedSchema}
+    - {code: 409, name: CannotInsertTimeseriesBucketsWithMixedSchema}
 
     # Error codes 4000-8999 are reserved.
 

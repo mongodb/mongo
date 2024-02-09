@@ -116,7 +116,7 @@ struct RemoteCommandRequestBase {
     bool enforceLocalTimeout = true;
 
     Milliseconds timeout = kNoTimeout;
-    ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit;
+    boost::optional<ErrorCodes::Error> timeoutCode;
 
     // Time when the request was scheduled.
     boost::optional<Date_t> dateScheduled;

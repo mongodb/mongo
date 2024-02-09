@@ -72,6 +72,7 @@
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -88,6 +89,8 @@ namespace mongo {
 namespace executor {
 namespace connection_pool_tl {
 namespace {
+MONGO_FAIL_POINT_DEFINE(triggerConnectionSetupHandshakeTimeout);
+
 const auto kMaxTimerDuration = Milliseconds::max();
 struct TimeoutHandler {
     AtomicWord<bool> done;
@@ -377,14 +380,22 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
     std::move(pf.future).thenRunOn(_reactor).getAsync(
         [this, cb = std::move(cb), anchor](Status status) { cb(this, std::move(status)); });
 
+    if (MONGO_unlikely(triggerConnectionSetupHandshakeTimeout.shouldFail())) {
+        triggerConnectionSetupHandshakeTimeout.executeIf(
+            [&](const BSONObj& data) { timeout = Milliseconds(0); },
+            [&](const BSONObj& data) {
+                std::string nameToTimeout = data["instance"].String();
+                return instanceName.substr(0, nameToTimeout.size()) == nameToTimeout;
+            });
+    }
+
     setTimeout(timeout, [this, handler, timeout] {
         if (handler->done.swap(true)) {
             return;
         }
         std::string reason = str::stream()
             << "Timed out connecting to " << _peer << " after " << timeout;
-        handler->promise.setError(
-            Status(ErrorCodes::NetworkInterfaceExceededTimeLimit, std::move(reason)));
+        handler->promise.setError(Status(ErrorCodes::HostUnreachable, std::move(reason)));
 
         if (_client) {
             _client->cancel();

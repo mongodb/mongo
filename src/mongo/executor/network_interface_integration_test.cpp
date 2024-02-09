@@ -223,20 +223,32 @@ public:
     RemoteCommandRequest makeTestCommand(Milliseconds timeout,
                                          BSONObj cmd,
                                          OperationContext* opCtx = nullptr,
-                                         RemoteCommandRequest::Options options = {}) {
+                                         RemoteCommandRequest::Options options = {},
+                                         boost::optional<ErrorCodes::Error> timeoutCode = {}) {
         auto cs = fixture();
-        return RemoteCommandRequest(cs.getServers().front(),
-                                    DatabaseName::kAdmin,
-                                    std::move(cmd),
-                                    BSONObj(),
-                                    opCtx,
-                                    timeout,
-                                    std::move(options));
+        RemoteCommandRequest request(cs.getServers().front(),
+                                     DatabaseName::kAdmin,
+                                     std::move(cmd),
+                                     BSONObj(),
+                                     opCtx,
+                                     timeout,
+                                     std::move(options));
+        // Don't override possible opCtx error code.
+        if (timeoutCode) {
+            request.timeoutCode = timeoutCode;
+        }
+        return request;
     }
 
     BSONObj makeEchoCmdObj() {
         return BSON("echo" << 1 << "foo"
                            << "bar");
+    }
+
+    BSONObj makeFindCmdObj() {
+        return BSON("find"
+                    << "test"
+                    << "filter" << BSONObj());
     }
 
     BSONObj makeSleepCmdObj() {
@@ -573,6 +585,86 @@ TEST_F(NetworkInterfaceTest, ConnectionErrorDropsSingleConnection) {
     // Connection dropped during finishRefresh, so the dropped connection still
     // counts toward the refreshed counter.
     ASSERT_EQ(stats.totalRefreshed, 2);
+}
+
+TEST_F(NetworkInterfaceTest, TimeoutDuringConnectionHandshake) {
+    // If network timeout occurs during connection setup before handshake completes,
+    // HostUnreachable should be returned.
+    FailPointEnableBlock fpb1("connectionPoolDropConnectionsBeforeGetConnection",
+                              BSON("instance"
+                                   << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
+    FailPointEnableBlock fpb2("triggerConnectionSetupHandshakeTimeout",
+                              BSON("instance"
+                                   << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
+    auto cbh = makeCallbackHandle();
+    auto deferred = runCommand(cbh, makeTestCommand(Milliseconds(100), makeEchoCmdObj()));
+
+    auto result = deferred.get();
+
+    ASSERT_EQ(ErrorCodes::HostUnreachable, result.status);
+    // No timeouts are counted as a result of HostUnreachable being returned.
+    assertNumOps(0u, 0u, 1u, 0u);
+}
+
+TEST_F(NetworkInterfaceTest, TimeoutWaitingToAcquireConnection) {
+    // If timeout occurs during connection acquisition, PooledConnectionAcquisitionExceededTimeLimit
+    // should be returned.
+    FailPointEnableBlock fpb("connectionPoolDoesNotFulfillRequests",
+                             BSON("instance"
+                                  << "NetworkInterfaceTL-NetworkInterfaceIntegrationFixture"));
+    auto cbh = makeCallbackHandle();
+    auto deferred = runCommand(cbh, makeTestCommand(Milliseconds(100), makeFindCmdObj()));
+
+    auto result = deferred.get();
+
+    ASSERT_EQ(ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit, result.status);
+    assertNumOps(0u, 1u, 0u, 0u);
+}
+
+TEST_F(NetworkInterfaceTest, TimeoutGeneralNetworkInterface) {
+    // If a general network timeout occurs in the NetworkInterface,
+    // NetworkInterfaceExceededTimeLimit should be returned.
+    FailPointEnableBlock fpb("triggerSendRequestNetworkTimeout",
+                             BSON("collectionNS"
+                                  << "test"));
+    auto cbh = makeCallbackHandle();
+    auto deferred = runCommand(cbh, makeTestCommand(Milliseconds(100), makeFindCmdObj()));
+
+    auto result = deferred.get();
+
+    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
+    assertNumOps(0u, 1u, 0u, 0u);
+}
+
+/**
+ * Test that if a custom timeout code is passed into the request, then timeouts errors will
+ * expect the request's error code.
+ */
+TEST_F(NetworkInterfaceTest, CustomCodeRequestTimeoutHit) {
+    auto cb = makeCallbackHandle();
+    // Force timeout by setting timeout to 0.
+    auto request = makeTestCommand(
+        Milliseconds(0), makeFindCmdObj(), nullptr, {}, ErrorCodes::MaxTimeMSExpired);
+    auto deferred = runCommandOnAny(cb, request);
+    auto res = deferred.get();
+
+    ASSERT(!res.isOK());
+    ASSERT_EQ(res.status.code(), ErrorCodes::MaxTimeMSExpired);
+}
+
+/**
+ * Test that if no custom timeout code is passed into the request, then timeouts errors will
+ * expect default error codes depending on location.
+ */
+TEST_F(NetworkInterfaceTest, NoCustomCodeRequestTimeoutHit) {
+    auto cb = makeCallbackHandle();
+    // Force timeout by setting timeout to 0.
+    auto request = makeTestCommand(Milliseconds(0), makeFindCmdObj());
+    auto deferred = runCommandOnAny(cb, request);
+    auto res = deferred.get();
+
+    ASSERT(!res.isOK());
+    ASSERT_EQ(res.status.code(), ErrorCodes::PooledConnectionAcquisitionExceededTimeLimit);
 }
 
 TEST_F(NetworkInterfaceTest, AsyncOpTimeout) {
