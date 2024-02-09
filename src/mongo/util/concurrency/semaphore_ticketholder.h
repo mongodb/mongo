@@ -69,7 +69,7 @@ public:
     int64_t numFinishedProcessing() const override final;
 
 private:
-    boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
+    boost::optional<Ticket> _waitForTicketUntilImpl(Interruptible& interruptible,
                                                     AdmissionContext* admCtx,
                                                     Date_t until) override final;
 

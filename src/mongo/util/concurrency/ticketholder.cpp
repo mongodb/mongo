@@ -37,12 +37,13 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/feature_flag.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/storage_engine_feature_flags_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/tick_source.h"
 
@@ -94,7 +95,7 @@ bool TicketHolder::resize(int32_t newSize, Date_t deadline) noexcept {
         for (auto remaining = -difference; remaining > 0; remaining--) {
             // This call bypasses statistics reporting.
             auto ticket =
-                _waitForTicketUntilImpl(nullptr /* not interruptible */, &admCtx, deadline);
+                _waitForTicketUntilImpl(*Interruptible::notInterruptible(), &admCtx, deadline);
             if (!ticket) {
                 // We timed out getting a ticket, fail the resize.
                 return false;
@@ -126,10 +127,10 @@ void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
     _releaseToTicketPoolImpl(admCtx);
 }
 
-Ticket TicketHolder::waitForTicket(OperationContext* opCtx,
+Ticket TicketHolder::waitForTicket(Interruptible& interruptible,
                                    AdmissionContext* admCtx,
                                    Microseconds& timeQueuedForTicketMicros) {
-    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max(), timeQueuedForTicketMicros);
+    auto res = waitForTicketUntil(interruptible, admCtx, Date_t::max(), timeQueuedForTicketMicros);
     invariant(res);
     return std::move(*res);
 }
@@ -148,7 +149,7 @@ boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
 }
 
 
-boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx,
+boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interruptible,
                                                          AdmissionContext* admCtx,
                                                          Date_t until,
                                                          Microseconds& timeQueuedForTicketMicros) {
@@ -179,7 +180,7 @@ boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx
         queueStats.totalCanceled.fetchAndAddRelaxed(1);
     });
 
-    auto ticket = _waitForTicketUntilImpl(opCtx, admCtx, until);
+    auto ticket = _waitForTicketUntilImpl(interruptible, admCtx, until);
 
     if (ticket) {
         cancelWait.dismiss();
@@ -242,7 +243,7 @@ boost::optional<Ticket> MockTicketHolder::tryAcquire(AdmissionContext* admCtx) {
     return Ticket{this, admCtx};
 }
 
-Ticket MockTicketHolder::waitForTicket(OperationContext* opCtx,
+Ticket MockTicketHolder::waitForTicket(Interruptible& interruptible,
                                        AdmissionContext* admCtx,
                                        Microseconds& timeQueuedForTicketMicros) {
     auto ticket = tryAcquire(admCtx);
@@ -251,7 +252,7 @@ Ticket MockTicketHolder::waitForTicket(OperationContext* opCtx,
 }
 
 boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(
-    OperationContext* opCtx,
+    Interruptible& interruptible,
     AdmissionContext* admCtx,
     Date_t until,
     Microseconds& timeQueuedForTicketMicros) {
@@ -262,7 +263,7 @@ boost::optional<Ticket> MockTicketHolder::_tryAcquireImpl(AdmissionContext* admC
     return tryAcquire(admCtx);
 }
 
-boost::optional<Ticket> MockTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+boost::optional<Ticket> MockTicketHolder::_waitForTicketUntilImpl(Interruptible&,
                                                                   AdmissionContext* admCtx,
                                                                   Date_t until) {
     return tryAcquire(admCtx);

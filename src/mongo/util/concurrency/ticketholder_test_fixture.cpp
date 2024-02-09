@@ -60,16 +60,16 @@ void TicketHolderTestFixture::basicTimeout(OperationContext* opCtx,
     {
         // Ignores deadline if there is a ticket instantly available.
         auto ticket = holder->waitForTicketUntil(
-            opCtx, &admCtx, Date_t::now() - Milliseconds(100), timeInQueue);
+            *opCtx, &admCtx, Date_t::now() - Milliseconds(100), timeInQueue);
         ASSERT(ticket);
         ASSERT_EQ(holder->used(), 1);
         ASSERT_EQ(holder->available(), 0);
         ASSERT_EQ(holder->outof(), 1);
 
         // Respects there are none available.
-        ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now(), timeInQueue));
+        ASSERT_FALSE(holder->waitForTicketUntil(*opCtx, &admCtx, Date_t::now(), timeInQueue));
         ASSERT_FALSE(holder->waitForTicketUntil(
-            opCtx, &admCtx, Date_t::now() + Milliseconds(42), timeInQueue));
+            *opCtx, &admCtx, Date_t::now() + Milliseconds(42), timeInQueue));
     }
 
     ASSERT_EQ(holder->used(), 0);
@@ -86,7 +86,7 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
     Microseconds timeInQueue(0);
     auto ticket =
-        holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds{500}, timeInQueue);
+        holder->waitForTicketUntil(*opCtx, &admCtx, Date_t::now() + Milliseconds{500}, timeInQueue);
 
     ASSERT_EQ(holder->used(), 1);
     ASSERT_EQ(holder->available(), 0);
@@ -125,24 +125,24 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
     holder->resize(6);
     std::array<boost::optional<Ticket>, 5> tickets;
     {
-        auto ticket = holder->waitForTicket(opCtx, &admCtx, timeInQueue);
+        auto ticket = holder->waitForTicket(*opCtx, &admCtx, timeInQueue);
         ASSERT_EQ(holder->used(), 1);
         ASSERT_EQ(holder->outof(), 6);
 
         for (int i = 0; i < 5; ++i) {
-            tickets[i] = holder->waitForTicket(opCtx, &admCtx, timeInQueue);
+            tickets[i] = holder->waitForTicket(*opCtx, &admCtx, timeInQueue);
             ASSERT_EQ(holder->used(), 2 + i);
             ASSERT_EQ(holder->outof(), 6);
         }
         ASSERT_FALSE(holder->waitForTicketUntil(
-            opCtx, &admCtx, Date_t::now() + Milliseconds(1), timeInQueue));
+            *opCtx, &admCtx, Date_t::now() + Milliseconds(1), timeInQueue));
     }
 
     holder->resize(5);
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->outof(), 5);
     ASSERT_FALSE(
-        holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1), timeInQueue));
+        holder->waitForTicketUntil(*opCtx, &admCtx, Date_t::now() + Milliseconds(1), timeInQueue));
 
     ASSERT_FALSE(holder->resize(4, Date_t::now() + Milliseconds(1)));
 }
@@ -154,7 +154,7 @@ void TicketHolderTestFixture::interruptTest(OperationContext* opCtx,
 
     auto waiter = stdx::thread([&]() {
         AdmissionContext admCtx;
-        ASSERT_THROWS_CODE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::max(), timeInQueue),
+        ASSERT_THROWS_CODE(holder->waitForTicketUntil(*opCtx, &admCtx, Date_t::max(), timeInQueue),
                            DBException,
                            ErrorCodes::Interrupted);
     });

@@ -35,7 +35,6 @@
 #include <type_traits>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -86,7 +85,7 @@ public:
 private:
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
 
-    boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
+    boost::optional<Ticket> _waitForTicketUntilImpl(Interruptible& interruptible,
                                                     AdmissionContext* admCtx,
                                                     Date_t until) override final;
 

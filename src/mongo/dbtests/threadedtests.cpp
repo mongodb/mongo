@@ -309,7 +309,8 @@ private:
                 admCtx.setPriority(AdmissionContext::Priority::kLow);
             }
 
-            auto ticket = _tickets->waitForTicket(nullptr, &admCtx, timeInQueue);
+            auto ticket =
+                _tickets->waitForTicket(*Interruptible::notInterruptible(), &admCtx, timeInQueue);
 
             _hotel.checkIn();
 

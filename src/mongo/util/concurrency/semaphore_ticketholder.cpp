@@ -79,11 +79,13 @@ void check(int ret) {
 }
 
 /**
- * Takes a Date_t deadline and sets the appropriate values in a timespec structure.
+ * Takes a Date_t deadline and constructs an appropriate timespec structure.
  */
-void tsFromDate(const Date_t& deadline, struct timespec& ts) {
+struct timespec tsFromDate(const Date_t& deadline) {
+    struct timespec ts;
     ts.tv_sec = deadline.toTimeT();
     ts.tv_nsec = (deadline.toMillisSinceEpoch() % 1000) * 1'000'000;
+    return ts;
 }
 }  // namespace
 
@@ -108,18 +110,20 @@ boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext*
     return Ticket{this, admCtx};
 }
 
-boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Interruptible& interruptible,
                                                                        AdmissionContext* admCtx,
                                                                        Date_t until) {
     const Milliseconds intervalMs(500);
-    struct timespec ts;
 
     // To support interrupting ticket acquisition while still benefiting from semaphores, we do a
     // timed wait on an interval to periodically check for interrupts.
     // The wait period interval is the smaller of the default interval and the provided
     // deadline.
-    Date_t deadline = std::min(until, Date_t::now() + intervalMs);
-    tsFromDate(deadline, ts);
+    auto calcDeadline = [&]() {
+        return std::min(until, Date_t::now() + intervalMs);
+    };
+    Date_t deadline = calcDeadline();
+    struct timespec ts = tsFromDate(deadline);
 
     while (0 != sem_timedwait(&_sem, &ts)) {
         if (errno == ETIMEDOUT) {
@@ -127,16 +131,15 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
             if (deadline == until)
                 return boost::none;
 
-            deadline = std::min(until, Date_t::now() + intervalMs);
-            tsFromDate(deadline, ts);
+            deadline = calcDeadline();
+            ts = tsFromDate(deadline);
         } else if (errno != EINTR) {
             failWithErrno(errno);
         }
 
         // To correctly handle errors from sem_timedwait, we should check for interrupts last.
         // It is possible to unset 'errno' after a call to checkForInterrupt().
-        if (opCtx)
-            opCtx->checkForInterrupt();
+        interruptible.checkForInterrupt();
     }
     return Ticket{this, admCtx};
 }
@@ -168,25 +171,13 @@ boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext*
     return Ticket{this, admCtx};
 }
 
-boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Interruptible& interruptible,
                                                                        AdmissionContext* admCtx,
                                                                        Date_t until) {
     stdx::unique_lock<Latch> lk(_mutex);
 
-    bool taken = [&] {
-        if (opCtx) {
-            return opCtx->waitForConditionOrInterruptUntil(
-                _newTicket, lk, until, [this] { return _tryAcquire(); });
-        } else {
-            if (until == Date_t::max()) {
-                _newTicket.wait(lk, [this] { return _tryAcquire(); });
-                return true;
-            } else {
-                return _newTicket.wait_until(
-                    lk, until.toSystemTimePoint(), [this] { return _tryAcquire(); });
-            }
-        }
-    }();
+    bool taken = interruptible.waitForConditionOrInterruptUntil(
+        _newTicket, lk, until, [this] { return _tryAcquire(); });
     if (!taken) {
         return boost::none;
     }
