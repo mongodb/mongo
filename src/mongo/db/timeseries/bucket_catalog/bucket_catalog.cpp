@@ -168,6 +168,23 @@ BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
 }
 
+Stripe::Stripe(TrackingContext& trackingContext)
+    : openBucketsById(
+          make_tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>(
+              trackingContext)),
+      openBucketsByKey(make_tracked_unordered_map<BucketKey, tracked_set<Bucket*>, BucketHasher>(
+          trackingContext)),
+      idleBuckets(make_tracked_list<Bucket*>(trackingContext)),
+      archivedBuckets(
+          make_tracked_unordered_map<BucketKey::Hash,
+                                     tracked_map<Date_t, ArchivedBucket, std::greater<Date_t>>,
+                                     BucketHasher>(trackingContext)),
+      outstandingReopeningRequests(
+          make_tracked_unordered_map<
+              BucketKey,
+              tracked_inlined_vector<shared_tracked_ptr<ReopeningRequest>, kInlinedVectorSize>,
+              BucketHasher>(trackingContext)) {}
+
 BucketCatalog::BucketCatalog()
     : BucketCatalog(kDefaultNumberOfStripes,
                     getTimeseriesIdleBucketExpiryMemoryUsageThresholdBytes) {}
@@ -175,18 +192,23 @@ BucketCatalog::BucketCatalog()
 BucketCatalog::BucketCatalog(size_t numberOfStripes, std::function<uint64_t()> memoryUsageThreshold)
     : bucketStateRegistry(trackingContext),
       numberOfStripes(numberOfStripes),
-      stripes(make_tracked_vector<Stripe>(trackingContext, numberOfStripes)),
+      stripes(make_tracked_vector<unique_tracked_ptr<Stripe>>(trackingContext)),
       executionStats(
           make_tracked_unordered_map<NamespaceString, shared_tracked_ptr<ExecutionStats>>(
               trackingContext)),
-      memoryUsageThreshold(memoryUsageThreshold) {}
+      memoryUsageThreshold(memoryUsageThreshold) {
+    stripes.reserve(numberOfStripes);
+    std::generate_n(std::back_inserter(stripes), numberOfStripes, [&]() {
+        return make_unique_tracked<Stripe>(trackingContext, trackingContext);
+    });
+}
 
 BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
 BSONObj getMetadata(BucketCatalog& catalog, const BucketHandle& handle) {
-    auto const& stripe = catalog.stripes[handle.stripe];
+    auto const& stripe = *catalog.stripes[handle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     const Bucket* bucket =
@@ -232,7 +254,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
 
     ClosedBuckets closedBuckets;
     internal::CreationInfo info{key, stripeNumber, time, options, stats, &closedBuckets};
-    auto& stripe = catalog.stripes[stripeNumber];
+    auto& stripe = *catalog.stripes[stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     Bucket* bucket = internal::useBucket(
@@ -334,7 +356,7 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
     // measurement into.
     auto rehydratedBucket = (reopeningContext.bucketToReopen.has_value())
         ? internal::rehydrateBucket(opCtx,
-                                    catalog.bucketStateRegistry,
+                                    catalog,
                                     stats,
                                     ns,
                                     comparator,
@@ -342,12 +364,12 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                     reopeningContext.bucketToReopen.value(),
                                     reopeningContext.catalogEra,
                                     &key)
-        : StatusWith<std::unique_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
+        : StatusWith<unique_tracked_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
     if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
         return rehydratedBucket.getStatus();
     }
 
-    auto& stripe = catalog.stripes[stripeNumber];
+    auto& stripe = *catalog.stripes[stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     // Can safely clear reentrant coordination state now that we have acquired the lock.
@@ -448,7 +470,7 @@ StatusWith<InsertResult> insert(OperationContext* opCtx,
     auto stripeNumber = internal::getStripeNumber(key, catalog.numberOfStripes);
     ClosedBuckets closedBuckets;
     internal::CreationInfo info{key, stripeNumber, time, options, stats, &closedBuckets};
-    auto& stripe = catalog.stripes[stripeNumber];
+    auto& stripe = *catalog.stripes[stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     Bucket* bucket =
@@ -489,7 +511,7 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
         return getBatchStatus();
     }
 
-    auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = *catalog.stripes[batch->bucketHandle.stripe];
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
@@ -535,7 +557,7 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
 
     finishWriteBatch(*batch, info);
 
-    auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = *catalog.stripes[batch->bucketHandle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     if (MONGO_unlikely(runPostCommitDebugChecks.shouldFail() && opCtx)) {
@@ -641,7 +663,7 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
         return;
     }
 
-    auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
+    auto& stripe = *catalog.stripes[batch->bucketHandle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     internal::abort(catalog, stripe, stripeLock, batch, status);

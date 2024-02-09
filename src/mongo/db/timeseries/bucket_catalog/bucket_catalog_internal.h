@@ -177,15 +177,15 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
  * validate that the bucket is expected (i.e. to help resolve hash collisions for archived buckets).
  * Does *not* hand ownership of the bucket to the catalog.
  */
-StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
-                                                    BucketStateRegistry& registry,
-                                                    ExecutionStatsController& stats,
-                                                    const NamespaceString& ns,
-                                                    const StringDataComparator* comparator,
-                                                    const TimeseriesOptions& options,
-                                                    const BucketToReopen& bucketToReopen,
-                                                    uint64_t catalogEra,
-                                                    const BucketKey* expectedKey);
+StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
+                                                       BucketCatalog& catalog,
+                                                       ExecutionStatsController& stats,
+                                                       const NamespaceString& ns,
+                                                       const StringDataComparator* comparator,
+                                                       const TimeseriesOptions& options,
+                                                       const BucketToReopen& bucketToReopen,
+                                                       uint64_t catalogEra,
+                                                       const BucketKey* expectedKey);
 
 /**
  * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the bucket
@@ -197,7 +197,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
                                                         WithLock stripeLock,
                                                         ExecutionStatsController& stats,
                                                         const BucketKey& key,
-                                                        std::unique_ptr<Bucket>&& bucket,
+                                                        unique_tracked_ptr<Bucket>&& bucket,
                                                         std::uint64_t targetEra,
                                                         ClosedBuckets& closedBuckets);
 

@@ -44,7 +44,7 @@ public:
 
     template <class T>
     TrackingAllocator<T> makeAllocator() {
-        return TrackingAllocator<T>(_stats);
+        return TrackingAllocator<T>(&_stats);
     }
 
     uint64_t allocated() const {

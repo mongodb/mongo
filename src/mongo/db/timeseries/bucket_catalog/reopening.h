@@ -75,20 +75,11 @@ struct BucketToReopen {
  */
 struct ArchivedBucket {
     ArchivedBucket() = delete;
-    ArchivedBucket(const BucketId& bucketId, const std::string& timeField);
+    ArchivedBucket(const BucketId& bucketId, const tracked_string& timeField);
 
     BucketId bucketId;
-    std::string timeField;
+    tracked_string timeField;
 };
-
-/**
- * Calculates the marginal memory usage for an archived bucket. The 'IncludeMemoryOverheadFromMap'
- * parameter will be set to 'kInclude' if the bucket will be (if inserting) or was (if removing) the
- * only bucket associated with it's meta hash value. If so, then the returned value will attempt to
- * account for the overhead of the map data structure for the meta hash value.
- */
-long long marginalMemoryUsageForArchivedBucket(
-    const ArchivedBucket& bucket, IncludeMemoryOverheadFromMap includeMemoryOverheadFromMap);
 
 
 /**

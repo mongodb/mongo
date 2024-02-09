@@ -58,13 +58,15 @@ boost::optional<OID> initializeRequest(BucketCatalog& catalog,
     if (it == stripe.outstandingReopeningRequests.end()) {
         bool inserted = false;
         std::tie(it, inserted) = stripe.outstandingReopeningRequests.emplace(
-            key, decltype(stripe.outstandingReopeningRequests)::mapped_type{});
+            std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple());
         invariant(inserted);
     }
     auto& list = it->second;
 
-    list.push_back(std::make_shared<ReopeningRequest>(
-        ExecutionStatsController{internal::getOrInitializeExecutionStats(catalog, key.ns)}, oid));
+    list.push_back(make_shared_tracked<ReopeningRequest>(
+        catalog.trackingContext,
+        ExecutionStatsController{internal::getOrInitializeExecutionStats(catalog, key.ns)},
+        oid));
 
     return oid;
 }
@@ -148,19 +150,9 @@ void ReopeningContext::clear(WithLock) {
     _cleared = true;
 }
 
-ArchivedBucket::ArchivedBucket(const BucketId& b, const std::string& t)
+ArchivedBucket::ArchivedBucket(const BucketId& b, const tracked_string& t)
     : bucketId{b}, timeField{t} {}
 
-long long marginalMemoryUsageForArchivedBucket(
-    const ArchivedBucket& bucket, IncludeMemoryOverheadFromMap includeMemoryOverheadFromMap) {
-    return sizeof(Date_t) +        // key in set of archived buckets for meta hash
-        sizeof(ArchivedBucket) +   // main data for archived bucket
-        bucket.timeField.size() +  // allocated space for timeField string, ignoring SSO
-        (includeMemoryOverheadFromMap == IncludeMemoryOverheadFromMap::kInclude
-             ? sizeof(std::size_t) +                                    // key in set (meta hash)
-                 sizeof(decltype(Stripe::archivedBuckets)::value_type)  // set container
-             : 0);
-}
 
 ReopeningRequest::ReopeningRequest(ExecutionStatsController&& s, boost::optional<OID> o)
     : stats{std::move(s)}, oid{o} {}

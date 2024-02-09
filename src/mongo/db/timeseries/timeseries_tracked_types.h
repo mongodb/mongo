@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <absl/container/inlined_vector.h>
 #include <boost/smart_ptr/allocate_unique.hpp>
 #include <memory>
 #include <scoped_allocator>
@@ -44,17 +45,56 @@ template <class T>
 using shared_tracked_ptr = std::shared_ptr<T>;
 
 template <class T, class... Args>
-shared_tracked_ptr<T> make_shared_tracked(TrackingContext& trackingContext, Args... args) {
-    return std::allocate_shared<T>(trackingContext.makeAllocator<T>(), args...);
+shared_tracked_ptr<T> make_shared_tracked(TrackingContext& trackingContext, Args&&... args) {
+    return std::allocate_shared<T>(trackingContext.makeAllocator<T>(), std::forward<Args>(args)...);
 }
 
 template <class T>
-using unique_tracked_ptr = std::unique_ptr<T, boost::alloc_deleter<T, TrackingAllocator<T>>>;
+class unique_tracked_ptr {
+public:
+    unique_tracked_ptr() = delete;
+
+    template <class... Args>
+    unique_tracked_ptr(TrackingContext& trackingContext, Args&&... args)
+        : _uniquePtr(boost::allocate_unique<T>(trackingContext.makeAllocator<T>(),
+                                               std::forward<Args>(args)...)) {}
+    unique_tracked_ptr(unique_tracked_ptr& utp) noexcept : _uniquePtr(*utp.get()){};
+    unique_tracked_ptr(unique_tracked_ptr&&) = default;
+    ~unique_tracked_ptr() = default;
+
+    T* operator->() {
+        return _uniquePtr.get().ptr();
+    }
+
+    T* operator->() const {
+        return _uniquePtr.get().ptr();
+    }
+
+    T* get() {
+        return _uniquePtr.get().ptr();
+    }
+
+    T* get() const {
+        return _uniquePtr.get().ptr();
+    }
+
+    T& operator*() {
+        return *get();
+    }
+
+    T& operator*() const {
+        return *get();
+    }
+
+private:
+    std::unique_ptr<T, boost::alloc_deleter<T, TrackingAllocator<T>>> _uniquePtr;
+};
 
 template <class T, class... Args>
-unique_tracked_ptr<T> make_unique_tracked(TrackingContext& trackingContext, Args... args) {
-    return boost::allocate_unique<T>(trackingContext.makeAllocator<T>(), args...);
+unique_tracked_ptr<T> make_unique_tracked(TrackingContext& trackingContext, Args&&... args) {
+    return unique_tracked_ptr<T>(trackingContext, std::forward<Args>(args)...);
 }
+
 
 template <class Key, class T, class Compare = std::less<Key>>
 using tracked_map =
@@ -104,6 +144,32 @@ using tracked_vector =
 template <class T, class... Args>
 tracked_vector<T> make_tracked_vector(TrackingContext& trackingContext, Args... args) {
     return tracked_vector<T>(args..., trackingContext.makeAllocator<T>());
+}
+
+template <class T>
+using tracked_list = std::list<T, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<T>>>;
+
+template <class T>
+tracked_list<T> make_tracked_list(TrackingContext& trackingContext) {
+    return tracked_list<T>(trackingContext.makeAllocator<T>());
+}
+
+template <class Key>
+using tracked_set = std::
+    set<Key, std::less<Key>, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<Key>>>;
+
+template <class Key>
+tracked_set<Key> make_tracked_set(TrackingContext& trackingContext) {
+    return tracked_set<Key>(trackingContext.makeAllocator<Key>());
+}
+
+template <class T, std::size_t N>
+using tracked_inlined_vector =
+    absl::InlinedVector<T, N, std::scoped_allocator_adaptor<timeseries::TrackingAllocator<T>>>;
+
+template <class T, std::size_t N>
+tracked_inlined_vector<T, N> make_tracked_inlined_vector(TrackingContext& trackingContext) {
+    return tracked_inline_vector<T, N>(N, trackingContext);
 }
 
 }  // namespace mongo::timeseries

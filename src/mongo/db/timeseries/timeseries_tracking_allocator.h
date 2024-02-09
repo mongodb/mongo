@@ -51,7 +51,7 @@ public:
     using propagate_on_container_move_assignment = std::true_type;
 
     TrackingAllocator() = delete;
-    explicit TrackingAllocator(TrackingAllocatorStats& stats) noexcept : _stats(stats){};
+    explicit TrackingAllocator(TrackingAllocatorStats* stats) noexcept : _stats(stats){};
     TrackingAllocator(const TrackingAllocator&) noexcept = default;
 
     ~TrackingAllocator() = default;
@@ -59,34 +59,33 @@ public:
     template <class U>
     TrackingAllocator(const TrackingAllocator<U>& ta) noexcept : _stats{ta.getStats()} {};
 
-
     T* allocate(size_t n) {
         const size_t allocation = n * sizeof(T);
-        _stats.bytesAllocated.fetchAndAdd(allocation);
+        _stats->bytesAllocated.fetchAndAdd(allocation);
         return static_cast<T*>(::operator new(allocation));
     }
 
     void deallocate(T* p, size_t n) {
-        _stats.bytesAllocated.fetchAndSubtract(n * sizeof(T));
+        _stats->bytesAllocated.fetchAndSubtract(n * sizeof(T));
         ::operator delete(p);
     }
 
-    TrackingAllocatorStats& getStats() const {
+    TrackingAllocatorStats* getStats() const {
         return _stats;
     }
 
 private:
-    TrackingAllocatorStats& _stats;
+    TrackingAllocatorStats* _stats;
 };
 
 template <class T, class U>
 bool operator==(const TrackingAllocator<T>& lhs, const TrackingAllocator<U>& rhs) noexcept {
-    return &lhs.getStats() == &rhs.getStats();
+    return lhs.getStats() == rhs.getStats();
 }
 
 template <class T, class U>
 bool operator!=(const TrackingAllocator<T>& lhs, const TrackingAllocator<U>& rhs) noexcept {
-    return &lhs.getStats() != &rhs.getStats();
+    return lhs.getStats() != rhs.getStats();
 }
 
 }  // namespace mongo::timeseries

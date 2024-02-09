@@ -63,10 +63,10 @@ class BucketCatalogServerStatus : public ServerStatusSection {
     BucketCounts _getBucketCounts(const BucketCatalog& catalog) const {
         BucketCounts sum;
         for (auto const& stripe : catalog.stripes) {
-            stdx::lock_guard stripeLock{stripe.mutex};
-            sum += {stripe.openBucketsById.size(),
-                    stripe.openBucketsByKey.size(),
-                    stripe.idleBuckets.size()};
+            stdx::lock_guard stripeLock{stripe->mutex};
+            sum += {stripe->openBucketsById.size(),
+                    stripe->openBucketsByKey.size(),
+                    stripe->idleBuckets.size()};
         }
         return sum;
     }

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <boost/container/small_vector.hpp>
+#include <absl/container/inlined_vector.h>
 #include <boost/container/static_vector.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -135,14 +135,14 @@ struct Stripe {
 
     // All buckets currently open in the catalog, including buckets which are full or pending
     // closure but not yet committed, indexed by BucketId. Owning pointers.
-    stdx::unordered_map<BucketId, std::unique_ptr<Bucket>, BucketHasher> openBucketsById;
+    tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher> openBucketsById;
 
     // All buckets currently open in the catalog, including buckets which are full or pending
     // closure but not yet committed, indexed by BucketKey. Non-owning pointers.
-    stdx::unordered_map<BucketKey, std::set<Bucket*>, BucketHasher> openBucketsByKey;
+    tracked_unordered_map<BucketKey, tracked_set<Bucket*>, BucketHasher> openBucketsByKey;
 
     // Open buckets that do not have any outstanding writes.
-    using IdleList = std::list<Bucket*>;
+    using IdleList = tracked_list<Bucket*>;
     IdleList idleBuckets;
 
     // Buckets that are not currently in the catalog, but which are eligible to receive more
@@ -151,17 +151,21 @@ struct Stripe {
     //
     // We invert the key comparison in the inner map so that we can use lower_bound to efficiently
     // find an archived bucket that is a candidate for an incoming measurement.
-    stdx::unordered_map<BucketKey::Hash,
-                        std::map<Date_t, ArchivedBucket, std::greater<Date_t>>,
-                        BucketHasher>
+    tracked_unordered_map<BucketKey::Hash,
+                          tracked_map<Date_t, ArchivedBucket, std::greater<Date_t>>,
+                          BucketHasher>
         archivedBuckets;
 
     // All series currently with outstanding reopening operations. Used to coordinate disk access
     // between reopenings and regular writes to prevent stale reads and corrupted updates.
-    stdx::unordered_map<BucketKey,
-                        boost::container::small_vector<std::shared_ptr<ReopeningRequest>, 4>,
-                        BucketHasher>
+    static constexpr int kInlinedVectorSize = 4;
+    tracked_unordered_map<
+        BucketKey,
+        tracked_inlined_vector<shared_tracked_ptr<ReopeningRequest>, kInlinedVectorSize>,
+        BucketHasher>
         outstandingReopeningRequests;
+
+    Stripe(TrackingContext& trackingContext);
 };
 
 /**
@@ -188,7 +192,7 @@ public:
     // independently locked and operated on in parallel. The size of the stripe vector should not be
     // changed after initialization.
     const std::size_t numberOfStripes = 32;
-    tracked_vector<Stripe> stripes;
+    tracked_vector<unique_tracked_ptr<Stripe>> stripes;
 
     // Per-namespace execution stats. This map is protected by 'mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the

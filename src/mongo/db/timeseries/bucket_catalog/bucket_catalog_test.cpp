@@ -320,7 +320,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, ns);
 
     auto res = internal::rehydrateBucket(_opCtx,
-                                         _bucketCatalog->bucketStateRegistry,
+                                         *_bucketCatalog,
                                          stats,
                                          ns,
                                          coll->getDefaultCollator(),
@@ -336,7 +336,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     auto stripeNumber = internal::getStripeNumber(key, _bucketCatalog->numberOfStripes);
 
     // Register the reopened bucket with the catalog.
-    auto& stripe = _bucketCatalog->stripes[stripeNumber];
+    auto& stripe = *_bucketCatalog->stripes[stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
 
     ClosedBuckets closedBuckets;
@@ -1992,7 +1992,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     };
 
     ReopeningContext reopeningContext{*_bucketCatalog,
-                                      _bucketCatalog->stripes[0],
+                                      *_bucketCatalog->stripes[0],
                                       WithLock::withoutLock(),
                                       batch->bucketKey,
                                       getCurrentEra(_bucketCatalog->bucketStateRegistry),
@@ -2078,7 +2078,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     directWriteFinish(_bucketCatalog->bucketStateRegistry, fakeNs, fakeId);
 
     ReopeningContext reopeningContext{*_bucketCatalog,
-                                      _bucketCatalog->stripes[0],
+                                      *_bucketCatalog->stripes[0],
                                       WithLock::withoutLock(),
                                       batch->bucketKey,
                                       oldCatalogEra,
@@ -2232,8 +2232,11 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
     auto minTime = roundTimestampToGranularity(doc["time"].Date(), options);
     BucketId id{_ns1, OID::gen()};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id));
-    _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
-        minTime, ArchivedBucket{id, options.getTimeField().toString()});
+    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
+        minTime,
+        ArchivedBucket{id,
+                       make_tracked_string(_bucketCatalog->trackingContext,
+                                           options.getTimeField().toString())});
 
     // Should try to reopen archived bucket.
     boost::optional<StatusWith<InsertResult>> result1 =
@@ -2278,8 +2281,11 @@ TEST_F(BucketCatalogTest,
     auto minTime1 = roundTimestampToGranularity(doc1["time"].Date(), options);
     BucketId id1{_ns1, OID::gen()};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id1));
-    _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
-        minTime1, ArchivedBucket{id1, options.getTimeField().toString()});
+    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
+        minTime1,
+        ArchivedBucket{id1,
+                       make_tracked_string(_bucketCatalog->trackingContext,
+                                           options.getTimeField().toString())});
 
     // Should try to reopen archived bucket.
     boost::optional<StatusWith<InsertResult>> result1 =
@@ -2302,8 +2308,11 @@ TEST_F(BucketCatalogTest,
     auto minTime2 = roundTimestampToGranularity(doc2["time"].Date(), options);
     BucketId id2{_ns1, OID::gen()};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id2));
-    _bucketCatalog->stripes[0].archivedBuckets[key.hash].emplace(
-        minTime2, ArchivedBucket{id2, options.getTimeField().toString()});
+    _bucketCatalog->stripes[0]->archivedBuckets[key.hash].emplace(
+        minTime2,
+        ArchivedBucket{id2,
+                       make_tracked_string(_bucketCatalog->trackingContext,
+                                           options.getTimeField().toString())});
 
     // A second attempt should block.
     boost::optional<StatusWith<InsertResult>> result2 =
@@ -2337,14 +2346,15 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
         dummyBucketId, dummyBucketKey, "time", Date_t(), sideBucketCatalog->bucketStateRegistry);
 
     // Create and populate stripe.
-    auto& stripe = sideBucketCatalog->stripes[0];
+    auto& stripe = *sideBucketCatalog->stripes[0];
     stripe.openBucketsById.try_emplace(
         dummyBucketId,
-        std::make_unique<Bucket>(dummyBucketId,
-                                 dummyBucketKey,
-                                 "time",
-                                 Date_t(),
-                                 sideBucketCatalog->bucketStateRegistry));
+        make_unique_tracked<Bucket>(sideBucketCatalog->trackingContext,
+                                    dummyBucketId,
+                                    dummyBucketKey,
+                                    "time",
+                                    Date_t(),
+                                    sideBucketCatalog->bucketStateRegistry));
     stripe.openBucketsByKey[dummyBucketKey].emplace(dummyBucket.get());
     stripe.idleBuckets.push_front(dummyBucket.get());
     stdx::lock_guard stripeLock{stripe.mutex};
@@ -2460,7 +2470,7 @@ TEST_F(BucketCatalogTest, InsertWithMultipleOpenBucketsPerMetadata) {
     // Initialize the document that we will be inserting.
     auto doc = BSON(_metaField << 42 << _timeField << currentTime);
     // Initialize the values with which we will create our two buckets.
-    auto& stripe = _bucketCatalog->stripes[0];
+    auto& stripe = *_bucketCatalog->stripes[0];
     ClosedBuckets closedBuckets;
     auto options = _getTimeseriesOptions(_ns1);
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);
@@ -2538,7 +2548,7 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
     auto currentTime = Date_t::now();
 
     // Initialize the values with which we will create our bucket.
-    auto& stripe = _bucketCatalog->stripes[0];
+    auto& stripe = *_bucketCatalog->stripes[0];
     auto options = _getTimeseriesOptions(_ns1);
     ClosedBuckets closedBuckets;
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);
@@ -2638,7 +2648,7 @@ TEST_F(BucketCatalogTest, ReopeningWithMultipleOpenBucketsPerMetadataWithFeature
     auto currentTime = Date_t::now();
 
     // Initialize the values with which we will create our bucket.
-    auto& stripe = _bucketCatalog->stripes[0];
+    auto& stripe = *_bucketCatalog->stripes[0];
     auto options = _getTimeseriesOptions(_ns1);
     ClosedBuckets closedBuckets;
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);
@@ -2689,7 +2699,7 @@ TEST_F(BucketCatalogTest, AllocateBucketClosesExistingOpenBucketsWhenOverLimit) 
     auto currentTime = Date_t::now();
 
     // Initialize the values with which we will create our bucket.
-    auto& stripe = _bucketCatalog->stripes[0];
+    auto& stripe = *_bucketCatalog->stripes[0];
     auto options = _getTimeseriesOptions(_ns1);
     ClosedBuckets closedBuckets;
     auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _ns1);

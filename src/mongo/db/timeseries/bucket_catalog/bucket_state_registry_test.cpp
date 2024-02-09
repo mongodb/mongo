@@ -93,7 +93,7 @@ public:
 
     Bucket& createBucket(const internal::CreationInfo& info) {
         auto ptr = &internal::allocateBucket(
-            operationContext(), *this, stripes[info.stripe], withLock, info);
+            operationContext(), *this, *stripes[info.stripe], withLock, info);
         ASSERT_FALSE(hasBeenCleared(*ptr));
         return *ptr;
     }
@@ -101,7 +101,7 @@ public:
     bool cannotAccessBucket(Bucket& bucket) {
         if (hasBeenCleared(bucket)) {
             internal::removeBucket(*this,
-                                   stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                                   *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
                                    withLock,
                                    bucket,
                                    internal::RemovalMode::kAbort);
@@ -114,20 +114,20 @@ public:
     void checkAndRemoveClearedBucket(Bucket& bucket) {
         auto a =
             internal::findBucket(bucketStateRegistry,
-                                 stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                                 *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
                                  withLock,
                                  bucket.bucketId,
                                  internal::IgnoreBucketState::kYes);
         ASSERT(a == &bucket);
         auto b =
             internal::findBucket(bucketStateRegistry,
-                                 stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                                 *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
                                  withLock,
                                  bucket.bucketId,
                                  internal::IgnoreBucketState::kNo);
         ASSERT(b == nullptr);
         internal::removeBucket(*this,
-                               stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
+                               *stripes[internal::getStripeNumber(bucket.key, numberOfStripes)],
                                withLock,
                                bucket,
                                internal::RemovalMode::kAbort);
@@ -732,7 +732,7 @@ TEST_F(BucketStateRegistryTest, ArchivingBucketPreservesState) {
     ClosedBuckets closedBuckets;
     internal::archiveBucket(operationContext(),
                             *this,
-                            stripes[info1.stripe],
+                            *stripes[info1.stripe],
                             WithLock::withoutLock(),
                             bucket,
                             closedBuckets);
@@ -748,7 +748,7 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     auto batch = std::make_shared<WriteBatch>(
         BucketHandle{bucketId, info1.stripe}, info1.key, 0, stats, bucket.timeField);
 
-    internal::abort(*this, stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
+    internal::abort(*this, *stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
     ASSERT(getBucketState(bucketStateRegistry, bucketId) == boost::none);
 }
 

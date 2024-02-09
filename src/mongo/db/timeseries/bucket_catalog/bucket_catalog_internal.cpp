@@ -373,19 +373,19 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
     return nullptr;
 }
 
-StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
-                                                    BucketStateRegistry& registry,
-                                                    ExecutionStatsController& stats,
-                                                    const NamespaceString& ns,
-                                                    const StringDataComparator* comparator,
-                                                    const TimeseriesOptions& options,
-                                                    const BucketToReopen& bucketToReopen,
-                                                    const uint64_t catalogEra,
-                                                    const BucketKey* expectedKey) {
+StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
+                                                       BucketCatalog& catalog,
+                                                       ExecutionStatsController& stats,
+                                                       const NamespaceString& ns,
+                                                       const StringDataComparator* comparator,
+                                                       const TimeseriesOptions& options,
+                                                       const BucketToReopen& bucketToReopen,
+                                                       const uint64_t catalogEra,
+                                                       const BucketKey* expectedKey) {
     ScopeGuard updateStatsOnError([&stats] { stats.incNumBucketReopeningsFailed(); });
 
     const auto& [bucketDoc, validator] = bucketToReopen;
-    if (catalogEra < getCurrentEra(registry)) {
+    if (catalogEra < getCurrentEra(catalog.bucketStateRegistry)) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
     }
 
@@ -425,8 +425,12 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                        .getField(options.getTimeField())
                        .Date();
     BucketId bucketId{key.ns, bucketIdElem.OID()};
-    std::unique_ptr<Bucket> bucket =
-        std::make_unique<Bucket>(bucketId, key, options.getTimeField(), minTime, registry);
+    unique_tracked_ptr<Bucket> bucket = make_unique_tracked<Bucket>(catalog.trackingContext,
+                                                                    bucketId,
+                                                                    key,
+                                                                    options.getTimeField(),
+                                                                    minTime,
+                                                                    catalog.bucketStateRegistry);
 
     const bool isCompressed = isCompressedBucket(bucketDoc);
 
@@ -492,13 +496,10 @@ StatusWith<std::unique_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
 
     // The namespace is stored two times: the bucket itself and openBucketsByKey. The bucket
     // consists of minmax and schema data so add their memory usage. Since the metadata is stored in
-    // the bucket, we need to add that as well. A unique pointer to the bucket is stored once:
-    // openBucketsById. A raw pointer to the bucket is stored at most twice: openBucketsByKey,
-    // idleBuckets.
+    // the bucket, we need to add that as well.
 
     bucket->memoryUsage += (key.ns.size() * 2) + bucket->minmax.calculateMemUsage() +
-        bucket->schema.calculateMemUsage() + key.metadata.toBSON().objsize() + sizeof(Bucket) +
-        sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
+        bucket->schema.calculateMemUsage() + key.metadata.toBSON().objsize();
 
     updateStatsOnError.dismiss();
     return {std::move(bucket)};
@@ -510,10 +511,10 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
                                                         WithLock stripeLock,
                                                         ExecutionStatsController& stats,
                                                         const BucketKey& key,
-                                                        std::unique_ptr<Bucket>&& bucket,
+                                                        unique_tracked_ptr<Bucket>&& bucket,
                                                         std::uint64_t targetEra,
                                                         ClosedBuckets& closedBuckets) {
-    invariant(bucket);
+    invariant(bucket.get());
 
     expireIdleBuckets(opCtx, catalog, stripe, stripeLock, stats, closedBuckets);
 
@@ -530,16 +531,11 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
         auto& archivedSet = setIt->second;
         if (auto bucketIt = archivedSet.find(bucket->minTime);
             bucketIt != archivedSet.end() && bucket->bucketId == bucketIt->second.bucketId) {
-            long long memory = marginalMemoryUsageForArchivedBucket(
-                bucketIt->second,
-                (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                          : IncludeMemoryOverheadFromMap::kExclude);
             if (archivedSet.size() == 1) {
                 stripe.archivedBuckets.erase(setIt);
             } else {
                 archivedSet.erase(bucketIt);
             }
-            catalog.memoryUsage.fetchAndSubtract(memory);
             catalog.numberOfActiveBuckets.fetchAndSubtract(1);
         }
     }
@@ -664,13 +660,10 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
         }
         // The namespace is stored two times: the bucket itself and openBucketsByKey.
         // We don't have a great approximation for the
-        // _schema size, so we use initial document size minus metadata as an approximation. Since
-        // the metadata itself is stored once, in the bucket, we can combine the two and just use
-        // the initial document size. A unique pointer to the bucket is stored once:
-        // openBucketsById. A raw pointer to the bucket is stored at most twice: openBucketsByKey,
-        // idleBuckets.
-        bucket.memoryUsage += (info.key.ns.size() * 2) + doc.objsize() + sizeof(Bucket) +
-            sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
+        // _schema size, so we use initial document size minus metadata as an approximation.
+        // We can combine this with the metadata size to just use the document size.
+        // (doc size - metadata size + metadata size) = doc size.
+        bucket.memoryUsage += (info.key.ns.size() * 2) + doc.objsize();
 
         auto updateStatus = bucket.schema.update(
             doc, info.options.getMetaField(), info.key.metadata.getComparator());
@@ -801,13 +794,11 @@ void archiveBucket(OperationContext* opCtx,
     auto& archivedSet = stripe.archivedBuckets[bucket.key.hash];
     auto it = archivedSet.find(bucket.minTime);
     if (it == archivedSet.end()) {
-        auto [it, inserted] =
-            archivedSet.emplace(bucket.minTime, ArchivedBucket{bucket.bucketId, bucket.timeField});
-        long long memory = marginalMemoryUsageForArchivedBucket(
-            it->second,
-            (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                      : IncludeMemoryOverheadFromMap::kExclude);
-        catalog.memoryUsage.fetchAndAdd(memory);
+        // TODO SERVER-85293: remove conversion to tracked_string.
+        archivedSet.emplace(
+            bucket.minTime,
+            ArchivedBucket{bucket.bucketId,
+                           make_tracked_string(catalog.trackingContext, bucket.timeField)});
         archived = true;
     }
 
@@ -859,16 +850,11 @@ boost::optional<OID> findArchivedCandidate(BucketCatalog& catalog,
                 // finishes.
                 stopTrackingBucketState(catalog.bucketStateRegistry, candidateBucket.bucketId);
             }
-            long long memory = marginalMemoryUsageForArchivedBucket(
-                candidateBucket,
-                (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                          : IncludeMemoryOverheadFromMap::kExclude);
             if (archivedSet.size() == 1) {
                 stripe.archivedBuckets.erase(setIt);
             } else {
                 archivedSet.erase(it);
             }
-            catalog.memoryUsage.fetchAndSubtract(memory);
             catalog.numberOfActiveBuckets.fetchAndSubtract(1);
         }
     }
@@ -1059,10 +1045,6 @@ void expireIdleBuckets(OperationContext* opCtx,
 
         auto& [timestamp, bucket] = *archivedSet.begin();
         closeArchivedBucket(catalog, bucket, closedBuckets);
-        long long memory = marginalMemoryUsageForArchivedBucket(
-            bucket,
-            (archivedSet.size() == 1) ? IncludeMemoryOverheadFromMap::kInclude
-                                      : IncludeMemoryOverheadFromMap::kExclude);
         if (archivedSet.size() == 1) {
             // If this is the only entry, erase the whole map so we don't leave it empty.
             stripe.archivedBuckets.erase(stripe.archivedBuckets.begin());
@@ -1070,7 +1052,6 @@ void expireIdleBuckets(OperationContext* opCtx,
             // Otherwise just erase this bucket from the map.
             archivedSet.erase(archivedSet.begin());
         }
-        catalog.memoryUsage.fetchAndSubtract(memory);
         catalog.numberOfActiveBuckets.fetchAndSubtract(1);
 
         stats.incNumBucketsClosedDueToMemoryThreshold();
@@ -1198,18 +1179,19 @@ Bucket& allocateBucket(OperationContext* opCtx,
     auto maxRetries = gTimeseriesInsertMaxRetriesOnDuplicates.load();
     OID oid;
     Date_t roundedTime;
-    stdx::unordered_map<BucketId, std::unique_ptr<Bucket>, BucketHasher>::iterator it;
+    tracked_unordered_map<BucketId, unique_tracked_ptr<Bucket>, BucketHasher>::iterator it;
     bool inserted = false;
     for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
         std::tie(oid, roundedTime) = generateBucketOID(info.time, info.options);
         auto bucketId = BucketId{info.key.ns, oid};
         std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
             bucketId,
-            std::make_unique<Bucket>(bucketId,
-                                     info.key,
-                                     info.options.getTimeField(),
-                                     roundedTime,
-                                     catalog.bucketStateRegistry));
+            make_unique_tracked<Bucket>(catalog.trackingContext,
+                                        bucketId,
+                                        info.key,
+                                        info.options.getTimeField(),
+                                        roundedTime,
+                                        catalog.bucketStateRegistry));
         if (!inserted) {
             resetBucketOIDCounter();
         }
@@ -1489,7 +1471,7 @@ void closeArchivedBucket(BucketCatalog& catalog,
     try {
         closedBuckets.emplace_back(&catalog.bucketStateRegistry,
                                    bucket.bucketId,
-                                   bucket.timeField,
+                                   bucket.timeField.c_str(),
                                    boost::none,
                                    getOrInitializeExecutionStats(catalog, bucket.bucketId.ns));
     } catch (...) {
