@@ -759,7 +759,7 @@ distribution for details.
 This file is part of Valgrind, a dynamic binary instrumentation
 framework.
 
-Copyright (C) 2000-2015 Julian Seward.  All rights reserved.
+Copyright (C) 2000-2017 Julian Seward.  All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -768,16 +768,16 @@ are met:
 1. Redistributions of source code must retain the above copyright
    notice, this list of conditions and the following disclaimer.
 
-2. The origin of this software must not be misrepresented; you must
-   not claim that you wrote the original software.  If you use this
-   software in a product, an acknowledgment in the product
+2. The origin of this software must not be misrepresented; you must 
+   not claim that you wrote the original software.  If you use this 
+   software in a product, an acknowledgment in the product 
    documentation would be appreciated but is not required.
 
 3. Altered source versions must be plainly marked as such, and must
    not be misrepresented as being the original software.
 
-4. The name of the author may not be used to endorse or promote
-   products derived from this software without specific prior written
+4. The name of the author may not be used to endorse or promote 
+   products derived from this software without specific prior written 
    permission.
 
 THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
@@ -799,7 +799,7 @@ Notice that the above BSD-style license applies to this one file
 the terms of the GNU General Public License, version 2.  See the
 COPYING file in the source distribution for details.
 
-----------------------------------------------------------------
+---------------------------------------------------------------- 
 
 18) License notice for ICU4C
 ----------------------------
