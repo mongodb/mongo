@@ -9,7 +9,7 @@
  * ]
  */
 import {withEachMergeMode} from "jstests/aggregation/extras/merge_helpers.js";
-import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {getExplainPipelineFromAggregationResult} from "jstests/aggregation/extras/utils.js";
 
 let sourceColl = db.explain_writing_aggs_source;
 let targetColl = db.explain_writing_aggs_target;
@@ -34,7 +34,11 @@ function assertExecutionExplainOk(writingStage, verbosity) {
 // Test that $out can be explained with 'queryPlanner' explain verbosity and does not perform
 // any writes.
 let explain = sourceColl.explain("queryPlanner").aggregate([{$out: targetColl.getName()}]);
-let outExplain = getAggPlanStage(explain, "$out");
+let explainedPipeline =
+    getExplainPipelineFromAggregationResult(explain, {inhibitOptimization: false});
+assert.eq(1, explainedPipeline.length);
+assert(explainedPipeline[0].$out);
+let outExplain = explainedPipeline[0];
 assert.neq(outExplain, null, explain);
 
 assert.eq(outExplain.$out.coll, targetColl.getName(), explain);
@@ -60,7 +64,11 @@ withEachMergeMode(function({whenMatchedMode, whenNotMatchedMode}) {
     assertExecutionExplainOk(mergeStage, "allPlansExecution");
 
     const explain = sourceColl.explain("queryPlanner").aggregate([mergeStage]);
-    const mergeExplain = getAggPlanStage(explain, "$merge");
+    let explainedPipeline =
+        getExplainPipelineFromAggregationResult(explain, {inhibitOptimization: false});
+    assert.eq(1, explainedPipeline.length);
+    assert(explainedPipeline[0].$merge);
+    const mergeExplain = explainedPipeline[0];
     assert.neq(mergeExplain, null, explain);
     assert(mergeExplain.hasOwnProperty("$merge"), explain);
     assert.eq(mergeExplain.$merge.whenMatched, whenMatchedMode, mergeExplain);

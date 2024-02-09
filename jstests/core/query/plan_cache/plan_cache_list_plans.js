@@ -205,15 +205,17 @@ if (!isSbeEnabled) {
     const explain = coll.explain().aggregate(pipeline);
     assert.commandWorked(explain);
 
-    const lookupStage = getPlanStage(explain, "EQ_LOOKUP");
-    assert.neq(null, lookupStage, explain);
-    assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
-    assert.eq(lookupStage.indexName, "b_1");
+    if (!explain.splitPipeline) {
+        const lookupStage = getPlanStage(explain, "EQ_LOOKUP");
+        assert.neq(null, lookupStage, explain);
+        assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
+        assert.eq(lookupStage.indexName, "b_1");
 
-    // The '$planCacheStats' pipeline executed against the foreign collection shouldn't include
-    // cached $lookup plans.
-    const res = foreignColl.aggregate([{$planCacheStats: {}}]).toArray();
-    assert.eq(0, res.length, dumpPlanCacheState());
+        // The '$planCacheStats' pipeline executed against the foreign collection shouldn't include
+        // cached $lookup plans.
+        const res = foreignColl.aggregate([{$planCacheStats: {}}]).toArray();
+        assert.eq(0, res.length, dumpPlanCacheState());
+    }
 }
 
 // Ensure query setting entry is present in $planCacheStats output.

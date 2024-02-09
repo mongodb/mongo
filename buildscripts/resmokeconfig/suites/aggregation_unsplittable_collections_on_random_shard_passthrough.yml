@@ -17,7 +17,6 @@ selector:
   # this suite creates unsplittable collections on random shards and we cannot reliably check the
   # colocation of collections in these tests, this means that these tests are incompatible with
   # this suite as written.
-  # TODO SERVER-83351: Rewrite these tests to be compatible with this suite.
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_inlj.js
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_nlj.js
   - jstests/aggregation/sources/lookup/lookup_equijoin_semantics_hj.js
@@ -28,23 +27,18 @@ selector:
   - jstests/aggregation/sources/lookup/lookup_collation.js
   - jstests/aggregation/sources/lookup/lookup_foreign_collation.js
 
-  # TODO: SERVER-83351 (failing due to incorrect explain expectations). Reenable:
-  - jstests/aggregation/explain_writing_aggs.js
-  - jstests/aggregation/sources/unionWith/unionWith_explain.js
+  # Includes expectations on failpoints being hit on specific shards.
   - jstests/aggregation/sources/indexStats/verify_index_stats_output.js
-  - jstests/aggregation/sources/lookup/lookup_single_solution_cache.js
-  - jstests/aggregation/spill_to_disk.js
 
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
-  - assumes_no_implicit_index_creation
-  - cannot_create_unique_index_when_using_hashed_shard_key
   - requires_profiling
 
   # This passthrough implicitly creates the accessed collections. Do not run tests where collections
   # can't be created on `getCollection` call. (TODO SERVER-83396 Remove this).
   - assumes_no_implicit_collection_creation_on_get_collection
   - assumes_no_implicit_collection_creation_after_drop
+  - assumes_no_implicit_index_creation
 
 executor:
   archive:

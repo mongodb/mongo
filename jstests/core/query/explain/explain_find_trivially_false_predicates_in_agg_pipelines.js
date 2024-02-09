@@ -35,8 +35,7 @@ function assertUnionOfPlans(plan, firstPartStage, secondPartStage) {
     const firstPartPlan = getWinningPlanFromExplain(explain);
     assert(planHasStage(db, firstPartPlan, firstPartStage),
            `Expected ${firstPartStage} plan, found ${tojson(firstPartPlan)}`);
-    const pipeline =
-        getExplainPipelineFromAggregationResult(db, plan, {inhibitOptimization: false});
+    const pipeline = getExplainPipelineFromAggregationResult(plan, {inhibitOptimization: false});
     const unionStages = pipeline.filter((stage) => stage.hasOwnProperty("$unionWith"));
     assert.eq(unionStages.length, 1, "Expected to find only one $unionWith pipeline stage");
     const unionStageWinningPlan = getWinningPlanFromExplain(unionStages[0].$unionWith);

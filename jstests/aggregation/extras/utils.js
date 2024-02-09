@@ -540,11 +540,11 @@ export function getExplainedPipelineFromAggregation(
     const result = coll.explain().aggregate(pipeline, aggOptions);
 
     assert.commandWorked(result);
-    return getExplainPipelineFromAggregationResult(
-        db, result, {inhibitOptimization, postPlanningResults});
+    return getExplainPipelineFromAggregationResult(result,
+                                                   {inhibitOptimization, postPlanningResults});
 }
 
-export function getExplainPipelineFromAggregationResult(db, result, {
+export function getExplainPipelineFromAggregationResult(result, {
     inhibitOptimization = true,
     postPlanningResults = false,
 } = {}) {

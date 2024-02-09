@@ -443,8 +443,10 @@ function runTest_MultipleLocalForeignRecords({
                             }}];
     const results = localColl.aggregate(pipeline, {allowDiskUse: true}).toArray();
     const explain = localColl.explain('executionStats').aggregate(pipeline, {allowDiskUse: true});
-    // If sharding is enabled, '$lookup' is not pushed down to SBE.
-    if (isSbeGroupLookupPushdownEnabled && !sharded) {
+    const pipelineWasSplit = !!explain.splitPipeline;
+
+    // If sharding is enabled, or the pipeline was split, then '$lookup' is not pushed down to SBE.
+    if (isSbeGroupLookupPushdownEnabled && !sharded && !pipelineWasSplit) {
         const hLookups = getSbePlanStages(explain, 'hash_lookup');
         assert.eq(hLookups.length, 1, explain);
         const hLookup = hLookups[0];

@@ -422,84 +422,89 @@ if (checkSbeRestrictedOrFullyEnabled(db)) {
     // the 'foreign_a_1' one, rather than 'foreign_a_1_c_1' specified in the index filter, as the
     // INLJ heuristics always prefer an index with a narrower key pattern.
     explain = coll.explain().aggregate(pipeline);
-    assert.commandWorked(explain);
-    explain = getSingleNodeExplain(explain);
 
-    let lookupStage = getPlanStage(explain, "EQ_LOOKUP");
-    assert.neq(null, lookupStage, explain);
-    assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
-    assert.eq(lookupStage.indexName, "foreign_a_1");
+    // Cannot check when pipeline is split, because we won't push down to SBE in this case.`
+    if (!explain.splitPipeline) {
+        assert.commandWorked(explain);
+        explain = getSingleNodeExplain(explain);
 
-    // Now, add the same set of indexes to the main collection as defined on the foreign collection.
-    assert.commandWorked(coll.createIndex(indexA1, {name: "main_a_1"}));
-    assert.commandWorked(coll.createIndex(indexA1B1, {name: "main_a_1_b_1"}));
-    assert.commandWorked(coll.createIndex(indexA1C1, {name: "main_a_1_c_1"}));
+        let lookupStage = getPlanStage(explain, "EQ_LOOKUP");
+        assert.neq(null, lookupStage, explain);
+        assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
+        assert.eq(lookupStage.indexName, "foreign_a_1");
 
-    // Add the same index filter on the main collection as defined on the foreign collection.
-    assert.commandWorked(
-        coll.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
-    filters = getFilters(coll);
-    assert.eq(1, filters.length, filters);
-    assert.eq(queryA1, filters[0].query, filters);
-    assert.eq(1, filters[0].indexes.length, filters);
-    assert.eq(indexA1C1, filters[0].indexes[0], filters);
+        // Now, add the same set of indexes to the main collection as defined on the foreign
+        // collection.
+        assert.commandWorked(coll.createIndex(indexA1, {name: "main_a_1"}));
+        assert.commandWorked(coll.createIndex(indexA1B1, {name: "main_a_1_b_1"}));
+        assert.commandWorked(coll.createIndex(indexA1C1, {name: "main_a_1_c_1"}));
 
-    // Make sure we still have one index filter defined on the foreign collection.
-    assert.commandWorked(
-        foreignColl.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
-    filters = getFilters(foreignColl);
-    assert.eq(1, filters.length, filters);
+        // Add the same index filter on the main collection as defined on the foreign collection.
+        assert.commandWorked(
+            coll.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
+        filters = getFilters(coll);
+        assert.eq(1, filters.length, filters);
+        assert.eq(queryA1, filters[0].query, filters);
+        assert.eq(1, filters[0].indexes.length, filters);
+        assert.eq(indexA1C1, filters[0].indexes[0], filters);
 
-    // Re-run the pipeline.
-    results = coll.aggregate(pipeline).toArray();
+        // Make sure we still have one index filter defined on the foreign collection.
+        assert.commandWorked(
+            foreignColl.runCommand("planCacheSetFilter", {query: queryA1, indexes: [indexA1C1]}));
+        filters = getFilters(foreignColl);
+        assert.eq(1, filters.length, filters);
 
-    // Check details of the cached plan.
-    assert.eq(1, results.length, results);
-    planAfterSetFilter = planCacheEntryForPipeline(pipeline);
-    assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
-    // Check 'indexFilterSet' field in plan details - an index filter should be applied.
-    assert.eq(true, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
+        // Re-run the pipeline.
+        results = coll.aggregate(pipeline).toArray();
 
-    // Check that the inner side was still using the heursitics to select an INLJ plan, and the
-    // outer side honoured the index filter.
-    explain = coll.explain().aggregate(pipeline);
-    assert.commandWorked(explain);
-    explain = getSingleNodeExplain(explain);
-    lookupStage = getPlanStage(explain, "EQ_LOOKUP");
-    assert.neq(null, lookupStage, explain);
-    assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
-    assert.eq(lookupStage.indexName, "foreign_a_1");
+        // Check details of the cached plan.
+        assert.eq(1, results.length, results);
+        planAfterSetFilter = planCacheEntryForPipeline(pipeline);
+        assert.neq(null, planAfterSetFilter, coll.getPlanCache().list());
+        // Check 'indexFilterSet' field in plan details - an index filter should be applied.
+        assert.eq(true, planAfterSetFilter.indexFilterSet, planAfterSetFilter);
 
-    let ixscanStage = getPlanStage(explain, "IXSCAN");
-    assert.neq(null, ixscanStage, explain);
-    assert.eq(ixscanStage.indexName, "main_a_1_c_1", explain);
+        // Check that the inner side was still using the heursitics to select an INLJ plan, and the
+        // outer side honoured the index filter.
+        explain = coll.explain().aggregate(pipeline);
+        assert.commandWorked(explain);
+        explain = getSingleNodeExplain(explain);
+        lookupStage = getPlanStage(explain, "EQ_LOOKUP");
+        assert.neq(null, lookupStage, explain);
+        assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
+        assert.eq(lookupStage.indexName, "foreign_a_1");
 
-    //
-    // Test that planCacheClearFilters only clears plan cache entries on the main collection.
-    //
+        let ixscanStage = getPlanStage(explain, "IXSCAN");
+        assert.neq(null, ixscanStage, explain);
+        assert.eq(ixscanStage.indexName, "main_a_1_c_1", explain);
 
-    // Clear the index filter on the foreign collection and check that the plan cache entry for the
-    // $lookup still exists.
-    assert.commandWorked(foreignColl.runCommand("planCacheClearFilters", {query: queryA1}));
-    filters = getFilters(foreignColl);
-    assert.eq(0, filters.length, filters);
+        //
+        // Test that planCacheClearFilters only clears plan cache entries on the main collection.
+        //
 
-    filters = getFilters(coll);
-    assert.eq(1, filters.length, filters);
-    assert.eq(queryA1, filters[0].query, filters);
-    assert.eq(1, filters[0].indexes.length, filters);
-    assert.eq(indexA1C1, filters[0].indexes[0], filters);
+        // Clear the index filter on the foreign collection and check that the plan cache entry for
+        // the $lookup still exists.
+        assert.commandWorked(foreignColl.runCommand("planCacheClearFilters", {query: queryA1}));
+        filters = getFilters(foreignColl);
+        assert.eq(0, filters.length, filters);
 
-    let planCacheEntry = planCacheEntryForPipeline(pipeline);
-    assert.neq(null, planCacheEntry, coll.getPlanCache().list());
-    assert.eq(true, planCacheEntry.indexFilterSet, planCacheEntry);
+        filters = getFilters(coll);
+        assert.eq(1, filters.length, filters);
+        assert.eq(queryA1, filters[0].query, filters);
+        assert.eq(1, filters[0].indexes.length, filters);
+        assert.eq(indexA1C1, filters[0].indexes[0], filters);
 
-    // Clear the index filter on the main collection and ensure that the plan is no longer in the
-    // cache.
-    assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: queryA1}));
-    filters = getFilters(coll);
-    assert.eq(0, filters.length, filters);
+        let planCacheEntry = planCacheEntryForPipeline(pipeline);
+        assert.neq(null, planCacheEntry, coll.getPlanCache().list());
+        assert.eq(true, planCacheEntry.indexFilterSet, planCacheEntry);
 
-    planCacheEntry = planCacheEntryForPipeline(pipeline);
-    assert.eq(null, planCacheEntry, coll.getPlanCache().list());
+        // Clear the index filter on the main collection and ensure that the plan is no longer in
+        // the cache.
+        assert.commandWorked(coll.runCommand("planCacheClearFilters", {query: queryA1}));
+        filters = getFilters(coll);
+        assert.eq(0, filters.length, filters);
+
+        planCacheEntry = planCacheEntryForPipeline(pipeline);
+        assert.eq(null, planCacheEntry, coll.getPlanCache().list());
+    }
 }
