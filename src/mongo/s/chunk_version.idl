@@ -78,3 +78,5 @@ types:
         cpp_type: ChunkVersion
         serializer: ChunkVersion::serialize
         deserializer: ChunkVersion::parse
+        # ChunkVersion has only non view members.
+        is_view: false

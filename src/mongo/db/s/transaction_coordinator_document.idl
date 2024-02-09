@@ -44,6 +44,7 @@ types:
         cpp_type: "txn::CommitDecision"
         serializer: "::mongo::txn::writeCommitDecisionEnumProperty"
         deserializer: "::mongo::txn::readCommitDecisionEnumProperty"
+        is_view: false
 
     status:
         bson_serialization_type: any
@@ -51,6 +52,8 @@ types:
         cpp_type: "::mongo::Status"
         serializer: "::mongo::txn::writeStatusProperty"
         deserializer: "::mongo::txn::readStatusProperty"
+        # Status is not a view type.
+        is_view: false
 
 structs:
     CoordinatorCommitDecision:

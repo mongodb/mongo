@@ -47,6 +47,8 @@ types:
         serializer: CursorResponse::toBSONAsInitialResponse
         deserializer: CursorResponse::parseFromBSONThrowing
         deserialize_with_tenant: true
+        # CursorResponse uses getOwned.
+        is_view: false
 
 structs:
     RemoteCursor:

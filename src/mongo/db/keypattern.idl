@@ -40,3 +40,5 @@ types:
         cpp_type: KeyPattern
         serializer: KeyPattern::serializeForIDL
         deserializer: KeyPattern::fromBSON
+        # Deserializer uses getOwned.
+        is_view: false

@@ -42,3 +42,5 @@ types:
         cpp_type: "mongo::repl::ReadConcernArgs"
         serializer: "mongo::repl::ReadConcernArgs::toBSONInner"
         deserializer: "mongo::repl::ReadConcernArgs::fromBSONThrows"
+        # repl::ReadConcernArgs has only non view members.
+        is_view: false

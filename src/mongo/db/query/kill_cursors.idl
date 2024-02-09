@@ -42,6 +42,7 @@ types:
         description: "Uniquely identifies a single cursor on a particular mongoS or mongoD."
         cpp_type: mongo::CursorId
         deserializer: "mongo::BSONElement::_numberLong"
+        is_view: false
 
 structs:
     KillCursorsCommandReply:

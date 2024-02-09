@@ -52,18 +52,24 @@ types:
         description: "An array of objects specifying the aggregation pipeline."
         cpp_type: "std::vector<mongo::BSONObj>"
         deserializer: ::mongo::parsePipelineFromBSON
+        # Deserializer uses getOwned.
+        is_view: false
     aggregateCursor:
         bson_serialization_type: any
         description: "A cursor type representing the cursor field of aggregate command."
         cpp_type: SimpleCursorOptions
         serializer: ::mongo::serializeAggregateCursorToBSON
         deserializer: ::mongo::parseAggregateCursorFromBSON
+        # SimpleCursorOptions has only non view members.
+        is_view: false
     explainVerbosity:
         bson_serialization_type: any
         description: "The Verbosity value representing explain verbosity."
         cpp_type: "mongo::ExplainOptions::Verbosity"
         serializer: ::mongo::serializeExplainToBSON
         deserializer: ::mongo::parseExplainModeFromBSON
+        # ExplainOptions::Verbosity is not a view.
+        is_view: false
 
 structs:
     PassthroughToShardOptions:

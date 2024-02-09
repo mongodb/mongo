@@ -120,11 +120,13 @@ class TestImport(testcase.IDLTestcase):
                     serializer: foo
                     deserializer: foo
                     default: foo
+                    is_view: false
                 serialization_context:
                     bson_serialization_type: any
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
 
             structs:
                 bar:
@@ -144,6 +146,7 @@ class TestImport(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: int
                     deserializer: BSONElement::fake
+                    is_view: false
 
             """),
             "recurse2.idl":
@@ -157,6 +160,7 @@ class TestImport(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: double
                     deserializer: BSONElement::fake
+                    is_view: false
 
             """),
             "recurse1b.idl":
@@ -170,6 +174,7 @@ class TestImport(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: bool
                     deserializer: BSONElement::fake
+                    is_view: false
             """),
             "cycle1a.idl":
                 textwrap.dedent("""
@@ -187,11 +192,13 @@ class TestImport(testcase.IDLTestcase):
                     serializer: foo
                     deserializer: foo
                     default: foo
+                    is_view: false
                 serialization_context:
                     bson_serialization_type: any
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
 
             structs:
                 bar:
@@ -215,6 +222,7 @@ class TestImport(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: bool
                     deserializer: BSONElement::fake
+                    is_view: false
 
             structs:
                 bar2:
@@ -240,11 +248,13 @@ class TestImport(testcase.IDLTestcase):
                     serializer: foo
                     deserializer: foo
                     default: foo
+                    is_view: false
                 serialization_context:
                     bson_serialization_type: any
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
             """),
         }
 
@@ -360,6 +370,7 @@ class TestImport(testcase.IDLTestcase):
                     serializer: foo
                     deserializer: foo
                     default: foo
+                    is_view: false
 
             structs:
                 bar:
@@ -387,6 +398,7 @@ class TestImport(testcase.IDLTestcase):
                     description: foo
                     bson_serialization_type: bool
                     deserializer: BSONElement::fake
+                    is_view: false
             """),
         }
 
@@ -410,6 +422,7 @@ class TestImport(testcase.IDLTestcase):
                 description: foo
                 cpp_type: foo
                 bson_serialization_type: string
+                is_view: false
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL, resolver=resolver)
 
         # Duplicate structs
@@ -449,6 +462,7 @@ class TestImport(testcase.IDLTestcase):
                 description: foo
                 cpp_type: foo
                 bson_serialization_type: string
+                is_view: false
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL, resolver=resolver)
 
         # Duplicate enums
@@ -478,6 +492,7 @@ class TestImport(testcase.IDLTestcase):
                 description: foo
                 cpp_type: foo
                 bson_serialization_type: string
+                is_view: false
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD, resolver=resolver)
 
 

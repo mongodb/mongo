@@ -68,6 +68,7 @@ types:
     cpp_type: "mongo::BSONKey"
     serializer: "mongo::BSONKey::serializeToBSON"
     deserializer: "mongo::BSONKey::parseFromBSON"
+    is_view: false
 
 enums:
   OplogEntries:

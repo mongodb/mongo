@@ -46,6 +46,8 @@ types:
         description: "The absolute value of an int for limit."
         cpp_type: "std::int64_t"
         deserializer: ::count_request::countParseLimit
+        # std::int64_t is not a view.
+        is_view: false
 
 commands:
     count:

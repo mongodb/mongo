@@ -39,3 +39,4 @@ types:
     cpp_type: mongo::SHA256Block
     serializer: "mongo::SHA256Block::toHexString"
     deserializer: "mongo::SHA256Block::fromHexString"
+    is_view: false

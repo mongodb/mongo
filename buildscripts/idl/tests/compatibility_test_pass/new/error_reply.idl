@@ -32,6 +32,7 @@ types:
         description: "A BSON UTF-8 string"
         cpp_type: "std::string"
         deserializer: "mongo::BSONElement::str"
+        is_view: false
 
 structs:
     ErrorReply:

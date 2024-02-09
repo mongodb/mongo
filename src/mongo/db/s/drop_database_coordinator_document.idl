@@ -52,6 +52,7 @@ types:
         cpp_type: CollectionType
         serializer: "mongo::CollectionType::toBSON"
         deserializer: "mongo::CollectionType"
+        is_view: false
 
 structs:
     DropDatabaseCoordinatorDocument:

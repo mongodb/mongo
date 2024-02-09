@@ -42,6 +42,8 @@ types:
         description: "An array of objects representing the split keys."
         cpp_type: "std::vector<mongo::BSONObj>"
         deserializer: ::mongo::parseSplitKeys
+        # Deserializer uses getOwned.
+        is_view: false
 
 structs:
     AutoSplitVectorResponse:

@@ -58,6 +58,7 @@ types:
         cpp_type: "mongo::MigrationSessionId"
         deserializer: "mongo::MigrationSessionId::fromString"
         serializer: "mongo::MigrationSessionId::toString"
+        is_view: false
 
 structs:
     migrationCoordinatorDocument:

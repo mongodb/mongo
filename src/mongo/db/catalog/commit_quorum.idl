@@ -45,3 +45,4 @@ types:
         cpp_type: "mongo::CommitQuorumOptions"
         serializer: "mongo::CommitQuorumOptions::appendToBuilder"
         deserializer: "mongo::CommitQuorumOptions::deserializerForIDL"
+        is_view: false

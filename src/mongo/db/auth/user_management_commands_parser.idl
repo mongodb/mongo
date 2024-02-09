@@ -44,6 +44,8 @@ types:
         deserializer: "mongo::auth::UsersInfoCommandArg::parseFromBSON"
         serializer: "mongo::auth::UsersInfoCommandArg::serializeToBSON"
         deserialize_with_tenant: true
+        # Class which is constructed using AuthName has only non view members.
+        is_view: false
 
     # Unifies the various invocations of {rolesInfo:...}
     RolesInfoCommandArg:
@@ -53,6 +55,8 @@ types:
         deserializer: "mongo::auth::RolesInfoCommandArg::parseFromBSON"
         serializer: "mongo::auth::RolesInfoCommandArg::serializeToBSON"
         deserialize_with_tenant: true
+        # Class which is constructed using AuthName has only non view members.
+        is_view: false
 
     # PrivilegeFormat: true | false | "asUserFragment"
     ParsedPrivilegeFormat:
@@ -61,3 +65,4 @@ types:
         cpp_type: "ParsedPrivilegeFormat"
         deserializer: "mongo::auth::ParsedPrivilegeFormat::parseFromBSON"
         serializer: "mongo::auth::ParsedPrivilegeFormat::serializeToBSON"
+        is_view: false

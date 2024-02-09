@@ -42,6 +42,7 @@ types:
         cpp_type: "mongo::WriteConcernOptions"
         serializer: "mongo::WriteConcernOptions::toBSON"
         deserializer: "mongo::WriteConcernOptions::deserializerForIDL"
+        is_view: false
 
     writeConcernW:
         bson_serialization_type: any
@@ -51,6 +52,7 @@ types:
         cpp_type: "mongo::WriteConcernW"
         serializer: "::mongo::serializeWriteConcernW"
         deserializer: "::mongo::deserializeWriteConcernW"
+        is_view: false
 
     writeConcernWTimeout:
         bson_serialization_type: any
@@ -59,6 +61,7 @@ types:
             See https://docs.mongodb.com/manual/reference/write-concern/"
         cpp_type: std::int64_t
         deserializer: "::mongo::parseWTimeoutFromBSON"
+        is_view: false
 
 structs:
     WriteConcernIdl:

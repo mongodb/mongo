@@ -43,3 +43,5 @@ types:
     bson_serialization_type: any
     serializer: "mongo::IndexHint::append"
     deserializer: "mongo::IndexHint::parse"
+    # Deserializer uses owned object or BSONElement::String().
+    is_view: false

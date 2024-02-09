@@ -48,6 +48,8 @@ types:
         serializer: "::mongo::mergeTargetNssSerializeToBSON"
         deserializer: "::mongo::mergeTargetNssParseFromBSON"
         deserialize_with_tenant: true
+        # NamespaceString is not a view.
+        is_view: false
 
     MergeOnFields:
         bson_serialization_type: any
@@ -55,6 +57,8 @@ types:
         cpp_type: std::vector<std::string>
         serializer: "::mongo::mergeOnFieldsSerializeToBSON"
         deserializer: "::mongo::mergeOnFieldsParseFromBSON"
+        # std::vector<std::string> is not a view.
+        is_view: false
 
     MergeWhenMatchedPolicy:
         bson_serialization_type: any
@@ -64,6 +68,8 @@ types:
         cpp_type: "::mongo::MergeWhenMatchedPolicy"
         serializer: "::mongo::mergeWhenMatchedSerializeToBSON"
         deserializer: "::mongo::mergeWhenMatchedParseFromBSON"
+        # Deserializer uses getOwned.
+        is_view: false
 
 structs:
     NamespaceSpec:

@@ -73,6 +73,8 @@ types:
         default: std::vector<StmtId>()
         serializer: ::mongo::repl::zeroOneManyStmtIdAppend
         deserializer: ::mongo::repl::parseZeroOneManyStmtId
+        # std::vector<StmtId> is not a view.
+        is_view: false
 structs:
     DurableReplOperation:
         description: "A document that represents an operation. Should never be used directly in

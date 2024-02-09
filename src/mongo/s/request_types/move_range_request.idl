@@ -53,6 +53,8 @@ types:
         cpp_type: "mongo::MigrationSecondaryThrottleOptions"
         serializer: mongo::MigrationSecondaryThrottleOptions::toBSON
         deserializer: mongo::MigrationSecondaryThrottleOptions::parseFromBSON
+        # Deserializer uses getOwned.
+        is_view: false
 
 structs:
     MoveRangeRequestBase:

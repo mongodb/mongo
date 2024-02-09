@@ -47,6 +47,7 @@ types:
     cpp_type: "mongo::QueryFrameworkControlEnum"
     deserializer: "::mongo::query_settings::query_framework::parse"
     serializer: "::mongo::query_settings::query_framework::serialize"
+    is_view: false
 
 structs:
   Namespace:

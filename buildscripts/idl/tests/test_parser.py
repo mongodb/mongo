@@ -167,6 +167,7 @@ class TestParser(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
                 bindata_subtype: foo
+                is_view: false
             """))
 
         # Test sequence of bson serialization types
@@ -179,6 +180,7 @@ class TestParser(testcase.IDLTestcase):
                 bson_serialization_type:
                     - foo
                     - bar
+                is_view: false
             """))
 
     def test_type_negative(self):
@@ -193,11 +195,13 @@ class TestParser(testcase.IDLTestcase):
                 description: test
                 cpp_type: foo
                 bson_serialization_type: int
+                is_view: false
         types:
             bar:
                 description: test
                 cpp_type: foo
                 bson_serialization_type: int
+                is_view: false
                 """), idl.errors.ERROR_ID_DUPLICATE_NODE)
 
         # Test scalar fails
@@ -215,6 +219,7 @@ class TestParser(testcase.IDLTestcase):
                 description: test
                 cpp_type: foo
                 bson_serialization_type:
+                is_view: false
                 """), idl.errors.ERROR_ID_UNKNOWN_NODE)
 
         # test duplicate field
@@ -226,6 +231,7 @@ class TestParser(testcase.IDLTestcase):
                 description: test
                 cpp_type: foo
                 bson_serialization_type:
+                is_view: false
                 """), idl.errors.ERROR_ID_DUPLICATE_NODE)
 
         # test list instead of scalar
@@ -259,6 +265,7 @@ class TestParser(testcase.IDLTestcase):
             foo:
                 description: foo
                 cpp_type: foo
+                is_view: false
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
 
         # test missing cpp_type field
@@ -268,6 +275,7 @@ class TestParser(testcase.IDLTestcase):
             foo:
                 description: foo
                 bson_serialization_type: foo
+                is_view: false
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
 
     def test_struct_positive(self):
@@ -617,6 +625,7 @@ class TestParser(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
 
         structs:
             foo1:
@@ -644,6 +653,7 @@ class TestParser(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
 
     def test_chained_type_positive(self):
@@ -892,6 +902,7 @@ class TestParser(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
 
         enums:
             foo:
@@ -912,6 +923,7 @@ class TestParser(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
 
         structs:
             foo:
@@ -1306,6 +1318,7 @@ class TestParser(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
         """)
 
         # Commands and structs with same name

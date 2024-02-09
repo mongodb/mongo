@@ -49,6 +49,7 @@ types:
         cpp_type: "bool"
         serializer: "::mongo::write_ops::writeMultiDeleteProperty"
         deserializer: "::mongo::write_ops::readMultiDeleteProperty"
+        is_view: false
 
     update_modification:
         bson_serialization_type: any
@@ -57,6 +58,7 @@ types:
         cpp_type: "mongo::write_ops::UpdateModification"
         serializer: "mongo::write_ops::UpdateModification::serializeToBSON"
         deserializer: "mongo::write_ops::UpdateModification::parseFromBSON"
+        is_view: true
 
     write_cmd_optime:
         bson_serialization_type: any
@@ -64,6 +66,8 @@ types:
         cpp_type: "mongo::repl::OpTime"
         serializer: "::mongo::write_ops::opTimeSerializerWithTermCheck"
         deserializer: "::mongo::write_ops::opTimeParser"
+        # repl::OpTime has only non view members.
+        is_view: false
 
     write_error:
         bson_serialization_type: object
@@ -72,6 +76,7 @@ types:
         cpp_type: "mongo::write_ops::WriteError"
         serializer: "mongo::write_ops::WriteError::serialize"
         deserializer: "mongo::write_ops::WriteError::parse"
+        is_view: false
 
 structs:
 

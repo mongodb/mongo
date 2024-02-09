@@ -45,12 +45,14 @@ types:
         description: "A BSON UTF-8 string"
         cpp_type: "std::string"
         deserializer: "mongo::BSONElement::str"
+        is_view: false
 
     int:
         bson_serialization_type: int
         description: "A BSON 32-bit integer"
         cpp_type: "std::int32_t"
         deserializer: "mongo::BSONElement::_numberInt"
+        is_view: false
 
     namespacestring:
         bson_serialization_type: string
@@ -58,6 +60,7 @@ types:
         cpp_type: "mongo::NamespaceString"
         serializer: mongo::NamespaceString::toString
         deserializer: mongo::NamespaceString
+        is_view: false
 
     safeInt32:
         description: Accepts any numerical type within int32 range
@@ -68,6 +71,7 @@ types:
                                 - decimal
                                 - double
         deserializer: "mongo::BSONElement::numberInt"
+        is_view: false
 
     bindata_generic:
         bson_serialization_type: bindata
@@ -75,6 +79,7 @@ types:
         description: "A BSON bindata of "
         cpp_type: "std::vector<std::uint8_t>"
         deserializer: "mongo::BSONElement::_binDataVector"
+        is_view: false
 
     bindata_uuid:
         bson_serialization_type: bindata
@@ -82,6 +87,7 @@ types:
         description: "A BSON bindata of uuid sub type"
         cpp_type: "std::array<std::uint8_t, 16>"
         deserializer: "mongo::BSONElement::uuid"
+        is_view: false
 
 
 structs:

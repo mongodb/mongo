@@ -63,3 +63,5 @@ types:
         cpp_type: CollectionIndexes
         serializer: CollectionIndexes::serialize
         deserializer: CollectionIndexes::parse
+        # CollectionIndexes has only non view members.
+        is_view: false

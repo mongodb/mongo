@@ -69,6 +69,8 @@ types:
         bson_serialization_type: object
         serializer: "mongo::ForwardableOperationMetadata::toBSON"
         deserializer: "mongo::ForwardableOperationMetadata"
+        # ForwardableOperationMetadata has only non view members.
+        is_view: false
 
     DatabaseVersion:
         description: ""
@@ -76,6 +78,7 @@ types:
         bson_serialization_type: object
         serializer: "mongo::DatabaseVersion::toBSON"
         deserializer: "mongo::DatabaseVersion"
+        is_view: false
 
     ErrorStatus:
         bson_serialization_type: any
@@ -83,6 +86,8 @@ types:
         cpp_type: "::mongo::Status"
         serializer: "::mongo::sharding_ddl_util_serializeErrorStatusToBSON"
         deserializer: "::mongo::sharding_ddl_util_deserializeErrorStatusFromBSON"
+        # Status is a non view type.
+        is_view: false
 
 structs:
     ShardingDDLCoordinatorId:

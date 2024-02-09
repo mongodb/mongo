@@ -43,6 +43,8 @@ types:
         cpp_type: "mongo::EncryptSchemaKeyId"
         serializer: mongo::EncryptSchemaKeyId::serializeToBSON
         deserializer: mongo::EncryptSchemaKeyId::parseFromBSON
+        # EncryptSchemaKeyId has only non view members.
+        is_view: false
 
     bsonTypeSet:
         bson_serialization_type: any
@@ -50,6 +52,8 @@ types:
         cpp_type: "mongo::BSONTypeSet"
         serializer: mongo::BSONTypeSet::serializeToBSON
         deserializer: mongo::BSONTypeSet::parseFromBSON
+        # BSONTypeSet initialized with non view objects.
+        is_view: false
 
 enums:
     FleAlgorithm:

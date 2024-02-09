@@ -53,6 +53,7 @@ types:
         cpp_type: "bool"
         deserializer: "::mongo::parseBoolean"
         serializer: "::mongo::noOpSerializer"
+        is_view: false
     object_owned_nonempty_serialize:
         bson_serialization_type: any
         description: "An owned BSONObj, which gets serialized only when the BSON is not empty.
@@ -61,6 +62,7 @@ types:
         serializer: "::mongo::serializeBSONWhenNotEmpty"
         deserializer: "::mongo::parseOwnedBSON"
         default: mongo::BSONObj()
+        is_view: false
 
 commands:
   find:

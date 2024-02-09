@@ -47,12 +47,14 @@ types:
     bson_serialization_type: long
     cpp_type: "std::int64_t"
     deserializer: "mongo::BSONElement::_numberLong"
+    is_view: false
 
   StmtId:
     description: "A number representing an operation within a transaction."
     bson_serialization_type: int
     cpp_type: "std::int32_t"
     deserializer: "mongo::BSONElement::_numberInt"
+    is_view: false
 
   TxnRetryCounter:
     description: "A strictly-increasing per-transaction counter that starts at 0 and is incremented
@@ -61,6 +63,7 @@ types:
     bson_serialization_type: int
     cpp_type: "std::int32_t"
     deserializer: "mongo::BSONElement::_numberInt"
+    is_view: false
 
 structs:
 

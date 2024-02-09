@@ -46,6 +46,8 @@ types:
         cpp_type: "MemberId"
         serializer: MemberId::serializeToBSON
         deserializer: MemberId::parseFromBSON
+        # MemberId is not a view.
+        is_view: false
 
     memberConfig:
         bson_serialization_type: object
@@ -53,6 +55,8 @@ types:
         cpp_type: MemberConfig
         serializer: MemberConfig::toBSON
         deserializer: MemberConfig::parseFromBSON
+        # MemberConfig has a view member horizons.
+        is_view: true
 
 structs:
     MemberConfigBase:

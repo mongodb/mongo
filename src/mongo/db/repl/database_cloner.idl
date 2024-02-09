@@ -40,6 +40,9 @@ types:
       bson_serialization_type: object
       deserializer: mongo::repl::parseCollectionOptionsForDatabaseCloner
       serializer: mongo::CollectionOptions::toBSON
+      # View members of CollectionOptions are storageEngine, idIndex, validator, collation, and
+      # pipeline, all of which are always owned.
+      is_view: false
       
 structs:
    CollectionInfo:

@@ -59,6 +59,8 @@ types:
         cpp_type: ElectionReasonCounter
         serializer: "::mongo::repl::serializeElectionReasonCounterToBSON"
         deserializer: "::mongo::repl::parseElectionReasonCounter"
+        # ElectionReasonCounter has only non view members.
+        is_view: false
 
 structs:
     ElectionMetrics:

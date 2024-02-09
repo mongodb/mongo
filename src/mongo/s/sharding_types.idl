@@ -45,6 +45,7 @@ types:
         cpp_type: "ShardId"
         deserializer: "mongo::BSONElement::str"
         serializer: "mongo::ShardId::toString"
+        is_view: false
 
     database_version:
         bson_serialization_type: object
@@ -52,6 +53,8 @@ types:
         cpp_type: DatabaseVersion
         serializer: "mongo::DatabaseVersion::toBSON"
         deserializer: "mongo::DatabaseVersion"
+        # DatabaseVersion has only non view members.
+        is_view: false
 
     shard_version:
         bson_serialization_type: any
@@ -59,4 +62,6 @@ types:
         cpp_type: ShardVersion
         serializer: "mongo::ShardVersion::serialize"
         deserializer: "mongo::ShardVersion::parse"
+        # ShardVersion has only non view members.
+        is_view: false
 

@@ -39,6 +39,7 @@ types:
         description: "The bson_serialization_type changes from int in the old command's reply
                       field type to [int, string] in the new command's reply field type"
         cpp_type: "std::int32_t"
+        is_view: false
 
     intStringToIntStringBool:
         bson_serialization_type:
@@ -48,6 +49,7 @@ types:
                       reply field type to [int, string, bool] in the new command's reply field
                       type"
         cpp_type: "std::int32_t"
+        is_view: false
 
     oldBsonSerializationTypeAny:
         bson_serialization_type:
@@ -55,12 +57,14 @@ types:
                                 - any
         description: "The old bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
+        is_view: false
 
     newBsonSerializationTypeAny:
         bson_serialization_type:
                                 - int
         description: "The new bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
+        is_view: false
 
     bsonSerializationTypeAny:
         bson_serialization_type:
@@ -68,6 +72,7 @@ types:
                                 - any
         description: "The old and new bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
+        is_view: false
 
     bsonSerializationTypeAnyCppTypeNotEqual:
         bson_serialization_type:
@@ -75,6 +80,7 @@ types:
                                 - any
         description: "The old and new bson_serialization_type contains 'any'"
         cpp_type: "std::int64_t"
+        is_view: false
 
     bsonSerializationTypeAnySerializerNotEqual:
         bson_serialization_type:
@@ -84,6 +90,7 @@ types:
                       field value here is different from the one defined in new."
         cpp_type: "std::int64_t"
         serializer: ::mongo::oldSerializer
+        is_view: false
 
     bsonSerializationTypeAnyDeserializerNotEqual:
         bson_serialization_type:
@@ -93,6 +100,7 @@ types:
                       field value here is different from the one defined in new."
         cpp_type: "std::int64_t"
         deserializer: ::mongo::oldDeserializer
+        is_view: false
 
     intStringBoolToIntString:
         bson_serialization_type:
@@ -103,6 +111,7 @@ types:
                       command's reply field type to [int, string] in the new command's reply
                       field type"
         cpp_type: "std::int32_t"
+        is_view: false
 
     intStringToInt:
         bson_serialization_type:
@@ -111,6 +120,7 @@ types:
         description: "The bson_serialization_type changes from [int, string] in the old command
                       parameter's type to [int] in the new command parameter's type"
         cpp_type: "std::int32_t"
+        is_view: false
 
 enums:
     NewReplyFieldEnumNotSubset:

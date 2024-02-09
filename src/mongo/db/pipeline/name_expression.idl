@@ -42,4 +42,6 @@ types:
         cpp_type: "mongo::NameExpression"
         serializer: mongo::NameExpression::serializeToBSON
         deserializer: mongo::NameExpression::parseFromBSON
+        # NameExpression's members are owned or non-view.
+        is_view: false
 

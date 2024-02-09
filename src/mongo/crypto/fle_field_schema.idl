@@ -122,6 +122,7 @@ types:
     cpp_type: "mongo::IDLAnyType"
     serializer: mongo::IDLAnyType::serializeToBSON
     deserializer: mongo::IDLAnyType::parseFromBSON
+    is_view: true
 
 structs:
     EncryptionPlaceholder:

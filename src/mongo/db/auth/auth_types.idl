@@ -44,6 +44,8 @@ types:
     cpp_type: "UserName"
     deserializer: "mongo::UserName::parseFromBSON"
     serializer: "mongo::UserName::serializeToBSON"
+    # The AuthName that is constructed has only non-view members.
+    is_view: false
 
   RoleName:
     bson_serialization_type: any
@@ -51,6 +53,8 @@ types:
     cpp_type: "RoleName"
     deserializer: "mongo::RoleName::parseFromBSON"
     serializer: "mongo::RoleName::serializeToBSON"
+    # The AuthName that is constructed has only non-view members.
+    is_view: false
 
   RoleNameOrString:
     bson_serialization_type: any
@@ -58,6 +62,8 @@ types:
     cpp_type: "RoleNameOrString"
     deserializer: "mongo::RoleNameOrString::parseFromBSON"
     serializer: "mongo::RoleNameOrString::serializeToBSON"
+    # The AuthName that is constructed has only non-view members.
+    is_view: false
 
 structs:
   authLocalGetUserFailPoint:

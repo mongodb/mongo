@@ -46,6 +46,7 @@ types:
     cpp_type: Value
     serializer: Value::serializeForIDL
     deserializer: Value::deserializeForIDL
+    is_view: false
 
 enums:
     QueryType:

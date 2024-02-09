@@ -41,4 +41,6 @@ types:
         cpp_type: ClientMetadata
         serializer: "mongo::ClientMetadata::getDocument"
         deserializer: "mongo::ClientMetadata::parseFromBSON"
+        # Deserializer uses getOwned.
+        is_view: false
 

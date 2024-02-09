@@ -44,3 +44,4 @@ types:
         cpp_type: ResumeToken
         serializer: ResumeToken::toBSON
         deserializer: ResumeToken::parse
+        is_view: false

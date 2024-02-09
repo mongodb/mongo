@@ -39,3 +39,6 @@ types:
         cpp_type: mongo::BSONObj
         serializer: "::mongo::serializeHintToBSON"
         deserializer: "::mongo::parseHint"
+        # Construction uses BSONObjBuilder, which will memcpy the data, meaning the constructed
+        # BSONObj is a non-view.
+        is_view: false

@@ -40,6 +40,7 @@ types:
                                 - any
         description: "The bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
+        is_view: false
 
 structs:
     NewStructFieldNoUnstableField:

@@ -46,3 +46,5 @@ types:
         cpp_type: "mongo::ChunkRange"
         serializer: "mongo::ChunkRange::toBSON"
         deserializer: "mongo::ChunkRange::fromBSONThrowing"
+        # Deserializer uses getOwned.
+        is_view: false

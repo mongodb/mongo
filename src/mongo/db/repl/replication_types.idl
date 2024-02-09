@@ -43,3 +43,5 @@ types:
         cpp_type: "OpTime"
         serializer: OpTime::toBSON
         deserializer: OpTime::parse
+        # OpTime has only non view members.
+        is_view: false

@@ -77,6 +77,7 @@ class TestBinder(testcase.IDLTestcase):
             bson_serialization_type: object
             serializer: foo
             deserializer: foo
+            is_view: false
 
         bool:
             description: foo
@@ -84,6 +85,7 @@ class TestBinder(testcase.IDLTestcase):
             bson_serialization_type: any
             serializer: foo
             deserializer: foo
+            is_view: false
 
         string:
             description: foo
@@ -91,6 +93,7 @@ class TestBinder(testcase.IDLTestcase):
             bson_serialization_type: string
             serializer: foo
             deserializer: foo
+            is_view: false
 
         any_type:
             description: foo
@@ -98,6 +101,7 @@ class TestBinder(testcase.IDLTestcase):
             bson_serialization_type: any
             serializer: foo
             deserializer: foo
+            is_view: false
 
         tenant_id:
             bson_serialization_type: any
@@ -105,6 +109,7 @@ class TestBinder(testcase.IDLTestcase):
             cpp_type: foo
             deserializer: foo
             serializer: foo
+            is_view: false
 
         database_name:
             bson_serialization_type: string
@@ -112,12 +117,14 @@ class TestBinder(testcase.IDLTestcase):
             cpp_type: foo
             serializer: foo
             deserializer: foo
+            is_view: false
 
         serialization_context:
             bson_serialization_type: any
             description: foo
             cpp_type: foo
             internal_only: true
+            is_view: false
     """)
 
     def test_empty(self):
@@ -167,6 +174,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
             """))
 
         # Test supported types
@@ -183,6 +191,7 @@ class TestBinder(testcase.IDLTestcase):
                 bson_serialization_type: %s
                 default: foo
                 deserializer: BSONElement::fake
+                is_view: false
             """ % (bson_type)))
 
         # Test supported numeric types
@@ -202,6 +211,7 @@ class TestBinder(testcase.IDLTestcase):
                         cpp_type: %s
                         bson_serialization_type: int
                         deserializer: BSONElement::fake
+                        is_view: false
                 """ % (cpp_type)))
 
         # Test object
@@ -215,6 +225,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
             """))
 
         # Test 'any'
@@ -228,6 +239,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
             """))
 
         # Test 'chain'
@@ -241,6 +253,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
             """))
 
         # Test supported bindata_subtype
@@ -254,6 +267,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: bindata
                     bindata_subtype: %s
                     deserializer: BSONElement::fake
+                    is_view: false
                 """ % (bindata_subtype)))
 
     def test_type_negative(self):
@@ -268,6 +282,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: foo
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
 
         # Test bad cpp_type name
@@ -279,6 +294,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: StringData
                     bson_serialization_type: string
                     deserializer: bar
+                    is_view: false
             """), idl.errors.ERROR_ID_NO_STRINGDATA)
 
         # Test unsupported serialization
@@ -329,6 +345,7 @@ class TestBinder(testcase.IDLTestcase):
                         cpp_type: %s
                         bson_serialization_type: int
                         deserializer: BSONElement::int
+                        is_view: false
                     """ % (cpp_type)), idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE)
 
         # Test the std prefix 8 and 16-byte integers fail
@@ -341,6 +358,7 @@ class TestBinder(testcase.IDLTestcase):
                         cpp_type: %s
                         bson_serialization_type: int
                         deserializer: BSONElement::int
+                        is_view: false
                     """ % (std_cpp_type)), idl.errors.ERROR_ID_BAD_NUMERIC_CPP_TYPE)
 
         # Test bindata_subtype missing
@@ -352,6 +370,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: bindata
                     deserializer: BSONElement::fake
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
 
         # Test fake bindata_subtype is wrong
@@ -364,6 +383,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: bindata
                     bindata_subtype: foo
                     deserializer: BSONElement::fake
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
 
         # Test deprecated bindata_subtype 'binary', and 'uuid_old' are wrong
@@ -375,6 +395,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: bindata
                     bindata_subtype: binary
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
 
         self.assert_bind_fail(
@@ -385,6 +406,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: bindata
                     bindata_subtype: uuid_old
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE)
 
         # Test bindata_subtype on wrong type
@@ -397,6 +419,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: string
                     bindata_subtype: generic
                     deserializer: BSONElement::fake
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_TYPE)
 
         # Test bindata with default
@@ -409,6 +432,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: bindata
                     bindata_subtype: uuid
                     default: 42
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BINDATA_DEFAULT)
 
         # Test bindata in list of types
@@ -421,6 +445,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type:
                                 - bindata
                                 - string
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
 
         # Test bindata in list of types
@@ -433,6 +458,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type:
                                 - bindata
                                 - string
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
 
         # Test 'any' in list of types
@@ -445,6 +471,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type:
                                 - any
                                 - int
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_ANY_TYPE_USE)
 
         # Test object in list of types
@@ -457,6 +484,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type:
                                 - object
                                 - int
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_TYPE_LIST)
 
         # Test fake in list of types
@@ -469,6 +497,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type:
                                 - int
                                 - fake
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_BSON_TYPE)
 
         # Test 'chain' in list of types
@@ -481,6 +510,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type:
                                 - chain
                                 - int
+                    is_view: false
             """), idl.errors.ERROR_ID_BAD_ANY_TYPE_USE)
 
         # Test unsupported serialization
@@ -497,6 +527,7 @@ class TestBinder(testcase.IDLTestcase):
                         bson_serialization_type: %s
                         serializer: foo
                         deserializer: BSONElement::fake
+                        is_view: false
                     """ % (bson_type)),
                 idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED)
 
@@ -508,6 +539,7 @@ class TestBinder(testcase.IDLTestcase):
                         cpp_type: std::string
                         bson_serialization_type: %s
                         deserializer: foo
+                        is_view: false
                     """ % (bson_type)),
                 idl.errors.ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED)
 
@@ -519,6 +551,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: any
+                    is_view: false
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
         # Test 'chain' serialization needs deserializer
@@ -530,6 +563,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: chain
                     serializer: bar
+                    is_view: false
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
         # Test 'string' serialization needs deserializer
@@ -541,6 +575,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: string
                     serializer: bar
+                    is_view: false
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
         # Test 'date' serialization needs deserializer
@@ -551,6 +586,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: foo
                     cpp_type: foo
                     bson_serialization_type: date
+                    is_view: false
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
         # Test 'chain' serialization needs serializer
@@ -562,6 +598,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: chain
                     deserializer: bar
+                    is_view: false
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
         # Test list of bson types needs deserializer
@@ -574,6 +611,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type:
                                 - int
                                 - string
+                    is_view: false
             """), idl.errors.ERROR_ID_MISSING_AST_REQUIRED_FIELD)
 
         # Test array as name
@@ -585,6 +623,7 @@ class TestBinder(testcase.IDLTestcase):
                     cpp_type: foo
                     bson_serialization_type: string
                     deserializer: bar
+                    is_view: false
             """), idl.errors.ERROR_ID_ARRAY_NOT_VALID_TYPE)
 
     def test_struct_positive(self):
@@ -600,6 +639,7 @@ class TestBinder(testcase.IDLTestcase):
                 cpp_type: std::int32_t
                 bson_serialization_type: int
                 deserializer: mongo::BSONElement::_numberInt
+                is_view: false
         """))
 
         self.assert_bind(test_preamble + textwrap.dedent("""
@@ -633,6 +673,7 @@ class TestBinder(testcase.IDLTestcase):
                 cpp_type: std::int32_t
                 bson_serialization_type: int
                 deserializer: mongo::BSONElement::_numberInt
+                is_view: false
         """))
 
         # Test array as name
@@ -668,12 +709,14 @@ class TestBinder(testcase.IDLTestcase):
                 cpp_type: std::int32_t
                 bson_serialization_type: int
                 deserializer: mongo::BSONElement::_numberInt
+                is_view: false
             bindata_function:
                 bson_serialization_type: bindata
                 bindata_subtype: function
                 description: "A BSON bindata of function sub type"
                 cpp_type: "std::vector<std::uint8_t>"
                 deserializer: "mongo::BSONElement::_binDataVector"
+                is_view: false
         """))
 
         self.assert_bind(test_preamble + textwrap.dedent("""
@@ -746,6 +789,7 @@ class TestBinder(testcase.IDLTestcase):
                 cpp_type: std::int32_t
                 bson_serialization_type: int
                 deserializer: mongo::BSONElement::_numberInt
+                is_view: false
             safeInt:
                 bson_serialization_type:
                 - long
@@ -755,6 +799,7 @@ class TestBinder(testcase.IDLTestcase):
                 description: foo
                 cpp_type: "std::int32_t"
                 deserializer: "mongo::BSONElement::safeNumberInt"
+                is_view: false
         """)) + textwrap.dedent("""
         enums:
             foo_enum:
@@ -975,6 +1020,7 @@ class TestBinder(testcase.IDLTestcase):
                     bson_serialization_type: string
                     serializer: foo
                     deserializer: foo
+                    is_view: false
             """)) + textwrap.dedent("""
             structs:
                 foo:
@@ -1028,18 +1074,21 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
 
             bindata:
                 description: foo
                 cpp_type: foo
                 bson_serialization_type: bindata
                 bindata_subtype: uuid
+                is_view: false
 
             serialization_context:
                 bson_serialization_type: any
                 description: foo
                 cpp_type: foo
                 internal_only: true
+                is_view: false
         """)
 
         # Test field of a struct type with a non-true default
@@ -1211,6 +1260,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
         """))
 
         # Chaining only
@@ -1236,6 +1286,7 @@ class TestBinder(testcase.IDLTestcase):
                 bson_serialization_type: chain
                 serializer: foo
                 deserializer: foo
+                is_view: false
         """))
 
         # Chaining with strict struct
@@ -1323,6 +1374,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
         """)) + textwrap.dedent("""
         structs:
             chained:
@@ -1444,6 +1496,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+                is_view: false
         """)) + textwrap.dedent("""
         structs:
             chained:
@@ -2777,16 +2830,19 @@ class TestBinder(testcase.IDLTestcase):
                     description: "A BSON UTF-8 string"
                     cpp_type: "std::string"
                     deserializer: "mongo::BSONElement::str"
+                    is_view: false
                 bool:
                     bson_serialization_type: bool
                     description: "A BSON bool"
                     cpp_type: "bool"
                     deserializer: "mongo::BSONElement::boolean"
+                    is_view: false
                 serialization_context:
                     bson_serialization_type: any
                     description: foo
                     cpp_type: foo
                     internal_only: true
+                    is_view: false
         """)
         self.assert_bind(basic_types + textwrap.dedent("""
             structs:

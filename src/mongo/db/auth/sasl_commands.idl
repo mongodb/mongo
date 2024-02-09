@@ -40,6 +40,7 @@ types:
         cpp_type: SaslPayload
         deserializer: "mongo::auth::SaslPayload::parseFromBSON"
         serializer: "mongo::auth::SaslPayload::serializeToBSON"
+        is_view: false
 
 structs:
     SaslReply:

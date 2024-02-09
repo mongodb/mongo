@@ -42,3 +42,5 @@ types:
     cpp_type: ReadPreferenceSetting
     serializer: ReadPreferenceSetting::toInnerBSON
     deserializer: ReadPreferenceSetting::fromInnerBSONForIDL
+    # Deserializer uses getOwned.
+    is_view: false

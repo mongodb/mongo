@@ -51,6 +51,8 @@ types:
         cpp_type: std::int64_t
         serializer: ::mongo::repl::smallExactInt64Append
         deserializer: ::mongo::repl::parseSmallExactInt64
+        # std::int64_t is not a view.
+        is_view: false
 
     termType:
         bson_serialization_type: any
@@ -58,6 +60,8 @@ types:
         cpp_type: std::int64_t
         serializer: ::mongo::repl::serializeTermField
         deserializer: ::mongo::repl::parseSmallExactInt64
+        # std::int64_t is not a view.
+        is_view: false
 
     optionalBoolSerializeIfTrue:
         bson_serialization_type: any
@@ -66,6 +70,8 @@ types:
         default: "mongo::OptionalBool()"
         deserializer: "mongo::OptionalBool::parseFromBSON"
         serializer: "::mongo::repl::serializeOptionalBoolIfTrue"
+        # OptionalBool is not a view.
+        is_view: false
 
     replSetWriteConcernModeMap:
         bson_serialization_type: any
@@ -73,6 +79,8 @@ types:
         cpp_type: ReplSetWriteConcernModeDefinitions
         serializer: ReplSetWriteConcernModeDefinitions::serializeToBSON
         deserializer: ReplSetWriteConcernModeDefinitions::parseFromBSON
+        # ReplSetWriteConcernModeDefinitions has only non view members.
+        is_view: false
 
 structs:
     ReplSetConfigSettings:

@@ -44,6 +44,7 @@ types:
     cpp_type: mongo::SHA1Block
     serializer: "mongo::SHA1Block::toCDR"
     deserializer: "mongo::SHA1Block::fromBinData"
+    is_view: false
 
   sha1BlockHex:
     bson_serialization_type: string
@@ -51,3 +52,4 @@ types:
     cpp_type: mongo::SHA1Block
     serializer: "mongo::SHA1Block::toHexString"
     deserializer: "mongo::SHA1Block::fromHexString"
+    is_view: false

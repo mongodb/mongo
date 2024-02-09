@@ -46,6 +46,7 @@ types:
         cpp_type: UUID
         deserializer: UUID::parse
         serializer: UUID::toBSON
+        is_view: false
 
 structs:
     ConfigSvrMergeResponse:
