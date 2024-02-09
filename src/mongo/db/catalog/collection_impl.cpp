@@ -263,13 +263,37 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
             str::stream() << "Index ident " << ident << " is being dropped or is already dropped."};
 }
 
-bool collUsesCappedSnapshots(const NamespaceString& nss, const CollectionOptions& options) {
-    // Only use the behavior for non-replicated capped collections (which can accept concurrent
-    // writes). This behavior relies on RecordIds being allocated in increasing order. For clustered
+namespace internal {
+bool collUsesCappedSnapshots(const CollectionOptions& options) {
+    // This behavior relies on RecordIds being allocated in increasing order. For clustered
     // collections, users define their RecordIds and are not constrained to creating them in
     // increasing order.
+    return options.capped && !options.clusteredIndex;
+}
+
+bool collUsesCappedSnapshots(const NamespaceString& nss) {
     // The oplog tracks its visibility through support from the storage engine.
-    return options.capped && !nss.isReplicated() && !options.clusteredIndex && !nss.isOplog();
+    if (nss.isOplog()) {
+        return false;
+    }
+
+    // Only use the behavior for non-replicated capped collections (which can accept concurrent
+    // writes).
+    if (nss.isReplicated()) {
+        return false;
+    }
+
+    return true;
+}
+}  // namespace internal
+
+bool collUsesCappedSnapshots(const NamespaceString& nss, const CollectionOptions& options) {
+    return internal::collUsesCappedSnapshots(nss) && internal::collUsesCappedSnapshots(options);
+}
+
+bool collUsesCappedSnapshots(const CollectionImpl& coll) {
+    return internal::collUsesCappedSnapshots(coll.ns()) &&
+        internal::collUsesCappedSnapshots(coll.getCollectionOptions());
 }
 }  // namespace
 
@@ -957,7 +981,7 @@ long long CollectionImpl::getCappedMaxSize() const {
 }
 
 bool CollectionImpl::usesCappedSnapshots() const {
-    return collUsesCappedSnapshots(ns(), getCollectionOptions());
+    return collUsesCappedSnapshots(*this);
 }
 
 CappedVisibilityObserver* CollectionImpl::getCappedVisibilityObserver() const {
