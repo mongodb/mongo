@@ -166,13 +166,16 @@ ValidatedTenancyScope ValidatedTenancyScopeFactory::parseUnsignedToken(Client* c
             "Unexpected signature on unsigned security token",
             parsed.signature.empty());
 
-    auto* as = AuthorizationSession::get(client);
-    uassert(ErrorCodes::Unauthorized,
-            "Use of unsigned security token requires either useTenant privilege or a system "
-            "connection",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(boost::none),
-                                                 ActionType::useTenant) ||
-                client->isFromSystemConnection());
+    // This function is used in the shell for testing which lacks AuthorizationSession
+    if (AuthorizationSession::exists(client)) {
+        auto* as = AuthorizationSession::get(client);
+        uassert(ErrorCodes::Unauthorized,
+                "Use of unsigned security token requires either useTenant privilege or a system "
+                "connection",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(boost::none), ActionType::useTenant) ||
+                    client->isFromSystemConnection());
+    }
 
     auto jwt = crypto::JWT::parse(ctxt, decodeJSON(parsed.body));
     uassert(ErrorCodes::Unauthorized,
