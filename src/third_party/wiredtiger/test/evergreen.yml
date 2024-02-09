@@ -3705,8 +3705,6 @@ buildvariants:
 
 - name: big-endian
   display_name: "~ Big-endian (s390x/zSeries)"
-  modules:
-  - enterprise
   run_on:
   - rhel80-zseries-build
   batchtime: 4320 # 3 days
