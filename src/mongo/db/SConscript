@@ -1245,6 +1245,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/query_analysis_sampler',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
         '$BUILD_DIR/mongo/s/startup_initialization',
         '$BUILD_DIR/mongo/transport/service_executor',
         'audit',

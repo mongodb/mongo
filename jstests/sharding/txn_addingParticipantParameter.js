@@ -53,7 +53,8 @@ const testAddingParticipant = function(
     }) {
     let st = new ShardingTest({shards: 4, causallyConsistent: true});
 
-    // SERVER-67748
+    // TODO SERVER-85353 Remove or modify this test to avoid relying on the failpoint and feature
+    // flag to inject added participants
     const featureFlagAllowAdditionalParticipants = FeatureFlagUtil.isEnabled(
         st.configRS.getPrimary().getDB('admin'), "AllowAdditionalParticipants");
     if (!featureFlagAllowAdditionalParticipants) {

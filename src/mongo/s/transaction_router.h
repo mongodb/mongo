@@ -517,6 +517,25 @@ public:
         const boost::optional<ShardId>& getRecoveryShardId() const;
 
         /**
+         * If this router is a sub-router and the txnNumber and retryCounter match that on the
+         * opCtx, returns a map containing {participantShardId : readOnly} for each participant
+         * added by this router. If `includeReadOnly` is true, the "readOnly" value is expected to
+         * be set for every participant. If "includeReadOnly" is false, this function will only
+         * return the shard names (as the map keys) - it will not initialize the values (readOnly
+         * values).
+         *
+         * Returns boost::none if this router is not a sub-router, or if the txnNumber or
+         * retryCounter on this router do not match that on the opCtx.
+         */
+        // TODO SERVER-85353 Remove commandName and nss parameters, which are used only for the
+        // failpoint
+        boost::optional<StringMap<boost::optional<bool>>> getAdditionalParticipantsForResponse(
+            OperationContext* opCtx,
+            bool includeReadOnly,
+            boost::optional<const std::string&> commandName = boost::none,
+            boost::optional<const NamespaceString&> nss = boost::none);
+
+        /**
          * Commits the transaction.
          *
          * For transactions that only did reads or only wrote to one shard, sends commit directly to
