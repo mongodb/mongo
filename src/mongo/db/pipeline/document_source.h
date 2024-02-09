@@ -534,6 +534,13 @@ private:
                          Pipeline::SourceContainer* container);
 
     /**
+     * Attempts to push a $redact stage directly ahead of the stage present at the 'itr' position if
+     * matches the constraints. Returns true if optimization was performed, false otherwise.
+     */
+    bool pushRedactBefore(Pipeline::SourceContainer::iterator itr,
+                          Pipeline::SourceContainer* container);
+
+    /**
      * Attempt to push a sample stage from directly ahead of the current stage given by itr to
      * before the current stage. Returns whether the optimization was performed.
      */
@@ -561,8 +568,8 @@ private:
             return false;
         }
 
-        return pushMatchBefore(itr, container) || pushSampleBefore(itr, container) ||
-            pushSingleDocumentTransformBefore(itr, container);
+        return pushMatchBefore(itr, container) || pushRedactBefore(itr, container) ||
+            pushSampleBefore(itr, container) || pushSingleDocumentTransformBefore(itr, container);
     }
 
 public:
