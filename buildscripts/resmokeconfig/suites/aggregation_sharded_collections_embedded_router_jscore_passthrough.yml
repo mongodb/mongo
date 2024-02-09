@@ -52,10 +52,8 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    num_shards: 2
-    mongos_options:
-      set_parameters:
-        enableTestCommands: 1
+    num_shards: 1
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+    embedded_router: 1
