@@ -19,6 +19,10 @@ selector:
   # Uses hangAfterCollectionInserts failpoint not available on mongos.
   - jstests/core/txns/speculative_snapshot_includes_all_writes.js
 
+  # Currentop is not supported in embedded router mode yet.
+  # TODO SERVER-81359 Enable currentOp testing.
+  - jstests/core/txns/kill_sessions_kills_transaction.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # Transactions are not allowed to operate on capped collections.
@@ -47,5 +51,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagEmbeddedRouter: 1
-    num_rs_nodes_per_shard: 1
+    num_rs_nodes_per_shard: 2
     embedded_router: 1

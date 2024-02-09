@@ -409,7 +409,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                     shard_options[option] = value
 
         if self.embedded_router_mode:
-            mongod_options["routerPort"] = self.fixturelib.get_next_port(self.job_num)
+            mongod_options["routerPort"] = ""
             if self.config_shard != index:
                 mongod_options["configdb"] = self.configsvr.get_internal_connection_string()
 

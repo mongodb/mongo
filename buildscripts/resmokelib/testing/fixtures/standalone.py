@@ -55,7 +55,12 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongod = None
         self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
-        self.router_port = mongod_options.get("routerPort", None)
+
+        self.router_port = None
+        if "routerPort" in self.mongod_options:
+            self.router_port = fixturelib.get_next_port(job_num)
+            mongod_options["routerPort"] = self.router_port
+
         if "featureFlagGRPC" in self.config.ENABLED_FEATURE_FLAGS:
             self.grpcPort = fixturelib.get_next_port(job_num)
             self.mongod_options["grpcPort"] = self.grpcPort

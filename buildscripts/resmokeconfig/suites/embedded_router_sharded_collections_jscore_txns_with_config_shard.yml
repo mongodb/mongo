@@ -31,6 +31,10 @@ selector:
   - jstests/core/txns/create_indexes_parallel.js
   - jstests/core/txns/commands_in_txns_read_concern.js
 
+  # Currentop is not supported in embedded router mode yet.
+  # TODO SERVER-81359 Enable currentOp testing.
+  - jstests/core/txns/kill_sessions_kills_transaction.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # This passthrough implicitly shards the accessed collections. Do not run tests where collections
@@ -69,5 +73,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagEmbeddedRouter: 1
-    num_rs_nodes_per_shard: 1
+    num_rs_nodes_per_shard: 2
     embedded_router: 1
