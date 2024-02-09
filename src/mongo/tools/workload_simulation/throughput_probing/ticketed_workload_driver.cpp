@@ -30,6 +30,8 @@
 #include "mongo/tools/workload_simulation/throughput_probing/ticketed_workload_driver.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo::workload_simulation {
 
@@ -158,7 +160,7 @@ void TicketedWorkloadDriver::_read(int32_t i) {
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
 
     while (_readRunning.load() >= i) {
-        Ticket ticket = _readTicketHolder->waitForTicket(opCtx.get(), &admCtx);
+        Ticket ticket = _readTicketHolder->waitForTicket(*opCtx, &admCtx);
         _doRead(opCtx.get(), &admCtx);
     }
 }
@@ -170,7 +172,7 @@ void TicketedWorkloadDriver::_write(int32_t i) {
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
 
     while (_writeRunning.load() >= i) {
-        Ticket ticket = _writeTicketHolder->waitForTicket(opCtx.get(), &admCtx);
+        Ticket ticket = _writeTicketHolder->waitForTicket(*opCtx, &admCtx);
         _doWrite(opCtx.get(), &admCtx);
     }
 }

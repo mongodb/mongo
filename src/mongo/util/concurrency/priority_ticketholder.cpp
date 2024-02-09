@@ -88,7 +88,7 @@ boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* 
     return boost::none;
 }
 
-boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(Interruptible& interruptible,
                                                                       AdmissionContext* admCtx,
                                                                       Date_t until) {
     invariant(admCtx);
@@ -106,9 +106,7 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
             }
         });
 
-        if (opCtx) {
-            opCtx->checkForInterrupt();
-        }
+        interruptible.checkForInterrupt();
 
         if (acquired) {
             rereleaseIfTimedOutOrInterrupted.dismiss();

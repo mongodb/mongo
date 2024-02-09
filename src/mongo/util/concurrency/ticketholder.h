@@ -48,7 +48,6 @@
 namespace mongo {
 
 class Ticket;
-class OperationContext;
 class PriorityTicketHolder;
 class SemaphoreTicketHolder;
 
@@ -80,19 +79,17 @@ public:
     virtual boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx);
 
     /**
-     * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
-     * 'opCtx' is killed, throwing an AssertionException. If no OperationContext is provided, then
-     * the operation is uninterruptible.
+     * Attempts to acquire a ticket. Blocks until a ticket is acquired or the Interruptible is
+     * interrupted, throwing an AssertionException.
      */
-    virtual Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx);
+    virtual Ticket waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
      * acquired and 'false' if the deadline is reached, but the operation is retryable. Throws an
-     * AssertionException if the OperationContext 'opCtx' is killed and no waits for tickets can
-     * proceed. If no OperationContext is provided, then the operation is uninterruptible.
+     * AssertionException if the Interruptible is interrupted.
      */
-    virtual boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
+    virtual boost::optional<Ticket> waitForTicketUntil(Interruptible& interruptible,
                                                        AdmissionContext* admCtx,
                                                        Date_t until);
 
@@ -182,7 +179,7 @@ private:
 
     virtual boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) = 0;
 
-    virtual boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
+    virtual boost::optional<Ticket> _waitForTicketUntilImpl(Interruptible& interruptible,
                                                             AdmissionContext* admCtx,
                                                             Date_t until) = 0;
 
@@ -220,11 +217,11 @@ public:
 
     boost::optional<Ticket> tryAcquire(AdmissionContext*) override;
 
-    Ticket waitForTicket(OperationContext*, AdmissionContext*) override;
+    Ticket waitForTicket(Interruptible& interruptible, AdmissionContext* admCtx) override;
 
-    boost::optional<Ticket> waitForTicketUntil(OperationContext*,
-                                               AdmissionContext*,
-                                               Date_t) override;
+    boost::optional<Ticket> waitForTicketUntil(Interruptible& interruptible,
+                                               AdmissionContext* admCtx,
+                                               Date_t until) override;
 
     void appendStats(BSONObjBuilder&) const override {}
 
@@ -259,7 +256,7 @@ private:
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override;
 
-    boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
+    boost::optional<Ticket> _waitForTicketUntilImpl(Interruptible& interruptible,
                                                     AdmissionContext* admCtx,
                                                     Date_t until) override;
 
