@@ -346,13 +346,26 @@ __wt_update_obsolete_check(
      * Walk the list of updates, looking for obsolete updates at the end.
      *
      * Only updates with globally visible, self-contained data can terminate update chains.
-     *
      */
     for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++) {
         if (upd->txnid == WT_TXN_ABORTED)
             continue;
 
         ++upd_seen;
+        /*
+         * WiredTiger internal operations such as Rollback to stable and prepare transaction
+         * rollback adds a globally visible tombstone to the update chain to remove the entire key.
+         * Treating these globally visible tombstones as obsolete and trimming update list can cause
+         * problems if the update chain is getting accessed somewhere. To avoid this problem, skip
+         * these globally visible tombstones from the update obsolete check were generated from
+         * prepare transaction rollback and not from RTS, because there are no concurrent operations
+         * run in parallel to the RTS to be affected.
+         */
+        if (upd->txnid == WT_TXN_NONE && upd->start_ts == WT_TS_NONE &&
+          upd->type == WT_UPDATE_TOMBSTONE && upd->next != NULL &&
+          upd->next->txnid == WT_TXN_ABORTED && upd->next->prepare_state == WT_PREPARE_INPROGRESS)
+            continue;
+
         if (__wt_txn_upd_visible_all(session, upd)) {
             if (first == NULL && WT_UPDATE_DATA_VALUE(upd))
                 first = upd;
