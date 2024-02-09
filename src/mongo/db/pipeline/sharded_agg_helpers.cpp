@@ -1236,6 +1236,12 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
          (needsPrimaryShardMerge && cri && *(shardIds.begin()) != cri->cm.dbPrimary())) ||
         (mergeShardId && *(shardIds.begin()) != mergeShardId);
 
+    if (mergeShardId) {
+        tassert(8561400,
+                "Expected no mergeShardId, or a valid one; got " + mergeShardId->toString(),
+                mergeShardId->isValid());
+    }
+
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any
     // shards, we must ensure that the list of shards to which we initially dispatch the pipeline is

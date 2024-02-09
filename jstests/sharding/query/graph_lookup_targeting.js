@@ -106,7 +106,8 @@ shardTargetingTest.setupColl({
 });
 
 // Inner collection is unsplittable and not on the primary shard. Outer collection is sharded.
-// In this case, we should be merging on the shard which owns the unsplittable collection.
+// In this case, we should execute in parallel on the shards.
+let pipeline = [{$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
 let expectedResults = [
     {
         _id: -2,
@@ -124,25 +125,18 @@ let expectedResults = [
 ];
 
 let profileFilters = {
-    [shard0]: [{ns: kShardedColl1Name, expectedStages: []}],
-    /**
-     * TODO SERVER-81335: The cursor against 'kShardedColl1Name' may no longer be profiled
-     * once the $mergeCursors pipeline can execute it locally. If this is the case, remove
-     * this assertion (here and elsewhere).
-     */
+    [shard0]: [{ns: kShardedColl1Name, expectedStages: ["$graphLookup"]}],
     [shard1]: [
-        {ns: kShardedColl1Name, expectedStages: []},
-        {ns: kShardedColl1Name, expectedStages: ["$mergeCursors", "$graphLookup"]}
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup"]},
+        {ns: kUnsplittable1CollName, expectedStages: ["$match"]},
     ],
-    [shard2]: [{ns: kShardedColl1Name, expectedStages: []}],
+    [shard2]: [{ns: kShardedColl1Name, expectedStages: ["$graphLookup"]}],
 };
 
 shardTargetingTest.assertShardTargeting({
-    pipeline:
-        [{$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}],
+    pipeline: pipeline,
     targetCollName: kShardedColl1Name,
-    explainAssertionObj:
-        {expectedMergingShard: shard1, expectedMergingStages: ["$mergeCursors", "$graphLookup"]},
+    explainAssertionObj: {expectedShardStages: ["$graphLookup"]},
     expectedResults: expectedResults,
     comment: "graph_lookup_outer_sharded_inner_unsplittable",
     profileFilters: profileFilters,
@@ -150,6 +144,7 @@ shardTargetingTest.assertShardTargeting({
 
 // Outer collection is unsplittable and not on the primary shard. Inner collection is sharded.
 // We should target the shard which owns the unsplittable collection.
+pipeline = [{$graphLookup: {from: kShardedColl1Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
 expectedResults = [
     {
         _id: -1,
@@ -183,8 +178,7 @@ profileFilters = {
 };
 
 shardTargetingTest.assertShardTargeting({
-    pipeline:
-        [{$graphLookup: {from: kShardedColl1Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}],
+    pipeline: pipeline,
     targetCollName: kUnsplittable1CollName,
     explainAssertionObj: {expectedShard: shard1, expectedShardStages: ["$cursor", "$graphLookup"]},
     expectedResults: expectedResults,
@@ -192,8 +186,9 @@ shardTargetingTest.assertShardTargeting({
     profileFilters: profileFilters,
 });
 
-// Both collections are unsplittable and are located on different shards. We should merge on the
-// shard which owns the inner collection in each case.
+// Both collections are unsplittable and are located on different shards. We should execute the
+// $graphLookup on the shard which owns the outer collection.
+pipeline = [{$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
 expectedResults = [
     {
         _id: -1,
@@ -218,13 +213,14 @@ expectedResults = [
 
 profileFilters = {
     [shard0]: [],
-    [shard1]: [{ns: kUnsplittable1CollName, expectedStages: []}],
+    [shard1]: [
+        {ns: kUnsplittable1CollName, expectedStages: []},
+    ],
     [shard2]: [{ns: kUnsplittable1CollName, expectedStages: ["$mergeCursors", "$graphLookup"]}]
 };
 
 shardTargetingTest.assertShardTargeting({
-    pipeline:
-        [{$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}],
+    pipeline: pipeline,
     targetCollName: kUnsplittable1CollName,
     explainAssertionObj: {
         expectedMergingShard: shard2,
@@ -236,6 +232,7 @@ shardTargetingTest.assertShardTargeting({
     profileFilters: profileFilters,
 });
 
+pipeline = [{$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}];
 expectedResults = [
     {
         _id: 0,
@@ -256,8 +253,7 @@ profileFilters = {
     [shard2]: [{ns: kUnsplittable2CollName, expectedStages: []}],
 };
 shardTargetingTest.assertShardTargeting({
-    pipeline:
-        [{$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}],
+    pipeline: pipeline,
     targetCollName: kUnsplittable2CollName,
     explainAssertionObj: {
         expectedMergingShard: shard1,
@@ -279,9 +275,13 @@ shardTargetingTest.assertShardTargeting({
 // the primary shard, B sharded.
 // - Consider adding a case with 3 levels of nested pipelines
 
-// Issue an aggregate featuring two $graphLookup stages, where both stages' inner collections are
-// unsplittable and reside on different shards. We should always merge on the shard which owns the
-// first inner collection.
+// Issue an aggregate targeting a sharded collection featuring two $graphLookup stages, where both
+// stages' inner collections are unsplittable and reside on different shards We should execute the
+// $graphLookups in parallel on the shards.
+pipeline = [
+    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
+    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
+];
 expectedResults = [
     {
         _id: -2,
@@ -318,52 +318,43 @@ expectedResults = [
     {_id: 2, a: 101, links: [], links_2: []},
 ];
 profileFilters = {
-    [shard0]: [{ns: kShardedColl1Name, expectedStages: []}],
+    [shard0]: [
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
+    ],
     [shard1]: [
-        {ns: kShardedColl1Name, expectedStages: []},
-        {ns: kShardedColl1Name, expectedStages: ["$mergeCursors", "$graphLookup", "$graphLookup"]},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
+        {ns: kUnsplittable1CollName, expectedStages: ["$match"]},
     ],
     [shard2]: [
-        {ns: kShardedColl1Name, expectedStages: []},
-        {ns: kUnsplittable2CollName, expectedStages: ["$match"]}
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
+        {ns: kUnsplittable2CollName, expectedStages: ["$match"]},
     ],
 };
 
 shardTargetingTest.assertShardTargeting({
-    pipeline: [
-        {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
-        {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
-    ],
+    pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectedMergingShard: shard1,
-        expectedMergingStages: ["$mergeCursors", "$graphLookup", "$graphLookup"],
+        expectedShardStages: ["$graphLookup", "$graphLookup"],
+        expectedMergingStages: ["$mergeCursors"],
+        expectMongos: true,
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_unsplittable_1_second_graph_lookup_inner_unsplittable_2",
     profileFilters: profileFilters,
 });
 
-profileFilters = {
-    [shard0]: [{ns: kShardedColl1Name, expectedStages: []}],
-    [shard1]: [
-        {ns: kShardedColl1Name, expectedStages: []},
-        {ns: kUnsplittable1CollName, expectedStages: ["$match"]},
-    ],
-    [shard2]: [
-        {ns: kShardedColl1Name, expectedStages: []},
-        {ns: kShardedColl1Name, expectedStages: ["$mergeCursors", "$graphLookup", "$graphLookup"]},
-    ],
-};
+pipeline = [
+    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
+    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
+];
 shardTargetingTest.assertShardTargeting({
-    pipeline: [
-        {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
-        {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
-    ],
+    pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectedMergingShard: shard2,
-        expectedMergingStages: ["$mergeCursors", "$graphLookup", "$graphLookup"],
+        expectedShardStages: ["$graphLookup", "$graphLookup"],
+        expectedMergingStages: ["$mergeCursors"],
+        expectMongos: true,
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_unsplittable_2_second_graph_lookup_inner_unsplittable_1",
@@ -371,8 +362,12 @@ shardTargetingTest.assertShardTargeting({
 });
 
 // Issue aggregates featuring two $graphLookup stages: the first $graphLookup targets an inner
-// sharded collection and the other targets an unsplittable inner collection. We should merge on the
-// shard which owns the unsplittable collection.
+// sharded collection and the other targets an unsplittable inner collection. We should execute both
+// $graphLookup stages in parallel on the shards.
+pipeline = [
+    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
+    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
+];
 expectedResults = [
     {
         _id: -2,
@@ -424,34 +419,36 @@ expectedResults = [
 
 profileFilters = {
     [shard0]: [
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup"]},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]}
     ],
     [shard1]: [
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup"]},
-        {ns: kShardedColl1Name, expectedStages: ["$mergeCursors", "$graphLookup"]},
+        {ns: kUnsplittable1CollName, expectedStages: ["$match"]},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
     [shard2]: [
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup"]},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]}
     ],
 };
 shardTargetingTest.assertShardTargeting({
-    pipeline: [
-        {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
-        {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
-    ],
+    pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectedMergingShard: shard1,
-        expectedMergingStages: ["$mergeCursors", "$graphLookup"],
+        expectedShardStages: ["$graphLookup", "$graphLookup"],
+        expectedMergingStages: ["$mergeCursors"],
+        expectMongos: true,
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_sharded_second_graph_lookup_inner_unsplittable_1",
     profileFilters: profileFilters,
 });
 
+pipeline =  [
+    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
+    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
+];
 expectedResults = [
     {
         _id: -2,
@@ -508,37 +505,39 @@ expectedResults = [
 profileFilters = {
     [shard0]: [
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup"]}
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]}
     ],
     [shard1]: [
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup"]}
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]}
     ],
     [shard2]: [
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
-        {ns: kShardedColl1Name, expectedStages: ["$graphLookup"]},
-        {ns: kShardedColl1Name, expectedStages: ["$mergeCursors", "$graphLookup"]}
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
+        {ns: kUnsplittable2CollName, expectedStages: ["$match"]},
     ]
 };
 
 shardTargetingTest.assertShardTargeting({
-    pipeline: [
-        {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
-        {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}}
-    ],
+    pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectedMergingShard: shard2,
-        expectedMergingStages: ["$mergeCursors", "$graphLookup"],
+        expectMongos: true,
+        expectedShardStages: ["$graphLookup", "$graphLookup"],
+        expectedMergingStages: ["$mergeCursors"],
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_sharded_second_graph_lookup_inner_unsplittable_2",
     profileFilters: profileFilters,
 });
 
-// Issue aggregates featuring two $graphLookup stages, where the first one's inner collection is
-// unsplittable and the second one's inner collection is sharded. We should target the shard which
-// owns the unsplittable collection.
+// Issue aggregates targeting a sharded collection featuring two $graphLookup stages, where the
+// first one's inner collection is unsplittable and the second one's inner collection is sharded. We
+// should execute both $graphLookup stages in parallel on the shards.
+pipeline = [
+    {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
+    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
+];
 expectedResults = [
     {
         _id: -2,
@@ -589,35 +588,37 @@ expectedResults = [
 ];
 profileFilters = {
     [shard0]: [
-        {ns: kShardedColl1Name, expectedStages: []},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
     [shard1]: [
-        {ns: kShardedColl1Name, expectedStages: []},
-        {ns: kShardedColl1Name, expectedStages: ["$mergeCursors", "$graphLookup", "$graphLookup"]},
+        {ns: kUnsplittable1CollName, expectedStages: ["$match"]},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
     [shard2]: [
-        {ns: kShardedColl1Name, expectedStages: []},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
 };
 
 shardTargetingTest.assertShardTargeting({
-    pipeline: [
-        {$graphLookup: {from: kUnsplittable1CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
-        {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
-    ],
+    pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectedMergingShard: shard1,
-        expectedMergingStages: ["$mergeCursors", "$graphLookup", "$graphLookup"]
+        expectMongos: true,
+        expectedShardStages: ["$graphLookup", "$graphLookup"],
+        expectedMergingStages: ["$mergeCursors"],
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_unsplittable_1_second_graph_lookup_inner_sharded",
     profileFilters: profileFilters,
 });
 
+pipeline = [
+    {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
+    {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
+];
 expectedResults = [
     {
         _id: -2,
@@ -673,29 +674,26 @@ expectedResults = [
 ];
 profileFilters = {
     [shard0]: [
-        {ns: kShardedColl1Name, expectedStages: []},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
     [shard1]: [
-        {ns: kShardedColl1Name, expectedStages: []},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
     [shard2]: [
-        {ns: kShardedColl1Name, expectedStages: []},
-        {ns: kShardedColl1Name, expectedStages: ["$mergeCursors", "$graphLookup", "$graphLookup"]},
+        {ns: kUnsplittable2CollName, expectedStages: ["$match"]},
+        {ns: kShardedColl1Name, expectedStages: ["$graphLookup", "$graphLookup"]},
         {ns: kShardedColl2Name, expectedStages: ["$match"]},
     ],
 };
-
 shardTargetingTest.assertShardTargeting({
-    pipeline: [
-        {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links_2"}},
-        {$graphLookup: {from: kShardedColl2Name, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}}
-    ],
+    pipeline: pipeline,
     targetCollName: kShardedColl1Name,
     explainAssertionObj: {
-        expectedMergingShard: shard2,
-        expectedMergingStages: ["$mergeCursors", "$graphLookup", "$graphLookup"]
+        expectMongos: true,
+        expectedShardStages: ["$graphLookup", "$graphLookup"],
+        expectedMergingStages: ["$mergeCursors"],
     },
     expectedResults: expectedResults,
     comment: "first_graph_lookup_inner_unsplittable_2_second_graph_lookup_inner_sharded",
@@ -721,7 +719,7 @@ for (let i = startingId; i < startingId + 20; i++) {
 assert.commandWorked(coll.insertMany(docsToAdd));
 
 // Establish our cursor. We should not have exhausted our cursor.
-const pipeline = [
+pipeline = [
     {$graphLookup: {from: kUnsplittable2CollName, startWith: "$a", connectFromField: "a", connectToField: "_id", as: "links"}},
     {$project: {out: 0}}
 ];

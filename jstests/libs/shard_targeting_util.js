@@ -70,6 +70,30 @@ export class ShardTargetingTest {
         return profileFilter;
     }
 
+    _examineSplitPipeline({splitPipeline, expectedMergingStages, expectedShardStages}) {
+        if (splitPipeline.mergerPart) {
+            const mergerPart = splitPipeline.mergerPart;
+            if (mergerPart.length > 0) {
+                assert(
+                    expectedMergingStages,
+                    "Should have specified merging stages for test case if split pipeline has 'mergerPart'" +
+                        tojson(splitPipeline));
+                this._assertExpectedStages(expectedMergingStages, mergerPart, splitPipeline);
+            }
+        }
+
+        if (splitPipeline.shardsPart) {
+            const shardsPart = splitPipeline.shardsPart;
+            if (shardsPart.length > 0) {
+                assert(
+                    expectedShardStages,
+                    "Should have specified shard stages for test case if split pipeline has 'shardsPart'" +
+                        tojson(splitPipeline));
+                this._assertExpectedStages(expectedShardStages, shardsPart, splitPipeline);
+            }
+        }
+    }
+
     /**
      * Utility which makes certain assertions about 'explain' (obtained by running 'explain'),
      * namely:
@@ -84,21 +108,18 @@ export class ShardTargetingTest {
         expectedMergingStages,
         expectedShard,
         expectedShardStages,
-        assertSBELookupPushdown
+        assertSBELookupPushdown,
+        expectMongos,
     }) {
         if (expectedMergingShard) {
             assert.eq(explain.mergeType, "specificShard", explain);
             assert.eq(explain.mergeShardId, expectedMergingShard, explain);
             assert(explain.hasOwnProperty("splitPipeline"), explain);
-            const split = explain.splitPipeline;
-            assert(split.hasOwnProperty("mergerPart"), explain);
-            const mergerPart = split.mergerPart;
-            assert(
-                expectedMergingStages,
-                "Should have specified merging stages for test case if 'expectedMergingShard' was specified" +
-                    tojson(explain));
-            assert(expectedMergingStages, explain);
-            this._assertExpectedStages(expectedMergingStages, mergerPart, explain);
+            this._examineSplitPipeline({
+                splitPipeline: explain.splitPipeline,
+                expectedMergingStages: expectedMergingStages,
+                expectedShardStages: expectedShardStages
+            });
         } else {
             assert.neq(explain.mergeType,
                        "specificShard",
@@ -127,6 +148,16 @@ export class ShardTargetingTest {
             } else {
                 assert.eq(stage, null, shard);
             }
+        }
+
+        if (expectMongos) {
+            assert.eq(explain.mergeType, "mongos", explain);
+            assert(explain.hasOwnProperty("splitPipeline"), explain);
+            this._examineSplitPipeline({
+                splitPipeline: explain.splitPipeline,
+                expectedMergingStages: expectedMergingStages,
+                expectedShardStages: expectedShardStages
+            });
         }
     }
 

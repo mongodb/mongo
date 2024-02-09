@@ -315,11 +315,11 @@ assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_shard
 st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_unsharded"}, {
-    toplevelExec: [true, false],
+    toplevelExec: [true, true],
     // The shard executing the $graphLookup can read locally from the foreign collection,
     // since it is unsharded.
     subPipelineLocal: [true, false],
-    subPipelineRemote: [false, false]
+    subPipelineRemote: [true, false]
 });
 
 // Test $graphLookup when the foreign namespace is a view of a sharded collection.
@@ -328,10 +328,7 @@ st.shardColl(foreign, {_id: 1}, {_id: 0}, {_id: 0});
 
 pipeline[0].$graphLookup.from = "viewOfSharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_view_of_sharded"}, {
-    // TODO SERVER-83902: Only shard0 will execute the $graphLookup because we will not see that the
-    // 'from' collection is a sharded view. When views are tracked in the sharding catalog, we
-    // should be able to target both shards.
-    toplevelExec: [true, false],
+    toplevelExec: [true, true],
     subPipelineLocal: [false, false],
     // The node executing the $graphLookup will perform a scatter-gather query and open a cursor on
     // every shard that contains the foreign collection.
@@ -343,12 +340,11 @@ st.shardColl(local, {_id: 1}, {_id: 0}, {_id: 0});
 
 pipeline[0].$graphLookup.from = "viewOfUnsharded";
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_to_view_of_unsharded"}, {
-    // TODO SERVER-83902: Only shard0 will execute the $graphLookup because we will not see that the
-    // 'from' collection is a sharded view. When views are tracked in the sharding catalog, we
-    // should be able to target both shards.
-    toplevelExec: [true, false],
+    toplevelExec: [true, true],
+    // The shard executing the $graphLookup can read locally from the foreign collection, since it
+    // is unsharded. The other node sends the subpipelines over the network.
     subPipelineLocal: [true, false],
-    subPipelineRemote: [false, false]
+    subPipelineRemote: [true, false]
 });
 
 // Test $graphLookup when the foreign collection does not exist.
@@ -362,8 +358,7 @@ expectedRes = [
     {_id: 2, a: 3, bs: []}
 ];
 assertAggResultAndRouting(pipeline, expectedRes, {comment: "graphLookup_foreign_does_not_exist"}, {
-    // Only execute on shard0 because the 'from' collection does not exist.
-    toplevelExec: [true, false],
+    toplevelExec: [true, true],
     // If the primary node tries to execute a subpipeline first, then it believes it has stale info
     // about the foreign coll and needs to target shards to properly resolve it. Afterwards, it can
     // do local reads. As before, the other node sends its subpipelines over the network. This

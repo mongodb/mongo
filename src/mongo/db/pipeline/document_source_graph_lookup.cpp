@@ -255,12 +255,15 @@ boost::optional<DocumentSource::DistributedPlanLogic>
 DocumentSourceGraphLookUp::distributedPlanLogic() {
     // If $graphLookup into a sharded foreign collection is allowed, top-level $graphLookup
     // stages can run in parallel on the shards.
-    // TODO SERVER-83902: This check will fail if the inner side is a sharded view as we will not
-    // infer that '_from' is a view until we issue an aggregate to perform the search against
-    // '_from'. The result is that $graphLookup will execute on as a merger when the 'from'
-    // collection is a view (regardless of whether it is sharded or not).
-    if (foreignShardedGraphLookupAllowed() && pExpCtx->subPipelineDepth == 0 &&
-        pExpCtx->mongoProcessInterface->isSharded(_fromExpCtx->opCtx, _from)) {
+    if (foreignShardedGraphLookupAllowed() && pExpCtx->subPipelineDepth == 0) {
+        // We make an exception to the above: if the main namespace (that is, the namespace targeted
+        // by the aggregation) is unsharded, then we want to attempt to find a merging shard for
+        // this $graphLookup. This is because there's no way to execute an aggregate in parallel
+        // against an unsharded collection.
+        if (pExpCtx->inMongos &&
+            !pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, pExpCtx->ns)) {
+            return DistributedPlanLogic{nullptr, this, boost::none};
+        }
         return boost::none;
     }
 
@@ -574,22 +577,14 @@ StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pip
     // sharded (that is, it is either unsplittable or untracked), then we should merge on the shard
     // which owns the inner collection.
     if (pipeState == Pipeline::SplitState::kSplitForMerge) {
-        constraints.mergeShardId =
-            pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _from);
-    }
-
-    // If we have not yet designated a merging shard, and are either executing on mongod, the
-    // foreign collection is unsharded, or sharded $graphLookup is not allowed, designate the
-    // current shard as the merging shard. This is done to prevent pushing this $graphLookup to the
-    // shards part of the pipeline. This is an important optimization as designating this
-    // $graphLookup as a merging stage allows us to execute a single $graphLookup (as opposed
-    // executing one $graphLookup on each involved shard). When this stage is part of a deeply
-    // nested pipeline, it prevents creating an exponential explosion of cursors/resources
-    // (proportional to the level of pipeline nesting).
-    if (!constraints.mergeShardId &&
-        !(pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from) &&
-          foreignShardedGraphLookupAllowed())) {
-        constraints.mergeShardId = ShardingState::get(pExpCtx->opCtx)->shardId();
+        // Note that we can only check sharding state when we're on mongos as we may be holding
+        // locks on mongod (which would inhibit looking up sharding state in the catalog cache).
+        if (pExpCtx->inMongos) {
+            constraints.mergeShardId =
+                pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _from);
+        } else {
+            constraints.mergeShardId = ShardingState::get(pExpCtx->opCtx)->shardId();
+        }
     }
 
     return constraints;

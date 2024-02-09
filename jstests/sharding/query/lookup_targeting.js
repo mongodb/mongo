@@ -529,6 +529,7 @@ profileFilters = {
         explainAssertionObj: {
             expectedMergingShard: shard1,
             expectedMergingStages: ["$mergeCursors", "$lookup"],
+            expectedShardStages: ["$lookup"],
         },
         expectedResults: expectedResults,
         comment: "first_lookup_inner_sharded_second_lookup_inner_unsplittable_1",
@@ -561,6 +562,7 @@ shardTargetingTest.assertShardTargeting({
     explainAssertionObj: {
         expectedMergingShard: shard2,
         expectedMergingStages: ["$mergeCursors", "$lookup"],
+        expectedShardStages: ["$lookup"],
     },
     expectedResults: expectedResults,
     comment: "first_lookup_inner_sharded_second_lookup_inner_unsplittable_2",
