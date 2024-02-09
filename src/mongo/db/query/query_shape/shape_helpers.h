@@ -48,6 +48,43 @@ int64_t optionalSize(boost::optional<T> optionalVal) {
     return optionalVal->size();
 }
 
+template <typename T>
+std::function<size_t(size_t, const T&)> sizeAccumulatorFunc() {
+    MONGO_UNREACHABLE;  // Don't know how to compute the size of this template type.
+};
+
+template <>
+inline std::function<size_t(size_t, const BSONObj&)> sizeAccumulatorFunc<BSONObj>() {
+    return [](size_t total, const BSONObj& obj) {
+        return total + sizeof(BSONObj) + static_cast<size_t>(obj.objsize());
+    };
+}
+
+template <>
+inline std::function<size_t(size_t, const NamespaceString&)>
+sizeAccumulatorFunc<NamespaceString>() {
+    return [](size_t total, const NamespaceString& nss) {
+        // For each element, we have to track the size of the
+        // nss as well as the size allocated by the nss. It would be
+        // ideal to be able to ask the underlying namespace string for
+        // its capacity, but it's not something we have access to.
+        // Further, namespace strings appear to shrink to fit (i.e
+        // resize to correct size), so it may not be necessary. Should
+        // we also try to consider short string optimization? At the
+        // very least, the current approach gives us a good upper bound
+        // memory usage (assuming shrink to fit).
+        return total + sizeof(nss) + nss.size();
+    };
+}
+
+template <typename Container>
+size_t containerSize(const Container& container) {
+    return std::accumulate(container.begin(),
+                           container.end(),
+                           0,
+                           sizeAccumulatorFunc<typename Container::value_type>());
+}
+
 /**
  * Serializes the given 'hintObj' in accordance with the options. Assumes the hint is correct and
  * contains field names. It is possible that this hint doesn't actually represent an index, but we

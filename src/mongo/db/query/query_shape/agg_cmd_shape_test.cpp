@@ -49,7 +49,7 @@ public:
         _expCtx = make_intrusive<ExpressionContextForTest>();
     }
 
-    std::unique_ptr<AggCmdShape> makeShapeFromPipeline(
+    std::unique_ptr<AggregateCommandRequest> makeAggregateCommandRequest(
         std::vector<StringData> stagesJson,
         boost::optional<StringData> letJson = boost::none,
         boost::optional<StringData> collationJson = boost::none) {
@@ -57,17 +57,28 @@ public:
         for (auto&& stage : stagesJson) {
             pipeline.push_back(fromjson(stage));
         }
-        AggregateCommandRequest aggRequest(kDefaultTestNss, pipeline);
+
+        auto aggRequest =
+            std::make_unique<AggregateCommandRequest>(kDefaultTestNss, std::move(pipeline));
         if (letJson) {
-            aggRequest.setLet(fromjson(*letJson));
+            aggRequest->setLet(fromjson(*letJson));
         }
         if (collationJson) {
-            aggRequest.setCollation(fromjson(*collationJson));
+            aggRequest->setCollation(fromjson(*collationJson));
         }
+        return aggRequest;
+    }
 
-        auto parsedPipeline = Pipeline::parse(std::move(pipeline), _expCtx);
+    std::unique_ptr<AggCmdShape> makeShapeFromPipeline(
+        std::vector<StringData> stagesJson,
+        boost::optional<StringData> letJson = boost::none,
+        boost::optional<StringData> collationJson = boost::none) {
 
-        return std::make_unique<AggCmdShape>(aggRequest,
+        auto aggRequest = makeAggregateCommandRequest(
+            std::move(stagesJson), std::move(letJson), std::move(collationJson));
+
+        auto parsedPipeline = Pipeline::parse(aggRequest->getPipeline(), _expCtx);
+        return std::make_unique<AggCmdShape>(*aggRequest,
                                              kDefaultTestNss,
                                              stdx::unordered_set<NamespaceString>{kDefaultTestNss},
                                              *parsedPipeline,
@@ -75,30 +86,16 @@ public:
     }
     std::unique_ptr<AggCmdShapeComponents> makeShapeComponentsFromPipeline(
         std::vector<StringData> stagesJson, OptionalBool allowDiskUse = {}) {
-        std::vector<BSONObj> pipeline;
-        for (auto&& stage : stagesJson) {
-            pipeline.push_back(fromjson(stage));
-        }
-        AggregateCommandRequest aggRequest(kDefaultTestNss, pipeline);
-        if (allowDiskUse.has_value()) {
-            aggRequest.setAllowDiskUse(allowDiskUse);
-        }
+        auto aggRequest = makeAggregateCommandRequest(std::move(stagesJson));
 
-        auto parsedPipeline = Pipeline::parse(std::move(pipeline), _expCtx);
+        auto parsedPipeline = Pipeline::parse(aggRequest->getPipeline(), _expCtx);
         return std::make_unique<AggCmdShapeComponents>(
-            aggRequest,
+            *aggRequest,
             stdx::unordered_set<NamespaceString>{kDefaultTestNss},
             parsedPipeline->serializeToBson(
                 SerializationOptions::kRepresentativeQueryShapeSerializeOptions));
     }
 
-    size_t getRepresentativePipelineSize(std::vector<BSONObj> representativePipeline) {
-        return std::accumulate(
-            representativePipeline.begin(),
-            representativePipeline.end(),
-            0,
-            [](int64_t total, const auto& obj) { return total + sizeof(BSONObj) + obj.objsize(); });
-    }
     std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
 
     ServiceContext::UniqueOperationContext _operationContext;
@@ -216,12 +213,18 @@ TEST_F(AggCmdShapeTest, SizeOfAggCmdShapeComponents) {
         {R"({$match: {x: 3, y: {$lte: 3}}})"_sd,
          R"({$group: {_id: "$y", z: {$max: "$z"}, w: {$avg: "$w"}}})"},
         false /*allowDiskUse*/);
-    const auto pipelineSize = getRepresentativePipelineSize(aggComponents->representativePipeline);
 
-    const auto minimumSize = sizeof(CmdSpecificShapeComponents) + sizeof(std::vector<BSONObj>) +
-        sizeof(stdx::unordered_set<NamespaceString>) + sizeof(OptionalBool) + pipelineSize;
-    ASSERT_GTE(aggComponents->size(), minimumSize);
-    ASSERT_LTE(aggComponents->size(), minimumSize + 8 /*padding*/);
+    // The sizes of any members of AggCmdShapeComponents are typically accounted for by
+    // sizeof(AggCmdShapeComponents). The important part of the test here is to ensure that any
+    // additional memory allocations are also included in the size() operation. In our case,
+    // we expect additional memory use from the representative pipeline and the involved
+    // namespaces set.
+    const auto pipelineSize = shape_helpers::containerSize(aggComponents->representativePipeline);
+    const auto involvedNamespacesSize = sizeof(kDefaultTestNss) +
+        kDefaultTestNss.size();  // kDefaultTestNss is the only value in the unordered set.
+
+    ASSERT_EQ(aggComponents->size(),
+              sizeof(AggCmdShapeComponents) + pipelineSize + involvedNamespacesSize);
 }
 
 TEST_F(AggCmdShapeTest, EquivalentAggCmdShapeComponentSizes) {
