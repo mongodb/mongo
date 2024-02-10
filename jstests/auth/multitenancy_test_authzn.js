@@ -1,5 +1,7 @@
 // Test creation of local users and roles for multitenancy.
 
+import {runCommandWithSecurityToken} from "jstests/libs/multitenancy_utils.js";
+
 function setup(conn) {
     const admin = conn.getDB('admin');
     assert.commandWorked(
@@ -28,22 +30,18 @@ function runTests(conn, tenant, multitenancySupport) {
 
     const admin = conn.getDB('admin');
     const test = conn.getDB('test');
-    const cmdSuffix = (tenant === null) ? {} : {"$tenant": tenant};
-    function runCmd(cmd) {
-        const cmdToRun = Object.assign({}, cmd, cmdSuffix);
-        return test.runCommand(cmdToRun);
-    }
+    const token = tenant === null ? undefined : _createTenantToken({tenant: tenant});
 
     function runFindCmdWithTenant(db, collection, filter) {
         let result = [];
-        let cmdRes = assert.commandWorked(
-            db.runCommand({find: collection, filter: filter, batchSize: 0, "$tenant": tenant}));
+        let cmdRes = assert.commandWorked(runCommandWithSecurityToken(
+            token, db, {find: collection, filter: filter, batchSize: 0}));
         result = result.concat(cmdRes.cursor.firstBatch);
 
         let cursorId = cmdRes.cursor.id;
         while (cursorId != 0) {
-            cmdRes = assert.commandWorked(db.runCommand(
-                {getMore: cursorId, collection: collection, batchSize: 1, "$tenant": tenant}));
+            cmdRes = assert.commandWorked(runCommandWithSecurityToken(
+                token, db, {getMore: cursorId, collection: collection, batchSize: 1}));
             result = result.concat(cmdRes.cursor.nextBatch);
             cursorId = cmdRes.cursor.id;
         }
@@ -68,8 +66,12 @@ function runTests(conn, tenant, multitenancySupport) {
         }
 
         // usersInfo/rolesInfo commands return expected data.
-        const usersInfo = assert.commandWorked(runCmd({usersInfo: 1})).users;
-        const rolesInfo = assert.commandWorked(runCmd({rolesInfo: 1, showPrivileges: true})).roles;
+        const usersInfo =
+            assert.commandWorked(runCommandWithSecurityToken(token, test, {usersInfo: 1})).users;
+        const rolesInfo = assert
+                              .commandWorked(runCommandWithSecurityToken(
+                                  token, test, {rolesInfo: 1, showPrivileges: true}))
+                              .roles;
         assert.eq(usersInfo.length, expectUsers, tojson(usersInfo));
         assert.eq(rolesInfo.length, expectRoles, tojson(rolesInfo));
 
@@ -93,20 +95,26 @@ function runTests(conn, tenant, multitenancySupport) {
     }
 
     // createUser/createRole
-    checkSuccess(runCmd({createUser: 'user1', 'pwd': 'pwd', roles: []}));
-    checkSuccess(runCmd({createRole: 'role1', roles: [], privileges: []}));
-    checkSuccess(runCmd({createRole: 'role2', roles: ['role1'], privileges: []}));
     checkSuccess(
-        runCmd({createRole: 'role3', roles: [{db: 'test', role: 'role1'}], privileges: []}));
-    checkSuccess(runCmd({createUser: 'user2', 'pwd': 'pwd', roles: ['role2', 'role3']}));
+        runCommandWithSecurityToken(token, test, {createUser: 'user1', 'pwd': 'pwd', roles: []}));
+    checkSuccess(
+        runCommandWithSecurityToken(token, test, {createRole: 'role1', roles: [], privileges: []}));
+    checkSuccess(runCommandWithSecurityToken(
+        token, test, {createRole: 'role2', roles: ['role1'], privileges: []}));
+    checkSuccess(runCommandWithSecurityToken(
+        token, test, {createRole: 'role3', roles: [{db: 'test', role: 'role1'}], privileges: []}));
+    checkSuccess(runCommandWithSecurityToken(
+        token, test, {createUser: 'user2', 'pwd': 'pwd', roles: ['role2', 'role3']}));
 
     const rwMyColl_privs = [{
         resource: {db: 'test', collection: 'myColl'},
         actions: ['find', 'insert', 'remove', 'update']
     }];
     const myCollUser_roles = [{role: 'rwMyColl', db: 'test'}];
-    checkSuccess(runCmd({createRole: 'rwMyColl', roles: [], privileges: rwMyColl_privs}));
-    checkSuccess(runCmd({createUser: 'myCollUser', pwd: 'pwd', roles: myCollUser_roles}));
+    checkSuccess(runCommandWithSecurityToken(
+        token, test, {createRole: 'rwMyColl', roles: [], privileges: rwMyColl_privs}));
+    checkSuccess(runCommandWithSecurityToken(
+        token, test, {createUser: 'myCollUser', pwd: 'pwd', roles: myCollUser_roles}));
     validateCounts(3, 4);
 
     if (tenant && expectSuccess) {
@@ -123,8 +131,9 @@ function runTests(conn, tenant, multitenancySupport) {
     // grant/revoke privileges
     const rwMyColl_addPrivs =
         [{resource: {db: 'test', collection: 'otherColl'}, actions: ['find']}];
-    checkSuccess(runCmd({grantPrivilegesToRole: 'rwMyColl', privileges: rwMyColl_addPrivs}));
-    checkSuccess(runCmd({
+    checkSuccess(runCommandWithSecurityToken(
+        token, test, {grantPrivilegesToRole: 'rwMyColl', privileges: rwMyColl_addPrivs}));
+    checkSuccess(runCommandWithSecurityToken(token, test, {
         revokePrivilegesFromRole: 'rwMyColl',
         privileges: [{resource: {db: 'test', collection: 'myColl'}, actions: ['find']}]
     }));
@@ -140,10 +149,14 @@ function runTests(conn, tenant, multitenancySupport) {
     }
 
     // Grant/Revoke Roles to/fromfrom User/Role
-    checkSuccess(runCmd({grantRolesToUser: 'user1', roles: ['role1']}));
-    checkSuccess(runCmd({revokeRolesFromUser: 'user2', roles: ['role2']}));
-    checkSuccess(runCmd({grantRolesToRole: 'role1', roles: ['rwMyColl']}));
-    checkSuccess(runCmd({revokeRolesFromRole: 'role3', roles: ['role1']}));
+    checkSuccess(
+        runCommandWithSecurityToken(token, test, {grantRolesToUser: 'user1', roles: ['role1']}));
+    checkSuccess(
+        runCommandWithSecurityToken(token, test, {revokeRolesFromUser: 'user2', roles: ['role2']}));
+    checkSuccess(
+        runCommandWithSecurityToken(token, test, {grantRolesToRole: 'role1', roles: ['rwMyColl']}));
+    checkSuccess(
+        runCommandWithSecurityToken(token, test, {revokeRolesFromRole: 'role3', roles: ['role1']}));
     validateCounts(3, 4);
 
     if (tenant && expectSuccess) {
@@ -159,8 +172,9 @@ function runTests(conn, tenant, multitenancySupport) {
     }
 
     // updateUser/updateRole
-    checkSuccess(runCmd({updateUser: 'user1', roles: ['role2']}));
-    checkSuccess(runCmd({updateRole: 'role2', roles: ['rwMyColl']}));
+    checkSuccess(runCommandWithSecurityToken(token, test, {updateUser: 'user1', roles: ['role2']}));
+    checkSuccess(
+        runCommandWithSecurityToken(token, test, {updateRole: 'role2', roles: ['rwMyColl']}));
     validateCounts(3, 4);
 
     if (tenant && expectSuccess) {
@@ -171,8 +185,8 @@ function runTests(conn, tenant, multitenancySupport) {
     }
 
     // dropUser/dropRole
-    checkSuccess(runCmd({dropRole: 'role2'}));
-    checkSuccess(runCmd({dropUser: 'myCollUser'}));
+    checkSuccess(runCommandWithSecurityToken(token, test, {dropRole: 'role2'}));
+    checkSuccess(runCommandWithSecurityToken(token, test, {dropUser: 'myCollUser'}));
     validateCounts(2, 3);
 
     if (tenant && expectSuccess) {
@@ -184,8 +198,8 @@ function runTests(conn, tenant, multitenancySupport) {
     }
 
     // Cleanup
-    checkSuccess(runCmd({dropAllUsersFromDatabase: 1}));
-    checkSuccess(runCmd({dropAllRolesFromDatabase: 1}));
+    checkSuccess(runCommandWithSecurityToken(token, test, {dropAllUsersFromDatabase: 1}));
+    checkSuccess(runCommandWithSecurityToken(token, test, {dropAllRolesFromDatabase: 1}));
     validateCounts(0, 0);
 }
 

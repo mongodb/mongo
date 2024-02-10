@@ -798,16 +798,13 @@ public:
     static constexpr StringData kAbortTransaction = "abortTransaction"_sd;
 
     UMCTransaction(OperationContext* opCtx,
-                   StringData forCommand,
-                   const boost::optional<TenantId>& tenant)
+                   StringData forCommand)
         :  // Don't transactionalize on standalone.
           _isReplSet{repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet()},
           // Subclient used by transaction operations.
           _client{opCtx->getServiceContext()
                       ->getService(ClusterRole::ShardServer)
                       ->makeClient(forCommand.toString())},
-          _dbName{DatabaseNameUtil::deserialize(
-              tenant, kAdminDB, SerializationContext::stateDefault())},
           _sessionInfo{LogicalSessionFromClient(UUID::gen())} {
         // Note: We allow the client to be killable. We only make an operation context on this
         // client during runCommand, and that operation context is short-lived. If we get
@@ -817,6 +814,13 @@ public:
         _sessionInfo.setStartTransaction(true);
         _sessionInfo.setAutocommit(false);
 
+        _vts = auth::ValidatedTenancyScope::get(opCtx);
+        const auto tenantId =
+            _vts && _vts->hasTenantId() ? boost::optional<TenantId>(_vts->tenantId()) : boost::none;
+        const auto serializationContext = _vts ? SerializationContext::stateCommandRequest(
+                                                     _vts->hasTenantId(), _vts->isFromAtlasProxy())
+                                               : SerializationContext::stateCommandRequest();
+        _dbName = DatabaseNameUtil::deserialize(tenantId, kAdminDB, serializationContext);
 
         auto as = AuthorizationSession::get(_client.get());
         if (as) {
@@ -938,12 +942,15 @@ private:
 
         auto svcCtx = _client->getServiceContext();
         auto sep = svcCtx->getService(ClusterRole::ShardServer)->getServiceEntryPoint();
-        auto opMsgRequest = OpMsgRequestBuilder::create(_dbName, cmdBuilder->obj());
+        auto opMsgRequest =
+            OpMsgRequestBuilder::createWithValidatedTenancyScope(_dbName, _vts, cmdBuilder->obj());
         auto requestMessage = opMsgRequest.serialize();
 
         // Switch to our local client and create a short-lived opCtx for this transaction op.
         AlternativeClientRegion clientRegion(_client);
         auto subOpCtx = svcCtx->makeOperationContext(Client::getCurrent());
+        auth::ValidatedTenancyScope::set(subOpCtx.get(), _vts);
+
         auto responseMessage = sep->handleRequest(subOpCtx.get(), requestMessage).get().response;
         return rpc::makeReply(&responseMessage)->getCommandReply().getOwned();
     }
@@ -960,6 +967,7 @@ private:
     DatabaseName _dbName;
     OperationSessionInfoFromClient _sessionInfo;
     TransactionState _state = TransactionState::kInit;
+    boost::optional<auth::ValidatedTenancyScope> _vts;
 };
 
 void uassertNoUnrecognizedActions(const std::vector<std::string>& unrecognizedActions) {
@@ -1952,7 +1960,6 @@ bool shouldRetryTransaction(const Status& status) {
 }
 
 Status retryTransactionOps(OperationContext* opCtx,
-                           const boost::optional<TenantId>& tenant,
                            StringData forCommand,
                            TxnOpsCallback ops,
                            TxnAuditCallback audit) {
@@ -1975,7 +1982,7 @@ Status retryTransactionOps(OperationContext* opCtx,
                         "reason"_attr = status);
         }
 
-        UMCTransaction txn(opCtx, forCommand, tenant);
+        UMCTransaction txn(opCtx, forCommand);
         status = ops(txn);
         if (!status.isOK()) {
             if (!shouldRetryTransaction(status)) {
@@ -2064,10 +2071,10 @@ void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx)
         return Status::OK();
     };
 
-    auto status = retryTransactionOps(
-        opCtx, roleName.getTenant(), DropRoleCommand::kCommandName, dropRoleOps, [&] {
-            audit::logDropRole(client, roleName);
-        });
+
+    auto status = retryTransactionOps(opCtx, DropRoleCommand::kCommandName, dropRoleOps, [&] {
+        audit::logDropRole(client, roleName);
+    });
     if (!status.isOK()) {
         uassertStatusOK(status.withContext("Failed applying dropRole transaction"));
     }
@@ -2135,8 +2142,8 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
         return Status::OK();
     };
 
-    auto status = retryTransactionOps(
-        opCtx, dbname.tenantId(), DropAllRolesFromDatabaseCommand::kCommandName, dropRoleOps, [&] {
+    auto status =
+        retryTransactionOps(opCtx, DropAllRolesFromDatabaseCommand::kCommandName, dropRoleOps, [&] {
             audit::logDropAllRolesFromDatabase(opCtx->getClient(), dbname);
         });
     if (!status.isOK()) {
