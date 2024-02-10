@@ -240,7 +240,7 @@ public:
 
     std::unique_ptr<CellBlock> clone() const override;
 
-    const std::vector<int32_t>& filterPositionInfo() override {
+    const std::vector<char>& filterPositionInfo() override {
         return _positionInfo;
     }
 
@@ -252,6 +252,6 @@ private:
     TsBlock* _unownedTsBlock;
 
     // For now this is always empty since only top-level fields are supported.
-    std::vector<int32_t> _positionInfo;
+    std::vector<char> _positionInfo;
 };
 }  // namespace mongo::sbe::value

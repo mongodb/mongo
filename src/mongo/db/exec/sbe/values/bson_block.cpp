@@ -39,41 +39,18 @@ struct FilterPositionInfoRecorder {
     void recordValue(TypeTags tag, Value val) {
         auto [cpyTag, cpyVal] = copyValue(tag, val);
         outputArr->push_back(cpyTag, cpyVal);
-        posInfo.back()++;
+        posInfo.push_back(char(isNewDoc));
         isNewDoc = false;
     }
 
-    void emptyArraySeen() {
-        arraySeen = true;
-    }
-
     void newDoc() {
-        posInfo.push_back(0);
         isNewDoc = true;
-        arraySeen = false;
     }
 
     void endDoc() {
         if (isNewDoc) {
-            // We recorded no values for this doc. There are two possibilities:
-            // (1) there is/are only empty array(s) at this path, which were traversed.
-            //     Example: document {a: {b: []}}, path Get(a)/Traverse/Get(b)/Traverse/Id.
-            // (2) There are no values at this path.
-            //     Example: document {a: {b:1}} searching for path Get(a)/Traverse/Get(c)/Id.
-            //
-            // It is important that we distinguish these two cases for MQL's sake.
-            if (arraySeen) {
-                // This represents case (1). We record this by adding no values to our output and
-                // leaving the position info value as '0'.
-
-                // Do nothing.
-            } else {
-                // This represents case (2). We record this by adding an explicit Nothing value and
-                // indicate that there's one value for this document. This matches the behavior of
-                // the scalar traverseF primitive.
-                outputArr->push_back(value::TypeTags::Nothing, Value(0));
-                posInfo.back()++;
-            }
+            outputArr->push_back(value::TypeTags::Nothing, Value(0));
+            posInfo.push_back(char(true));
         }
     }
 
@@ -83,9 +60,8 @@ struct FilterPositionInfoRecorder {
         return out;
     }
 
-    std::vector<int32_t> posInfo;
+    std::vector<char> posInfo;
     bool isNewDoc = false;
-    bool arraySeen = false;
     std::unique_ptr<HeterogeneousBlock> outputArr;
 };
 
@@ -245,7 +221,6 @@ void walkField(
                 projRecorder->startArray();
             }
 
-            bool isArrayEmpty = true;
             {
                 auto arrayBson = value::bitcastTo<const char*>(eltVal);
                 const auto arrayEnd = bson::bsonEnd(arrayBson);
@@ -260,14 +235,7 @@ void walkField(
                     walkField(node->traverseChild.get(), arrEltTag, arrEltVal, arrayBson, cb);
 
                     arrayBson = bson::advance(arrayBson, sv.size());
-                    isArrayEmpty = false;
                 }
-            }
-
-            if (isArrayEmpty && node->traverseChild->filterPosInfoRecorder) {
-                // If the array was empty, indicate that we saw an empty array to the
-                // filterPosInfoRecorder.
-                node->traverseChild->filterPosInfoRecorder->emptyArraySeen();
             }
 
             for (auto& projRecorder : node->childProjRecorders) {

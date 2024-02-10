@@ -85,7 +85,7 @@ namespace {
 struct PathTestCase {
     value::CellBlock::Path path;
     BSONObj filterValues;
-    std::vector<int32_t> filterPosInfo;
+    std::string filterPosInfo;
 
     BSONObj projectValues;
 };
@@ -114,11 +114,10 @@ BSONObj blockToBsonArr(value::ValueBlock& block) {
 }
 
 // Converts a vector of char storing char(1)/char(0) into an ascii string of '1' and '0'.
-std::string posInfoToString(const std::vector<int32_t>& posInfo) {
+std::string posInfoToString(const std::vector<char>& posInfo) {
     std::string out;
     for (auto c : posInfo) {
-        out += std::to_string(c);
-        out += " ";
+        out.push_back(c ? '1' : '0');
     }
     return out;
 }
@@ -233,11 +232,8 @@ void BsonBlockDecodingTest::testPaths(const std::vector<PathTestCase>& testCases
             << "Incorrect values for filter path " << pathReqs[filterIdx].toString() << " got "
             << numObj << " expected " << tc.filterValues;
 
-        ASSERT_EQ(cellBlocks[filterIdx]->filterPositionInfo(), tc.filterPosInfo)
-            << "Incorrect position info for filter path " << pathReqs[filterIdx].toString()
-            << posInfoToString(cellBlocks[filterIdx]->filterPositionInfo())
-            << " == " << posInfoToString(tc.filterPosInfo);
-
+        ASSERT_EQ(posInfoToString(cellBlocks[filterIdx]->filterPositionInfo()), tc.filterPosInfo)
+            << "Incorrect position info for filter path " << pathReqs[filterIdx].toString();
 
         auto projectValues = blockToBsonArr(cellBlocks[projectIdx]->getValueBlock());
         ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(projectValues == tc.projectValues))
@@ -265,12 +261,12 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSimple) {
     std::vector<PathTestCase> tests{
         PathTestCase{.path = {Get{"a"}, Id{}},
                      .filterValues = fromjson("{result: [1,2,[3,4], null, 6]}"),
-                     .filterPosInfo = {1, 1, 1, 1, 1},
+                     .filterPosInfo = "11111",
                      .projectValues = fromjson("{result: [1,2,[3,4], null, 6]}")},
 
         PathTestCase{.path = {Get{"b"}, Id{}},
                      .filterValues = fromjson("{result: [1,2,3,null,null]}"),
-                     .filterPosInfo = {1, 1, 1, 1, 1},
+                     .filterPosInfo = "11111",
                      .projectValues = fromjson("{result: [1,2,3,null,null]}")}};
     testPaths(tests, bsons);
 }
@@ -291,7 +287,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockMissings) {
     std::vector<PathTestCase> tests{PathTestCase{
         .path = {Get{"a"}, Id{}},
         .filterValues = fromjson("{result: [null, null, 1,2,[[3],4], null, 6, null]}"),
-        .filterPosInfo = {1, 1, 1, 1, 1, 1, 1, 1},
+        .filterPosInfo = "11111111",
         .projectValues = fromjson("{result: [null, null, 1,2,[[3],4], null, 6, null]}")}};
     testPaths(tests, bsons);
 }
@@ -308,7 +304,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockGetTraverse) {
     std::vector<PathTestCase> tests{
         PathTestCase{.path = {Get{"a"}, Traverse{}, Id{}},
                      .filterValues = fromjson("{result: [1,2,3,4,[999], 5]}"),
-                     .filterPosInfo = {1, 1, 3, 1},
+                     .filterPosInfo = "111001",
                      .projectValues = fromjson("{result: [1,2,[3,4,[999]], 5]}")}};
     testPaths(tests, bsons);
 }
@@ -330,32 +326,32 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockSubfield) {
         // Get(A)/Id case.
         PathTestCase{.path = {Get{"a"}, Id{}},
                      .filterValues = getFieldAResult,
-                     .filterPosInfo = {1, 1, 1, 1, 1},
+                     .filterPosInfo = "11111",
                      .projectValues = getFieldAResult},
         // Get(A)/Traverse/Id case.
         PathTestCase{.path = {Get{"a"}, Traverse{}, Id{}},
                      .filterValues =
                          fromjson("{result: [{b: 1}, {b: [999, 999]}, {b: [2,3]}, {b: [4,5]}, "
                                   "null, {b: [[999]]}]}"),
-                     .filterPosInfo = {1, 1, 2, 1, 1},
+                     .filterPosInfo = "111011",
                      .projectValues = getFieldAResult},
         // Get(A)/Traverse/Get(b)/Id case.
         PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Id{}},
                      .filterValues =
                          fromjson("{result: [1, [999,999], [2,3], [4,5], null, [[999]]]}"),
-                     .filterPosInfo = {1, 1, 2, 1, 1},
+                     .filterPosInfo = "111011",
                      .projectValues =
                          fromjson("{result: [1, [999,999], [[2, 3], [4,5]], null, [[[999]]]]}")},
         // Get(a)/Get(b)/Id case. This case does not correspond to any MQL equivalent, but we
         // still want it to work.
         PathTestCase{.path = {Get{"a"}, Get{"b"}, Id{}},
                      .filterValues = fromjson("{result: [1, [999,999], null, null, null]}"),
-                     .filterPosInfo = {1, 1, 1, 1, 1},
+                     .filterPosInfo = "11111",
                      .projectValues = fromjson("{result: [1, [999,999], null, null, null]}")},
         // Get(A)/Traverse/Get(b)/Traverse/Id case.
         PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
                      .filterValues = fromjson("{result: [1,999,999,2,3,4,5, null, [999]]}"),
-                     .filterPosInfo = {1, 2, 4, 1, 1},
+                     .filterPosInfo = "110100011",
                      .projectValues =
                          fromjson("{result: [1, [999,999], [[2, 3], [4,5]], null, [[[999]]]]}")}};
     testPaths(tests, bsons);
@@ -374,13 +370,13 @@ TEST_F(BsonBlockDecodingTest, DoublyNestedArrays) {
         // Get(A)/Id case.
         PathTestCase{.path = {Get{"a"}, Id{}},
                      .filterValues = getFieldAResult,
-                     .filterPosInfo = {1, 1},
+                     .filterPosInfo = "11",
                      .projectValues = getFieldAResult},
         // Get(A)/Traverse/Id case.
         PathTestCase{.path = {Get{"a"}, Traverse{}, Id{}},
                      .filterValues =
                          fromjson("{result: [[{b: 1}], {b:2}, {b: [[3,4]]}, {b: [5, 6]}, {b:7}]}"),
-                     .filterPosInfo = {2, 3},
+                     .filterPosInfo = "10100",
                      .projectValues = getFieldAResult},
         // Get(A)/Traverse/Get(b)/Id case.
         PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Id{}},
@@ -388,63 +384,20 @@ TEST_F(BsonBlockDecodingTest, DoublyNestedArrays) {
                      // traversed. Arrays directly nested within arrays (e.g. [3,4]) are treated
                      // as "blobs" and are not traversed.
                      .filterValues = fromjson("{result: [2, [[3,4]], [5, 6], 7]}"),
-                     .filterPosInfo = {1, 3},
+                     .filterPosInfo = "1100",
                      .projectValues = fromjson("{result: [[2], [[[3,4]], [5, 6], 7]]}")},
         // Get(a)/Get(b)/Id case. This case does not correspond to any MQL equivalent, but we
         // still want it to work.
         PathTestCase{.path = {Get{"a"}, Get{"b"}, Id{}},
                      .filterValues = fromjson("{result: [null, null]}"),
-                     .filterPosInfo = {1, 1},
+                     .filterPosInfo = "11",
                      .projectValues = fromjson("{result: [null, null]}")},
         // Get(A)/Traverse/Get(b)/Traverse/Id case.
         PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
                      .filterValues = fromjson("{result: [2, [3,4], 5, 6, 7]}"),
-                     .filterPosInfo = {1, 4},
+                     .filterPosInfo = "11000",
                      .projectValues = fromjson("{result: [[2], [[[3,4]], [5, 6], 7]]}")}};
     testPaths(tests, bsons);
-}
-
-TEST_F(BsonBlockDecodingTest, BSONDocumentEmptyArrays) {
-    {
-        std::vector<BSONObj> bsons{
-            fromjson("{a: {b: 1}}"),
-            fromjson("{a: {b: []}}"),
-            fromjson("{a: {b: [2, 3]}}"),
-        };
-        std::vector<PathTestCase> tests{
-            PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Id{}},
-                         .filterValues = fromjson("{result: [1, [], [2,3]]}"),
-                         .filterPosInfo = {1, 1, 1},
-                         .projectValues = fromjson("{result: [1, [], [2,3]]}")},
-            PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
-                         .filterValues = fromjson("{result: [1, 2,3]}"),
-                         .filterPosInfo = {1, 0, 2},
-                         .projectValues = fromjson("{result: [1, [], [2,3]]}")},
-        };
-        testPaths(tests, bsons);
-    }
-
-    {
-        std::vector<BSONObj> bsons{
-            fromjson("{a: [{b: []}, {b: [1,2]}, {b: []}]}"),
-            fromjson("{a: [{b: []}, {b: []}, {b: []}]}"),
-            fromjson("{a: {b: [3, 4]}}"),
-        };
-        std::vector<PathTestCase> tests{
-            PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Id{}},
-                         .filterValues = fromjson("{result: [[], [1, 2], [], [], [], [], [3, 4]]}"),
-                         .filterPosInfo = {3, 3, 1},
-                         .projectValues =
-                             fromjson("{result: [[[], [1, 2], []], [[], [], []], [3, 4]]}")},
-            PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
-                         .filterValues = fromjson("{result: [1,2,3,4]}"),
-                         .filterPosInfo = {2, 0, 2},
-                         .projectValues =
-                             fromjson("{result: [[[], [1, 2], []], [[], [], []], [3, 4]]}")},
-
-        };
-        testPaths(tests, bsons);
-    }
 }
 
 TEST_F(BsonBlockDecodingTest, BSONDocumentBlockFieldDoesNotExist) {
@@ -466,7 +419,7 @@ TEST_F(BsonBlockDecodingTest, BSONDocumentBlockFieldDoesNotExist) {
     std::vector<PathTestCase> tests{
         PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Traverse{}, Id{}},
                      .filterValues = fromjson("{result: [1, null, null, 4, 5, 6, 7]}"),
-                     .filterPosInfo = {1, 1, 1, 4},
+                     .filterPosInfo = "1111000",
                      .projectValues = fromjson("{result: [1, [], [], [[4, 5], [], [6, 7]]]}")}};
     testPaths(tests, bsons);
 }

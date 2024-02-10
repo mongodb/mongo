@@ -71,8 +71,8 @@ public:
         }
     }
 
-    void testFoldF(std::vector<std::pair<value::TypeTags, value::Value>> vals,
-                   std::vector<int32_t> filterPosInfo,
+    void testFoldF(std::vector<bool> vals,
+                   std::vector<char> filterPosInfo,
                    std::vector<bool> expectedResult);
 
     void testCmpScalar(EPrimBinary::Op, StringData cmpFunctionName, value::ValueBlock* valBlock);
@@ -875,9 +875,10 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
     }
 }
 
-void SBEBlockExpressionTest::testFoldF(std::vector<std::pair<value::TypeTags, value::Value>> vals,
-                                       std::vector<int32_t> filterPosInfo,
+void SBEBlockExpressionTest::testFoldF(std::vector<bool> vals,
+                                       std::vector<char> filterPosInfo,
                                        std::vector<bool> expectedResult) {
+
     value::ViewOfValueAccessor valBlockAccessor;
     value::ViewOfValueAccessor cellBlockAccessor;
     auto valBlockSlot = bindAccessor(&valBlockAccessor);
@@ -887,10 +888,7 @@ void SBEBlockExpressionTest::testFoldF(std::vector<std::pair<value::TypeTags, va
     materializedCellBlock->_deblocked = nullptr;  // This is never read by the test.
     materializedCellBlock->_filterPosInfo = filterPosInfo;
 
-    auto valBlock = std::make_unique<value::HeterogeneousBlock>();
-    for (auto v : vals) {
-        valBlock->push_back(v);
-    }
+    auto valBlock = makeHeterogeneousBoolBlock(vals);
     valBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
                            value::bitcastFrom<value::ValueBlock*>(valBlock.get()));
     cellBlockAccessor.reset(sbe::value::TypeTags::cellBlock,
@@ -911,114 +909,49 @@ void SBEBlockExpressionTest::testFoldF(std::vector<std::pair<value::TypeTags, va
 
 TEST_F(SBEBlockExpressionTest, CellFoldFTest) {
     // For empty position info, FoldF() should act as an identity function.
-    testFoldF({makeBool(true),
-               makeBool(true),
-               makeBool(false),
-               makeBool(false),
-               makeBool(true)},                 // Values.
-              {},                               // Position info.
-              {true, true, false, false, true}  // Expected result.
-    );
-
-    testFoldF({makeBool(true),
-               makeBool(true),
-               makeBool(false),
-               makeBool(false),
-               makeBool(true)},          // Values.
-              {1, 1, 2, 1},              // Position info.
-              {true, true, false, true}  // Expected result.
-    );
-
-
-    testFoldF({makeBool(true),
-               makeNothing(),
-               makeInt32(123),
-               makeBool(false),
-               makeBool(true)},                  // Values.
+    testFoldF({true, true, false, false, true},  // Values.
               {},                                // Position info.
-              {true, false, false, false, true}  // Expected result.
+              {true, true, false, false, true}   // Expected result.
     );
 
+    testFoldF({true, true, false, false, true},  // Values.
+              {1, 1, 1, 0, 1},                   // Position info.
+              {true, true, false, true}          // Expected result.
+    );
 
     //
     // Non-empty position info edge case tests.
     //
 
-    testFoldF({},  // Values.
-              {},  // Position info.
-              {}   // Expected result.
+    testFoldF({false},  // Values.
+              {1},      // Position info.
+              {false}   // Expected result.
     );
 
-    testFoldF({makeBool(false)},  // Values.
-              {1},                // Position info.
-              {false}             // Expected result.
+    testFoldF({true},  // Values.
+              {1},     // Position info.
+              {true}   // Expected result.
     );
 
-    testFoldF({makeBool(true)},  // Values.
-              {1},               // Position info.
-              {true}             // Expected result.
+    testFoldF({true, true, false, false, true},  // Values.
+              {1, 0, 0, 0, 0},                   // Position info.
+              {true}                             // Expected result.
     );
-
-    testFoldF({makeNothing()},  // Values.
-              {1},              // Position info.
-              {false}           // Expected result.
+    testFoldF({true, true, false, false, true},  // Values.
+              {1, 1, 1, 1, 0},                   // Position info.
+              {true, true, false, true}          // Expected result.
     );
-
-    testFoldF({},      // Values.
-              {0},     // Position info.
-              {false}  // Expected result.
+    testFoldF({false, false, false, false, false},  // Values.
+              {1, 0, 0, 0, 0},                      // Position info.
+              {false}                               // Expected result.
     );
-
-    testFoldF({makeBool(true),
-               makeBool(true),
-               makeBool(false),
-               makeBool(false),
-               makeBool(true)},  // Values.
-              {5},               // Position info.
-              {true}             // Expected result.
+    testFoldF({false, false, false, false, false},  // Values.
+              {1, 0, 1, 0, 0},                      // Position info.
+              {false, false}                        // Expected result.
     );
-    testFoldF({makeBool(true),
-               makeBool(true),
-               makeBool(false),
-               makeBool(false),
-               makeBool(true)},          // Values.
-              {1, 1, 1, 2},              // Position info.
-              {true, true, false, true}  // Expected result.
-    );
-    testFoldF({makeBool(false),
-               makeBool(false),
-               makeBool(false),
-               makeBool(false),
-               makeBool(false)},  // Values.
-              {5},                // Position info.
-              {false}             // Expected result.
-    );
-    testFoldF({makeBool(false),
-               makeBool(false),
-               makeBool(false),
-               makeBool(false),
-               makeBool(false)},  // Values.
-              {2, 3},             // Position info.
-              {false, false}      // Expected result.
-    );
-    testFoldF({makeBool(false), makeBool(false), makeBool(false), makeBool(true)},  // Values.
-              {3, 1},        // Position info.
-              {false, true}  // Expected result.
-    );
-
-    testFoldF({makeBool(false), makeBool(false), makeBool(false), makeBool(true)},  // Values.
-              {0, 0, 0, 0, 3, 1},                        // Position info.
-              {false, false, false, false, false, true}  // Expected result.
-    );
-
-    testFoldF({makeNothing(), makeBool(false), makeBool(false)},  // Values.
-              {0, 1, 2, 0},                                       // Position info.
-              {false, false, false, false}                        // Expected result.
-    );
-
-    testFoldF({},                    // Values.
-              {0, 0, 0},             // Position info.
-              {false, false, false}  // Expected result.
+    testFoldF({false, false, false, true},  // Values.
+              {1, 0, 0, 1},                 // Position info.
+              {false, true}                 // Expected result.
     );
 }
 

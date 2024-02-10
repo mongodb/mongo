@@ -465,14 +465,12 @@ TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(TsBlock* block) : _unownedTsBlock(block) {
     auto count = block->tryCount();
     tassert(8182400, "Assumes count() is available in O(1) time on TS Block type", count);
-    // Position info of 1111...
-    _positionInfo.resize(*count, 1);
+    _positionInfo.resize(*count, char(1));
 }
 
 TsCellBlockForTopLevelField::TsCellBlockForTopLevelField(size_t count,
                                                          std::unique_ptr<TsBlock> tsBlock)
     : _ownedTsBlock(std::move(tsBlock)), _unownedTsBlock(_ownedTsBlock.get()) {
-    // Position info of 1111...
-    _positionInfo.resize(count, 1);
+    _positionInfo.resize(count, char(1));
 }
 }  // namespace mongo::sbe::value
