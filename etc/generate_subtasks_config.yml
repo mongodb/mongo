@@ -42,6 +42,7 @@ build_variant_large_distro_exceptions:
   - macos-arm64
   - macos-debug-suggested
   - rhel7.9-small
+  - rhel7.9-large
   - rhel80
   - rhel80-debug-asan
   - rhel80-debug-asan-all-feature-flags
