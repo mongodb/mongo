@@ -652,7 +652,8 @@ private:
     }
 
     StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
-                                                          bool startTransaction);
+                                                          bool startTransaction,
+                                                          bool startOrContinueTransaction);
 
     const std::shared_ptr<HandleRequest::ExecutionContext> _execContext;
 
@@ -1410,8 +1411,8 @@ Date_t ExecCommandDatabase::_lastDirectConnectionWarningTime = Date_t();
  * if the read concern is not valid for the command.
  * Note that the validation performed is not necessarily exhaustive.
  */
-StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(OperationContext* opCtx,
-                                                                           bool startTransaction) {
+StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(
+    OperationContext* opCtx, bool startTransaction, bool startOrContinueTransaction) {
     auto& request = _execContext->getRequest();
     repl::ReadConcernArgs readConcernArgs;
 
@@ -1505,7 +1506,7 @@ StatusWith<repl::ReadConcernArgs> ExecCommandDatabase::_extractReadConcern(Opera
 
     // If we are starting a transaction, we need to check whether the read concern is
     // appropriate for running a transaction.
-    if (startTransaction) {
+    if (startTransaction || startOrContinueTransaction) {
         if (!isReadConcernLevelAllowedInTransaction(readConcernArgs.getLevel())) {
             return {ErrorCodes::InvalidOptions,
                     "The readConcern level must be either 'local' (default), 'majority' or "
@@ -1776,19 +1777,24 @@ void ExecCommandDatabase::_initiateCommand() {
     // original read concern.
     auto skipReadConcern = opCtx->getClient()->isInDirectClient();
     bool startTransaction = static_cast<bool>(_sessionOptions.getStartTransaction());
+    bool startOrContinueTransaction =
+        static_cast<bool>(_sessionOptions.getStartOrContinueTransaction());
     if (!skipReadConcern) {
-        auto newReadConcernArgs = uassertStatusOK(_extractReadConcern(opCtx, startTransaction));
+        auto newReadConcernArgs = uassertStatusOK(
+            _extractReadConcern(opCtx, startTransaction, startOrContinueTransaction));
 
         // Ensure that the RC being set on the opCtx has provenance.
         invariant(newReadConcernArgs.getProvenance().hasSource(),
                   fmt::format("unexpected unset provenance on readConcern: {}",
                               newReadConcernArgs.toBSONInner().toString()));
 
-        // TODO SERVER-85643 Check for startOrContinueTransaction as well
+        // If startOrContinueTransaction is set, that means that the shard is trying to
+        // add another shard to the transaction, so the command should allow specifying a
+        // readConcern even if it is not the first command in the transaction.
         uassert(ErrorCodes::InvalidOptions,
                 "Only the first command in a transaction may specify a readConcern",
-                startTransaction || !opCtx->inMultiDocumentTransaction() ||
-                    newReadConcernArgs.isEmpty());
+                startTransaction || startOrContinueTransaction ||
+                    !opCtx->inMultiDocumentTransaction() || newReadConcernArgs.isEmpty());
 
         {
             // We must obtain the client lock to set the ReadConcernArgs on the operation context as
@@ -1798,7 +1804,7 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
-    if (startTransaction) {
+    if (startTransaction || startOrContinueTransaction) {
         _setLockStateForTransaction(opCtx);
 
         // Remember whether or not this operation is starting a transaction, in case something later
@@ -2085,7 +2091,8 @@ void ExecCommandDatabase::_handleFailure(Status status) {
     // it here, so if it is valid it can be used to compute the proper operationTime.
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (readConcernArgs.isEmpty()) {
-        auto readConcernArgsStatus = _extractReadConcern(opCtx, false /*startTransaction*/);
+        auto readConcernArgsStatus = _extractReadConcern(
+            opCtx, false /*startTransaction*/, false /* startOrContinueTransaction */);
         if (readConcernArgsStatus.isOK()) {
             // We must obtain the client lock to set the ReadConcernArgs on the operation context as
             // it may be concurrently read by CurrentOp.

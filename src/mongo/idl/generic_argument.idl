@@ -169,6 +169,9 @@ structs:
             requestGossipRoutingCache:
                 type: IDLAnyType
                 forward_to_shards: false
+            startOrContinueTransaction:
+                type: IDLAnyType
+                forward_to_shards: true
 
     generic_reply_fields_api_v1:
         description: "Fields that may appear in any command reply. These are guaranteed backwards-compatible for as long as the server supports API Version 1."

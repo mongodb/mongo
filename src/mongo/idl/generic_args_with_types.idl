@@ -223,6 +223,10 @@ structs:
                 type: array<namespacestring>
                 forward_to_shards: false
                 optional: true
+            startOrContinueTransaction:
+                type: bool
+                forward_to_shards: true
+                optional: true
 
     GenericReplyFieldsWithTypesV1:
         # This struct is meant to mirror 'generic_reply_fields_api_v1' in '../idl/generic_argument.idl'.
