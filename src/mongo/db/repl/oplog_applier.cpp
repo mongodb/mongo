@@ -139,8 +139,9 @@ StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx,
     return lastApplied;
 }
 
-StatusWith<std::vector<OplogEntry>> OplogApplier::getNextApplierBatch(
-    OperationContext* opCtx, const BatchLimits& batchLimits, Milliseconds waitToFillBatch) {
+StatusWith<OplogApplierBatch> OplogApplier::getNextApplierBatch(OperationContext* opCtx,
+                                                                const BatchLimits& batchLimits,
+                                                                Milliseconds waitToFillBatch) {
     return _oplogBatcher->getNextApplierBatch(opCtx, batchLimits, waitToFillBatch);
 }
 

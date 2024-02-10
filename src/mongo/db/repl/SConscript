@@ -651,9 +651,7 @@ env.Library(
 
 env.Library(
     target='oplog_write',
-    source=[
-        'oplog_writer_impl.cpp',
-    ],
+    source=['oplog_writer_batcher.cpp', 'oplog_writer_impl.cpp'],
     LIBDEPS=[
         'oplog_write_interface',
         'repl_coordinator_interface',
@@ -1831,6 +1829,7 @@ if wiredtiger:
             'oplog_fetcher_mock.cpp',
             'oplog_fetcher_test.cpp',
             'oplog_test.cpp',
+            'oplog_writer_batcher_test.cpp',
             'oplog_writer_impl_test.cpp',
             'optime_extract_test.cpp',
             'primary_only_service_test.cpp',

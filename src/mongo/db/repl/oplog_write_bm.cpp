@@ -388,7 +388,8 @@ public:
     void writeOplog(OperationContext* opCtx, size_t numEntriesPerBatch, size_t numBytesPerBatch) {
         while (!_testSvcCtx->getOplogApplier()->getBuffer()->isEmpty()) {
             auto oplogBatch = invariantStatusOK(_testSvcCtx->getOplogApplier()->getNextApplierBatch(
-                opCtx, {numBytesPerBatch, numEntriesPerBatch}));
+                                                    opCtx, {numBytesPerBatch, numEntriesPerBatch}))
+                                  .releaseBatch();
 
             AutoGetDb autoDb(opCtx, _foobarNs.dbName(), MODE_X);
 

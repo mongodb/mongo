@@ -539,8 +539,9 @@ public:
 
     void applyOplog(OperationContext* opCtx) {
         while (!_testSvcCtx->getOplogApplier()->getBuffer()->isEmpty()) {
-            auto oplogBatch = invariantStatusOK(
-                _testSvcCtx->getOplogApplier()->getNextApplierBatch(opCtx, _batchLimits));
+            auto oplogBatch = invariantStatusOK(_testSvcCtx->getOplogApplier()->getNextApplierBatch(
+                                                    opCtx, _batchLimits))
+                                  .releaseBatch();
 
             const auto lastOpInBatch = oplogBatch.back();
             const auto lastOpTimeInBatch = lastOpInBatch.getOpTime();

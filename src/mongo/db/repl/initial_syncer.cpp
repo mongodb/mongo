@@ -1555,7 +1555,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
     }
 
     // Schedule MultiApplier if we have operations to apply.
-    const auto& ops = batchResult.getValue();
+    const auto& ops = batchResult.getValue().getBatch();
     if (!ops.empty()) {
         _fetchCount.store(0);
         MultiApplier::MultiApplyFn applyBatchOfOperationsFn = [this](OperationContext* opCtx,
@@ -2118,12 +2118,12 @@ void InitialSyncer::_shutdownComponent_inlock(Component& component) {
     component->shutdown();
 }
 
-StatusWith<std::vector<OplogEntry>> InitialSyncer::_getNextApplierBatch_inlock() {
+StatusWith<OplogApplierBatch> InitialSyncer::_getNextApplierBatch_inlock() {
     // If the fail-point is active, delay the apply batch by returning an empty batch so that
     // _getNextApplierBatchCallback() will reschedule itself at a later time.
     // See InitialSyncerInterface::Options::getApplierBatchCallbackRetryWait.
     if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
-        return std::vector<OplogEntry>();
+        return OplogApplierBatch();
     }
 
     // Obtain next batch of operations from OplogApplier.

@@ -754,7 +754,9 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
     OpTime applyThroughOpTime;
     std::vector<OplogEntry> batch;
     while (
-        !(batch = fassert(50763, oplogApplier.getNextApplierBatch(opCtx, batchLimits))).empty()) {
+        !(batch =
+              fassert(50763, oplogApplier.getNextApplierBatch(opCtx, batchLimits)).releaseBatch())
+             .empty()) {
         if (advanceTimestampsEachBatch && applyThroughOpTime.isNull()) {
             // We must set appliedThrough before applying anything at all, so we know
             // any unstable checkpoints we take are "dirty".  A null appliedThrough indicates

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/util/assert_util.h"
 #include <boost/optional.hpp>
 #include <cstddef>
 #include <string>
@@ -36,6 +37,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/repl/oplog_batch.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/time_support.h"
 
@@ -138,6 +140,14 @@ public:
     virtual bool tryPop(OperationContext* opCtx, Value* value) = 0;
 
     /**
+     * Returns false if oplog buffer is empty. "batch" is left unchanged.
+     * Otherwise, removes last batch (saves in "batch") from the oplog buffer and returns true.
+     */
+    virtual bool tryPopBatch(OperationContext* opCtx, OplogBatchBSONObj* batch) {
+        MONGO_UNIMPLEMENTED;
+    }
+
+    /**
      * Waits uninterruptibly for "waitDuration" for an operation to be pushed into the oplog buffer.
      * Returns false if oplog buffer is still empty after "waitDuration".
      * Otherwise, returns true.
@@ -182,12 +192,16 @@ public:
      * "waitForData" will return immediately even if there is data in the queue.  This
      * is an optimization and subclasses may choose not to implement this function.
      */
-    virtual void enterDrainMode(){};
+    virtual void enterDrainMode() {
+        MONGO_UNIMPLEMENTED;
+    }
 
     /**
      * Leaves "drain mode".  May only be called by the producer.
      */
-    virtual void exitDrainMode(){};
+    virtual void exitDrainMode() {
+        MONGO_UNIMPLEMENTED;
+    }
 };
 
 class OplogBuffer::Counters {

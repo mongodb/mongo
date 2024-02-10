@@ -541,7 +541,7 @@ private:
     void _appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob) const;
     BSONObj _getInitialSyncProgress_inlock() const;
 
-    StatusWith<std::vector<OplogEntry>> _getNextApplierBatch_inlock();
+    StatusWith<OplogApplierBatch> _getNextApplierBatch_inlock();
 
     /**
      * Schedules a fetcher to get the last oplog entry from the sync source.

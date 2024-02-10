@@ -73,12 +73,12 @@ MONGO_FAIL_POINT_DEFINE(skipOplogBatcherWaitForData);
 MONGO_FAIL_POINT_DEFINE(oplogBatcherPauseAfterSuccessfulPeek);
 
 OplogBatcher::OplogBatcher(OplogApplier* oplogApplier, OplogBuffer* oplogBuffer)
-    : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops(0) {}
+    : _oplogApplier(oplogApplier), _oplogBuffer(oplogBuffer), _ops() {}
 OplogBatcher::~OplogBatcher() {
     invariant(!_thread);
 }
 
-OplogBatch OplogBatcher::getNextBatch(Seconds maxWaitTime) {
+OplogApplierBatch OplogBatcher::getNextBatch(Seconds maxWaitTime) {
     stdx::unique_lock<Latch> lk(_mutex);
     // _ops can indicate the following cases:
     // 1. A new batch is ready to consume.
@@ -95,8 +95,8 @@ OplogBatch OplogBatcher::getNextBatch(Seconds maxWaitTime) {
         (void)_cv.wait_for(lk, maxWaitTime.toSystemDuration());
     }
 
-    OplogBatch ops = std::move(_ops);
-    _ops = OplogBatch(0);
+    OplogApplierBatch ops = std::move(_ops);
+    _ops = OplogApplierBatch();
     _cv.notify_all();
     return ops;
 }
@@ -130,8 +130,9 @@ std::size_t OplogBatcher::getOpCount(const OplogEntry& entry) {
     return 1U;
 }
 
-StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
-    OperationContext* opCtx, const BatchLimits& batchLimits, Milliseconds waitToFillBatch) {
+StatusWith<OplogApplierBatch> OplogBatcher::getNextApplierBatch(OperationContext* opCtx,
+                                                                const BatchLimits& batchLimits,
+                                                                Milliseconds waitToFillBatch) {
     if (batchLimits.ops == 0) {
         return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
     }
@@ -181,7 +182,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
                     // reconfigs and shutdown to occur.
                     sleepsecs(1);
                 }
-                return std::move(ops);
+                return OplogApplierBatch(std::move(ops), batchStats.totalBytes);
             }
         }
 
@@ -191,7 +192,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
                 break;
             case BatchAction::kStartNewBatch:
                 if (!ops.empty()) {
-                    return std::move(ops);
+                    return OplogApplierBatch(std::move(ops), batchStats.totalBytes);
                 }
                 break;
             case BatchAction::kProcessIndividually:
@@ -199,7 +200,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
                     ops.push_back(std::move(entry));
                     _consume(opCtx, _oplogBuffer);
                 }
-                return std::move(ops);
+                return OplogApplierBatch(std::move(ops), batchStats.totalBytes);
         }
 
         // Apply replication batch limits. Avoid returning an empty batch.
@@ -208,7 +209,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
         if (batchStats.totalOps > 0) {
             if (batchStats.totalOps + opCount > batchLimits.ops ||
                 batchStats.totalBytes + opBytes > batchLimits.bytes) {
-                return std::move(ops);
+                return OplogApplierBatch(std::move(ops), batchStats.totalBytes);
             }
         }
 
@@ -216,7 +217,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
         if (batchStats.totalOps > 0 && !batchLimits.forceBatchBoundaryAfter.isNull() &&
             entry.getOpTime().getTimestamp() > batchLimits.forceBatchBoundaryAfter &&
             ops.back().getOpTime().getTimestamp() <= batchLimits.forceBatchBoundaryAfter) {
-            return std::move(ops);
+            return OplogApplierBatch(std::move(ops), batchStats.totalBytes);
         }
 
         // Add op to buffer.
@@ -247,7 +248,8 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
             }
         }
     }
-    return std::move(ops);
+
+    return OplogApplierBatch(std::move(ops), batchStats.totalBytes);
 }
 
 /**
@@ -354,7 +356,7 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
         batchLimits.ops = getBatchLimitOplogEntries();
 
         // Use the OplogBuffer to populate a local OplogBatch. Note that the buffer may be empty.
-        OplogBatch ops(batchLimits.ops);
+        OplogApplierBatch ops;
         try {
             auto opCtx = cc().makeOperationContext();
             shard_role_details::getLocker(opCtx.get())
@@ -378,12 +380,9 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // Locks the oplog to check its max size, do this in the UninterruptibleLockGuard.
             batchLimits.bytes = getBatchLimitOplogBytes(opCtx.get(), storageInterface);
 
-            auto oplogEntries = fassertNoTrace(
+            ops = fassertNoTrace(
                 31004,
                 getNextApplierBatch(opCtx.get(), batchLimits, Milliseconds(oplogBatchDelayMillis)));
-            for (const auto& oplogEntry : oplogEntries) {
-                ops.emplace_back(oplogEntry);
-            }
         } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
             LOGV2_DEBUG(6133400,
                         1,

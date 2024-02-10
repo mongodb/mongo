@@ -157,7 +157,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOps) {
         makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(srcOps.size(), batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
@@ -170,7 +170,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWithOtherO
         makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
@@ -183,7 +183,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsSystemDotViewsOpInOwnBatch) {
         makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
 }
@@ -195,7 +195,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsServerConfigurationOpInOwnBat
         makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
 }
@@ -207,7 +207,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsConfigReshardingDonorOpInOwnB
         makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
 }
@@ -219,7 +219,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpW
         makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
@@ -236,19 +236,19 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsPreparedApplyOpsOrPreparedComm
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
     // Prepares can be batched together.
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
 
     // Prepared commit or abort must start a new batch with commits or aborts only.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[2], batch[0]);
     ASSERT_EQUALS(srcOps[3], batch[1]);
 
     // Prepares can be batched together.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[4], batch[0]);
     ASSERT_EQUALS(srcOps[5], batch[1]);
@@ -266,24 +266,24 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithPreparedApplyOpsOrP
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
     // Prepares can be batched together with normal CRUDs.
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(3U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
     ASSERT_EQUALS(srcOps[2], batch[2]);
 
     // Prepared commit must start a new batch.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[3], batch[0]);
 
     // CRUD op cannot be in the same batch with the previous prepared commit.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[4], batch[0]);
 
     // Prepared abort must start a new batch.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[5], batch[0]);
 }
@@ -312,12 +312,12 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsDBCheckWithCrudOps) {
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
     // 1st batch: [insert]
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
 
     // 2nd batch: [DBCheck, Unprepared ApplyOps, Insert, Prepared ApplyOps]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(4U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[1], batch[0]);
     ASSERT_EQUALS(srcOps[2], batch[1]);
@@ -325,18 +325,18 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsDBCheckWithCrudOps) {
     ASSERT_EQUALS(srcOps[4], batch[3]);
 
     // 3rd batch:  [DBCheck, Insert]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[5], batch[0]);
     ASSERT_EQUALS(srcOps[6], batch[1]);
 
     // 4th batch: [Commit]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[7], batch[0]);
 
     // 5th batch: [Dbcheck]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[8], batch[0]);
 }
@@ -359,14 +359,14 @@ TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForNumberOfOperatio
     _limits.ops = 3U;
 
     // First batch: [insert, insert, insert]
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(3U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
     ASSERT_EQUALS(srcOps[2], batch[2]);
 
     // Second batch: [insert, insert]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[3], batch[0]);
     ASSERT_EQUALS(srcOps[4], batch[1]);
@@ -387,13 +387,13 @@ TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations
         std::size_t(srcOps[0].getRawObjSizeBytes()) + std::size_t(srcOps[1].getRawObjSizeBytes());
 
     // First batch: [insert, insert]
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
 
     // Second batch: [insert]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[2], batch[0]);
 }
@@ -413,12 +413,12 @@ TEST_F(OplogApplierTest,
     _limits.ops = 3U;
 
     // First batch: [insert]
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
 
     // Second batch: [commit]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[1], batch[0]);
 }
@@ -440,13 +440,13 @@ TEST_F(OplogApplierTest,
     _limits.ops = 4U;
 
     // First batch: [insert, insert]
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
 
     // Second batch: [commit, insert]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(2U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[2], batch[0]);
     ASSERT_EQUALS(srcOps[3], batch[1]);
@@ -467,12 +467,12 @@ TEST_F(OplogApplierTest,
     _limits.ops = 4U;
 
     // First batch: [insert]
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
 
     // Second batch: [commit]
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[1], batch[0]);
 }
@@ -501,7 +501,7 @@ TEST_F(OplogApplierTest, LastOpInLargeTransactionIsProcessedIndividually) {
     _limits.ops = 10U;
 
     // First batch: [insert, applyOps, applyOps]
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(3U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[0], batch[0]);
     ASSERT_EQUALS(srcOps[1], batch[1]);
@@ -509,13 +509,13 @@ TEST_F(OplogApplierTest, LastOpInLargeTransactionIsProcessedIndividually) {
 
     // Second batch: [applyOps]. The last oplog entry of a large transaction must be processed by
     // itself.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[3], batch[0]);
 
     // Third batch: [insert]. The this confirms that the last oplog entry of a large txn will be
     // batched individually.
-    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
+    batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits)).getBatch();
     ASSERT_EQUALS(1U, batch.size()) << toString(batch);
     ASSERT_EQUALS(srcOps[4], batch[0]);
 }

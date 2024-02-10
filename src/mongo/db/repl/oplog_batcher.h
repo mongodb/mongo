@@ -39,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -56,76 +57,6 @@ namespace repl {
 constexpr std::size_t kMaxPrepareOpsPerBatch = 128;
 
 class OplogApplier;
-
-/**
- * Stores a batch of oplog entries for oplog application.
- */
-class OplogBatch {
-public:
-    explicit OplogBatch(std::size_t batchLimitOps) {
-        _batch.reserve(batchLimitOps);
-    }
-    bool empty() const {
-        return _batch.empty();
-    }
-    const OplogEntry& front() const {
-        invariant(!_batch.empty());
-        return _batch.front();
-    }
-    const OplogEntry& back() const {
-        invariant(!_batch.empty());
-        return _batch.back();
-    }
-    const std::vector<OplogEntry>& getBatch() const {
-        return _batch;
-    }
-
-    void emplace_back(OplogEntry oplog) {
-        invariant(!_mustShutdown);
-        _batch.emplace_back(std::move(oplog));
-    }
-    void pop_back() {
-        _batch.pop_back();
-    }
-
-    /**
-     * A batch with this set indicates that the upstream stages of the pipeline are shutdown and
-     * no more batches will be coming.
-     *
-     * This can only happen with empty batches.
-     */
-    bool mustShutdown() const {
-        return _mustShutdown;
-    }
-    void setMustShutdownFlag() {
-        invariant(empty());
-        _mustShutdown = true;
-    }
-
-    /**
-     * Passes the term when the buffer is exhausted to a higher level in case the node has stepped
-     * down and then stepped up again. See its caller for more context.
-     */
-    boost::optional<long long> termWhenExhausted() const {
-        return _termWhenExhausted;
-    }
-    void setTermWhenExhausted(long long term) {
-        invariant(empty());
-        _termWhenExhausted = term;
-    }
-
-    /**
-     * Leaves this object in an unspecified state. Only assignment and destruction are valid.
-     */
-    std::vector<OplogEntry> releaseBatch() {
-        return std::move(_batch);
-    }
-
-private:
-    std::vector<OplogEntry> _batch;
-    bool _mustShutdown = false;
-    boost::optional<long long> _termWhenExhausted;
-};
 
 /**
  * Consumes batches of oplog entries from the OplogBuffer to give to the oplog applier, freeing
@@ -165,7 +96,7 @@ public:
     /**
      * Returns the batch of oplog entries and clears _ops so the batcher can store a new batch.
      */
-    OplogBatch getNextBatch(Seconds maxWaitTime);
+    OplogApplierBatch getNextBatch(Seconds maxWaitTime);
 
     /**
      * Starts up a thread to continuously pull from the OplogBuffer into the OplogBatcher's oplog
@@ -191,7 +122,7 @@ public:
      * interruptible but aside from ending the wait, interrupts will be ignored to avoid losing
      * data. (that is, on interrupt, data already in the batch is returned immediately)
      */
-    StatusWith<std::vector<OplogEntry>> getNextApplierBatch(
+    StatusWith<OplogApplierBatch> getNextApplierBatch(
         OperationContext* opCtx,
         const BatchLimits& batchLimits,
         Milliseconds waitToFillBatch = Milliseconds(0));
@@ -242,7 +173,7 @@ private:
     /**
      * The latest batch of oplog entries ready for the applier.
      */
-    OplogBatch _ops;
+    OplogApplierBatch _ops;
 
     std::unique_ptr<stdx::thread> _thread;
 };
