@@ -286,11 +286,6 @@ Bucket* useBucket(OperationContext* opCtx,
     Bucket* bucket = nullptr;
     for (Bucket* potentialBucket : openSet) {
         if (potentialBucket->rolloverAction == RolloverAction::kNone) {
-            if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-                    serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-                !isDocumentWithinTimeRangeForBucket(potentialBucket, info)) {
-                continue;
-            }
             bucket = potentialBucket;
             break;
         }
@@ -319,12 +314,6 @@ Bucket* useBucket(OperationContext* opCtx,
         : nullptr;
 }
 
-bool isDocumentWithinTimeRangeForBucket(Bucket* potentialBucket, const CreationInfo& info) {
-    auto bucketTime = potentialBucket->minTime;
-    return !(info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds()) ||
-             info.time < bucketTime);
-}
-
 Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
@@ -347,7 +336,9 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
             continue;
         }
 
-        if (!isDocumentWithinTimeRangeForBucket(potentialBucket, info)) {
+        auto bucketTime = potentialBucket->minTime;
+        if (info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds()) ||
+            info.time < bucketTime) {
             continue;
         }
 
@@ -545,11 +536,24 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
         stripe.openBucketsById.try_emplace(bucket->bucketId, std::move(bucket));
     invariant(newlyInserted);
     Bucket* unownedBucket = insertedIt->second.get();
-    // Close other existing bucket(s) if adding this bucket would push us over the
-    // max number of buckets per metadata.
-    constexpr bool isReopening = true;
-    ensureSpaceToOpenNewBucket(
-        opCtx, catalog, stripe, stripeLock, stats, key, closedBuckets, isReopening);
+
+    // If we already have an open bucket for this key, we need to close it.
+    if (auto it = stripe.openBucketsByKey.find(key); it != stripe.openBucketsByKey.end()) {
+        auto& openSet = it->second;
+        for (Bucket* existingBucket : openSet) {
+            if (existingBucket->rolloverAction == RolloverAction::kNone) {
+                stats.incNumBucketsClosedDueToReopening();
+                if (allCommitted(*existingBucket)) {
+                    closeOpenBucket(
+                        opCtx, catalog, stripe, stripeLock, *existingBucket, closedBuckets);
+                } else {
+                    existingBucket->rolloverAction = RolloverAction::kSoftClose;
+                }
+                // We should only have one open bucket at a time.
+                break;
+            }
+        }
+    }
 
     // Now actually mark this bucket as open.
     stripe.openBucketsByKey[key].emplace(unownedBucket);
@@ -1059,50 +1063,6 @@ void expireIdleBuckets(OperationContext* opCtx,
     }
 }
 
-void ensureSpaceToOpenNewBucket(OperationContext* opCtx,
-                                BucketCatalog& catalog,
-                                Stripe& stripe,
-                                WithLock stripeLock,
-                                ExecutionStatsController& stats,
-                                const BucketKey& key,
-                                ClosedBuckets& closedBuckets,
-                                bool isReopening) {
-    auto alwaysCompressedFeatureFlagEnabled =
-        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
-
-    if (auto it = stripe.openBucketsByKey.find(key); it != stripe.openBucketsByKey.end()) {
-        auto& openSet = it->second;
-        int numOpenBuckets = 0;
-        for (Bucket* existingBucket : openSet) {
-            if (existingBucket->rolloverAction == RolloverAction::kNone) {
-                ++numOpenBuckets;
-            }
-        }
-        auto maxOpenBuckets = gTimeseriesMaxOpenBucketsPerMetadata;
-        // Return early, we don't need to close any open buckets.
-        if (alwaysCompressedFeatureFlagEnabled && numOpenBuckets < maxOpenBuckets) {
-            return;
-        }
-        // TODO: SERVER-79480 Close the most 'expensive' buckets first, as defined by the cost
-        // function defined in SERVER-79480.
-        for (Bucket* existingBucket : openSet) {
-            if (existingBucket->rolloverAction == RolloverAction::kNone) {
-                if (isReopening) {
-                    stats.incNumBucketsClosedDueToReopening();
-                }
-                if (allCommitted(*existingBucket)) {
-                    closeOpenBucket(
-                        opCtx, catalog, stripe, stripeLock, *existingBucket, closedBuckets);
-                } else {
-                    existingBucket->rolloverAction = RolloverAction::kSoftClose;
-                }
-                break;
-            }
-        }
-    }
-}
-
 std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOptions& options) {
     OID oid;
 
@@ -1156,22 +1116,6 @@ Bucket& allocateBucket(OperationContext* opCtx,
                        WithLock stripeLock,
                        const CreationInfo& info) {
     expireIdleBuckets(opCtx, catalog, stripe, stripeLock, info.stats, *info.closedBuckets);
-    // If the feature flag for timeseriesAlwaysUseCompressed is enabled, we want to make sure that
-    // if allocating a new bucket for this metadata pushes the number of open buckets for this
-    // metadata above gTimeseriesMaxOpenBucketsPerMetadata, that we close a bucket to get back
-    // under this limit.
-    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        constexpr bool isReopening = false;
-        ensureSpaceToOpenNewBucket(opCtx,
-                                   catalog,
-                                   stripe,
-                                   stripeLock,
-                                   info.stats,
-                                   info.key,
-                                   *info.closedBuckets,
-                                   isReopening);
-    }
 
     // In rare cases duplicate bucket _id fields can be generated in the same stripe and fail to be
     // inserted. We will perform a limited number of retries to minimize the probability of

@@ -19,25 +19,9 @@
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
-// If the timeseriesAlwaysUseCompressedBuckets feature flag is enabled, when searching through
-// candidate buckets useBucket also checks if the time range for the measurement that we are
-// trying to insert matches the candidate bucket - if it does not, we do not return it. Because
-// of this extra check, we do not attempt to insert a measurement into a bucket with an
-// incompatible time range, which prevents that bucket from being rolled over.
-// However, although buckets are not immediately rolled over due to time forward/backward, open
-// buckets are still rolled over when we have reached a max amount of open buckets for a
-// particular metadata, as determined by 'timeseriesMaxOpenBucketsPerMetadata'. The default value
-// would cause this test to fail. By setting this value to 1, when we need to open a new bucket
-// because an existing open bucket cannot take in a measurement (for example, in the case of
-// 'expectToReopenArchivedBuckets', due to a time related issue), the existing bucket will still be
-// rolled over same as before.
-const conn = MongoRunner.runMongod({setParameter: {timeseriesMaxOpenBucketsPerMetadata: 1}});
-
-const dbName = jsTestName();
-const collName = jsTestName();
-const testDB = conn.getDB(dbName);
-const coll = testDB.getCollection(collName);
-const bucketsColl = testDB.getCollection("system.buckets." + collName);
+const testDB = db.getSiblingDB(jsTestName());
+const coll = testDB.timeseries_reopened_bucket_insert;
+const bucketsColl = testDB["system.buckets." + coll.getName()];
 const timeField = "time";
 const metaField = "mm";
 const metaTimeIndexName = [[metaField], "1", [timeField], "1"].join("_");
@@ -226,6 +210,48 @@ const checkIfBucketReopened = function(
     checkIfBucketReopened(measurement3, /* willCreateBucket */ false, /* willReopenBucket */ true);
 
     jsTestLog("Exiting expectToReopenArchivedBuckets.");
+})();
+
+(function expectToReopenCompressedBuckets() {
+    if (!TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
+        return;
+    }
+
+    jsTestLog("Entering expectToReopenCompressedBuckets...");
+    resetCollection();
+
+    let initialMeasurements = [];
+    const timestamp = ISODate("2022-08-26T19:19:00Z");
+    for (let i = 0; i < 5; ++i) {
+        initialMeasurements.push({
+            [timeField]: timestamp,
+            [metaField]: "ReopenedBucket1",
+        });
+    }
+    const forward = {
+        [timeField]: ISODate("2022-08-27T19:19:00Z"),
+        [metaField]: "ReopenedBucket1",
+    };
+    const backward = {
+        [timeField]: timestamp,
+        [metaField]: "ReopenedBucket1",
+    };
+
+    for (let i = 0; i < initialMeasurements.length; ++i) {
+        checkIfBucketReopened(
+            initialMeasurements[i], /* willCreateBucket= */ i == 0, /* willReopenBucket= */ false);
+    }
+    // Time forwards will open a new bucket, and close and compress the old one.
+    checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
+    assert.eq(2,
+              bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressed})
+                  .toArray()
+                  .length);
+
+    // We expect to reopen the compressed bucket with time backwards.
+    checkIfBucketReopened(backward, /* willCreateBucket= */ false, /* willReopenBucket= */ true);
+
+    jsTestLog("Exiting expectToReopenCompressedBuckets.");
 })();
 
 (function failToReopenNonSuitableBuckets() {
@@ -743,4 +769,3 @@ const checkIfBucketReopened = function(
 })();
 
 coll.drop();
-MongoRunner.stopMongod(conn);

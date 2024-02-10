@@ -151,9 +151,7 @@ Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
 
 /**
  * Retrieve the open bucket for write use if one exists. If none exists and 'mode' is set to kYes,
- * then we will create a new bucket. If the feature flag for alwaysUseCompressedBuckets is enabled,
- * then we check both that the candidate bucket is open and that its time range accomadates the
- * time value of the measurement we are attempting to write.
+ * then we will create a new bucket.
  */
 Bucket* useBucket(OperationContext* opCtx,
                   BucketCatalog& catalog,
@@ -441,29 +439,5 @@ void closeArchivedBucket(BucketCatalog& catalog,
 void runPostCommitDebugChecks(OperationContext* opCtx,
                               const Bucket& bucket,
                               const WriteBatch& batch);
-
-/**
- * Returns false if a document's time is not within the time range of the bucket - i.e, that it is
- * either earlier than the minTime of the bucket, or that it is later than the minTime + the
- * maximum time span of the bucket. Returns true if neither of these are true and the document is
- * within the time range for the bucket.
- */
-bool isDocumentWithinTimeRangeForBucket(Bucket* potentialBucket, const CreationInfo& info);
-
-/**
- * Closes open buckets when there are too many open buckets for a particular metadata.
- * If the TimeseriesAlwaysUseCompressedBuckets feature flag is enabled, this limit is
- * determined by the gTimeseriesMaxOpenBucketsPerMetadata server parameter - we will close
- * a bucket only if we are at this limit. If the feature flag is not enabled, then we can
- * have only one open bucket per metadata, so we will close any other existing open bucket.
- */
-void ensureSpaceToOpenNewBucket(OperationContext* opCtx,
-                                BucketCatalog& catalog,
-                                Stripe& stripe,
-                                WithLock stripeLock,
-                                ExecutionStatsController& stats,
-                                const BucketKey& key,
-                                ClosedBuckets& closedBuckets,
-                                bool isReopening);
 
 }  // namespace mongo::timeseries::bucket_catalog::internal

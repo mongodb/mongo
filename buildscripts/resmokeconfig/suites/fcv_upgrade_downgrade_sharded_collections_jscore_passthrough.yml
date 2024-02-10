@@ -165,6 +165,10 @@ selector:
   # SERVER-85456: this test uses benchRun which does not use runCommand and index creation can fail.
   - jstests/core/bench_test1.js
 
+  # Bucketing behavior changes based on the timeseriesAlwaysUseCompressedBuckets feature flag.
+  - jstests/core/timeseries/timeseries_lastpoint.js
+  - jstests/core/timeseries/timeseries_reopened_bucket_insert.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
