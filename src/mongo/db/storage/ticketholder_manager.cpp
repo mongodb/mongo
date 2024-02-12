@@ -227,6 +227,8 @@ void TicketHolderManager::appendStats(BSONObjBuilder& b) {
         _readTicketHolder->appendStats(bbb);
         bbb.done();
     }
+
+    _appendImplStats(b);
 }
 
 }  // namespace mongo
