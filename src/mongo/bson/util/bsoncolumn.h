@@ -577,60 +577,7 @@ public:
     void decompressIterative(Buffer& buffer, boost::intrusive_ptr<ElementStorage> allocator) const {
         BSONColumn::Iterator it(allocator, _binary, _binary + _size);
         for (; it.more(); ++it) {
-            BSONElement elem = *it;
-            switch (elem.type()) {
-                case NumberInt:
-                    buffer.template append<int32_t>(elem);
-                    break;
-                case NumberLong:
-                    buffer.template append<int64_t>(elem);
-                    break;
-                case NumberDouble:
-                    buffer.template append<double>(elem);
-                    break;
-                case NumberDecimal:
-                    buffer.template append<Decimal128>(elem);
-                    break;
-                case Bool:
-                    buffer.template append<bool>(elem);
-                    break;
-                case jstOID:
-                    buffer.template append<OID>(elem);
-                    break;
-                case Date:
-                    buffer.template append<Date_t>(elem);
-                    break;
-                case Code:
-                    buffer.template append<BSONCode>(elem);
-                    break;
-                case String:
-                    buffer.template append<StringData>(elem);
-                    break;
-                case bsonTimestamp:
-                    buffer.template append<Timestamp>(elem);
-                    break;
-                case BinData:
-                    buffer.template append<BSONBinData>(elem);
-                    break;
-                // Below are types that cannot be compressed, so we will append the BSONElement.
-                case DBRef:
-                case RegEx:
-                case Symbol:
-                case CodeWScope:
-                case Object:
-                case Array:
-                case Undefined:
-                case jstNULL:
-                case MaxKey:
-                case MinKey:
-                    buffer.template append<BSONElement>(elem);
-                    break;
-                case EOO:
-                    buffer.appendMissing();
-                    break;
-                default:
-                    MONGO_UNREACHABLE
-            }
+            buffer.appendPreallocated(*it);
         }
     }
 
