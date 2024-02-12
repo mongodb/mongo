@@ -3,6 +3,33 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
+export const logQueries = {
+    allErrorsOrWarningsQuery: {$or: [{"severity": "warning"}, {"severity": "error"}]},
+    recordNotFoundQuery: {
+        "severity": "error",
+        "msg": "found extra index key entry without corresponding document",
+        "data.context.indexSpec": {$exists: true}
+    },
+    recordDoesNotMatchQuery: {
+        "severity": "error",
+        "msg":
+            "found index key entry with corresponding document/keystring set that does not contain the expected key string",
+        "data.context.indexSpec": {$exists: true}
+    },
+    collNotFoundWarningQuery: {
+        severity: "warning",
+        "msg": "abandoning dbCheck extra index keys check because collection no longer exists"
+    },
+    indexNotFoundWarningQuery: {
+        severity: "warning",
+        "msg": "abandoning dbCheck extra index keys check because index no longer exists"
+    },
+    warningQuery: {"severity": "warning"},
+    infoOrErrorQuery:
+        {$or: [{"severity": "info", "operation": "dbCheckBatch"}, {"severity": "error"}]},
+    infoBatchQuery: {"severity": "info", "operation": "dbCheckBatch"}
+};
+
 // Apply function on all secondary nodes except arbiters.
 export const forEachNonArbiterSecondary = (replSet, f) => {
     for (let secondary of replSet.getSecondaries()) {
