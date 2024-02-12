@@ -3,7 +3,14 @@
  *
  * Runs defragmentation on collections with concurrent operations.
  *
- * @tags: [requires_sharding, assumes_balancer_on, antithesis_incompatible]
+ * @tags: [
+ *  requires_sharding,
+ *  assumes_balancer_on,
+ *  antithesis_incompatible,
+ *  # This test configure the 'balancerShouldReturnRandomMigrations' failpoint
+ *  # that will be reset to its default value if a node is killed and restarted.
+ *  does_not_support_stepdowns,
+ * ]
  */
 
 const dbPrefix = jsTestName() + '_DB_';

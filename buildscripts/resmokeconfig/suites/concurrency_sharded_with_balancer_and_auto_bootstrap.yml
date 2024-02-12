@@ -111,3 +111,5 @@ executor:
     num_shards: 2
     num_mongos: 2
     use_auto_bootstrap_procedure: 1
+    enable_balancer: true
+    random_migrations: true

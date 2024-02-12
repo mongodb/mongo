@@ -25,7 +25,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                  num_rs_nodes_per_shard=1, num_mongos=1, enable_balancer=True, auth_options=None,
                  configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
                  config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False,
-                 replica_set_endpoint=False):
+                 replica_set_endpoint=False, random_migrations=False):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
@@ -59,7 +59,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.num_shards = num_shards
         self.num_rs_nodes_per_shard = num_rs_nodes_per_shard
         self.num_mongos = num_mongos
-        self.enable_balancer = enable_balancer
         self.auth_options = auth_options
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
         self.embedded_router_mode = embedded_router
@@ -83,6 +82,30 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         elif isinstance(self.num_rs_nodes_per_shard, int):
             if self.num_rs_nodes_per_shard <= 0:
                 raise ValueError("num_rs_nodes_per_shard must be a positive integer")
+
+        # Balancer options
+        self.enable_balancer = enable_balancer
+        self.random_migrations = random_migrations
+        if self.random_migrations:
+            if not self.enable_balancer:
+                raise ValueError(
+                    "random_migrations can only be enabled when balancer is enabled (enable_balancer=True)"
+                )
+
+            if "failpoint.balancerShouldReturnRandomMigrations" in self.mongod_options[
+                    "set_parameters"]:
+                raise ValueError(
+                    "Cannot enable random_migrations because balancerShouldReturnRandomMigrations failpoint is already present in mongod_options"
+                )
+
+            # Enable random migrations failpoint
+            self.mongod_options["set_parameters"][
+                "failpoint.balancerShouldReturnRandomMigrations"] = {"mode": "alwaysOn"}
+
+            # Reduce migration throttling to increase frequency of random migrations
+            self.mongod_options["set_parameters"][
+                "balancerMigrationsThrottlingMs"] = self.mongod_options["set_parameters"].get(
+                    "balancerMigrationsThrottlingMs", 100)  # millis
 
         self._dbpath_prefix = os.path.join(self._dbpath_prefix, self.config.FIXTURE_SUBDIR)
 

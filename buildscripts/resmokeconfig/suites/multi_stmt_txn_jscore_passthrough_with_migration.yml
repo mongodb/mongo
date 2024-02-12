@@ -341,9 +341,6 @@ executor:
         enableTestCommands: 1
     mongod_options:
       set_parameters:
-        balancerMigrationsThrottlingMs: 100
-        failpoint.balancerShouldReturnRandomMigrations:
-          mode: alwaysOn
         logComponentVerbosity:
           verbosity: 0
           command: 2
@@ -362,3 +359,5 @@ executor:
         skipDroppingHashedShardKeyIndex: true
     num_rs_nodes_per_shard: 2
     num_shards: 2
+    enable_balancer: true
+    random_migrations: true
