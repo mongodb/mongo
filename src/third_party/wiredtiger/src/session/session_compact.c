@@ -68,11 +68,11 @@
  *
  * Then, we compact the high-level object.
  *
- * Compacting the object is done 10% at a time, that is, we try and move blocks
- * from the last 10% of the file into the beginning of the file (the 10% is
- * hard coded in the block manager).  The reason for this is because we are
- * walking the file in logical order, not block offset order, and we can fail
- * to compact a file if we write the wrong blocks first.
+ * Compacting the object is done 20% or 10% at a time, that is, we try and move blocks
+ * from the last 20% or 10% of the file into the beginning of the file. This incremental step is
+ * hard-coded in the block manager.  The reason for this is because we are walking the file in
+ * logical order, not block offset order, and we can fail to compact a file if we write the wrong
+ * blocks first.
  *
  * For example, imagine a file with 10 blocks in the first 10% of a file, 1,000
  * blocks in the 3rd quartile of the file, and 10 blocks in the last 10% of the
@@ -84,7 +84,7 @@
  * on.  Note the block manager uses a first-fit block selection algorithm
  * during compaction to maximize block movement.
  *
- * After each 10% compaction, we checkpoint two more times (seriously, twice).
+ * After each iteration of compaction, we checkpoint two more times (seriously, twice).
  * The second and third checkpoints are because the block manager checkpoints
  * in two steps: blocks made available for reuse during a checkpoint are put on
  * a special checkpoint-available list and only moved to the real available

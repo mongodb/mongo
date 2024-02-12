@@ -18,15 +18,22 @@ the blocks at the end of the file to the reusable blocks at the start of the fil
 The compaction process starts with a system-wide checkpoint. There are potentially many dirty blocks
 in the cache, and the intention here is to write them out and then discard previous checkpoints so
 that there are as many blocks as possible on the file's "available for reuse" list when the compaction
-starts.  The compaction logic then starts examining the files that need to be compacted. Compaction
-ignores files smaller than 1MB and computes the available bytes in the initial 80% and 90% of the file.
-Compaction doesn't proceed if at least 1MB worth of space can not be recovered. If at least 20% of
-the space is available in the first 80% of the file, the compaction process will try to rewrite
-the last 20% of the file. Else if at least 10% of the total file is available in the first 90% of
-the file, compaction is tried on the last 10% of the file. Else the file is skipped.
+starts. The compaction logic then starts examining the files that need to be compacted. Compaction
+does not proceed if any of the following conditions are met:
 
-Compacting the object is done 10% at a time, that is, compaction tries to move blocks from the last 10% of the
-file into the beginning of the file (the 10% is hard-coded in the block manager).  The reason for
+    - The file is smaller than 1MB.
+    - Less than the configured \c free_space_target (see \c WT_SESSION::compact) worth of space
+can be theoretically recovered.
+
+Once enough free space is available, one of the two following conditions has to be met for compaction to proceed:
+
+    - At least 20% of the available space lies within the first 80% of the file (compaction will
+then try to rewrite the last 20% of the file).
+    - At least 10% of the total file is available in the first 90% of the file (compaction will then
+attempt to work on the last 10% of the file).
+
+Depending on the scenario, compaction the object is done 20% or 10% at a time, that is, compaction tries to move blocks from the last 20% or 10% of the
+file into the beginning of the file. This incremental step is hard-coded in the block manager. The reason for
 this is because compaction walks the file in a logical order, not block offset order, and compaction
 of a file can fail if the block from the end of the file is not written first. Note that the block manager
 uses a first-fit block selection algorithm during compaction to maximize block movement. The process
@@ -44,22 +51,40 @@ checkpoint or eviction rewrites the page. When a leaf page is rewritten by compa
 internal page is marked dirty so that the chain of internal pages from root to the leaf page is
 rewritten by the next checkpoint or eviction.
 
-After each 10% compaction, a checkpoint is performed two more times. The second and third
-checkpoints are because the block manager checkpoints in two steps: blocks made available for reuse
-during a checkpoint are put on a special checkpoint-available list and only moved to the real available
+After each compaction pass, two checkpoints are executed because the block manager checkpoints in two steps:
+
+The blocks made available for reuse during a checkpoint are put on a special checkpoint-available list and only moved to the real available
 list after the metadata has been updated with the new checkpoint's information. For this reason,
 blocks allocated to write the checkpoint itself cannot be taken from the blocks made available by
 the checkpoint. To say it another way, the second checkpoint puts the blocks from the end of the file
 that were made available by compaction onto the checkpoint-available list, but then potentially
-writes the checkpoint itself at the end of the file, which would prevent any file truncation.  When
+writes the checkpoint itself at the end of the file, which would prevent any file truncation. When
 the metadata is updated for the second checkpoint, the blocks freed by compaction become available for
 the third checkpoint, so the third checkpoint's blocks are written towards the beginning of the file,
-and then the file can be truncated.
+and then the file can be truncated. It is worth noting that the usage of named checkpoints may prevent
+compaction from accomplishing anything as they are not discarded until explicitly removed or replaced.
 
 Compaction is a time-consuming operation and therefore logs have been added in compaction logic to
 track current progress. Some of the verbose logs for compaction can be activated by setting
 \c "verbose=[compact,compact_progress]" configuration option for \c wiredtiger_open() method. Apart from
 verbose logs, WT also records statistics about compact progress that can be used to debug issues
 with the compaction process.
+
+# Background compaction #
+
+Background compaction is a WiredTiger service that runs compaction autonomously on all the eligible files
+present in the database while being the least disruptive as possible. Every file is eligible unless:
+
+    - it belongs to a tiered table or,
+    - it is a part of the exclude list that can be configured when enabling background compaction.
+
+To limit disruption, background compaction reduces the number of checkpoints by skipping the first one
+described in the section above. Furthermore, background compaction gathers statistics over time to
+keep track of tables where compaction is successful. Using those statistics, the service focuses on
+tables where compaction is likely to reclaim space and avoids unnecessary attempts.
+
+Background compaction can be enabled, configured, and disabled through the same API \c WT_SESSION::compact.
+When disabled, background compaction goes off as soon as possible and when re-enabled, it starts
+from the last processed table.
 
 */
