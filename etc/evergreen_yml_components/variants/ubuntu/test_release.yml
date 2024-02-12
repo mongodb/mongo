@@ -2,6 +2,30 @@
 # rapid release (7.1, 7.2 etc.) and LTS release (7.0, 6.0 etc.) branch projects
 
 buildvariants:
+- name: enterprise-ubuntu1804-64
+  display_name: Jepsen Tests on Enterprise Ubuntu 18.04
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-small
+  expansions:
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=ubuntu1804
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    scons_cache_scope: shared
+    large_distro_name: ubuntu1804-large
+    compile_variant: enterprise-ubuntu1804-64
+  tasks:
+  - name: compile_and_archive_dist_test_TG
+    distros:
+    - ubuntu1804-large
+  - name: .jepsen
+    distros:
+    - ubuntu1804-large
+
 - name: ubuntu2204
   display_name: Ubuntu 22.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
