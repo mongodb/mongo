@@ -916,6 +916,29 @@ err:
 }
 
 /*
+ * __session_bind_configuration --
+ *     Bind values to a compiled configuration string.
+ */
+static int
+__session_bind_configuration(WT_SESSION *wt_session, const char *compiled, ...)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    va_list ap;
+
+    WT_UNUSED(compiled);
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL_NOCONF(session, alter);
+
+    va_start(ap, compiled);
+    ret = __wt_conf_bind(session, compiled, ap);
+    va_end(ap);
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * __wt_session_create --
  *     Internal version of WT_SESSION::create.
  */
@@ -1922,22 +1945,25 @@ err:
 static int
 __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 {
+    WT_DECL_CONF(WT_SESSION, begin_transaction, conf);
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     session = (WT_SESSION_IMPL *)wt_session;
     SESSION_API_CALL_PREPARE_NOT_ALLOWED(session, ret, begin_transaction, config, cfg);
+    SESSION_API_CONF(session, begin_transaction, cfg, conf);
     WT_STAT_CONN_INCR(session, txn_begin);
     WT_STAT_SESSION_SET(session, txn_bytes_dirty, 0);
 
     WT_ERR(__wt_txn_context_check(session, false));
 
-    ret = __wt_txn_begin(session, cfg);
+    ret = __wt_txn_begin(session, conf);
 
 err:
 #ifdef HAVE_CALL_LOG
     WT_TRET(__wt_call_log_begin_transaction(session, config, ret));
 #endif
+    API_CONF_END(session, conf);
     API_END_RET(session, ret);
 }
 
@@ -2472,33 +2498,35 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
 {
     static const WT_SESSION
       stds = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
-        __session_open_cursor, __session_alter, __session_create, __wt_session_compact,
-        __session_drop, __session_join, __session_log_flush, __session_log_printf, __session_rename,
-        __session_reset, __session_salvage, __session_truncate, __session_upgrade, __session_verify,
-        __session_begin_transaction, __session_commit_transaction, __session_prepare_transaction,
-        __session_rollback_transaction, __session_query_timestamp, __session_timestamp_transaction,
+        __session_open_cursor, __session_alter, __session_bind_configuration, __session_create,
+        __wt_session_compact, __session_drop, __session_join, __session_log_flush,
+        __session_log_printf, __session_rename, __session_reset, __session_salvage,
+        __session_truncate, __session_upgrade, __session_verify, __session_begin_transaction,
+        __session_commit_transaction, __session_prepare_transaction, __session_rollback_transaction,
+        __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint, __session_reset_snapshot,
         __session_transaction_pinned_range, __session_get_rollback_reason, __wt_session_breakpoint},
       stds_min = {NULL, NULL, __session_close, __session_reconfigure_notsup, __wt_session_strerror,
-        __session_open_cursor, __session_alter_readonly, __session_create_readonly,
-        __wt_session_compact_readonly, __session_drop_readonly, __session_join_notsup,
-        __session_log_flush_readonly, __session_log_printf_readonly, __session_rename_readonly,
-        __session_reset_notsup, __session_salvage_readonly, __session_truncate_readonly,
-        __session_upgrade_readonly, __session_verify_notsup, __session_begin_transaction_notsup,
-        __session_commit_transaction_notsup, __session_prepare_transaction_readonly,
-        __session_rollback_transaction_notsup, __session_query_timestamp_notsup,
-        __session_timestamp_transaction_notsup, __session_timestamp_transaction_uint_notsup,
-        __session_checkpoint_readonly, __session_reset_snapshot_notsup,
-        __session_transaction_pinned_range_notsup, __session_get_rollback_reason,
-        __wt_session_breakpoint},
+        __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
+        __session_create_readonly, __wt_session_compact_readonly, __session_drop_readonly,
+        __session_join_notsup, __session_log_flush_readonly, __session_log_printf_readonly,
+        __session_rename_readonly, __session_reset_notsup, __session_salvage_readonly,
+        __session_truncate_readonly, __session_upgrade_readonly, __session_verify_notsup,
+        __session_begin_transaction_notsup, __session_commit_transaction_notsup,
+        __session_prepare_transaction_readonly, __session_rollback_transaction_notsup,
+        __session_query_timestamp_notsup, __session_timestamp_transaction_notsup,
+        __session_timestamp_transaction_uint_notsup, __session_checkpoint_readonly,
+        __session_reset_snapshot_notsup, __session_transaction_pinned_range_notsup,
+        __session_get_rollback_reason, __wt_session_breakpoint},
       stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __wt_session_strerror,
-        __session_open_cursor, __session_alter_readonly, __session_create_readonly,
-        __wt_session_compact_readonly, __session_drop_readonly, __session_join,
-        __session_log_flush_readonly, __session_log_printf_readonly, __session_rename_readonly,
-        __session_reset, __session_salvage_readonly, __session_truncate_readonly,
-        __session_upgrade_readonly, __session_verify, __session_begin_transaction,
-        __session_commit_transaction, __session_prepare_transaction_readonly,
-        __session_rollback_transaction, __session_query_timestamp, __session_timestamp_transaction,
+        __session_open_cursor, __session_alter_readonly, __session_bind_configuration,
+        __session_create_readonly, __wt_session_compact_readonly, __session_drop_readonly,
+        __session_join, __session_log_flush_readonly, __session_log_printf_readonly,
+        __session_rename_readonly, __session_reset, __session_salvage_readonly,
+        __session_truncate_readonly, __session_upgrade_readonly, __session_verify,
+        __session_begin_transaction, __session_commit_transaction,
+        __session_prepare_transaction_readonly, __session_rollback_transaction,
+        __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint_readonly,
         __session_reset_snapshot, __session_transaction_pinned_range, __session_get_rollback_reason,
         __wt_session_breakpoint};

@@ -1125,6 +1125,20 @@ struct __wt_session {
         const char *name, const char *config);
 
     /*!
+     * Bind values for a compiled configuration.  The bindings hold for API calls in this
+     * session that use the compiled string.  Strings passed into this call are not duplicated,
+     * the application must ensure that strings remain valid while the bindings are being
+     * used.
+     *
+     * This API may change in future releases.
+     *
+     * @param session the session handle
+     * @param compiled a string returned from WT_CONNECTION::compile_configuration
+     * @errors
+     */
+    int __F(bind_configuration)(WT_SESSION *session, const char *compiled, ...);
+
+    /*!
      * Create a table, column group, index or file.
      *
      * @not_transactional
@@ -2482,13 +2496,13 @@ struct __wt_connection {
      * categories not explicitly set in the config string., a list\, with values chosen from the
      * following options: \c "all"\, \c "api"\, \c "backup"\, \c "block"\, \c "block_cache"\, \c
      * "checkpoint"\, \c "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "chunkcache"\, \c
-     * "compact"\, \c "compact_progress"\, \c "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c
-     * "evictserver"\, \c "fileops"\, \c "generation"\, \c "handleops"\, \c "history_store"\, \c
-     * "history_store_activity"\, \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
-     * "mutex"\, \c "out_of_order"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c
-     * "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
-     * "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c
-     * "verify"\, \c "version"\, \c "write"; default \c [].}
+     * "compact"\, \c "compact_progress"\, \c "configuration"\, \c "error_returns"\, \c "evict"\, \c
+     * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "generation"\, \c "handleops"\, \c
+     * "history_store"\, \c "history_store_activity"\, \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c
+     * "metadata"\, \c "mutex"\, \c "out_of_order"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c
+     * "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c
+     * "split"\, \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c
+     * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default \c [].}
      * @configend
      * @errors
      */
@@ -2503,6 +2517,29 @@ struct __wt_connection {
      * @returns a pointer to a string naming the home directory
      */
     const char *__F(get_home)(WT_CONNECTION *connection);
+
+    /*!
+     * Compile a configuration string to be used with an API.  The string returned by this
+     * method can be used with the indicated API call as its configuration argument.
+     * Precompiled strings should be used where configuration parsing has proved to be a
+     * performance bottleneck. The lifetime of a configuration string ends when the connection
+     * is closed. The number of compilation strings that can be made is limited by
+     * the \c compile_configuration_count configuration in ::wiredtiger_open .
+     *
+     * Configuration strings containing '%d' or '%s' can have values bound, see
+     * WT_SESSION::bind_configuration.
+     *
+     * This API may change in future releases.
+     *
+     * @param connection the connection handle
+     * @param method the API to the configuration string applies to, e.g.
+     * \c "WT_SESSION.open_cursor"
+     * @param str the configuration string to compile
+     * @param compiled the returned configuration string
+     * @errors
+     */
+    int __F(compile_configuration)(WT_CONNECTION *connection, const char *method,
+        const char *str, const char **compiled);
 
     /*!
      * Add configuration options for a method.  See
@@ -3003,6 +3040,9 @@ struct __wt_connection {
  * version set in the \c release setting.  Has no effect if creating the database., a string;
  * default empty.}
  * @config{ ),,}
+ * @config{compile_configuration_count, the number of configuration strings that can be precompiled.
+ * Some configuration strings are compiled internally when the connection is opened., an integer
+ * greater than or equal to \c 500; default \c 1000.}
  * @config{config_base, write the base configuration file if creating the database.  If \c false in
  * the config passed directly to ::wiredtiger_open\, will ignore any existing base configuration
  * file in addition to not creating one.  See @ref config_base for more information., a boolean
@@ -3363,13 +3403,13 @@ struct __wt_connection {
  * categories not explicitly set in the config string., a list\, with values chosen from the
  * following options: \c "all"\, \c "api"\, \c "backup"\, \c "block"\, \c "block_cache"\, \c
  * "checkpoint"\, \c "checkpoint_cleanup"\, \c "checkpoint_progress"\, \c "chunkcache"\, \c
- * "compact"\, \c "compact_progress"\, \c "error_returns"\, \c "evict"\, \c "evict_stuck"\, \c
- * "evictserver"\, \c "fileops"\, \c "generation"\, \c "handleops"\, \c "history_store"\, \c
- * "history_store_activity"\, \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\,
- * \c "out_of_order"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c "recovery"\, \c
- * "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\,
- * \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c "verify"\, \c
- * "version"\, \c "write"; default \c [].}
+ * "compact"\, \c "compact_progress"\, \c "configuration"\, \c "error_returns"\, \c "evict"\, \c
+ * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "generation"\, \c "handleops"\, \c
+ * "history_store"\, \c "history_store_activity"\, \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c
+ * "metadata"\, \c "mutex"\, \c "out_of_order"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c
+ * "recovery"\, \c "recovery_progress"\, \c "rts"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
+ * \c "temporary"\, \c "thread_group"\, \c "tiered"\, \c "timestamp"\, \c "transaction"\, \c
+ * "verify"\, \c "version"\, \c "write"; default \c [].}
  * @config{verify_metadata, open connection and verify any WiredTiger metadata.  Not supported when
  * opening a connection from a backup.  This API allows verification and detection of corruption in
  * WiredTiger metadata., a boolean flag; default \c false.}
@@ -3756,7 +3796,7 @@ struct __wt_config_item {
     int64_t val;
 
     /*! Permitted values of the \c type field. */
-    enum {
+    enum WT_CONFIG_ITEM_TYPE {
         /*! A string value with quotes stripped. */
         WT_CONFIG_ITEM_STRING,
         /*! A boolean literal ("true" or "false"). */
@@ -3774,6 +3814,17 @@ struct __wt_config_item {
      */
     type;
 };
+
+/*
+ * This is needed for compatible usage of this embedded enum type.
+ */
+#if !defined(SWIG) && !defined(DOXYGEN)
+#if defined(__cplusplus)
+typedef enum __wt_config_item::WT_CONFIG_ITEM_TYPE WT_CONFIG_ITEM_TYPE;
+#else
+typedef enum WT_CONFIG_ITEM_TYPE WT_CONFIG_ITEM_TYPE;
+#endif
+#endif
 
 #if !defined(SWIG) && !defined(DOXYGEN)
 /*!
@@ -7965,6 +8016,7 @@ typedef enum {
     WT_VERB_CHUNKCACHE,           /*!< Chunk cache messages. */
     WT_VERB_COMPACT,              /*!< Compact messages. */
     WT_VERB_COMPACT_PROGRESS,     /*!< Compact progress messages. */
+    WT_VERB_CONFIGURATION,
     WT_VERB_DEFAULT,
     WT_VERB_ERROR_RETURNS,
     WT_VERB_EVICT,                /*!< Eviction messages. */

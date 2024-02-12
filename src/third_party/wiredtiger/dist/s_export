@@ -30,7 +30,7 @@ check()
     egrep -v '^__ut' |
     # MSan injected symbol present when origin tracking is enabled.
     egrep -v '^__msan_track_origins' |
-    egrep -v '^__wt') |
+    egrep -vi '^__wt') |
     sort |
     uniq -u |
     egrep -v \

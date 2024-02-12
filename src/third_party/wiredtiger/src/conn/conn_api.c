@@ -1141,6 +1141,30 @@ __conn_close_session_callback(
 }
 
 /*
+ * __conn_compile_configuration --
+ *     WT_CONNECTION->compile_configuration method.
+ */
+static int
+__conn_compile_configuration(
+  WT_CONNECTION *wt_conn, const char *method, const char *str, const char **compiled)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(method);
+    WT_UNUSED(str);
+    WT_UNUSED(compiled);
+
+    conn = (WT_CONNECTION_IMPL *)wt_conn;
+    CONNECTION_API_CALL_NOCONF(conn, session, compile_configuration);
+
+    ret = __wt_conf_compile(session, method, str, compiled);
+err:
+    API_END_RET(session, ret);
+}
+
+/*
  * __conn_close --
  *     WT_CONNECTION->close method.
  */
@@ -2275,12 +2299,12 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
       {"checkpoint", WT_VERB_CHECKPOINT}, {"checkpoint_cleanup", WT_VERB_CHECKPOINT_CLEANUP},
       {"checkpoint_progress", WT_VERB_CHECKPOINT_PROGRESS}, {"chunkcache", WT_VERB_CHUNKCACHE},
       {"compact", WT_VERB_COMPACT}, {"compact_progress", WT_VERB_COMPACT_PROGRESS},
-      {"error_returns", WT_VERB_ERROR_RETURNS}, {"evict", WT_VERB_EVICT},
-      {"evict_stuck", WT_VERB_EVICT_STUCK}, {"evictserver", WT_VERB_EVICTSERVER},
-      {"fileops", WT_VERB_FILEOPS}, {"generation", WT_VERB_GENERATION},
-      {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG}, {"history_store", WT_VERB_HS},
-      {"history_store_activity", WT_VERB_HS_ACTIVITY}, {"lsm", WT_VERB_LSM},
-      {"lsm_manager", WT_VERB_LSM_MANAGER}, {"metadata", WT_VERB_METADATA},
+      {"configuration", WT_VERB_CONFIGURATION}, {"error_returns", WT_VERB_ERROR_RETURNS},
+      {"evict", WT_VERB_EVICT}, {"evict_stuck", WT_VERB_EVICT_STUCK},
+      {"evictserver", WT_VERB_EVICTSERVER}, {"fileops", WT_VERB_FILEOPS},
+      {"generation", WT_VERB_GENERATION}, {"handleops", WT_VERB_HANDLEOPS}, {"log", WT_VERB_LOG},
+      {"history_store", WT_VERB_HS}, {"history_store_activity", WT_VERB_HS_ACTIVITY},
+      {"lsm", WT_VERB_LSM}, {"lsm_manager", WT_VERB_LSM_MANAGER}, {"metadata", WT_VERB_METADATA},
       {"mutex", WT_VERB_MUTEX}, {"prefetch", WT_VERB_PREFETCH},
       {"out_of_order", WT_VERB_OUT_OF_ORDER}, {"overflow", WT_VERB_OVERFLOW},
       {"read", WT_VERB_READ}, {"reconcile", WT_VERB_RECONCILE}, {"recovery", WT_VERB_RECOVERY},
@@ -2756,8 +2780,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
   WT_CONNECTION **connectionp)
 {
     static const WT_CONNECTION stdc = {__conn_close, __conn_debug_info, __conn_reconfigure,
-      __conn_get_home, __conn_configure_method, __conn_is_new, __conn_open_session,
-      __conn_query_timestamp, __conn_set_timestamp, __conn_rollback_to_stable,
+      __conn_get_home, __conn_compile_configuration, __conn_configure_method, __conn_is_new,
+      __conn_open_session, __conn_query_timestamp, __conn_set_timestamp, __conn_rollback_to_stable,
       __conn_load_extension, __conn_add_data_source, __conn_add_collator, __conn_add_compressor,
       __conn_add_encryptor, __conn_add_extractor, __conn_set_file_system, __conn_add_storage_source,
       __conn_get_storage_source, __conn_get_extension_api};
@@ -3091,6 +3115,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
         F_SET(conn, WT_CONN_SALVAGE);
     }
 
+    WT_ERR(__wt_conf_compile_init(session, cfg));
     WT_ERR(__wt_conn_statistics_config(session, cfg));
     WT_ERR(__wt_lsm_manager_config(session, cfg));
     WT_ERR(__wt_sweep_config(session, cfg));

@@ -15,6 +15,7 @@ BLmRrSVv
 CAS
 CFLAGS
 CMake
+CONF
 COV
 CPPFLAGS
 CPPSuite
@@ -80,6 +81,7 @@ HyperLevelDB
 IAA
 IEC
 IMPL
+ITEM
 ITER
 JDK
 JIRA
@@ -223,6 +225,7 @@ ccache
 cd
 cdb
 cds
+cfg
 changelog
 checkpointed
 checkpointing
@@ -241,6 +244,7 @@ command's
 comparator
 compressibility
 cond
+conf
 config
 configurign
 conn
@@ -265,6 +269,7 @@ curtable
 customerABC
 customizability
 cv
+cval
 cyclomatic
 dN
 dNLen
@@ -321,6 +326,7 @@ encryptor's
 encryptors
 endcode
 endcond
+endditaa
 endian
 endif
 endinternal
@@ -637,6 +643,7 @@ spinlocks
 sql
 src
 ssd
+startditaa
 startsync
 startuml
 startup

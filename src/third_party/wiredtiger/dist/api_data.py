@@ -3,10 +3,11 @@
 # This file is a python script that describes the WiredTiger API.
 
 class Method:
-    def __init__(self, config):
+    def __init__(self, config, compilable=False):
         # Deal with duplicates: with complex configurations (like WT_SESSION::create), it's simpler
         # to deal with duplicates once than manually as configurations are defined.
         self.config = []
+        self.compilable = compilable
         lastname = None
         for c in sorted(config):
             if '.' in c.name:
@@ -847,6 +848,7 @@ connection_runtime_config = [
             'chunkcache',
             'compact',
             'compact_progress',
+            'configuration',
             'error_returns',
             'evict',
             'evict_stuck',
@@ -1171,6 +1173,10 @@ wiredtiger_open_common =\
     Config('checkpoint_sync', 'true', r'''
         flush files to stable storage when closing or writing checkpoints''',
         type='boolean'),
+    Config('compile_configuration_count', '1000', r'''
+        the number of configuration strings that can be precompiled. Some configuration strings
+        are compiled internally when the connection is opened.''',
+        min='500'),
     Config('direct_io', '', r'''
         Use \c O_DIRECT on POSIX systems, and \c FILE_FLAG_NO_BUFFERING on Windows to access files.
         Options are given as a list, such as <code>"direct_io=[data]"</code>. Configuring \c
@@ -1777,7 +1783,7 @@ methods = {
         whether to sync log records when the transaction commits, inherited from ::wiredtiger_open
         \c transaction_sync''',
         type='boolean')
-]),
+], compilable=True),
 
 'WT_SESSION.commit_transaction' : Method([
     Config('commit_timestamp', '', r'''

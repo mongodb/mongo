@@ -699,6 +699,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     struct timespec tsp;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
+    WT_DECL_CONF(WT_SESSION, begin_transaction, txn_conf);
     WT_DECL_RET;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
@@ -714,13 +715,15 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
 
+    API_CONF(session, WT_SESSION, begin_transaction, txn_cfg, txn_conf);
+
     WT_ASSERT_SPINLOCK_OWNED(session, &conn->schema_lock);
 
-    WT_RET(__wt_config_gets(session, cfg, "use_timestamp", &cval));
+    WT_ERR(__wt_config_gets(session, cfg, "use_timestamp", &cval));
     use_timestamp = (cval.val != 0);
-    WT_RET(__wt_config_gets(session, cfg, "flush_tier.enabled", &cval));
+    WT_ERR(__wt_config_gets(session, cfg, "flush_tier.enabled", &cval));
     flush = cval.val;
-    WT_RET(__wt_config_gets(session, cfg, "flush_tier.force", &cval));
+    WT_ERR(__wt_config_gets(session, cfg, "flush_tier.force", &cval));
     flush_force = cval.val;
 
     /*
@@ -732,7 +735,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     WT_STAT_CONN_SET(session, checkpoint_prep_running, 1);
     __wt_epoch(session, &conn->ckpt_prep_start);
 
-    WT_RET(__wt_txn_begin(session, txn_cfg));
+    WT_ERR(__wt_txn_begin(session, txn_conf));
     /* Wait 1000 microseconds to simulate slowdown in checkpoint prepare. */
     tsp.tv_sec = 0;
     tsp.tv_nsec = WT_MILLION;
@@ -742,10 +745,10 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     WT_DIAGNOSTIC_YIELD;
 
     /* Ensure a transaction ID is allocated prior to sharing it globally */
-    WT_RET(__wt_txn_id_check(session));
+    WT_ERR(__wt_txn_id_check(session));
 
     /* Keep track of handles acquired for locking. */
-    WT_RET(__wt_meta_track_on(session));
+    WT_ERR(__wt_meta_track_on(session));
     *trackingp = true;
 
     /*
@@ -850,7 +853,7 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
      * in this function.
      */
     if (flush)
-        WT_RET(__checkpoint_flush_tier(session, flush_force));
+        WT_ERR(__checkpoint_flush_tier(session, flush_force));
 
     /*
      * Get a list of handles we want to sync; for named checkpoints this may pull closed objects
@@ -866,6 +869,8 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, bool *trackingp, const char *cfg[
     __wt_epoch(session, &conn->ckpt_prep_end);
     WT_STAT_CONN_SET(session, checkpoint_prep_running, 0);
 
+err:
+    API_CONF_END(session, txn_conf);
     return (ret);
 }
 

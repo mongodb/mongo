@@ -200,6 +200,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
         WT_TRET(__wt_dlclose(session, dlh));
     }
 
+    /* Destroy any precompiled configuration. */
+    __wt_conf_compile_discard(session);
+
     /* Destroy the handle. */
     __wt_connection_destroy(conn);
 

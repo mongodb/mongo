@@ -147,6 +147,9 @@ of the documentation.
     - @ref arch-rts
     - @ref arch-fast-truncate
 
+- @subpage arch-toc-api
+    - @ref arch-config-compile
+
 - @subpage arch-toc-data-org
     - @ref arch-schema
     - @ref arch-metadata
@@ -217,6 +220,14 @@ stable timestamp.
 @subpage arch-fast-truncate
 - Delete whole pages at once without reading them, and handling of
 such pages.
+
+*/
+
+/*! @page arch-toc-api API
+
+@subpage arch-config-compile
+
+The API allows for configuration strings to be compiled in advance of their use.
 
 */
 

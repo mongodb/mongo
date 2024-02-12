@@ -117,12 +117,13 @@ typedef enum {
  *		['_'] = &&l_bare,
  *		['A' ... 'Z'] = &&l_bare, ['a' ... 'z'] = &&l_bare,
  *		['/'] = &&l_bare,
+ *		['%'] = &&l_bare,
  *	};
  */
 static const int8_t gostruct[256] = {A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_LOOP, A_LOOP, A_BAD, A_BAD, A_LOOP, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
   A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_LOOP, A_BAD, A_QUP, A_BAD,
-  A_BAD, A_BAD, A_BAD, A_BAD, A_UP, A_DOWN, A_BAD, A_BAD, A_NEXT, A_NUMBARE, A_BARE, A_BARE,
+  A_BAD, A_BARE, A_BAD, A_BAD, A_UP, A_DOWN, A_BAD, A_BAD, A_NEXT, A_NUMBARE, A_BARE, A_BARE,
   A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE,
   A_NUMBARE, A_VALUE, A_BAD, A_BAD, A_VALUE, A_BAD, A_BAD, A_BAD, A_BARE, A_BARE, A_BARE, A_BARE,
   A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE, A_BARE,

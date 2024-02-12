@@ -58,6 +58,7 @@ CHUNKCACHE
 CKPT
 CLOEXEC
 CMP
+CONF
 CONFIG
 CPP
 CPUs
@@ -297,6 +298,7 @@ Podir
 Posix
 PostgreSQL
 Pre
+Precompiled
 Preload
 Prepend
 Prepending
@@ -634,6 +636,7 @@ cust
 customizable
 customp
 cv
+cval
 cx
 cxa
 dT
@@ -1096,6 +1099,9 @@ pre
 pread
 prealloc
 precomp
+precompilation
+precompiled
+precompiling
 prefetch
 preload
 prepend

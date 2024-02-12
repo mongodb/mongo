@@ -21,7 +21,8 @@ sed -e '/^$/d' -e '/^#/d' < s_define.list
 # Ignore configuration objects #defines
 # Ignore statistic "keys" generated for applications #defines
 search=`cat $dl |
-    sed -e '/configuration section: BEGIN/,/configuration section: END/d' \
+    sed -e '/API configuration keys: BEGIN/,/API configuration keys: END/d' \
+        -e '/configuration section: BEGIN/,/configuration section: END/d' \
         -e '/Statistics section: BEGIN/,/Statistics section: END/d' |
     egrep '^#define' |
     sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |

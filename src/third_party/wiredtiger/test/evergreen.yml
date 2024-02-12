@@ -2027,6 +2027,16 @@ tasks:
         vars:
           test_name: wt12015_backup_corruption
 
+  - name: csuite-wt11126-compile-config-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "csuite test"
+        vars:
+          test_name: wt11126_compile_config
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks

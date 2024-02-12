@@ -3,11 +3,12 @@
 # This file is a python script that describes the cpp test framework test configuration options.
 
 class Method:
-    def __init__(self, config):
+    def __init__(self, config, compilable=False):
         # Deal with duplicates: with complex configurations (like
         # WT_SESSION::create), it's simpler to deal with duplicates once than
         # manually as configurations are defined
         self.config = []
+        self.compilable = compilable
         lastname = None
         for c in sorted(config):
             if '.' in c.name:

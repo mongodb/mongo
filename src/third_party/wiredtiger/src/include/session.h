@@ -340,6 +340,11 @@ struct __wt_session_impl {
     wt_shared volatile uint64_t generations[WT_GENERATIONS];
 
     /*
+     * Bindings for compiled configurations.
+     */
+    WT_CONF_BINDINGS conf_bindings;
+
+    /*
      * Session memory persists past session close because it's accessed by threads of control other
      * than the thread owning the session. For example, btree splits and hazard pointers can "free"
      * memory that's still in use. In order to eventually free it, it's stashed here with its
