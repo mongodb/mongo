@@ -3,7 +3,7 @@
  * change stream pipeline.
  */
 (function() {
-"use strict"
+"use strict";
 
 const testDB = db.getSiblingDB("test");
 const testColl = testDB[jsTestName()];

@@ -170,8 +170,7 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
     // stages and ensures that they get pushed down to the shards, as this stage bisects the change
     // streams pipeline.
     constraints.canSwapWithMatch = true;
-    constraints.canSwapWithRedact = true;
-    constraints.canSwapWithSingleDocTransform = true;
+    constraints.canSwapWithSingleDocTransformOrRedact = true;
 
     return constraints;
 }
