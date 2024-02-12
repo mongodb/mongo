@@ -420,7 +420,7 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
     ignore_cache_size_set = false;
 
     session = (WT_SESSION_IMPL *)wt_session;
-    SESSION_API_CALL(session, compact, config, cfg);
+    SESSION_API_CALL(session, ret, compact, config, cfg);
 
     /* Trigger the background server. */
     if ((ret = __wt_config_getones(session, config, "background", &cval) == 0)) {

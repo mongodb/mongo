@@ -42,7 +42,7 @@ __curextract_insert(WT_CURSOR *cursor)
     WT_ITEM *key, ikey, pkey;
     WT_SESSION_IMPL *session;
 
-    CURSOR_API_CALL(cursor, session, insert, NULL);
+    CURSOR_API_CALL(cursor, session, ret, insert, NULL);
 
     cextract = (WT_CURSOR_EXTRACTOR *)cursor;
 
@@ -202,7 +202,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
     WT_SESSION_IMPL *session;
     va_list ap;
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, get_value, NULL);
 
     va_start(ap, cursor);
     ret = __wt_curtable_get_valuev(cursor, ap);
@@ -261,7 +261,7 @@ __curtable_set_valuev(WT_CURSOR *cursor, va_list ap)
     u_int i;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, set_value, NULL);
 
     if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON)) {
         item = va_arg(ap, WT_ITEM *);
@@ -334,7 +334,7 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    JOINABLE_CURSOR_API_CALL(a, session, compare, NULL);
+    JOINABLE_CURSOR_API_CALL(a, session, ret, compare, NULL);
 
     /*
      * Confirm both cursors refer to the same source and have keys, then call the underlying
@@ -363,7 +363,7 @@ __curtable_next(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, next, NULL);
     API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
     APPLY_CG(ctable, next);
@@ -388,7 +388,7 @@ __curtable_next_random(WT_CURSOR *cursor)
     u_int i;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, next, NULL);
     cp = ctable->cg_cursors;
 
     /* Split out the first next, it retrieves the random record. */
@@ -420,7 +420,7 @@ __curtable_prev(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, prev, NULL);
     API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
     APPLY_CG(ctable, prev);
@@ -477,7 +477,7 @@ __curtable_search(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, search, NULL);
     API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
     APPLY_CG(ctable, search);
@@ -502,7 +502,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
     u_int i;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, search_near, NULL);
     API_RETRYABLE(session);
     CURSOR_REPOSITION_ENTER(cursor, session);
 
@@ -539,7 +539,7 @@ __curtable_insert(WT_CURSOR *cursor)
     u_int i;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, insert);
+    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, ret, insert);
     WT_ERR(__curtable_open_indices(ctable));
 
     cp = ctable->cg_cursors;
@@ -617,7 +617,7 @@ __curtable_update(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, update);
+    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, ret, update);
     WT_ERR(__curtable_open_indices(ctable));
 
     /*
@@ -669,7 +669,7 @@ __curtable_remove(WT_CURSOR *cursor)
     bool positioned;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_REMOVE_API_CALL(cursor, session, NULL);
+    JOINABLE_CURSOR_REMOVE_API_CALL(cursor, session, ret, NULL);
     WT_ERR(__curtable_open_indices(ctable));
 
     /* Check if the cursor was positioned. */
@@ -714,7 +714,7 @@ __curtable_reserve(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, reserve);
+    JOINABLE_CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve);
 
     /*
      * We don't have to open the indices here, but it makes the code similar to other cursor
@@ -834,7 +834,7 @@ __curtable_largest_key(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, largest_key, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, largest_key, NULL);
 
     WT_ERR(cursor->reset(cursor));
     primary = *ctable->cg_cursors;
@@ -864,7 +864,7 @@ __curtable_bound(WT_CURSOR *cursor, const char *config)
     WT_CLEAR(saved_bounds);
     ctable = (WT_CURSOR_TABLE *)cursor;
     primary = *ctable->cg_cursors;
-    JOINABLE_CURSOR_API_CALL(cursor, session, bound, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, bound, NULL);
 
     /* Save the current state of the bounds in case we fail to apply the new state. */
     WT_ERR(__wt_cursor_bounds_save(session, primary, &saved_bounds));

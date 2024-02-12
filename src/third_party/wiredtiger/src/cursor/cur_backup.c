@@ -175,7 +175,7 @@ __curbackup_next(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
-    CURSOR_API_CALL(cursor, session, next, NULL);
+    CURSOR_API_CALL(cursor, session, ret, next, NULL);
     WT_CURSOR_BACKUP_CHECK_STOP(cb);
 
     if (cb->list == NULL || cb->list[cb->next] == NULL) {

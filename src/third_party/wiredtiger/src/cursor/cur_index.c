@@ -19,7 +19,7 @@ __curindex_get_value(WT_CURSOR *cursor, ...)
     WT_SESSION_IMPL *session;
     va_list ap;
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, get_value, NULL);
 
     va_start(ap, cursor);
     ret = __wt_curindex_get_valuev(cursor, ap);
@@ -41,7 +41,7 @@ __curindex_set_valuev(WT_CURSOR *cursor, va_list ap)
 
     WT_UNUSED(ap);
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, set_value, NULL);
     WT_ERR_MSG(session, ENOTSUP, "WT_CURSOR.set_value not supported for index cursors");
 
 err:
@@ -76,7 +76,7 @@ __curindex_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     WT_SESSION_IMPL *session;
 
     cindex = (WT_CURSOR_INDEX *)a;
-    JOINABLE_CURSOR_API_CALL(a, session, compare, NULL);
+    JOINABLE_CURSOR_API_CALL(a, session, ret, compare, NULL);
 
     /* Check both cursors are "index:" type. */
     if (!WT_PREFIX_MATCH(a->uri, "index:") || strcmp(a->uri, b->uri) != 0)
@@ -147,7 +147,7 @@ __curindex_next(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cindex = (WT_CURSOR_INDEX *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, next, NULL);
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     if ((ret = cindex->child->next(cindex->child)) == 0)
@@ -169,7 +169,7 @@ __curindex_prev(WT_CURSOR *cursor)
     WT_SESSION_IMPL *session;
 
     cindex = (WT_CURSOR_INDEX *)cursor;
-    JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, prev, NULL);
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     if ((ret = cindex->child->prev(cindex->child)) == 0)
@@ -230,7 +230,7 @@ __curindex_search(WT_CURSOR *cursor)
 
     cindex = (WT_CURSOR_INDEX *)cursor;
     child = cindex->child;
-    JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, search, NULL);
 
     /*
      * We are searching using the application-specified key, which (usually) doesn't contain the
@@ -299,7 +299,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 
     cindex = (WT_CURSOR_INDEX *)cursor;
     child = cindex->child;
-    JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, search_near, NULL);
 
     /*
      * We are searching using the application-specified key, which (usually) doesn't contain the
@@ -409,7 +409,7 @@ __curindex_bound(WT_CURSOR *cursor, const char *config)
     WT_CLEAR(saved_bounds);
     inclusive = false;
 
-    JOINABLE_CURSOR_API_CALL_CONF(cursor, session, bound, config, cfg, NULL);
+    JOINABLE_CURSOR_API_CALL_CONF(cursor, session, ret, bound, config, cfg, NULL);
 
     /* Save the current state of the bounds in case we fail to apply the new state. */
     WT_ERR(__wt_cursor_bounds_save(session, child, &saved_bounds));

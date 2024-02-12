@@ -243,7 +243,7 @@ __curmetadata_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     a_file_cursor = a_mdc->file_cursor;
     b_file_cursor = b_mdc->file_cursor;
 
-    CURSOR_API_CALL(a, session, compare, CUR2BT(a_file_cursor));
+    CURSOR_API_CALL(a, session, ret, compare, CUR2BT(a_file_cursor));
 
     if (b->compare != __curmetadata_compare)
         WT_ERR_MSG(session, EINVAL, "Can only compare cursors of the same type");
@@ -279,7 +279,7 @@ __curmetadata_next(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, next, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, next, CUR2BT(file_cursor));
 
     if (!F_ISSET(mdc, WT_MDC_POSITIONED))
         WT_ERR(__curmetadata_metadata_search(session, cursor));
@@ -325,7 +325,7 @@ __curmetadata_prev(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, prev, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, prev, CUR2BT(file_cursor));
 
     if (F_ISSET(mdc, WT_MDC_ONMETADATA)) {
         ret = WT_NOTFOUND;
@@ -397,7 +397,7 @@ __curmetadata_search(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, search, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, search, CUR2BT(file_cursor));
 
     WT_MD_CURSOR_NEEDKEY(cursor);
 
@@ -434,7 +434,7 @@ __curmetadata_search_near(WT_CURSOR *cursor, int *exact)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, search_near, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, search_near, CUR2BT(file_cursor));
 
     WT_MD_CURSOR_NEEDKEY(cursor);
 
@@ -472,7 +472,7 @@ __curmetadata_insert(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, insert, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, insert, CUR2BT(file_cursor));
 
     WT_MD_CURSOR_NEEDKEY(cursor);
     WT_MD_CURSOR_NEEDVALUE(cursor);
@@ -500,7 +500,7 @@ __curmetadata_update(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, update, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, update, CUR2BT(file_cursor));
 
     WT_MD_CURSOR_NEEDKEY(cursor);
     WT_MD_CURSOR_NEEDVALUE(cursor);
@@ -528,7 +528,7 @@ __curmetadata_remove(WT_CURSOR *cursor)
 
     mdc = (WT_CURSOR_METADATA *)cursor;
     file_cursor = mdc->file_cursor;
-    CURSOR_API_CALL(cursor, session, remove, CUR2BT(file_cursor));
+    CURSOR_API_CALL(cursor, session, ret, remove, CUR2BT(file_cursor));
 
     WT_MD_CURSOR_NEEDKEY(cursor);
 

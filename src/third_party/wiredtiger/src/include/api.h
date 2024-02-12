@@ -87,10 +87,12 @@
 
 #define API_CALL_NOCONF(s, struct_name, func_name, dh) \
     do {                                               \
+        bool __set_err = true;                         \
     API_SESSION_INIT(s, struct_name, func_name, dh)
 
 #define API_CALL(s, struct_name, func_name, dh, config, cfg)                                \
     do {                                                                                    \
+        bool __set_err = true;                                                              \
         const char *(cfg)[] = {WT_CONFIG_BASE(s, struct_name##_##func_name), config, NULL}; \
         API_SESSION_INIT(s, struct_name, func_name, dh);                                    \
         if ((config) != NULL)                                                               \
@@ -100,8 +102,8 @@
     if ((s) != NULL) {                                                                     \
         WT_TRACK_OP_END(s);                                                                \
         WT_SINGLE_THREAD_CHECK_STOP(s);                                                    \
-        if ((ret) != 0)                                                                    \
-            __wt_txn_err_set(s, ret);                                                      \
+        if ((ret) != 0 && __set_err)                                                       \
+            __wt_txn_err_set(s, (ret));                                                    \
         if ((s)->api_call_counter == 1 && !F_ISSET(s, WT_SESSION_INTERNAL))                \
             __wt_op_timer_stop(s);                                                         \
         /*                                                                                 \
@@ -231,47 +233,51 @@
 #define SESSION_API_CALL_PREPARE_ALLOWED_NOCONF(s, func_name) \
     API_CALL_NOCONF(s, WT_SESSION, func_name, NULL)
 
-#define SESSION_API_CALL_PREPARE_NOT_ALLOWED(s, func_name, config, cfg) \
-    SESSION_API_PREPARE_CHECK(s, WT_SESSION, func_name);                \
-    API_CALL(s, WT_SESSION, func_name, NULL, config, cfg)
+#define SESSION_API_CALL_PREPARE_NOT_ALLOWED(s, ret, func_name, config, cfg) \
+    API_CALL(s, WT_SESSION, func_name, NULL, config, cfg);                   \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_SESSION, func_name)
 
-#define SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(s, func_name) \
-    SESSION_API_PREPARE_CHECK(s, WT_SESSION, func_name);          \
-    API_CALL_NOCONF(s, WT_SESSION, func_name, NULL)
+#define SESSION_API_CALL_PREPARE_NOT_ALLOWED_NOCONF(s, ret, func_name) \
+    API_CALL_NOCONF(s, WT_SESSION, func_name, NULL);                   \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_SESSION, func_name)
 
-#define SESSION_API_PREPARE_CHECK(s, struct_name, func_name)   \
-    do {                                                       \
-        if ((s)->api_call_counter == 0) {                      \
-            int __prepare_ret;                                 \
-            API_SESSION_PUSH(s, WT_SESSION, func_name, NULL);  \
-            __prepare_ret = __wt_txn_context_prepare_check(s); \
-            API_SESSION_POP(s);                                \
-            WT_RET(__prepare_ret);                             \
-        }                                                      \
+#define SESSION_API_PREPARE_CHECK(s, ret, struct_name, func_name)                                \
+    do {                                                                                         \
+        if ((s)->api_call_counter == 1) {                                                        \
+            (ret) = __wt_txn_context_prepare_check(s);                                           \
+            if ((ret) != 0) {                                                                    \
+                /*                                                                               \
+                 * Don't set the error on transaction. We don't want to rollback the transaction \
+                 * because of this error.                                                        \
+                 */                                                                              \
+                __set_err = false;                                                               \
+                goto err;                                                                        \
+            }                                                                                    \
+        }                                                                                        \
     } while (0)
 
-#define SESSION_API_CALL(s, func_name, config, cfg)      \
-    SESSION_API_PREPARE_CHECK(s, WT_SESSION, func_name); \
-    API_CALL(s, WT_SESSION, func_name, NULL, config, cfg)
+#define SESSION_API_CALL(s, ret, func_name, config, cfg)   \
+    API_CALL(s, WT_SESSION, func_name, NULL, config, cfg); \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_SESSION, func_name)
 
 #define SESSION_API_CALL_NOCONF(s, func_name) API_CALL_NOCONF(s, WT_SESSION, func_name, NULL)
 
-#define SESSION_TXN_API_CALL(s, func_name, config, cfg)  \
-    SESSION_API_PREPARE_CHECK(s, WT_SESSION, func_name); \
-    TXN_API_CALL(s, WT_SESSION, func_name, NULL, config, cfg)
+#define SESSION_TXN_API_CALL(s, ret, func_name, config, cfg)   \
+    TXN_API_CALL(s, WT_SESSION, func_name, NULL, config, cfg); \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_SESSION, func_name)
 
-#define CURSOR_API_CALL(cur, s, func_name, bt)                                                     \
+#define CURSOR_API_CALL(cur, s, ret, func_name, bt)                                                \
     (s) = CUR2S(cur);                                                                              \
-    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, func_name);                                            \
     API_CALL_NOCONF(s, WT_CURSOR, func_name, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle); \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, func_name);                                       \
     if (F_ISSET(cur, WT_CURSTD_CACHED))                                                            \
     WT_ERR(__wt_cursor_cached(cur))
 
-#define CURSOR_API_CALL_CONF(cur, s, func_name, config, cfg, bt)                                  \
+#define CURSOR_API_CALL_CONF(cur, s, ret, func_name, config, cfg, bt)                             \
     (s) = CUR2S(cur);                                                                             \
-    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, func_name);                                           \
     API_CALL(                                                                                     \
       s, WT_CURSOR, func_name, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle, config, cfg); \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, func_name);                                      \
     if (F_ISSET(cur, WT_CURSTD_CACHED))                                                           \
     WT_ERR(__wt_cursor_cached(cur))
 
@@ -302,42 +308,43 @@
     if (F_ISSET(cur, WT_CURSTD_JOINED)) \
     WT_ERR(__wt_curjoin_joined(cur))
 
-#define JOINABLE_CURSOR_API_CALL(cur, s, func_name, bt) \
-    CURSOR_API_CALL(cur, s, func_name, bt);             \
+#define JOINABLE_CURSOR_API_CALL(cur, s, ret, func_name, bt) \
+    CURSOR_API_CALL(cur, s, ret, func_name, bt);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
-#define JOINABLE_CURSOR_API_CALL_CONF(cur, s, func_name, config, cfg, bt) \
-    CURSOR_API_CALL_CONF(cur, s, func_name, config, cfg, bt);             \
+#define JOINABLE_CURSOR_API_CALL_CONF(cur, s, ret, func_name, config, cfg, bt) \
+    CURSOR_API_CALL_CONF(cur, s, ret, func_name, config, cfg, bt);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
 #define JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cur, s, func_name, bt) \
     CURSOR_API_CALL_PREPARE_ALLOWED(cur, s, func_name, bt);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
-#define CURSOR_REMOVE_API_CALL(cur, s, bt)           \
-    (s) = CUR2S(cur);                                \
-    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, remove); \
-    TXN_API_CALL_NOCONF(s, WT_CURSOR, remove, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle)
+#define CURSOR_REMOVE_API_CALL(cur, s, ret, bt)                                   \
+    (s) = CUR2S(cur);                                                             \
+    TXN_API_CALL_NOCONF(                                                          \
+      s, WT_CURSOR, remove, ((bt) == NULL) ? NULL : ((WT_BTREE *)(bt))->dhandle); \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, remove)
 
-#define JOINABLE_CURSOR_REMOVE_API_CALL(cur, s, bt) \
-    CURSOR_REMOVE_API_CALL(cur, s, bt);             \
+#define JOINABLE_CURSOR_REMOVE_API_CALL(cur, s, ret, bt) \
+    CURSOR_REMOVE_API_CALL(cur, s, ret, bt);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
-#define CURSOR_UPDATE_API_CALL_BTREE(cur, s, func_name)                                       \
+#define CURSOR_UPDATE_API_CALL_BTREE(cur, s, ret, func_name)                                  \
     (s) = CUR2S(cur);                                                                         \
-    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, func_name);                                       \
     TXN_API_CALL_NOCONF(s, WT_CURSOR, func_name, ((WT_CURSOR_BTREE *)(cur))->dhandle);        \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, func_name);                                  \
     if (F_ISSET(S2C(s), WT_CONN_IN_MEMORY) && !F_ISSET(CUR2BT(cur), WT_BTREE_IGNORE_CACHE) && \
       __wt_cache_full(s))                                                                     \
         WT_ERR(WT_CACHE_FULL);
 
-#define CURSOR_UPDATE_API_CALL(cur, s, func_name)       \
+#define CURSOR_UPDATE_API_CALL(cur, s, ret, func_name)  \
     (s) = CUR2S(cur);                                   \
-    SESSION_API_PREPARE_CHECK(s, WT_CURSOR, func_name); \
-    TXN_API_CALL_NOCONF(s, WT_CURSOR, func_name, NULL)
+    TXN_API_CALL_NOCONF(s, WT_CURSOR, func_name, NULL); \
+    SESSION_API_PREPARE_CHECK(s, ret, WT_CURSOR, func_name)
 
-#define JOINABLE_CURSOR_UPDATE_API_CALL(cur, s, func_name) \
-    CURSOR_UPDATE_API_CALL(cur, s, func_name);             \
+#define JOINABLE_CURSOR_UPDATE_API_CALL(cur, s, ret, func_name) \
+    CURSOR_UPDATE_API_CALL(cur, s, ret, func_name);             \
     JOINABLE_CURSOR_CALL_CHECK(cur)
 
 #define CURSOR_UPDATE_API_END_RETRY(s, ret, retry) \

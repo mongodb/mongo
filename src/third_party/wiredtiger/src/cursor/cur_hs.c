@@ -108,7 +108,7 @@ __curhs_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    CURSOR_API_CALL(a, session, compare, NULL);
+    CURSOR_API_CALL(a, session, ret, compare, NULL);
 
     WT_ERR(__cursor_checkkey(a));
     WT_ERR(__cursor_checkkey(b));

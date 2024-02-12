@@ -528,7 +528,7 @@ __curjoin_extract_insert(WT_CURSOR *cursor)
     if (cextract->ismember)
         return (0);
 
-    CURSOR_API_CALL(cursor, session, insert, NULL);
+    CURSOR_API_CALL(cursor, session, ret, insert, NULL);
 
     WT_ITEM_SET(ikey, cursor->key);
     /*
@@ -689,7 +689,7 @@ __curjoin_get_key(WT_CURSOR *cursor, ...)
 
     cjoin = (WT_CURSOR_JOIN *)cursor;
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, get_key, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, get_key, NULL);
 
     if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) || !cjoin->iter->positioned)
         WT_ERR_MSG(session, EINVAL, "join cursor must be advanced with next()");
@@ -715,7 +715,7 @@ __curjoin_get_value(WT_CURSOR *cursor, ...)
 
     cjoin = (WT_CURSOR_JOIN *)cursor;
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, get_value, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, get_value, NULL);
 
     if (!F_ISSET(cjoin, WT_CURJOIN_INITIALIZED) || !cjoin->iter->positioned)
         WT_ERR_MSG(session, EINVAL, "join cursor must be advanced with next()");
@@ -1023,7 +1023,7 @@ __curjoin_next(WT_CURSOR *cursor)
 
     cjoin = (WT_CURSOR_JOIN *)cursor;
 
-    JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
+    JOINABLE_CURSOR_API_CALL(cursor, session, ret, next, NULL);
 
     if (F_ISSET(cjoin, WT_CURJOIN_ERROR))
         WT_ERR_MSG(session, WT_ERROR, "join cursor encountered previous error");

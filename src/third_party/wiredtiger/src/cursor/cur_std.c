@@ -405,7 +405,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
     size_t size;
     const char *fmt;
 
-    CURSOR_API_CALL(cursor, session, get_key, NULL);
+    CURSOR_API_CALL(cursor, session, ret, get_key, NULL);
     if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))
         WT_ERR(__wt_cursor_kv_not_set(cursor, true));
 
@@ -457,7 +457,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint64_t flags, va_list ap)
     buf = &cursor->key;
     tmp.mem = NULL;
 
-    CURSOR_API_CALL(cursor, session, set_key, NULL);
+    CURSOR_API_CALL(cursor, session, ret, set_key, NULL);
     WT_ERR(__cursor_copy_release(cursor));
     if (F_ISSET(cursor, WT_CURSTD_KEY_SET) && WT_DATA_IN_ITEM(buf)) {
         tmp = *buf;
@@ -553,7 +553,7 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
     WT_SESSION_IMPL *session;
     const char *fmt;
 
-    CURSOR_API_CALL(cursor, session, get_value, NULL);
+    CURSOR_API_CALL(cursor, session, ret, get_value, NULL);
 
     if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
         WT_ERR(__wt_cursor_kv_not_set(cursor, false));
@@ -589,7 +589,7 @@ __wt_cursor_get_raw_key_value(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    CURSOR_API_CALL(cursor, session, get_raw_key_value, NULL);
+    CURSOR_API_CALL(cursor, session, ret, get_raw_key_value, NULL);
 
     if ((key != NULL) && !F_ISSET(cursor, WT_CURSTD_KEY_SET))
         WT_ERR(__wt_cursor_kv_not_set(cursor, true));
@@ -646,7 +646,7 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, const char *fmt, va_list ap)
     buf = &cursor->value;
     tmp.mem = NULL;
 
-    CURSOR_API_CALL(cursor, session, set_value, NULL);
+    CURSOR_API_CALL(cursor, session, ret, set_value, NULL);
     WT_ERR(__cursor_copy_release(cursor));
     if (F_ISSET(cursor, WT_CURSTD_VALUE_SET) && WT_DATA_IN_ITEM(buf)) {
         tmp = *buf;
@@ -1020,7 +1020,7 @@ __wt_cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
     WT_SESSION_IMPL *session;
     int cmp;
 
-    CURSOR_API_CALL(cursor, session, equals, NULL);
+    CURSOR_API_CALL(cursor, session, ret, equals, NULL);
 
     WT_ERR(cursor->compare(cursor, other, &cmp));
     *equalp = (cmp == 0) ? 1 : 0;
@@ -1039,7 +1039,7 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    CURSOR_API_CALL(cursor, session, modify, NULL);
+    CURSOR_API_CALL(cursor, session, ret, modify, NULL);
 
     /* Check for a rational modify vector count. */
     if (nentries <= 0)
@@ -1107,7 +1107,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    CURSOR_API_CALL_CONF(cursor, session, reconfigure, config, cfg, NULL);
+    CURSOR_API_CALL_CONF(cursor, session, ret, reconfigure, config, cfg, NULL);
 
     /* Reconfiguration resets the cursor. */
     WT_ERR(cursor->reset(cursor));
@@ -1157,7 +1157,7 @@ __wt_cursor_largest_key(WT_CURSOR *cursor)
 
     cbt = (WT_CURSOR_BTREE *)cursor;
     key_only = F_ISSET(cursor, WT_CURSTD_KEY_ONLY);
-    CURSOR_API_CALL(cursor, session, largest_key, CUR2BT(cbt));
+    CURSOR_API_CALL(cursor, session, ret, largest_key, CUR2BT(cbt));
 
     if (WT_CURSOR_BOUNDS_SET(cursor))
         WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with cursor largest key");
@@ -1222,7 +1222,7 @@ __wt_cursor_bound(WT_CURSOR *cursor, const char *config)
     inclusive = true;
     have_action = false;
 
-    CURSOR_API_CALL(cursor, session, bound, NULL);
+    CURSOR_API_CALL(cursor, session, ret, bound, NULL);
 
     if (CUR2BT(cursor)->type == BTREE_COL_FIX)
         WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with fixed column store");

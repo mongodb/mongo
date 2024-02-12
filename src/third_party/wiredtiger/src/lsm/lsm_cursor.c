@@ -796,7 +796,7 @@ __clsm_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 
     /* There's no need to sync with the LSM tree, avoid WT_LSM_ENTER. */
     alsm = (WT_CURSOR_LSM *)a;
-    CURSOR_API_CALL(a, session, compare, NULL);
+    CURSOR_API_CALL(a, session, ret, compare, NULL);
 
     /*
      * Confirm both cursors refer to the same source and have keys, then compare the keys.
@@ -866,7 +866,7 @@ __clsm_next(WT_CURSOR *cursor)
 
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    CURSOR_API_CALL(cursor, session, next, NULL);
+    CURSOR_API_CALL(cursor, session, ret, next, NULL);
     __cursor_novalue(cursor);
     WT_ERR(__clsm_enter(clsm, false, false));
 
@@ -973,7 +973,7 @@ __clsm_next_random(WT_CURSOR *cursor)
     c = NULL;
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    CURSOR_API_CALL(cursor, session, next, NULL);
+    CURSOR_API_CALL(cursor, session, ret, next, NULL);
     __cursor_novalue(cursor);
     WT_ERR(__clsm_enter(clsm, false, false));
 
@@ -1023,7 +1023,7 @@ __clsm_prev(WT_CURSOR *cursor)
 
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    CURSOR_API_CALL(cursor, session, prev, NULL);
+    CURSOR_API_CALL(cursor, session, ret, prev, NULL);
     __cursor_novalue(cursor);
     WT_ERR(__clsm_enter(clsm, false, false));
 
@@ -1222,7 +1222,7 @@ __clsm_search(WT_CURSOR *cursor)
 
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    CURSOR_API_CALL(cursor, session, search, NULL);
+    CURSOR_API_CALL(cursor, session, ret, search, NULL);
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
     WT_ERR(__clsm_enter(clsm, true, false));
@@ -1256,7 +1256,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
     clsm = (WT_CURSOR_LSM *)cursor;
     exact = 0;
 
-    CURSOR_API_CALL(cursor, session, search_near, NULL);
+    CURSOR_API_CALL(cursor, session, ret, search_near, NULL);
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
     WT_ERR(__clsm_enter(clsm, true, false));
@@ -1463,7 +1463,7 @@ __clsm_insert(WT_CURSOR *cursor)
 
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    CURSOR_UPDATE_API_CALL(cursor, session, insert);
+    CURSOR_UPDATE_API_CALL(cursor, session, ret, insert);
     WT_ERR(__cursor_needkey(cursor));
     WT_ERR(__cursor_needvalue(cursor));
     WT_ERR(__clsm_enter(clsm, false, true));
@@ -1511,7 +1511,7 @@ __clsm_update(WT_CURSOR *cursor)
 
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    CURSOR_UPDATE_API_CALL(cursor, session, update);
+    CURSOR_UPDATE_API_CALL(cursor, session, ret, update);
     WT_ERR(__cursor_needkey(cursor));
     WT_ERR(__cursor_needvalue(cursor));
     WT_ERR(__clsm_enter(clsm, false, true));
@@ -1562,7 +1562,7 @@ __clsm_remove(WT_CURSOR *cursor)
     /* Remember if the cursor is currently positioned. */
     positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
 
-    CURSOR_REMOVE_API_CALL(cursor, session, NULL);
+    CURSOR_REMOVE_API_CALL(cursor, session, ret, NULL);
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
 
@@ -1613,7 +1613,7 @@ __clsm_reserve(WT_CURSOR *cursor)
 
     clsm = (WT_CURSOR_LSM *)cursor;
 
-    CURSOR_UPDATE_API_CALL(cursor, session, reserve);
+    CURSOR_UPDATE_API_CALL(cursor, session, ret, reserve);
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
     WT_ERR(__wt_txn_context_check(session, true));
