@@ -667,7 +667,7 @@ __conf_verbose_cat_config(WT_SESSION_IMPL *session, const char **cfg, WT_CONF *c
             continue;
         }
 
-        key_id = (ccheck->key_id << shift) | subkey_id;
+        key_id = ((uint64_t)ccheck->key_id << shift) | subkey_id;
         type = ccheck->compiled_type;
         if (ccheck->subconfigs != NULL) {
             WT_RET(__wt_buf_catfmt(session, buf, "("));
