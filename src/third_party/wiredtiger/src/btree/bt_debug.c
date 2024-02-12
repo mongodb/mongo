@@ -1373,7 +1373,7 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page)
     session = ds->session;
 
     WT_INTL_FOREACH_BEGIN (session, page, ref) {
-        WT_RET(ds->f(ds, "\trecno: {%" PRIu64 "}\n", ref->ref_recno));
+        WT_RET(ds->f(ds, "\trecno: {%" PRIu64 "}\n\t", ref->ref_recno));
         WT_RET(__debug_ref(ds, ref));
     }
     WT_INTL_FOREACH_END;
