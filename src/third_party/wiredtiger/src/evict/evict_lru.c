@@ -1511,15 +1511,19 @@ retry:
 
         /* Skip files that don't allow eviction. */
         btree = dhandle->handle;
-        if (btree->evict_disabled > 0)
+        if (btree->evict_disabled > 0) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_trees_eviction_disabled);
             continue;
+        }
 
         /*
          * Skip files that are checkpointing if we are only looking for dirty pages.
          */
         if (WT_BTREE_SYNCING(btree) &&
-          !F_ISSET(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_UPDATES))
+          !F_ISSET(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_UPDATES)) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_checkpointing_trees);
             continue;
+        }
 
         /*
          * Skip files that are configured to stick in cache until we become aggressive.
@@ -1528,8 +1532,10 @@ retry:
          * its pages.
          */
         if (btree->evict_priority != 0 && !__wt_cache_aggressive(session) &&
-          !__wt_btree_dominating_cache(session, btree))
+          !__wt_btree_dominating_cache(session, btree)) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_trees_stick_in_cache);
             continue;
+        }
 
         /*
          * Skip files if we have too many active walks.
@@ -1538,14 +1544,18 @@ retry:
          * Even though that ceiling has been removed, we need to test eviction with huge numbers of
          * active trees before allowing larger numbers of hazard pointers in the walk session.
          */
-        if (btree->evict_ref == NULL && session->hazards.num_active > WT_EVICT_MAX_TREES)
+        if (btree->evict_ref == NULL && session->hazards.num_active > WT_EVICT_MAX_TREES) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_trees_too_many_active_walks);
             continue;
+        }
 
         /*
          * If we are filling the queue, skip files that haven't been useful in the past.
          */
-        if (btree->evict_walk_period != 0 && btree->evict_walk_skips++ < btree->evict_walk_period)
+        if (btree->evict_walk_period != 0 && btree->evict_walk_skips++ < btree->evict_walk_period) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_trees_not_useful_before);
             continue;
+        }
         btree->evict_walk_skips = 0;
 
         (void)__wt_atomic_addi32(&dhandle->session_inuse, 1);
@@ -2035,15 +2045,19 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         if (WT_IS_METADATA(session->dhandle) && F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) &&
           F_ISSET(ref, WT_REF_FLAG_LEAF) && !modified && page->modify != NULL &&
           !__wt_txn_visible_all(
-            session, page->modify->rec_max_txn, page->modify->rec_max_timestamp))
+            session, page->modify->rec_max_txn, page->modify->rec_max_timestamp)) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_metatdata_with_history);
             continue;
+        }
 
         /* Skip pages we don't want. */
         want_page = (F_ISSET(cache, WT_CACHE_EVICT_CLEAN) && !modified) ||
           (F_ISSET(cache, WT_CACHE_EVICT_DIRTY) && modified) ||
           (F_ISSET(cache, WT_CACHE_EVICT_UPDATES) && page->modify != NULL);
-        if (!want_page)
+        if (!want_page) {
+            WT_STAT_CONN_INCR(session, cache_eviction_server_skip_unwanted_pages);
             continue;
+        }
 
         /*
          * Don't attempt eviction of internal pages with children in cache (indicated by seeing an
