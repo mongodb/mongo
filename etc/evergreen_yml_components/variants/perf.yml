@@ -319,6 +319,55 @@ buildvariants:
     # - name: genny_query_TenMDocCollection_IntId_IdentityView
     # - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
 
+- <<: *al2023_al2_arm64_compile_variant_dependency
+  name: atlas-like-replica.west.2024-02
+  display_name: PERF M60-like-replica-West.2024-02 3-Node ReplSet
+  cron: &atlas-like-repl-cron "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  modules: *perf_modules
+  expansions:
+    mongodb_setup: atlas-like-replica.2023-09
+    mongodb_setup_release: 2022-11
+    infrastructure_provisioning: M60-like-replica-west.2024-02
+    infrastructure_provisioning_release: 2023-09
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: al2023-arm64-compile
+    client_compile_variant: amazon2-arm64-compile
+  run_on:
+    - "rhel70-perf-M60-like"
+  tasks:
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: ycsb.2023-09
+      cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+    - name: ycsb_single_thread
+    - name: ycsb_60GB.2023-09
+      cron: *high-value-workload-cron
+    - name: ycsb_60GB.long.2023-09
+      cron: *high-value-workload-cron
+    - name: bestbuy_agg
+    - name: tpcc
+    - name: tpcc_majority
+    - name: linkbench
+    - name: linkbench2
+    - name: tsbs_load
+    - name: tsbs_query
+    - name: mixed_workloads_genny_rate_limited_high_value
+    - name: load_test_high_value
+    - name: majority_reads10_k_threads_high_value
+    - name: large_indexed_ins_high_value
+    - name: expressive_queries_high_value
+    - name: time_series_sort_high_value
+    # - name: genny_query_TenMDocCollection_IntId
+    # - name: genny_query_TenMDocCollection_ObjectId
+    # - name: genny_query_TenMDocCollection_SubDocId
+    # - name: genny_query_TenMDocCollection_IntId_Agg
+    # - name: genny_query_TenMDocCollection_IntId_IdentityView
+    # - name: genny_query_TenMDocCollection_IntId_IdentityView_Agg
+
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M30-real.arm.aws.2023-11
   display_name: PERF M30-Atlas ReplSet ARM AWS 2023-11
@@ -369,7 +418,7 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: ycsb.2023-09
-      cron: &high-value-workload-cron "0 */4 * * 1-5" # High-value workloads run every weekday, every 4 hours
+      cron: *high-value-workload-cron
     - name: ycsb_single_thread
     - name: ycsb_60GB.2023-09
     - name: tpcc
