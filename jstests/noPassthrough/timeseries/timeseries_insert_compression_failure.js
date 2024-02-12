@@ -1,5 +1,6 @@
 /**
- * Tests that time-series inserts get retried with a different bucket if compression fails.
+ * Tests that if time-series inserts fails due to bucket compression failure, those insert can be
+ * retried and will not try writing to the same corrupt bucket.
  *
  * @tags: [
  *   featureFlagTimeseriesAlwaysUseCompressedBuckets,
@@ -11,12 +12,7 @@ import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 // Disable testing diagnostics because bucket compression failure results in a tripwire assertion.
 TestData.testingDiagnosticsEnabled = false;
 
-// TODO (SERVER-86072): Run test with both ordered and unordered inserts.
-// TimeseriesTest.run((insert) => {
-const insert = function(coll, docs) {
-    return coll.insert(docs);
-};
-{
+const runTest = function(ordered) {
     const conn = MongoRunner.runMongod();
 
     const db = conn.getDB(jsTestName());
@@ -61,18 +57,45 @@ const insert = function(coll, docs) {
 
     // Corrupt the bucket by adding an out-of-order index in the "a" column. This will make the
     // bucket uncompressable.
-    const res = assert.commandWorked(
+    let res = assert.commandWorked(
         bucketsColl.updateOne({_id: bucket._id}, {$set: {"data.a.0": 0, "control.min.a": 0}}));
     assert.eq(res.modifiedCount, 1);
 
-    assert.commandWorked(insert(coll, [
+    const insert = function(docs) {
+        return db.runCommand({insert: coll.getName(), documents: docs, ordered: ordered});
+    };
+
+    const docs = [
         {t: time, m: 1, a: 2},  // Bucket 1
         {t: time, m: 0, a: 2},  // Bucket 0 (corrupt)
         {t: time, m: 2, a: 2},  // Bucket 2
         {t: time, m: 1, a: 3},  // Bucket 1
         {t: time, m: 0, a: 3},  // Bucket 0 (corrupt)
         {t: time, m: 1, a: 4},  // Bucket 1
-    ]));
+    ];
+
+    res = insert(docs);
+    assert.eq(res.ok, 1);
+    assert.eq(res.writeErrors[0].index, 1);
+    assert.eq(res.writeErrors[0].code, ErrorCodes.TimeseriesBucketCompressionFailed);
+    assert.eq(res.writeErrors[0].bucketId, bucket._id);
+    if (ordered) {
+        assert.eq(res.n, 1);
+        assert.eq(res.writeErrors.length, 1);
+
+        res = assert.commandWorked(insert(docs.slice(1)));
+        assert.eq(res.n, 5);
+    } else {
+        assert.eq(res.n, 4);
+        assert.eq(res.writeErrors.length, 2);
+        assert.eq(res.writeErrors[1].index, 4);
+        assert.eq(res.writeErrors[1].code, ErrorCodes.TimeseriesBucketCompressionFailed);
+        assert.eq(res.writeErrors[1].bucketId, bucket._id);
+
+        res = assert.commandWorked(insert([docs[1], docs[4]]));
+        assert.eq(res.n, 2);
+    }
+
     assert.eq(coll.find().itcount(), 8);
     assert.eq(coll.find({m: 0}).itcount(), 4);
     assert.eq(coll.find({m: 1}).itcount(), 3);
@@ -87,7 +110,7 @@ const insert = function(coll, docs) {
     assert.eq(buckets[1].control.version, TimeseriesTest.BucketVersion.kCompressed);
     assert.eq(buckets[1].control.count, 2);
 
-    checkLog.containsJson(db, 8065300, {
+    checkLog.containsJson(db, 8607200, {
         bucketId: function(bucketId) {
             return bucketId["$oid"] === bucket._id.valueOf();
         }
@@ -95,5 +118,7 @@ const insert = function(coll, docs) {
 
     // Skip validation due to the corrupt buckets.
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
-}
-//});
+};
+
+runTest(true);
+runTest(false);

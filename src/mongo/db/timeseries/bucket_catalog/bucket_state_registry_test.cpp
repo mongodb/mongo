@@ -342,6 +342,11 @@ TEST_F(BucketStateRegistryTest, TransitionsFromFrozenState) {
     // We cannot untrack a 'kFrozen' bucket.
     stopTrackingBucketState(bucketStateRegistry, bucket.bucketId);
     ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kFrozen));
+
+    // We cannot initialize bucket state for a bucket that is already frozen.
+    auto status = initializeBucketState(bucketStateRegistry, bucket.bucketId, /*bucket*/ nullptr);
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::TimeseriesBucketFrozen);
 }
 
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedState) {

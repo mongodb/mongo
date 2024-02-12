@@ -241,11 +241,14 @@ Status initializeBucketState(BucketStateRegistry& registry,
     if (it == registry.bucketStates.end()) {
         registry.bucketStates.emplace(bucketId, BucketState::kNormal);
         return Status::OK();
-    } else if (conflictsWithReopening(it->second) || isBucketStateFrozen(it->second)) {
-        // If the bucket is frozen or we are currently performing direct writes on it we cannot
-        // initialize the bucket to a normal state.
+    } else if (conflictsWithReopening(it->second)) {
+        // If we are currently performing direct writes on it we cannot initialize the bucket to a
+        // normal state.
         return {ErrorCodes::WriteConflict,
                 "Bucket initialization failed: conflict with an exisiting bucket"};
+    } else if (isBucketStateFrozen(it->second)) {
+        return {ErrorCodes::TimeseriesBucketFrozen,
+                "Bucket initialization failed: bucket is frozen"};
     }
 
     invariant(!isBucketStatePrepared(it->second));

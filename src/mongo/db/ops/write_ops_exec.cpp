@@ -2508,6 +2508,9 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
             tryPerformTimeseriesBucketCompression(opCtx, *closedBucket, request);
         }
+    } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
+        abortStatus = ex.toStatus();
+        return false;
     } catch (const DBException& ex) {
         abortStatus = ex.toStatus();
         throw;
@@ -2687,7 +2690,6 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
     size_t start,
     size_t numDocs,
     const std::vector<size_t>& indices,
-    timeseries::BucketReopeningPermittance reopening,
     std::vector<write_ops::WriteError>* errors,
     bool* containsRetry) {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
@@ -2752,7 +2754,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
             bucketsColl,
             timeSeriesOptions,
             measurementDoc,
-            reopening,
+            timeseries::BucketReopeningPermittance::kAllowed,
             canCombineTimeseriesInsertWithOtherClients(opCtx, request));
 
         if (auto error = write_ops_exec::generateError(
@@ -2811,57 +2813,25 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
     return {std::move(batches), std::move(stmtIds), request.getDocuments().size()};
 }
 
-template <typename Fn>
-auto timeseriesBucketCompressionFailureRetry(
-    timeseries::bucket_catalog::BucketCatalog& bucketCatalog, const NamespaceString& ns, Fn&& fn) {
-    try {
-        return fn(timeseries::BucketReopeningPermittance::kAllowed);
-    } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
-        auto bucketId = ex.extraInfo<timeseries::BucketCompressionFailure>()->bucketId();
-        timeseries::bucket_catalog::freeze(bucketCatalog, ns, bucketId);
-        LOGV2_WARNING(
-            8065300,
-            "Failed to compress bucket for time-series write, retrying write with different bucket",
-            "bucketId"_attr = bucketId);
-    }
-
-    // Disallow bucket reopening when retrying, in order to avoid reopening the same bucket that we
-    // just tried.
-    return fn(timeseries::BucketReopeningPermittance::kDisallowed);
-}
-
 bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
                                               const write_ops::InsertCommandRequest& request,
                                               std::vector<write_ops::WriteError>* errors,
                                               boost::optional<repl::OpTime>* opTime,
                                               boost::optional<OID>* electionId,
                                               bool* containsRetry) {
-    return timeseriesBucketCompressionFailureRetry(
-        timeseries::bucket_catalog::BucketCatalog::get(opCtx),
-        request.getNamespace(),
-        [&](auto reopening) {
-            auto [batches, stmtIds, numInserted] =
-                insertIntoBucketCatalog(opCtx,
-                                        request,
-                                        0,
-                                        request.getDocuments().size(),
-                                        {},
-                                        reopening,
-                                        errors,
-                                        containsRetry);
+    auto [batches, stmtIds, numInserted] = insertIntoBucketCatalog(
+        opCtx, request, 0, request.getDocuments().size(), {}, errors, containsRetry);
 
-            hangTimeseriesInsertBeforeCommit.pauseWhileSet();
+    hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-            if (!commitTimeseriesBucketsAtomically(
-                    opCtx, batches, std::move(stmtIds), opTime, electionId, request)) {
-                return false;
-            }
+    if (!commitTimeseriesBucketsAtomically(
+            opCtx, batches, std::move(stmtIds), opTime, electionId, request)) {
+        return false;
+    }
 
-            getTimeseriesBatchResults(
-                opCtx, batches, 0, batches.size(), true, errors, opTime, electionId);
+    getTimeseriesBatchResults(opCtx, batches, 0, batches.size(), true, errors, opTime, electionId);
 
-            return true;
-        });
+    return true;
 }
 
 /**
@@ -2878,14 +2848,13 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     size_t start,
     size_t numDocs,
     const std::vector<size_t>& indices,
-    timeseries::BucketReopeningPermittance reopening,
     std::vector<write_ops::WriteError>* errors,
     boost::optional<repl::OpTime>* opTime,
     boost::optional<OID>* electionId,
     bool* containsRetry,
     absl::flat_hash_map<int, int>& retryAttemptsForDup) {
-    auto [batches, bucketStmtIds, _] = insertIntoBucketCatalog(
-        opCtx, request, start, numDocs, indices, reopening, errors, containsRetry);
+    auto [batches, bucketStmtIds, _] =
+        insertIntoBucketCatalog(opCtx, request, start, numDocs, indices, errors, containsRetry);
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
@@ -2922,6 +2891,21 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
                                                      &docsToRetry,
                                                      retryAttemptsForDup,
                                                      request);
+            } catch (const ExceptionFor<ErrorCodes::TimeseriesBucketCompressionFailed>& ex) {
+                auto bucketId = ex.extraInfo<timeseries::BucketCompressionFailure>()->bucketId();
+
+                timeseries::bucket_catalog::freeze(
+                    timeseries::bucket_catalog::BucketCatalog::get(opCtx),
+                    request.getNamespace(),
+                    bucketId);
+
+                LOGV2_WARNING(
+                    8607200,
+                    "Failed to compress bucket for time-series insert, please retry your write",
+                    "bucketId"_attr = bucketId);
+
+                errors->emplace_back(*write_ops_exec::generateErrorNoTenantMigration(
+                    opCtx, ex.toStatus(), start + index, errors->size()));
             } catch (const DBException& ex) {
                 // Exception during commit, append error and wait for all our batches to commit or
                 // abort. We need to wait here as pointers to memory owned by this command is stored
@@ -2962,19 +2946,16 @@ void performUnorderedTimeseriesWritesWithRetries(OperationContext* opCtx,
     std::vector<size_t> docsToRetry;
     absl::flat_hash_map<int, int> retryAttemptsForDup;
     do {
-        // TODO (SERVER-86072): Retry on bucket compression failure.
-        docsToRetry =
-            performUnorderedTimeseriesWrites(opCtx,
-                                             request,
-                                             start,
-                                             numDocs,
-                                             docsToRetry,
-                                             timeseries::BucketReopeningPermittance::kAllowed,
-                                             errors,
-                                             opTime,
-                                             electionId,
-                                             containsRetry,
-                                             retryAttemptsForDup);
+        docsToRetry = performUnorderedTimeseriesWrites(opCtx,
+                                                       request,
+                                                       start,
+                                                       numDocs,
+                                                       docsToRetry,
+                                                       errors,
+                                                       opTime,
+                                                       electionId,
+                                                       containsRetry,
+                                                       retryAttemptsForDup);
         if (!retryAttemptsForDup.empty()) {
             timeseries::bucket_catalog::resetBucketOIDCounter();
         }

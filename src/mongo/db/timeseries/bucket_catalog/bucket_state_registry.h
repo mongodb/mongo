@@ -210,16 +210,16 @@ bool conflictsWithInsertions(std::variant<BucketState, DirectWriteCounter>& stat
  * operating on a potentially stale bucket. Returns WriteConflict if the current bucket state
  * conflicts with reopening.
  *
- * |   Current State    |   Result
- * |--------------------|-----------
+ * |   Current State    |         Result
+ * |--------------------|------------------------
  * | Untracked          | kNormal
  * | Normal             | kNormal
  * | Cleared            | kNormal
  * | Frozen             | kFrozen
- * | Prepared           | invariants
- * | PreparedAndCleared | throws WCE
- * | PreparedAndFrozen  | throws WCE
- * | DirectWriteCounter | throws WCE
+ * | Prepared           | TimeseriesBucketFrozen
+ * | PreparedAndCleared | WriteConflict
+ * | PreparedAndFrozen  | WriteConflict
+ * | DirectWriteCounter | WriteConflict
  */
 Status initializeBucketState(BucketStateRegistry& registry,
                              const BucketId& bucketId,

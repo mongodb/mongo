@@ -540,6 +540,8 @@ error_codes:
 
     - {code: 409, name: CannotInsertTimeseriesBucketsWithMixedSchema}
 
+    - {code: 410, name: TimeseriesBucketFrozen, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
