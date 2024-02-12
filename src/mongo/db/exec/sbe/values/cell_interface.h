@@ -107,24 +107,39 @@ struct CellBlock {
     virtual std::unique_ptr<CellBlock> clone() const = 0;
 
     /**
-     * Returns an vector of true/false values with a 1 in the position for every new document. E.g.
+     * Returns an vector of integers indicating the position of values within documents. The ith
+     * integer represents number of values for the ith row.
      * {a: [1,2,3,4]}
      * {a: 5}
      * {XYZ: 999}
      * {a: [6,7]}
      *
      * Values for the 'a' CellBlock:
-     * [1,2,3,4,5,Nothing,6,7]
+     * [1, 2, 3, 4, 5, Nothing, 6, 7]
      *
      * Filter position info (the return value of this function):
-     * [1,0,0,0,1,1       1,0]
+     * [4            1  1        2]
      *
-     * A '1' indicates that this value is the beginning of the next document. A '0' indicates this
-     * value is part of the same document as the previous entry.
+     * Or (without spaces): [4,1,1,2]
      *
-     * An empty vector represents a trivial position info, ie, there are no arrays at all.
+     * The case where a document has an empty array is special, because we need to distinguish it
+     * from the case where the document has no values at the path for MQL's sake. (For example, if
+     * we search for documents that have a missing 'a' field, we need to know whether 'a' is really
+     * missing or whether it's an empty array)
+     *
+     * A document with an empty array has a 0 in its position info.
+     * {a: 1}
+     * {a: []}
+     * {a: [2,3]}
+     *
+     * values:    [1,2,3]
+     * pos info:  [1,0,2]
+     *
+     * An empty vector represents a trivial position info, ie, there are no arrays at all, and
+     * there is exactly one value per document (including Nothings, for documents where the field
+     * is missing). This could also be represented with a vector of all 1s.
      */
-    virtual const std::vector<char>& filterPositionInfo() = 0;
+    virtual const std::vector<int32_t>& filterPositionInfo() = 0;
 };
 
 /*
@@ -135,11 +150,11 @@ struct MaterializedCellBlock : public CellBlock {
     ValueBlock& getValueBlock() override;
     std::unique_ptr<CellBlock> clone() const override;
 
-    const std::vector<char>& filterPositionInfo() override {
+    const std::vector<int32_t>& filterPositionInfo() override {
         return _filterPosInfo;
     }
 
     std::unique_ptr<ValueBlock> _deblocked;
-    std::vector<char> _filterPosInfo;
+    std::vector<int32_t> _filterPosInfo;
 };
 }  // namespace mongo::sbe::value

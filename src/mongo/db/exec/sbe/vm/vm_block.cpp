@@ -58,9 +58,10 @@ bool allBools(const value::TypeTags* tag, size_t sz) {
     return true;
 }
 
-bool emptyPositionInfo(const std::vector<char>& positionInfo) {
+bool emptyPositionInfo(const std::vector<int32_t>& positionInfo) {
     return positionInfo.empty() ||
-        std::all_of(positionInfo.begin(), positionInfo.end(), [](const char& c) { return c == 1; });
+        std::all_of(
+               positionInfo.begin(), positionInfo.end(), [](const int32_t& c) { return c == 1; });
 }
 }  // namespace
 
@@ -1443,46 +1444,67 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
     auto* cellBlock = value::bitcastTo<value::CellBlock*>(cellVal);
 
     auto valsExtracted = valueBlock->extract();
-    tassert(7953535, "Unsupported empty block", valsExtracted.count() > 0);
-
-
     const auto& positionInfo = cellBlock->filterPositionInfo();
-    if (emptyPositionInfo(positionInfo) && allBools(valsExtracted.tags(), valsExtracted.count())) {
-        // Return the input unchanged.
-        return moveFromStack(0);
+
+    if (emptyPositionInfo(positionInfo)) {
+        if (valsExtracted.count() > 0 && allBools(valsExtracted.tags(), valsExtracted.count())) {
+            // Return the input unchanged.
+            return moveFromStack(0);
+        } else {
+            auto out = std::make_unique<value::BoolBlock>();
+            for (size_t i = 0; i < valsExtracted.count(); ++i) {
+                auto [t, v] = valsExtracted[i];
+                out->push_back(t == value::TypeTags::Boolean && value::bitcastTo<bool>(v));
+            }
+
+            return {true,
+                    value::TypeTags::valueBlock,
+                    value::bitcastFrom<value::ValueBlock*>(out.release())};
+        }
     }
 
-    tassert(7953534,
-            "Expected position info count to be same as value size",
-            valsExtracted.count() == positionInfo.size());
-    tassert(7953536, "First position info element should always be true", positionInfo[0]);
+    // Note that the representation for positionInfo was chosen for simplicity and not for
+    // performance.  If this code ends up being a bottleneck, there are plenty of tricks we can do
+    // to speed it up. At time of writing, this code was not at all "hot," so we kept it simple.
 
-    // Note: if this code ends up being a bottleneck, we can make some changes. foldCounts()
-    // can be initialized based on the number of 1 bits in filterPosInfo. We can also try to
-    // make 'folded' and 'foldCounts' use one buffer, rather than two.
+    std::vector<value::Value> folded(positionInfo.size(), value::Value(0));
 
-    // Represents number of true values in each run.
-    std::vector<int> foldCounts(valsExtracted.count(), 0);
-    int runsSeen = -1;
-    for (size_t i = 0; i < valsExtracted.count(); ++i) {
-        dassert(positionInfo[i] == 1 || positionInfo[i] == 0);
-        runsSeen += positionInfo[i];
-        foldCounts[runsSeen] +=
-            static_cast<int>(valsExtracted[i].first == sbe::value::TypeTags::Boolean &&
-                             value::bitcastTo<bool>(valsExtracted[i].second));
+    // We keep two parallel iterators, one over the position info and another over the vector of
+    // values. There is exactly one position info element per row, so our output is guaranteed to be
+    // of size positionInfo.size().
+
+    // pos info: [1, 1, 2, 1, 1, 0, 1, 1]
+    //                  ^rowIdx
+    //
+    // vals:     [true, false, true, true, Nothing, ...]
+    //                         ^valIdx
+    //
+    // We then logically OR the values associated with the same row. So if a row has any 'trues'
+    // associated with it, its result is true. Otherwise its result is false. In the special case
+    // where a row has 0 values associated with it (corresponding to an empty array), it's result
+    // is false.
+
+    size_t valIdx = 0;
+    for (size_t rowIdx = 0; rowIdx < positionInfo.size(); ++rowIdx) {
+        const auto nElementsForRow = positionInfo[rowIdx];
+        invariant(nElementsForRow >= 0);
+
+        bool foldedResultForRow = false;
+        for (int elementForDoc = 0; elementForDoc < nElementsForRow; ++elementForDoc) {
+            tassert(8604101, "Corrupt position info", valIdx < valsExtracted.count());
+
+            const bool valForElement =
+                valsExtracted[valIdx].first == sbe::value::TypeTags::Boolean &&
+                value::bitcastTo<bool>(valsExtracted[valIdx].second);
+            ++valIdx;
+
+            foldedResultForRow = foldedResultForRow || valForElement;
+        }
+        folded[rowIdx] = foldedResultForRow;
     }
 
-    // The last run is implicitly ended.
-    ++runsSeen;
-
-    // TODO SERVER-83799 Use BitsetBlock instead
-    std::vector<value::Value> folded(runsSeen);
-    for (size_t i = 0; i < folded.size(); ++i) {
-        folded[i] = value::bitcastFrom<bool>(static_cast<bool>(foldCounts[i]));
-    }
-
-    auto blockOut =
-        std::make_unique<value::HomogeneousBlock<bool, value::TypeTags::Boolean>>(folded);
+    auto blockOut = std::make_unique<value::HeterogeneousBlock>(
+        std::vector<value::TypeTags>(folded.size(), value::TypeTags::Boolean), std::move(folded));
 
     return {true,
             value::TypeTags::valueBlock,
