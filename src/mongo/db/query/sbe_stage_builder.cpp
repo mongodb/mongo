@@ -3552,27 +3552,28 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(8146605, "buildProjection() does not support kSortKey", !reqs.hasSortKeys());
 
+    // Build a plan for this projection.
     std::unique_ptr<BuildProjectionPlan> plan = makeBuildProjectionPlan(root, reqs);
 
-    return buildProjectionImpl(root, reqs, std::move(plan));
+    // Call build() on the child.
+    auto [stage, outputs] = build(root->children[0].get(), plan->childReqs);
+
+    // Call buildProjectionImpl() to generate all SBE expressions and stages needed for this
+    // projection.
+    return buildProjectionImpl(root, reqs, std::move(plan), std::move(stage), std::move(outputs));
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
                                            const PlanStageReqs& reqs,
-                                           std::unique_ptr<BuildProjectionPlan> plan) {
-    PlanStageReqs& childReqs = plan->childReqs;
-
+                                           std::unique_ptr<BuildProjectionPlan> plan,
+                                           std::unique_ptr<sbe::PlanStage> stage,
+                                           PlanStageSlots outputs) {
     BuildProjectionPlan::Type planType = plan->type;
 
     const bool isInclusion = plan->isInclusion;
     std::vector<std::string>& paths = plan->paths;
     std::vector<ProjectNode>& nodes = plan->nodes;
-
-    // Call build() on the child.
-    auto [childOutStage, childOutputs] = build(root->children[0].get(), childReqs);
-    auto stage = std::move(childOutStage);
-    auto outputs = std::move(childOutputs);
 
     // Update 'outputs' so that the kField slot for each field in 'plan->projNothingInputFields'
     // is set to Nothing.

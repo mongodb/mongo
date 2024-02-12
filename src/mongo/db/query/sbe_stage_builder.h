@@ -1096,7 +1096,9 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionImpl(
         const QuerySolutionNode* root,
         const PlanStageReqs& reqs,
-        std::unique_ptr<BuildProjectionPlan> plan);
+        std::unique_ptr<BuildProjectionPlan> plan,
+        std::unique_ptr<sbe::PlanStage> stage,
+        PlanStageSlots outputs);
 
     std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
                                                     PlanStageSlots& outputs);
