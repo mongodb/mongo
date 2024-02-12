@@ -1047,34 +1047,33 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCombin
             bitmapTag == value::TypeTags::valueBlock);
     auto* bitmap = value::getValueBlock(bitmapVal);
     auto bitmapExtracted = bitmap->extract();
-    tassert(8141610,
-            "valueBlockCombine expects a block of boolean values as mask",
-            allBools(bitmapExtracted.tags(), bitmapExtracted.count()));
 
-    size_t numTrue = 0;
-    for (size_t i = 0; i < bitmapExtracted.count(); i++) {
-        numTrue += value::bitcastTo<bool>(bitmapExtracted.vals()[i]);
-    }
-    auto promoteArgAsResult =
-        [&](size_t stackPos) -> FastTuple<bool, value::TypeTags, value::Value> {
-        auto [owned, tag, val] = moveFromStack(stackPos);
-        tassert(8141611,
-                "valueBlockCombine expects a block as argument",
-                tag == value::TypeTags::valueBlock);
-        auto* rhsBlock = value::getValueBlock(val);
-        auto count = rhsBlock->tryCount();
-        if (!count.has_value()) {
-            count = rhsBlock->extract().count();
+    if (allBools(bitmapExtracted.tags(), bitmapExtracted.count())) {
+        size_t numTrue = 0;
+        for (size_t i = 0; i < bitmapExtracted.count(); i++) {
+            numTrue += value::bitcastTo<bool>(bitmapExtracted.vals()[i]);
         }
-        tassert(8141612,
-                "valueBlockCombine expects the arguments to have the same size",
-                *count == bitmapExtracted.count());
-        return {owned, tag, val};
-    };
-    if (numTrue == 0) {
-        return promoteArgAsResult(1);
-    } else if (numTrue == bitmapExtracted.count()) {
-        return promoteArgAsResult(0);
+        auto promoteArgAsResult =
+            [&](size_t stackPos) -> FastTuple<bool, value::TypeTags, value::Value> {
+            auto [owned, tag, val] = moveFromStack(stackPos);
+            tassert(8141611,
+                    "valueBlockCombine expects a block as argument",
+                    tag == value::TypeTags::valueBlock);
+            auto* rhsBlock = value::getValueBlock(val);
+            auto count = rhsBlock->tryCount();
+            if (!count.has_value()) {
+                count = rhsBlock->extract().count();
+            }
+            tassert(8141612,
+                    "valueBlockCombine expects the arguments to have the same size",
+                    *count == bitmapExtracted.count());
+            return {owned, tag, val};
+        };
+        if (numTrue == 0) {
+            return promoteArgAsResult(1);
+        } else if (numTrue == bitmapExtracted.count()) {
+            return promoteArgAsResult(0);
+        }
     }
 
     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
@@ -1098,14 +1097,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCombin
     std::vector<value::Value> valueOut(bitmapExtracted.count());
     std::vector<value::TypeTags> tagOut(bitmapExtracted.count(), value::TypeTags::Nothing);
     for (size_t i = 0; i < bitmapExtracted.count(); i++) {
-        if (value::bitcastTo<bool>(bitmapExtracted.vals()[i])) {
-            std::tie(tagOut[i], valueOut[i]) =
-                value::copyValue(lhsExtracted.tags()[i], lhsExtracted.vals()[i]);
-        } else {
-            std::tie(tagOut[i], valueOut[i]) =
-                value::copyValue(rhsExtracted.tags()[i], rhsExtracted.vals()[i]);
+        if (bitmapExtracted.tags()[i] == value::TypeTags::Boolean) {
+            if (value::bitcastTo<bool>(bitmapExtracted.vals()[i])) {
+                std::tie(tagOut[i], valueOut[i]) =
+                    value::copyValue(lhsExtracted.tags()[i], lhsExtracted.vals()[i]);
+            } else {
+                std::tie(tagOut[i], valueOut[i]) =
+                    value::copyValue(rhsExtracted.tags()[i], rhsExtracted.vals()[i]);
+            }
         }
     }
+
     auto blockOut =
         std::make_unique<value::HeterogeneousBlock>(std::move(tagOut), std::move(valueOut));
     return {true,

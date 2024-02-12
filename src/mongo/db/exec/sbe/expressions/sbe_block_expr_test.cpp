@@ -1951,29 +1951,62 @@ TEST_F(SBEBlockExpressionTest, BlockCombineTest) {
     blockAccessorRight.reset(sbe::value::TypeTags::valueBlock,
                              value::bitcastFrom<value::ValueBlock*>(&rightBlock));
 
-    auto block = makeHeterogeneousBoolBlock({true, false, true, false, true});
-    blockAccessorMask.reset(sbe::value::TypeTags::valueBlock,
-                            value::bitcastFrom<value::ValueBlock*>(block.get()));
+    {
+        auto block = makeHeterogeneousBoolBlock({true, false, true, false, true});
+        blockAccessorMask.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(block.get()));
 
-    auto expr = makeE<sbe::EFunction>("valueBlockCombine",
-                                      sbe::makeEs(makeE<EVariable>(blockLeftSlot),
-                                                  makeE<EVariable>(blockRightSlot),
-                                                  makeE<EVariable>(blockMaskSlot)));
-    auto compiledExpr = compileExpression(*expr);
+        auto expr = makeE<sbe::EFunction>("valueBlockCombine",
+                                          sbe::makeEs(makeE<EVariable>(blockLeftSlot),
+                                                      makeE<EVariable>(blockRightSlot),
+                                                      makeE<EVariable>(blockMaskSlot)));
+        auto compiledExpr = compileExpression(*expr);
 
-    auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guardRun(runTag, runVal);
-    auto [strTag, strVal] = value::makeNewString("This is item #4"_sd);
-    value::ValueGuard guardStr(strTag, strVal);
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guardRun(runTag, runVal);
+        auto [strTag, strVal] = value::makeNewString("This is item #4"_sd);
+        value::ValueGuard guardStr(strTag, strVal);
 
-    assertBlockEq(
-        runTag,
-        runVal,
-        std::vector<std::pair<value::TypeTags, value::Value>>{makeInt32(1),
-                                                              makeNothing(),
-                                                              makeInt32(3),
-                                                              std::make_pair(strTag, strVal),
-                                                              makeInt32(5)});
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector<std::pair<value::TypeTags, value::Value>>{makeInt32(1),
+                                                                  makeNothing(),
+                                                                  makeInt32(3),
+                                                                  std::make_pair(strTag, strVal),
+                                                                  makeInt32(5)});
+    }
+
+    {
+        value::HeterogeneousBlock block;
+        block.push_back(makeBool(true));
+        block.push_back(makeBool(false));
+        block.push_back(makeBool(true));
+        block.push_back(makeBool(false));
+        block.push_back(makeNothing());
+        blockAccessorMask.reset(sbe::value::TypeTags::valueBlock,
+                                value::bitcastFrom<value::ValueBlock*>(&block));
+
+        auto expr = makeE<sbe::EFunction>("valueBlockCombine",
+                                          sbe::makeEs(makeE<EVariable>(blockLeftSlot),
+                                                      makeE<EVariable>(blockRightSlot),
+                                                      makeE<EVariable>(blockMaskSlot)));
+        auto compiledExpr = compileExpression(*expr);
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guardRun(runTag, runVal);
+        auto [strTag, strVal] = value::makeNewString("This is item #4"_sd);
+        value::ValueGuard guardStr(strTag, strVal);
+
+        assertBlockEq(
+            runTag,
+            runVal,
+            std::vector<std::pair<value::TypeTags, value::Value>>{makeInt32(1),
+                                                                  makeNothing(),
+                                                                  makeInt32(3),
+                                                                  std::make_pair(strTag, strVal),
+                                                                  makeNothing()});
+    }
 }
 
 TEST_F(SBEBlockExpressionTest, BlockIsMemberArrayTestNumeric) {
