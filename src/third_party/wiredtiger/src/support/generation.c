@@ -118,7 +118,7 @@ __gen_drain_callback(
 
     for (;;) {
         /* Ensure we only read the value once. */
-        WT_ORDERED_READ(v, array_session->generations[cookie->base.which]);
+        WT_ACQUIRE_READ_WITH_BARRIER(v, array_session->generations[cookie->base.which]);
 
         /*
          * The generation argument is newer than the limit. Wait for threads in generations older
@@ -254,7 +254,7 @@ __gen_oldest_callback(
     WT_UNUSED(exit_walkp);
     cookie = (WT_GENERATION_COOKIE *)cookiep;
 
-    WT_ORDERED_READ(v, array_session->generations[cookie->which]);
+    WT_ACQUIRE_READ_WITH_BARRIER(v, array_session->generations[cookie->which]);
     if (v != 0 && v < cookie->ret_oldest_gen)
         cookie->ret_oldest_gen = v;
 
@@ -281,7 +281,7 @@ __gen_oldest(WT_SESSION_IMPL *session, int which)
      * it could read an earlier session generation value. This would then violate the acquisition
      * semantics and could result in us reading 0 for the session generation when it is non-zero.
      */
-    WT_ORDERED_READ(cookie.ret_oldest_gen, conn->generations[which]);
+    WT_ACQUIRE_READ_WITH_BARRIER(cookie.ret_oldest_gen, conn->generations[which]);
 
     WT_IGNORE_RET(__wt_session_array_walk(session, __gen_oldest_callback, false, &cookie));
 
@@ -303,7 +303,7 @@ __gen_active_callback(
     WT_UNUSED(session);
     cookie = (WT_GENERATION_COOKIE *)cookiep;
 
-    WT_ORDERED_READ(v, array_session->generations[cookie->which]);
+    WT_ACQUIRE_READ_WITH_BARRIER(v, array_session->generations[cookie->which]);
     if (v != 0 && cookie->target_generation >= v) {
         cookie->ret_active = true;
         *exit_walkp = true;

@@ -36,9 +36,9 @@ __insert_simple_func(
          * against the next pointer might indicate that the skip list location is still valid, but
          * that may no longer be true when the atomic_cas operation executes.
          *
-         * Place a read barrier here to avoid this issue.
+         * Place an acquire barrier here to avoid this issue.
          */
-        WT_ORDERED_READ(old_ins, *ins_stack[i]);
+        WT_ACQUIRE_READ_WITH_BARRIER(old_ins, *ins_stack[i]);
         if (old_ins != new_ins->next[i] || !__wt_atomic_cas_ptr(ins_stack[i], old_ins, new_ins))
             return (i == 0 ? WT_RESTART : 0);
     }
@@ -79,9 +79,9 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_INSE
          * against the next pointer might indicate that the skip list location is still valid, but
          * that may no longer be true when the atomic_cas operation executes.
          *
-         * Place a read barrier here to avoid this issue.
+         * Place an acquire barrier here to avoid this issue.
          */
-        WT_ORDERED_READ(old_ins, *ins_stack[i]);
+        WT_ACQUIRE_READ_WITH_BARRIER(old_ins, *ins_stack[i]);
         if (old_ins != new_ins->next[i] || !__wt_atomic_cas_ptr(ins_stack[i], old_ins, new_ins))
             return (i == 0 ? WT_RESTART : 0);
         if (ins_head->tail[i] == NULL || ins_stack[i] == &ins_head->tail[i]->next[i])

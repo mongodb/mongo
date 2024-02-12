@@ -542,12 +542,12 @@ __chunkcache_should_evict(WT_CHUNKCACHE_CHUNK *chunk)
     bool valid;
 
     /*
-     * Do not evict chunks that are in the process of being added to the cache. The ordered read,
+     * Do not evict chunks that are in the process of being added to the cache. The acquire read,
      * and matching publish, are required since populating the chunk itself isn't protected by the
      * bucket lock. Ergo, we need to make sure that reads or writes to the valid field are not
      * reordered relative to reads or writes of other fields.
      */
-    WT_ORDERED_READ(valid, chunk->valid);
+    WT_ACQUIRE_READ_WITH_BARRIER(valid, chunk->valid);
     if (!valid)
         return (false);
 
@@ -868,7 +868,7 @@ retry:
         TAILQ_FOREACH (chunk, WT_BUCKET_CHUNKS(chunkcache, bucket_id), next_chunk) {
             if (__hash_id_eq(&chunk->hash_id, &hash_id)) {
                 /* If the chunk is there, but invalid, there is I/O in progress. Retry. */
-                WT_ORDERED_READ(valid, chunk->valid);
+                WT_ACQUIRE_READ_WITH_BARRIER(valid, chunk->valid);
                 if (!valid) {
                     __wt_spin_unlock(session, WT_BUCKET_LOCK(chunkcache, bucket_id));
                     __wt_spin_backoff(&retries, &sleep_usec);

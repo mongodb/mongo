@@ -1511,12 +1511,12 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session, bool full, const char *name, siz
     /*
      * Handle the oldest timestamp.
      *
-     * Cache the oldest timestamp and use a read barrier to prevent us from reading two different
-     * values of the oldest timestamp.
+     * Cache the oldest timestamp and use an acquire barrier to prevent us from reading two
+     * different values of the oldest timestamp.
      */
 
     oldest_timestamp = txn_global->oldest_timestamp;
-    WT_READ_BARRIER();
+    WT_ACQUIRE_BARRIER();
     __wt_timestamp_to_hex_string(
       WT_MIN(oldest_timestamp, txn_global->meta_ckpt_timestamp), hex_timestamp);
 

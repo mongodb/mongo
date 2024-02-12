@@ -87,9 +87,9 @@ restart:
              * code. Here we don't need to worry about CPU reordering as we are reading a thread
              * local value.
              *
-             * Place a read barrier to avoid this issue.
+             * Place an acquire barrier to avoid this issue.
              */
-            WT_ORDERED_READ(ins, cbt->ins_head->head[i]);
+            WT_ACQUIRE_READ_WITH_BARRIER(ins, cbt->ins_head->head[i]);
             if (ins != NULL && ins != current)
                 break;
         }
@@ -113,9 +113,9 @@ restart:
          * insert B into both level 0 and level 1. If B is visible on level 1 to this thread, it
          * must also be visible on level 0. Otherwise, we would record an inconsistent stack.
          *
-         * Place a read barrier to avoid this issue.
+         * Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(next_ins, ins->next[i]);
+        WT_ACQUIRE_READ_WITH_BARRIER(next_ins, ins->next[i]);
         if (next_ins != current) /* Stay at this level */
             ins = next_ins;
         else { /* Drop down a level */

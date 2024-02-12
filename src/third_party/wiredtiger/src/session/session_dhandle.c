@@ -525,10 +525,10 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
          *
          * By saving the generation number before, if there is a race, the saved generation number
          * will not be equal to the latest one. We want both variables to be read in as early as
-         * possible in this loop, ordered reads encourage this.
+         * possible in this loop, acquire reads encourage this.
          */
-        WT_ORDERED_READ(ckpt_gen, __wt_gen(session, WT_GEN_CHECKPOINT));
-        WT_ORDERED_READ(ckpt_running, S2C(session)->txn_global.checkpoint_running);
+        WT_ACQUIRE_READ_WITH_BARRIER(ckpt_gen, __wt_gen(session, WT_GEN_CHECKPOINT));
+        WT_ACQUIRE_READ_WITH_BARRIER(ckpt_running, S2C(session)->txn_global.checkpoint_running);
 
         if (!must_resolve)
             /* Copy the checkpoint name first because we may need it to get the first wall time. */

@@ -61,7 +61,7 @@ __wt_cond_auto_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool prog
          * within the bounds of the maximum configured. Don't retry if our update didn't make it in
          * - it's not necessary for the previous wait time to be updated every time.
          */
-        WT_ORDERED_READ(saved_prev_wait, cond->prev_wait);
+        WT_ACQUIRE_READ_WITH_BARRIER(saved_prev_wait, cond->prev_wait);
         if (!__wt_atomic_cas64(
               &cond->prev_wait, saved_prev_wait, WT_MIN(cond->max_wait, saved_prev_wait + delta)))
             WT_STAT_CONN_INCR(session, cond_auto_wait_skipped);

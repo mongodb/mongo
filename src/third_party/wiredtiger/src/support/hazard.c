@@ -164,7 +164,7 @@ __wt_hazard_set_func(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
          * Callers require a barrier here so operations holding the hazard pointer see consistent
          * data.
          */
-        WT_READ_BARRIER();
+        WT_ACQUIRE_BARRIER();
         return (0);
     }
 
@@ -293,8 +293,8 @@ hazard_get_reference(WT_SESSION_IMPL *session, WT_HAZARD **hazardp, uint32_t *ha
      * Use a barrier instead of marking the fields volatile because we don't want to slow down the
      * rest of the hazard pointer functions that don't need special treatment.
      */
-    WT_ORDERED_READ(*hazard_inusep, session->hazards.inuse);
-    WT_ORDERED_READ(*hazardp, session->hazards.arr);
+    WT_ACQUIRE_READ_WITH_BARRIER(*hazard_inusep, session->hazards.inuse);
+    WT_ACQUIRE_READ_WITH_BARRIER(*hazardp, session->hazards.arr);
 }
 
 /*

@@ -19,9 +19,9 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     /*
      * Compiler may replace the following usage of the variable with another read.
      *
-     * Place a read barrier to avoid this issue.
+     * Place an acquire barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ins, WT_SKIP_LAST(ins_head));
+    WT_ACQUIRE_READ_WITH_BARRIER(ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -39,9 +39,9 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
          * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
-         * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
+         * and inconsistent value in the lower level. Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, *insp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, *insp);
         if (ins != NULL && recno >= WT_INSERT_RECNO(ins)) {
             /* GTE: keep going at this level */
             insp = &ins->next[i];
@@ -71,9 +71,9 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
          * -> E initially, D is inserted, then B is inserted. If the current thread sees B, it would
          * be consistent to not see D.
          *
-         * Place a read barrier to avoid this issue.
+         * Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, WT_SKIP_NEXT(ins));
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, WT_SKIP_NEXT(ins));
     return (ins);
 }
 
@@ -90,9 +90,9 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     /*
      * Compiler may replace the following usage of the variable with another read.
      *
-     * Place a read barrier to avoid this issue.
+     * Place an acquire barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ins, WT_SKIP_FIRST(ins_head));
+    WT_ACQUIRE_READ_WITH_BARRIER(ins, WT_SKIP_FIRST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -110,9 +110,9 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
          * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
-         * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
+         * and inconsistent value in the lower level. Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, *insp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, *insp);
         if (ins != NULL && recno > WT_INSERT_RECNO(ins)) {
             /* GT: keep going at this level */
             insp = &ins->next[i];
@@ -140,9 +140,9 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
     /*
      * Compiler may replace the following usage of the variable with another read.
      *
-     * Place a read barrier to avoid this issue.
+     * Place an acquire barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ins, WT_SKIP_LAST(ins_head));
+    WT_ACQUIRE_READ_WITH_BARRIER(ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ins == NULL)
@@ -161,9 +161,9 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
     for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
         /*
          * CPUs with weak memory ordering may reorder the reads which may lead us to read a stale
-         * and inconsistent value in the lower level. Place a read barrier to avoid this issue.
+         * and inconsistent value in the lower level. Place an acquire barrier to avoid this issue.
          */
-        WT_ORDERED_READ(ins, *insp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ins, *insp);
         if (ins == NULL) {
             --i;
             --insp;
@@ -201,9 +201,9 @@ __col_insert_search(
     /*
      * Compiler may replace the following usage of the variable with another read.
      *
-     * Place a read barrier to avoid this issue.
+     * Place an acquire barrier to avoid this issue.
      */
-    WT_ORDERED_READ(ret_ins, WT_SKIP_LAST(ins_head));
+    WT_ACQUIRE_READ_WITH_BARRIER(ret_ins, WT_SKIP_LAST(ins_head));
 
     /* If there's no insert chain to search, we're done. */
     if (ret_ins == NULL)
@@ -229,11 +229,11 @@ __col_insert_search(
          * Compiler and CPUs with weak memory ordering may reorder the reads causing us to read a
          * stale value here. Different to the row store version, it is generally OK here to read a
          * stale value as we don't have prefix search optimization for column store. Therefore, we
-         * cannot wrongly skip the prefix comparison. However, we should still place a read barrier
-         * here to ensure we see consistent values in the lower levels to prevent any unexpected
-         * behavior.
+         * cannot wrongly skip the prefix comparison. However, we should still place an acquire
+         * barrier here to ensure we see consistent values in the lower levels to prevent any
+         * unexpected behavior.
          */
-        WT_ORDERED_READ(ret_ins, *insp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ret_ins, *insp);
         if (ret_ins == NULL) {
             next_stack[i] = NULL;
             ins_stack[i--] = insp--;
@@ -258,9 +258,9 @@ __col_insert_search(
                 /*
                  * It is possible that we read an old value that is inconsistent to the higher
                  * levels of the skip list due to read reordering on CPUs with weak memory ordering.
-                 * Add a read barrier to avoid this issue.
+                 * Add an acquire barrier to avoid this issue.
                  */
-                WT_ORDERED_READ(next_stack[i], ret_ins->next[i]);
+                WT_ACQUIRE_READ_WITH_BARRIER(next_stack[i], ret_ins->next[i]);
                 ins_stack[i] = &ret_ins->next[i];
             }
         else { /* Drop down a level */

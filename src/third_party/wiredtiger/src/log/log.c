@@ -1175,7 +1175,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
         log->log_close_fh = NULL;
     else {
         WT_ASSIGN_LSN(&log->log_close_lsn, &log->alloc_lsn);
-        /* Paired with an ordered read in the log file server path. */
+        /* Paired with an acquire read in the log file server path. */
         WT_PUBLISH(log->log_close_fh, log->log_fh);
     }
     log->fileid++;

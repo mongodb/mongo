@@ -125,7 +125,7 @@ replay_maximum_committed(void)
      */
     ts = g.replay_cached_committed;
     if (ts == 0 || __wt_atomic_addv32(&g.replay_calculate_committed, 1) % 20 == 0) {
-        WT_ORDERED_READ(ts, g.timestamp);
+        WT_ACQUIRE_READ_WITH_BARRIER(ts, g.timestamp);
         testutil_check(pthread_rwlock_wrlock(&g.lane_lock));
         for (lane = 0; lane < LANE_COUNT; ++lane) {
             if (g.lanes[lane].in_use) {
@@ -257,7 +257,7 @@ replay_pick_timestamp(TINFO *tinfo)
             ts = __wt_atomic_addv64(&g.timestamp, 1);
             g.timestamp_copy = g.timestamp;
             lane = LANE_NUMBER(ts);
-            WT_ORDERED_READ(in_use, g.lanes[lane].in_use);
+            WT_ACQUIRE_READ_WITH_BARRIER(in_use, g.lanes[lane].in_use);
         } while (in_use);
 
         tinfo->replay_ts = ts;

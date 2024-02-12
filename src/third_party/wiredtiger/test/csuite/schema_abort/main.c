@@ -650,7 +650,7 @@ thread_ckpt_run(void *arg)
          * timestamp could increment during (or after) the checkpoint, so if we read it later, we
          * could prematurely wrap this thread up.
          */
-        WT_ORDERED_READ(stable_ts_copy, stable_timestamp);
+        WT_ACQUIRE_READ_WITH_BARRIER(stable_ts_copy, stable_timestamp);
 
         /* Set the configuration based on whether we're flushing. */
         testutil_check(session->checkpoint(session, flush_tier ? ckpt_flush_config : ckpt_config));

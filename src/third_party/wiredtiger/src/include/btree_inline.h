@@ -417,7 +417,7 @@ __wt_cache_page_byte_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t 
         /*
          * Take care to read the dirty-byte count only once in case we're racing with updates.
          */
-        WT_ORDERED_READ(orig, page->modify->bytes_dirty);
+        WT_ACQUIRE_READ_WITH_BARRIER(orig, page->modify->bytes_dirty);
         decr = WT_MIN(size, orig);
         if (__wt_atomic_cassize(&page->modify->bytes_dirty, orig, orig - decr))
             break;
@@ -459,7 +459,7 @@ __wt_cache_page_byte_updates_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_
 
     /* See above for why this can race. */
     for (i = 0; i < 5; ++i) {
-        WT_ORDERED_READ(orig, page->modify->bytes_updates);
+        WT_ACQUIRE_READ_WITH_BARRIER(orig, page->modify->bytes_updates);
         decr = WT_MIN(size, orig);
         if (__wt_atomic_cassize(&page->modify->bytes_updates, orig, orig - decr))
             break;
@@ -1545,7 +1545,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
      * WT_ADDRs and swapped into place. The content of the two WT_ADDRs are identical, and we don't
      * care which version we get as long as we don't mix-and-match the two.
      */
-    WT_ORDERED_READ(addr, (WT_ADDR *)ref->addr);
+    WT_ACQUIRE_READ_WITH_BARRIER(addr, (WT_ADDR *)ref->addr);
 
     /* If NULL, there is no information. */
     if (addr == NULL)
@@ -1651,7 +1651,7 @@ __wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, b
     WT_ASSERT(session, page_del->txnid != WT_TXN_ABORTED);
 
     if (hide_prepared) {
-        WT_ORDERED_READ(prepare_state, page_del->prepare_state);
+        WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, page_del->prepare_state);
         if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
             return (false);
     }
@@ -1677,7 +1677,7 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
     WT_ASSERT(session, page_del->txnid != WT_TXN_ABORTED);
 
     if (hide_prepared) {
-        WT_ORDERED_READ(prepare_state, page_del->prepare_state);
+        WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, page_del->prepare_state);
         if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
             return (false);
     }

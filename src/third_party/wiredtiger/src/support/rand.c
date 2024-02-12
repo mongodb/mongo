@@ -145,7 +145,7 @@ __wt_random(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visibility
      * of the random state so we can ensure that the calculation operates on the state consistently
      * regardless of concurrent calls with the same random state.
      */
-    WT_ORDERED_READ(rnd, *rnd_state);
+    WT_ACQUIRE_READ_WITH_BARRIER(rnd, *rnd_state);
     w = M_W(rnd);
     z = M_Z(rnd);
 

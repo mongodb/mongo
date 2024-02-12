@@ -44,8 +44,8 @@
  *
  * GCC and Clang have a __typeof__ compiler builtin which allows us to temporarily cast the value
  * being read as a volatile and achieve volatile semantics. For other compilers we'll fall back on
- * inserting a read barrier after the read (our pre-existing implementation) which prevents invented
- * and fused loads for this variable in the code following the expression.
+ * inserting an acquire barrier after the read (our pre-existing implementation) which prevents
+ * invented and fused loads for this variable in the code following the expression.
  *
  * FIXME-WT-11718 - Once Windows build machines that support C11 _Generics are available this macro
  * will be updated to use _Generic on all platforms.
@@ -53,16 +53,16 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define WT_READ_ONCE(v, val) (v) = (*(volatile __typeof__(val) *)&(val))
 #else
-#define WT_READ_ONCE(v, val) WT_ORDERED_READ(v, val)
+#define WT_READ_ONCE(v, val) WT_ACQUIRE_READ_WITH_BARRIER(v, val)
 #endif
 
 /*
  * Read a shared location and guarantee that subsequent reads do not see any earlier state.
  */
-#define WT_ORDERED_READ(v, val) \
-    do {                        \
-        (v) = (val);            \
-        WT_READ_BARRIER();      \
+#define WT_ACQUIRE_READ_WITH_BARRIER(v, val) \
+    do {                                     \
+        (v) = (val);                         \
+        WT_ACQUIRE_BARRIER();                \
     } while (0)
 
 /*

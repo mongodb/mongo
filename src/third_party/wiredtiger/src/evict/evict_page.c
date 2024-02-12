@@ -628,12 +628,12 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
             if (!WT_REF_CAS_STATE(session, child, WT_REF_DELETED, WT_REF_LOCKED))
                 return (__wt_set_return(session, EBUSY));
             /*
-             * Insert a read/read barrier so we're guaranteed the page_del state we read below comes
-             * after the locking operation on the ref state and therefore after the previous unlock
-             * of the ref. Otherwise we might read an inconsistent view of the page deletion info,
-             * and while many combinations are harmless and would just lead us to falsely refuse to
-             * evict, some (e.g. reading committed as true and a stale durable timestamp from before
-             * it was set by commit) are not.
+             * Insert a read/acquire barrier so we're guaranteed the page_del state we read below
+             * comes after the locking operation on the ref state and therefore after the previous
+             * unlock of the ref. Otherwise we might read an inconsistent view of the page deletion
+             * info, and while many combinations are harmless and would just lead us to falsely
+             * refuse to evict, some (e.g. reading committed as true and a stale durable timestamp
+             * from before it was set by commit) are not.
              *
              * Note that while ordinarily a lock acquire should have an acquire (read/any) barrier
              * after it, because we are only reading the write part is irrelevant and a read/read
@@ -641,7 +641,7 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
              *
              * FIXME-WT-9780: this and the CAS should be rolled into a WT_REF_TRYLOCK macro.
              */
-            WT_READ_BARRIER();
+            WT_ACQUIRE_BARRIER();
 
             /*
              * We can evict any truncation that's committed. However, restrictions in reconciliation

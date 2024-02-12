@@ -548,7 +548,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
      * with the oldest ID, which is what we want. The logged tables are excluded as part of RTS, so
      * there is no need of holding their oldest_id
      */
-    WT_ORDERED_READ(oldest_id, txn_global->oldest_id);
+    WT_ACQUIRE_READ_WITH_BARRIER(oldest_id, txn_global->oldest_id);
 
     if (!F_ISSET(conn, WT_CONN_RECOVERING) || session->dhandle == NULL ||
       F_ISSET(S2BT(session), WT_BTREE_LOGGED)) {
@@ -607,7 +607,7 @@ __wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
      * pinned. If a checkpoint is starting and we have to use the checkpoint timestamp, we take the
      * minimum of it with the oldest timestamp, which is what we want.
      */
-    WT_READ_BARRIER();
+    WT_ACQUIRE_BARRIER();
     checkpoint_ts = txn_global->checkpoint_timestamp;
 
     if (checkpoint_ts != 0 && checkpoint_ts < pinned_ts)
@@ -716,7 +716,7 @@ __wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
     uint8_t prepare_state;
 
-    WT_ORDERED_READ(prepare_state, upd->prepare_state);
+    WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
 
     if (prepare_state == WT_PREPARE_LOCKED || prepare_state == WT_PREPARE_INPROGRESS)
         return (false);
@@ -950,7 +950,7 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
     for (;; __wt_yield()) {
         /* Prepare state change is in progress, yield and try again. */
-        WT_ORDERED_READ(prepare_state, upd->prepare_state);
+        WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
         if (prepare_state == WT_PREPARE_LOCKED)
             continue;
 
@@ -965,11 +965,11 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
          * The visibility check is only valid if the update does not change state. If the state does
          * change, recheck visibility.
          *
-         * We need to place a read barrier prior to the second read of prepare state as otherwise it
-         * could overlap with the reads of the transaction id and start timestamp. Which would
-         * invalidate this check.
+         * We need to place an acquire barrier prior to the second read of prepare state as
+         * otherwise it could overlap with the reads of the transaction id and start timestamp.
+         * Which would invalidate this check.
          */
-        WT_READ_BARRIER();
+        WT_ACQUIRE_BARRIER();
         if (prepare_state == upd->prepare_state)
             break;
 
@@ -1082,7 +1082,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
         if (upd->type == WT_UPDATE_RESERVE)
             continue;
 
-        WT_ORDERED_READ(prepare_state, upd->prepare_state);
+        WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
 
         /*
          * We previously found a prepared update, check if the update has the same transaction id,
@@ -1816,7 +1816,7 @@ __wt_upd_value_assign(WT_UPDATE_VALUE *upd_value, WT_UPDATE *upd)
 {
     uint8_t prepare_state;
 
-    WT_ORDERED_READ(prepare_state, upd->prepare_state);
+    WT_ACQUIRE_READ_WITH_BARRIER(prepare_state, upd->prepare_state);
 
     if (!upd_value->skip_buf) {
         upd_value->buf.data = upd->data;

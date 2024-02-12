@@ -108,12 +108,12 @@ WT_PAUSE(void)
 }
 
 /*
- * WT_READ_BARRIER --
- *	MSVC implementation of WT_READ_BARRIER. As we're running on x86 TSO we only issue a compiler
- *  barrier.
+ * WT_ACQUIRE_BARRIER --
+ *	MSVC implementation of WT_ACQUIRE_BARRIER. As we're running on x86 TSO we only issue a
+ *compiler barrier.
  */
 static inline void
-WT_READ_BARRIER(void)
+WT_ACQUIRE_BARRIER(void)
 {
     WT_COMPILER_BARRIER();
 }

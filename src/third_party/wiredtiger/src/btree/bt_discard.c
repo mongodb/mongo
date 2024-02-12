@@ -285,17 +285,17 @@ __wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
      *
      * However as we could be the child of a page being split the ref->home pointer which tells us
      * whether the addr is on or off page could change concurrently. To avoid this we save the home
-     * pointer before we do the compare and swap. While the second ordered read should be sufficient
-     * we use an ordered read on the ref->home pointer as that is the standard mechanism to
+     * pointer before we do the compare and swap. While the second acquire read should be sufficient
+     * we use an acquire read on the ref->home pointer as that is the standard mechanism to
      * guarantee we read the current value.
      *
      * We don't reread this value inside loop as if it was to change then we would be pointing at a
      * new parent, which would mean that our ref->addr must have been instantiated and thus we are
      * safe to free it at the end of this function.
      */
-    WT_ORDERED_READ(home, ref->home);
+    WT_ACQUIRE_READ_WITH_BARRIER(home, ref->home);
     do {
-        WT_ORDERED_READ(ref_addr, ref->addr);
+        WT_ACQUIRE_READ_WITH_BARRIER(ref_addr, ref->addr);
         if (ref_addr == NULL)
             return;
     } while (!__wt_atomic_cas_ptr(&ref->addr, ref_addr, NULL));

@@ -303,7 +303,7 @@ thread_wait(void)
 
     (void)__wt_atomic_add64(&ready_counter, 1);
     for (;; __wt_yield()) {
-        WT_ORDERED_READ(ready_counter_local, ready_counter);
+        WT_ACQUIRE_READ_WITH_BARRIER(ready_counter_local, ready_counter);
         if (ready_counter_local >= 2) {
             break;
         }

@@ -244,7 +244,7 @@ __split_ref_move(WT_SESSION_IMPL *session, WT_PAGE *from_home, WT_REF **from_ref
      * unchanged from the original. In the case of a race, the address must no longer reference the
      * split page, we're done.
      */
-    WT_ORDERED_READ(ref_addr, ref->addr);
+    WT_ACQUIRE_READ_WITH_BARRIER(ref_addr, ref->addr);
     if (ref_addr != NULL && !__wt_off_page(from_home, ref_addr)) {
         __wt_cell_unpack_addr(session, from_home->dsk, (WT_CELL *)ref_addr, &unpack);
         WT_RET(__wt_calloc_one(session, &addr));

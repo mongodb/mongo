@@ -267,7 +267,7 @@ stall:
      * data. The atomic operation above isn't sufficient here because we don't own the lock until
      * our ticket comes up and whatever data we are protecting may have changed in the meantime.
      */
-    WT_READ_BARRIER();
+    WT_ACQUIRE_BARRIER();
 
     /* Sanity check that we (still) have the lock. */
     WT_ASSERT(session, ticket == l->u.s.current && l->u.s.readers_active > 0);
@@ -432,7 +432,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
      * data. The atomic operation above isn't sufficient here because we don't own the lock until
      * our ticket comes up and whatever data we are protecting may have changed in the meantime.
      */
-    WT_READ_BARRIER();
+    WT_ACQUIRE_BARRIER();
 
     /* Sanity check that we (still) have the lock. */
     WT_ASSERT(session, ticket == l->u.s.current && l->u.s.readers_active == 0);

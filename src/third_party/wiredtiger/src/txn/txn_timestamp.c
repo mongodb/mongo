@@ -74,7 +74,7 @@ __wt_txn_parse_timestamp(
 static void
 __txn_get_read_timestamp(WT_TXN_SHARED *txn_shared, wt_timestamp_t *read_timestampp)
 {
-    WT_ORDERED_READ(*read_timestampp, txn_shared->read_timestamp);
+    WT_ACQUIRE_READ_WITH_BARRIER(*read_timestampp, txn_shared->read_timestamp);
 }
 
 /*
@@ -113,7 +113,7 @@ __wt_txn_get_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, uin
         tmp_ts = txn_global->checkpoint_timestamp;
 
     /* Walk the array of concurrent transactions. */
-    WT_ORDERED_READ(session_cnt, conn->session_array.cnt);
+    WT_ACQUIRE_READ_WITH_BARRIER(session_cnt, conn->session_array.cnt);
     for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
         __txn_get_read_timestamp(s, &tmp_read_ts);
         /*
@@ -139,7 +139,7 @@ __wt_txn_get_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, uin
 static void
 __txn_get_durable_timestamp(WT_TXN_SHARED *txn_shared, wt_timestamp_t *durable_timestampp)
 {
-    WT_ORDERED_READ(*durable_timestampp, txn_shared->pinned_durable_timestamp);
+    WT_ACQUIRE_READ_WITH_BARRIER(*durable_timestampp, txn_shared->pinned_durable_timestamp);
 }
 
 /*
@@ -176,7 +176,7 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
         ts = txn_global->durable_timestamp;
 
         /* Walk the array of concurrent transactions. */
-        WT_ORDERED_READ(session_cnt, conn->session_array.cnt);
+        WT_ACQUIRE_READ_WITH_BARRIER(session_cnt, conn->session_array.cnt);
         for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
             __txn_get_durable_timestamp(s, &tmpts);
             if (tmpts != 0 && (ts == 0 || --tmpts < ts))
@@ -474,7 +474,7 @@ __txn_assert_after_reads(WT_SESSION_IMPL *session, const char *op, wt_timestamp_
 
     if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_TXN_VISIBILITY)) {
         txn_global = &S2C(session)->txn_global;
-        WT_ORDERED_READ(session_cnt, S2C(session)->session_array.cnt);
+        WT_ACQUIRE_READ_WITH_BARRIER(session_cnt, S2C(session)->session_array.cnt);
         WT_STAT_CONN_INCR(session, txn_walk_sessions);
         WT_STAT_CONN_INCRV(session, txn_sessions_walked, session_cnt);
 
