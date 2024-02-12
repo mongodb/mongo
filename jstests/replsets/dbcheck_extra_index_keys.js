@@ -866,12 +866,6 @@ runMainTests(1000, 99 /* batchSize */, 98 /* snapshotSize*/, null /*docSuffix*/,
 runMainTests(1000, defaultMaxDocsPerBatch, 19 /* snapshotSize */, null /*docSuffix*/, -1, 301);
 runMainTests(1000, 99 /* batchSize */, 20 /* snapshotSize */, null /*docSuffix*/, 699, 1000);
 
-// TODO SERVER-79849 Add testing for:
-// * Reached bytes per batch ends batch.
-// * Total bytes seen over limit ends dbcheck
-// * Total keys seen over limit ends dbcheck
-// * Docs in current interval over limit slows rate.
-
 // TODO SERVER-79846:
 // * Test progress meter/stats are correct
 
