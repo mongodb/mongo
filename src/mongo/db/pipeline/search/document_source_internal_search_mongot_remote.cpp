@@ -269,8 +269,13 @@ DocumentSource::GetNextResult DocumentSourceInternalSearchMongotRemote::getNextA
 }
 
 executor::TaskExecutorCursor DocumentSourceInternalSearchMongotRemote::establishCursor() {
-    auto cursors = mongot_cursor::establishSearchCursors(
-        pExpCtx, _searchQuery, _taskExecutor, _mongotDocsRequested);
+    auto cursors = mongot_cursor::establishSearchCursors(pExpCtx,
+                                                         _searchQuery,
+                                                         _taskExecutor,
+                                                         _mongotDocsRequested,
+                                                         nullptr,
+                                                         _metadataMergeProtocolVersion,
+                                                         _requiresSearchSequenceToken);
     // Should be called only in unsharded scenario, therefore only expect a results cursor and no
     // metadata cursor.
     tassert(5253301, "Expected exactly one cursor from mongot", cursors.size() == 1);
