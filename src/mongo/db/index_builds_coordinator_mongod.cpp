@@ -389,15 +389,15 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             return status;
         }
     } else {
-        if (MONGO_unlikely(hangAfterRegisteringIndexBuild.shouldFail())) {
-            LOGV2(8296700, "Hanging due to hangAfterRegisteringIndexBuild");
-            hangAfterRegisteringIndexBuild.pauseWhileSet(opCtx);
-        }
-
         auto statusWithOptionalResult =
             _filterSpecsAndRegisterBuild(opCtx, dbName, collectionUUID, specs, buildUUID, protocol);
         if (!statusWithOptionalResult.isOK()) {
             return statusWithOptionalResult.getStatus();
+        }
+
+        if (MONGO_unlikely(hangAfterRegisteringIndexBuild.shouldFail())) {
+            LOGV2(8296700, "Hanging due to hangAfterRegisteringIndexBuild");
+            hangAfterRegisteringIndexBuild.pauseWhileSet(opCtx);
         }
 
         if (statusWithOptionalResult.getValue()) {
