@@ -329,10 +329,12 @@ MigrationChunkClonerSource::MigrationChunkClonerSource(OperationContext* opCtx,
       _recipientHost(std::move(recipientHost)),
       _forceJumbo(_args.getForceJumbo() != ForceJumbo::kDoNotForce) {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getSettings().isReplSet()) {
-        _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
-            opCtx, nss(), ChunkRange(getMin(), getMax()), _shardKeyPattern.getKeyPattern());
-    }
+    uassert(8393800,
+            "cannot start migration, shard must run as replica sets",
+            replCoord->getSettings().isReplSet());
+
+    _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
+        opCtx, nss(), ChunkRange(getMin(), getMax()), _shardKeyPattern.getKeyPattern());
 }
 
 MigrationChunkClonerSource::~MigrationChunkClonerSource() {
@@ -346,12 +348,10 @@ Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
     invariant(_state == kNew);
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
-    if (_sessionCatalogSource) {
-        _sessionCatalogSource->init(opCtx, lsid);
+    _sessionCatalogSource->init(opCtx, lsid);
 
-        // Prime up the session migration source if there are oplog entries to migrate.
-        _sessionCatalogSource->fetchNextOplog(opCtx);
-    }
+    // Prime up the session migration source if there are oplog entries to migrate.
+    _sessionCatalogSource->fetchNextOplog(opCtx);
 
     {
         // Ignore prepare conflicts when we load ids of currently available documents. This is
@@ -452,9 +452,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
         }
     }
 
-    if (_sessionCatalogSource) {
-        _sessionCatalogSource->onCommitCloneStarted();
-    }
+    _sessionCatalogSource->onCommitCloneStarted();
 
     auto responseStatus = _callRecipient(opCtx, [&] {
         BSONObjBuilder builder;
@@ -467,7 +465,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
     if (responseStatus.isOK()) {
         _cleanup(true);
 
-        if (_sessionCatalogSource && _sessionCatalogSource->hasMoreOplog()) {
+        if (_sessionCatalogSource->hasMoreOplog()) {
             return {ErrorCodes::SessionTransferIncomplete,
                     "destination shard finished committing but there are still some session "
                     "metadata that needs to be transferred"};
@@ -483,9 +481,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
 void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) noexcept {
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
-    if (_sessionCatalogSource) {
-        _sessionCatalogSource->onCloneCleanup();
-    }
+    _sessionCatalogSource->onCloneCleanup();
 
     switch (_state) {
         case kDone:
@@ -610,7 +606,7 @@ void MigrationChunkClonerSource::onDeleteOp(OperationContext* opCtx,
 void MigrationChunkClonerSource::_addToSessionMigrationOptimeQueue(
     const repl::OpTime& opTime,
     SessionCatalogMigrationSource::EntryAtOpTimeType entryAtOpTimeType) {
-    if (_sessionCatalogSource && !opTime.isNull()) {
+    if (!opTime.isNull()) {
         _sessionCatalogSource->notifyNewWriteOpTime(opTime, entryAtOpTimeType);
     }
 }
@@ -1341,10 +1337,6 @@ Status MigrationChunkClonerSource::_checkRecipientCloningStatus(OperationContext
 
 boost::optional<repl::OpTime> MigrationChunkClonerSource::nextSessionMigrationBatch(
     OperationContext* opCtx, BSONArrayBuilder* arrBuilder) {
-    if (!_sessionCatalogSource) {
-        return boost::none;
-    }
-
     repl::OpTime opTimeToWaitIfWaitingForMajority;
     const ChunkRange range(getMin(), getMax());
 
@@ -1382,27 +1374,15 @@ boost::optional<repl::OpTime> MigrationChunkClonerSource::nextSessionMigrationBa
 
 std::shared_ptr<Notification<bool>>
 MigrationChunkClonerSource::getNotificationForNextSessionMigrationBatch() {
-    if (!_sessionCatalogSource) {
-        return nullptr;
-    }
-
     return _sessionCatalogSource->getNotificationForNewOplog();
 }
 
 boost::optional<long long>
 MigrationChunkClonerSource::getSessionOplogEntriesSkippedSoFarLowerBound() {
-    if (!_sessionCatalogSource) {
-        return boost::none;
-    }
-
     return _sessionCatalogSource->getSessionOplogEntriesSkippedSoFarLowerBound();
 }
 
 boost::optional<long long> MigrationChunkClonerSource::getSessionOplogEntriesToBeMigratedSoFar() {
-    if (!_sessionCatalogSource) {
-        return boost::none;
-    }
-
     return _sessionCatalogSource->getSessionOplogEntriesToBeMigratedSoFar();
 }
 
