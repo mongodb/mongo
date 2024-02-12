@@ -24,7 +24,7 @@ __wt_config_check(
      * Callers don't check, it's a fast call without a configuration or check array.
      */
     return (config == NULL || entry->checks == NULL ||
-          (entry->compilable && __wt_conf_is_compiled(S2C(session), config)) ?
+          (entry->compilable && session != NULL && __wt_conf_is_compiled(S2C(session), config)) ?
         0 :
         __config_check(
           session, entry->checks, entry->checks_entries, entry->checks_jump, config, config_len));
