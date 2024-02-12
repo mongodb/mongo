@@ -16,7 +16,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.9,<4.0"
+python = ">=3.10,<4.0"
 # OPTIONAL
 # Libdeps depdencies
 networkx = "*"                                    # This is also used as a part of build_metrics so it is sort of required
