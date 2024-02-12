@@ -6,7 +6,7 @@ include:
 variables:
 # Template for perf-tasks
 - &perf-tasks-template
-  batchtime: 1440 # 1 day
+  batchtime: 360 # 6 hours
   expansions: &ubuntu2004-perf-tests-expansions-template
     additional_env_vars: export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$WT_BUILDDIR/test/utility/"
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
