@@ -74,7 +74,7 @@ testHiddenFlagInCurrentOp({
                 "index": {"name": "b_1", "hidden": true}}));`,
     isCommandExpected: function(inprogs) {
         return inprogs.find(function(inprog) {
-            return inprog.command.collMod === "profile_hide_index" &&
+            return inprog.command.collMod === "profile_hide_index" && inprog.command.index &&
                 inprog.command.index.hidden === true && inprog.command.index.name === "b_1";
         }) !== undefined;
     },
