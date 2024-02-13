@@ -890,6 +890,13 @@ FastTuple<bool, value::TypeTags, value::Value> homogeneousCmpScalar(
                     op(value::bitcastTo<double>(deblocked.vals[i]), value::bitcastTo<double>(val)));
             }
             break;
+        case value::TypeTags::Boolean: {
+            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
+                res[i] = value::bitcastFrom<bool>(
+                    op(value::bitcastTo<bool>(deblocked.vals[i]), value::bitcastTo<bool>(val)));
+            }
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }

@@ -218,7 +218,7 @@ TimeseriesTest.run((insert) => {
                 }
             },
             ids: [0],
-            usesBlockProcessing: false
+            usesBlockProcessing: true
         },
         {
             pred: {
@@ -236,7 +236,7 @@ TimeseriesTest.run((insert) => {
                 }
             },
             ids: [4],
-            usesBlockProcessing: false
+            usesBlockProcessing: true
         },
 
         // Comparisons with an empty array.

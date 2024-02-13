@@ -443,6 +443,11 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
             return TypeSignature::kNumericType.include(
                 argSignature.intersect(TypeSignature::kNothingType));
         }
+
+        if (op.name() == "fail"s) {
+            // "fail" aborts the query and doesn't return any value
+            return TypeSignature{};
+        }
     } else if (arity == 1) {
         if (op.name() == "exists"s) {
             // If the argument is already guaranteed not to be a Nothing or if it is a constant, we
@@ -505,6 +510,11 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
         // Always mark Nothing as a possible return type, as it can be reported due to invalid
         // arguments.
         return getTypeSignature(sbe::value::TypeTags::Date).include(TypeSignature::kNothingType);
+    }
+
+    if ((arity == 5 || arity == 6) && op.name() == "dateDiff"s) {
+        return getTypeSignature(sbe::value::TypeTags::NumberInt64)
+            .include(TypeSignature::kNothingType);
     }
     return TypeSignature::kAnyScalarType;
 }

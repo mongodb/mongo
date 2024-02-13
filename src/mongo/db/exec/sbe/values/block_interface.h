@@ -107,11 +107,13 @@ struct DeblockedHomogeneousVals {
                              const HomogeneousBlockBitset& bitset,
                              std::span<Value> vals)
         : tag(tag), bitset(bitset), vals(vals) {
+        // TODO SERVER-83799 Remove TypeTags::Boolean
         tassert(8407200,
                 "Can only create DeblockedHomogeneousVals with NumberInt32, NumberInt64, "
-                "NumberDouble, or Date",
+                "NumberDouble, Date, or Boolean",
                 tag == TypeTags::NumberInt32 || tag == TypeTags::NumberInt64 ||
-                    tag == TypeTags::Date || tag == TypeTags::NumberDouble);
+                    tag == TypeTags::Date || tag == TypeTags::NumberDouble ||
+                    tag == TypeTags::Boolean);
         tassert(8407201, "Empty block cannot have values", this->bitset.size() || (vals.empty()));
     }
 
