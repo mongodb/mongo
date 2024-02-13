@@ -957,7 +957,7 @@ buildvariants:
     - "rhel70-perf-single"
   tasks: *audit-tasks
 
-- <<: *amazon_linux2_arm64_compile_variant_dependency
+- <<: *amazon_linux2_arm64_mongocrypt_compile_variant_dependency
   name: perf-shard-lite-fle.arm.aws.2023-11
   display_name: PERF Shard Lite FLE ARM AWS 2023-11
   cron: *cron_sunday_thursday
