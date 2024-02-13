@@ -94,8 +94,7 @@ export function checkSbeFullyEnabled(theDB) {
 
 /**
  * Check if SBE is either restricted (only select agg stages: $group, $lookup,
- * $_internalUnpackBucket, $search are allowed to be pushed down to sbe) or fully enabled in the
- * cluster.
+ * $_internalUnpackBucket are allowed to be pushed down to sbe) or fully enabled in the cluster.
  */
 export function checkSbeRestrictedOrFullyEnabled(theDB) {
     const status = checkSbeStatus(theDB);
@@ -103,8 +102,8 @@ export function checkSbeRestrictedOrFullyEnabled(theDB) {
 }
 
 /**
- * Check if SBE is restricted (only select agg stages: $group, $lookup, $_internalUnpackBucket,
- * $search are allowed to be pushed down to sbe).
+ * Check if SBE is restricted (only select agg stages: $group, $lookup, $_internalUnpackBucket are
+ * allowed to be pushed down to sbe).
  */
 export function checkSbeRestricted(theDB) {
     return checkSbeStatus(theDB) === kSbeRestricted;

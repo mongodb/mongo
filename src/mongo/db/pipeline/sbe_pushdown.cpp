@@ -332,7 +332,7 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  * {'internalQueryFrameworkControl': 'forceClassicEngine'}, a stage can be extracted from the
  * pipeline if and only if all the stages before it are extracted and it meets the criteria for its
  * stage type. When 'internalQueryFrameworkControl' is set to 'trySbeRestricted', only '$group',
- * '$lookup', '$_internalUnpackBucket', and search can be extracted. Criteria by stage type:
+ * '$lookup', and '$_internalUnpackBucket' can be extracted. Criteria by stage type:
  *
  * $group via 'DocumentSourceGroup':
  *   - The 'internalQuerySlotBasedExecutionDisableGroupPushdown' knob is false and
@@ -372,6 +372,7 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  *
  * 'DocumentSourceSearch':
  *   - The 'featureFlagSearchInSbe' flag is enabled.
+ *   - the 'featureFlagSbeFull' flag is enabled.
  *
  * $_internalUnpackBucket via 'DocumentSourceInternalUnpackBucket':
  *   - The 'featureFlagTimeSeriesInSbe' flag is enabled and
@@ -405,10 +406,9 @@ bool findSbeCompatibleStagesForPushdown(
 
     auto& queryKnob = QueryKnobConfiguration::decoration(cq->getExpCtxRaw()->opCtx);
 
-    // We do a pushdown of all eligible stages when one of 3 conditions are met: the query knob is
-    // set to 'trySbeEngine'; featureFlagSbeFull is enabled; the given query is a search query.
-    const bool doFullPushdown =
-        queryKnob.canPushDownFullyCompatibleStages() || sbeFullEnabled || cq->isSearchQuery();
+    // We do a pushdown of all eligible stages when one of 2 conditions are met: the query knob is
+    // set to 'trySbeEngine'; featureFlagSbeFull is enabled.
+    const bool doFullPushdown = queryKnob.canPushDownFullyCompatibleStages() || sbeFullEnabled;
 
     CompatiblePipelineStages allowedStages = {
         .group = !queryKnob.getSbeDisableGroupPushdownForOp(),
@@ -445,8 +445,9 @@ bool findSbeCompatibleStagesForPushdown(
 
         // TODO (SERVER-77229): SBE execution of $search requires 'featureFlagSearchInSbe' to be
         // enabled.
-        .search = feature_flags::gFeatureFlagSearchInSbe.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
+        .search = doFullPushdown && SbeCompatibility::flagGuarded >= minRequiredCompatibility &&
+            feature_flags::gFeatureFlagSearchInSbe.isEnabled(
+                serverGlobalParams.featureCompatibility.acquireFCVSnapshot()),
 
         .window = doFullPushdown && SbeCompatibility::fullyCompatible >= minRequiredCompatibility,
 

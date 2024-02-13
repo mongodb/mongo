@@ -1,5 +1,10 @@
 /**
- *  Test the basic case for searchSequenceToken in standalone environment with SBE turned on.
+ * Test the basic case for searchSequenceToken in standalone environment with SBE turned on.
+ * @tags: [
+ * # Search in SBE requires featureFlagSbeFull to be enabled. Remove this tag when search is not
+ * # restricted by featureFlagSbeFull.
+ *  featureFlagSbeFull,
+ * ]
  */
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";
 import {MongotMock} from "jstests/with_mongot/mongotmock/lib/mongotmock.js";
