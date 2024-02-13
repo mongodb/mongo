@@ -1173,6 +1173,32 @@ private:
                         !hasShardingIndexCatalogEntries);
             }
         }
+
+        if (gFeatureFlagRecordIdsReplicated.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
+            // so don't allow downgrading with such a collection.
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_IS,
+                    [&](const Collection* collection) -> bool {
+                        uasserted(
+                            ErrorCodes::CannotDowngrade,
+                            fmt::format(
+                                "Cannot downgrade the cluster when there are collections with "
+                                "'recordIdsReplicated' enabled. Please unset the option or "
+                                "drop the collection(s) before downgrading. First detected "
+                                "collection with 'recordIdsReplicated' enabled: {} (UUID: {}).",
+                                collection->ns().toStringForErrorMsg(),
+                                collection->uuid().toString()));
+                    },
+                    [&](const Collection* collection) {
+                        return collection->areRecordIdsReplicated();
+                    });
+            }
+        }
     }
 
     // Remove cluster parameters from the clusterParameters collections which are not enabled on
