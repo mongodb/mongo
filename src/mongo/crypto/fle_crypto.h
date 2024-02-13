@@ -1437,7 +1437,7 @@ struct ParsedFindRangePayload {
 
 class Edges {
 public:
-    Edges(std::string leaf, int sparsity);
+    Edges(std::string leaf, int sparsity, int trimFactor);
     std::vector<StringData> get();
     const std::string& getLeaf() const {
         return _leaf;
@@ -1446,30 +1446,34 @@ public:
 private:
     std::string _leaf;
     int _sparsity;
+    int _trimFactor;
 };
 
 std::unique_ptr<Edges> getEdgesInt32(int32_t value,
                                      boost::optional<int32_t> min,
                                      boost::optional<int32_t> max,
-                                     int sparsity);
+                                     int sparsity,
+                                     int trimFactor);
 
 std::unique_ptr<Edges> getEdgesInt64(int64_t value,
                                      boost::optional<int64_t> min,
                                      boost::optional<int64_t> max,
-                                     int sparsity);
+                                     int sparsity,
+                                     int trimFactor);
 
 std::unique_ptr<Edges> getEdgesDouble(double value,
                                       boost::optional<double> min,
                                       boost::optional<double> max,
                                       boost::optional<uint32_t> precision,
-                                      int sparsity);
+                                      int sparsity,
+                                      int trimFactor);
 
 std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
                                           boost::optional<Decimal128> min,
                                           boost::optional<Decimal128> max,
                                           boost::optional<uint32_t> precision,
-
-                                          int sparsity);
+                                          int sparsity,
+                                          int trimFactor);
 /**
  * Mincover calculator
  */
@@ -1480,7 +1484,8 @@ std::vector<std::string> minCoverInt32(int32_t lowerBound,
                                        bool includeUpperBound,
                                        boost::optional<int32_t> min,
                                        boost::optional<int32_t> max,
-                                       int sparsity);
+                                       int sparsity,
+                                       int trimFactor);
 
 std::vector<std::string> minCoverInt64(int64_t lowerBound,
                                        bool includeLowerBound,
@@ -1488,7 +1493,8 @@ std::vector<std::string> minCoverInt64(int64_t lowerBound,
                                        bool includeUpperBound,
                                        boost::optional<int64_t> min,
                                        boost::optional<int64_t> max,
-                                       int sparsity);
+                                       int sparsity,
+                                       int trimFactor);
 
 std::vector<std::string> minCoverDouble(double lowerBound,
                                         bool includeLowerBound,
@@ -1497,7 +1503,8 @@ std::vector<std::string> minCoverDouble(double lowerBound,
                                         boost::optional<double> min,
                                         boost::optional<double> max,
                                         boost::optional<uint32_t> precision,
-                                        int sparsity);
+                                        int sparsity,
+                                        int trimFactor);
 
 std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             bool includeLowerBound,
@@ -1506,7 +1513,8 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             boost::optional<Decimal128> min,
                                             boost::optional<Decimal128> max,
                                             boost::optional<uint32_t> precision,
-                                            int sparsity);
+                                            int sparsity,
+                                            int trimFactor);
 
 class FLEUtil {
 public:

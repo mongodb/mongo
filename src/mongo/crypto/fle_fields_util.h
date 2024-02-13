@@ -35,12 +35,14 @@
 namespace mongo {
 class FLE2EncryptionPlaceholder;
 class FLE2RangeFindSpec;
+class FLE2RangeInsertSpec;
 /**
  * Extra validation for the placeholder struct to verify that range placeholders have min/max
  * endpoints. Will throw a uassert if the placeholder does not pass validation.
  */
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder);
 void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder);
+void validateIDLFLE2RangeInsertSpec(const FLE2RangeInsertSpec* spec);
 void validateQueryBounds(BSONType indexType, ImplicitValue lb, ImplicitValue ub);
 bool isInfinite(ImplicitValue val);
 }  // namespace mongo

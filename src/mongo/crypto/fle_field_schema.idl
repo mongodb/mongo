@@ -382,6 +382,12 @@ structs:
             description: "Determines the number of digits after the decimal point for floating point values"
             type: safeInt
             optional: true
+            validator: { gte: 0 }
+          trimFactor:
+            description: "Determines how many levels of the hypergraph to trim"
+            type: safeInt
+            optional: true
+            validator: { gte: 0 }
           indexMin:
             description: "Minimum value for the encrypted index that this query is using."
             type: encrypted_numeric_element
@@ -414,6 +420,7 @@ structs:
     FLE2RangeInsertSpec:
         description: "Range insert specification that is encoded inside of a FLE2EncryptionPlaceholder."
         strict: true
+        cpp_validator_func: "validateIDLFLE2RangeInsertSpec"
         fields:
           v:
             description: "Value to encrypt"
@@ -433,3 +440,9 @@ structs:
             description: "Determines the number of digits after the decimal point for floating point values"
             type: safeInt
             optional: true
+            validator: { gte: 0 }
+          trimFactor:
+            description: "Determines how many levels of the hypergraph to trim"
+            type: safeInt
+            optional: true
+            validator: { gte: 0 }

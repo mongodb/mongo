@@ -161,8 +161,52 @@ void validateIDLFLE2RangeFindSpec(const FLE2RangeFindSpec* placeholder) {
                 min.type() == BSONType::NumberDecimal || min.type() == BSONType::NumberDouble);
     }
 
+    if (edgesInfo.getTrimFactor().has_value()) {
+        uint32_t tf = edgesInfo.getTrimFactor().value();
+        uassert(8574100,
+                "Trim factor must be less than the number of bits used to represent the domain.",
+                tf == 0 ||
+                    tf < getNumberOfBitsInDomain(
+                             min.type(), min, max, edgesInfo.getPrecision().map([](std::int32_t m) {
+                                 return static_cast<uint32_t>(m);
+                             })));
+    }
+
     auto lb = edgesInfo.getLowerBound().getElement();
     auto ub = edgesInfo.getUpperBound().getElement();
     validateQueryBounds(min.type(), lb, ub);
+}
+
+void validateIDLFLE2RangeInsertSpec(const FLE2RangeInsertSpec* spec) {
+    auto valueType = spec->getValue().getElement().type();
+    if (spec->getMinBound().has_value() && spec->getMaxBound().has_value()) {
+        auto min = spec->getMinBound()->getElement();
+        auto max = spec->getMaxBound()->getElement();
+        uassert(
+            8574101, "Range min and range max must be the same type.", min.type() == max.type());
+        uassert(8574109,
+                "Range min and range max must match the type of the element to be inserted.",
+                min.type() == valueType);
+    }
+
+    if (spec->getTrimFactor().has_value()) {
+        uint32_t tf = spec->getTrimFactor().value();
+        auto optMin = spec->getMinBound().map([](const auto& e) { return e.getElement(); });
+        auto optMax = spec->getMaxBound().map([](const auto& e) { return e.getElement(); });
+        uassert(8574103,
+                "Trim factor must be less than the number of bits used to represent the domain.",
+                tf == 0 ||
+                    tf <
+                        getNumberOfBitsInDomain(
+                            valueType, optMin, optMax, spec->getPrecision().map([](std::int32_t m) {
+                                return static_cast<uint32_t>(m);
+                            })));
+    }
+
+    if (spec->getPrecision().has_value()) {
+        uassert(8574102,
+                "Precision can only be set if type is floating point",
+                valueType == BSONType::NumberDecimal || valueType == BSONType::NumberDouble);
+    }
 }
 }  // namespace mongo

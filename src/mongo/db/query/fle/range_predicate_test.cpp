@@ -225,7 +225,7 @@ BSONObj generateFFP(StringData path, int lb, int ub, int min, int max) {
     auto userKey = getUserKey();
     FLEUserKeyAndId userKeyAndId(userKey.data, indexKeyId);
 
-    auto edges = minCoverInt32(lb, true, ub, true, min, max, 1);
+    auto edges = minCoverInt32(lb, true, ub, true, min, max, 1, 0);
     FLE2RangeFindSpec spec(0, Fle2RangeOperator::kGt);
     auto ffp =
         FLEClientCrypto::serializeFindRangePayloadV2(indexKeyAndId, userKeyAndId, edges, 0, spec);

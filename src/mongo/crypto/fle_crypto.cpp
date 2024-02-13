@@ -929,6 +929,7 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
     auto element = spec.getValue().getElement();
     auto minBound = spec.getMinBound().map([](IDLAnyType m) { return m.getElement(); });
     auto maxBound = spec.getMaxBound().map([](IDLAnyType m) { return m.getElement(); });
+    auto trimFactor = spec.getTrimFactor() ? spec.getTrimFactor().value() : 0;
 
     switch (element.type()) {
         case BSONType::NumberInt:
@@ -941,7 +942,8 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
             return getEdgesInt32(element.Int(),
                                  minBound.map([](BSONElement m) { return m.Int(); }),
                                  maxBound.map([](BSONElement m) { return m.Int(); }),
-                                 sparsity);
+                                 sparsity,
+                                 trimFactor);
 
         case BSONType::NumberLong:
             uassert(6775503,
@@ -953,7 +955,8 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
             return getEdgesInt64(element.Long(),
                                  minBound.map([](BSONElement m) { return int64_t(m.Long()); }),
                                  maxBound.map([](BSONElement m) { return int64_t(m.Long()); }),
-                                 sparsity);
+                                 sparsity,
+                                 trimFactor);
 
         case BSONType::Date:
             uassert(6775505,
@@ -965,7 +968,8 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
             return getEdgesInt64(element.Date().asInt64(),
                                  minBound.map([](BSONElement m) { return m.Date().asInt64(); }),
                                  maxBound.map([](BSONElement m) { return m.Date().asInt64(); }),
-                                 sparsity);
+                                 sparsity,
+                                 trimFactor);
 
         case BSONType::NumberDouble:
             uassert(6775507,
@@ -979,7 +983,8 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
                 minBound.map([](BSONElement m) { return m.Double(); }),
                 maxBound.map([](BSONElement m) { return m.Double(); }),
                 spec.getPrecision().map([](std::int32_t m) { return static_cast<uint32_t>(m); }),
-                sparsity);
+                sparsity,
+                trimFactor);
 
         case BSONType::NumberDecimal:
             uassert(6775509,
@@ -993,7 +998,8 @@ std::unique_ptr<Edges> getEdges(FLE2RangeInsertSpec spec, int sparsity) {
                 minBound.map([](BSONElement m) { return m.numberDecimal(); }),
                 maxBound.map([](BSONElement m) { return m.numberDecimal(); }),
                 spec.getPrecision().map([](std::int32_t m) { return static_cast<uint32_t>(m); }),
-                sparsity);
+                sparsity,
+                trimFactor);
 
         default:
             uassert(6775500, "must use supported FLE2 range type", false);
@@ -2029,6 +2035,8 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
     auto includeLowerBound = edgesInfo.getLbIncluded();
     auto includeUpperBound = edgesInfo.getUbIncluded();
 
+    auto trimFactor = edgesInfo.getTrimFactor().value_or(0);
+
     // Open-ended ranges are represented with infinity as the other endpoint. Resolve infinite
     // bounds at this point to end at the min or max for this index.
     if (isInfinite(lowerBound)) {
@@ -2049,7 +2057,8 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                  includeUpperBound,
                                  indexMin.Int(),
                                  indexMax.Int(),
-                                 sparsity);
+                                 sparsity,
+                                 trimFactor);
         case NumberLong:
             return minCoverInt64(lowerBound.safeNumberLong(),
                                  includeLowerBound,
@@ -2057,7 +2066,8 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                  includeUpperBound,
                                  indexMin.Long(),
                                  indexMax.Long(),
-                                 sparsity);
+                                 sparsity,
+                                 trimFactor);
         case Date:
             return minCoverInt64(lowerBound.Date().asInt64(),
                                  includeLowerBound,
@@ -2065,7 +2075,8 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                  includeUpperBound,
                                  indexMin.Date().asInt64(),
                                  indexMax.Date().asInt64(),
-                                 sparsity);
+                                 sparsity,
+                                 trimFactor);
         case NumberDouble:
             return minCoverDouble(lowerBound.numberDouble(),
                                   includeLowerBound,
@@ -2075,8 +2086,8 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                   indexMax.numberDouble(),
                                   edgesInfo.getPrecision().map(
                                       [](std::int32_t m) { return static_cast<uint32_t>(m); }),
-
-                                  sparsity);
+                                  sparsity,
+                                  trimFactor);
         case NumberDecimal:
             return minCoverDecimal128(lowerBound.numberDecimal(),
                                       includeLowerBound,
@@ -2086,8 +2097,8 @@ std::vector<std::string> getMinCover(const FLE2RangeFindSpec& spec, uint8_t spar
                                       indexMax.numberDecimal(),
                                       edgesInfo.getPrecision().map(
                                           [](std::int32_t m) { return static_cast<uint32_t>(m); }),
-
-                                      sparsity);
+                                      sparsity,
+                                      trimFactor);
         default:
             // IDL validates that no other type is permitted.
             MONGO_UNREACHABLE_TASSERT(6901302);
@@ -4265,21 +4276,27 @@ bool EncryptedPredicateEvaluatorV2::evaluate(
 
 // Edges
 
-Edges::Edges(std::string leaf, int sparsity) : _leaf(std::move(leaf)), _sparsity(sparsity) {
+Edges::Edges(std::string leaf, int sparsity, int trimFactor)
+    : _leaf(std::move(leaf)), _sparsity(sparsity), _trimFactor(trimFactor) {
     uassert(6775101, "sparsity must be 1 or larger", _sparsity > 0);
     dassert(std::all_of(_leaf.begin(), _leaf.end(), [](char c) { return c == '1' || c == '0'; }));
+    uassert(8574105,
+            "trim factor must be >= 0 and less than the number of bits used to represent an "
+            "element of the domain",
+            _trimFactor >= 0 && (_trimFactor == 0 || (size_t)_trimFactor < _leaf.length()));
 }
 
 std::vector<StringData> Edges::get() {
     static const StringData kRoot = "root"_sd;
     StringData leaf = _leaf;
+    std::vector<StringData> result;
+    if (_trimFactor == 0) {
+        result.push_back(kRoot);
+    }
+    result.push_back(leaf);
 
-    std::vector<StringData> result{
-        kRoot,
-        leaf,
-    };
-
-    for (size_t i = 1; i < _leaf.size(); ++i) {
+    size_t startLevel = _trimFactor < 1 ? 1 : _trimFactor;
+    for (size_t i = startLevel; i < _leaf.size(); ++i) {
         if (i % _sparsity == 0) {
             result.push_back(leaf.substr(0, i));
         }
@@ -4288,7 +4305,7 @@ std::vector<StringData> Edges::get() {
 }
 
 template <typename T>
-std::unique_ptr<Edges> getEdgesT(T value, T min, T max, int sparsity) {
+std::unique_ptr<Edges> getEdgesT(T value, T min, T max, int sparsity, int trimFactor) {
     static_assert(!std::numeric_limits<T>::is_signed);
     static_assert(std::numeric_limits<T>::is_integer);
 
@@ -4299,59 +4316,65 @@ std::unique_ptr<Edges> getEdgesT(T value, T min, T max, int sparsity) {
     size_t maxlen = getFirstBitSet(max);
     std::string valueBin = toBinaryString(value);
     std::string valueBinTrimmed = valueBin.substr(bits - maxlen, maxlen);
-    return std::make_unique<Edges>(valueBinTrimmed, sparsity);
+    return std::make_unique<Edges>(valueBinTrimmed, sparsity, trimFactor);
 }
 
 std::unique_ptr<Edges> getEdgesInt32(int32_t value,
                                      boost::optional<int32_t> min,
                                      boost::optional<int32_t> max,
-                                     int sparsity) {
+                                     int sparsity,
+                                     int trimFactor) {
     auto aost = getTypeInfo32(value, min, max);
-    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
 std::unique_ptr<Edges> getEdgesInt64(int64_t value,
                                      boost::optional<int64_t> min,
                                      boost::optional<int64_t> max,
-                                     int sparsity) {
+                                     int sparsity,
+                                     int trimFactor) {
     auto aost = getTypeInfo64(value, min, max);
-    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
 std::unique_ptr<Edges> getEdgesDouble(double value,
                                       boost::optional<double> min,
                                       boost::optional<double> max,
                                       boost::optional<uint32_t> precision,
-                                      int sparsity) {
+                                      int sparsity,
+                                      int trimFactor) {
     auto aost = getTypeInfoDouble(value, min, max, precision);
-    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
 std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
                                           boost::optional<Decimal128> min,
                                           boost::optional<Decimal128> max,
                                           boost::optional<uint32_t> precision,
-                                          int sparsity) {
+                                          int sparsity,
+                                          int trimFactor) {
     auto aost = getTypeInfoDecimal128(value, min, max, precision);
-    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity, trimFactor);
 }
 
 
 template <typename T>
 class MinCoverGenerator {
 public:
-    static std::vector<std::string> minCover(T lowerBound, T upperBound, T max, int sparsity) {
-        MinCoverGenerator<T> mcg(lowerBound, upperBound, max, sparsity);
+    static std::vector<std::string> minCover(
+        T lowerBound, T upperBound, T max, int sparsity, int trimFactor) {
+        MinCoverGenerator<T> mcg(lowerBound, upperBound, max, sparsity, trimFactor);
         std::vector<std::string> c;
         mcg.minCoverRec(c, 0, mcg._maxlen);
         return c;
     }
 
 private:
-    MinCoverGenerator(T lowerBound, T upperBound, T max, int sparsity)
+    MinCoverGenerator(T lowerBound, T upperBound, T max, int sparsity, int trimFactor)
         : _lowerBound(lowerBound),
           _upperBound(upperBound),
           _sparsity(sparsity),
+          _trimFactor(trimFactor),
           _maxlen(getFirstBitSet(max)) {
         static_assert(!std::numeric_limits<T>::is_signed);
         static_assert(std::numeric_limits<T>::is_integer);
@@ -4359,6 +4382,10 @@ private:
                 "Lower bound must be less or equal to upper bound for range search.",
                 lowerBound <= upperBound);
         dassert(lowerBound >= 0 && upperBound <= max);
+        uassert(8574106,
+                "Trim factor must be >= 0 and less than the number of bits used to represent an "
+                "element of the domain",
+                trimFactor >= 0 && (trimFactor == 0 || trimFactor < _maxlen));
     }
 
     // Generate and apply a mask to an integer, filling masked bits with 1;
@@ -4378,12 +4405,12 @@ private:
         return value | mask;
     }
 
-    // Some levels are discarded when sparsity does not divide current level
-    // Discarded levels are replaced by the set of edges on the next level
-    // Return true if level is stored
+    // Some levels are discarded when sparsity does not divide current level, or when they are
+    // trimmed when trim factor is greater than the current level Discarded levels are replaced by
+    // the set of edges on the next level Return true if level is stored
     bool isLevelStored(int maskedBits) {
         int level = _maxlen - maskedBits;
-        return 0 == maskedBits || 0 == (level % _sparsity);
+        return 0 == maskedBits || (level >= _trimFactor && 0 == (level % _sparsity));
     }
 
     std::string toString(T start, int maskedBits) {
@@ -4422,13 +4449,15 @@ private:
     T _lowerBound;
     T _upperBound;
     int _sparsity;
+    int _trimFactor;
     int _maxlen;
 };
 
 template <typename T>
-std::vector<std::string> minCover(T lowerBound, T upperBound, T min, T max, int sparsity) {
+std::vector<std::string> minCover(
+    T lowerBound, T upperBound, T min, T max, int sparsity, int trimFactor) {
     dassert(0 == min);
-    return MinCoverGenerator<T>::minCover(lowerBound, upperBound, max, sparsity);
+    return MinCoverGenerator<T>::minCover(lowerBound, upperBound, max, sparsity, trimFactor);
 }
 
 /**
@@ -4463,7 +4492,8 @@ std::vector<std::string> minCoverInt32(int32_t lowerBound,
                                        bool includeUpperBound,
                                        boost::optional<int32_t> min,
                                        boost::optional<int32_t> max,
-                                       int sparsity) {
+                                       int sparsity,
+                                       int trimFactor) {
     auto a = getTypeInfo32(lowerBound, min, max);
     auto b = getTypeInfo32(upperBound, min, max);
     dassert(a.min == b.min);
@@ -4472,7 +4502,7 @@ std::vector<std::string> minCoverInt32(int32_t lowerBound,
     if (a.value > b.value) {
         return {};
     }
-    return minCover(a.value, b.value, a.min, a.max, sparsity);
+    return minCover(a.value, b.value, a.min, a.max, sparsity, trimFactor);
 }
 
 std::vector<std::string> minCoverInt64(int64_t lowerBound,
@@ -4481,7 +4511,8 @@ std::vector<std::string> minCoverInt64(int64_t lowerBound,
                                        bool includeUpperBound,
                                        boost::optional<int64_t> min,
                                        boost::optional<int64_t> max,
-                                       int sparsity) {
+                                       int sparsity,
+                                       int trimFactor) {
     auto a = getTypeInfo64(lowerBound, min, max);
     auto b = getTypeInfo64(upperBound, min, max);
     dassert(a.min == b.min);
@@ -4490,7 +4521,7 @@ std::vector<std::string> minCoverInt64(int64_t lowerBound,
     if (a.value > b.value) {
         return {};
     }
-    return minCover(a.value, b.value, a.min, a.max, sparsity);
+    return minCover(a.value, b.value, a.min, a.max, sparsity, trimFactor);
 }
 
 std::vector<std::string> minCoverDouble(double lowerBound,
@@ -4500,7 +4531,8 @@ std::vector<std::string> minCoverDouble(double lowerBound,
                                         boost::optional<double> min,
                                         boost::optional<double> max,
                                         boost::optional<uint32_t> precision,
-                                        int sparsity) {
+                                        int sparsity,
+                                        int trimFactor) {
     auto a = getTypeInfoDouble(lowerBound, min, max, precision);
     auto b = getTypeInfoDouble(upperBound, min, max, precision);
     dassert(a.min == b.min);
@@ -4509,7 +4541,7 @@ std::vector<std::string> minCoverDouble(double lowerBound,
     if (a.value > b.value) {
         return {};
     }
-    return minCover(a.value, b.value, a.min, a.max, sparsity);
+    return minCover(a.value, b.value, a.min, a.max, sparsity, trimFactor);
 }
 std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             bool includeLowerBound,
@@ -4518,7 +4550,8 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             boost::optional<Decimal128> min,
                                             boost::optional<Decimal128> max,
                                             boost::optional<uint32_t> precision,
-                                            int sparsity) {
+                                            int sparsity,
+                                            int trimFactor) {
     auto a = getTypeInfoDecimal128(lowerBound, min, max, precision);
     auto b = getTypeInfoDecimal128(upperBound, min, max, precision);
     dassert(a.min == b.min);
@@ -4527,7 +4560,7 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
     if (a.value > b.value) {
         return {};
     }
-    return minCover(a.value, b.value, a.min, a.max, sparsity);
+    return minCover(a.value, b.value, a.min, a.max, sparsity, trimFactor);
 }
 
 PrfBlock FLEUtil::blockToArray(const SHA256Block& block) {

@@ -102,46 +102,119 @@ Value coerceValueToRangeIndexTypes(Value val, BSONType fieldType) {
 }
 
 namespace {
-uint32_t getNumberOfBitsInDomain(BSONType fieldType,
-                                 const Value& min,
-                                 const Value& max,
+int32_t bsonToInt(const BSONElement& e) {
+    return e.Int();
+}
+int64_t bsonToLong(const BSONElement& e) {
+    return e.Long();
+}
+int64_t bsonToDateToLong(const BSONElement& e) {
+    return e.Date().toMillisSinceEpoch();
+}
+double bsonToDouble(const BSONElement& e) {
+    return e.Double();
+}
+Decimal128 bsonToDecimal(const BSONElement& e) {
+    return e.Decimal();
+}
+int32_t valToInt(const Value& e) {
+    return e.coerceToInt();
+}
+int64_t valToLong(const Value& e) {
+    return e.coerceToLong();
+}
+int64_t valToDateToLong(const Value& e) {
+    return e.coerceToDate().toMillisSinceEpoch();
+}
+double valToDouble(const Value& e) {
+    return e.coerceToDouble();
+}
+Decimal128 valToDecimal(const Value& e) {
+    return e.coerceToDecimal();
+}
+
+uint32_t getNumberOfBitsInDomain(const boost::optional<int32_t>& min,
+                                 const boost::optional<int32_t>& max) {
+    auto info = getTypeInfo32(min.value_or(0), min, max);
+    return 64 - countLeadingZeros64(info.max);
+}
+
+uint32_t getNumberOfBitsInDomain(const boost::optional<int64_t>& min,
+                                 const boost::optional<int64_t>& max) {
+    auto info = getTypeInfo64(min.value_or(0), min, max);
+    return 64 - countLeadingZeros64(info.max);
+}
+
+uint32_t getNumberOfBitsInDomain(const boost::optional<double>& min,
+                                 const boost::optional<double>& max,
                                  const boost::optional<uint32_t>& precision) {
-    switch (fieldType) {
-        case NumberInt: {
-            int32_t minC = min.coerceToInt();
-            auto info = getTypeInfo32(minC, minC, max.coerceToInt());
-            return 64 - countLeadingZeros64(info.max);
-        }
-        case NumberLong: {
-            int64_t minC = min.coerceToLong();
-            auto info = getTypeInfo64(minC, minC, max.coerceToLong());
-            return 64 - countLeadingZeros64(info.max);
-        }
-        case Date: {
-            int64_t minC = min.coerceToDate().toMillisSinceEpoch();
-            auto info = getTypeInfo64(minC, minC, max.coerceToDate().toMillisSinceEpoch());
-            return 64 - countLeadingZeros64(info.max);
-        }
-        case NumberDouble: {
-            double minC = min.coerceToDouble();
-            auto info = getTypeInfoDouble(minC, minC, max.coerceToDouble(), precision);
-            return 64 - countLeadingZeros64(info.max);
-        }
-        case NumberDecimal: {
-            auto minC = min.coerceToDecimal();
-            auto info = getTypeInfoDecimal128(minC, minC, max.coerceToDecimal(), precision);
-            try {
-                return boost::multiprecision::msb(info.max) + 1;
-            } catch (const std::domain_error&) {
-                // no bits set case
-                return 0;
-            }
-        }
-        default:
-            MONGO_UNREACHABLE;
+    auto info = getTypeInfoDouble(min.value_or(0), min, max, precision);
+    return 64 - countLeadingZeros64(info.max);
+}
+
+uint32_t getNumberOfBitsInDomain(const boost::optional<Decimal128>& min,
+                                 const boost::optional<Decimal128>& max,
+                                 const boost::optional<uint32_t>& precision) {
+    auto info =
+        getTypeInfoDecimal128(min.value_or(Decimal128::kNormalizedZero), min, max, precision);
+    try {
+        return boost::multiprecision::msb(info.max) + 1;
+    } catch (const std::domain_error&) {
+        // no bits set case
+        return 0;
     }
 }
 }  // namespace
+
+uint32_t getNumberOfBitsInDomain(BSONType fieldType,
+                                 const boost::optional<BSONElement>& min,
+                                 const boost::optional<BSONElement>& max,
+                                 const boost::optional<uint32_t>& precision) {
+    uassert(8574112,
+            "Precision may only be set when type is double or decimal",
+            !precision || fieldType == NumberDouble || fieldType == NumberDecimal);
+    switch (fieldType) {
+        case NumberInt:
+            return getNumberOfBitsInDomain(min.map(bsonToInt), max.map(bsonToInt));
+        case NumberLong:
+            return getNumberOfBitsInDomain(min.map(bsonToLong), max.map(bsonToLong));
+        case Date:
+            return getNumberOfBitsInDomain(min.map(bsonToDateToLong), max.map(bsonToDateToLong));
+        case NumberDouble:
+            return getNumberOfBitsInDomain(min.map(bsonToDouble), max.map(bsonToDouble), precision);
+        case NumberDecimal:
+            return getNumberOfBitsInDomain(
+                min.map(bsonToDecimal), max.map(bsonToDecimal), precision);
+        default:
+            uasserted(8574107,
+                      "Field type is invalid; must be one of int, long, date, double, or decimal");
+    }
+}
+
+
+uint32_t getNumberOfBitsInDomain(BSONType fieldType,
+                                 const boost::optional<Value>& min,
+                                 const boost::optional<Value>& max,
+                                 const boost::optional<uint32_t>& precision) {
+    uassert(8574113,
+            "Precision may only be set when type is double or decimal",
+            !precision || fieldType == NumberDouble || fieldType == NumberDecimal);
+    switch (fieldType) {
+        case NumberInt:
+            return getNumberOfBitsInDomain(min.map(valToInt), max.map(valToInt));
+        case NumberLong:
+            return getNumberOfBitsInDomain(min.map(valToLong), max.map(valToLong));
+        case Date:
+            return getNumberOfBitsInDomain(min.map(valToDateToLong), max.map(valToDateToLong));
+        case NumberDouble:
+            return getNumberOfBitsInDomain(min.map(valToDouble), max.map(valToDouble), precision);
+        case NumberDecimal:
+            return getNumberOfBitsInDomain(min.map(valToDecimal), max.map(valToDecimal), precision);
+        default:
+            uasserted(8574114,
+                      "Field type is invalid; must be one of int, long, date, double, or decimal");
+    }
+}
 
 void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
     uassert(6775201,
@@ -182,24 +255,24 @@ void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
                 if (fieldType == NumberDouble) {
                     uassert(
                         6966805,
-                        "The number of decimal digits for minimum value must be less then or equal "
+                        "The number of decimal digits for minimum value must be less than or equal "
                         "to precision",
                         validateDoublePrecisionRange(query.getMin()->coerceToDouble(), precision));
                     uassert(
                         6966806,
-                        "The number of decimal digits for maximum value must be less then or equal "
+                        "The number of decimal digits for maximum value must be less than or equal "
                         "to precision",
                         validateDoublePrecisionRange(query.getMax()->coerceToDouble(), precision));
 
                 } else {
                     auto minDecimal = query.getMin()->coerceToDecimal();
                     uassert(6966807,
-                            "The number of decimal digits for minimum value must be less then or "
+                            "The number of decimal digits for minimum value must be less than or "
                             "equal to precision",
                             validateDecimal128PrecisionRange(minDecimal, precision));
                     auto maxDecimal = query.getMax()->coerceToDecimal();
                     uassert(6966808,
-                            "The number of decimal digits for maximum value must be less then or "
+                            "The number of decimal digits for maximum value must be less than or "
                             "equal to precision",
                             validateDecimal128PrecisionRange(maxDecimal, precision));
                 }
@@ -293,6 +366,9 @@ void validateEncryptedField(const EncryptedField* field) {
                 uassert(6775207,
                         "The field 'max' is not allowed for equality index but is present",
                         !encryptedIndex.getMax().has_value());
+                uassert(8574104,
+                        "The field 'trimFactor' is not allowed for equality index but is present",
+                        !encryptedIndex.getTrimFactor().has_value());
                 break;
             case QueryTypeEnum::RangePreview: {
                 validateRangeIndex(fieldType, encryptedIndex);

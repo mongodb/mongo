@@ -60,14 +60,15 @@ namespace mongo {
 
 template <typename T>
 struct EdgeCalcTestVector {
-    std::function<std::unique_ptr<Edges>(T, boost::optional<T>, boost::optional<T>, int)> getEdgesT;
+    std::function<std::unique_ptr<Edges>(T, boost::optional<T>, boost::optional<T>, int, int)>
+        getEdgesT;
     T value;
     boost::optional<T> min, max;
     int sparsity;
     stdx::unordered_set<std::string> expectedEdges;
 
     bool validate() const {
-        auto edgeCalc = getEdgesT(value, min, max, sparsity);
+        auto edgeCalc = getEdgesT(value, min, max, sparsity, 0);
         auto edges = edgeCalc->get();
         for (const std::string& ee : expectedEdges) {
             if (!std::any_of(edges.begin(), edges.end(), [ee](auto edge) { return edge == ee; })) {
@@ -139,9 +140,10 @@ TEST(EdgeCalcTest, Int64_TestVectors) {
 std::unique_ptr<Edges> getEdgesDoubleForTest(double value,
                                              boost::optional<double> min,
                                              boost::optional<double> max,
-                                             int sparsity) {
+                                             int sparsity,
+                                             int trimFactor) {
     // The non-precision test vectors set min/max which is not allowed
-    return getEdgesDouble(value, boost::none, boost::none, boost::none, sparsity);
+    return getEdgesDouble(value, boost::none, boost::none, boost::none, sparsity, trimFactor);
 }
 
 TEST(EdgeCalcTest, Double_TestVectors) {
@@ -157,10 +159,11 @@ TEST(EdgeCalcTest, Double_TestVectors) {
 std::unique_ptr<Edges> getEdgesDecimal128ForTest(Decimal128 value,
                                                  boost::optional<Decimal128> min,
                                                  boost::optional<Decimal128> max,
-                                                 int sparsity) {
+                                                 int sparsity,
+                                                 int trimFactor) {
 
     // The non-precision test vectors set min/max which is not allowed
-    return getEdgesDecimal128(value, boost::none, boost::none, boost::none, sparsity);
+    return getEdgesDecimal128(value, boost::none, boost::none, boost::none, sparsity, trimFactor);
 }
 
 
@@ -180,9 +183,10 @@ struct MinCoverTestVector {
     int sparsity;
     std::string expect;
 
-    bool validate(std::function<std::vector<std::string>(
-                      T, bool, T, bool, boost::optional<T>, boost::optional<T>, int)> algo) const {
-        auto result = algo(rangeMin, true, rangeMax, true, min, max, sparsity);
+    bool validate(
+        std::function<std::vector<std::string>(
+            T, bool, T, bool, boost::optional<T>, boost::optional<T>, int, int)> algo) const {
+        auto result = algo(rangeMin, true, rangeMax, true, min, max, sparsity, 0);
 
         std::stringstream ss(expect);
         std::vector<std::string> vexpect;
@@ -235,7 +239,8 @@ std::vector<std::string> minCoverDoubleForTest(double lowerBound,
                                                bool includeUpperBound,
                                                boost::optional<double> min,
                                                boost::optional<double> max,
-                                               int sparsity) {
+                                               int sparsity,
+                                               int trimFactor) {
     // The non-precision test vectors set min/max which is not allowed
     return minCoverDouble(lowerBound,
                           includeLowerBound,
@@ -244,7 +249,8 @@ std::vector<std::string> minCoverDoubleForTest(double lowerBound,
                           boost::none,
                           boost::none,
                           boost::none,
-                          sparsity);
+                          sparsity,
+                          trimFactor);
 }
 
 TEST(MinCoverCalcTest, Double_TestVectors) {
@@ -262,7 +268,8 @@ std::vector<std::string> minCoverDecimal128ForTest(Decimal128 lowerBound,
                                                    bool includeUpperBound,
                                                    boost::optional<Decimal128> min,
                                                    boost::optional<Decimal128> max,
-                                                   int sparsity) {
+                                                   int sparsity,
+                                                   int trimFactor) {
 
     // The non-precision test vectors set min/max which is not allowed
     return minCoverDecimal128(lowerBound,
@@ -272,7 +279,8 @@ std::vector<std::string> minCoverDecimal128ForTest(Decimal128 lowerBound,
                               boost::none,
                               boost::none,
                               boost::none,
-                              sparsity);
+                              sparsity,
+                              trimFactor);
 }
 
 
@@ -296,10 +304,10 @@ struct MinCoverTestVectorPrecision {
     uint32_t precision;
     std::string expect;
 
-    bool validate(
-        std::function<std::vector<std::string>(
-            T, bool, T, bool, boost::optional<T>, boost::optional<T>, uint32_t, int)> algo) const {
-        auto result = algo(rangeMin, true, rangeMax, true, min, max, precision, sparsity);
+    bool validate(std::function<std::vector<std::string>(
+                      T, bool, T, bool, boost::optional<T>, boost::optional<T>, uint32_t, int, int)>
+                      algo) const {
+        auto result = algo(rangeMin, true, rangeMax, true, min, max, precision, sparsity, 0);
 
         std::stringstream ss(expect);
         std::vector<std::string> vexpect;
