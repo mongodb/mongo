@@ -5699,7 +5699,19 @@ std::pair<std::unique_ptr<sbe::PlanStage>, bool> SlotBasedStageBuilder::buildVec
             // Add a project stage to project the boolean block to a slot.
             sbe::value::SlotId bitmapSlotId = _state.slotId();
             sbe::SlotExprPairVector projects;
-            projects.emplace_back(bitmapSlotId, vectorizedFilterExpression.extractExpr(_state));
+
+            auto incomingBitmapSlotId =
+                outputs.getSlotIfExists(PlanStageSlots::kBlockSelectivityBitmap);
+            if (incomingBitmapSlotId) {
+                SbExprBuilder sb(_state);
+                auto sbExpr = sb.makeFunction("valueBlockLogicalAnd"_sd,
+                                              sb.makeVariable(SbVar{*incomingBitmapSlotId}),
+                                              std::move(vectorizedFilterExpression));
+
+                projects.emplace_back(bitmapSlotId, sbExpr.extractExpr(_state));
+            } else {
+                projects.emplace_back(bitmapSlotId, vectorizedFilterExpression.extractExpr(_state));
+            }
 
             stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
 

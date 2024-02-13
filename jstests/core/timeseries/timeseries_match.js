@@ -348,4 +348,38 @@ TimeseriesTest.run((insert) => {
         const res = coll.aggregate(pipe).toArray()
         assert.eq(res.length, coll.count(), res);
     }
+
+    // Make sure that the bitmap from the previous stage is forwarded to the next stage
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {
+        timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+    }));
+    assert.contains(bucketsColl.getName(), db.getCollectionNames())
+
+    insert(
+        coll,
+        {_id: 0, [timeFieldName]: new Date(datePrefix + 100), [metaFieldName]: "cpu", a: 1, b: 1});
+    insert(
+        coll,
+        {_id: 0, [timeFieldName]: new Date(datePrefix + 200), [metaFieldName]: "cpu", a: 2, b: 0});
+    insert(
+        coll,
+        {_id: 0, [timeFieldName]: new Date(datePrefix + 300), [metaFieldName]: "cpu", a: 1, b: 3});
+
+    {
+        const pipeline = [
+            {$addFields: {ex: 3}},
+            {$match: {a: {$eq: 1}}},
+            {$match: {$expr: {$lt: ["$b", "$ex"]}}},
+            {
+                $group: {
+                    "_id": {"time": {"$dateTrunc": {"date": "$time", "unit": "minute"}}},
+                    "suma": {"$sum": "$a"}
+                }
+            }
+        ];
+
+        const res = coll.aggregate(pipeline).toArray();
+        assert.docEq([{"_id": {"time": ISODate("1970-01-20T10:55:00Z")}, "suma": 1}], res);
+    }
 });
