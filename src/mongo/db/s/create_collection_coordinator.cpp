@@ -97,6 +97,7 @@
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/remote_command_response.h"
@@ -1449,6 +1450,10 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
                                                               _critSecReason,
                                                               originalNss());
 
+                            // Checkpoint configTime in order to preserve causality of operations in
+                            // case of a stepdown.
+                            VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
+
                             _result = createCollectionResponseOpt;
                             return;
                         }
@@ -1592,6 +1597,10 @@ ExecutorFuture<void> CreateCollectionCoordinatorLegacy::_runImpl(
 
                     throw;
                 }
+
+                // Checkpoint configTime in order to preserve causality of operations in case of a
+                // stepdown.
+                VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
 
                 // Best effort refresh to warm up cache of all involved shards so we can have a
                 // cluster ready to receive operations.
@@ -2029,6 +2038,9 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
                 _doc.getTranslatedRequestParams()->getCollation(),
                 _request.getUnique().value_or(false),
                 _request.getUnsplittable().value_or(false))) {
+            // Checkpoint configTime in order to preserve causality of operations in case of a
+            // stepdown.
+            VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
             return;
         }
 
@@ -2085,6 +2097,10 @@ void CreateCollectionCoordinator::_commitOnShardingCatalog(
            involvedShards,
            _doc.getTranslatedRequestParams(),
            [this](OperationContext* opCtx) { return getNewSession(opCtx); });
+
+    // Checkpoint configTime in order to preserve causality of operations in
+    // case of a stepdown.
+    VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
 }
 
 void CreateCollectionCoordinator::_setPostCommitMetadata(
