@@ -71,6 +71,11 @@ public:
         return;
     }
 
+    void push_back(const T& element) {
+        _size++;
+        return;
+    }
+
     int size() {
         return _size;
     }

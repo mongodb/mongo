@@ -52,8 +52,9 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
         Simple8b<make_unsigned_t<Encoding>> s8b(ptr + 1, size);
         auto it = s8b.begin();
-        // process all copies of the reference object efficiently
-        // this can otherwise get more complicated on string/binary types
+        // after reading a literal, the the buffer's last value is incorrect so we
+        // process all copies of the reference object until we materialize something
+        // otherwise the buffer will reference the wrong value on calls to appendLast()
         for (; it != s8b.end(); ++it) {
             const auto& delta = *it;
             if (delta) {
@@ -68,9 +69,13 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
         for (; it != s8b.end(); ++it) {
             const auto& delta = *it;
             if (delta) {
-                last = expandDelta(last,
-                                   Simple8bTypeUtil::decodeInt<make_unsigned_t<Encoding>>(*delta));
-                materialize(last, reference, buffer);
+                if (*delta == 0) {
+                    buffer.appendLast();
+                } else {
+                    last = expandDelta(last,
+                                    Simple8bTypeUtil::decodeInt<make_unsigned_t<Encoding>>(*delta));
+                    materialize(last, reference, buffer);
+                }
             } else {
                 buffer.appendMissing();
             }

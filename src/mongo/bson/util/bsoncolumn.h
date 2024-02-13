@@ -393,6 +393,9 @@ concept Appendable =
     t.appendPreallocated(bsonVal);
 
     t.appendMissing();
+
+    // Repeat the last appended value
+    t.appendLast();
 };
 
 /**
@@ -470,67 +473,67 @@ public:
         : _collection(collection), _allocator(std::move(allocator)) {}
 
     void append(bool val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(int32_t val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(int64_t val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(Decimal128 val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(double val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(Timestamp val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(Date_t val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(OID val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(const StringData& val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(const BSONBinData& val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     void append(const BSONCode& val) {
-        collect(CMaterializer::materialize(*_allocator, val));
+        _collection.push_back(CMaterializer::materialize(*_allocator, val));
     }
 
     template <typename T>
     void append(const BSONElement& val) {
-        collect(CMaterializer::template materialize<T>(*_allocator, val));
+        _collection.push_back(CMaterializer::template materialize<T>(*_allocator, val));
     }
 
     void appendPreallocated(const BSONElement& val) {
-        collect(CMaterializer::materializePreallocated(val));
+        _collection.push_back(CMaterializer::materializePreallocated(val));
     }
 
     void appendMissing() {
-        collect(CMaterializer::materializeMissing(*_allocator));
+        _collection.push_back(CMaterializer::materializeMissing(*_allocator));
+    }
+
+    void appendLast() {
+        _collection.push_back(_collection.back());
     }
 
 private:
-    inline void collect(Element val) {
-        _collection.insert(_collection.end(), val);
-    }
-
     Container& _collection;
     boost::intrusive_ptr<ElementStorage> _allocator;
 };
