@@ -65,10 +65,15 @@ static constexpr int kTimeseriesControlCompressedVersion = 2;
 static constexpr int kTimeseriesControlLatestVersion = kTimeseriesControlCompressedVersion;
 static constexpr int kTimeseriesControlMinVersion = kTimeseriesControlUncompressedVersion;
 
-
 // These are hard-coded control object subfields.
 static constexpr StringData kControlVersionPath = "control.version"_sd;
 static constexpr StringData kControlClosedPath = "control.closed"_sd;
+
+// DocDiff: constexpr versions of doc_diff::kSubDiffSectionFieldPrefix + bucket field names.
+static constexpr StringData kDataFieldNameDocDiff = "sdata"_sd;
+static constexpr StringData kControlFieldNameDocDiff = "scontrol"_sd;
+static constexpr StringData kMinFieldNameDocDiff = "smin"_sd;
+static constexpr StringData kMaxFieldNameDocDiff = "smax"_sd;
 
 static const StringDataSet kAllowedCollectionCreationOptions{
     CreateCommand::kStorageEngineFieldName,

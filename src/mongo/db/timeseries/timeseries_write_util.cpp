@@ -231,8 +231,7 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     BSONObjBuilder updateBuilder;
     {
         // Control builder.
-        BSONObjBuilder controlBuilder(updateBuilder.subobjStart(
-            str::stream() << doc_diff::kSubDiffSectionFieldPrefix << kBucketControlFieldName));
+        BSONObjBuilder controlBuilder(updateBuilder.subobjStart(kControlFieldNameDocDiff));
         BSONObj countObj =
             BSON(kBucketControlCountFieldName << static_cast<int>(
                      (batch->numPreviouslyCommittedMeasurements + batch->measurements.size())));
@@ -240,14 +239,10 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
 
         if (!batch->min.isEmpty() || !batch->max.isEmpty()) {
             if (!batch->min.isEmpty()) {
-                controlBuilder.append(str::stream() << doc_diff::kSubDiffSectionFieldPrefix
-                                                    << kBucketControlMinFieldName,
-                                      batch->min);
+                controlBuilder.append(kMinFieldNameDocDiff, batch->min);
             }
             if (!batch->max.isEmpty()) {
-                controlBuilder.append(str::stream() << doc_diff::kSubDiffSectionFieldPrefix
-                                                    << kBucketControlMaxFieldName,
-                                      batch->max);
+                controlBuilder.append(kMaxFieldNameDocDiff, batch->max);
             }
         }
     }
@@ -257,7 +252,7 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
         const BSONObj& beforeData = bucketDocBefore.getObjectField(kBucketDataFieldName);
         const BSONObj& afterData = bucketDocAfter.getObjectField(kBucketDataFieldName);
 
-        BSONObjBuilder dataBuilder(updateBuilder.subobjStart("sdata"));
+        BSONObjBuilder dataBuilder(updateBuilder.subobjStart(kDataFieldNameDocDiff));
         BSONObjBuilder newDataFieldsBuilder;
         BSONObjBuilder updatedDataFieldsBuilder;
         auto beforeIt = beforeData.begin();
@@ -332,15 +327,12 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
     BSONObjBuilder updateBuilder;
     {
         if (!batch->min.isEmpty() || !batch->max.isEmpty()) {
-            BSONObjBuilder controlBuilder(updateBuilder.subobjStart(
-                str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "control"));
+            BSONObjBuilder controlBuilder(updateBuilder.subobjStart(kControlFieldNameDocDiff));
             if (!batch->min.isEmpty()) {
-                controlBuilder.append(
-                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "min", batch->min);
+                controlBuilder.append(kMinFieldNameDocDiff, batch->min);
             }
             if (!batch->max.isEmpty()) {
-                controlBuilder.append(
-                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "max", batch->max);
+                controlBuilder.append(kMaxFieldNameDocDiff, batch->max);
             }
         }
     }
@@ -360,8 +352,7 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
             ++count;
         }
 
-        // doc_diff::kSubDiffSectionFieldPrefix + <field name>
-        BSONObjBuilder dataBuilder(updateBuilder.subobjStart("sdata"));
+        BSONObjBuilder dataBuilder(updateBuilder.subobjStart(kDataFieldNameDocDiff));
         BSONObjBuilder newDataFieldsBuilder;
         for (auto& pair : dataFieldBuilders) {
             // Existing 'data' fields with measurements require different treatment from fields
