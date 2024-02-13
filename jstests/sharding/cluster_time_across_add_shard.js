@@ -111,8 +111,12 @@ if (isShardSvrRst) {
         const cfg = rst.getReplSetConfigFromNode();
         cfg["configsvr"] = true;
         reconfig(rst, cfg);
-        rst.upgradeSet(Object.assign(
-            {configsvr: "", setParameter: {skipShardingConfigurationChecks: false}}, upgradeOpts));
+        rst.upgradeSet(Object.assign({
+            configsvr: "",
+            setParameter:
+                {skipShardingConfigurationChecks: false, featureFlagTransitionToCatalogShard: true}
+        },
+                                     upgradeOpts));
     }, tmpTestData);
 }
 
@@ -165,7 +169,11 @@ if (isShardSvrRst) {
         });
     }
 
-    mongos = MongoRunner.runMongos({configdb: rst.getURL(), keyFile});
+    mongos = MongoRunner.runMongos({
+        configdb: rst.getURL(),
+        keyFile,
+        setParameter: "featureFlagTransitionToCatalogShard=true",
+    });
     authutil.asCluster(mongos, keyFile, () => {
         assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
     });

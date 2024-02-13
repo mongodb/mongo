@@ -90,11 +90,13 @@ MongoRunner.stopMongod(shardSecondary);
 shardSecondary = MongoRunner.runMongod({restart: shardSecondary});
 assert.soon(() => isShardingReady(shardSecondary));
 
-// Transition the config shard to a dedicated config server and ensure that ShardingReady is still
-// set on the config server primary and secondary.
-assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
-assert.soon(() => isShardingReady(configPrimary));
-assert.soon(() => isShardingReady(configSecondary));
+if (TestData.configShard) {
+    // Transition the config shard to a dedicated config server and ensure that ShardingReady is
+    // still set on the config server primary and secondary.
+    assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.soon(() => isShardingReady(configPrimary));
+    assert.soon(() => isShardingReady(configSecondary));
+}
 
 // Restart the dedicated config server primary and secondaries and ensure that they still have
 // ShardingReady set.

@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_70,
+ *    featureFlagTransitionToCatalogShard,
  * ]
  */
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";

@@ -4,7 +4,7 @@
  * server is also a shard server, we want to make sure that we can't use the localhost exception to
  * create two users.
  *
- * @tags: [requires_fcv_70]
+ * @tags: [requires_fcv_70, featureFlagTransitionToCatalogShard]
  */
 // Test that we can't create a shard specific user on the config shard if we already created a
 // cluster wide user using the localhost exception.

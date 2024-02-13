@@ -11,8 +11,16 @@ import {ShardingStateTest} from "jstests/sharding/libs/sharding_state_test.js";
 const st = new ShardingTest({config: 1, shards: {rs0: {nodes: 1}}});
 const rs = st.rs0;
 
-const serverTypeFlag = TestData.configShard ? "configsvr" : "shardsvr";
-const newNode = ShardingStateTest.addReplSetNode({replSet: rs, serverTypeFlag});
+let newNode;
+if (TestData.configShard) {
+    newNode = ShardingStateTest.addReplSetNode({
+        replSet: rs,
+        serverTypeFlag: "configsvr",
+        newNodeParams: "featureFlagTransitionToCatalogShard=true"
+    });
+} else {
+    newNode = ShardingStateTest.addReplSetNode({replSet: rs, serverTypeFlag: "shardsvr"});
+}
 
 jsTestLog("Checking sharding state before failover.");
 ShardingStateTest.checkShardingState(st);

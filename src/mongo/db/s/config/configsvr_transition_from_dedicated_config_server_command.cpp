@@ -36,6 +36,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
@@ -86,6 +87,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+            uassert(8454803,
+                    "The transition to config shard feature is disabled",
+                    gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
             uassert(
                 ErrorCodes::IllegalOperation,
                 "_configsvrTransitionFromDedicatedConfigServer can only be run on config servers",
