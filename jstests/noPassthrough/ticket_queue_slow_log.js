@@ -5,8 +5,8 @@
 
 // Set the number of tickets to a small value to force ticket exhaustion.
 const kNumReadTickets = 5;
-const kNumDocs = 100;
-const kQueuedReaders = 15;
+const kNumDocs = 1000;
+const kQueuedReaders = 20;
 
 const rst = new ReplSetTest({
     nodes: 1,
