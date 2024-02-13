@@ -33,13 +33,6 @@ build --experimental_remote_cache_compression=true
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
 
-# Authenticate to the EngFlow cluster using mTLS certificate
-# For mongodb employees, certs can be generated at 
-# https://sodalite.cluster.engflow.com/gettingstarted
-# then place in the appropriate location as shown below
-build --tls_client_certificate=/engflow/creds/engflow.crt
-build --tls_client_key=/engflow/creds/engflow.key
-
 # if you don't have access to the remote execution cluster above, use the local config
 # described below.
 # pass local config to SCons like:
