@@ -79,9 +79,21 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             GetClusterParameterInvocation invocation;
 
-            // Refresh cached cluster server parameters via a majority read from the config
-            // servers.
-            uassertStatusOK(ClusterServerParameterRefresher::get(opCtx)->refreshParameters(opCtx));
+            if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
+                // Refresh cached cluster server parameters via a majority read from the config
+                // servers.
+                uassertStatusOK(
+                    ClusterServerParameterRefresher::get(opCtx)->refreshParameters(opCtx));
+            } else {
+                // If we're an embedded router, we don't have a separate cache of the parameters and
+                // refresh mechanism. We rely on the co-process shard-role to update our in-memory
+                // parameters. Double check that we have the router-role if we're running this
+                // router command.
+                bool isEmbeddedRouter =
+                    serverGlobalParams.clusterRole.has(ClusterRole::RouterServer) &&
+                    serverGlobalParams.clusterRole.has(ClusterRole::ShardServer);
+                invariant(isEmbeddedRouter);
+            }
 
             return invocation.getCachedParameters(opCtx, request());
         }

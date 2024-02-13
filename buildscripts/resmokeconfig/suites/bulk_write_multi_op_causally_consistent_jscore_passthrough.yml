@@ -150,6 +150,9 @@ selector:
   - jstests/core/operation_latency_histogram.js
   - jstests/core/views/views_stats.js
 
+  # Sets cluster parameters, which do writes with timestamps that will vary b/w clusters.
+  - jstests/core/cluster_parameter_commands.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_read_preference_unchanged
