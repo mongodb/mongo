@@ -109,6 +109,16 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
             self.logger.debug('Mongod not running when gathering standalone fixture pid.')
         return out
 
+    def _handle_await_ready_retry(self, deadline):
+        remaining = deadline - time.time()
+        if remaining <= 0.0:
+            raise self.fixturelib.ServerFailure(
+                "Failed to connect to mongod on port {} after {} seconds".format(
+                    self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
+
+        self.logger.info("Waiting to connect to mongod on port %d.", self.port)
+        time.sleep(0.1)  # Wait a little bit before trying again.
+
     def await_ready(self):
         """Block until the fixture can be used for testing."""
         deadline = time.time() + MongoDFixture.AWAIT_READY_TIMEOUT_SECS
@@ -129,15 +139,12 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                 client = self.mongo_client(timeout_millis=500)
                 client.admin.command("ping")
                 break
+            except pymongo.errors.OperationFailure as err:
+                if err.code != self._INTERRUPTED_DUE_TO_STORAGE_CHANGE:
+                    raise err
+                self._handle_await_ready_retry(deadline)
             except pymongo.errors.ConnectionFailure:
-                remaining = deadline - time.time()
-                if remaining <= 0.0:
-                    raise self.fixturelib.ServerFailure(
-                        "Failed to connect to mongod on port {} after {} seconds".format(
-                            self.port, MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
-
-                self.logger.info("Waiting to connect to mongod on port %d.", self.port)
-                time.sleep(0.1)  # Wait a little bit before trying again.
+                self._handle_await_ready_retry(deadline)
 
         self.logger.info("Successfully contacted the mongod on port %d.", self.port)
 
