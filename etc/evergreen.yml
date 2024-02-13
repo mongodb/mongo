@@ -2842,7 +2842,7 @@ tasks:
   - func: "do benchmark setup"
   - func: "run tests"
     vars:
-      exec_timeout_secs: 10800  # 3 hour timeout.
+      exec_timeout_secs: 14400  # 4 hour timeout.
       resmoke_args: --suites=benchmarks
       resmoke_jobs_max: 1
 
