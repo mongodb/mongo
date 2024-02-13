@@ -245,8 +245,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                 insertStmt.oplogSlot = oplogSlots.front();
             }
 
-            uassertStatusOK(toCollection->insertDocument(
-                opCtx, InsertStatement(objToClone), nullOpDebug, true));
+            uassertStatusOK(toCollection->insertDocument(opCtx, insertStmt, nullOpDebug, true));
             wunit.commit();
 
             // Go to the next document
