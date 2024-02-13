@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -47,6 +48,9 @@ struct Interval {
     // 'start' may not point at the first field in _intervalData.
     // 'end' may not point at the last field in _intervalData.
     // 'start' and 'end' may point at the same field.
+    // This BSON may or may not be owned. In some cases (such as indexed $in), we store an unowned
+    // BSON pointing to the $in array as an optimization. As such, we cannot made any assumptions
+    // about the order of elements in this object; its field names also do not have an meaning.
     BSONObj _intervalData;
 
     // Start and End must be ordered according to the index order.
@@ -103,6 +107,9 @@ struct Interval {
 
     /** Sets the current interval to the given values (see constructor) */
     void init(BSONObj base, bool startIncluded, bool endIncluded);
+
+    Interval(
+        BSONObj base, BSONElement start, bool startInclusive, BSONElement end, bool endInclusive);
 
     /**
      * Returns true if an empty-constructed interval hasn't been init()-ialized yet
@@ -239,8 +246,12 @@ inline bool operator!=(const Interval& lhs, const Interval& rhs) {
 
 template <typename H>
 H AbslHashValue(H state, const Interval& c) {
-    return H::combine(
-        std::move(state), c.startInclusive, c.endInclusive, simpleHash(c._intervalData));
+    // Ignore field names since we only care about the value of the intervals.
+    BSONElementComparator bec(BSONElementComparator::FieldNamesMode::kIgnore, nullptr);
+    size_t hash;
+    bec.hash_combine(hash, c.start);
+    bec.hash_combine(hash, c.end);
+    return H::combine(std::move(state), c.startInclusive, c.endInclusive, hash);
 }
 
 }  // namespace mongo

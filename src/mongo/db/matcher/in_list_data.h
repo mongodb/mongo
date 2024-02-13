@@ -250,7 +250,7 @@ public:
     }
 
     bool isBSONOwned() const {
-        return !_elementsInitialized || (_arr.has_value() && _arr->isOwned());
+        return _arr.has_value() && _arr->isOwned();
     }
 
     bool isPrepared() const {
@@ -267,6 +267,11 @@ public:
     // This method is called by SBE to "prepare" this InListData for use in an SBE plan. Once
     // prepare() is called on an InListData, it can no longer be modified.
     void prepare();
+
+    const BSONObj& getOwnedBSONStorage() const {
+        tassert(8558800, "Expected BSON storage to be owned", isBSONOwned());
+        return *_arr;
+    }
 
 private:
     InListData(const InListData& other);

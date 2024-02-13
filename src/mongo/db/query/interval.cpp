@@ -62,8 +62,16 @@ void Interval::init(BSONObj base, bool si, bool ei) {
     endInclusive = ei;
 }
 
+Interval::Interval(
+    BSONObj base, BSONElement start, bool startInclusive, BSONElement end, bool endInclusive)
+    : _intervalData(base),
+      start(start),
+      startInclusive(startInclusive),
+      end(end),
+      endInclusive(endInclusive) {}
+
 bool Interval::isEmpty() const {
-    return _intervalData.nFields() == 0;
+    return start.eoo() && end.eoo();
 }
 
 bool Interval::isPoint() const {

@@ -185,9 +185,9 @@ public:
      */
     void testTranslateAndIntersect(const std::vector<BSONObj>& toIntersect,
                                    OrderedIntervalList* oilOut,
-                                   IndexBoundsBuilder::BoundsTightness* tightnessOut) {
+                                   IndexBoundsBuilder::BoundsTightness* tightnessOut,
+                                   BSONObj obj) {
         auto testIndex = buildSimpleIndexEntry();
-        auto obj = BSON("$and" << toIntersect);
         auto [expr, inputParamIdMap] = parseMatchExpression(obj);
         BSONElement elt = toIntersect[0].firstElement();
         interval_evaluation_tree::Builder ietBuilder{};

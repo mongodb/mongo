@@ -233,7 +233,13 @@ public:
                                OrderedIntervalList* oil,
                                BoundsTightness* tightnessOut);
 
+    /**
+     * Convert the value at 'data' to an Interval. Populate the out-params, 'oil' and 'tightnessOut'
+     * accordingly. If 'holder' is specified, use that BSONObj as the '_intervalData' for the
+     * construted Interval, otherwise construct a new BSONObj from 'data'.
+     */
     static void translateEquality(const BSONElement& data,
+                                  const BSONObj* holder,
                                   const IndexEntry& index,
                                   bool isHashed,
                                   OrderedIntervalList* oil,

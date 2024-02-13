@@ -666,7 +666,7 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         const auto* node = static_cast<const ComparisonMatchExpressionBase*>(expr);
         // There is no need to sort intervals or merge overlapping intervals here since the output
         // is from one element.
-        translateEquality(node->getData(), index, isHashed, oilOut, tightnessOut);
+        translateEquality(node->getData(), nullptr, index, isHashed, oilOut, tightnessOut);
         if (ietBuilder != nullptr) {
             switch (expr->matchType()) {
                 case MatchExpression::EQ:
@@ -1094,11 +1094,29 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         // basis of indexes, null intervals, and array intervals.
         const bool entireNullIntervalMatchesPredicate =
             detectIfEntireNullIntervalMatchesPredicate(ime, index);
+
+        // Ensure that we own the BSON buffer containing the $in array. This will allow us to create
+        // Interval objects which point to this BSON without having to make copies just to strip out
+        // the field name as is usually done in IndexBoundsBuilder::translateEquality.
+        // If the InList has already been prepared, as will be the case if we reach this codepath
+        // from IntervalEvalutionTree evaluation (SBE plan was retrieved from the cache and
+        // parameters are being bound), then we cannot make a copy of the BSON buffer. In this case,
+        // we clone() the InList, which will share the underlying BSON but the copy will not be in
+        // the prepared state, allowing us to make a copy of the BSON.
+        auto inList = ime->getInList();
+        if (!inList->isBSONOwned()) {
+            if (inList->isPrepared()) {
+                inList = inList->clone();
+            }
+            inList->makeBSONOwned();
+        }
+
         for (auto&& equality : ime->getEqualities()) {
             // First, we generate the bounds the same way that we would do for an individual
             // equality. This will set tightness to the value it should be if this equality is being
             // considered in isolation.
-            IndexBoundsBuilder::translateEquality(equality, index, isHashed, oilOut, &tightness);
+            IndexBoundsBuilder::translateEquality(
+                equality, &inList->getOwnedBSONStorage(), index, isHashed, oilOut, &tightness);
             if (entireNullIntervalMatchesPredicate &&
                 (BSONType::jstNULL == equality.type() ||
                  (BSONType::Array == equality.type() && equality.Obj().isEmpty()))) {
@@ -1376,6 +1394,7 @@ void IndexBoundsBuilder::translateRegex(const RegexMatchExpression* rme,
 
 // static
 void IndexBoundsBuilder::translateEquality(const BSONElement& data,
+                                           const BSONObj* holder,
                                            const IndexEntry& index,
                                            bool isHashed,
                                            OrderedIntervalList* oil,
@@ -1386,9 +1405,15 @@ void IndexBoundsBuilder::translateEquality(const BSONElement& data,
         return makeNullEqualityBounds(index, isHashed, oil, tightnessOut);
     }
 
-    // We have to copy the data out of the parse tree and stuff it into the index
-    // bounds.  BSONValue will be useful here.
     if (BSONType::Array != data.type()) {
+        // Reuse the BSON from the parse tree if possible to avoid allocating a BSONObj.
+        // A hashed index or collation means we have to create a copy to construct the bounds.
+        if (!isHashed && index.collator == nullptr && holder != nullptr) {
+            oil->intervals.emplace_back(*holder, data, true, data, true);
+            *tightnessOut = IndexBoundsBuilder::EXACT;
+            return;
+        }
+
         BSONObj dataObj = objFromElement(data, index.collator);
         if (isHashed) {
             dataObj = ExpressionMapping::hash(dataObj.firstElement());

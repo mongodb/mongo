@@ -1205,7 +1205,8 @@ TEST_F(IndexBoundsBuilderTest, IntersectTwoLt) {
     toIntersect.push_back(fromjson("{a: {$lt: 5}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(
@@ -1221,7 +1222,8 @@ TEST_F(IndexBoundsBuilderTest, IntersectEqGte) {
     toIntersect.push_back(fromjson("{a: {$gte: 1}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
@@ -1236,7 +1238,8 @@ TEST_F(IndexBoundsBuilderTest, IntersectGtLte) {
     toIntersect.push_back(fromjson("{a: {$lte: 10}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
@@ -1251,7 +1254,8 @@ TEST_F(IndexBoundsBuilderTest, IntersectGtIn) {
     toIntersect.push_back(fromjson("{a: {$in: [1,2,3,4,5,6]}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
@@ -1268,7 +1272,8 @@ TEST_F(IndexBoundsBuilderTest, IntersectionIsPointInterval) {
     toIntersect.push_back(fromjson("{a: {$lte: 1}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
@@ -1285,7 +1290,8 @@ TEST_F(IndexBoundsBuilderTest, IntersectFullyContained) {
     toIntersect.push_back(fromjson("{a: {$lte: 13}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 1U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
@@ -1300,7 +1306,8 @@ TEST_F(IndexBoundsBuilderTest, EmptyIntersection) {
     toIntersect.push_back(fromjson("{a: {$gte: 2}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 0U);
 }
@@ -1359,7 +1366,8 @@ TEST_F(IndexBoundsBuilderTest, IntersectWithNE) {
     toIntersect.push_back(fromjson("{a: {$lte: 6}}"));
     OrderedIntervalList oil;
     IndexBoundsBuilder::BoundsTightness tightness;
-    testTranslateAndIntersect(toIntersect, &oil, &tightness);
+    auto obj = BSON("$and" << toIntersect);
+    testTranslateAndIntersect(toIntersect, &oil, &tightness, obj);
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
