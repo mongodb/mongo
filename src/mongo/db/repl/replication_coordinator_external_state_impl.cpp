@@ -974,9 +974,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         if (status.isOK()) {
             // Load the clusterId into memory. Use local readConcern, since we can't use
-            // majority readConcern in drain mode because the global lock prevents replication.
-            // This is safe, since if the clusterId write is rolled back, any writes that depend
-            // on it will also be rolled back.
+            // majority/snapshot readConcern in drain mode because the global lock prevents
+            // replication. This is safe, since if the clusterId write is rolled back, any writes
+            // that depend on it will also be rolled back.
             //
             // Since we *just* wrote the cluster ID to the config.version document (via the call
             // to ShardingCatalogManager::initializeConfigDatabaseIfNeeded above), this read can

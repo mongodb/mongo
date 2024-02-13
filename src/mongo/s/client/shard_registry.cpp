@@ -664,7 +664,7 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
     auto shardsAndOpTime = uassertStatusOKWithContext(
-        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern),
+        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kSnapshotReadConcern),
         "could not get updated shard list from config server");
 
     auto shards = std::move(shardsAndOpTime.value);

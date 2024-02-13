@@ -367,10 +367,16 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     }();
 
     BSONObj readConcernObj = [&] {
-        invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
-        repl::OpTime configOpTime{configTime.asTimestamp(),
-                                  mongo::repl::OpTime::kUninitializedTerm};
-        repl::ReadConcernArgs readConcern{configOpTime, readConcernLevel};
+        auto readConcern = [&] {
+            if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
+                repl::OpTime configOpTime{configTime.asTimestamp(),
+                                          mongo::repl::OpTime::kUninitializedTerm};
+                return repl::ReadConcernArgs{configOpTime, readConcernLevel};
+            } else {
+                invariant(readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
+                return repl::ReadConcernArgs{configTime, readConcernLevel};
+            }
+        }();
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);
         return bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
