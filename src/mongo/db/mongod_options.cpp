@@ -591,6 +591,11 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("magicRestore") && params["magicRestore"].as<bool>() == true) {
         storageGlobalParams.magicRestore = 1;
+
+        // Use an ephemeral port so that users don't connect to a node that is being restored.
+        if (!params.count("net.port")) {
+            serverGlobalParams.port = ServerGlobalParams::DefaultMagicRestorePort;
+        }
     }
 
     if (params.count("maintenanceMode") &&

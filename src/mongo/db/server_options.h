@@ -77,6 +77,7 @@ struct ServerGlobalParams {
 #ifdef MONGO_CONFIG_GRPC
         DefaultGRPCServerPort = 27021,
 #endif
+        DefaultMagicRestorePort = 27022,
     };
 
     enum MaintenanceMode { None, ReplicaSetMode, StandaloneMode };

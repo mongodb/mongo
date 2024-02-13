@@ -62,6 +62,11 @@ public:
             return *this;
         }
 
+        auto& setMagicRestore() {
+            _set("magicRestore", true);
+            return *this;
+        }
+
     private:
         template <typename K, typename V>
         void _set(K key, V value) {
@@ -132,6 +137,20 @@ TEST_F(MongodOptionsTest, RouterAndConfigServerWithCustomPorts) {
     ASSERT_EQ(*serverGlobalParams.routerPort, 456);
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::RouterServer));
     ASSERT_TRUE(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+}
+
+TEST_F(MongodOptionsTest, MagicRestoreDefaultPort) {
+    env.setMagicRestore();
+    ASSERT_OK(storeMongodOptions(env));
+
+    ASSERT_EQ(serverGlobalParams.port, ServerGlobalParams::DefaultMagicRestorePort);
+}
+
+TEST_F(MongodOptionsTest, MagicRestoreUseProvidedPort) {
+    env.setMagicRestore().setPort(123);
+    ASSERT_OK(storeMongodOptions(env));
+
+    ASSERT_EQ(serverGlobalParams.port, 123);
 }
 
 }  // namespace
