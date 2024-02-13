@@ -105,7 +105,8 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     boost::optional<ScopeGuard<std::function<void()>>> readSourceGuard;
 
-    if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
+    if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+        readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
         invariant(!opCtx->lockState()->isLocked());
         invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -123,25 +124,44 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
                 opCtx->recoveryUnit()->setTimestampReadSource(originalReadSource);
             }
         });
-        // Sets up operation context with majority read snapshot so correct optime can be retrieved.
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        Status status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
-        if (!status.isOK()) {
-            return status;
-        }
+        if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
+            // Sets up operation context with majority read snapshot so correct optime can be
+            // retrieved.
+            opCtx->recoveryUnit()->setTimestampReadSource(
+                RecoveryUnit::ReadSource::kMajorityCommitted);
+            Status status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
+            if (!status.isOK()) {
+                return status;
+            }
 
-        // Waits for any writes performed by this ShardLocal instance to be committed and visible.
-        Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
-            opCtx, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
-        if (!readConcernStatus.isOK()) {
-            return readConcernStatus;
-        }
+            // Waits for any writes performed by this ShardLocal instance to be committed and
+            // visible.
+            Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
+                opCtx, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
+            if (!readConcernStatus.isOK()) {
+                return readConcernStatus;
+            }
 
-        // Informs the storage engine to read from the committed snapshot for the rest of this
-        // operation.
-        status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
-        if (!status.isOK()) {
-            return status;
+            // Informs the storage engine to read from the committed snapshot for the rest of this
+            // operation.
+            status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
+            if (!status.isOK()) {
+                return status;
+            }
+        } else {
+            // Waits for any writes performed by this ShardLocal instance to be committed and
+            // visible. We use majority readConcern here since the snaphsot model will open it at
+            // the majority timestamp.
+            Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
+                opCtx,
+                repl::ReadConcernArgs{_getLastOpTime(),
+                                      repl::ReadConcernLevel::kMajorityReadConcern});
+            if (!readConcernStatus.isOK()) {
+                return readConcernStatus;
+            }
+            auto opTime = replCoord->getCurrentCommittedSnapshotOpTime();
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                          opTime.getTimestamp());
         }
     } else {
         invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);
