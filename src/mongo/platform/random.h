@@ -117,8 +117,18 @@ public:
     }
 
     /** A number uniformly distributed over all possible values. */
+    uint32_t nextUInt32() {
+        return _nextAny<uint32_t>();
+    }
+
+    /** A number uniformly distributed over all possible values. */
     int64_t nextInt64() {
         return _nextAny<int64_t>();
+    }
+
+    /** A number uniformly distributed over all possible values. */
+    uint64_t nextUInt64() {
+        return _nextAny<uint64_t>();
     }
 
     /** A number in the half-open interval [0, max) */

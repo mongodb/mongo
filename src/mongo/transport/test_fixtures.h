@@ -31,21 +31,14 @@
 
 #include <queue>
 
+#include "mongo/unittest/join_thread.h"
 #include "mongo/util/concurrency/notification.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::transport::test {
 
-class JoinThread : public stdx::thread {
-public:
-    using stdx::thread::thread;
-    ~JoinThread() {
-        if (joinable())
-            join();
-    }
-};
-
+using unittest::JoinThread;
 
 template <typename T>
 class BlockingQueue {

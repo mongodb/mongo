@@ -49,6 +49,7 @@
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
@@ -64,18 +65,7 @@ constexpr auto operator""_sec(unsigned long long n) noexcept {
     return Seconds{static_cast<long long>(n)};
 }
 
-class JoinThread : public stdx::thread {
-public:
-    using stdx::thread::thread;
-
-    JoinThread(JoinThread&&) = default;
-    JoinThread& operator=(JoinThread&&) = default;
-
-    ~JoinThread() {
-        if (joinable())
-            join();
-    }
-};
+using unittest::JoinThread;
 
 class OperationContextTest : public ServiceContextTest {
 public:

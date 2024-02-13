@@ -22,6 +22,7 @@ env.CppUnitTest(
         'decimal128_test.cpp',
         'decimal128_bson_test.cpp',
         'overflow_arithmetic_test.cpp',
+        'waitable_atomic_test.cpp',
     ],
 )
 
