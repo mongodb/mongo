@@ -638,14 +638,17 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx) {
                             std::make_unique<ShardServerCatalogCacheLoader>(
                                 std::make_unique<ConfigServerCatalogCacheLoader>()));
 
-    // This is only called in startup when there shouldn't be replication state changes, but to
-    // be safe we take the RSTL anyway.
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    bool isReplSet = replCoord->getSettings().isReplSet();
-    bool isStandaloneOrPrimary =
-        !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
-    CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+
+    {
+        // This is only called in startup when there shouldn't be replication state changes, but to
+        // be safe we take the RSTL anyway.
+        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool isReplSet = replCoord->getSettings().isReplSet();
+        bool isStandaloneOrPrimary =
+            !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
+        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+    }
 
     _initializeGlobalShardingState(opCtx, configCS);
 
