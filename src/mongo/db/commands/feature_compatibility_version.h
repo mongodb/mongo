@@ -73,10 +73,10 @@ public:
     static void addTransitionFromLatestToLastContinuous();
 
     /**
-     * Returns the on-disk feature compatibility version document if it exists.
+     * Returns the on-disk feature compatibility version document if it can be found.
+     * If there was an error finding the document, returns the error reason.
      */
-    static boost::optional<BSONObj> findFeatureCompatibilityVersionDocument(
-        OperationContext* opCtx);
+    static StatusWith<BSONObj> findFeatureCompatibilityVersionDocument(OperationContext* opCtx);
 
     /**
      * uassert that a transition from fromVersion to newVersion is permitted. Different rules apply

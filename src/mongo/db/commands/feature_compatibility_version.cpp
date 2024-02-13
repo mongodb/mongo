@@ -295,18 +295,14 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
 
 }  // namespace
 
-boost::optional<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
+StatusWith<BSONObj> FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(
     OperationContext* opCtx) {
     AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
     invariant(autoColl.ensureDbExists(opCtx), NamespaceString::kServerConfigurationNamespace.ns());
 
     const auto query = BSON("_id" << multiversion::kParameterName);
-    const auto swFcv = repl::StorageInterface::get(opCtx)->findById(
+    return repl::StorageInterface::get(opCtx)->findById(
         opCtx, NamespaceString::kServerConfigurationNamespace, query["_id"]);
-    if (!swFcv.isOK()) {
-        return boost::none;
-    }
-    return swFcv.getValue();
 }
 
 void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
@@ -322,8 +318,18 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
         fcvTransitions.permitsTransition(fromVersion, newVersion, isFromConfigServer));
 
     auto fcvObj = findFeatureCompatibilityVersionDocument(opCtx);
+    if (!fcvObj.isOK()) {
+        Status status = fcvObj.getStatus();
+        invariant(ErrorCodes::isRetriableError(status));
+        uasserted(
+            8531600,
+            str::stream() << "failed to validate setFCV request because the existing FCV document "
+                             "could not be found due to error: "
+                          << status.toString() << ". Retry the setFCV request.");
+    }
+
     auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-        IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.value());
+        IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.getValue());
 
     auto isCleaningServerMetadata = fcvDoc.getIsCleaningServerMetadata();
     uassert(7428200,
@@ -425,8 +431,18 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
         // case we do not want to remove the existing isCleaningServerMetadata FCV doc field
         // because it would not be safe to upgrade the FCV.
         auto currentFCVObj = findFeatureCompatibilityVersionDocument(opCtx);
+        if (!currentFCVObj.isOK()) {
+            Status status = currentFCVObj.getStatus();
+            invariant(ErrorCodes::isRetriableError(status));
+            uasserted(8531601,
+                      str::stream()
+                          << "failed to update FCV document because the existing FCV document "
+                             "could not be found due to error: "
+                          << status.toString() << ". Retry the setFCV request.");
+        }
+
         auto currentFCVDoc = FeatureCompatibilityVersionDocument::parse(
-            IDLParserContext("featureCompatibilityVersionDocument"), currentFCVObj.value());
+            IDLParserContext("featureCompatibilityVersionDocument"), currentFCVObj.getValue());
 
         auto currentIsCleaningServerMetadata = currentFCVDoc.getIsCleaningServerMetadata();
         if (currentIsCleaningServerMetadata.is_initialized() && *currentIsCleaningServerMetadata) {
@@ -560,7 +576,7 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
     // Global write lock must be held.
     invariant(shard_role_details::getLocker(opCtx)->isW());
     auto featureCompatibilityVersion = findFeatureCompatibilityVersionDocument(opCtx);
-    if (!featureCompatibilityVersion) {
+    if (!featureCompatibilityVersion.isOK()) {
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot().logFCVWithContext(
             "startup"_sd);
         return;
@@ -568,7 +584,8 @@ void FeatureCompatibilityVersion::initializeForStartup(OperationContext* opCtx) 
 
     // If the server configuration collection already contains a valid
     // featureCompatibilityVersion document, cache it in-memory as a server parameter.
-    auto swVersion = FeatureCompatibilityVersionParser::parse(*featureCompatibilityVersion);
+    auto swVersion =
+        FeatureCompatibilityVersionParser::parse(featureCompatibilityVersion.getValue());
 
     // Note this error path captures all cases of an FCV document existing, but with any
     // unacceptable value. This includes unexpected cases with no path forward such as the FCV
@@ -630,7 +647,7 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
     // Fail to start up if there is no featureCompatibilityVersion document and there are
     // non-local databases present.
-    if (!fcvDocument && nonLocalDatabases) {
+    if (!fcvDocument.isOK() && nonLocalDatabases) {
         LOGV2_FATAL_NOTRACE(40652,
                             "Unable to start up mongod due to missing featureCompatibilityVersion "
                             "document. Please run with --repair to restore the document.");
