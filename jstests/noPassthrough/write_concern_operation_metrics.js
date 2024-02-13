@@ -25,6 +25,27 @@
 //  | OnCommit hooks    |              |
 //  |                   | Commit       |
 //  | WaitForTopOfOplog |              |
+//
+// TODO(SERVER-84271): Remove the diagram above and keep only the section about when
+//                     featureFlagReplicateVectoredInsertsTransactionally is set.
+//
+// When featureFlagReplicateVectoredInsertsTransactionally is set, the potential for the issue
+// happening is smaller but can still occur:
+//  | Writer 1          | Writer 2     |
+//  |-------------------+--------------|
+//  | BeginTxn          |              |
+//  | Write A           |              |
+//  | Timestamp 10      |              |
+//  | Commit            |              |
+//  | OnCommit hooks    |              |
+//  |                   | BeginTxn     |
+//  |                   | Update B     |
+//  |                   | Timestamp 11 |
+//  |                   | Commit       |
+//  | WaitForTopOfOplog |              |
+//
+// The cause of the issue is that WaitForTopOfOplog reads the top of the oplog in real time, not
+// the latest timestamp that the current client has read.
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 
@@ -73,31 +94,22 @@ function doUpdate() {
         db.getSiblingDB("otherDB").othercoll.update({_id: 1}, {a: 'a'.repeat(100 * 1024)}));
 }
 
-const hangAfterReserveOptime =
-    configureFailPoint(primary,
-                       "hangAndFailAfterDocumentInsertsReserveOpTimes",
-                       {collectionNS: db1.coll.getFullName(), skipFail: true});
-
-var joinWriter1 = startParallelShell(doInsert, primary.port);
-// Ensure Writer 1 has fetched the op time before starting up Writer 2.
-hangAfterReserveOptime.wait();
-
-// We want Writer 2 to perform the update after Writer 1 has fetched the oplog.
-const hangAfterUpdate = configureFailPoint(primary, "hangAfterBatchUpdate");
-var joinWriter2 = startParallelShell(doUpdate, primary.port);
-hangAfterUpdate.wait();
-
 // Stop the primary from calling into awaitReplication()
 const hangBeforeWaitingForWriteConcern =
     configureFailPoint(primary, "hangBeforeWaitingForWriteConcern");
 
-// Unblock Writer 1 so it performs the insert and then blocks on hangBeforeWaitingForWriteConcern.
-hangAfterReserveOptime.off();
-// Unblock Writer 2, which should commit after Writer 1.
-hangAfterUpdate.off();
-
-// Waiting for write concern.
+var joinWriter1 = startParallelShell(doInsert, primary.port);
+// Wait for writer1 to finish before starting writer 2.
 hangBeforeWaitingForWriteConcern.wait();
+
+// We want Writer 2 to perform the update after Writer 1 has finished but before it waits for
+// write concern.
+const hangAfterUpdate = configureFailPoint(primary, "hangAfterBatchUpdate");
+var joinWriter2 = startParallelShell(doUpdate, primary.port);
+hangAfterUpdate.wait();
+
+// Unblock Writer 2, which has committed after Writer 1.
+hangAfterUpdate.off();
 
 assert.soon(() => {
     // Make sure waitForWriteConcernDurationMillis exists in the currentOp query.
