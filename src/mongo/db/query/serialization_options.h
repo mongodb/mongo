@@ -77,27 +77,6 @@ struct SerializationOptions {
     static const SerializationOptions kRepresentativeQueryShapeSerializeOptions;
     static const SerializationOptions kDebugQueryShapeSerializeOptions;
 
-    SerializationOptions() {}
-
-    SerializationOptions(bool explain_)
-        // kQueryPlanner is the "base" explain level, used as default in the case explain is
-        // specified without a specific verbosity level
-        : verbosity(explain_ ? boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)
-                             : boost::none) {}
-
-    SerializationOptions(boost::optional<ExplainOptions::Verbosity> verbosity_)
-        : verbosity(verbosity_) {}
-
-    SerializationOptions(ExplainOptions::Verbosity verbosity_) : verbosity(verbosity_) {}
-
-    SerializationOptions(std::function<std::string(StringData)> fieldNamesHmacPolicy_,
-                         LiteralSerializationPolicy policy)
-        : literalPolicy(policy),
-          transformIdentifiers(fieldNamesHmacPolicy_),
-          transformIdentifiersCallback(fieldNamesHmacPolicy_) {}
-
-    SerializationOptions(LiteralSerializationPolicy policy) : literalPolicy(policy) {}
-
     /**
      * Checks if this SerializationOptions represents the same options as another
      * SerializationOptions. Note it cannot compare whether the two 'transformIdentifiersCallback's
@@ -155,7 +134,7 @@ struct SerializationOptions {
 
     // Helper functions for applying hmac to BSONObj. Does not take into account anything to do with
     // MQL semantics, removes all field names and literals in the passed in obj.
-    void addHmacedArrayToBuilder(BSONArrayBuilder* bab, std::vector<BSONElement> array) {
+    void addHmacedArrayToBuilder(BSONArrayBuilder* bab, std::vector<BSONElement> array) const {
         for (const auto& elem : array) {
             if (elem.type() == BSONType::Object) {
                 BSONObjBuilder subObj(bab->subobjStart());
@@ -171,7 +150,7 @@ struct SerializationOptions {
         }
     }
 
-    void addHmacedObjToBuilder(BSONObjBuilder* bob, BSONObj objToHmac) {
+    void addHmacedObjToBuilder(BSONObjBuilder* bob, BSONObj objToHmac) const {
         for (const auto& elem : objToHmac) {
             auto fieldName = serializeFieldPath(elem.fieldName());
             if (elem.type() == BSONType::Object) {

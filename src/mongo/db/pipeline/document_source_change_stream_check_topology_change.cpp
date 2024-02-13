@@ -87,7 +87,8 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckTopologyChange::doG
     return nextInput;
 }
 
-Value DocumentSourceChangeStreamCheckTopologyChange::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamCheckTopologyChange::serialize(
+    const SerializationOptions& opts) const {
     if (opts.verbosity) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage"

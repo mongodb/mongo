@@ -77,7 +77,7 @@ struct WindowFunctionStatement {
         }
     }
 
-    void serialize(MutableDocument& outputFields, SerializationOptions opts) const;
+    void serialize(MutableDocument& outputFields, const SerializationOptions& opts) const;
 };
 
 /**
@@ -183,7 +183,7 @@ public:
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     DocumentSource::GetNextResult doGetNext();
 

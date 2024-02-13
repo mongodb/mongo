@@ -104,7 +104,7 @@ const char* AccumulatorMinMaxN::getOpName() const {
 
 Document AccumulatorMinMaxN::serialize(boost::intrusive_ptr<Expression> initializer,
                                        boost::intrusive_ptr<Expression> argument,
-                                       SerializationOptions options) const {
+                                       const SerializationOptions& options) const {
     MutableDocument args;
     AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
@@ -156,7 +156,7 @@ void AccumulatorN::checkMemUsage() {
 
 void AccumulatorN::serializeHelper(const boost::intrusive_ptr<Expression>& initializer,
                                    const boost::intrusive_ptr<Expression>& argument,
-                                   SerializationOptions options,
+                                   const SerializationOptions& options,
                                    MutableDocument& md) {
     md.addField(kFieldNameN, Value(initializer->serialize(options)));
     md.addField(kFieldNameInput, Value(argument->serialize(options)));
@@ -318,7 +318,7 @@ const char* AccumulatorFirstLastN::getOpName() const {
 
 Document AccumulatorFirstLastN::serialize(boost::intrusive_ptr<Expression> initializer,
                                           boost::intrusive_ptr<Expression> argument,
-                                          SerializationOptions options) const {
+                                          const SerializationOptions& options) const {
     MutableDocument args;
     AccumulatorN::serializeHelper(initializer, argument, options, args);
     return DOC(getOpName() << args.freeze());
@@ -464,7 +464,7 @@ template <TopBottomSense sense, bool single>
 Document AccumulatorTopBottomN<sense, single>::serialize(
     boost::intrusive_ptr<Expression> initializer,
     boost::intrusive_ptr<Expression> argument,
-    SerializationOptions options) const {
+    const SerializationOptions& options) const {
     MutableDocument args;
 
     if constexpr (!single) {
@@ -502,7 +502,7 @@ std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionCon
             // since the evaluated argument wouldn't have the same metadata as the original
             // document. Instead we use [{$meta: "textScore"}] as the sortFields expression so the
             // sortFields array contains the data we need for sorting.
-            const auto serialized = part.expression->serialize(false);
+            const auto serialized = part.expression->serialize(SerializationOptions{});
             sortFieldsExpBab.append(serialized.getDocument().toBson());
         } else {
             sortFieldsExpBab.append((StringBuilder() << "$" << fieldName).str());

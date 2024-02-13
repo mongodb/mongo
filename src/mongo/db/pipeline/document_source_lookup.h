@@ -123,8 +123,9 @@ public:
                          const boost::intrusive_ptr<ExpressionContext>&);
 
     const char* getSourceName() const final;
-    void serializeToArray(std::vector<Value>& array,
-                          SerializationOptions opts = SerializationOptions()) const final override;
+    void serializeToArray(
+        std::vector<Value>& array,
+        const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     /**
      * Returns the 'as' path, and possibly fields modified by an absorbed $unwind.
@@ -304,7 +305,8 @@ private:
     /**
      * Should not be called; use serializeToArray instead.
      */
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
+    Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
         MONGO_UNREACHABLE_TASSERT(7484304);
     }
 

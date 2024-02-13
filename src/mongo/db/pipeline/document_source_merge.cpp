@@ -614,8 +614,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distr
     return DocumentSourceWriter::distributedPlanLogic();
 }
 
-Value DocumentSourceMerge::serialize(SerializationOptions opts) const {
-    auto explain = opts.verbosity;
+Value DocumentSourceMerge::serialize(const SerializationOptions& opts) const {
     DocumentSourceMergeSpec spec;
     spec.setTargetNss(_outputNs);
     spec.setLet([&]() -> boost::optional<BSONObj> {
@@ -625,7 +624,7 @@ Value DocumentSourceMerge::serialize(SerializationOptions opts) const {
 
         BSONObjBuilder bob;
         for (auto&& [name, expr] : *_letVariables) {
-            bob << name << expr->serialize(explain);
+            bob << name << expr->serialize(opts);
         }
         return bob.obj();
     }());

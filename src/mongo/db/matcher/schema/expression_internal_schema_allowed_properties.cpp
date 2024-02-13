@@ -121,15 +121,18 @@ bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONO
     return true;
 }
 
-void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* builder,
-                                                               SerializationOptions opts) const {
+void InternalSchemaAllowedPropertiesMatchExpression::serialize(
+    BSONObjBuilder* builder, const SerializationOptions& opts) const {
     BSONObjBuilder expressionBuilder(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 
     std::vector<StringData> sortedProperties(_properties.begin(), _properties.end());
     std::sort(sortedProperties.begin(), sortedProperties.end());
     opts.appendLiteral(&expressionBuilder, "properties", sortedProperties);
-    opts.appendLiteral(&expressionBuilder, "namePlaceholder", _namePlaceholder);
+    // This will be serialized to "i", which is the parser chosen namePlaceholder. Using this
+    // unmodified will have a similar effect to serializing to "?", however it preserves round trip
+    // parsing.
+    expressionBuilder.append("namePlaceholder", _namePlaceholder);
 
     BSONArrayBuilder patternPropertiesBuilder(expressionBuilder.subarrayStart("patternProperties"));
     for (auto&& [pattern, expression] : _patternProperties) {

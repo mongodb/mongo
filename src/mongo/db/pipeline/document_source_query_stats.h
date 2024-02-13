@@ -112,7 +112,7 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
@@ -120,7 +120,10 @@ private:
     DocumentSourceQueryStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone,
                              std::string hmacKey = {})
-        : DocumentSource(kStageName, expCtx), _algorithm(algorithm), _hmacKey(hmacKey) {}
+        : DocumentSource(kStageName, expCtx),
+          _transformIdentifiers(algorithm != TransformAlgorithmEnum::kNone),
+          _algorithm(algorithm),
+          _hmacKey(hmacKey) {}
 
     GetNextResult doGetNext() final;
 

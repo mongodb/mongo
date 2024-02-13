@@ -51,7 +51,7 @@ void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debu
 }
 
 void InternalSchemaNumArrayItemsMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, SerializationOptions opts) const {
+    BSONObjBuilder* bob, const SerializationOptions& opts) const {
     opts.appendLiteral(bob, _name, _numItems);
 }
 

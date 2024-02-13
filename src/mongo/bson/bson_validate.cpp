@@ -133,6 +133,7 @@ public:
                 switch (subtype) {
                     case BinDataType::BinDataGeneral:
                     case BinDataType::Function:
+                    case BinDataType::Sensitive:
                     case BinDataType::bdtCustom:
                         break;
                     case BinDataType::Column:

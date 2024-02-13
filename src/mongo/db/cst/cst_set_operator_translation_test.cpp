@@ -59,7 +59,7 @@ TEST(CstPipelineTranslationTest, AllElementsTrueTest) {
     auto expr =
         cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$allElementsTrue: [\"$set\"]}")) ==
-                                           expr->serialize(false)));
+                                           expr->serialize(SerializationOptions{})));
 }
 
 TEST(CstPipelineTranslationTest, AnyElementsTrueTest) {
@@ -70,7 +70,7 @@ TEST(CstPipelineTranslationTest, AnyElementsTrueTest) {
     auto expr =
         cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$anyElementTrue: [\"$set\"]}")) ==
-                                           expr->serialize(false)));
+                                           expr->serialize(SerializationOptions{})));
 }
 
 TEST(CstPipelineTranslationTest, SetDifferenceTest) {
@@ -81,8 +81,9 @@ TEST(CstPipelineTranslationTest, SetDifferenceTest) {
     auto expCtx = getExpCtx();
     auto expr =
         cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
-    ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson("{$setDifference: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
+    ASSERT_TRUE(
+        ValueComparator().evaluate(Value(fromjson("{$setDifference: [\"$set\", \"$set2\"]}")) ==
+                                   expr->serialize(SerializationOptions{})));
 }
 
 TEST(CstPipelineTranslationTest, SetEqualsTest) {
@@ -94,7 +95,7 @@ TEST(CstPipelineTranslationTest, SetEqualsTest) {
     auto expr =
         cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$setEquals: [\"$set\", \"$set2\"]}")) ==
-                                           expr->serialize(false)));
+                                           expr->serialize(SerializationOptions{})));
 }
 
 TEST(CstPipelineTranslationTest, SetIntersectionTest) {
@@ -108,7 +109,7 @@ TEST(CstPipelineTranslationTest, SetIntersectionTest) {
         cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setIntersection: [\"$set\", \"$set2\", \"$set3\"]}")) ==
-        expr->serialize(false)));
+        expr->serialize(SerializationOptions{})));
 }
 
 TEST(CstPipelineTranslationTest, SetIsSubsetTest) {
@@ -119,8 +120,9 @@ TEST(CstPipelineTranslationTest, SetIsSubsetTest) {
     auto expCtx = getExpCtx();
     auto expr =
         cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
-    ASSERT_TRUE(ValueComparator().evaluate(
-        Value(fromjson("{$setIsSubset: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
+    ASSERT_TRUE(
+        ValueComparator().evaluate(Value(fromjson("{$setIsSubset: [\"$set\", \"$set2\"]}")) ==
+                                   expr->serialize(SerializationOptions{})));
 }
 
 TEST(CstPipelineTranslationTest, SetUnionTest) {
@@ -134,7 +136,7 @@ TEST(CstPipelineTranslationTest, SetUnionTest) {
         cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setUnion: [\"$set\", \"$set2\", \"$set3\"]}")) ==
-        expr->serialize(false)));
+        expr->serialize(SerializationOptions{})));
 }
 
 }  // namespace

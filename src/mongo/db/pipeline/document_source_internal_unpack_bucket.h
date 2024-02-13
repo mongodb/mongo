@@ -75,13 +75,15 @@ public:
         return kStageNameInternal.rawData();
     }
 
-    void serializeToArray(std::vector<Value>& array,
-                          SerializationOptions opts = SerializationOptions()) const final override;
+    void serializeToArray(
+        std::vector<Value>& array,
+        const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     /**
      * Use 'serializeToArray' above.
      */
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
+    Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
         MONGO_UNREACHABLE_TASSERT(7484305);
     }
 

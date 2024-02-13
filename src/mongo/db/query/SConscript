@@ -386,7 +386,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        "$BUILD_DIR/mongo/idl/idl_parser",
+        '$BUILD_DIR/mongo/idl/idl_parser',
         'canonical_query',
     ],
     LIBDEPS_PRIVATE=[

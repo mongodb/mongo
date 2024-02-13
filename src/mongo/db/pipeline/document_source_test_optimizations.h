@@ -74,7 +74,7 @@ public:
 
 private:
     virtual Value serialize(
-        SerializationOptions opts = SerializationOptions()) const final override {
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
         MONGO_UNREACHABLE_TASSERT(7484301);
     }
 };

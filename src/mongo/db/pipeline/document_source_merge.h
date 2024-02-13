@@ -135,7 +135,7 @@ public:
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     /**
      * Creates a new $merge stage from the given arguments.

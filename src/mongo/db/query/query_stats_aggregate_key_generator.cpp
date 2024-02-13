@@ -41,10 +41,13 @@ BSONObj AggregateKeyGenerator::generate(
     // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
     // to mongot.
     auto expCtx = makeDummyExpCtx(opCtx);
-
     SerializationOptions opts = hmacPolicy
-        ? SerializationOptions(*hmacPolicy, LiteralSerializationPolicy::kToDebugTypeString)
-        : SerializationOptions(LiteralSerializationPolicy::kToDebugTypeString);
+        ? SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString,
+                               /*transformIdentifiersBool*/ true,
+                               *hmacPolicy,
+                               /*includePath*/ true,
+                               /*verbosity*/ boost::none}
+        : SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
     return makeQueryStatsKey(opts, expCtx);
 }

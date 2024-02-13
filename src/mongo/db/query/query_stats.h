@@ -54,7 +54,6 @@ using BSONNumeric = long long;
 }  // namespace
 
 namespace query_stats {
-
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
  * with the reduction in required storage.
@@ -104,10 +103,6 @@ public:
         // (QueryStatsEntry)
         queryStatsStoreSizeEstimateBytesMetric.increment(kKeySize + size());
     }
-
-    QueryStatsEntry(QueryStatsEntry& entry) = delete;
-
-    QueryStatsEntry(QueryStatsEntry&& entry) = delete;
 
     ~QueryStatsEntry() {
         // Decrement by size of query stats store key (hash returns size_t) and value
@@ -179,7 +174,7 @@ public:
     /**
      * The KeyGenerator that can generate the query stats key for this request.
      */
-    std::unique_ptr<KeyGenerator> keyGenerator;
+    const std::shared_ptr<const KeyGenerator> keyGenerator;
 };
 struct TelemetryPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.

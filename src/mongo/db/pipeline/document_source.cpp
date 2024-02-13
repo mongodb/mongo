@@ -247,7 +247,9 @@ bool DocumentSource::pushSampleBefore(Pipeline::SourceContainer::iterator itr,
 
 BSONObj DocumentSource::serializeToBSONForDebug() const {
     std::vector<Value> serialized;
-    serializeToArray(serialized, ExplainOptions::Verbosity::kQueryPlanner);
+    auto opts = SerializationOptions{
+        .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
+    serializeToArray(serialized, opts);
     if (serialized.empty()) {
         LOGV2_DEBUG(5943501,
                     5,
@@ -294,7 +296,8 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
     return doOptimizeAt(itr, container);
 }
 
-void DocumentSource::serializeToArray(vector<Value>& array, SerializationOptions opts) const {
+void DocumentSource::serializeToArray(vector<Value>& array,
+                                      const SerializationOptions& opts) const {
     Value entry = serialize(opts);
     if (!entry.missing()) {
         array.push_back(entry);

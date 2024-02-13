@@ -313,7 +313,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     return create(std::move(targetNss), expCtx, std::move(outSpec.getTimeseries()));
 }
 
-Value DocumentSourceOut::serialize(SerializationOptions opts) const {
+Value DocumentSourceOut::serialize(const SerializationOptions& opts) const {
     BSONObjBuilder bob;
     DocumentSourceOutSpec spec;
     spec.setDb(_outputNs.dbName().db());

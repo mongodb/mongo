@@ -462,7 +462,7 @@ boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
     return this;
 }
 
-Value ExpressionInternalIndexKey::serialize(SerializationOptions options) const {
+Value ExpressionInternalIndexKey::serialize(const SerializationOptions& options) const {
     invariant(_doc);
     invariant(_spec);
 

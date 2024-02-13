@@ -203,7 +203,7 @@ public:
         }
     }
 
-    virtual Value serialize(SerializationOptions opts) const {
+    virtual Value serialize(const SerializationOptions& opts) const {
         MutableDocument args;
 
         args[_accumulatorName] = _input->serialize(opts);
@@ -336,7 +336,7 @@ public:
                                 << " is not supported as a removable window function");
     }
 
-    Value serialize(SerializationOptions opts) const final {
+    Value serialize(const SerializationOptions& opts) const final {
         MutableDocument args;
         args.addField(_accumulatorName, Value(_input->serialize(opts)));
         return args.freezeToValue();
@@ -450,7 +450,7 @@ public:
                                 << " is not supported with a removable window");
     }
 
-    Value serialize(SerializationOptions opts) const final {
+    Value serialize(const SerializationOptions& opts) const final {
         MutableDocument args;
         args.addField(_accumulatorName, Value(Document()));
         return args.freezeToValue();
@@ -499,7 +499,7 @@ public:
                                 << " is not supported with a removable window");
     }
 
-    Value serialize(SerializationOptions opts) const final {
+    Value serialize(const SerializationOptions& opts) const final {
         MutableDocument subObj;
         tassert(5433604, "ExpMovingAvg neither N nor alpha was set", _N || _alpha);
         if (_N) {
@@ -534,7 +534,7 @@ public:
         return _unit;
     }
 
-    Value serialize(SerializationOptions opts) const final {
+    Value serialize(const SerializationOptions& opts) const final {
         MutableDocument result;
         result[_accumulatorName][kArgInput] = _input->serialize(opts);
         if (_unit) {
@@ -809,7 +809,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(5490705);
     }
 
-    Value serialize(SerializationOptions opts) const final {
+    Value serialize(const SerializationOptions& opts) const final {
         MutableDocument args;
         args.addField(_accumulatorName, Value(_input->serialize(opts)));
         return args.freezeToValue();
@@ -903,7 +903,7 @@ public:
           nExpr(std::move(nExpr)),
           sortPattern(std::move(sortPattern)) {}
 
-    Value serialize(SerializationOptions opts) const final;
+    Value serialize(const SerializationOptions& opts) const final;
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
 
@@ -953,7 +953,7 @@ public:
           _method(method),
           _intializeExpr(std::move(initializeExpr)) {}
 
-    Value serialize(SerializationOptions opts) const final;
+    Value serialize(const SerializationOptions& opts) const final;
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
 

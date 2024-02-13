@@ -492,13 +492,13 @@ public:
      * to re-parse, since we will put strings in places where strings may not be accpeted
      * syntactically (e.g. a number is always expected, as in with the $mod expression).
      */
-    virtual void serialize(BSONObjBuilder* out, SerializationOptions options) const = 0;
+    virtual void serialize(BSONObjBuilder* out, const SerializationOptions& options) const = 0;
 
     /**
      * Convenience method which serializes this MatchExpression to a BSONObj. See the override with
      * a BSONObjBuilder* argument for details.
      */
-    BSONObj serialize(SerializationOptions options = {}) const {
+    BSONObj serialize(const SerializationOptions& options = {}) const {
         BSONObjBuilder bob;
         serialize(&bob, options);
         return bob.obj();

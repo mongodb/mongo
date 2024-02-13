@@ -244,7 +244,7 @@ public:
 
     static RangeStatement parse(RangeSpec spec);
 
-    Value serialize(SerializationOptions opts) const {
+    Value serialize(const SerializationOptions& opts) const {
         MutableDocument spec;
         spec[kArgStep] = opts.serializeLiteral(_step);
         spec[kArgBounds] = stdx::visit(
@@ -384,7 +384,7 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert(_field.fullPath());

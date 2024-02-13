@@ -103,7 +103,7 @@ private:
 
     GetNextResult doGetNext() final;
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     bool _didEmit = false;
 };

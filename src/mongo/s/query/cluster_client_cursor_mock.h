@@ -107,6 +107,7 @@ public:
 
     boost::optional<uint32_t> getQueryHash() const final;
 
+    boost::optional<std::size_t> getQueryStatsStoreKeyHash() const final;
     /**
      * Returns false unless the mock cursor has been fully iterated.
      */

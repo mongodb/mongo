@@ -84,7 +84,11 @@ public:
         LOGV2_DEBUG(6979800,
                     1,
                     "running sbe expression benchmark on expression",
-                    "expression"_attr = expression->serialize(/*explain = */ true).toString());
+                    "expression"_attr = expression
+                                            ->serialize(SerializationOptions{
+                                                .verbosity = boost::make_optional(
+                                                    ExplainOptions::Verbosity::kQueryPlanner)})
+                                            .toString());
 
         // This stage makes it possible to execute the benchmark in cases when
         // stage_builder::generateExpression adds more stages.

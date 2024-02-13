@@ -313,7 +313,7 @@ DocumentSourceAnalyzeShardKeyReadWriteDistribution::createFromBson(
 }
 
 Value DocumentSourceAnalyzeShardKeyReadWriteDistribution::serialize(
-    SerializationOptions opts) const {
+    const SerializationOptions& opts) const {
     return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
 }
 

@@ -38,7 +38,6 @@ assert.commandWorked(bulk.execute());
     // Assert there is only one entry.
     assert.eq(queryStatsResults.length, 1, queryStatsResults);
     const queryStatsEntry = queryStatsResults[0];
-    jsTestLog(queryStatsEntry);
     assert.eq(queryStatsEntry.key.queryShape.cmdNs.db, "test");
     assert.eq(queryStatsEntry.key.queryShape.cmdNs.coll, jsTestName());
     assert.eq(queryStatsEntry.key.client.application.name, "MongoDB Shell");

@@ -63,7 +63,7 @@ void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
 }
 
 void InternalSchemaObjectMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, SerializationOptions opts) const {
+    BSONObjBuilder* bob, const SerializationOptions& opts) const {
     bob->append(kName, _sub->serialize(opts));
 }
 

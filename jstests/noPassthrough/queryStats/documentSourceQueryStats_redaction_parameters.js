@@ -18,7 +18,7 @@ function assertQueryStatsKeyWithoutHmac(queryStatsKey) {
 
 function runTest(conn) {
     const testDB = conn.getDB('test');
-    var coll = testDB[jsTestName()];
+    const coll = testDB[jsTestName()];
     coll.drop();
 
     coll.insert({foo: 1});
@@ -36,7 +36,7 @@ function runTest(conn) {
 
     // Turning hmac back off should preserve field names on all entries, even previously cached
     // ones.
-    const queryStats = getQueryStats(conn)[1]["key"];
+    const queryStats = getQueryStatsFindCmd(conn)[0]["key"];
     assertQueryStatsKeyWithoutHmac(queryStats.queryShape);
 
     // Explicitly set transformIdentifiers to false.

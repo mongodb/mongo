@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/test_commands_enabled.h"

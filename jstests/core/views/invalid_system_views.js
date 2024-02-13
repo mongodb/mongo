@@ -17,6 +17,8 @@
  *   tenant_migration_incompatible,
  *   uses_compact,
  *   references_foreign_collection,
+ *   # TODO SERVER-78025 reenable query stats coverage on this test
+ *   skip_for_query_stats
  * ]
  */
 

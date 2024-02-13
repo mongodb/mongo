@@ -101,7 +101,8 @@ public:
         return DocumentSourceListLocalSessions::kStageName.rawData();
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
+    Value serialize(
+        const SerializationOptions& opts = SerializationOptions{}) const final override {
         return Value(Document{{getSourceName(), _spec.toBSON(opts)}});
     }
 

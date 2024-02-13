@@ -78,7 +78,7 @@ intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
     return new DocumentSourceIndexStats(pExpCtx);
 }
 
-Value DocumentSourceIndexStats::serialize(SerializationOptions opts) const {
+Value DocumentSourceIndexStats::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << Document()));
 }
 }  // namespace mongo

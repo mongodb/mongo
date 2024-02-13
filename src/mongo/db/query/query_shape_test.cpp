@@ -49,7 +49,7 @@ std::string applyHmacForTest(StringData sd) {
 }
 
 static const SerializationOptions literalAndFieldRedactOpts{
-    applyHmacForTest, LiteralSerializationPolicy::kToDebugTypeString};
+    LiteralSerializationPolicy::kToDebugTypeString, true, applyHmacForTest};
 
 
 BSONObj predicateShape(std::string filterJson) {

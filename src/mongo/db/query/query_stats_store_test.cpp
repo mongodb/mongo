@@ -29,6 +29,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_shape.h"
@@ -54,7 +55,7 @@ std::size_t hash(const BSONObj& obj) {
 
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    boost::optional<StringData> collectionType = boost::make_optional("collection"_sd);
+    static constexpr auto collectionType = query_shape::CollectionType::collection;
     BSONObj makeQueryStatsKeyFindRequest(const FindCommandRequest& fcr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          bool applyHmac) {
@@ -83,7 +84,7 @@ public:
                                               acr.getNamespace(),
                                               collectionType);
 
-        SerializationOptions opts(literalPolicy);
+        SerializationOptions opts{.literalPolicy = literalPolicy};
         if (applyHmac) {
             opts.transformIdentifiers = true;
             opts.transformIdentifiersCallback = applyHmacForTest;

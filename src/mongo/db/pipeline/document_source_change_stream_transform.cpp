@@ -109,7 +109,7 @@ namespace {
 
 template <typename T>
 void serializeSpecField(BSONObjBuilder* builder,
-                        SerializationOptions opts,
+                        const SerializationOptions& opts,
                         const StringData& fieldName,
                         const boost::optional<T>& value) {
     if (value) {
@@ -119,7 +119,7 @@ void serializeSpecField(BSONObjBuilder* builder,
 
 template <>
 void serializeSpecField(BSONObjBuilder* builder,
-                        SerializationOptions opts,
+                        const SerializationOptions& opts,
                         const StringData& fieldName,
                         const boost::optional<Timestamp>& value) {
     if (value) {
@@ -129,7 +129,7 @@ void serializeSpecField(BSONObjBuilder* builder,
 
 template <typename T>
 void serializeSpecField(BSONObjBuilder* builder,
-                        SerializationOptions opts,
+                        const SerializationOptions& opts,
                         const StringData& fieldName,
                         const T& value) {
     opts.appendLiteral(builder, fieldName, value);
@@ -137,7 +137,7 @@ void serializeSpecField(BSONObjBuilder* builder,
 
 template <>
 void serializeSpecField(BSONObjBuilder* builder,
-                        SerializationOptions opts,
+                        const SerializationOptions& opts,
                         const StringData& fieldName,
                         const mongo::OptionalBool& value) {
     if (value.has_value()) {
@@ -146,7 +146,7 @@ void serializeSpecField(BSONObjBuilder* builder,
 }
 
 void serializeSpec(const DocumentSourceChangeStreamSpec& spec,
-                   SerializationOptions opts,
+                   const SerializationOptions& opts,
                    BSONObjBuilder* builder) {
     serializeSpecField(builder,
                        opts,
@@ -199,7 +199,7 @@ void serializeSpec(const DocumentSourceChangeStreamSpec& spec,
 
 }  // namespace
 
-Value DocumentSourceChangeStreamTransform::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamTransform::serialize(const SerializationOptions& opts) const {
     if (opts.verbosity) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,
                                Document{{"stage"_sd, "internalTransform"_sd},

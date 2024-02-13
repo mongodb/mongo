@@ -326,7 +326,7 @@ void DocumentSourceUnionWith::doDispose() {
     }
 }
 
-Value DocumentSourceUnionWith::serialize(SerializationOptions opts) const {
+Value DocumentSourceUnionWith::serialize(const SerializationOptions& opts) const {
     auto collectionless = _pipeline->getContext()->ns.isCollectionlessAggregateNS();
     if (opts.verbosity) {
         // There are several different possible states depending on the explain verbosity as well as

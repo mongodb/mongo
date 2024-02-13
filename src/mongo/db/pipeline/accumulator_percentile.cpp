@@ -237,7 +237,7 @@ void AccumulatorPercentile::reset() {
 
 Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initializer,
                                           boost::intrusive_ptr<Expression> argument,
-                                          SerializationOptions options) const {
+                                          const SerializationOptions& options) const {
     ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
     invariant(ec);
     invariant(ec->getValue().nullish());
@@ -249,7 +249,7 @@ Document AccumulatorPercentile::serialize(boost::intrusive_ptr<Expression> initi
 }
 
 void AccumulatorPercentile::serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                            SerializationOptions options,
+                                            const SerializationOptions& options,
                                             std::vector<double> percentiles,
                                             PercentileMethod method,
                                             MutableDocument& md) {
@@ -353,7 +353,7 @@ Value AccumulatorMedian::getValue(bool toBeMerged) {
 
 Document AccumulatorMedian::serialize(boost::intrusive_ptr<Expression> initializer,
                                       boost::intrusive_ptr<Expression> argument,
-                                      SerializationOptions options) const {
+                                      const SerializationOptions& options) const {
     ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
     invariant(ec);
     invariant(ec->getValue().nullish());
@@ -365,7 +365,7 @@ Document AccumulatorMedian::serialize(boost::intrusive_ptr<Expression> initializ
 }
 
 void AccumulatorMedian::serializeHelper(const boost::intrusive_ptr<Expression>& argument,
-                                        SerializationOptions options,
+                                        const SerializationOptions& options,
                                         std::vector<double> percentiles,
                                         PercentileMethod method,
                                         MutableDocument& md) {

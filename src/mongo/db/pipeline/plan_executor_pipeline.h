@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/serialization_options.h"
 
 namespace mongo {
 
@@ -159,7 +160,8 @@ public:
      * providing the level of detail specified by 'verbosity'.
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
-        return _pipeline->writeExplainOps(verbosity);
+        auto opts = SerializationOptions{.verbosity = verbosity};
+        return _pipeline->writeExplainOps(opts);
     }
 
     void enableSaveRecoveryUnitAcrossCommandsIfSupported() override {}

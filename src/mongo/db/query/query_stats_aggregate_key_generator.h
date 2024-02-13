@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/collection_type.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/query_stats_key_generator.h"
@@ -44,12 +45,13 @@ class AggregateKeyGenerator final : public KeyGenerator {
 public:
     static constexpr StringData kOtherNssFieldName = "otherNss"_sd;
 
-    AggregateKeyGenerator(AggregateCommandRequest request,
-                          const Pipeline& pipeline,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          stdx::unordered_set<NamespaceString> involvedNamespaces,
-                          const NamespaceString& origNss,
-                          boost::optional<StringData> collectionType = boost::none)
+    AggregateKeyGenerator(
+        AggregateCommandRequest request,
+        const Pipeline& pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        stdx::unordered_set<NamespaceString> involvedNamespaces,
+        const NamespaceString& origNss,
+        query_shape::CollectionType collectionType = query_shape::CollectionType::unknown)
         : KeyGenerator(
               expCtx->opCtx,
               // TODO: SERVER-76330 Store representative agg query shape in telemetry store.

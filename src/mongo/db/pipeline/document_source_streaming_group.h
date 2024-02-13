@@ -90,8 +90,9 @@ protected:
     GetNextResult doGetNext() final;
 
     bool isSpecFieldReserved(StringData fieldName) final;
-    void serializeAdditionalFields(MutableDocument& out,
-                                   SerializationOptions opts = SerializationOptions()) const final;
+    void serializeAdditionalFields(
+        MutableDocument& out,
+        const SerializationOptions& opts = SerializationOptions{}) const final;
 
 private:
     static constexpr StringData kMonotonicIdFieldsSpecField = "$monotonicIdFields"_sd;

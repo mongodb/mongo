@@ -295,7 +295,7 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
                                        backtrace);
 }
 
-Value DocumentSourceCurrentOp::serialize(SerializationOptions opts) const {
+Value DocumentSourceCurrentOp::serialize(const SerializationOptions& opts) const {
     return Value(Document{
         {getSourceName(),
          Document{

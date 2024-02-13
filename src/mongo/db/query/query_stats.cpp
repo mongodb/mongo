@@ -184,17 +184,25 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
             std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
         auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
-        // The plan cache and queryStats store should use the same number of partitions.
-        // That is, the number of cpu cores.
-        size_t numPartitions = ProcessInfo::getNumCores();
-        size_t partitionBytes = size / numPartitions;
-        size_t metricsSize = sizeof(QueryStatsEntry);
-        if (partitionBytes < metricsSize * 10) {
-            numPartitions = size / metricsSize;
-            if (numPartitions < 1) {
-                numPartitions = 1;
-            }
+
+        // Initially the queryStats store used the same number of partitions as the plan cache, that
+        // is the number of cpu cores. However, with performance investigation we found that when
+        // the size of the partitions was too large, it took too long to copy out and read one
+        // partition. We are now capping each partition at 16MB (the largest size a query shape can
+        // be), or smaller if that gives us fewer partitions than we have cores. The size needs to
+        // be cast to a double since we want to round up the number of partitions, and therefore
+        // need to avoid int division.
+        size_t numPartitions = std::ceil(double(size) / (16 * 1024 * 1024));
+        // This is our guess at how big a small-ish query shape (+ metrics) would be, but
+        // intentionally not the smallest possible one. The purpose of this constant is to keep us
+        // from making each partition so small that it does not record anything, while still being
+        // small enough to allow us to shrink the overall memory footprint of the data structure if
+        // the user requested that we do so.
+        constexpr double approxEntrySize = 0.004 * 1024 * 1024;  // 4KB
+        if (numPartitions < ProcessInfo::getNumCores()) {
+            numPartitions = std::ceil(double(size) / (approxEntrySize * 10));
         }
+
         globalQueryStatsStoreManager =
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
         auto configuredSamplingRate = internalQueryStatsRateLimit.load();

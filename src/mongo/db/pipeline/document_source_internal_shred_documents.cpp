@@ -55,7 +55,7 @@ DocumentSource::GetNextResult DocumentSourceInternalShredDocuments::doGetNext() 
     return next;
 }
 
-Value DocumentSourceInternalShredDocuments::serialize(const SerializationOptions opts) const {
+Value DocumentSourceInternalShredDocuments::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << Document()));
 }
 

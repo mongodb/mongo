@@ -1248,7 +1248,10 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         BSONObjBuilder bob;
-        actualGroupNode->groupByExpression->serialize(true).addToBsonObj(&bob, "_id");
+        actualGroupNode->groupByExpression
+            ->serialize(SerializationOptions{
+                .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})
+            .addToBsonObj(&bob, "_id");
         auto actualGroupByObj = bob.done();
         if (!SimpleBSONObjComparator::kInstance.evaluate(actualGroupByObj ==
                                                          expectedGroupByElem.Obj())) {
@@ -1261,7 +1264,10 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         BSONArrayBuilder actualAccs;
         for (auto& acc : actualGroupNode->accumulators) {
             BSONObjBuilder bob;
-            acc.expr.argument->serialize(true).addToBsonObj(&bob, acc.expr.name);
+            acc.expr.argument
+                ->serialize(SerializationOptions{
+                    .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)})
+                .addToBsonObj(&bob, acc.expr.name);
             actualAccs.append(BSON(acc.fieldName << bob.done()));
         }
         auto expectedAccsObj = expectedGroupObj["accs"].Obj();

@@ -98,10 +98,11 @@ void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int inden
 }
 
 void ElemMatchObjectMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, SerializationOptions opts) const {
+    BSONObjBuilder* bob, const SerializationOptions& opts) const {
     BSONObjBuilder elemMatchBob = bob->subobjStart("$elemMatch");
-    opts.includePath = true;
-    _sub->serialize(&elemMatchBob, opts);
+    SerializationOptions options = opts;
+    options.includePath = true;
+    _sub->serialize(&elemMatchBob, options);
     elemMatchBob.doneFast();
 }
 
@@ -166,12 +167,13 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     }
 }
 
-void ElemMatchValueMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                                  SerializationOptions opts) const {
+void ElemMatchValueMatchExpression::appendSerializedRightHandSide(
+    BSONObjBuilder* bob, const SerializationOptions& opts) const {
     BSONObjBuilder emBob = bob->subobjStart("$elemMatch");
-    opts.includePath = false;
+    SerializationOptions options = opts;
+    options.includePath = false;
     for (auto&& child : _subs) {
-        child->serialize(&emBob, opts);
+        child->serialize(&emBob, options);
     }
     emBob.doneFast();
 }
@@ -208,7 +210,7 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
 }
 
 void SizeMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                        SerializationOptions opts) const {
+                                                        const SerializationOptions& opts) const {
     opts.appendLiteral(bob, "$size", _size);
 }
 

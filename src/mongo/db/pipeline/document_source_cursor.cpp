@@ -213,7 +213,7 @@ void DocumentSourceCursor::recordPlanSummaryStats() {
     _exec->getPlanExplainer().getSummaryStats(&_stats.planSummaryStats);
 }
 
-Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
+Value DocumentSourceCursor::serialize(const SerializationOptions& opts) const {
     auto verbosity = opts.verbosity;
     // We never parse a DocumentSourceCursor, so we only serialize for explain. Since it's never
     // part of user input, there's no need to compute its query shape.

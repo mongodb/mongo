@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "serialization_options.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/query/serialization_options.h"
@@ -308,10 +309,11 @@ ArraySubtypeInfo getSubTypeFromValueArray(const Value& arrayVal) {
 }  // namespace
 
 const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerializeOptions =
-    SerializationOptions{LiteralSerializationPolicy::kToRepresentativeParseableValue};
+    SerializationOptions{.literalPolicy =
+                             LiteralSerializationPolicy::kToRepresentativeParseableValue};
 
 const SerializationOptions SerializationOptions::kDebugQueryShapeSerializeOptions =
-    SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
+    SerializationOptions{.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString};
 
 // Overloads for BSONElem and Value.
 StringData debugTypeString(BSONElement e) {

@@ -97,7 +97,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalShardFilter::doOptimiz
     return ret;
 }
 
-Value DocumentSourceInternalShardFilter::serialize(SerializationOptions opts) const {
+Value DocumentSourceInternalShardFilter::serialize(const SerializationOptions& opts) const {
     return Value(DOC(getSourceName() << Document()));
 }
 

@@ -534,10 +534,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 // If this is an explain write the explain output and return.
                 auto expCtx = targeter.pipeline->getContext();
                 if (expCtx->explain) {
+                    auto opts = SerializationOptions{.verbosity = boost::make_optional(
+                                                         ExplainOptions::Verbosity::kQueryPlanner)};
                     *result << "splitPipeline" << BSONNULL << "mongos"
                             << Document{{"host", getHostNameCachedAndPort()},
-                                        {"stages",
-                                         targeter.pipeline->writeExplainOps(*expCtx->explain)}};
+                                        {"stages", targeter.pipeline->writeExplainOps(opts)}};
                     return Status::OK();
                 }
 

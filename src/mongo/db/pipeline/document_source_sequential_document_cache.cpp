@@ -154,7 +154,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     return container->end();
 }
 
-Value DocumentSourceSequentialDocumentCache::serialize(SerializationOptions opts) const {
+Value DocumentSourceSequentialDocumentCache::serialize(const SerializationOptions& opts) const {
     if (opts.verbosity) {
         return Value(Document{
             {kStageName,

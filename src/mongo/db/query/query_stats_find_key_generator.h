@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
@@ -41,19 +41,28 @@ namespace mongo::query_stats {
 
 class FindKeyGenerator final : public KeyGenerator {
 public:
-    FindKeyGenerator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                     const ParsedFindCommand& request,
-                     BSONObj parseableQueryShape,
-                     boost::optional<StringData> collectionType = boost::none)
+    FindKeyGenerator(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const ParsedFindCommand& request,
+        BSONObj parseableQueryShape,
+        query_shape::CollectionType collectionType = query_shape::CollectionType::unknown)
         : KeyGenerator(expCtx->opCtx, parseableQueryShape, collectionType),
-          _readConcern(
-              request.findCommandRequest->getReadConcern().has_value()
-                  ? boost::optional<BSONObj>(request.findCommandRequest->getReadConcern()->copy())
-                  : boost::none),
-          _allowPartialResults(request.findCommandRequest->getAllowPartialResults()),
-          _noCursorTimeout(request.findCommandRequest->getNoCursorTimeout()),
-          _maxTimeMS(request.findCommandRequest->getMaxTimeMS()),
-          _batchSize(request.findCommandRequest->getBatchSize()) {}
+          _readConcern(request.findCommandRequest->getReadConcern().has_value()
+                           ? request.findCommandRequest->getReadConcern()->copy()
+                           : BSONObj()),
+          _batchSize(request.findCommandRequest->getBatchSize().value_or(0)),
+          _maxTimeMS(request.findCommandRequest->getMaxTimeMS().value_or(0)),
+          _allowPartialResults(
+              request.findCommandRequest->getAllowPartialResults().value_or(false)),
+          _noCursorTimeout(request.findCommandRequest->getNoCursorTimeout().value_or(false)),
+          _hasField{
+              .readConcern = request.findCommandRequest->getReadConcern().has_value(),
+              .batchSize = request.findCommandRequest->getBatchSize().has_value(),
+              .maxTimeMS = request.findCommandRequest->getMaxTimeMS().has_value(),
+              .allowPartialResults =
+                  request.findCommandRequest->getAllowPartialResults().has_value(),
+              .noCursorTimeout = request.findCommandRequest->getNoCursorTimeout().has_value(),
+          } {}
 
 
     BSONObj generate(OperationContext* opCtx,
@@ -61,7 +70,7 @@ public:
 
 protected:
     int64_t doGetSize() const final {
-        return sizeof(*this) + optionalObjSize(_readConcern);
+        return sizeof(*this) + (_hasField.readConcern ? _readConcern.objsize() : 0);
     }
 
 private:
@@ -88,19 +97,41 @@ private:
         return expCtx;
     }
 
-    // Preserved literal.
-    boost::optional<BSONObj> _readConcern;
+    // Avoid using boost::optional here because it creates extra padding at the beginning of the
+    // struct. Since each QueryStatsEntry can have its own FindKeyGenerator, it's better to
+    // minimize the struct's size as much as possible.
 
     // Preserved literal.
-    OptionalBool _allowPartialResults;
+    BSONObj _readConcern;
 
     // Shape.
-    OptionalBool _noCursorTimeout;
+    int64_t _batchSize;
 
     // Shape.
-    boost::optional<int32_t> _maxTimeMS;
+    int32_t _maxTimeMS;
+
+    // Preserved literal.
+    bool _allowPartialResults;
 
     // Shape.
-    boost::optional<int64_t> _batchSize;
+    bool _noCursorTimeout;
+
+    // This anonymous struct represents the presence of the member variables as C++ bit fields.
+    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
+    struct {
+        bool readConcern : 1 = false;
+        bool batchSize : 1 = false;
+        bool maxTimeMS : 1 = false;
+        bool allowPartialResults : 1 = false;
+        bool noCursorTimeout : 1 = false;
+    } _hasField;
 };
+
+// This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
+// or otherwise changing the members, this assert may be updated with care.
+static_assert(
+    sizeof(FindKeyGenerator) <= sizeof(KeyGenerator) + sizeof(BSONObj) + 2 * sizeof(int64_t),
+    "Size of FindKeyGenerator is too large! "
+    "Make sure that the struct has been align- and padding-optimized. "
+    "If the struct's members have changed, this assert may need to be updated with a new value.");
 }  // namespace mongo::query_stats

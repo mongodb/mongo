@@ -88,7 +88,8 @@ void DocumentSourceSingleDocumentTransformation::doDispose() {
     }
 }
 
-Value DocumentSourceSingleDocumentTransformation::serialize(SerializationOptions opts) const {
+Value DocumentSourceSingleDocumentTransformation::serialize(
+    const SerializationOptions& opts) const {
     return Value(
         Document{{getSourceName(),
                   _parsedTransform ? _parsedTransform->serializeTransformation(opts.verbosity, opts)

@@ -86,7 +86,8 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
-    void appendSerializedRightHandSide(BSONObjBuilder* bob, SerializationOptions opts) const final;
+    void appendSerializedRightHandSide(BSONObjBuilder* bob,
+                                       const SerializationOptions& opts) const final;
 
     std::unique_ptr<MatchExpression> clone() const final;
 

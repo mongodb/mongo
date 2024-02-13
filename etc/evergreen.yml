@@ -746,6 +746,7 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gen
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
+  - name: query_stats_mongos_passthrough
   - name: unittest_shell_hang_analyzer_gen
 
 - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
@@ -1326,6 +1327,7 @@ buildvariants:
   - name: .shard_merge
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
+  - name: query_stats_mongos_passthrough
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -1914,6 +1916,7 @@ buildvariants:
   - name: .shard_merge
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
+  - name: query_stats_mongos_passthrough
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
@@ -2232,6 +2235,7 @@ buildvariants:
   - name: .shard_merge
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
+  - name: query_stats_mongos_passthrough
   - name: .updatefuzzer
   - name: .watchdog
 
@@ -2937,6 +2941,9 @@ buildvariants:
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
+  - name: query_stats_passthrough
+  - name: query_stats_passthrough_writeonly
+  - name: query_stats_mongos_passthrough
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-classic-engine
   name: &enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only enterprise-rhel-80-64-bit-dynamic-classic-engine-query-patch-only

@@ -928,11 +928,12 @@ Status _runAggregate(OperationContext* opCtx,
                     !request.getCollectionUUID());
 
             // If this is a collectionless agg with no foreign namespaces, don't acquire any locks.
-            statsTracker.emplace(opCtx,
-                                 nss,
-                                 Top::LockType::NotLocked,
-                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                 0);
+            statsTracker.emplace(
+                opCtx,
+                nss,
+                Top::LockType::NotLocked,
+                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
             auto [collator, match] = PipelineD::resolveCollator(
                 opCtx, request.getCollation().get_value_or(BSONObj()), CollectionPtr());
             collatorToUse.emplace(std::move(collator));
@@ -1059,7 +1060,7 @@ Status _runAggregate(OperationContext* opCtx,
                     expCtx,
                     pipelineInvolvedNamespaces,
                     nss,
-                    ctx ? boost::make_optional(ctx->getCollectionType()) : boost::none);
+                    ctx ? ctx->getCollectionType() : query_shape::CollectionType::unknown);
             });
         }
 
@@ -1153,6 +1154,7 @@ Status _runAggregate(OperationContext* opCtx,
             "plan executors.",
             externalDataSourceGuard == nullptr || execs.size() == 1);
     for (auto&& exec : execs) {
+        // TODO SERVER-79373: Do not create a cursor if results can fit in a single batch.
         ClientCursorParams cursorParams(
             std::move(exec),
             origNss,

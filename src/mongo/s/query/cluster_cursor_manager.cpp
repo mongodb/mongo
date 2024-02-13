@@ -249,6 +249,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     cursorGuard->reattachToOperationContext(opCtx);
 
     CurOp::get(opCtx)->debug().queryHash = cursorGuard->getQueryHash();
+    CurOp::get(opCtx)->debug().queryStatsStoreKeyHash = cursorGuard->getQueryStatsStoreKeyHash();
 
     return PinnedCursor(this, std::move(cursorGuard), entry->getNamespace(), cursorId);
 }

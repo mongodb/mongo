@@ -1427,9 +1427,11 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         MutableDocument pipelinesDoc;
         // We specify "queryPlanner" verbosity when building the output for "shardsPart" because
         // execution stats are reported by each shard individually.
-        pipelinesDoc.addField("shardsPart",
-                              Value(dispatchResults.splitPipeline->shardsPipeline->writeExplainOps(
-                                  ExplainOptions::Verbosity::kQueryPlanner)));
+        auto opts = SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
+        pipelinesDoc.addField(
+            "shardsPart",
+            Value(dispatchResults.splitPipeline->shardsPipeline->writeExplainOps(opts)));
         if (dispatchResults.exchangeSpec) {
             BSONObjBuilder bob;
             dispatchResults.exchangeSpec->exchangeSpec.serialize(&bob);
@@ -1438,7 +1440,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
         }
         // We specify "queryPlanner" verbosity because execution stats are not currently
         // supported when building the output for "mergerPart".
-        auto explainOps = mergePipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
+        auto explainOps = mergePipeline->writeExplainOps(opts);
 
         // No cursors to remote shards are established for an explain, and the $mergeCursors
         // aggregation stage which is normally built in addMergeCursorsSource() requires vectors of

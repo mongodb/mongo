@@ -1023,7 +1023,7 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
 }
 
 void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
-                                            SerializationOptions opts) const {
+                                            const SerializationOptions& opts) const {
     // Support alternative $lookup from config.cache.chunks* namespaces.
     //
     // Do not include the tenantId in serialized 'from' namespace.

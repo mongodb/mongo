@@ -209,7 +209,7 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
         pExpCtx, nss, *resumeTokenData.uuid, documentKey, std::move(readConcern));
 }
 
-Value DocumentSourceChangeStreamAddPostImage::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamAddPostImage::serialize(const SerializationOptions& opts) const {
     return opts.verbosity
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,

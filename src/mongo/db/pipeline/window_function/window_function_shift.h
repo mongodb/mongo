@@ -68,7 +68,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(5424302);
     }
 
-    Value serialize(SerializationOptions opts) const final;
+    Value serialize(const SerializationOptions& opts) const final;
 
 private:
     static boost::intrusive_ptr<Expression> parseShiftArgs(BSONObj obj,

@@ -66,7 +66,7 @@ public:
         return constraints;
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions{}) const override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
         return boost::none;

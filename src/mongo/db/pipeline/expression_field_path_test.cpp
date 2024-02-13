@@ -523,7 +523,7 @@ public:
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
         ASSERT_BSONOBJ_BINARY_EQ(BSON("foo"
                                       << "$a.b.c"),
-                                 BSON("foo" << expression->serialize(false)));
+                                 BSON("foo" << expression->serialize(SerializationOptions{})));
     }
 };
 
@@ -535,7 +535,7 @@ public:
         intrusive_ptr<Expression> expression =
             ExpressionFieldPath::deprecatedCreate(&expCtx, "a.b.c");
         BSONArrayBuilder bab;
-        bab << expression->serialize(false);
+        bab << expression->serialize(SerializationOptions{});
         ASSERT_BSONOBJ_BINARY_EQ(BSON_ARRAY("$a.b.c"), bab.arr());
     }
 };

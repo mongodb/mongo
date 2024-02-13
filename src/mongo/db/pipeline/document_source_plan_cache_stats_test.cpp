@@ -41,6 +41,8 @@ namespace mongo {
 
 using DocumentSourcePlanCacheStatsTest = AggregationContextFixture;
 
+static const SerializationOptions kExplain = SerializationOptions{
+    .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 /**
  * A MongoProcessInterface used for testing which returns artificial plan cache stats.
  */
@@ -106,7 +108,9 @@ TEST_F(DocumentSourcePlanCacheStatsTest, CanParseAndSerializeAsExplainSuccessful
     const auto specObj = fromjson("{$planCacheStats: {}}");
     auto stage = DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
     std::vector<Value> serialized;
-    stage->serializeToArray(serialized, ExplainOptions::Verbosity::kQueryPlanner);
+    stage->serializeToArray(serialized,
+                            SerializationOptions{.verbosity = boost::make_optional(
+                                                     ExplainOptions::Verbosity::kQueryPlanner)});
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(specObj, serialized[0].getDocument().toBson());
 }
@@ -139,7 +143,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
     pipeline->optimizePipeline();
     ASSERT_EQ(1u, pipeline->getSources().size());
 
-    auto serialized = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
+    auto serialized = pipeline->writeExplainOps(kExplain);
     ASSERT_EQ(1u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$planCacheStats: {match: {foo: 'bar'}}}"),
                       serialized[0].getDocument().toBson());

@@ -190,7 +190,7 @@ private:
         kFinished
     };
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 

@@ -86,7 +86,7 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
 
     GetNextResult doGetNext() override;
 

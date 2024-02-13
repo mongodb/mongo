@@ -130,7 +130,10 @@ static BSONObj toBson(const Value& value) {
 
 /** Convert Expression to BSON. */
 static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
-    return BSON("" << expression->serialize(false)).firstElement().embeddedObject().getOwned();
+    return BSON("" << expression->serialize(SerializationOptions{}))
+        .firstElement()
+        .embeddedObject()
+        .getOwned();
 }
 
 /** Convert Document to BSON. */
@@ -723,7 +726,7 @@ public:
 
 private:
     static BSONObj toBsonObj(const intrusive_ptr<Expression>& expression) {
-        return BSON("field" << expression->serialize(false));
+        return BSON("field" << expression->serialize(SerializationOptions{}));
     }
 };
 
@@ -742,7 +745,7 @@ public:
 private:
     static BSONArray toBsonArray(const intrusive_ptr<Expression>& expression) {
         BSONArrayBuilder bab;
-        bab << expression->serialize(false);
+        bab << expression->serialize(SerializationOptions{});
         return bab.arr();
     }
 };
@@ -818,7 +821,7 @@ public:
 
 private:
     static BSONObj toBsonObj(const intrusive_ptr<Expression>& expression) {
-        return BSON("field" << expression->serialize(false));
+        return BSON("field" << expression->serialize(SerializationOptions{}));
     }
 };
 
@@ -835,7 +838,7 @@ public:
 private:
     static BSONObj toBsonArray(const intrusive_ptr<Expression>& expression) {
         BSONArrayBuilder bab;
-        bab << expression->serialize(false);
+        bab << expression->serialize(SerializationOptions{});
         return bab.obj();
     }
 };
@@ -853,7 +856,7 @@ TEST(ExpressionConstantTest, ConstantOfValueMissingSerializesToRemoveSystemVar) 
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value());
     ASSERT_BSONOBJ_BINARY_EQ(BSON("field"
                                   << "$$REMOVE"),
-                             BSON("field" << expression->serialize(false)));
+                             BSON("field" << expression->serialize(SerializationOptions{})));
 }
 
 TEST(ExpressionConstantTest, ConstantRedaction) {
@@ -1623,7 +1626,8 @@ TEST(ParseExpression, ShouldRecognizeConstExpression) {
     auto resultExpression = parseExpression(BSON("$const" << 5));
     auto constExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
     ASSERT_TRUE(constExpression);
-    ASSERT_VALUE_EQ(constExpression->serialize(false), Value(Document{{"$const", 5}}));
+    ASSERT_VALUE_EQ(constExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$const", 5}}));
 }
 
 TEST(ParseExpression, ShouldRejectUnknownExpression) {
@@ -1657,7 +1661,7 @@ TEST(ParseExpression, ShouldParseExpressionWithMultipleArguments) {
     ASSERT_TRUE(strCaseCmpExpression);
     vector<Value> arguments = {Value(Document{{"$const", "foo"_sd}}),
                                Value(Document{{"$const", "FOO"_sd}})};
-    ASSERT_VALUE_EQ(strCaseCmpExpression->serialize(false),
+    ASSERT_VALUE_EQ(strCaseCmpExpression->serialize(SerializationOptions{}),
                     Value(Document{{"$strcasecmp", arguments}}));
 }
 
@@ -1665,7 +1669,8 @@ TEST(ParseExpression, ShouldParseExpressionWithNoArguments) {
     auto resultExpression = parseExpression(BSON("$and" << BSONArray()));
     auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
     ASSERT_TRUE(andExpression);
-    ASSERT_VALUE_EQ(andExpression->serialize(false), Value(Document{{"$and", vector<Value>{}}}));
+    ASSERT_VALUE_EQ(andExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$and", vector<Value>{}}}));
 }
 
 TEST(ParseExpression, ShouldParseExpressionWithOneArgument) {
@@ -1673,7 +1678,8 @@ TEST(ParseExpression, ShouldParseExpressionWithOneArgument) {
     auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
     ASSERT_TRUE(andExpression);
     vector<Value> arguments = {Value(Document{{"$const", 1}})};
-    ASSERT_VALUE_EQ(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+    ASSERT_VALUE_EQ(andExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$and", arguments}}));
 }
 
 TEST(ParseExpression, ShouldAcceptArgumentWithoutArrayForVariadicExpressions) {
@@ -1681,7 +1687,8 @@ TEST(ParseExpression, ShouldAcceptArgumentWithoutArrayForVariadicExpressions) {
     auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
     ASSERT_TRUE(andExpression);
     vector<Value> arguments = {Value(Document{{"$const", 1}})};
-    ASSERT_VALUE_EQ(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+    ASSERT_VALUE_EQ(andExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$and", arguments}}));
 }
 
 TEST(ParseExpression, ShouldAcceptArgumentWithoutArrayAsSingleArgument) {
@@ -1689,7 +1696,8 @@ TEST(ParseExpression, ShouldAcceptArgumentWithoutArrayAsSingleArgument) {
     auto notExpression = dynamic_cast<ExpressionNot*>(resultExpression.get());
     ASSERT_TRUE(notExpression);
     vector<Value> arguments = {Value(Document{{"$const", 1}})};
-    ASSERT_VALUE_EQ(notExpression->serialize(false), Value(Document{{"$not", arguments}}));
+    ASSERT_VALUE_EQ(notExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$not", arguments}}));
 }
 
 TEST(ParseExpression, ShouldAcceptObjectAsSingleArgument) {
@@ -1697,7 +1705,8 @@ TEST(ParseExpression, ShouldAcceptObjectAsSingleArgument) {
     auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
     ASSERT_TRUE(andExpression);
     vector<Value> arguments = {Value(Document{{"$const", 1}})};
-    ASSERT_VALUE_EQ(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+    ASSERT_VALUE_EQ(andExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$and", arguments}}));
 }
 
 TEST(ParseExpression, ShouldAcceptObjectInsideArrayAsSingleArgument) {
@@ -1705,7 +1714,8 @@ TEST(ParseExpression, ShouldAcceptObjectInsideArrayAsSingleArgument) {
     auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
     ASSERT_TRUE(andExpression);
     vector<Value> arguments = {Value(Document{{"$const", 1}})};
-    ASSERT_VALUE_EQ(andExpression->serialize(false), Value(Document{{"$and", arguments}}));
+    ASSERT_VALUE_EQ(andExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$and", arguments}}));
 }
 
 }  // namespace Expression
@@ -1731,7 +1741,7 @@ TEST(ParseOperand, ShouldRecognizeFieldPath) {
                                               << "$field"));
     auto fieldPathExpression = dynamic_cast<ExpressionFieldPath*>(resultExpression.get());
     ASSERT_TRUE(fieldPathExpression);
-    ASSERT_VALUE_EQ(fieldPathExpression->serialize(false), Value("$field"_sd));
+    ASSERT_VALUE_EQ(fieldPathExpression->serialize(SerializationOptions{}), Value("$field"_sd));
 }
 
 TEST(ParseOperand, ShouldRecognizeStringLiteral) {
@@ -1739,7 +1749,8 @@ TEST(ParseOperand, ShouldRecognizeStringLiteral) {
                                               << "foo"));
     auto constantExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
     ASSERT_TRUE(constantExpression);
-    ASSERT_VALUE_EQ(constantExpression->serialize(false), Value(Document{{"$const", "foo"_sd}}));
+    ASSERT_VALUE_EQ(constantExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$const", "foo"_sd}}));
 }
 
 TEST(ParseOperand, ShouldRecognizeNestedArray) {
@@ -1749,21 +1760,24 @@ TEST(ParseOperand, ShouldRecognizeNestedArray) {
     ASSERT_TRUE(arrayExpression);
     vector<Value> expectedSerializedArray = {Value(Document{{"$const", "foo"_sd}}),
                                              Value("$field"_sd)};
-    ASSERT_VALUE_EQ(arrayExpression->serialize(false), Value(expectedSerializedArray));
+    ASSERT_VALUE_EQ(arrayExpression->serialize(SerializationOptions{}),
+                    Value(expectedSerializedArray));
 }
 
 TEST(ParseOperand, ShouldRecognizeNumberLiteral) {
     auto resultExpression = parseOperand(BSON("" << 5));
     auto constantExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
     ASSERT_TRUE(constantExpression);
-    ASSERT_VALUE_EQ(constantExpression->serialize(false), Value(Document{{"$const", 5}}));
+    ASSERT_VALUE_EQ(constantExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$const", 5}}));
 }
 
 TEST(ParseOperand, ShouldRecognizeNestedExpression) {
     auto resultExpression = parseOperand(BSON("" << BSON("$and" << BSONArray())));
     auto andExpression = dynamic_cast<ExpressionAnd*>(resultExpression.get());
     ASSERT_TRUE(andExpression);
-    ASSERT_VALUE_EQ(andExpression->serialize(false), Value(Document{{"$and", vector<Value>{}}}));
+    ASSERT_VALUE_EQ(andExpression->serialize(SerializationOptions{}),
+                    Value(Document{{"$and", vector<Value>{}}}));
 }
 
 }  // namespace Operand
@@ -1804,7 +1818,8 @@ public:
                 if (ValueComparator().evaluate(result != expected)) {
                     string errMsg = str::stream()
                         << "for expression " << field.first.toString() << " with argument "
-                        << args.toString() << " full tree: " << expr->serialize(false).toString()
+                        << args.toString()
+                        << " full tree: " << expr->serialize(SerializationOptions{}).toString()
                         << " expected: " << expected.toString()
                         << " but got: " << result.toString();
                     FAIL(errMsg);
@@ -2628,7 +2643,7 @@ TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectly) {
     auto expression = ExpressionFieldPath::parse(&expCtx, "$$REMOVE", vps);
     ASSERT_BSONOBJ_EQ(BSON("foo"
                            << "$$REMOVE"),
-                      BSON("foo" << expression->serialize(false)));
+                      BSON("foo" << expression->serialize(SerializationOptions{})));
 }
 
 TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyWithTrailingPath) {
@@ -2637,7 +2652,7 @@ TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyWithTrailingPath) {
     auto expression = ExpressionFieldPath::parse(&expCtx, "$$REMOVE.a.b", vps);
     ASSERT_BSONOBJ_EQ(BSON("foo"
                            << "$$REMOVE.a.b"),
-                      BSON("foo" << expression->serialize(false)));
+                      BSON("foo" << expression->serialize(SerializationOptions{})));
 }
 
 TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyAfterOptimization) {
@@ -2648,7 +2663,7 @@ TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyAfterOptimization) {
     ASSERT(dynamic_cast<ExpressionConstant*>(optimizedExpression.get()));
     ASSERT_BSONOBJ_EQ(BSON("foo"
                            << "$$REMOVE"),
-                      BSON("foo" << optimizedExpression->serialize(false)));
+                      BSON("foo" << optimizedExpression->serialize(SerializationOptions{})));
 }
 
 }  // namespace BuiltinRemoveVariable
@@ -2866,7 +2881,8 @@ public:
                 if (ValueComparator().evaluate(result != expected)) {
                     string errMsg = str::stream()
                         << "for expression " << field.first.toString() << " with argument "
-                        << args.toString() << " full tree: " << expr->serialize(false).toString()
+                        << args.toString()
+                        << " full tree: " << expr->serialize(SerializationOptions{}).toString()
                         << " expected: " << expected.toString()
                         << " but got: " << result.toString();
                     FAIL(errMsg);
@@ -3596,7 +3612,8 @@ TEST(ExpressionRandom, Basic) {
     intrusive_ptr<Expression> expression =
         Expression::parseExpression(&expCtx, fromjson("{ $rand: {} }"), vps);
 
-    const std::string& serialized = expression->serialize(false).getDocument().toString();
+    const std::string& serialized =
+        expression->serialize(SerializationOptions{}).getDocument().toString();
     ASSERT_EQ("{$rand: {}}", serialized);
 
     const auto randFn = [&expression, &expCtx]() -> double {
@@ -3744,7 +3761,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesStringArgumentCorrectly) {
                 }
             }
         })",
-        BSON("ignoredField" << expression->serialize(false)));
+        BSON("ignoredField" << expression->serialize(SerializationOptions{})));
 }
 
 TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
@@ -3767,7 +3784,7 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
                 }
             }
         })",
-        BSON("ignoredField" << expression->serialize(false)));
+        BSON("ignoredField" << expression->serialize(SerializationOptions{})));
 }
 
 TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
@@ -3985,7 +4002,7 @@ TEST(ExpressionSetFieldTest, SetFieldSerializesCorrectly) {
                                                             << "foo")
                                                     << "input" << BSON("a" << BSON("$const" << 1))
                                                     << "value" << BSON("$const" << 24)))),
-        BSON("ignoredField" << expression->serialize(false)));
+        BSON("ignoredField" << expression->serialize(SerializationOptions{})));
 }
 
 TEST(ExpressionIfNullTest, OptimizedExpressionIfNullShouldRemoveNullConstant) {
@@ -4005,7 +4022,7 @@ TEST(ExpressionIfNullTest,
     auto expr = fromjson("{$ifNull: [null, \"$a\"]}");
     auto exprIfNull = ExpressionIfNull::parse(&expCtx, expr.firstElement(), vps);
     auto optimizedNullRemoved = exprIfNull->optimize();
-    ASSERT_VALUE_EQ(optimizedNullRemoved->serialize(false), Value("$a"_sd));
+    ASSERT_VALUE_EQ(optimizedNullRemoved->serialize(SerializationOptions{}), Value("$a"_sd));
 }
 
 TEST(ExpressionIfNullTest, OptimizedExpressionIfNullShouldRemoveAllNullConstantsButLast) {
@@ -4426,7 +4443,7 @@ TEST(ExpressionFLETest, TestBinData_RoundTrip) {
 
     ASSERT_VALUE_EQ(exprFle->evaluate({}, &expCtx.variables), Value(true));
 
-    auto value = exprFle->serialize(false);
+    auto value = exprFle->serialize(SerializationOptions{});
 
     auto roundTripExpr = fromjson(R"({$_internalFleEq: {
     field: {
@@ -4468,7 +4485,7 @@ TEST(ExpressionFLETest, ParseAndSerializeBetween) {
     } })");
 
     auto exprFle = ExpressionInternalFLEBetween::parse(&expCtx, expr.firstElement(), vps);
-    auto value = exprFle->serialize(false);
+    auto value = exprFle->serialize(SerializationOptions{});
 
     auto roundTripExpr = fromjson(R"({$_internalFleBetween: {
     field: {

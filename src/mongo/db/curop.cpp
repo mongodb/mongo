@@ -339,11 +339,14 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
 
 void CurOp::setEndOfOpMetrics(long long nreturned) {
     _debug.additiveMetrics.nreturned = nreturned;
-    // executionTime is set with the final executionTime in completeAndLogOperation, but for
-    // query stats collection we want it set before incrementing cursor metrics using OpDebug's
-    // AdditiveMetrics. The value set here will be overwritten later in
-    // completeAndLogOperation.
-    _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+    // A non-null queryStats store key indicates the current query is being tracked for queryStats
+    // and therefore the executionTime needs to be recorded as part of that effort. executionTime is
+    // set with the final executionTime in completeAndLogOperation, but for query stats collection
+    // we want it set before incrementing cursor metrics using OpDebug's AdditiveMetrics. The value
+    // set here will be overwritten later in completeAndLogOperation.
+    if (_debug.queryStatsStoreKeyHash) {
+        _debug.additiveMetrics.executionTime = elapsedTimeExcludingPauses();
+    }
 }
 
 void CurOp::setMessage_inlock(StringData message) {

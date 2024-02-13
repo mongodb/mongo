@@ -51,7 +51,7 @@ void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
 }
 
 void InternalSchemaStrLengthMatchExpression::appendSerializedRightHandSide(
-    BSONObjBuilder* bob, SerializationOptions opts) const {
+    BSONObjBuilder* bob, const SerializationOptions& opts) const {
     opts.appendLiteral(bob, _name, _strLen);
 }
 

@@ -67,10 +67,12 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
     auto convertExp = Expression::parseExpression(expCtx.get(), spec, expCtx->variablesParseState);
 
     ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
-                    convertExp->serialize(false));
+                    convertExp->serialize(SerializationOptions{}));
 
-    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
-                    convertExp->serialize(true));
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
+        convertExp->serialize(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
@@ -85,11 +87,12 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onError: {$const: 0}}}")),
-        convertExp->serialize(false));
+        convertExp->serialize(SerializationOptions{}));
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onError: {$const: 0}}}")),
-        convertExp->serialize(true));
+        convertExp->serialize(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
 TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
@@ -104,11 +107,12 @@ TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onNull: {$const: 0}}}")),
-        convertExp->serialize(false));
+        convertExp->serialize(SerializationOptions{}));
 
     ASSERT_VALUE_EQ(
         Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onNull: {$const: 0}}}")),
-        convertExp->serialize(true));
+        convertExp->serialize(SerializationOptions{
+            .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)}));
 }
 
 TEST_F(ExpressionConvertTest, ConvertWithoutInputFailsToParse) {

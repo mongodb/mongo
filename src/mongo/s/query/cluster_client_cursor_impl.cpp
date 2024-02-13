@@ -242,6 +242,10 @@ boost::optional<uint32_t> ClusterClientCursorImpl::getQueryHash() const {
     return _queryHash;
 }
 
+boost::optional<std::size_t> ClusterClientCursorImpl::getQueryStatsStoreKeyHash() const {
+    return _queryStatsStoreKeyHash;
+}
+
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {
     return _params.apiParameters;
 }

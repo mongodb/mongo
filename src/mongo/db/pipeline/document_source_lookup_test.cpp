@@ -62,7 +62,8 @@ using std::vector;
 using DocumentSourceLookUpTest = AggregationContextFixture;
 
 const long long kDefaultMaxCacheSize = internalDocumentSourceLookupCacheSizeBytes.load();
-const auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
+const auto kExplain = SerializationOptions{
+    .verbosity = boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)};
 
 // For tests which need to run in a replica set context.
 class ReplDocumentSourceLookUpTest : public DocumentSourceLookUpTest {

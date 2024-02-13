@@ -283,7 +283,8 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
 }
 
 template <typename WindowFunctionN, typename AccumulatorNType>
-Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(SerializationOptions opts) const {
+Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(
+    const SerializationOptions& opts) const {
     auto acc = buildAccumulatorOnly();
     MutableDocument result(acc->serialize(nExpr, _input, opts));
 
@@ -441,7 +442,7 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
 }
 
 template <typename AccumulatorTType>
-Value ExpressionQuantile<AccumulatorTType>::serialize(SerializationOptions opts) const {
+Value ExpressionQuantile<AccumulatorTType>::serialize(const SerializationOptions& opts) const {
     MutableDocument result;
 
     MutableDocument md;

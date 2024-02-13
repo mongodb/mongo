@@ -219,10 +219,9 @@ TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTy
 
 TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
     TypeMatchExpression type(""_sd, String);
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$type":"?array<?number>"})",
+        R"({"$type":[2]})",
         type.getSerializedRightHandSide(opts));
 }
 
@@ -274,6 +273,14 @@ TEST(ExpressionBinDataSubTypeTest, MatchesBinDataColumnType) {
     ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
 }
 
+TEST(ExpressionBinDataSubTypeTest, MatchesBinDataSensitiveType) {
+    BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Sensitive));
+    BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::newUUID));
+    InternalSchemaBinDataSubTypeExpression type(""_sd, BinDataType::Sensitive);
+    ASSERT_TRUE(type.matchesSingleElement(match["a"]));
+    ASSERT_FALSE(type.matchesSingleElement(notMatch["a"]));
+}
+
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataBdtCustom) {
     BSONObj match = BSON("a" << BSONBinData(nullptr, 0, BinDataType::bdtCustom));
     BSONObj notMatch = BSON("a" << BSONBinData(nullptr, 0, BinDataType::Function));
@@ -311,8 +318,7 @@ TEST(ExpressionBinDataSubTypeTest, Equivalent) {
 
 TEST(ExpressionBinDataSubTypeTest, RedactsCorrectly) {
     InternalSchemaBinDataSubTypeExpression e("b"_sd, BinDataType::newUUID);
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    auto opts = SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$_internalSchemaBinDataSubType":"?number"})",
         e.getSerializedRightHandSide(opts));

@@ -49,7 +49,7 @@ var $config = (function() {
                     $queryStats: {
                         transformIdentifiers: {
                             algorithm: "hmac-sha-256",
-                            hmacKey: BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")
+                            hmacKey: BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")
                         }
                     }
                 }],

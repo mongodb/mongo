@@ -87,7 +87,7 @@ DocumentSourceGroupBase::~DocumentSourceGroupBase() {
         _stats.spills, _stats.spilledDataStorageSize, _stats.spilledRecords);
 }
 
-Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
+Value DocumentSourceGroupBase::serialize(const SerializationOptions& opts) const {
     MutableDocument insides;
 
     // Add the _id.

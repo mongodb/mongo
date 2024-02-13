@@ -241,7 +241,8 @@ TEST_F(DocumentSourceCursorTest, SerializationQueryPlannerExplainLevel) {
     ctx()->explain = verb;
     createSource();
 
-    auto explainResult = source()->serialize(verb);
+    auto explainResult =
+        source()->serialize(SerializationOptions{.verbosity = boost::make_optional(verb)});
     ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
     ASSERT_TRUE(explainResult["$cursor"]["executionStats"].missing());
 
@@ -256,7 +257,8 @@ TEST_F(DocumentSourceCursorTest, SerializationExecStatsExplainLevel) {
     // Execute the plan so that the source populates its internal execution stats.
     exhaustCursor();
 
-    auto explainResult = source()->serialize(verb);
+    auto explainResult =
+        source()->serialize(SerializationOptions{.verbosity = boost::make_optional(verb)});
     ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
     ASSERT_FALSE(explainResult["$cursor"]["executionStats"].missing());
     ASSERT_TRUE(explainResult["$cursor"]["executionStats"]["allPlansExecution"].missing());
@@ -272,7 +274,10 @@ TEST_F(DocumentSourceCursorTest, SerializationExecAllPlansExplainLevel) {
     // Execute the plan so that the source populates its internal executionStats.
     exhaustCursor();
 
-    auto explainResult = source()->serialize(verb).getDocument();
+    auto explainResult =
+        source()
+            ->serialize(SerializationOptions{.verbosity = boost::make_optional(verb)})
+            .getDocument();
     ASSERT_FALSE(explainResult["$cursor"]["queryPlanner"].missing());
     ASSERT_FALSE(explainResult["$cursor"]["executionStats"].missing());
     ASSERT_FALSE(explainResult["$cursor"]["executionStats"]["allPlansExecution"].missing());
@@ -289,7 +294,10 @@ TEST_F(DocumentSourceCursorTest, ExpressionContextAndSerializeVerbosityMismatch)
     // Execute the plan so that the source populates its internal executionStats.
     exhaustCursor();
 
-    ASSERT_THROWS_CODE(source()->serialize(verb2), DBException, 50660);
+    ASSERT_THROWS_CODE(
+        source()->serialize(SerializationOptions{.verbosity = boost::make_optional(verb2)}),
+        DBException,
+        50660);
 }
 
 TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout) {

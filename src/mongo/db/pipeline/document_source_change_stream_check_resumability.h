@@ -90,7 +90,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(SerializationOptions opts = SerializationOptions()) const override;
+    Value serialize(const SerializationOptions& opts = SerializationOptions{}) const override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

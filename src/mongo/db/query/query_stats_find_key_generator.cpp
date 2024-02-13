@@ -74,10 +74,12 @@ BSONObj FindKeyGenerator::generate(
                                    ExtensionsCallbackNoop(),
                                    MatchExpressionParser::kAllowAllSpecialFeatures));
     expCtx->setUserRoles();
-
-    auto opts = hmacPolicy
-        ? SerializationOptions(*hmacPolicy, LiteralSerializationPolicy::kToDebugTypeString)
-        : SerializationOptions(LiteralSerializationPolicy::kToDebugTypeString);
+    auto opts = hmacPolicy ? SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString,
+                                                  /*transformIdentifiersBool*/ true,
+                                                  *hmacPolicy,
+                                                  /*includePath*/ true,
+                                                  /*verbosity*/ boost::none}
+                           : SerializationOptions{LiteralSerializationPolicy::kToDebugTypeString};
 
     return generateWithQueryShape(query_shape::extractQueryShape(*parsedRequest, opts, expCtx),
                                   opts);
@@ -85,44 +87,43 @@ BSONObj FindKeyGenerator::generate(
 
 void FindKeyGenerator::appendCommandSpecificComponents(BSONObjBuilder& bob,
                                                        const SerializationOptions& opts) const {
-    if (auto optObj = _readConcern) {
+    if (_hasField.readConcern) {
         // Read concern should not be considered a literal.
         // afterClusterTime is distinct for every operation with causal consistency enabled. We
         // normalize it in order not to blow out the telemetry store cache.
-        if (optObj.get()["afterClusterTime"]) {
+        if (_readConcern["afterClusterTime"]) {
             BSONObjBuilder subObj = bob.subobjStart(FindCommandRequest::kReadConcernFieldName);
 
-            if (auto levelElem = optObj.get()["level"]) {
+            if (auto levelElem = _readConcern["level"]) {
                 subObj.append(levelElem);
             }
-            opts.appendLiteral(&subObj, "afterClusterTime", optObj.get()["afterClusterTime"]);
+            opts.appendLiteral(&subObj, "afterClusterTime", _readConcern["afterClusterTime"]);
             subObj.doneFast();
         } else {
-            bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
+            bob.append(FindCommandRequest::kReadConcernFieldName, _readConcern);
         }
     }
 
-    if (_allowPartialResults.has_value()) {
-        bob.append(FindCommandRequest::kAllowPartialResultsFieldName,
-                   _allowPartialResults.value_or(false));
+    if (_hasField.allowPartialResults) {
+        bob.append(FindCommandRequest::kAllowPartialResultsFieldName, _allowPartialResults);
     }
 
     // Fields for literal redaction. Adds batchSize, maxTimeMS, and noCursorTimeOut.
 
-    if (auto noCursorTimeout = _noCursorTimeout) {
+    if (_noCursorTimeout) {
         // Capture whether noCursorTimeout was specified in the query, do not distinguish between
         // true or false.
         opts.appendLiteral(
-            &bob, FindCommandRequest::kNoCursorTimeoutFieldName, noCursorTimeout.has_value());
+            &bob, FindCommandRequest::kNoCursorTimeoutFieldName, _hasField.noCursorTimeout);
     }
 
-    if (auto maxTimeMs = _maxTimeMS) {
-        opts.appendLiteral(&bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
+    if (_hasField.maxTimeMS) {
+        opts.appendLiteral(&bob, FindCommandRequest::kMaxTimeMSFieldName, _maxTimeMS);
     }
 
-    if (auto batchSize = _batchSize) {
+    if (_hasField.batchSize) {
         opts.appendLiteral(
-            &bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
+            &bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(_batchSize));
     }
 }
 }  // namespace mongo::query_stats

@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/collection_type.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/serialization_options.h"
@@ -87,8 +88,8 @@ public:
         return doGetSize() +
             _parseableQueryShape.objsize() + /* _collectionType is not owned here */
             (_apiParams ? sizeof(*_apiParams) + optionalSize(_apiParams->getAPIVersion()) : 0) +
-            optionalObjSize(_clientMetaData) + _commentObj.objsize() +
-            optionalObjSize(_readPreference);
+            (_hasField.clientMetaData ? _clientMetaData.objsize() : 0) + _commentObj.objsize() +
+            (_hasField.readPreference ? _readPreference.objsize() : 0);
     }
 
     BSONObj getRepresentativeQueryShapeForDebug() const {
@@ -98,25 +99,28 @@ public:
 protected:
     KeyGenerator(OperationContext* opCtx,
                  BSONObj parseableQueryShape,
-                 boost::optional<StringData> collectionType = boost::none,
+                 query_shape::CollectionType collectionType = query_shape::CollectionType::unknown,
                  boost::optional<query_shape::QueryShapeHash> queryShapeHash = boost::none)
         : _parseableQueryShape(parseableQueryShape.getOwned()),
-          _collectionType(collectionType ? boost::make_optional(*collectionType) : boost::none),
-          _queryShapeHash(queryShapeHash.value_or(query_shape::hash(parseableQueryShape))) {
+          _queryShapeHash(queryShapeHash.value_or(query_shape::hash(parseableQueryShape))),
+          _collectionType(collectionType) {
         if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-            _clientMetaData = boost::make_optional(metadata->getDocument());
+            _clientMetaData = metadata->getDocument();
+            _hasField.clientMetaData = true;
         }
 
         if (auto comment = opCtx->getCommentOwnedCopy()) {
             _commentObj = std::move(comment.value());
             _comment = _commentObj.firstElement();
+            _hasField.comment = true;
         }
 
         _apiParams = std::make_unique<APIParameters>(APIParameters::get(opCtx));
 
         if (!ReadPreferenceSetting::get(opCtx).toInnerBSON().isEmpty() &&
             !ReadPreferenceSetting::get(opCtx).usedDefaultReadPrefValue()) {
-            _readPreference = boost::make_optional(ReadPreferenceSetting::get(opCtx).toInnerBSON());
+            _readPreference = ReadPreferenceSetting::get(opCtx).toInnerBSON();
+            _hasField.readPreference = true;
         }
     }
 
@@ -152,8 +156,8 @@ protected:
      * Specifies the serialization of the query stats key components which apply to all commands.
      */
     void appendUniversalComponents(BSONObjBuilder& bob, const SerializationOptions& opts) const {
-        if (_comment) {
-            opts.appendLiteral(&bob, "comment", *_comment);
+        if (_hasField.comment) {
+            opts.appendLiteral(&bob, "comment", _comment);
         }
 
         if (const auto& apiVersion = _apiParams->getAPIVersion()) {
@@ -168,15 +172,16 @@ protected:
             bob.append("apiDeprecationErrors", apiDeprecationErrors.value());
         }
 
-        if (_readPreference) {
-            bob.append("$readPreference", *_readPreference);
+        if (_hasField.readPreference) {
+            bob.append("$readPreference", _readPreference);
         }
 
-        if (_clientMetaData) {
-            bob.append("client", *_clientMetaData);
+        if (_hasField.clientMetaData) {
+            bob.append("client", _clientMetaData);
         }
-        if (_collectionType) {
-            bob.append("collectionType", *_collectionType);
+        if (_collectionType > query_shape::CollectionType::unknown &&
+            _collectionType < query_shape::CollectionType::end) {
+            bob.append("collectionType", toStringData(_collectionType));
         }
     }
 
@@ -189,22 +194,47 @@ protected:
      */
     virtual int64_t doGetSize() const = 0;
 
+    // Avoid using boost::optional here because it creates extra padding at the beginning of the
+    // struct. Since each QueryStatsEntry can have its own KeyGenerator subclass, it's better to
+    // minimize the struct's size as much as possible.
+
     BSONObj _parseableQueryShape;
-    // This value is not known when run a query is run on mongos over an unsharded collection, so it
-    // is not set through that code path.
-    boost::optional<StringData> _collectionType;
-    query_shape::QueryShapeHash _queryShapeHash;
+    // Preserve this value in the query shape.
+    BSONObj _clientMetaData;
+    // Shapify this value.
+    BSONObj _commentObj;
+    // Preserve this value in the query shape.
+    BSONObj _readPreference;
+
+    // Separate the possibly-enormous BSONObj from the remaining members
 
     // Preserve this value in the query shape.
     std::unique_ptr<APIParameters> _apiParams;
-    // Preserve this value in the query shape.
-    boost::optional<BSONObj> _clientMetaData = boost::none;
-    // Shapify this value.
-    BSONObj _commentObj;
-    boost::optional<BSONElement> _comment = boost::none;
-    // Preserve this value in the query shape.
-    boost::optional<BSONObj> _readPreference = boost::none;
+
+    BSONElement _comment;
+
+    // This value is not known when run a query is run on mongos over an unsharded collection, so it
+    // is not set through that code path.
+    query_shape::QueryShapeHash _queryShapeHash;
+    query_shape::CollectionType _collectionType;
+
+    // This anonymous struct represents the presence of the member variables as C++ bit fields.
+    // In doing so, each of these boolean values takes up 1 bit instead of 1 byte.
+    struct {
+        bool clientMetaData : 1 = false;
+        bool comment : 1 = false;
+        bool readPreference : 1 = false;
+    } _hasField;
 };
 
+// This static assert checks to ensure that the struct's size is changed thoughtfully. If adding
+// or otherwise changing the members, this assert may be updated with care.
+static_assert(
+    sizeof(KeyGenerator) <= 4 * sizeof(BSONObj) + sizeof(BSONElement) +
+            2 * sizeof(std::unique_ptr<APIParameters>) + sizeof(query_shape::CollectionType) +
+            sizeof(query_shape::QueryShapeHash) + sizeof(int64_t),
+    "Size of KeyGenerator is too large! "
+    "Make sure that the struct has been align- and padding-optimized. "
+    "If the struct's members have changed, this assert may need to be updated with a new value.");
 }  // namespace query_stats
 }  // namespace mongo

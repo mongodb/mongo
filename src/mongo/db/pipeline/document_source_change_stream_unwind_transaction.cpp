@@ -128,7 +128,8 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
                             ChangeStreamRequirement::kChangeStreamStage);
 }
 
-Value DocumentSourceChangeStreamUnwindTransaction::serialize(SerializationOptions opts) const {
+Value DocumentSourceChangeStreamUnwindTransaction::serialize(
+    const SerializationOptions& opts) const {
     tassert(7481400, "expression has not been initialized", _expression);
 
     if (opts.verbosity) {
