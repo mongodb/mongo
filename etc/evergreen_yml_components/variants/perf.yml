@@ -322,7 +322,7 @@ buildvariants:
 - <<: *al2023_al2_arm64_compile_variant_dependency
   name: atlas-like-replica.west.2024-02
   display_name: PERF M60-like-replica-West.2024-02 3-Node ReplSet
-  cron: &atlas-like-repl-cron "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
   modules: *perf_modules
   expansions:
     mongodb_setup: atlas-like-replica.2023-09
