@@ -701,6 +701,17 @@ add_option(
 )
 
 add_option(
+    'xray',
+    choices=["on", "off"],
+    default="off",
+    help="Build with LLVM XRay support",
+    type='choice',
+)
+
+add_option('xray-instruction-threshold', help="XRay instrumentation instruction threshold",
+           default=1, nargs='?', type=int)
+
+add_option(
     'git-decider',
     choices=["on", "off"],
     const='on',
@@ -5539,6 +5550,16 @@ def doConfigure(myenv):
             myenv.ConfError(
                 "Running on ppc64le, but can't find a correct vec_vbpermq output index.  Compiler or platform not supported"
             )
+
+    if get_option('xray') == "on":
+        if not (myenv.ToolchainIs('clang') and env.TargetOSIs('linux')):
+            env.FatalError("LLVM Xray is only supported with clang on linux")
+
+        myenv.AppendUnique(
+            CCFLAGS=[
+                '-fxray-instrument',
+                '-fxray-instruction-threshold=' + str(get_option('xray-instruction-threshold'))
+            ], LINKFLAGS=['-fxray-instrument'])
 
     myenv = conf.Finish()
 

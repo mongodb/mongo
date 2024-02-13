@@ -161,6 +161,14 @@ env.Library(
     ])
 
 # Commands available in all mongodb server processes (mongod, mongos, etc.)
+xray_files = []
+
+if get_option("xray") == "on":
+    xray_files = [
+        'xray_commands.cpp',
+        'xray_commands.idl',
+    ]
+
 env.Library(
     target='servers',
     source=[
@@ -185,7 +193,7 @@ env.Library(
         'traffic_recording_cmds.cpp',
         'user_management_commands_common.cpp',
         'user_management_commands.idl',
-    ],
+    ] + xray_files,
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/auth/address_restriction',
