@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_fcv_70,
+ *   featureFlagTransitionToCatalogShard,
  * ]
  */
 const st = new ShardingTest({shards: 2, configShard: true});

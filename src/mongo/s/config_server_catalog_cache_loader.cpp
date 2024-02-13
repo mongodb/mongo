@@ -118,7 +118,7 @@ void ConfigServerCatalogCacheLoader::onStepUp() {
 }
 
 void ConfigServerCatalogCacheLoader::onReplicationRollback() {
-    MONGO_UNREACHABLE;
+    // no-op
 }
 
 void ConfigServerCatalogCacheLoader::shutDown() {
@@ -128,7 +128,7 @@ void ConfigServerCatalogCacheLoader::shutDown() {
 
 void ConfigServerCatalogCacheLoader::notifyOfCollectionRefreshEndMarkerSeen(
     const NamespaceString& nss, const Timestamp& commitTime) {
-    MONGO_UNREACHABLE;
+    // no-op
 }
 
 void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
@@ -143,6 +143,13 @@ void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCt
 
 SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
+    // There's no need to refresh if a collection is always unsharded. Further, attempting to
+    // refresh config.collections or config.chunks would trigger recursive refreshes since a config
+    // shard can use the shard svr process interface.
+    if (nss.isNamespaceAlwaysUntracked()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Collection " << nss.toStringForErrorMsg() << " not found");
+    }
 
     return ExecutorFuture<void>(_executor)
         .then([=]() {

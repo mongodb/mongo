@@ -52,6 +52,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
@@ -887,15 +888,18 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
         TransactionCoordinatorService::get(_service)->onStepDown();
     }
     if (ShardingState::get(_service)->enabled()) {
-        CatalogCacheLoader::get(_service).onStepDown();
-
         if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Called earlier for config servers.
             TransactionCoordinatorService::get(_service)->onStepDown();
+            CatalogCacheLoader::get(_service).onStepDown();
+            // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+        } else if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+            CatalogCacheLoader::get(_service).onStepDown();
         }
     } else if (serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
-        // If this mongod has a router service, it needs to run stepdown
-        // hooks even if the shard-role isn't initialized yet.
+        // TODO(SERVER-86759): Investigate if the router path is not initialized, if this can hit
+        // MONGO_UNREACHABLE. If this mongod has a router service, it needs to run stepdown hooks
+        // even if the shard-role isn't initialized yet.
         // TODO SERVER-84243: Update this code once CatalogCacheLoader is split between
         // router and shard roles.
         if (Grid::get(_service)->isShardingInitialized()) {
@@ -999,17 +1003,19 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
 
-        CatalogCacheLoader::get(_service).onStepUp();
+        // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+        if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+            CatalogCacheLoader::get(_service).onStepUp();
+        }
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         if (ShardingState::get(opCtx)->enabled()) {
             VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
 
-            CatalogCacheLoader::get(_service).onStepUp();
-
             if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
                 // Called earlier for config servers.
                 TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+                CatalogCacheLoader::get(_service).onStepUp();
             }
 
             const auto configsvrConnStr =

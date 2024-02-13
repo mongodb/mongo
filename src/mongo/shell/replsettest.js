@@ -3317,6 +3317,12 @@ var ReplSetTest = function ReplSetTest(opts) {
         // We need to recalculate the DWC after each reconfig until the full set is included.
         options.setParameter.enableDefaultWriteConcernUpdatesForInitiate = true;
 
+        if (baseOptions.hasOwnProperty("setParameter") &&
+            baseOptions.setParameter.hasOwnProperty("featureFlagTransitionToCatalogShard") &&
+            baseOptions.setParameter.featureFlagTransitionToCatalogShard) {
+            options.setParameter.featureFlagTransitionToCatalogShard = true;
+        }
+
         // Disable a check in reconfig that will prevent certain configs with arbiters from
         // spinning up. We will re-enable this check after the replica set has finished initiating.
         if (jsTestOptions().enableTestCommands) {

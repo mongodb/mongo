@@ -53,6 +53,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -634,20 +635,23 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx) {
         return serverGlobalParams.configdbs;
     }();
 
-    CatalogCacheLoader::set(service,
-                            std::make_unique<ShardServerCatalogCacheLoader>(
-                                std::make_unique<ConfigServerCatalogCacheLoader>()));
-
-
-    {
-        // This is only called in startup when there shouldn't be replication state changes, but to
-        // be safe we take the RSTL anyway.
-        repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-        const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        bool isReplSet = replCoord->getSettings().isReplSet();
-        bool isStandaloneOrPrimary =
-            !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
-        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+    // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
+    if (gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+        CatalogCacheLoader::set(service,
+                                std::make_unique<ShardServerCatalogCacheLoader>(
+                                    std::make_unique<ConfigServerCatalogCacheLoader>()));
+        {
+            // This is only called in startup when there shouldn't be replication state changes, but
+            // to be safe we take the RSTL anyway.
+            repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+            const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            bool isReplSet = replCoord->getSettings().isReplSet();
+            bool isStandaloneOrPrimary =
+                !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
+            CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+        }
+    } else {
+        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
     }
 
     _initializeGlobalShardingState(opCtx, configCS);

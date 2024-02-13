@@ -355,8 +355,11 @@ if (!TestData.configShard) {
         cfg.configsvr = true;
         reconfig(configShard, cfg);
 
-        configShard.restart(
-            0, {configsvr: '', setParameter: {skipShardingConfigurationChecks: false}});
+        configShard.restart(0, {
+            configsvr: '',
+            setParameter:
+                {skipShardingConfigurationChecks: false, featureFlagTransitionToCatalogShard: true}
+        });
         configShard.awaitNodesAgreeOnPrimary();
 
         // Cluster params should still exist.
@@ -371,7 +374,10 @@ if (!TestData.configShard) {
             assert.commandWorked(configShard.getPrimary().adminCommand(
                 {setFeatureCompatibilityVersion: targetFCV, confirm: true}));
         }
-        var mongos = MongoRunner.runMongos({configdb: configShard.getURL()});
+        var mongos = MongoRunner.runMongos({
+            configdb: configShard.getURL(),
+            setParameter: "featureFlagTransitionToCatalogShard=true",
+        });
         assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
         checkClusterParameters(clusterParameter2Name,
                                clusterParameter2Value,

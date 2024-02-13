@@ -65,6 +65,7 @@ env.Library(
     target='server_base',
     source=[
         env.BazelIdlc('basic_types.idl')[0],
+        'catalog_shard_feature_flag.idl',
         'cluster_role.cpp',
         'dump_lock_manager.cpp',
         'feature_compatibility_version_document.idl',
