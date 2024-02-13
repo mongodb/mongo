@@ -165,16 +165,6 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceSearch::desugar() {
 StageConstraints DocumentSourceSearch::constraints(Pipeline::SplitState pipeState) const {
     return DocumentSourceInternalSearchMongotRemote::getSearchDefaultConstraints();
 }
-bool getSearchSequenceTokenFlag(Pipeline::SourceContainer::iterator itr,
-                                Pipeline::SourceContainer* container) {
-    DepsTracker deps = DepsTracker::kNoMetadata;
-    while (itr != container->end()) {
-        auto nextStage = itr->get();
-        nextStage->getDependencies(&deps);
-        ++itr;
-    }
-    return deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
-}
 bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
                                       Pipeline::SourceContainer* container) {
     DepsTracker deps = DepsTracker::kNoMetadata;
@@ -183,7 +173,7 @@ bool checkRequiresSearchSequenceToken(Pipeline::SourceContainer::iterator itr,
         nextStage->getDependencies(&deps);
         ++itr;
     }
-    return deps.getNeedsMetadata(DocumentMetadataFields::kSearchSequenceToken);
+    return deps.searchMetadataDeps()[DocumentMetadataFields::kSearchSequenceToken];
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSearch::doOptimizeAt(

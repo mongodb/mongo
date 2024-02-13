@@ -314,6 +314,10 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
 
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
 
+        // If the subpipeline needs any search metadata, the top level pipeline must know to
+        // generate it.
+        deps->searchMetadataDeps() |= subDepsTracker.searchMetadataDeps();
+
         // The text score is the only type of metadata that could be needed by $facet.
         deps->setNeedsMetadata(
             DocumentMetadataFields::kTextScore,

@@ -45,12 +45,29 @@ const history = [
                 id: cursorId,
                 ns: coll.getFullName(),
                 nextBatch: [
-                    {_id: 1, $searchSequenceToken: "aaaaaaa=="},
-                    {_id: 2, $searchSequenceToken: "bbbbbbb=="},
-                    {_id: 3, $searchSequenceToken: "ccccccc=="},
-                    {_id: 4, $searchSequenceToken: "ddddddd=="},
+                    {
+                        _id: 1,
+                        $searchSequenceToken: "aaaaaaa==",
+                        $searchScore: 1.234,
+                    },
+                    {
+                        _id: 2,
+                        $searchSequenceToken: "bbbbbbb==",
+                        $searchScore: 1.345,
+                    },
+                    {
+                        _id: 3,
+                        $searchSequenceToken: "ccccccc==",
+                        $searchScore: 2.234,
+                    },
+                    {
+                        _id: 4,
+                        $searchSequenceToken: "ddddddd==",
+                        $searchScore: 2.5,
+                    },
                 ]
             },
+            vars: {SEARCH_META: {value: 1}},
             ok: 1
         }
     },
@@ -62,10 +79,26 @@ const history = [
                 id: NumberLong(0),
                 ns: coll.getFullName(),
                 nextBatch: [
-                    {_id: 5, $searchSequenceToken: "eeeeeee=="},
-                    {_id: 6, $searchSequenceToken: "fffffff=="},
-                    {_id: 7, $searchSequenceToken: "ggggggg=="},
-                    {_id: 8, $searchSequenceToken: "hhhhhhh=="},
+                    {
+                        _id: 5,
+                        $searchSequenceToken: "eeeeeee==",
+                        $searchScore: 1.234,
+                    },
+                    {
+                        _id: 6,
+                        $searchSequenceToken: "fffffff==",
+                        $searchScore: 1.345,
+                    },
+                    {
+                        _id: 7,
+                        $searchSequenceToken: "ggggggg==",
+                        $searchScore: 2.234,
+                    },
+                    {
+                        _id: 8,
+                        $searchSequenceToken: "hhhhhhh==",
+                        $searchScore: 2.5,
+                    },
                 ]
             },
             ok: 1
@@ -101,6 +134,50 @@ assert.commandWorked(
 cursor = coll.aggregate(
     [{$search: searchQuery}, {$addFields: {"myToken": {$meta: "searchSequenceToken"}}}]);
 assert.eq(expected, cursor.toArray());
+
+const expected2 = [{
+    "meta": [{"value": 1}],
+    "docs": [
+        {"_id": 1, "paginationToken": "aaaaaaa==", "score": 1.234},
+        {"_id": 2, "paginationToken": "bbbbbbb==", "score": 1.345},
+        {"_id": 3, "paginationToken": "ccccccc==", "score": 2.234},
+    ]
+}];
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+
+// Test $search + $facet with searchSequenceToken.
+cursor = coll.aggregate([
+    {$search: searchQuery},
+    {
+        $facet: {
+            meta: [
+                {
+                    $replaceWith: "$$SEARCH_META",
+                },
+                {
+                    $limit: 1,
+                },
+            ],
+            docs: [
+                {
+                    $limit: 3,
+                },
+                {
+                    $project: {
+                        paginationToken: {
+                            $meta: "searchSequenceToken",
+                        },
+                        score: {
+                            $meta: "searchScore",
+                        },
+                    },
+                },
+            ],
+        },
+    },
+]);
+assert.eq(expected2, cursor.toArray());
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();

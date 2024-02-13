@@ -113,6 +113,7 @@ void DepsTracker::setNeedsMetadata(DocumentMetadataFields::MetaType type, bool r
         case DocumentMetadataFields::MetaType::kSearchHighlights:
         case DocumentMetadataFields::MetaType::kSearchScoreDetails:
         case DocumentMetadataFields::MetaType::kVectorSearchScore:
+        case DocumentMetadataFields::MetaType::kSearchSequenceToken:
             // We track the dependencies for searchScore, searchHighlights,
             // searchScoreDetails, or vectorSearchScore separately because those values are not
             // stored in the collection (or in mongod at all).

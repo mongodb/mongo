@@ -5493,10 +5493,12 @@ SlotBasedStageBuilder::buildSearchMetadataSlots() {
         _data->metadataSlots.searchSortValuesSlot = metadataSlots.back();
     }
 
-    // searchSequenceToken is only available when user specify it in the query.
-    metadataNames.push_back(Document::metaFieldSearchSequenceToken.toString());
-    metadataSlots.push_back(_slotIdGenerator.generate());
-    _data->metadataSlots.searchSequenceToken = metadataSlots.back();
+    if (metadataBit.test(DocumentMetadataFields::MetaType::kSearchSequenceToken) ||
+        _state.needsMerge) {
+        metadataNames.push_back(Document::metaFieldSearchSequenceToken.toString());
+        metadataSlots.push_back(_slotIdGenerator.generate());
+        _data->metadataSlots.searchSequenceToken = metadataSlots.back();
+    }
 
     return {metadataNames, metadataSlots};
 }
