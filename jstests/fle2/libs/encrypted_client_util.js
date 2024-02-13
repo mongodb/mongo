@@ -156,6 +156,10 @@ export var EncryptedClient = class {
 
         const res = assert.commandWorked(this._edb.createCollection(name, options));
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
+        const dollarTenant = options["$tenant"];
+        if (dollarTenant) {
+            Object.extend(listCollCmdObj, {"$tenant": dollarTenant});
+        }
         const cis = assert.commandWorked(this._edb.runCommand(listCollCmdObj));
 
         assert.eq(
@@ -191,8 +195,14 @@ export var EncryptedClient = class {
 
         const indexOptions = [{"key": {__safeContent__: 1}, name: "__safeContent___1"}];
         const createIndexCmdObj = {createIndexes: name, indexes: indexOptions};
+        if (dollarTenant) {
+            Object.extend(createIndexCmdObj, {"$tenant": dollarTenant});
+        }
         assert.commandWorked(this._edb.runCommand(createIndexCmdObj));
         let tenantOption = {clusteredIndex: {key: {_id: 1}, unique: true}};
+        if (dollarTenant) {
+            Object.extend(tenantOption, {"$tenant": dollarTenant});
+        }
         assert.commandWorked(this._edb.createCollection(ef.escCollection, tenantOption));
         assert.commandWorked(this._edb.createCollection(ef.ecocCollection, tenantOption));
 
@@ -208,9 +218,11 @@ export var EncryptedClient = class {
      * @param {number} ecoc Number of documents in ECOC
      */
     assertEncryptedCollectionCountsByObject(
-        sessionDB, name, expectedEdc, expectedEsc, expectedEcoc) {
+        sessionDB, name, expectedEdc, expectedEsc, expectedEcoc, tenantId) {
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
-
+        if (tenantId) {
+            Object.extend(listCollCmdObj, {"$tenant": tenantId});
+        }
         const cis = assert.commandWorked(this._edb.runCommand(listCollCmdObj));
         assert.eq(
             cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
@@ -221,26 +233,32 @@ export var EncryptedClient = class {
         assert(options.hasOwnProperty("encryptedFields"),
                `Expected collection '${name}' to have 'encryptedFields'`);
 
-        function countDocuments(sessionDB, name) {
+        function countDocuments(sessionDB, name, tenantId) {
             // FLE2 tests are testing transactions and using the count command is not supported.
             // For the purpose of testing NTDI and `$tenant` we are going to simply use the count
             // command since we are not testing any transaction. Otherwise fall back to use
             // aggregation.
-            return sessionDB.getCollection(name).countDocuments({});
+            if (tenantId) {
+                return assert
+                    .commandWorked(sessionDB.runCommand({count: name, "$tenant": tenantId}))
+                    .n;
+            } else {
+                return sessionDB.getCollection(name).countDocuments({});
+            }
         }
 
-        const actualEdc = countDocuments(sessionDB, name);
+        const actualEdc = countDocuments(sessionDB, name, tenantId);
         assert.eq(actualEdc,
                   expectedEdc,
                   `EDC document count is wrong: Actual ${actualEdc} vs Expected ${expectedEdc}`);
 
         const ef = options.encryptedFields;
-        const actualEsc = countDocuments(sessionDB, ef.escCollection);
+        const actualEsc = countDocuments(sessionDB, ef.escCollection, tenantId);
         assert.eq(actualEsc,
                   expectedEsc,
                   `ESC document count is wrong: Actual ${actualEsc} vs Expected ${expectedEsc}`);
 
-        const actualEcoc = countDocuments(sessionDB, ef.ecocCollection);
+        const actualEcoc = countDocuments(sessionDB, ef.ecocCollection, tenantId);
         assert.eq(actualEcoc,
                   expectedEcoc,
                   `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`);
@@ -254,9 +272,9 @@ export var EncryptedClient = class {
      * @param {number} esc Number of documents in ESC
      * @param {number} ecoc Number of documents in ECOC
      */
-    assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc) {
+    assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc, tenantId) {
         this.assertEncryptedCollectionCountsByObject(
-            this._edb, name, expectedEdc, expectedEsc, expectedEcoc);
+            this._edb, name, expectedEdc, expectedEsc, expectedEcoc, tenantId);
     }
 
     /**
@@ -284,10 +302,13 @@ export var EncryptedClient = class {
      * @param {object} query
      * @param {object} fields
      */
-    assertOneEncryptedDocumentFields(coll, query, fields) {
+    assertOneEncryptedDocumentFields(coll, query, fields, tenantId) {
         let cmd = {find: coll};
         if (query) {
             cmd.filter = query;
+        }
+        if (tenantId) {
+            Object.extend(cmd, {"$tenant": tenantId});
         }
         const encryptedDocs = assert.commandWorked(this._db.runCommand(cmd)).cursor.firstBatch;
         assert.eq(encryptedDocs.length,

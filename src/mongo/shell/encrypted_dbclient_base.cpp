@@ -71,13 +71,11 @@
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/object_check.h"  // IWYU pragma: keep
-#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/scripting/mozjs/bindata.h"
@@ -209,6 +207,10 @@ BSONObj EncryptedDBClientBase::encryptDecryptCommand(const BSONObj& object,
     invariant(frameStack.size() == 1);
     // Append '$db' which shouldn't contain tenantid.
     frameStack.top().second.append("$db", dbName.toString_forTest());
+    // If encrypt request, append '$tenant' which contains tenantid.
+    if (encrypt && dbName.tenantId() && !object.hasField("$tenant")) {
+        dbName.tenantId()->serializeToBSON("$tenant", &frameStack.top().second);
+    }
     return frameStack.top().second.obj();
 }
 
@@ -783,26 +785,6 @@ DBClientBase* EncryptedDBClientBase::getRawConnection() {
     return _conn.get();
 }
 
-BSONObj EncryptedDBClientBase::doFindOne(OpMsgRequest& req) {
-    // We directly "call" the server so we have fine grained control over how ValidatedTenancyScope
-    // and $tenant is handled.
-    //
-    Client* client = &cc();
-
-    auto msg = req.serialize();
-    auto reply = _conn->call(msg);
-
-    OpMsg opReply = OpMsg::parse(reply, client);
-    BSONObj ownedResponse = opReply.body.getOwned();
-    CursorResponse cp = uassertStatusOK(CursorResponse::parseFromBSON(ownedResponse));
-
-    uassert(ErrorCodes::BadValue,
-            "EncryptedDBClientBase findOne found many documents",
-            cp.getBatch().size() <= 1);
-
-    return cp.getBatch().size() == 1 ? cp.getBatch()[0] : BSONObj();
-}
-
 BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
     NamespaceString fullNameNS = getCollectionNS();
     FindCommandRequest findCmd{fullNameNS};
@@ -810,19 +792,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
     findCmd.setReadConcern(
         repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern).toBSONInner());
 
-    Client* client = &cc();
-    auto opCtx = client->getOperationContext();
-
-    boost::optional<auth::ValidatedTenancyScope> vts;
-    if (opCtx) {
-        vts = auth::ValidatedTenancyScope::get(opCtx);
-    }
-
-    OpMsgRequest req = OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        fullNameNS.dbName(), vts, findCmd.toBSON({}));
-
-    BSONObj dataKeyObj = doFindOne(req);
-
+    BSONObj dataKeyObj = _conn->findOne(std::move(findCmd));
     if (dataKeyObj.isEmpty()) {
         uasserted(ErrorCodes::BadValue,
                   fmt::format("Unable to find key ID {} from {} on node {}",

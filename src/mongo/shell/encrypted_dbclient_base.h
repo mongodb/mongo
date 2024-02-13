@@ -272,8 +272,6 @@ protected:
 
     FLEDecryptionFrame createDecryptionFrame(ConstDataRange data);
 
-    BSONObj doFindOne(OpMsgRequest& req);
-
 private:
     Message _call(Message& toSend, std::string* actualServer) final;
 
