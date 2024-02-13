@@ -714,6 +714,7 @@ void clear(BucketCatalog& catalog, const DatabaseName& dbName) {
 }
 
 void freeze(BucketCatalog& catalog, const NamespaceString& ns, const OID& oid) {
+    internal::getOrInitializeExecutionStats(catalog, ns).incNumBucketsFrozen();
     freezeBucket(catalog.bucketStateRegistry, {ns, oid});
 }
 
