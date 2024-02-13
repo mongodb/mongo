@@ -103,7 +103,7 @@ feature_flags:
     featureFlagSearchInSbe:
       description: "Feature flag to enable $search execution in SBE"
       cpp_varname: gFeatureFlagSearchInSbe
-      default: true
+      default: false
       shouldBeFCVGated: false
 
     featureFlagTimeSeriesInSbe:
