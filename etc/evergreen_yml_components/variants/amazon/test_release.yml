@@ -659,7 +659,8 @@ buildvariants:
 # We just want it to bake for a while before considering that we turn it on by default.
 - name: enterprise-amazon2023-lto
   display_name: "Enterprise Amazon Linux 2023 LTO"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  # TODO(SERVER-85904): Re-enable this to run in nightly once Bazel supports LTO.
+  # cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
@@ -937,7 +938,8 @@ buildvariants:
 # We just want it to bake for a while before considering that we turn it on by default.
 - name: enterprise-amazon2023-arm64-lto
   display_name: "Enterprise Amazon Linux 2023 arm64 LTO"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  # TODO(SERVER-85904): Re-enable this to run in nightly once Bazel supports LTO.
+  # cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
