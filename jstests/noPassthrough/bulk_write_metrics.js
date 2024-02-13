@@ -1,7 +1,7 @@
 /**
  * Test that bulkWrite emit the same metrics that corresponding calls to update, delete and insert.
  *
- * @tags: [featureFlagBulkWriteCommand] // TODO SERVER-52419: Remove this tag.
+ * @tags: [requires_fcv_80, featureFlagTimeseriesUpdatesSupport]
  */
 
 import {BulkWriteMetricChecker} from "jstests/libs/bulk_write_utils.js";

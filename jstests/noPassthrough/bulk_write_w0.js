@@ -1,11 +1,10 @@
 /**
  * Tests bulkWrite command with {w: 0} writeConcern.
  *
- * // TODO SERVER-52419: Remove tag featureFlagBulkWriteCommand.
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80,
  * ]
  */
 

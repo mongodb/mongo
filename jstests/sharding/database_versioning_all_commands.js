@@ -14,6 +14,9 @@
  *      - 'conditional': If you set this field to true, the test case will skip the validation that
  *      ensures all test cases match existing commands. This is useful for commands that only exist
  *      in enterprise modules, for instance.
+ *      - 'skipMultiversion': If you set this field to true, the test case will skip running in
+ *      multiversion suites. This is useful if you have a command that existed behind a feature flag
+ *      in the previous version and is now enabled.
  */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
@@ -325,19 +328,18 @@ let testCases = {
     balancerStop: {skip: "not on a user database"},
     buildInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
     bulkWrite: {
-        // TODO SERVER-52419: Run this test and remove the skip.
-        // run: {
-        //     sendsDbVersion: true,
-        //     runsAgainstAdminDb: true,
-        //     command: function(dbName, collName) {
-        //         return {
-        //             bulkWrite: 1,
-        //             ops: [{insert: 0, document: {_id: 1}}],
-        //             nsInfo: [{ns: dbName + "." + collName}]
-        //         };
-        //     },
-        // }
-        skip: "requires feature flag"
+        run: {
+            sendsDbVersion: true,
+            runsAgainstAdminDb: true,
+            command: function(dbName, collName) {
+                return {
+                    bulkWrite: 1,
+                    ops: [{insert: 0, document: {_id: 1}}],
+                    nsInfo: [{ns: dbName + "." + collName}]
+                };
+            },
+        },
+        skipMultiversion: true
     },
     changePrimary: {skip: "reads primary shard from sharding catalog with readConcern: local"},
     checkMetadataConsistency: {
@@ -841,6 +843,9 @@ for (let command of Object.keys(listCommandsRes.commands)) {
     print(command);
 }
 
+const isMultiversion =
+    jsTest.options().shardMixedBinVersions || jsTest.options().useRandomBinVersionsWithinReplicaSet;
+
 (() => {
     // Validate test cases for all commands.
 
@@ -887,7 +892,7 @@ for (let command of Object.keys(listCommandsRes.commands)) {
 
     for (let command of Object.keys(listCommandsRes.commands)) {
         let testCase = testCases[command];
-        if (testCase.skip) {
+        if (testCase.skip || (isMultiversion && testCase.skipMultiversion)) {
             print("skipping " + command + ": " + testCase.skip);
             continue;
         }
@@ -926,7 +931,7 @@ for (let command of Object.keys(listCommandsRes.commands)) {
 
     for (let command of Object.keys(listCommandsRes.commands)) {
         let testCase = testCases[command];
-        if (testCase.skip) {
+        if (testCase.skip || (isMultiversion && testCase.skipMultiversion)) {
             print("skipping " + command + ": " + testCase.skip);
             continue;
         }
@@ -944,7 +949,7 @@ for (let command of Object.keys(listCommandsRes.commands)) {
 
     for (let command of Object.keys(listCommandsRes.commands)) {
         let testCase = testCases[command];
-        if (testCase.skip) {
+        if (testCase.skip || (isMultiversion && testCase.skipMultiversion)) {
             print("skipping " + command + ": " + testCase.skip);
             continue;
         }

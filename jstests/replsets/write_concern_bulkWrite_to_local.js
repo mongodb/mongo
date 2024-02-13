@@ -2,8 +2,7 @@
  * Tests that we are silently ignoring writeConcern when we write to local db.
  *
  * @tags: [
- *   # TODO SERVER-52419 Remove this tag.
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80
  * ]
  */
 

@@ -6,10 +6,9 @@
  * bulkWrite.
  *
  * @tags: [
- *   featureFlagBulkWriteCommand,
  *   requires_replication,
  *   requires_timeseries,
- *   requires_fcv_71,
+ *   requires_fcv_80,
  *   featureFlagTimeseriesUpdatesSupport,
  *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  * ]

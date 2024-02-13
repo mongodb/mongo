@@ -20,6 +20,9 @@
  *   server, rather than to the shard.
  * - useLogs: Normally, profiling is used to check behavior.  Set this to true to use slow op log
  *   lines instead.
+ * - skipMultiversion: If this is set to true then the test will be skipped for multiversion suites
+ *   only. This is useful if the command was behind a feature flag in previous versions and is now
+ *   enabled.
  *
  * @tags: [
  *   does_not_support_stepdowns,
@@ -267,23 +270,21 @@ let testCases = {
     balancerStop: {skip: "does not accept read or write concern"},
     buildInfo: {skip: "does not accept read or write concern"},
     bulkWrite: {
-        // TODO SERVER-52419: Run this test and remove the skip.
-        // setUp: function(conn) {
-        //     assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w:
-        //     1}}));
-        // },
-        // db: "admin",
-        // command: {
-        //     bulkWrite: 1,
-        //     ops: [{insert: 0, document: {_id: ObjectId()}}],
-        //     nsInfo: [{ns: db + "." + coll}]
-        // },
-        // checkReadConcern: false,
-        // checkWriteConcern: true,
-        // // TODO SERVER-23266: If the overall batch command if profiled, then it would be better
-        // // to use profiling.  In the meantime, use logs.
-        // useLogs: true,
-        skip: "requires feature flag"
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));
+        },
+        db: "admin",
+        command: {
+            bulkWrite: 1,
+            ops: [{insert: 0, document: {_id: ObjectId()}}],
+            nsInfo: [{ns: db + "." + coll}]
+        },
+        checkReadConcern: false,
+        checkWriteConcern: true,
+        // TODO SERVER-23266: If the overall batch command if profiled, then it would be better
+        // to use profiling.  In the meantime, use logs.
+        useLogs: true,
+        skipMultiversion: true,
     },
     captrunc: {skip: "test command"},
     changePrimary: {skip: "does not accept read or write concern"},
@@ -954,6 +955,14 @@ function runScenario(
             print("skipping " + cmdName + ": " + test.skip);
             return;
         }
+
+        const isMultiversion = jsTest.options().shardMixedBinVersions ||
+            jsTest.options().useRandomBinVersionsWithinReplicaSet;
+        if (isMultiversion && test.skipMultiversion) {
+            print("skipping " + cmdName + " since we are in a multiversion suite.");
+            return;
+        }
+
         validateTestCase(test);
 
         let sharded = !!configSvrCheckConn;

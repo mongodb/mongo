@@ -5,8 +5,7 @@
  * @tags: [
  *   not_allowed_with_signed_security_token,
  *   command_not_supported_in_serverless,
- *   # TODO SERVER-52419 Remove this tag.
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80,
  *   # TODO SERVER-80009: Remove this. These tests cannot run against sharded collections because
  *   # mongos update targeting logic does not have access to the per-statement constants when
  *   #  parsing the query filter.

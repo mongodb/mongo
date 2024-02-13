@@ -6,8 +6,7 @@
  *   # The test runs commands that are not allowed with security token: bulkWrite.
  *   not_allowed_with_signed_security_token,
  *   command_not_supported_in_serverless,
- *   # TODO SERVER-52419 Remove this tag.
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80,
  * ]
  */
 // Skip this test when running with storage engines other than inMemory, as the test relies on

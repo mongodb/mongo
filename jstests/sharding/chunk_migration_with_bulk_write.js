@@ -3,8 +3,7 @@
  * on multiple namespaces (one having been migrated and one not).
  *
  * @tags: [
- *   # TODO SERVER-52419 Remove this tag.
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80
  * ]
  */
 

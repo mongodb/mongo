@@ -6,7 +6,7 @@
  * bulkWrite.
  *
  * @tags: [
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80,
  *   requires_replication,
  *   requires_persistence,
  * ]

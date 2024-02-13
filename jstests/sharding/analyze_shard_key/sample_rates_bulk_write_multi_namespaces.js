@@ -2,7 +2,7 @@
  * Tests that bulkWrite command with multiple namespaces respects the sample rate configured via the
  * 'configureQueryAnalyzer' command.
  *
- * @tags: [featureFlagBulkWriteCommand]
+ * @tags: [requires_fcv_80]
  */
 import {Thread} from "jstests/libs/parallelTester.js";
 import {

@@ -137,8 +137,6 @@ selector:
   - requires_profiling
   # columnstore indexes are under development and cannot be used without enabling the feature flag
   - featureFlagColumnstoreIndexes
-  # TODO SERVER-52419 Remove this tag.
-  - featureFlagBulkWriteCommand
   - featureFlagFLE2CleanupCommand
   # TODO SERVER-71537: Remove Feature Flag for PM-412.
   - featureFlagQuerySettings

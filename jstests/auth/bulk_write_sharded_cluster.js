@@ -2,8 +2,7 @@
  * Auth test for the bulkWrite command on sharded clusters.
  * @tags: [
  * requires_sharding,
- * # TODO SERVER-52419 Remove this tag.
- * featureFlagBulkWriteCommand
+ * requires_fcv_80
  * ]
  */
 import {runTest} from "jstests/auth/lib/bulk_write_base.js";

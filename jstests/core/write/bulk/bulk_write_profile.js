@@ -5,8 +5,7 @@
  * @tags: [
  *   not_allowed_with_signed_security_token,
  *   command_not_supported_in_serverless,
- *   # TODO SERVER-52419 Remove this tag.
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80,
  *   does_not_support_stepdowns,
  *   requires_non_retryable_writes,
  *   requires_profiling,

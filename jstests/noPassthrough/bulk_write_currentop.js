@@ -1,11 +1,10 @@
 /**
  * Tests bulkWrite command shows up in currentop.
  *
- * // TODO SERVER-52419: Remove tag featureFlagBulkWriteCommand.
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80,
  *   # The test runs commands that are not allowed with security token: fsyncUnlock.
  *   not_allowed_with_signed_security_token,
  *   assumes_superuser_permissions,

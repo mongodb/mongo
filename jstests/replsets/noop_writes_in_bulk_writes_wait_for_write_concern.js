@@ -8,7 +8,7 @@
  * the operation to be a noop have also been replicated. For all of these tests, the optime fixing
  * behavior should be handled by LastOpFixer.
  *
- * @tags: [featureFlagBulkWriteCommand] // TODO SERVER-52419: Remove this tag.
+ * @tags: [requires_fcv_80]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

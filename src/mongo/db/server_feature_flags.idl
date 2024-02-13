@@ -56,7 +56,7 @@ feature_flags:
     featureFlagBulkWriteCommand:
         description: "Support for bulkWrite command and one-shot transactions"
         cpp_varname: gFeatureFlagBulkWriteCommand
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagRecordIdsReplicated:
         description: "Enable creating collections with the RecordIdsReplicated option."

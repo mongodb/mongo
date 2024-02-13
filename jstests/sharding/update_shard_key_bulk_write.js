@@ -3,8 +3,7 @@
  * to change shards.
  *
  * @tags: [
- *  # TODO SERVER-52419 Remove this tag.
- *   featureFlagBulkWriteCommand,
+ *  requires_fcv_80
  * ]
  */
 

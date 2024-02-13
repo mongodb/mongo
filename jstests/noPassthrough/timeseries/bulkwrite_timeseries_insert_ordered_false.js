@@ -4,7 +4,7 @@
  * This runs timeseries_insert_ordered_false.js while overriding all CRUD commands to use bulkWrite.
  *
  * @tags: [
- *   featureFlagBulkWriteCommand,
+ *   requires_fcv_80,
  *   requires_sharding,
  * ]
  */
