@@ -1,3 +1,5 @@
+import {getQueryPlanner} from "jstests/libs/analyze_plan.js";
+
 /**
  * This test was originally designed to reproduce SERVER-78752. It ensures that the correct plan is
  * added to the cache for similar queries that only differ in their IETs and if there is a
@@ -23,6 +25,14 @@
  */
 const coll = db.sbe_plan_cache_duplicate_or_clauses;
 coll.drop();
+
+const queryHashSet = new Set();
+
+const stash = (query) => {
+    queryHashSet.add(getQueryPlanner(query.explain()).queryHash);
+    return query;
+};
+
 assert.commandWorked(coll.createIndex({a: 1, b: 1, c: 1}));
 
 assert.commandWorked(coll.insert({a: 1, b: 1, c: 1}));
@@ -30,15 +40,16 @@ assert.commandWorked(coll.insert({a: 1, b: 1, c: 2}));
 assert.commandWorked(coll.insert({a: 1, b: 1, c: 3}));
 
 // Show that this query returns 2 results when the plan cache is empty.
-assert.eq(2, coll.find({a: 1, b: 1, $or: [{c: 2}, {c: 3, d: {$eq: null}}]}).itcount());
+assert.eq(2, stash(coll.find({a: 1, b: 1, $or: [{c: 2}, {c: 3, d: {$eq: null}}]})).itcount());
 
 // Create a cached plan. Run the query twice to make sure that the plan cache entry is active.
-assert.eq(1, coll.find({a: 1, b: 1, $or: [{c: 1}, {c: 1, d: {$eq: null}}]}).itcount());
+assert.eq(1, stash(coll.find({a: 1, b: 1, $or: [{c: 1}, {c: 1, d: {$eq: null}}]})).itcount());
 assert.eq(1, coll.find({a: 1, b: 1, $or: [{c: 1}, {c: 1, d: {$eq: null}}]}).itcount());
 
-// Check that we have 2 distinct plans in the cache.
-let cacheEntries = coll.getPlanCache().list();
-assert.eq(2, cacheEntries.length, cacheEntries);
+// Check that each query has a separate entry in the plan cache
+const cacheEntries = coll.getPlanCache().list().map(entry => entry.queryHash);
+const matchingEntries = cacheEntries.filter(entry => queryHashSet.has(entry));
+assert.eq(2, matchingEntries.length, [cacheEntries, queryHashSet]);
 
 // The query from above should still return 2 results.
 assert.eq(2, coll.find({a: 1, b: 1, $or: [{c: 2}, {c: 3, d: {$eq: null}}]}).itcount());
