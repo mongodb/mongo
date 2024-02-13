@@ -14,6 +14,15 @@
  * ]
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+// TODO(SERVER-86317): re-enable this test
+if (FeatureFlagUtil.isEnabled(
+        db, "TimeseriesAlwaysUseCompressedBuckets", /*user=*/ undefined, /*ignoreFCV=*/ true)) {
+    jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
+    quit();
+}
+
 // Test that measurements spanning the Unix Epoch end up in the same bucket.
 (function testUnixEpoch() {
     let coll = db.timeseries_bucket_spanning_epoch;

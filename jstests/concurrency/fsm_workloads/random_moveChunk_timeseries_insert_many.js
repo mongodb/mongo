@@ -14,6 +14,7 @@ import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
 import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js';
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
@@ -95,6 +96,12 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.setup = function setup(db, collName, cluster) {
+        // TODO(SERVER-86317): re-enable this test
+        if (FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+            jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
+            quit();
+        }
+
         db[collName].drop();
 
         assert.commandWorked(db.createCollection(

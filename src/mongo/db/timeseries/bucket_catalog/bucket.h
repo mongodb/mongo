@@ -41,12 +41,14 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/insertion_ordered_column_map.h"
 #include "mongo/db/timeseries/bucket_catalog/rollover.h"
 #include "mongo/db/timeseries/bucket_catalog/write_batch.h"
 #include "mongo/db/timeseries/bucket_compression.h"
@@ -93,8 +95,12 @@ public:
     // Time field for the measurements that have been inserted into the bucket.
     const std::string timeField;
 
-    // Minimum timestamp over contained measurements
+    // Minimum timestamp over contained measurements.
     const Date_t minTime;
+
+    // Maximum timestamp of committed measurements.
+    // TODO(SERVER-86434): remove this member once BSONColumnBuilder::last() is implemented.
+    Timestamp maxCommittedTime;
 
     // A reference so we can clean up some linked state from the destructor.
     BucketStateRegistry& bucketStateRegistry;
@@ -103,6 +109,8 @@ public:
     BucketStateRegistry::Era lastChecked;
 
     // Top-level hashed field names of the measurements that have been inserted into the bucket.
+    // TODO(SERVER-70605): Remove to avoid extra overhead. These are stored as keys in
+    // intermediateBuilders.
     StringSet fieldNames;
 
     // Top-level hashed new field names that have not yet been committed into the bucket.
@@ -149,17 +157,30 @@ public:
     // Approximate memory usage of this bucket.
     uint64_t memoryUsage = sizeof(*this);
 
-    // The uncompressed bucket.
-    BSONObj uncompressed;
+    /**
+     * The uncompressed bucket.
+     *
+     * Only set when reopening uncompressed buckets and the always compressed feature flag is
+     * enabled. Used to convert an uncompressed bucket to a compressed bucket on the next insert,
+     * and will be cleared when finished.
+     */
+    BSONObj uncompressedBucketDoc;
 
     // If set, bucket is compressed on disk, and first prepared batch will need to decompress it
     // before updating.
-    boost::optional<BSONObj> compressed;
+    // TODO(SERVER-79416): remove this member.
+    boost::optional<BSONObj> compressedBucketDoc;
 
     // Whether the bucket was created while the always used compressed buckets feature flag was
     // enabled.
     // TODO SERVER-70605: remove this boolean.
     const bool usingAlwaysCompressedBuckets;
+
+    /**
+     * In-memory state of each committed data field, sorted by insertion order. Enables fewer
+     * complete round-trips of decompression + compression.
+     */
+    InsertionOrderedColumnMap intermediateBuilders;
 };
 
 /**

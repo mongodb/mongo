@@ -22,6 +22,14 @@ import {
     runRewritesTest,
     setupColl
 } from "jstests/core/timeseries/libs/timeseries_sort_util.js"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+
+// TODO(SERVER-86317): re-enable this test
+if (FeatureFlagUtil.isEnabled(
+        db, "TimeseriesAlwaysUseCompressedBuckets", /*user=*/ undefined, /*ignoreFCV=*/ true)) {
+    jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
+    quit();
+}
 
 const collName = "bucket_unpacking_with_sort";
 const coll = db[collName];

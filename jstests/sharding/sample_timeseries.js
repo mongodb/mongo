@@ -9,6 +9,7 @@
  */
 import {documentEq} from "jstests/aggregation/extras/utils.js";
 import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // Test deliberately inserts orphans.
 TestData.skipCheckOrphans = true;
@@ -25,6 +26,13 @@ const primary = st.shard0;
 const primaryDB = primary.getDB(dbName);
 const otherShard = st.shard1;
 const otherShardDB = otherShard.getDB(dbName);
+
+// TODO(SERVER-86317): re-enable this test
+if (FeatureFlagUtil.isEnabled(primary, "TimeseriesAlwaysUseCompressedBuckets")) {
+    jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
+    st.stop();
+    quit();
+}
 
 let currentId = 0;
 function generateId() {

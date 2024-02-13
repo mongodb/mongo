@@ -104,6 +104,12 @@
 namespace mongo::timeseries {
 namespace {
 
+// Helper for measurement sorting.
+struct Measurement {
+    BSONElement timeField;
+    std::vector<BSONElement> dataFields;
+};
+
 // Builds the data field of a bucket document. Computes the min and max fields if necessary.
 boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
     const std::vector<BSONObj>& measurements,
@@ -208,22 +214,28 @@ write_ops::WriteCommandRequestBase makeTimeseriesWriteOpBase(std::vector<StmtId>
     return base;
 }
 
-// Generates a delta update oplog entry using the before and after compressed bucket documents.
+/**
+ * Takes two compressed forms of the same bucket document, and generates a delta update oplog entry.
+ *
+ * - bucketDocBefore: Compressed form of the bucket document before the operation is performed. It
+ *   only needs the data field. Any other top-level fields will be ignored.
+ * - bucketDocAfter: Compressed form of the bucket document after the operation is performed. It
+ *   only needs the data field. Any other top-level fields will be ignored.
+ */
 write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const BSONObj& before,
-    const BSONObj& after,
-    const BSONObj& metadata) {
+    const BSONObj& bucketDocBefore,
+    const BSONObj& bucketDocAfter,
+    const StringMap<int>& offsets) {
     BSONObjBuilder updateBuilder;
     {
         // Control builder.
         BSONObjBuilder controlBuilder(updateBuilder.subobjStart(
             str::stream() << doc_diff::kSubDiffSectionFieldPrefix << kBucketControlFieldName));
         BSONObj countObj =
-            BSON(kBucketControlCountFieldName << after.getObjectField(kBucketControlFieldName)
-                                                     .getField(kBucketControlCountFieldName)
-                                                     .Int());
+            BSON(kBucketControlCountFieldName << static_cast<int>(
+                     (batch->numPreviouslyCommittedMeasurements + batch->measurements.size())));
         controlBuilder.append(doc_diff::kUpdateSectionFieldName, countObj);
 
         if (!batch->min.isEmpty() || !batch->max.isEmpty()) {
@@ -242,8 +254,8 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
 
     {
         // Data builder.
-        const BSONObj& beforeData = before.getObjectField(kBucketDataFieldName);
-        const BSONObj& afterData = after.getObjectField(kBucketDataFieldName);
+        const BSONObj& beforeData = bucketDocBefore.getObjectField(kBucketDataFieldName);
+        const BSONObj& afterData = bucketDocAfter.getObjectField(kBucketDataFieldName);
 
         BSONObjBuilder dataBuilder(updateBuilder.subobjStart("sdata"));
         BSONObjBuilder newDataFieldsBuilder;
@@ -263,19 +275,13 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
             }
 
             // Generate the binary diff.
-            int beforeLen = 0;
-            const char* beforeData = beforeIt->binData(beforeLen);
-
             int afterLen = 0;
             const char* afterData = afterIt->binData(afterLen);
 
-            int offset = 0;
-            while (beforeData[offset] == afterData[offset]) {
-                if (offset == beforeLen - 1 || offset == afterLen - 1) {
-                    break;
-                }
-                offset++;
-            }
+            auto offsetsIt = offsets.find(beforeIt->fieldNameStringData());
+            invariant(offsetsIt != offsets.end());
+            int offset = offsetsIt->second;
+            invariant(afterLen >= offset);
 
             BSONObj binaryObj = BSON("o" << offset << "d"
                                          << BSONBinData(afterData + offset,
@@ -704,13 +710,20 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         invariant(bucketDoc.compressedBucket);
-        batch->uncompressed = bucketDoc.uncompressedBucket.getOwned();
+        batch->uncompressedBucketDoc = bucketDoc.uncompressedBucket.getOwned();
+
+        // Initialize BSONColumnBuilders which will later get transferred into the Bucket class.
+        BSONObj bucketDataDoc = bucketDoc.compressedBucket->getObjectField(kBucketDataFieldName);
+        batch->intermediateBuilders.initBuilders(
+            bucketDataDoc,
+            batch->measurements.size());  // i.e. number of to-insert measurements in bucketDataDoc
     }
     if (bucketDoc.compressedBucket) {
-        batch->compressed = bucketDoc.compressedBucket->getOwned();
+        batch->compressedBucketDoc = bucketDoc.compressedBucket->getOwned();
         bucketToInsert = *bucketDoc.compressedBucket;
     }
 
+    batch->maxCommittedTime = batch->measurements.back().getField(batch->timeField).timestamp();
     write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
@@ -731,23 +744,32 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     }
 
     auto updateMod = makeTimeseriesUpdateOpEntry(opCtx, batch, metadata).getU();
-    auto updated = doc_diff::applyDiff(batch->uncompressed,
+    auto updated = doc_diff::applyDiff(batch->uncompressedBucketDoc,
                                        updateMod.getDiff(),
                                        updateMod.mustCheckExistenceForInsertOperations());
 
     // Hold the uncompressed bucket document that's currently on-disk prior to this write batch
     // running.
-    auto before = std::move(batch->uncompressed);
+    auto before = std::move(batch->uncompressedBucketDoc);
 
     auto compressionResult = timeseries::compressBucket(
         updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
+
     uassert(BucketCompressionFailure{batch->bucketHandle.bucketId.oid},
             "Failed to compress time-series bucket",
             compressionResult.compressedBucket);
-    batch->uncompressed = updated;
-    batch->compressed = *compressionResult.compressedBucket;
+
+    batch->uncompressedBucketDoc = updated;
+    batch->compressedBucketDoc = *compressionResult.compressedBucket;
 
     auto after = compressionResult.compressedBucket ? *compressionResult.compressedBucket : updated;
+    if (compressionResult.compressedBucket) {
+        // Initialize BSONColumnBuilders which will later get transferred into the Bucket class.
+        BSONObj bucketDataDoc =
+            compressionResult.compressedBucket->getObjectField(kBucketDataFieldName);
+        batch->intermediateBuilders.initBuilders(bucketDataDoc,
+                                                 batch->numPreviouslyCommittedMeasurements);
+    }
 
     auto bucketTransformationFunc = [before = std::move(before), after = std::move(after)](
                                         const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
@@ -770,37 +792,122 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     return op;
 }
 
-write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
+
+/**
+ * Returns newly allocated collection of measurements sorted on time field.
+ * Filters out meta field from input and does not include it in output.
+ */
+std::vector<Measurement> sortMeasurementsOnTimeField(
+    std::shared_ptr<bucket_catalog::WriteBatch> batch) {
+    std::vector<Measurement> measurements;
+
+    // Convert measurements in batch from BSONObj to vector of data fields.
+    // Store timefield separate to allow simple sort.
+    for (auto& measurementObj : batch->measurements) {
+        Measurement measurement;
+        for (auto& dataField : measurementObj) {
+            StringData key = dataField.fieldNameStringData();
+            if (key == batch->bucketKey.metadata.getMetaField()) {
+                continue;
+            } else if (key == batch->timeField) {
+                // Add time field to both members of Measurement, fallthrough expected.
+                measurement.timeField = dataField;
+            }
+            measurement.dataFields.push_back(dataField);
+        }
+        measurements.push_back(std::move(measurement));
+    }
+
+    std::sort(measurements.begin(),
+              measurements.end(),
+              [](const Measurement& lhs, const Measurement& rhs) {
+                  return lhs.timeField.timestamp() < rhs.timeField.timestamp();
+              });
+
+    return measurements;
+}
+
+/**
+ * Performs lightweight compression utilizing in-memory BSONColumnBuilders from WriteBatch and
+ * returns the partial bucket document with data fields only.
+ *
+ * Output format of the partial bucket document that gets built:
+ * {
+ *   data: {
+ *     <time field>: BinData(7, ...), // BinDataType 7 represents BSONColumn.
+ *     <field0>:     BinData(7, ...),
+ *     <field1>:     BinData(7, ...),
+ *     ...
+ *   }
+ * }
+ */
+BSONObj buildCompressedBucketDataFieldDocEfficiently(
+    std::shared_ptr<bucket_catalog::WriteBatch> batch, StringMap<int>& offsets) {
+    BSONObjBuilder bucketBuilder;
+
+    auto& batchBuilders = batch->intermediateBuilders;
+    BSONObjBuilder dataBuilder = bucketBuilder.subobjStart(kBucketDataFieldName);
+    for (boost::optional<std::string> key = batchBuilders.begin(); key != boost::none;
+         key = batchBuilders.next()) {
+        BSONColumnBuilder* dataFieldColumnBuilder = batchBuilders.getBuilder(*key);
+        BufBuilder buf;
+        std::pair<int, int> anchors = dataFieldColumnBuilder->intermediate(buf);
+        offsets[*key] = anchors.first;
+        dataBuilder.append(*key, BSONBinData(buf.buf(), buf.len(), BinDataType::Column));
+    }
+    dataBuilder.done();
+
+    return bucketBuilder.obj();
+}
+
+/**
+ * Build the before and after data fields of the bucket documents efficiently with the column
+ * builders, but do not build out the rest of the bucket document (control field, etc). Then
+ * generate an update op based on the diff of the data fields, and relevant fields of control field.
+ */
+write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     OperationContext* opCtx,
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs,
-    const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
     invariant(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 
-    // Generate the diff and apply it against the previously decompressed bucket document.
-    auto updateMod = makeTimeseriesUpdateOpEntry(opCtx, batch, metadata).getU();
-    auto diff = updateMod.getDiff();
-    auto updated = doc_diff::applyDiff(
-        batch->uncompressed, diff, updateMod.mustCheckExistenceForInsertOperations());
+    // Holds the compressed bucket document that's currently on-disk
+    // prior to this write batch running.
+    StringMap<int> offsets;
+    BSONObj compressedBucketDataFieldDocBefore =
+        buildCompressedBucketDataFieldDocEfficiently(batch, offsets);
 
-    // Holds the compressed bucket document that's currently on-disk prior to this write batch
-    // running.
-    auto before = std::move(*batch->compressed);
+    auto& batchBuilders = batch->intermediateBuilders;
 
-    CompressionResult compressionResult = timeseries::compressBucket(
-        updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
-    uassert(BucketCompressionFailure{batch->bucketHandle.bucketId.oid},
-            "Failed to compress time-series bucket",
-            compressionResult.compressedBucket);
-    batch->uncompressed = updated;
-    batch->compressed = *compressionResult.compressedBucket;
+    std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
+    if (sortedMeasurements.begin()->timeField.timestamp() < batch->maxCommittedTime) {
+        // TODO(SERVER-86317): Upgrade to v3 buckets instead of throwing here.
+        throwWriteConflictException(
+            "New measurement falls between committed timestamp range. Create a new bucket.");
+    }
 
-    // Generates a delta update request using the before and after compressed bucket documents.
-    auto after = *compressionResult.compressedBucket;
-    const auto updateEntry =
-        makeTimeseriesCompressedDiffEntry(opCtx, batch, before, after, metadata);
+    // Insert new measurements, and appropriate skips, into all column builders.
+    for (const auto& sortedMeasurementDoc : sortedMeasurements) {
+        batchBuilders.insertOne(sortedMeasurementDoc.dataFields);
+    }
+
+    StringMap<int> unused;
+    BSONObj compressedBucketDataFieldDocAfter =
+        buildCompressedBucketDataFieldDocEfficiently(batch, unused);
+    batch->maxCommittedTime = batch->measurements.back().getField(batch->timeField).timestamp();
+    batch->compressedBucketDoc = compressedBucketDataFieldDocAfter;
+    batch->uncompressedBucketDoc = {};
+
+    // Generates a delta update request using the before and after compressed bucket documents' data
+    // fields. The only other items that will be different are the min, max, and count fields in the
+    // control block.
+    const auto updateEntry = makeTimeseriesCompressedDiffEntry(opCtx,
+                                                               batch,
+                                                               compressedBucketDataFieldDocBefore,
+                                                               compressedBucketDataFieldDocAfter,
+                                                               offsets);
     write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
@@ -857,13 +964,9 @@ void makeWriteRequest(OperationContext* opCtx,
             batch, bucketsNs, metadata, std::move(stmtIds[batch->bucketHandle.bucketId.oid])));
         return;
     }
-    if (batch->compressed) {
-        updateOps->push_back(makeTimeseriesDecompressAndUpdateOp(
-            opCtx,
-            batch,
-            bucketsNs,
-            metadata,
-            std::move(stmtIds[batch->bucketHandle.bucketId.oid])));
+    if (batch->compressedBucketDoc) {
+        updateOps->push_back(makeTimeseriesCompressedDiffUpdateOp(
+            opCtx, batch, bucketsNs, std::move(stmtIds[batch->bucketHandle.bucketId.oid])));
     } else {
         updateOps->push_back(
             makeTimeseriesUpdateOp(opCtx,

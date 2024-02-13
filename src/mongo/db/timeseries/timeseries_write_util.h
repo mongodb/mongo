@@ -159,13 +159,13 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     std::vector<StmtId>&& stmtIds = {});
 
 /**
- * Builds the decompress and update command request from a time-series insert write batch.
+ * Builds the DocDiff update command request from a time-series insert write batch.
+ * Assumes min/max in WriteBatch have already been updated to reflect new measurements in batch.
  */
-write_ops::UpdateCommandRequest makeTimeseriesDecompressAndUpdateOp(
+write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     OperationContext* opCtx,
     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs,
-    const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds = {});
 
 enum class BucketReopeningPermittance {

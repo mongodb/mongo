@@ -39,10 +39,12 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/bucket_catalog/insertion_ordered_column_map.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/future.h"
@@ -94,8 +96,24 @@ struct WriteBatch {
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
     uint32_t numPreviouslyCommittedMeasurements = 0;
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
-    BSONObj uncompressed;
-    boost::optional<BSONObj> compressed;  // If set, bucket is compressed on-disk.
+    BSONObj uncompressedBucketDoc;
+    boost::optional<BSONObj> compressedBucketDoc;  // If set, bucket is compressed on-disk.
+
+    /**
+     * In-memory data fields, sorted by insertion order. Allows for quick compression of bucket
+     * data.
+     *
+     * Initially these are for committed data fields, but this will be the working set of builders
+     * for the current WriteBatch and will contain uncommitted data fields in
+     * makeTimeseriesCompressedDiffUpdateOp.
+     */
+    InsertionOrderedColumnMap intermediateBuilders;
+
+    /**
+     * The purpose of this is to check that the new set of measurements don't overlap in time with
+     * the committed measurements.
+     */
+    Timestamp maxCommittedTime;
 
     bool openedDueToMetadata =
         false;  // If true, bucket has been opened due to the inserted measurement having different

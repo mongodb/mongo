@@ -1,3 +1,4 @@
+
 /**
  * Test that sort queries work properly on dates ouside the 32 bit epoch range,
  *  [1970-01-01 00:00:00 UTC - 2038-01-29 03:13:07 UTC], when a collection scan is used.
@@ -16,7 +17,15 @@
  * ]
  */
 import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
+// TODO(SERVER-86317): re-enable this test
+if (FeatureFlagUtil.isEnabled(
+        db, "TimeseriesAlwaysUseCompressedBuckets", /*user=*/ undefined, /*ignoreFCV=*/ true)) {
+    jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
+    quit();
+}
 
 if (FixtureHelpers.isMongos(db)) {
     const shards = db.getSiblingDB('config').shards.find().toArray();

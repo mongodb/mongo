@@ -40,6 +40,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/operation_context.h"
@@ -117,14 +118,19 @@ void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
         bucket.memoryUsage += batch.max.objsize();
     }
 
-    batch.uncompressed = std::move(bucket.uncompressed);
-    bucket.uncompressed = {};
-    bucket.memoryUsage -= batch.uncompressed.objsize();
+    // Move BSONColumnBuilders from Bucket to WriteBatch.
+    // See corollary in finish().
+    batch.intermediateBuilders = std::move(bucket.intermediateBuilders);
+    batch.uncompressedBucketDoc = std::move(bucket.uncompressedBucketDoc);
+    batch.maxCommittedTime = bucket.maxCommittedTime;
+    bucket.uncompressedBucketDoc = {};
+    bucket.memoryUsage -= batch.uncompressedBucketDoc.objsize();
+    bucket.memoryUsage -= batch.intermediateBuilders.getMemoryUsage();
 
-    if (bucket.compressed) {
-        batch.compressed = std::move(bucket.compressed);
-        bucket.compressed.reset();
-        bucket.memoryUsage -= batch.compressed->objsize();
+    if (bucket.compressedBucketDoc) {
+        batch.compressedBucketDoc = std::move(bucket.compressedBucketDoc);
+        bucket.compressedBucketDoc.reset();
+        bucket.memoryUsage -= batch.compressedBucketDoc->objsize();
     }
 }
 
@@ -578,20 +584,25 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
                                                   batch->bucketHandle.bucketId,
                                                   internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
+        // Move BSONColumnBuilders from WriteBatch to Bucket.
+        // See corollary in prepareWriteBatchForCommit().
+        bucket->maxCommittedTime = batch->maxCommittedTime;
+        bucket->intermediateBuilders = std::move(batch->intermediateBuilders);
         bucket->preparedBatch.reset();
 
         auto prevMemoryUsage = bucket->memoryUsage;
+        bucket->memoryUsage += bucket->intermediateBuilders.getMemoryUsage();
 
         // The uncompressed and compressed images should have already been moved to the batch by
         // this point.
-        invariant(!bucket->compressed && bucket->uncompressed.isEmpty());
+        invariant(!bucket->compressedBucketDoc);
 
         // Take ownership of the committed batch's uncompressed and compressed images.
-        bucket->uncompressed = std::move(batch->uncompressed);
-        bucket->memoryUsage += bucket->uncompressed.objsize();
-        if (batch->compressed) {
-            bucket->compressed = std::move(batch->compressed);
-            bucket->memoryUsage += bucket->compressed->objsize();
+        bucket->uncompressedBucketDoc = std::move(batch->uncompressedBucketDoc);
+        bucket->memoryUsage += bucket->uncompressedBucketDoc.objsize();
+        if (batch->compressedBucketDoc) {
+            bucket->compressedBucketDoc = std::move(batch->compressedBucketDoc);
+            bucket->memoryUsage += bucket->compressedBucketDoc->objsize();
         }
 
         catalog.memoryUsage.fetchAndAdd(bucket->memoryUsage - prevMemoryUsage);

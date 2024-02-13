@@ -119,9 +119,16 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
 }
 
 void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
+    // Bucket is not compressed, likely because compression failed.
+    // TODO SERVER-86072: This should no longer be possible with a retry mechanism on bucket
+    // compression failure.
+    if (!bucket.compressedBucketDoc) {
+        return;
+    }
+
     ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, bucket.key.ns);
-    stats.incNumBytesUncompressed(bucket.uncompressed.objsize());
-    stats.incNumBytesCompressed(bucket.compressed->objsize());
+    stats.incNumBytesUncompressed(bucket.uncompressedBucketDoc.objsize());
+    stats.incNumBytesCompressed(bucket.compressedBucketDoc->objsize());
 }
 
 /**
@@ -434,19 +441,19 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
             return {ErrorCodes::BadValue, "Bucket is compressed and cannot be reopened"};
         }
 
-        auto decompressed = decompressBucket(bucketDoc);
-        if (!decompressed.has_value()) {
+        auto decompressedBucketDoc = decompressBucket(bucketDoc);
+        if (!decompressedBucketDoc.has_value()) {
             return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};
         }
-        bucket->size = decompressed.value().objsize();
-        bucket->uncompressed = decompressed.value();
-        bucket->compressed = bucketDoc;
-        bucket->memoryUsage += (decompressed.value().objsize() + bucketDoc.objsize());
+        bucket->size = decompressedBucketDoc.value().objsize();
+        bucket->compressedBucketDoc = bucketDoc;
+        bucket->memoryUsage += bucketDoc.objsize();
     } else {
         bucket->size = bucketDoc.objsize();
         if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
                 serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            bucket->uncompressed = bucketDoc;
+            bucket->uncompressedBucketDoc = bucketDoc;
+            bucket->memoryUsage += bucketDoc.objsize();
         }
     }
 
@@ -482,8 +489,19 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                 "Bucket data field is malformed (missing a valid time column)"};
     }
 
+    bucket->maxCommittedTime = controlField.getObjectField(kBucketControlMinFieldName)
+                                   .getField(options.getTimeField())
+                                   .timestamp();
     bucket->numMeasurements = numMeasurements;
     bucket->numCommittedMeasurements = numMeasurements;
+
+    if (isCompressed &&
+        feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // Initialize BSONColumnBuilders from the compressed bucket data fields.
+        bucket->intermediateBuilders.initBuilders(dataObj, bucket->numCommittedMeasurements);
+        bucket->memoryUsage += bucket->intermediateBuilders.getMemoryUsage();
+    }
 
     // The namespace is stored two times: the bucket itself and openBucketsByKey. The bucket
     // consists of minmax and schema data so add their memory usage. Since the metadata is stored in
@@ -1344,7 +1362,7 @@ void closeOpenBucket(OperationContext* opCtx,
     // Skip creating a ClosedBucket when the bucket is already compressed. Check that
     // compressed is set because reopened uncompressed buckets can get closed without operations
     // against them.
-    if (bucket.usingAlwaysCompressedBuckets && bucket.compressed) {
+    if (bucket.usingAlwaysCompressedBuckets && bucket.compressedBucketDoc) {
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
@@ -1353,7 +1371,7 @@ void closeOpenBucket(OperationContext* opCtx,
         return;
     }
 
-    invariant(!bucket.compressed);
+    invariant(!bucket.compressedBucketDoc);
     bool error = false;
     try {
         closedBuckets.emplace_back(&catalog.bucketStateRegistry,
@@ -1377,7 +1395,7 @@ void closeOpenBucket(OperationContext* opCtx,
     // Skip creating a ClosedBucket when the bucket is already compressed. Check that
     // compressed is set because reopened uncompressed buckets can get closed without operations
     // against them.
-    if (bucket.usingAlwaysCompressedBuckets && bucket.compressed) {
+    if (bucket.usingAlwaysCompressedBuckets && bucket.compressedBucketDoc) {
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
@@ -1386,7 +1404,7 @@ void closeOpenBucket(OperationContext* opCtx,
         return;
     }
 
-    invariant(!bucket.compressed);
+    invariant(!bucket.compressedBucketDoc);
     bool error = false;
     try {
         closedBucket = boost::in_place(&catalog.bucketStateRegistry,
