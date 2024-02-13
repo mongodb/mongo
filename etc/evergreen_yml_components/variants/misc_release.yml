@@ -2185,34 +2185,16 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: aggregation
   - name: auth_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams !.secondary_reads
+  - name: change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common !.auth
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .causal
-  - name: .jstestfuzz .interrupt
-  - name: .jstestfuzz .common
-  - name: .jstestfuzz .session
+  - name: .jscore .common !.auth !.sharding
   - name: .logical_session_cache .one_sec
-  - name: .query_fuzzer
-  - name: .read_write_concern !.linearize
   - name: replica_sets_gen
-  - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: replica_sets_large_txns_format_gen
   - name: .replica_sets .common !.auth
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: .rollbackfuzzer
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !sharding_update_v1_oplog_jscore_passthrough
-  - name: .sharding .txns
   - name: .ssl
-  - name: .stitch
   - name: push
 
 - name: macos-arm64
@@ -2233,34 +2215,16 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_build_tools_next_TG
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: aggregation
   - name: auth_gen
-  - name: .causally_consistent !.sharding
-  - name: .change_streams !.secondary_reads
+  - name: change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.debug_only !.kill_terminate
   - name: disk_wiredtiger
-  - name: initial_sync_fuzzer_gen
-  - name: .jscore .common !.auth
-  - name: jsCore_txns_large_txns_format
-  - name: .jstestfuzz .causal
-  - name: .jstestfuzz .interrupt
-  - name: .jstestfuzz .common
-  - name: .jstestfuzz .session
+  - name: .jscore .common !.auth !.sharding
   - name: .logical_session_cache .one_sec
-  - name: .query_fuzzer
-  - name: .read_write_concern !.linearize
   - name: replica_sets_gen
-  - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: replica_sets_large_txns_format_gen
   - name: .replica_sets .common !.auth
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: .rollbackfuzzer
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt !sharding_update_v1_oplog_jscore_passthrough
-  - name: .sharding .txns
   - name: .ssl
-  - name: .stitch
   - name: push
 
 - name: enterprise-macos
@@ -2284,14 +2248,10 @@ buildvariants:
   - name: compile_build_tools_next_TG
   - name: audit
   - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.decimal !.sharding
-  - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
   - name: .crypt
@@ -2318,14 +2278,12 @@ buildvariants:
   - name: compile_build_tools_next_TG
   - name: audit
   - name: auth_audit_gen
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
   - name: .jscore .common !.decimal !.sharding
-  - name: .jstestfuzz .common
+  - name: fle
+  - name: fle2
   - name: .logical_session_cache .one_sec
   - name: mqlrun
   - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
   - name: .crypt
