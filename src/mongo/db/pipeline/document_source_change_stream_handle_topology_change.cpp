@@ -166,10 +166,11 @@ StageConstraints DocumentSourceChangeStreamHandleTopologyChange::constraints(
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage};
 
-    // Can be swapped with the '$match' and 'DocumentSourceSingleDocumentTransformation' stages and
-    // ensures that they get pushed down to the shards, as this stage bisects the change streams
-    // pipeline.
+    // Can be swapped with the '$match', '$redact', and 'DocumentSourceSingleDocumentTransformation'
+    // stages and ensures that they get pushed down to the shards, as this stage bisects the change
+    // streams pipeline.
     constraints.canSwapWithMatch = true;
+    constraints.canSwapWithRedact = true;
     constraints.canSwapWithSingleDocTransform = true;
 
     return constraints;

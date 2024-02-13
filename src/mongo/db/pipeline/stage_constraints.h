@@ -350,6 +350,9 @@ struct StageConstraints {
     // $match predicates be swapped before itself.
     bool canSwapWithMatch = false;
 
+    // True if this stage can be safely swapped with a subsequent $redact stage.
+    bool canSwapWithRedact = false;
+
     // True if this stage can be safely swapped with a stage which alters the number of documents in
     // the stream.
     //
@@ -398,6 +401,7 @@ struct StageConstraints {
             canSwapWithMatch == other.canSwapWithMatch &&
             canSwapWithSkippingOrLimitingStage == other.canSwapWithSkippingOrLimitingStage &&
             canSwapWithSingleDocTransform == other.canSwapWithSingleDocTransform &&
+            canSwapWithRedact == other.canSwapWithRedact &&
             canAppearOnlyOnceInPipeline == other.canAppearOnlyOnceInPipeline &&
             isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
             unionRequirement == other.unionRequirement &&

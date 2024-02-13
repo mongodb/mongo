@@ -81,12 +81,14 @@ StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints
                                  UnionRequirement::kNotAllowed,
                                  ChangeStreamRequirement::kChangeStreamStage};
 
-    // The '$match' and 'DocumentSourceSingleDocumentTransformation' stages can swap with this
-    // stage, allowing filtering and reshaping to occur earlier in the pipeline. For sharded cluster
-    // pipelines, swaps can allow $match and 'DocumentSourceSingleDocumentTransformation' stages to
-    // execute on the shards, providing inter-node parallelism and potentially reducing the amount
-    // of data sent form each shard to the mongoS.
+    // The '$match', '$redact', and 'DocumentSourceSingleDocumentTransformation' stages can swap
+    // with this stage, allowing filtering and reshaping to occur earlier in the pipeline. For
+    // sharded cluster pipelines, swaps can allow $match, $redact and
+    // 'DocumentSourceSingleDocumentTransformation' stages to execute on the shards, providing
+    // inter-node parallelism and potentially reducing the amount of data sent form each shard to
+    // the mongoS.
     constraints.canSwapWithMatch = true;
+    constraints.canSwapWithRedact = true;
     constraints.canSwapWithSingleDocTransform = true;
 
     return constraints;
