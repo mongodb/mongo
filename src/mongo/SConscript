@@ -184,6 +184,7 @@ baseEnv.Library(
         'logv2/redaction.cpp',
         'logv2/shared_access_fstream.cpp',
         'logv2/text_formatter.cpp',
+        'platform/atomic_waitable.cpp',
         'platform/decimal128.cpp',
         'platform/int128.cpp',
         'platform/mutex.cpp',

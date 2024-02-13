@@ -11,6 +11,7 @@ env.CppUnitTest(
     source=[
         'atomic_proxy_test.cpp',
         'atomic_word_test.cpp',
+        'atomic_waitable_test.cpp',
         'bits_test.cpp',
         'endian_test.cpp',
         'int128_test.cpp',

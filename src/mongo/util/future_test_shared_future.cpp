@@ -47,6 +47,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/unittest/join_thread.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/executor_test_util.h"
@@ -298,19 +299,7 @@ TEST(SharedFuture, InterruptedGet_AddChild_Get) {
                         });
 }
 
-/** Punt until we have `std::jthread`. Joins itself in destructor. Move-only. */
-class JoinThread : public stdx::thread {
-public:
-    explicit JoinThread(stdx::thread thread) : stdx::thread(std::move(thread)) {}
-    JoinThread(const JoinThread&) = delete;
-    JoinThread& operator=(const JoinThread&) = delete;
-    JoinThread(JoinThread&&) noexcept = default;
-    JoinThread& operator=(JoinThread&&) noexcept = default;
-    ~JoinThread() {
-        if (joinable())
-            join();
-    }
-};
+using unittest::JoinThread;
 
 /** Try a simple single-worker shared get. Exercise JoinThread. */
 TEST(SharedFuture, ConcurrentTest_Simple) {
