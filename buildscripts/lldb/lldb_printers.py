@@ -149,7 +149,12 @@ def ConstDataRangePrinter(valobj, *_args):  # pylint: disable=invalid-name
 def BSONObjPrinter(valobj, *_args):  # pylint: disable=invalid-name
     """Print a BSONObj in a JSON format."""
     ptr = valobj.GetChildMemberWithName("_objdata").GetValueAsUnsigned()
-    size = struct.unpack("<I", valobj.GetProcess().ReadMemory(ptr, 4, lldb.SBError()))[0]
+
+    bson_size = valobj.GetProcess().ReadMemory(ptr, 4, lldb.SBError())
+    if bson_size is None:
+        return None
+
+    size = struct.unpack("<I", bson_size)[0]
     if size < 5 or size > 17 * 1024 * 1024:
         return None
     mem = bytes(memoryview(valobj.GetProcess().ReadMemory(ptr, size, lldb.SBError())))
