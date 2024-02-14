@@ -119,3 +119,9 @@ feature_flags:
       cpp_varname: gFeatureFlagClassicRuntimePlanningForSbe
       default: false
       shouldBeFCVGated: false
+
+    featureFlagSearchBatchSizeTuning:
+      description: "Feature flag to enable batchSize tuning for search queries."
+      cpp_varname: gFeatureFlagSearchBatcSizeTuning
+      default: false
+      shouldBeFCVGated: true
