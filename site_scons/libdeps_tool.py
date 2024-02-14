@@ -953,7 +953,7 @@ _get_node_with_ixes.node_type_ixes = dict()
 def add_node_from(env, node):
 
     env.GetLibdepsGraph().add_nodes_from([(
-        str(node.abspath),
+        node.abspath,
         {
             NodeProps.bin_type.name: node.builder.get_name(env),
         },
@@ -962,9 +962,12 @@ def add_node_from(env, node):
 
 def add_edge_from(env, from_node, to_node, visibility, direct):
 
+    add_node_from(env, from_node)
+    add_node_from(env, to_node)
+
     env.GetLibdepsGraph().add_edges_from([(
-        from_node,
-        to_node,
+        from_node.abspath,
+        to_node.abspath,
         {
             EdgeProps.direct.name: direct,
             EdgeProps.visibility.name: int(visibility),
@@ -982,8 +985,8 @@ def add_libdeps_node(env, target, libdeps):
             if str(libdep.target_node).endswith(env["SHLIBSUFFIX"]):
                 add_edge_from(
                     env,
-                    str(node.abspath),
-                    str(libdep.target_node.abspath),
+                    node,
+                    libdep.target_node,
                     visibility=libdep.dependency_type,
                     direct=True,
                 )
@@ -1196,8 +1199,8 @@ def generate_libdeps_graph(env):
                 add_node_from(env, direct_libdep.target_node)
                 add_edge_from(
                     env,
-                    str(target_node.abspath),
-                    str(direct_libdep.target_node.abspath),
+                    target_node,
+                    direct_libdep.target_node,
                     visibility=int(direct_libdep.dependency_type),
                     direct=True,
                 )
@@ -1208,8 +1211,8 @@ def generate_libdeps_graph(env):
                     add_node_from(env, libdep)
                     add_edge_from(
                         env,
-                        str(target_node.abspath),
-                        str(libdep.abspath),
+                        target_node,
+                        libdep,
                         visibility=int(deptype.Public),
                         direct=False,
                     )
@@ -1378,7 +1381,7 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
 
         env['LIBDEPS_SYMBOL_DEP_FILES'] = symbol_deps
         env['LIBDEPS_GRAPH_FILE'] = env.File("${BUILD_DIR}/libdeps/libdeps.graphml")
-        env['LIBDEPS_GRAPH_SCHEMA_VERSION'] = 4
+        env['LIBDEPS_GRAPH_SCHEMA_VERSION'] = 5
         env["SYMBOLDEPSSUFFIX"] = '.symbol_deps'
 
         libdeps_graph = LibdepsGraph()

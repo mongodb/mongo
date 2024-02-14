@@ -57,6 +57,8 @@ class LinterSplitArgs(argparse.Action):
             selected_choices.remove(CountTypes.ALL.name)
         if selected_choices == []:
             selected_choices = copy.copy(self.default_choices)
+        if values == [""]:
+            selected_choices = []
         setattr(namespace, self.dest, [opt.replace('-', '_') for opt in selected_choices])
 
 
@@ -177,6 +179,11 @@ def setup_args_parser():
     )
 
     parser.add_argument(
+        '--bazel-order', action='store_true', default=False, help=
+        "Find candidate nodes for merging by searching the graph for nodes with only one node which depends on them."
+    )
+
+    parser.add_argument(
         '--indegree-one', action='store_true', default=False, help=
         "Find candidate nodes for merging by searching the graph for nodes with only one node which depends on them."
     )
@@ -286,6 +293,9 @@ def main():
 
     if args.efficiency_lint:
         analysis.append(libdeps_analyzer.EfficiencyLinter(libdeps_graph, args.efficiency_lint))
+
+    if args.bazel_order:
+        analysis.append(libdeps_analyzer.BazelOrder(libdeps_graph))
 
     for analyzer_args in args.critical_edges:
         analysis.append(
