@@ -374,17 +374,25 @@ def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
             print(
                 "Moving EngFlow credentials from the legacy directory (/engflow/) to the new directory (~/.engflow/)."
             )
-            shutil.move("/engflow/creds/engflow.crt",
-                        f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt")
-            shutil.move("/engflow/creds/engflow.key",
-                        f"/home/{getpass.getuser()}/.engflow/creds/engflow.key")
-            with open(f"/home/{getpass.getuser()}/.bazelrc", "a") as bazelrc:
-                bazelrc.write(
-                    f"build --tls_client_certificate=/home/{getpass.getuser()}/.engflow/creds/engflow.crt\n"
+            try:
+                os.makedirs(f"/home/{getpass.getuser()}/.engflow/creds/", exist_ok=True)
+                shutil.move("/engflow/creds/engflow.crt",
+                            f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt")
+                shutil.move("/engflow/creds/engflow.key",
+                            f"/home/{getpass.getuser()}/.engflow/creds/engflow.key")
+                with open(f"/home/{getpass.getuser()}/.bazelrc", "a") as bazelrc:
+                    bazelrc.write(
+                        f"build --tls_client_certificate=/home/{getpass.getuser()}/.engflow/creds/engflow.crt\n"
+                    )
+                    bazelrc.write(
+                        f"build --tls_client_key=/home/{getpass.getuser()}/.engflow/creds/engflow.key\n"
+                    )
+            except OSError as exc:
+                print(exc)
+                print(
+                    "Failed to update cert location, please move them manually. Otherwise you can pass 'BAZEL_FLAGS=\"--config=local\"' on the SCons command line."
                 )
-                bazelrc.write(
-                    f"build --tls_client_key=/home/{getpass.getuser()}/.engflow/creds/engflow.key\n"
-                )
+
             return True
 
         # Pull the external hostname of the system from aws
