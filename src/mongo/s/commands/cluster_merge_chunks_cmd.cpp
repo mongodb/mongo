@@ -156,8 +156,9 @@ public:
             return false;
         }
 
-        auto const [cm, _] =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+        auto const [cm, _] = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
 
         if (cm.isUnsplittable()) {
             uasserted(ErrorCodes::NamespaceNotSharded,
