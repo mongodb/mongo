@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
@@ -47,15 +46,12 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace repl {
@@ -545,8 +541,7 @@ TEST_F(CollectionClonerTestResumable, InsertDocumentsFailed) {
     // Modify the loader so insert documents fails.
     ASSERT(_loader != nullptr);
     _loader->insertDocsFn = [](const std::vector<BSONObj>::const_iterator begin,
-                               const std::vector<BSONObj>::const_iterator end,
-                               CollectionBulkLoader::ParseRecordIdAndDocFunc fn) {
+                               const std::vector<BSONObj>::const_iterator end) {
         return Status(ErrorCodes::OperationFailed, "");
     };
 
@@ -1028,74 +1023,6 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
     ASSERT_TRUE(_collectionStats->commitCalled);
     stats = cloner->getStats();
     ASSERT_EQUALS(7u, stats.documentsCopied);
-}
-
-// Test that the collection cloner uses a project to fetch documents from the upstream
-// node.
-TEST_F(CollectionClonerTestResumable, RecordIdsReplicatedFindProjects) {
-    // Set up data for preliminary stages
-    setMockServerReplies(BSON("size" << 10),
-                         createCountResponse(2),
-                         createCursorResponse(_nss.ns_forTest(), BSON_ARRAY(_idIndexSpec)));
-
-    // Set up documents to be returned from upstream node. Unfortunately, because the
-    // documents are not really stored in a storage engine on the mock server, they don't
-    // have recordIds associated with them and therefore the CollectionCloner's projection to
-    // return recordIds doesn't work.
-    // However, the document projection still works. Therefore the returned documents
-    // are of the form {d: <original document>}.
-    _mockServer->insert(_nss, BSON("_id" << 1));
-    _mockServer->insert(_nss, BSON("_id" << 2));
-    _mockServer->insert(_nss, BSON("_id" << 3));
-
-    auto collClonerBeforeFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-    auto timesEntered = collClonerBeforeFailPoint->setMode(
-        FailPoint::alwaysOn,
-        0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'query', nss: '" + _nss.ns_forTest() + "'}"));
-
-    // Create a cloner that tries to replicate recordIds.
-    CollectionOptions options;
-    options.recordIdsReplicated = true;
-    auto cloner = makeCollectionCloner(options);
-    // Get multiple batches.
-    cloner->setBatchSize_forTest(1);
-
-    // Run the cloner in a separate thread.
-    stdx::thread clonerThread([&] {
-        Client::initThread("ClonnerRunner", getGlobalServiceContext()->getService());
-        ASSERT_OK(cloner->run());
-    });
-
-    // Wait for the failpoint to be reached
-    collClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
-
-    // Intercept the loader's attempt to insert documents.
-    ASSERT(_loader != nullptr);
-    _loader->insertDocsFn = [](const std::vector<BSONObj>::const_iterator begin,
-                               const std::vector<BSONObj>::const_iterator end,
-                               CollectionBulkLoader::ParseRecordIdAndDocFunc fn) {
-        for (auto iter = begin; iter != end; iter++) {
-            LOGV2(8613800, "Processing projected document", "doc"_attr = *iter);
-            ASSERT(iter->nFields() == 1);
-            ASSERT(iter->hasField("d"));
-        }
-
-        // Assert that the correct parsing function was passed in, i.e. a function
-        // that can parse documents of the form {r: <long recordId>, d: <original document>}.
-        auto testDoc = BSON("r" << 10L << "d" << BSON("_id" << 42));
-        const auto& [rid, doc] = fn(testDoc);
-        ASSERT_EQUALS(rid, RecordId(10));
-        ASSERT_EQUALS(doc.woCompare(BSON("_id" << 42)), 0);
-
-        return Status::OK();
-    };
-
-    collClonerBeforeFailPoint->setMode(FailPoint::off, 0);
-    clonerThread.join();
-
-    auto stats = cloner->getStats();
-    ASSERT_EQUALS(3u, stats.receivedBatches);
 }
 
 class CollectionClonerMultitenancyTest : public CollectionClonerTestResumable {

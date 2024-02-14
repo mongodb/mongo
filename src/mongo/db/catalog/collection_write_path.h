@@ -66,14 +66,11 @@ constexpr const BSONObj* kUpdateNoIndexes = &BSONObj::kEmptyObject;
  * bulk loader is notified with the RecordId of the document inserted into the RecordStore through
  * the 'OnRecordInsertedFn' callback.
  *
- * When 'replRid' is provided, the document is inserted with the replRid as the recordId.
- *
  * NOTE: It is up to caller to commit the indexes.
  */
 Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                    const CollectionPtr& collection,
                                    const BSONObj& doc,
-                                   RecordId replRid,
                                    const OnRecordInsertedFn& onRecordInserted);
 
 /**

@@ -372,7 +372,6 @@ Status insertDocumentsImpl(OperationContext* opCtx,
 Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                    const CollectionPtr& collection,
                                    const BSONObj& doc,
-                                   RecordId replRid,
                                    const OnRecordInsertedFn& onRecordInserted) {
     const auto& nss = collection->ns();
 
@@ -389,14 +388,7 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX) ||
             (nss.isOplog() && shard_role_details::getLocker(opCtx)->isWriteLocked()));
 
-    // The replRid must be provided if the collection has recordIdsReplicated:true and it must
-    // not be provided if the collection has recordIdsReplicated:false
-    invariant(collection->areRecordIdsReplicated() != replRid.isNull(),
-              str::stream() << "Unexpected recordId value for collection with ns: '"
-                            << collection->ns().toStringForErrorMsg() << "', uuid: '"
-                            << collection->uuid());
-
-    RecordId recordId = replRid;
+    RecordId recordId;
     if (collection->isClustered()) {
         invariant(collection->getRecordStore()->keyFormat() == KeyFormat::String);
         recordId = uassertStatusOK(record_id_helpers::keyForDoc(
@@ -432,14 +424,19 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     }
     inserts.emplace_back(kUninitializedStmtId, doc, slot);
 
-    // During initial sync, there are no recordIds to be passed to the OpObserver to
-    // include in oplog entries, as we don't generate oplog entries.
+    // An empty vector of recordIds is ignored by the OpObserver. When non-empty,
+    // the OpObserver will add recordIds to the generated oplog entries.
+    std::vector<RecordId> recordIds;
+    if (collection->areRecordIdsReplicated()) {
+        recordIds = {loc.getValue()};
+    }
+
     opCtx->getServiceContext()->getOpObserver()->onInserts(
         opCtx,
         collection,
         inserts.begin(),
         inserts.end(),
-        /*recordIds=*/{},
+        recordIds,
         /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
         /*defaultFromMigrate=*/false);
 

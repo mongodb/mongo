@@ -594,9 +594,7 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionWithIDIndexCommits) {
         ASSERT_OK(loaderStatus.getStatus());
         auto loader = std::move(loaderStatus.getValue());
         std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
-        ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end(), [](const BSONObj& doc) {
-            return std::make_pair(RecordId(0), doc);
-        }));
+        ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
         ASSERT_OK(loader->commit());
     }
 
@@ -621,9 +619,7 @@ void _testDestroyUncommitedCollectionBulkLoader(
     ASSERT_OK(loaderStatus.getStatus());
     auto loader = std::move(loaderStatus.getValue());
     std::vector<BSONObj> docs = {BSON("_id" << 1)};
-    ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end(), [](const BSONObj& doc) {
-        return std::make_pair(RecordId(0), doc);
-    }));
+    ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
 
     // Destroy bulk loader.
     // Collection and ID index should not exist after 'loader' is destroyed.
@@ -937,9 +933,7 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsReturnsIndexOptionsConflictIfIndex
         auto loader = unittest::assertGet(storage.createCollectionForBulkLoading(
             nss, generateOptionsWithUuid(), makeIdIndexSpec(nss), indexes));
         std::vector<BSONObj> docs = {BSON("_id" << 1), BSON("_id" << 1), BSON("_id" << 2)};
-        ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end(), [](const BSONObj& doc) {
-            return std::make_pair(RecordId(0), doc);
-        }));
+        ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
         ASSERT_OK(loader->commit());
     }
     auto indexName = "x_1"_sd;

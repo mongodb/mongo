@@ -82,19 +82,16 @@ public:
     Status init(const std::vector<BSONObj>& secondaryIndexSpecs) override;
 
     Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
-                           std::vector<BSONObj>::const_iterator end,
-                           ParseRecordIdAndDocFunc fn) override;
+                           std::vector<BSONObj>::const_iterator end) override;
     Status commit() override;
 
     std::shared_ptr<CollectionMockStats> stats;
 
     // Override functions.
     std::function<Status(std::vector<BSONObj>::const_iterator,
-                         std::vector<BSONObj>::const_iterator,
-                         ParseRecordIdAndDocFunc fn)>
+                         std::vector<BSONObj>::const_iterator)>
         insertDocsFn = [](const std::vector<BSONObj>::const_iterator,
-                          const std::vector<BSONObj>::const_iterator,
-                          ParseRecordIdAndDocFunc fn) {
+                          const std::vector<BSONObj>::const_iterator) {
             return Status::OK();
         };
     std::function<Status()> abortFn = []() {
