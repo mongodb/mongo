@@ -46,9 +46,8 @@ assert.eq(res.warnings.length, 0);
 // from validation. If the feature flag is enabled, the previous documents will have inserted into
 // a compressed bucket
 if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-    assert.eq(
-        1,
-        bucket.find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted}).count());
+    assert.eq(1,
+              bucket.find({"control.version": TimeseriesTest.BucketVersion.kCompressed}).count());
     jsTestLog(
         "Manually changing 'control.version' from 2 to 1 and checking for warnings from validation.");
 } else {
@@ -76,7 +75,7 @@ if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
                      {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}});
 } else {
     bucket.updateOne({"meta.sensorId": 2},
-                     {"$set": {"control.version": TimeseriesTest.BucketVersion.kCompressedSorted}});
+                     {"$set": {"control.version": TimeseriesTest.BucketVersion.kCompressed}});
 }
 res = bucket.validate();
 assert(res.valid, tojson(res));
@@ -101,9 +100,8 @@ coll.insertMany([...Array(1200).keys()].map(i => ({
                                                 "temp": i
                                             })),
                 {ordered: false});
-bucket.updateOne(
-    {"meta.sensorId": 3, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
-    {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}});
+bucket.updateOne({"meta.sensorId": 3, "control.version": TimeseriesTest.BucketVersion.kCompressed},
+                 {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}});
 res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
@@ -126,14 +124,11 @@ coll.insertMany([...Array(1100).keys()].map(i => ({
                                             })),
                 {ordered: false});
 assert.gte(
-    bucket
-        .find(
-            {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
+    bucket.find({"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressed})
         .count(),
     1);
-bucket.updateOne(
-    {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
-    {"$set": {"control.version": 500}});
+bucket.updateOne({"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressed},
+                 {"$set": {"control.version": 500}});
 res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
@@ -145,12 +140,12 @@ jsTestLog(
     "Making a type-version mismatch in the same bucket as the previous test and checking for warnings.");
 if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
     bucket.updateOne(
-        {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
+        {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressed},
         {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}});
 } else {
     bucket.updateOne(
         {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kUncompressed},
-        {"$set": {"control.version": TimeseriesTest.BucketVersion.kCompressedSorted}});
+        {"$set": {"control.version": TimeseriesTest.BucketVersion.kCompressed}});
 }
 res = bucket.validate();
 assert(res.valid, tojson(res));

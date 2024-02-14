@@ -489,7 +489,7 @@ std::unique_ptr<AccumulationExpression> rewriteCountGroupAccm(
                 timeseries::kBucketControlVersionFieldName.toString(),
             pExpCtx->variablesParseState),
         ExpressionConstant::create(pExpCtx,
-                                   Value(timeseries::kTimeseriesControlCompressedSortedVersion)));
+                                   Value(timeseries::kTimeseriesControlCompressedVersion)));
 
     auto thenExpr = ExpressionFieldPath::createPathFromString(
         pExpCtx, controlCountField, pExpCtx->variablesParseState);

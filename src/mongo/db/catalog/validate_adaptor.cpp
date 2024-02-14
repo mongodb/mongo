@@ -179,9 +179,7 @@ Status _validateTimeseriesCount(const BSONObj& control,
     // Skips the check if a bucket is compressed, but we are not in a validate mode that will
     // decompress the bucket to actually go through the measurements.
     if (version == timeseries::kTimeseriesControlUncompressedVersion ||
-        ((version == timeseries::kTimeseriesControlCompressedSortedVersion ||
-          timeseries::kTimeseriesControlCompressedUnsortedVersion) &&
-         !shouldDecompressBSON)) {
+        (version == timeseries::kTimeseriesControlCompressedVersion && !shouldDecompressBSON)) {
         return Status::OK();
     }
     long long controlCount;
@@ -229,11 +227,10 @@ Status _validateTimeSeriesIdTimestamp(const CollectionPtr& collection, const BSO
  */
 Status _validateTimeseriesControlVersion(const BSONObj& recordBson, int bucketVersion) {
     if (bucketVersion != timeseries::kTimeseriesControlUncompressedVersion &&
-        bucketVersion != timeseries::kTimeseriesControlCompressedSortedVersion &&
-        bucketVersion != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
+        bucketVersion != timeseries::kTimeseriesControlCompressedVersion) {
         return Status(
             ErrorCodes::BadValue,
-            fmt::format("Invalid value for 'control.version'. Expected 1, 2, or 3, but got {}.",
+            fmt::format("Invalid value for 'control.version'. Expected 1 or 2, but got {}.",
                         bucketVersion));
     }
     return Status::OK();
@@ -278,9 +275,7 @@ Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
                                  bool shouldDecompressBSON) {
     // Skips the check if a bucket is compressed, but we are not in a validate mode that will
     // decompress the bucket to actually go through the measurements.
-    if ((version == timeseries::kTimeseriesControlCompressedSortedVersion ||
-         version == timeseries::kTimeseriesControlCompressedUnsortedVersion) &&
-        !shouldDecompressBSON) {
+    if (version == timeseries::kTimeseriesControlCompressedVersion && !shouldDecompressBSON) {
         return Status::OK();
     }
     auto min = minmax.min();
@@ -369,20 +364,15 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                             ErrorCodes::BadValue,
                             fmt::format("Time-series bucket '{}' field is not a Date", fieldName));
                     }
-                    // Checks the time values are sorted in increasing order for v2 buckets
-                    // (compressed, sorted). Skip the check if the bucket is v3 (compressed,
-                    // unsorted).
-                    if (version == timeseries::kTimeseriesControlCompressedSortedVersion) {
-                        Date_t curTimestamp = metric.Date();
-                        if (curTimestamp >= prevTimestamp) {
-                            prevTimestamp = curTimestamp;
-                        } else {
-                            return Status(
-                                ErrorCodes::BadValue,
-                                fmt::format(
-                                    "Time-series bucket '{}' field is not in ascending order",
-                                    fieldName));
-                        }
+                    // Checks the time values are sorted in increasing order for compressed buckets.
+                    Date_t curTimestamp = metric.Date();
+                    if (curTimestamp >= prevTimestamp) {
+                        prevTimestamp = curTimestamp;
+                    } else {
+                        return Status(
+                            ErrorCodes::BadValue,
+                            fmt::format("Time-series bucket '{}' field is not in ascending order",
+                                        fieldName));
                     }
                     minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
                     ++(*bucketCount);
@@ -973,8 +963,7 @@ void ValidateAdaptor::_enforceTimeseriesBucketsAreAlwaysCompressed(const BSONObj
                             .Obj()
                             .getIntField(timeseries::kBucketControlVersionFieldName);
 
-    if (bucketVersion != timeseries::kTimeseriesControlCompressedSortedVersion &&
-        bucketVersion != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
+    if (bucketVersion != timeseries::kTimeseriesControlCompressedVersion) {
         LOGV2(7735100,
               "Expected time-series bucket to be compressed",
               "bucket"_attr = recordBson.toString());

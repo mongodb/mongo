@@ -226,7 +226,7 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(bucketsColl.insert({
         control: {
             version: TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)
-                ? TimeseriesTest.BucketVersion.kCompressedSorted
+                ? TimeseriesTest.BucketVersion.kCompressed
                 : TimeseriesTest.BucketVersion.kUncompressed,
             min: {time: ISODate()},
             max: {time: ISODate()}

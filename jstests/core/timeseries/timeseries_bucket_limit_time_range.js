@@ -85,8 +85,9 @@ TimeseriesTest.run((insert) => {
         assert.eq(docTimes[2],
                   bucketDocs[0].control.max[timeFieldName],
                   'invalid control.max for time in first bucket: ' + tojson(bucketDocs[0].control));
-        assert(TimeseriesTest.isBucketCompressed(bucketDocs[0].control.version),
-               'unexpected control.version in first bucket: ' + tojson(bucketDocs));
+        assert.eq(TimeseriesTest.BucketVersion.kCompressed,
+                  bucketDocs[0].control.version,
+                  'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 
         // Second bucket should contain the remaining document.
         assert.eq(numDocs - 1,
@@ -110,8 +111,9 @@ TimeseriesTest.run((insert) => {
             bucketDocs[1].control.max[timeFieldName],
             'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
         if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
-            assert(TimeseriesTest.isBucketCompressed(bucketDocs[1].control.version),
-                   'unexpected control.version in second bucket: ' + tojson(bucketDocs));
+            assert.eq(TimeseriesTest.BucketVersion.kCompressed,
+                      bucketDocs[1].control.version,
+                      'unexpected control.version in second bucket: ' + tojson(bucketDocs));
         } else {
             assert.eq(TimeseriesTest.BucketVersion.kUncompressed,
                       bucketDocs[1].control.version,

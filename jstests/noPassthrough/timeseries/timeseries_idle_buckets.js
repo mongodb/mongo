@@ -64,10 +64,9 @@ for (let i = 0; i < numDocs; i++) {
     }));
 
     // Check buckets.
-    let bucketDocs =
-        bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
-            .limit(1)
-            .toArray();
+    let bucketDocs = bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressed})
+                         .limit(1)
+                         .toArray();
     if (bucketDocs.length > 0) {
         foundExpiredBucket = true;
     }

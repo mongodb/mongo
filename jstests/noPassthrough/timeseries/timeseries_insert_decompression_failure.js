@@ -67,9 +67,9 @@ TimeseriesTest.run((insert) => {
 
     const buckets = bucketsColl.find({meta: bucket.meta}).toArray();
     assert.eq(buckets.length, 2);
-    assert(TimeseriesTest.isBucketCompressed(buckets[0].control.version));
+    assert.eq(buckets[0].control.version, TimeseriesTest.BucketVersion.kCompressed);
     assert.eq(buckets[0].control.count, 2);
-    assert(TimeseriesTest.isBucketCompressed(buckets[1].control.version));
+    assert.eq(buckets[1].control.version, TimeseriesTest.BucketVersion.kCompressed);
     assert.eq(buckets[1].control.count, 2);
 
     MongoRunner.stopMongod(conn);

@@ -133,7 +133,7 @@ public:
         auto version = versionField.Number();
         if (version == kTimeseriesControlUncompressedVersion) {
             return computeElementCountFromTimestampObjSize(time.objsize());
-        } else if (version == kTimeseriesControlCompressedSortedVersion) {
+        } else if (version == kTimeseriesControlCompressedVersion) {
             auto countField = controlField.Obj()[kBucketControlCountFieldName];
             if (countField && isNumericBSONType(countField.type())) {
                 return static_cast<int>(countField.Number());

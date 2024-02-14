@@ -297,9 +297,8 @@ Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& 
 }
 
 BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
-    if (bucketVersion != timeseries::kTimeseriesControlCompressedSortedVersion &&
-        bucketVersion != timeseries::kTimeseriesControlUncompressedVersion &&
-        bucketVersion != timeseries::kTimeseriesControlCompressedUnsortedVersion) {
+    if (bucketVersion != timeseries::kTimeseriesControlCompressedVersion &&
+        bucketVersion != timeseries::kTimeseriesControlUncompressedVersion) {
         MONGO_UNREACHABLE;
     }
     // '$jsonSchema' : {
@@ -324,12 +323,10 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
     //                 },
     //                 closed: {bsonType: 'bool'},
     //                 count: {bsonType: 'number', minimum: 1} // only if bucketVersion ==
-    //                 // timeseries::kTimeseriesControlCompressedSortedVersion or
-    //                 // timeseries::kTimeseriesControlCompressedUnsortedVersion
+    //                 timeseries::kTimeseriesControlCompressedVersion
     //             },
     //             additionalProperties: false // only if bucketVersion ==
-    //             // timeseries::kTimeseriesControlCompressedSortedVersion or
-    //             // timeseries::kTimeseriesControlCompressedUnsortedVersion
+    //             timeseries::kTimeseriesControlCompressedVersion
     //         },
     //         data: {bsonType: 'object'},
     //         meta: {}
@@ -392,8 +389,7 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
                     closed.append("bsonType", "bool");
                     closed.done();
                 }
-                if (bucketVersion == timeseries::kTimeseriesControlCompressedSortedVersion ||
-                    bucketVersion == timeseries::kTimeseriesControlCompressedUnsortedVersion) {
+                if (bucketVersion == timeseries::kTimeseriesControlCompressedVersion) {
                     BSONObjBuilder count(innerProperties.subobjStart("count"));
                     count.append("bsonType", "number");
                     count.append("minimum", 1);
@@ -401,8 +397,7 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
                 }
                 innerProperties.done();
             }
-            if (bucketVersion == timeseries::kTimeseriesControlCompressedSortedVersion ||
-                bucketVersion == timeseries::kTimeseriesControlCompressedUnsortedVersion) {
+            if (bucketVersion == timeseries::kTimeseriesControlCompressedVersion) {
                 control.append("additionalProperties", false);
             }
             control.done();
