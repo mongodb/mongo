@@ -75,6 +75,12 @@ public:
      * Recovers the data on disk from the oplog up to and including the given timestamp.
      */
     virtual void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) = 0;
+
+    /**
+     * Truncates the oplog after the entry with the 'truncateAfterTimestamp'.
+     */
+    virtual void truncateOplogToTimestamp(OperationContext* opCtx,
+                                          Timestamp truncateAfterTimestamp) = 0;
 };
 
 class ReplicationRecoveryImpl : public ReplicationRecovery {
@@ -92,6 +98,9 @@ public:
                                       bool duringInitialSync = false) override;
 
     void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) override;
+
+    void truncateOplogToTimestamp(OperationContext* opCtx,
+                                  Timestamp truncateAfterTimestamp) override;
 
 private:
     enum class RecoveryMode {

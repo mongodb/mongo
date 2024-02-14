@@ -1726,6 +1726,34 @@ TEST_F(ReplicationRecoveryTest, StartupRecoveryRunsCompletionHook) {
     ASSERT_EQ(getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx), Timestamp());
 }
 
+TEST_F(ReplicationRecoveryTest, TruncateOplogToTimestamp) {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+
+    _setUpOplog(opCtx, getStorageInterface(), {1, 2, 3, 4, 5});
+    // We should truncate the oplog to Timestamp(3, 3) without ever setting the truncate after
+    // point. The truncate after point should remain as the default value.
+    ASSERT_EQUALS(Timestamp(), getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx));
+    recovery.truncateOplogToTimestamp(opCtx, Timestamp(3, 3));
+
+    ASSERT_EQUALS(Timestamp(), getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx));
+    _assertDocsInOplog(opCtx, {1, 2, 3});
+    _assertDocsInTestCollection(opCtx, {});
+}
+
+DEATH_TEST_REGEX_F(ReplicationRecoveryTest,
+                   TruncateOplogToTimestampOplogDoesntExist,
+                   "Fatal assertion.*34418") {
+    ReplicationRecoveryImpl recovery(getStorageInterface(), getConsistencyMarkers());
+    auto opCtx = getOperationContext();
+    ASSERT_OK(getStorageInterface()->dropCollection(opCtx, NamespaceString::kRsOplogNamespace));
+
+    // The truncate after point should remain as the default value.
+    ASSERT_EQUALS(Timestamp(), getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx));
+    // Without an oplog, the 'truncateOplogToTimestamp' function should hit a fatal assertion.
+    recovery.truncateOplogToTimestamp(opCtx, Timestamp(3, 3));
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

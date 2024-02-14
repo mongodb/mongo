@@ -527,6 +527,12 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
     std::terminate();
 }
 
+void ReplicationRecoveryImpl::truncateOplogToTimestamp(OperationContext* opCtx,
+                                                       Timestamp truncateAfterTimestamp) {
+    _truncateOplogTo(
+        opCtx, truncateAfterTimestamp, std::make_unique<boost::optional<Timestamp>>().get());
+}
+
 void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCtx,
                                                           Timestamp stableTimestamp,
                                                           OpTime topOfOplog,

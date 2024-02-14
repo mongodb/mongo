@@ -51,6 +51,9 @@ public:
                                       bool duringInitialSync = false) override {}
 
     void recoverFromOplogUpTo(OperationContext* opCtx, Timestamp endPoint) override {}
+
+    void truncateOplogToTimestamp(OperationContext* opCtx,
+                                  Timestamp truncateAfterTimestamp) override {}
 };
 
 }  // namespace repl
