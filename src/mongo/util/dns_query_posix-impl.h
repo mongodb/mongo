@@ -54,6 +54,7 @@
 
 #include <boost/noncopyable.hpp>
 
+#include "mongo/platform/mutex.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -365,12 +366,19 @@ public:
     }
 
     DNSQueryState() : _state() {
+        // res_ninit may modify the global conf object creating a data race when multiple instances
+        // of DNSQueryState are created concurrently.
+        stdx::lock_guard<Latch> lk(_staticMutex);
         res_ninit(&_state);
     }
 
 private:
     struct __res_state _state;
+    static Mutex _staticMutex;
 };
+
+Mutex DNSQueryState::_staticMutex = MONGO_MAKE_LATCH("DNSQueryState::_staticMutex");
+
 }  // namespace
 }  // namespace dns
 }  // namespace mongo
