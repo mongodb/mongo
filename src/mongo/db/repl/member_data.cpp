@@ -88,6 +88,9 @@ MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
 
     bool opTimeAdvanced =
         advanceLastAppliedOpTimeAndWallTime(hbResponse.getAppliedOpTimeAndWallTime(), now);
+    opTimeAdvanced =
+        advanceLastWrittenOpTimeAndWallTime(hbResponse.getWrittenOpTimeAndWallTime(), now) ||
+        opTimeAdvanced;
     auto durableOpTimeAndWallTime = hbResponse.hasDurableOpTime()
         ? hbResponse.getDurableOpTimeAndWallTime()
         : OpTimeAndWallTime();
