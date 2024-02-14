@@ -952,8 +952,13 @@ def fatal_error(env, msg, *args):
 
 
 def bazel_by_default():
-    return distro.name() == "Ubuntu" and distro.version().split(
-        ".")[0] == "22" and platform.machine() == "aarch64"
+    try:
+        return distro.name() == "Ubuntu" and distro.version().split(
+            ".")[0] == "22" and platform.machine() == "aarch64"
+    except Exception as e:
+        print(f"Error determining if Bazel should be enabled by default: {e}")
+        print("Defaulting to disable Bazel")
+        return False
 
 
 # Apply the default variables files, and walk the provided
