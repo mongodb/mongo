@@ -361,6 +361,10 @@ Status validateAndSetBucketingParameters(TimeseriesOptions& timeseriesOptions) {
         if (!maxSpanSeconds) {
             timeseriesOptions.setBucketMaxSpanSeconds(maxSpanSecondsFromGranularity);
         }
+
+        if (!allowSecondsParameters && roundingSeconds) {
+            uasserted(8545900, "Unknown parameter 'bucketRoundingSeconds'");
+        }
     }
 
     return Status::OK();
