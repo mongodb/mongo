@@ -206,6 +206,7 @@ components:
     local_directory_path: src/third_party/JSON-Schema-Test-Suite
     is_test_only: true
     team_owner: "Query"
+    # Note: This is a test-only library and not compiled into the server.
 
   libmongocrypt:
     homepage_url: https://github.com/mongodb/libmongocrypt
