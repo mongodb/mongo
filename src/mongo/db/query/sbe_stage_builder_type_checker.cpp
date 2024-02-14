@@ -65,7 +65,7 @@ TypeSignature TypeChecker::typeCheck(optimizer::ABT& node) {
     return node.visit(*this, false);
 }
 
-TypeSignature TypeChecker::getInferredType(optimizer::ProjectionName variable) {
+boost::optional<TypeSignature> TypeChecker::getInferredType(optimizer::ProjectionName variable) {
     // Walk the list of active bindings until the variable is found.
     for (auto it = _bindings.rbegin(); it != _bindings.rend(); it++) {
         auto findIt = it->find(variable);
@@ -73,15 +73,15 @@ TypeSignature TypeChecker::getInferredType(optimizer::ProjectionName variable) {
             return findIt->second;
         }
     }
-    // No explicit type defined, return the wildcard type.
-    return TypeSignature::kAnyScalarType;
+    // No explicit type defined.
+    return boost::none;
 }
 
 void TypeChecker::bind(optimizer::ProjectionName variable, TypeSignature type) {
     // Verify that the new type for the variable is compatible with the information deducted until
     // now.
-    TypeSignature curType = getInferredType(variable);
-    uassert(6950900, "Type checking error", type.isSubset(curType));
+    auto curType = getInferredType(variable);
+    uassert(6950900, "Type checking error", !curType || type.isSubset(*curType));
     // Store the association in the current binding level.
     _bindings.back()[variable] = type;
 }
@@ -109,7 +109,7 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
                                       optimizer::Variable& var,
                                       bool saveInference) {
     // Retrieve the current type of the variable.
-    return getInferredType(var.name());
+    return getInferredType(var.name()).value_or(TypeSignature::kAnyScalarType);
 }
 
 TypeSignature TypeChecker::operator()(optimizer::ABT& n,
@@ -458,7 +458,9 @@ TypeSignature TypeChecker::operator()(optimizer::ABT& n,
                 // If this 'exists' is testing a variable and is part of an And, add a mask
                 // excluding Nothing from the type information of the variable.
                 auto& varName = op.nodes()[0].cast<optimizer::Variable>()->name();
-                bind(varName, getInferredType(varName).exclude(TypeSignature::kNothingType));
+                auto varType = getInferredType(varName).value_or(TypeSignature::kAnyScalarType);
+
+                bind(varName, varType.exclude(TypeSignature::kNothingType));
             }
             return TypeSignature::kBooleanType;
         }

@@ -2153,6 +2153,7 @@ public:
                  _env,
                  nullptr /* planStageData */,
                  _variables,
+                 nullptr /* yieldPolicy */,
                  &_slotIdGenerator,
                  &_frameIdGenerator,
                  nullptr /* spoolIdGenerator */,

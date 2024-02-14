@@ -124,7 +124,7 @@ private:
 
 BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
                                      value::SlotId groupSlotId,
-                                     value::SlotId blockBitsetInSlotId,
+                                     boost::optional<value::SlotId> blockBitsetInSlotId,
                                      value::SlotVector blockDataInSlotIds,
                                      value::SlotId rowAccSlotId,
                                      value::SlotId accumulatorBitsetSlotId,
@@ -141,6 +141,7 @@ BlockHashAggStage::BlockHashAggStage(std::unique_ptr<PlanStage> input,
       _rowAccSlotId(rowAccSlotId),
       _blockRowAggs(std::move(aggs)) {
     invariant(_blockDataInSlotIds.size() == _accumulatorDataSlotIds.size());
+
     _children.emplace_back(std::move(input));
     _outAggBlocks.resize(_blockRowAggs.size());
     _blockDataInAccessors.resize(_blockDataInSlotIds.size());
@@ -180,17 +181,23 @@ void BlockHashAggStage::prepare(CompileCtx& ctx) {
     _idHtAccessor.emplace(_htIt, 0);
     _idAccessorIn = _children[0]->getAccessor(ctx, _groupSlot);
     invariant(_idAccessorIn);
-    _blockBitsetInAccessor = _children[0]->getAccessor(ctx, _blockBitsetInSlotId);
-    invariant(_blockBitsetInAccessor);
+
+    if (_blockBitsetInSlotId) {
+        _blockBitsetInAccessor = _children[0]->getAccessor(ctx, *_blockBitsetInSlotId);
+        invariant(_blockBitsetInAccessor);
+    }
+
     for (size_t i = 0; i < _blockDataInSlotIds.size(); i++) {
         _blockDataInAccessors[i] = _children[0]->getAccessor(ctx, _blockDataInSlotIds[i]);
         invariant(_blockDataInAccessors[i]);
     }
 
     value::SlotSet dupCheck;
-    auto throwIfDupSlot = [&dupCheck](value::SlotId slot) {
-        auto [_, inserted] = dupCheck.emplace(slot);
-        tassert(7953400, "duplicate slot id", inserted);
+    auto throwIfDupSlot = [&dupCheck](boost::optional<value::SlotId> slot) {
+        if (slot) {
+            auto [_, inserted] = dupCheck.emplace(*slot);
+            tassert(7953400, "duplicate slot id", inserted);
+        }
     };
 
     _outAccessorsMap.reserve(_blockRowAggs.size() + 1);
@@ -278,8 +285,13 @@ void BlockHashAggStage::executeAccumulatorCode(value::MaterializedRow key) {
 void BlockHashAggStage::runAccumulatorsTokenized(size_t nPartitions,
                                                  value::DeblockedTagVals deblockedTokens,
                                                  value::TokenizedBlock tokenInfo) {
-    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
-    invariant(bitmapInTag == value::TypeTags::valueBlock);
+    auto bitmapInTag = value::TypeTags::Nothing;
+    auto bitmapInVal = value::Value{0};
+
+    if (_blockBitsetInAccessor) {
+        std::tie(bitmapInTag, bitmapInVal) = _blockBitsetInAccessor->getViewOfValue();
+        invariant(bitmapInTag == value::TypeTags::valueBlock);
+    }
 
     // Process the accumulators for each partition rather than one element at a time.
     for (size_t partition = 0; partition < nPartitions; ++partition) {
@@ -290,20 +302,24 @@ void BlockHashAggStage::runAccumulatorsTokenized(size_t nPartitions,
         // The accumulators use `_accumulatorBitsetAccessor` to determine which values to
         // accumulate. If we have multiple partitions, we need some additional logic to
         // indicate which partition we're processing.
-        if (nPartitions > 1) {
-            // TODO SERVER-85739 we can avoid allocating a new bitset for every input. We
-            // can potentially reuse the same bitset. It also might not be worth the
-            // additional code complexity.
+        // TODO SERVER-85739 we can avoid allocating a new bitset for every input. We
+        // can potentially reuse the same bitset. It also might not be worth the
+        // additional code complexity.
+        if (nPartitions > 1 || !_blockBitsetInAccessor) {
+            // Combine the partition bitmap and input bitmap using bitAnd().
             auto partitionBitset = computeBitmapForPartition(tokenInfo.idxs, partition);
-            // AND the partition bitmap and input bitmap together. `bitAnd` returns a new
-            // bitmap so the accessor must own it.
-            auto accBitset =
-                bitAnd(partitionBitset.get(), value::bitcastTo<value::ValueBlock*>(bitmapInVal));
+
+            auto accBitset = _blockBitsetInAccessor
+                ? bitAnd(partitionBitset.get(), value::bitcastTo<value::ValueBlock*>(bitmapInVal))
+                : std::move(partitionBitset);
+
             _accumulatorBitsetAccessor.reset(
                 true,
                 value::TypeTags::valueBlock,
                 value::bitcastFrom<value::ValueBlock*>(accBitset.release()));
         } else {
+            // The partition bitmap would be all 1s if we computed it, so we can just use
+            // the input bitmap in this case.
             _accumulatorBitsetAccessor.reset(false, bitmapInTag, bitmapInVal);
         }
 
@@ -316,10 +332,18 @@ void BlockHashAggStage::runAccumulatorsTokenized(size_t nPartitions,
     }
 }
 
-void BlockHashAggStage::runAccumulatorsElementWise() {
-    auto [bitmapInTag, bitmapInVal] = _blockBitsetInAccessor->getViewOfValue();
-    invariant(bitmapInTag == value::TypeTags::valueBlock);
-    auto extractedBitmap = value::bitcastTo<value::ValueBlock*>(bitmapInVal)->extract();
+void BlockHashAggStage::runAccumulatorsElementWise(size_t blockSize) {
+    auto bitmapInTag = value::TypeTags::Nothing;
+    auto bitmapInVal = value::Value{0};
+    boost::optional<value::DeblockedTagVals> extractedBitmap;
+
+    if (_blockBitsetInAccessor) {
+        std::tie(bitmapInTag, bitmapInVal) = _blockBitsetInAccessor->getViewOfValue();
+        invariant(bitmapInTag == value::TypeTags::valueBlock);
+
+        extractedBitmap.emplace(value::bitcastTo<value::ValueBlock*>(bitmapInVal)->extract());
+        invariant(extractedBitmap->count() == blockSize);
+    }
 
     auto [gbInputTag, gbInputVal] = _idAccessorIn->getViewOfValue();
     invariant(gbInputTag == value::TypeTags::valueBlock);
@@ -354,18 +378,21 @@ void BlockHashAggStage::runAccumulatorsElementWise() {
             value::bitcastFrom<value::ValueBlock*>(&singletonDataBlocks[i]));
     }
 
-    for (size_t blockIndex = 0; blockIndex < extractedBitmap.count(); ++blockIndex) {
+    for (size_t blockIndex = 0; blockIndex < blockSize; ++blockIndex) {
         value::MaterializedRow key{1};
         auto [idTag, idVal] = extractedGbInput[blockIndex];
         key.reset(0, false, idTag, idVal);
 
-        // Update our accessors (via the blocks) with the current value.
-        auto [bitTag, bitVal] = extractedBitmap[blockIndex];
-        invariant(bitTag == value::TypeTags::Boolean);
-        if (!value::bitcastTo<bool>(bitVal)) {
-            continue;
+        if (extractedBitmap) {
+            auto [bitTag, bitVal] = (*extractedBitmap)[blockIndex];
+            invariant(bitTag == value::TypeTags::Boolean);
+
+            if (!value::bitcastTo<bool>(bitVal)) {
+                continue;
+            }
         }
 
+        // Update our accessors (via the blocks) with the current value.
         for (size_t i = 0; i < numDataInputs; i++) {
             singletonDataBlocks[i].setTagVal(extractedDataIn[i][blockIndex]);
         }
@@ -408,7 +435,7 @@ void BlockHashAggStage::open(bool reOpen) {
         if (nPartitions <= kMaxNumPartitionsForTokenizedPath) {
             runAccumulatorsTokenized(nPartitions, std::move(deblockedTokens), std::move(tokenInfo));
         } else {
-            runAccumulatorsElementWise();
+            runAccumulatorsElementWise(tokenInfo.idxs.size());
         }
 
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {

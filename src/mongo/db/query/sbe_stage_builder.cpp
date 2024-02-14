@@ -747,6 +747,7 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              _env,
              _data.get(),
              _cq.getExpCtxRaw()->variables,
+             _yieldPolicy,
              &_slotIdGenerator,
              &_frameIdGenerator,
              &_spoolIdGenerator,
@@ -2422,7 +2423,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Ensure that we are not forwarding block values that the caller cannot handle.
     if (outputs.hasBlockOutput() && (reqs.hasResult() || !reqs.getCanProcessBlockValues())) {
-        stage = buildBlockToRow(std::move(stage), outputs);
+        stage = buildBlockToRow(std::move(stage), _state, outputs);
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -3061,46 +3062,37 @@ bool canUseCoveredProjection(const QuerySolutionNode* root) {
 }
 
 boost::optional<std::vector<std::string>> projectionOutputsFieldOrderIsFixed(
+    bool isInclusion,
     const std::vector<std::string>& paths,
     const std::vector<ProjectNode>& nodes,
-    const StringSet& allowed) {
-    // If we know the post-image "allowed" field set is going to have more than 2 fields no matter
-    // what based on looking at the size of 'allowed' and 'nodes', then we can just bail out early
-    // and return boost::none.
-    if (allowed.size() - nodes.size() > 2) {
+    const FieldSet& childAllowedFields) {
+    // Compute the post-image allowed field set.
+    auto allowedFields = childAllowedFields;
+    allowedFields.setIntersect(makeAllowedFieldSet(isInclusion, paths, nodes));
+    allowedFields.setUnion(makeCreatedFieldSet(isInclusion, paths, nodes));
+    // If the field set is open, then return boost::none.
+    if (allowedFields.getScope() != FieldListScope::kClosed) {
         return boost::none;
     }
-    // Compute the post-image "allowed" field set. If 'postImageAllowedFields' 2 or more non-"_id"
-    // fields, then we know it's not possible to produce a materialized result object using a fixed
-    // plan from a result base.
-    auto postImageAllowedFields = allowed;
-    for (size_t i = 0; i < nodes.size(); ++i) {
-        auto& node = nodes[i];
-        auto& path = paths[i];
-        if (node.isDrop() && path.find('.') == std::string::npos) {
-            postImageAllowedFields.erase(path);
-        } else if (node.isExpr()) {
-            postImageAllowedFields.insert(getTopLevelField(path).toString());
-        }
-    }
-    bool hasId = postImageAllowedFields.count("_id"_sd);
-    size_t n = postImageAllowedFields.size();
+    // If the field set has 2 or more fields that are not "_id", then return boost::none.
+    const auto& allowedList = allowedFields.getList();
+    bool hasId = allowedFields.count("_id"_sd);
+    size_t n = allowedList.size();
+
     if (n > (hasId ? 2 : 1)) {
         return boost::none;
     }
-    // Remove "_id" from 'postImageAllowedFields'. At this point, all the should remain in
-    // 'postImageAllowedFields' (if anything) is the non-"_id" field.
-    postImageAllowedFields.erase("_id");
-
     // Build the result and return it.
     boost::optional<std::vector<std::string>> result;
     result.emplace();
     result->reserve(n);
     if (hasId) {
-        result->emplace_back("_id");
+        result->emplace_back("_id"_sd);
     }
-    if (!postImageAllowedFields.empty()) {
-        result->emplace_back(*postImageAllowedFields.begin());
+
+    if (n == (hasId ? 2 : 1)) {
+        size_t idx = allowedList[0] == "_id"_sd ? 1 : 0;
+        result->emplace_back(allowedList[idx]);
     }
 
     return result;
@@ -3411,13 +3403,14 @@ std::unique_ptr<BuildProjectionPlan> SlotBasedStageBuilder::makeBuildProjectionP
         inputPlanSingleFields.emplace(resultFields);
     }
 
-    // If our parent needs the full materialized result object AND if this is an inclusion AND
-    // we can prove the materialized result object either will have a single field only or will
-    // have "_id" and one other field only, then we can use a fixed plan.
-    if (!planType && childAllowedFields.getScope() == FieldListScope::kClosed) {
+    // If our parent needs the full materialized result object and we can prove the materialized
+    // result object either will have a single field only or will have "_id" and one other field
+    // only, then we can use a fixed plan.
+    if (!planType && allowedSet.getScope() == FieldListScope::kClosed) {
         tassert(8378206, "Expected result object requirement to be set", reqResultObj);
 
-        auto fields = projectionOutputsFieldOrderIsFixed(paths, nodes, childAllowedFields.getSet());
+        auto fields =
+            projectionOutputsFieldOrderIsFixed(isInclusion, paths, nodes, childAllowedFields);
         if (fields) {
             planType.emplace(BuildProjectionPlan::kUseInputPlanWithoutObj);
 
@@ -3794,7 +3787,7 @@ SlotBasedStageBuilder::buildProjectionImpl(const QuerySolutionNode* root,
 
             // Create a BlockToRowStage.
             auto [outStage, outSlots] =
-                buildBlockToRow(std::move(stage), outputs, std::move(individualSlots));
+                buildBlockToRow(std::move(stage), _state, outputs, std::move(individualSlots));
             stage = std::move(outStage);
 
             // For each slot that was in 'exprSlots', replace all occurrences of the original
@@ -5739,14 +5732,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, bool> SlotBasedStageBuilder::buildVec
         // The vectorised execution should stop if the caller cannot process blocks or the stage
         // needs to return a scalar result document.
         if (reqs.hasResult() || !reqs.getCanProcessBlockValues()) {
-            stage = buildBlockToRow(std::move(stage), outputs);
+            stage = buildBlockToRow(std::move(stage), _state, outputs);
         }
 
         return {std::move(stage), true};
     } else {
         // It is not possible to create the vectorised expression. Convert block to row and
         // continue with the scalar filter expression.
-        stage = buildBlockToRow(std::move(stage), outputs);
+        stage = buildBlockToRow(std::move(stage), _state, outputs);
         return {std::move(stage), false};
     }
 }

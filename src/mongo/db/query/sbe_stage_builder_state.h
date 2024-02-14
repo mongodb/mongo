@@ -39,6 +39,7 @@
 namespace mongo {
 class InListData;
 class StringListSet;
+class PlanYieldPolicySBE;
 
 namespace stage_builder {
 struct Environment;
@@ -58,6 +59,7 @@ struct StageBuilderState {
                       Environment& env,
                       PlanStageStaticData* data,
                       const Variables& variables,
+                      PlanYieldPolicySBE* yieldPolicy,
                       sbe::value::SlotIdGenerator* slotIdGenerator,
                       sbe::value::FrameIdGenerator* frameIdGenerator,
                       sbe::value::SpoolIdGenerator* spoolIdGenerator,
@@ -75,6 +77,7 @@ struct StageBuilderState {
           env{env},
           data{data},
           variables{variables},
+          yieldPolicy{yieldPolicy},
           expCtx{expCtx},
           needsMerge{needsMerge},
           allowDiskUse{allowDiskUse} {}
@@ -137,6 +140,8 @@ struct StageBuilderState {
     PlanStageStaticData* const data;
 
     const Variables& variables;
+
+    PlanYieldPolicySBE* const yieldPolicy{nullptr};
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
 

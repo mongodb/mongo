@@ -279,44 +279,99 @@ public:
                                                  const VariableTypes* varTypes,
                                                  SbExprOptSbSlotVector projects);
 
-    std::pair<SbStage, SbSlotVector> makeHashAgg(SbStage stage,
-                                                 const SbSlotVector& gbs,
-                                                 SbAggExprVector sbAggExprs,
-                                                 boost::optional<sbe::value::SlotId> collatorSlot,
-                                                 bool allowDiskUse,
-                                                 SbExprSbSlotVector mergingExprs) {
+    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
+        SbStage stage,
+        const SbSlotVector& groupBySlots,
+        SbAggExprVector sbAggExprs,
+        boost::optional<sbe::value::SlotId> collatorSlot,
+        bool allowDiskUse,
+        SbExprSbSlotVector mergingExprs) {
         return makeHashAgg(std::move(stage),
                            nullptr,
-                           gbs,
+                           groupBySlots,
                            std::move(sbAggExprs),
                            collatorSlot,
                            allowDiskUse,
                            std::move(mergingExprs));
     }
 
-    std::pair<SbStage, SbSlotVector> makeHashAgg(SbStage stage,
-                                                 const VariableTypes& varTypes,
-                                                 const SbSlotVector& gbs,
-                                                 SbAggExprVector sbAggExprs,
-                                                 boost::optional<sbe::value::SlotId> collatorSlot,
-                                                 bool allowDiskUse,
-                                                 SbExprSbSlotVector mergingExprs) {
+    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
+        SbStage stage,
+        const VariableTypes& varTypes,
+        const SbSlotVector& groupBySlots,
+        SbAggExprVector sbAggExprs,
+        boost::optional<sbe::value::SlotId> collatorSlot,
+        bool allowDiskUse,
+        SbExprSbSlotVector mergingExprs) {
         return makeHashAgg(std::move(stage),
                            &varTypes,
-                           gbs,
+                           groupBySlots,
                            std::move(sbAggExprs),
                            collatorSlot,
                            allowDiskUse,
                            std::move(mergingExprs));
     }
 
-    std::pair<SbStage, SbSlotVector> makeHashAgg(SbStage stage,
-                                                 const VariableTypes* varTypes,
-                                                 const SbSlotVector& gbs,
-                                                 SbAggExprVector sbAggExprs,
-                                                 boost::optional<sbe::value::SlotId> collatorSlot,
-                                                 bool allowDiskUse,
-                                                 SbExprSbSlotVector mergingExprs);
+    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeHashAgg(
+        SbStage stage,
+        const VariableTypes* varTypes,
+        const SbSlotVector& groupBySlots,
+        SbAggExprVector sbAggExprs,
+        boost::optional<sbe::value::SlotId> collatorSlot,
+        bool allowDiskUse,
+        SbExprSbSlotVector mergingExprs);
+
+    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
+        SbStage stage,
+        const SbSlotVector& groupBySlots,
+        SbAggExprVector sbAggExprs,
+        boost::optional<SbSlot> selectivityBitmapSlot,
+        const SbSlotVector& blockAccArgSlots,
+        const SbSlotVector& blockAccInternalArgSlots,
+        SbSlot bitmapInternalSlot,
+        SbSlot accInternalSlot) {
+        return makeBlockHashAgg(std::move(stage),
+                                nullptr,
+                                groupBySlots,
+                                std::move(sbAggExprs),
+                                selectivityBitmapSlot,
+                                blockAccArgSlots,
+                                blockAccInternalArgSlots,
+                                bitmapInternalSlot,
+                                accInternalSlot);
+    }
+
+    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
+        SbStage stage,
+        const VariableTypes& varTypes,
+        const SbSlotVector& groupBySlots,
+        SbAggExprVector sbAggExprs,
+        boost::optional<SbSlot> selectivityBitmapSlot,
+        const SbSlotVector& blockAccArgSlots,
+        const SbSlotVector& blockAccInternalArgSlots,
+        SbSlot bitmapInternalSlot,
+        SbSlot accInternalSlot) {
+        return makeBlockHashAgg(std::move(stage),
+                                &varTypes,
+                                groupBySlots,
+                                std::move(sbAggExprs),
+                                selectivityBitmapSlot,
+                                blockAccArgSlots,
+                                blockAccInternalArgSlots,
+                                bitmapInternalSlot,
+                                accInternalSlot);
+    }
+
+    std::tuple<SbStage, SbSlotVector, SbSlotVector> makeBlockHashAgg(
+        SbStage stage,
+        const VariableTypes* varTypes,
+        const SbSlotVector& groupBySlots,
+        SbAggExprVector sbAggExprs,
+        boost::optional<SbSlot> selectivityBitmapSlot,
+        const SbSlotVector& blockAccArgSlots,
+        const SbSlotVector& blockAccInternalArgSlots,
+        SbSlot bitmapInternalSlot,
+        SbSlot accInternalSlot);
 
     PlanNodeId _nodeId;
 };

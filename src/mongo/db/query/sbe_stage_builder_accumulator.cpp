@@ -88,6 +88,23 @@ SbExpr::Vector buildAccumulatorMin(const AccumulationExpression& expr,
     }
 }
 
+std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMin(
+    const AccumulationExpression& expr,
+    SbExpr arg,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state) {
+    SbExprBuilder b(state);
+    std::vector<BlockAggAndRowAgg> pairs;
+
+    pairs.emplace_back(
+        BlockAggAndRowAgg{b.makeFunction("valueBlockMin"_sd, bitmapInternalSlot, std::move(arg)),
+                          b.makeFunction("min"_sd, accInternalSlot)});
+
+    return pairs;
+}
+
 SbExpr::Vector buildCombinePartialAggsMin(const AccumulationExpression& expr,
                                           const SbSlotVector& inputSlots,
                                           boost::optional<sbe::value::SlotId> collatorSlot,
@@ -127,6 +144,23 @@ SbExpr::Vector buildAccumulatorMax(const AccumulationExpression& expr,
     } else {
         return SbExpr::makeSeq(b.makeFunction("max"_sd, wrapMinMaxArg(std::move(arg), state)));
     }
+}
+
+std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMax(
+    const AccumulationExpression& expr,
+    SbExpr arg,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state) {
+    SbExprBuilder b(state);
+    std::vector<BlockAggAndRowAgg> pairs;
+
+    pairs.emplace_back(
+        BlockAggAndRowAgg{b.makeFunction("valueBlockMax"_sd, bitmapInternalSlot, std::move(arg)),
+                          b.makeFunction("max"_sd, accInternalSlot)});
+
+    return pairs;
 }
 
 SbExpr::Vector buildCombinePartialAggsMax(const AccumulationExpression& expr,
@@ -1281,6 +1315,43 @@ SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
     return std::invoke(fn, acc.expr, std::move(argExpr), collatorSlot, state);
 }
 
+std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
+    const AccumulationStatement& acc,
+    SbExpr argExpr,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state) {
+    using BuildBlockAccumulatorFn =
+        std::function<std::vector<BlockAggAndRowAgg>(const AccumulationExpression&,
+                                                     SbExpr,
+                                                     SbSlot,
+                                                     SbSlot,
+                                                     boost::optional<sbe::value::SlotId>,
+                                                     StageBuilderState&)>;
+
+    static const StringDataMap<BuildBlockAccumulatorFn> kBlockAccumulatorBuilders = {
+        {AccumulatorMin::kName, &buildBlockAccumulatorMin},
+        {AccumulatorMax::kName, &buildBlockAccumulatorMax},
+    };
+
+    auto accExprName = acc.expr.name;
+
+    auto it = kBlockAccumulatorBuilders.find(accExprName);
+    if (it != kBlockAccumulatorBuilders.end()) {
+        auto& fn = it->second;
+        return std::invoke(fn,
+                           acc.expr,
+                           std::move(argExpr),
+                           bitmapInternalSlot,
+                           accInternalSlot,
+                           collatorSlot,
+                           state);
+    }
+
+    return {};
+}
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     const AccumulationStatement& acc,
     std::unique_ptr<sbe::EExpression> argExpr,
@@ -1329,6 +1400,40 @@ SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
 
     auto& fn = kAccumulatorBuilders.at(accExprName);
     return std::invoke(fn, acc.expr, std::move(argExprs), collatorSlot, state);
+}
+
+std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
+    const AccumulationStatement& acc,
+    StringDataMap<SbExpr> argExprs,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state) {
+    using BuildBlockAccumulatorFn =
+        std::function<std::vector<BlockAggAndRowAgg>(const AccumulationExpression&,
+                                                     StringDataMap<SbExpr>,
+                                                     SbSlot,
+                                                     SbSlot,
+                                                     boost::optional<sbe::value::SlotId>,
+                                                     StageBuilderState&)>;
+
+    static const StringDataMap<BuildBlockAccumulatorFn> kBlockAccumulatorBuilders = {};
+
+    auto accExprName = acc.expr.name;
+
+    auto it = kBlockAccumulatorBuilders.find(accExprName);
+    if (it != kBlockAccumulatorBuilders.end()) {
+        auto& fn = it->second;
+        return std::invoke(fn,
+                           acc.expr,
+                           std::move(argExprs),
+                           bitmapInternalSlot,
+                           accInternalSlot,
+                           collatorSlot,
+                           state);
+    }
+
+    return {};
 }
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(

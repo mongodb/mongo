@@ -131,6 +131,7 @@ public:
             _env,
             _planStageData.get(),
             _variables,
+            nullptr /* yieldPolicy */,
             &_slotIdGenerator,
             &_frameIdGenerator,
             &_spoolIdGenerator,

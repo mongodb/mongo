@@ -60,7 +60,7 @@ public:
 
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
                       value::SlotId groupSlotId,
-                      value::SlotId blockBitsetInSlotId,
+                      boost::optional<value::SlotId> blockBitsetInSlotId,
                       value::SlotVector blockDataInSlotIds,
                       value::SlotId rowAccSlotId,
                       value::SlotId accumulatorBitsetSlotId,
@@ -123,7 +123,7 @@ private:
      * Runs the accumulators on each element of the inputs, one at a time. This is best if the
      * number of unique keys is high so the partitioning approach would be quadratic.
      */
-    void runAccumulatorsElementWise();
+    void runAccumulatorsElementWise(size_t blockSize);
 
     using TableType = stdx::unordered_map<value::MaterializedRow,
                                           value::MaterializedRow,
@@ -138,7 +138,7 @@ private:
     value::SlotAccessor* _idAccessorIn = nullptr;
 
     // Input slot for bitset corresponding to data input.
-    const value::SlotId _blockBitsetInSlotId;
+    const boost::optional<value::SlotId> _blockBitsetInSlotId;
     value::SlotAccessor* _blockBitsetInAccessor = nullptr;
 
     // Input slots for data, eventually passed to the accumulator data slots.

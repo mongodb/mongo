@@ -79,6 +79,19 @@ SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
                                 StageBuilderState& state);
 
+struct BlockAggAndRowAgg {
+    SbExpr blockAgg;
+    SbExpr rowAgg;
+};
+
+std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
+    const AccumulationStatement& acc,
+    SbExpr argExpr,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state);
+
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     const AccumulationStatement& acc,
     std::unique_ptr<sbe::EExpression> argExpr,
@@ -92,6 +105,14 @@ SbExpr::Vector buildAccumulator(const AccumulationStatement& acc,
                                 StringDataMap<SbExpr> argExprs,
                                 boost::optional<sbe::value::SlotId> collatorSlot,
                                 StageBuilderState& state);
+
+std::vector<BlockAggAndRowAgg> buildBlockAccumulator(
+    const AccumulationStatement& acc,
+    StringDataMap<SbExpr> argExprs,
+    SbSlot bitmapInternalSlot,
+    SbSlot accInternalSlot,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    StageBuilderState& state);
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
     const AccumulationStatement& acc,

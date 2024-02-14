@@ -154,14 +154,16 @@ void printPlan(const sbe::PlanStage& stage) {
 }
 }  // namespace
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildBlockToRow(
-    std::unique_ptr<sbe::PlanStage> stage, PlanStageSlots& outputs) {
-    auto [outStage, _] = buildBlockToRow(std::move(stage), outputs, TypedSlotVector{});
+std::unique_ptr<sbe::PlanStage> buildBlockToRow(std::unique_ptr<sbe::PlanStage> stage,
+                                                StageBuilderState& state,
+                                                PlanStageSlots& outputs) {
+    auto [outStage, _] = buildBlockToRow(std::move(stage), state, outputs, TypedSlotVector{});
     return std::move(outStage);
 }
 
-std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> SlotBasedStageBuilder::buildBlockToRow(
+std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> buildBlockToRow(
     std::unique_ptr<sbe::PlanStage> stage,
+    StageBuilderState& state,
     PlanStageSlots& outputs,
     TypedSlotVector individualSlots) {
     // For this stage we output the 'topLevelSlots' (i.e. kField) and NOT the 'traversedSlots' (i.e.
@@ -183,7 +185,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> SlotBasedStageBuilde
              TypeSignature::kCellType.isSubset(*typeSig))) {
             if (!blockIdToUnpackedIdMap.count(slot.getId())) {
                 auto slotId = slot.getId();
-                auto unpackedId = _slotIdGenerator.generate();
+                auto unpackedId = state.slotId();
 
                 blockIdToUnpackedIdMap[slotId] = unpackedId;
                 blockSlots.push_back(slotId);
@@ -211,8 +213,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> SlotBasedStageBuilde
         invariant(outputs.getBlockSlot());
         auto slot = *outputs.getBlockSlot();
 
-        blockSlots.push_back(slot.slotId);
-        unpackedSlots.push_back(_slotIdGenerator.generate());
+        blockSlots.push_back(slot.getId());
+        unpackedSlots.push_back(state.slotId());
     }
 
     // Adds the BlockToRowStage.
@@ -223,7 +225,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, TypedSlotVector> SlotBasedStageBuilde
         unpackedSlots,
         outputs.getSlotIfExists(PlanStageSlots::kBlockSelectivityBitmap),
         nodeId,
-        _yieldPolicy);
+        state.yieldPolicy);
     printPlan(*stage);
 
     // Remove all the slots that should not be propagated.
@@ -483,7 +485,7 @@ SlotBasedStageBuilder::buildUnpackTsBucket(const QuerySolutionNode* root,
         // - we are supposed to return a BSON result
         // - the caller doesn't support working on block values
         if (reqs.hasResult() || !reqs.getCanProcessBlockValues()) {
-            stage = buildBlockToRow(std::move(stage), outputs);
+            stage = buildBlockToRow(std::move(stage), _state, outputs);
         }
     }
 
