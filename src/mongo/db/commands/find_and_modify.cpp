@@ -259,8 +259,8 @@ public:
         return true;
     }
 
-    static void collectMetrics(const Request& request) {
-        CmdFindAndModify::_updateMetrics.collectMetrics(request);
+    void collectMetrics(const Request& request) const {
+        _updateMetrics->collectMetrics(request);
     }
 
     bool supportsRetryableWrite() const final {
@@ -302,13 +302,17 @@ public:
         void appendMirrorableRequest(BSONObjBuilder* bob) const final;
     };
 
+protected:
+    void doInitializeClusterRole(ClusterRole role) override {
+        write_ops::FindAndModifyCmdVersion1Gen<CmdFindAndModify>::doInitializeClusterRole(role);
+        _updateMetrics.emplace(getName(), role);
+    }
+
 private:
     // Update related command execution metrics.
-    static UpdateMetrics _updateMetrics;
+    mutable boost::optional<UpdateMetrics> _updateMetrics;
 };
 MONGO_REGISTER_COMMAND(CmdFindAndModify).forShard();
-
-UpdateMetrics CmdFindAndModify::_updateMetrics{"findAndModify"};
 
 void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
     std::vector<Privilege> privileges;
@@ -486,8 +490,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     const NamespaceString& nsString = req.getNamespace();
     uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
 
-    // Collect metrics.
-    CmdFindAndModify::collectMetrics(req);
+    static_cast<const CmdFindAndModify*>(definition())->collectMetrics(req);
 
     auto disableDocumentValidation = req.getBypassDocumentValidation().value_or(false);
     auto fleCrudProcessed = write_ops_exec::getFleCrudProcessed(

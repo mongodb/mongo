@@ -143,17 +143,15 @@ APIVersionMetrics::APIVersionMetricsMap APIVersionMetrics::getAPIVersionMetrics_
     return _apiVersionMetrics;
 }
 
-class APIVersionMetrics::APIVersionMetricsSSM : public ServerStatusMetric {
-private:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        BSONObjBuilder apiVersionBob(b.subobjStart(leafName));
-        APIVersionMetrics::get(getGlobalServiceContext())
-            .appendAPIVersionMetricsInfo(&apiVersionBob);
-        apiVersionBob.done();
+namespace {
+struct ApiVersionsMetricPolicy {
+    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+        BSONObjBuilder bob{b.subobjStart(leafName)};
+        auto&& instance = APIVersionMetrics::get(getGlobalServiceContext());
+        instance.appendAPIVersionMetricsInfo(&bob);
     }
 };
+auto& apiVersionMetricsSSM = *CustomMetricBuilder<ApiVersionsMetricPolicy>{"apiVersions"};
 
-auto& apiVersionMetricsSSM =
-    addMetricToTree("apiVersions", std::make_unique<APIVersionMetrics::APIVersionMetricsSSM>());
-
+}  // namespace
 }  // namespace mongo

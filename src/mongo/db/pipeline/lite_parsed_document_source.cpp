@@ -58,7 +58,7 @@ void LiteParsedDocumentSource::registerParser(const std::string& name,
                                               AllowedWithClientType allowedWithClientType) {
     parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType};
     // Initialize a counter for this document source to track how many times it is used.
-    aggStageCounters.stageCounterMap[name] = std::make_unique<AggStageCounters::StageCounter>(name);
+    aggStageCounters.addMetric(name);
 }
 
 std::unique_ptr<LiteParsedDocumentSource> LiteParsedDocumentSource::parse(

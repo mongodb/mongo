@@ -207,9 +207,9 @@ public:
 class OplogBuffer::Counters {
 public:
     explicit Counters(const std::string& prefix)
-        : count(prefix + ".count"),
-          size(prefix + ".sizeBytes"),
-          maxSize(prefix + ".maxSizeBytes") {}
+        : count{*MetricBuilder<Counter64>{prefix + ".count"}},
+          size{*MetricBuilder<Counter64>{prefix + ".sizeBytes"}},
+          maxSize{*MetricBuilder<Counter64>{prefix + ".maxSizeBytes"}} {}
 
     /**
      * Sets maximum size of operations for this OplogBuffer.
@@ -239,13 +239,13 @@ public:
     }
 
     // Number of operations in this OplogBuffer.
-    CounterMetric count;
+    Counter64& count;
 
     // Total size of operations in this OplogBuffer. Measured in bytes.
-    CounterMetric size;
+    Counter64& size;
 
     // Maximum size of operations in this OplogBuffer. Measured in bytes.
-    CounterMetric maxSize;
+    Counter64& maxSize;
 };
 
 /**

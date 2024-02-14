@@ -719,7 +719,7 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     }
 
     // Collect metrics.
-    _updateMetrics.collectMetrics(cmdObj);
+    _updateMetrics->collectMetrics(cmdObj);
 
     // Technically, findAndModify should only be creating database if upsert is true, but this
     // would require that the parsing be pulled into this function.

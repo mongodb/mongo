@@ -73,7 +73,8 @@ using std::string;
 using std::vector;
 
 namespace {
-CounterMetric changeStreamsShowExpandedEvents("changeStreams.showExpandedEvents");
+auto& changeStreamsShowExpandedEvents =
+    *MetricBuilder<Counter64>{"changeStreams.showExpandedEvents"};
 }
 
 // The $changeStream stage is an alias for many stages.

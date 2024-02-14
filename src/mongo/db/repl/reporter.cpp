@@ -53,7 +53,7 @@ namespace repl {
 namespace {
 
 // The number of replSetUpdatePosition commands a node sent to its sync source.
-CounterMetric numUpdatePosition("repl.network.replSetUpdatePosition.num");
+auto& numUpdatePosition = *MetricBuilder<Counter64>{"repl.network.replSetUpdatePosition.num"};
 
 }  // namespace
 

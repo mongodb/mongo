@@ -101,8 +101,10 @@ Status makeCanceledStatus() {
     return {ErrorCodes::CallbackCanceled, "Operation was canceled"};
 }
 
-CounterMetric totalIngressTLSConnections("network.totalIngressTLSConnections");
-CounterMetric totalIngressTLSHandshakeTimeMillis("network.totalIngressTLSHandshakeTimeMillis");
+auto& totalIngressTLSConnections =  //
+    *MetricBuilder<Counter64>("network.totalIngressTLSConnections");
+auto& totalIngressTLSHandshakeTimeMillis =  //
+    *MetricBuilder<Counter64>("network.totalIngressTLSHandshakeTimeMillis");
 }  // namespace
 
 

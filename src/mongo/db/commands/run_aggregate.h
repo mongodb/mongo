@@ -77,5 +77,5 @@ Status runAggregate(OperationContext* opCtx,
 /**
  * Tracks explicit use of allowDiskUse:false with find and aggregate commands.
  */
-extern CounterMetric allowDiskUseFalseCounter;
+extern Counter64& allowDiskUseFalseCounter;
 }  // namespace mongo

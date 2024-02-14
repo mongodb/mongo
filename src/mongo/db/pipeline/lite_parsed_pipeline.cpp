@@ -149,9 +149,7 @@ void LiteParsedPipeline::verifyIsSupported(
 void LiteParsedPipeline::tickGlobalStageCounters() const {
     for (auto&& stage : _stageSpecs) {
         // Tick counter corresponding to current stage.
-        aggStageCounters.stageCounterMap.find(stage->getParseTimeName())
-            ->second->counter.increment(1);
-
+        aggStageCounters.increment(stage->getParseTimeName(), 1);
         // Recursively step through any sub-pipelines.
         for (auto&& subPipeline : stage->getSubPipelines()) {
             subPipeline.tickGlobalStageCounters();

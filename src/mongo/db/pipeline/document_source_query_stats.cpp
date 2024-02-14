@@ -61,7 +61,8 @@
 
 namespace mongo {
 namespace {
-CounterMetric queryStatsHmacApplicationErrors("queryStats.numHmacApplicationErrors");
+auto& queryStatsHmacApplicationErrors =
+    *MetricBuilder<Counter64>{"queryStats.numHmacApplicationErrors"};
 }
 
 REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,

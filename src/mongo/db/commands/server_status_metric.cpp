@@ -45,10 +45,8 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
-#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -290,34 +288,22 @@ private:
 
 }  // namespace
 
-MetricTree& getGlobalMetricTree() {
-    static StaticImmortal<synchronized_value<std::unique_ptr<MetricTree>>> instance{};
-    auto updateGuard = **instance;
-    if (!*updateGuard)
-        *updateGuard = std::make_unique<MetricTree>();
-    return **updateGuard;
-}
-
-void MetricTree::add(StringData path,
-                     std::unique_ptr<ServerStatusMetric> metric,
-                     boost::optional<ClusterRole> role) {
+void MetricTree::add(StringData path, std::unique_ptr<ServerStatusMetric> metric) {
     // Never add metrics with empty names.
     // If there's a leading ".", strip it.
     // Otherwise, we're really adding with an implied "metrics." prefix.
     if (path.empty())
         return;
-    if (path[0] == '.') {
-        path = path.substr(1);
+    if (path.starts_with('.')) {
+        path.remove_prefix(1);
         if (!path.empty())
-            _add(path, std::move(metric), role);
+            _add(path, std::move(metric));
     } else {
-        _add("metrics.{}"_format(path), std::move(metric), role);
+        _add("metrics.{}"_format(path), std::move(metric));
     }
 }
 
-void MetricTree::_add(StringData path,
-                      std::unique_ptr<ServerStatusMetric> metric,
-                      boost::optional<ClusterRole> role) {
+void MetricTree::_add(StringData path, std::unique_ptr<ServerStatusMetric> metric) {
     StringData tail = path;
     MetricTree* sub = this;
     while (true) {
@@ -356,4 +342,18 @@ void MetricTree::appendTo(BSONObjBuilder& b, const BSONObj& excludePaths) const 
     appendMergedTrees({this}, b, excludePaths);
 }
 
+MetricTree& MetricTreeSet::operator[](ClusterRole role) {
+    if (role.hasExclusively(ClusterRole::None))
+        return _none;
+    if (role.hasExclusively(ClusterRole::ShardServer))
+        return _shard;
+    if (role.hasExclusively(ClusterRole::RouterServer))
+        return _router;
+    MONGO_UNREACHABLE;
+}
+
+MetricTreeSet& globalMetricTreeSet() {
+    static StaticImmortal<MetricTreeSet> obj;
+    return *obj;
+}
 }  // namespace mongo

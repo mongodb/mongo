@@ -104,19 +104,21 @@ const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
 // The number of times a node attempted to choose a node to sync from among the available sync
 // source options. This occurs if we re-evaluate our sync source, receive an error from the source,
 // or step down.
-CounterMetric numSyncSourceSelections("repl.syncSource.numSelections");
+auto& numSyncSourceSelections = *MetricBuilder<Counter64>{"repl.syncSource.numSelections"};
 
 // The number of times a node kept it's original sync source after re-evaluating if its current sync
 // source was optimal.
-CounterMetric numTimesChoseSameSyncSource("repl.syncSource.numTimesChoseSame");
+auto& numTimesChoseSameSyncSource = *MetricBuilder<Counter64>{"repl.syncSource.numTimesChoseSame"};
 
 // The number of times a node chose a new sync source after re-evaluating if its current sync source
 // was optimal.
-CounterMetric numTimesChoseDifferentSyncSource("repl.syncSource.numTimesChoseDifferent");
+auto& numTimesChoseDifferentSyncSource =
+    *MetricBuilder<Counter64>{"repl.syncSource.numTimesChoseDifferent"};
 
 // The number of times a node could not find a sync source when choosing a node to sync from among
 // the available options.
-CounterMetric numTimesCouldNotFindSyncSource("repl.syncSource.numTimesCouldNotFind");
+auto& numTimesCouldNotFindSyncSource =
+    *MetricBuilder<Counter64>{"repl.syncSource.numTimesCouldNotFind"};
 
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.

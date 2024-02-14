@@ -101,8 +101,8 @@ using shard_key_pattern_query_util::QueryTargetingInfo;
 
 // Tracks the number of {multi:false} updates with an exact match on _id that are broadcasted to
 // multiple shards.
-CounterMetric updateOneOpStyleBroadcastWithExactIDCount(
-    "query.updateOneOpStyleBroadcastWithExactIDCount");
+auto& updateOneOpStyleBroadcastWithExactIDCount =
+    *MetricBuilder<Counter64>("query.updateOneOpStyleBroadcastWithExactIDCount");
 
 /**
  * Update expressions are bucketed into one of two types for the purposes of shard targeting:

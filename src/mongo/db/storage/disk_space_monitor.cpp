@@ -52,11 +52,11 @@
 
 namespace mongo {
 
-CounterMetric monitorPasses("diskSpaceMonitor.passes");
-CounterMetric tookAction("diskSpaceMonitor.tookAction");
-
 namespace {
-static const auto _decoration = ServiceContext::declareDecoration<DiskSpaceMonitor>();
+auto& monitorPasses = *MetricBuilder<Counter64>("diskSpaceMonitor.passes");
+auto& tookAction = *MetricBuilder<Counter64>("diskSpaceMonitor.tookAction");
+
+const auto _decoration = ServiceContext::declareDecoration<DiskSpaceMonitor>();
 }  // namespace
 
 void DiskSpaceMonitor::start(ServiceContext* svcCtx) {

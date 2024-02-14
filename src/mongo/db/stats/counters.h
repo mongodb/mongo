@@ -311,19 +311,31 @@ extern AuthCounter authCounter;
 class AggStageCounters {
 public:
     // Container for a stage count metric along with its corresponding counter.
-    struct StageCounter {
-        StageCounter(StringData name) : counter("aggStageCounters." + name) {}
-        CounterMetric counter;
-    };
+    explicit AggStageCounters(std::string prefix) : _prefix{std::move(prefix)} {}
 
+    void addMetric(const std::string& name) {
+        _stages[name] = &*MetricBuilder<Counter64>(_prefix + name);
+    }
+
+    /** requires `name` be a metric previously added with `addMetric`. */
+    void increment(StringData name, long long n = 1) {
+        _stages.find(name)->second->increment(n);
+    }
+
+private:
+    std::string _prefix;
     // Map of aggregation stages to the number of occurrences.
-    StringMap<std::unique_ptr<StageCounter>> stageCounterMap = {};
+    StringMap<Counter64*> _stages;
 };
 
 extern AggStageCounters aggStageCounters;
 
 class DotsAndDollarsFieldsCounters {
 public:
+    DotsAndDollarsFieldsCounters() = default;
+    DotsAndDollarsFieldsCounters(DotsAndDollarsFieldsCounters&) = delete;
+    DotsAndDollarsFieldsCounters& operator=(const DotsAndDollarsFieldsCounters&) = delete;
+
     void incrementForUpsert(bool didInsert) {
         if (didInsert) {
             inserts.increment();
@@ -332,8 +344,8 @@ public:
         }
     }
 
-    CounterMetric inserts{"dotsAndDollarsFields.inserts"};
-    CounterMetric updates{"dotsAndDollarsFields.updates"};
+    Counter64& inserts = *MetricBuilder<Counter64>{"dotsAndDollarsFields.inserts"};
+    Counter64& updates = *MetricBuilder<Counter64>{"dotsAndDollarsFields.updates"};
 };
 
 extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
@@ -341,6 +353,8 @@ extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 class QueryFrameworkCounters {
 public:
     QueryFrameworkCounters() = default;
+    QueryFrameworkCounters(QueryFrameworkCounters&) = delete;
+    QueryFrameworkCounters& operator=(const QueryFrameworkCounters&) = delete;
 
     void incrementQueryEngineCounters(CurOp* curop) {
         auto& debug = curop->debug();
@@ -387,24 +401,32 @@ public:
     // Query counters that record whether a find query was fully or partially executed in SBE, fully
     // executed using the classic engine, or fully executed using the common query framework (CQF).
     // One of these will always be incremented during a query.
-    CounterMetric sbeFindQueryCounter{"query.queryFramework.find.sbe"};
-    CounterMetric classicFindQueryCounter{"query.queryFramework.find.classic"};
-    CounterMetric cqfFindQueryCounter{"query.queryFramework.find.cqf"};
+    Counter64& sbeFindQueryCounter = *MetricBuilder<Counter64>{"query.queryFramework.find.sbe"};
+    Counter64& classicFindQueryCounter =
+        *MetricBuilder<Counter64>{"query.queryFramework.find.classic"};
+    Counter64& cqfFindQueryCounter = *MetricBuilder<Counter64>{"query.queryFramework.find.cqf"};
 
     // Aggregation query counters that record whether an aggregation was fully or partially executed
     // in DocumentSource (an sbe/classic hybrid plan), fully pushed down to the sbe/classic layer,
     // or executed using CQF. These are only incremented during aggregations.
-    CounterMetric sbeOnlyAggregationCounter{"query.queryFramework.aggregate.sbeOnly"};
-    CounterMetric classicOnlyAggregationCounter{"query.queryFramework.aggregate.classicOnly"};
-    CounterMetric sbeHybridAggregationCounter{"query.queryFramework.aggregate.sbeHybrid"};
-    CounterMetric classicHybridAggregationCounter{"query.queryFramework.aggregate.classicHybrid"};
-    CounterMetric cqfAggregationQueryCounter{"query.queryFramework.aggregate.cqf"};
+    Counter64& sbeOnlyAggregationCounter =
+        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.sbeOnly"};
+    Counter64& classicOnlyAggregationCounter =
+        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.classicOnly"};
+    Counter64& sbeHybridAggregationCounter =
+        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.sbeHybrid"};
+    Counter64& classicHybridAggregationCounter =
+        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.classicHybrid"};
+    Counter64& cqfAggregationQueryCounter =
+        *MetricBuilder<Counter64>{"query.queryFramework.aggregate.cqf"};
 };
 extern QueryFrameworkCounters queryFrameworkCounters;
 
 class LookupPushdownCounters {
 public:
     LookupPushdownCounters() = default;
+    LookupPushdownCounters(LookupPushdownCounters&) = delete;
+    LookupPushdownCounters& operator=(const LookupPushdownCounters&) = delete;
 
     void incrementLookupCounters(OpDebug& debug) {
         nestedLoopJoin.increment(debug.nestedLoopJoin);
@@ -414,18 +436,17 @@ public:
     }
 
     // Counters for lookup join strategies.
-    CounterMetric nestedLoopJoin{"query.lookup.nestedLoopJoin"};
-    CounterMetric indexedLoopJoin{"query.lookup.indexedLoopJoin"};
-    CounterMetric hashLookup{"query.lookup.hashLookup"};
+    Counter64& nestedLoopJoin = *MetricBuilder<Counter64>{"query.lookup.nestedLoopJoin"};
+    Counter64& indexedLoopJoin = *MetricBuilder<Counter64>{"query.lookup.indexedLoopJoin"};
+    Counter64& hashLookup = *MetricBuilder<Counter64>{"query.lookup.hashLookup"};
     // Counter tracking hashLookup spills in lookup stages that get pushed down.
-    CounterMetric hashLookupSpillToDisk{"query.lookup.hashLookupSpillToDisk"};
+    Counter64& hashLookupSpillToDisk =
+        *MetricBuilder<Counter64>{"query.lookup.hashLookupSpillToDisk"};
 };
 extern LookupPushdownCounters lookupPushdownCounters;
 
 class SortCounters {
 public:
-    SortCounters() = default;
-
     void incrementSortCounters(const OpDebug& debug) {
         sortSpillsCounter.increment(debug.sortSpills);
         sortTotalBytesCounter.increment(debug.sortTotalDataSizeBytes);
@@ -434,17 +455,20 @@ public:
 
     // Counters tracking sort stats across all engines
     // The total number of spills to disk from sort stages
-    CounterMetric sortSpillsCounter{"query.sort.spillToDisk"};
+    Counter64& sortSpillsCounter = *MetricBuilder<Counter64>{"query.sort.spillToDisk"};
     // The number of keys that we've sorted.
-    CounterMetric sortTotalKeysCounter{"query.sort.totalKeysSorted"};
+    Counter64& sortTotalKeysCounter = *MetricBuilder<Counter64>{"query.sort.totalKeysSorted"};
     // The amount of data we've sorted in bytes
-    CounterMetric sortTotalBytesCounter{"query.sort.totalBytesSorted"};
+    Counter64& sortTotalBytesCounter = *MetricBuilder<Counter64>{"query.sort.totalBytesSorted"};
 };
 extern SortCounters sortCounters;
 
+/** Counters tracking group stats across all execution engines. */
 class GroupCounters {
 public:
     GroupCounters() = default;
+    GroupCounters(GroupCounters&) = delete;
+    GroupCounters& operator=(const GroupCounters&) = delete;
 
     void incrementGroupCounters(uint64_t spills,
                                 uint64_t spilledDataStorageSize,
@@ -454,14 +478,13 @@ public:
         groupSpilledRecords.increment(spilledRecords);
     }
 
-    // Counters tracking group stats across all execution engines.
-    CounterMetric groupSpills{
-        "query.group.spills"};  // The total number of spills to disk from group stages.
-    CounterMetric groupSpilledDataStorageSize{
-        "query.group.spilledDataStorageSize"};  // The size of the file or RecordStore spilled to
-                                                // disk.
-    CounterMetric groupSpilledRecords{
-        "query.group.spilledRecords"};  // The number of records spilled to disk.
+    // The total number of spills to disk from group stages.
+    Counter64& groupSpills = *MetricBuilder<Counter64>{"query.group.spills"};
+    // The size of the file or RecordStore spilled to disk.
+    Counter64& groupSpilledDataStorageSize =
+        *MetricBuilder<Counter64>{"query.group.spilledDataStorageSize"};
+    // The number of records spilled to disk.
+    Counter64& groupSpilledRecords = *MetricBuilder<Counter64>{"query.group.spilledRecords"};
 };
 extern GroupCounters groupCounters;
 
@@ -471,6 +494,8 @@ extern GroupCounters groupCounters;
 class PlanCacheCounters {
 public:
     PlanCacheCounters() = default;
+    PlanCacheCounters(PlanCacheCounters&) = delete;
+    PlanCacheCounters& operator=(const PlanCacheCounters&) = delete;
 
     void incrementClassicHitsCounter() {
         classicHits.increment();
@@ -497,17 +522,21 @@ public:
     }
 
 private:
+    static Counter64& _makeMetric(std::string name) {
+        return *MetricBuilder<Counter64>("query.planCache." + std::move(name));
+    }
+
     // Counters that track the number of times a query plan is:
     // a) found in the cache (hits),
     // b) not found in cache (misses), or
     // c) not considered for caching hence we don't even look for it in the cache (skipped).
     // Split into classic and SBE, depending on which execution engine is used.
-    CounterMetric classicHits{"query.planCache.classic.hits"};
-    CounterMetric classicMisses{"query.planCache.classic.misses"};
-    CounterMetric classicSkipped{"query.planCache.classic.skipped"};
-    CounterMetric sbeHits{"query.planCache.sbe.hits"};
-    CounterMetric sbeMisses{"query.planCache.sbe.misses"};
-    CounterMetric sbeSkipped{"query.planCache.sbe.skipped"};
+    Counter64& classicHits = _makeMetric("classic.hits");
+    Counter64& classicMisses = _makeMetric("classic.misses");
+    Counter64& classicSkipped = _makeMetric("classic.skipped");
+    Counter64& sbeHits = _makeMetric("sbe.hits");
+    Counter64& sbeMisses = _makeMetric("sbe.misses");
+    Counter64& sbeSkipped = _makeMetric("sbe.skipped");
 };
 extern PlanCacheCounters planCacheCounters;
 
@@ -515,24 +544,17 @@ extern PlanCacheCounters planCacheCounters;
  * Generic class for counters of expressions inside various MQL statements.
  */
 class OperatorCounters {
-private:
-    struct ExprCounter {
-        ExprCounter(const std::string& name) : counter(name) {}
-        CounterMetric counter;
-    };
-
 public:
-    OperatorCounters(const std::string prefix) : _prefix{prefix} {}
+    explicit OperatorCounters(std::string prefix) : _prefix{std::move(prefix)} {}
 
-    void addCounter(const std::string name) {
-        const StringData sdName(name);
-        operatorCountersExprMap[sdName] = std::make_unique<ExprCounter>(_prefix + name);
+    void addCounter(const std::string& name) {
+        _counters[name] = &*MetricBuilder<Counter64>(_prefix + name);
     }
 
-    void mergeCounters(StringMap<uint64_t>& toMerge) {
+    void mergeCounters(const StringMap<uint64_t>& toMerge) {
         for (auto&& [name, cnt] : toMerge) {
-            if (auto it = operatorCountersExprMap.find(name); it != operatorCountersExprMap.end()) {
-                it->second->counter.increment(cnt);
+            if (auto it = _counters.find(name); it != _counters.end()) {
+                it->second->increment(cnt);
             }
         }
     }
@@ -540,7 +562,7 @@ public:
 private:
     const std::string _prefix;
     // Map of expressions to the number of occurrences in queries.
-    StringMap<std::unique_ptr<ExprCounter>> operatorCountersExprMap = {};
+    StringMap<Counter64*> _counters;
 };
 
 class ValidatorCounters {
@@ -572,16 +594,25 @@ public:
 
 private:
     struct ValidatorCounter {
-        ValidatorCounter(const StringData name)
-            : totalCounter{"commands." + name + ".validator.total"},
-              failedCounter{"commands." + name + ".validator.failed"},
-              jsonSchemaCounter{"commands." + name + ".validator.jsonSchema"} {}
-        CounterMetric totalCounter;
-        CounterMetric failedCounter;
-        CounterMetric jsonSchemaCounter;
+        explicit ValidatorCounter(StringData name)
+            : totalCounter{makeMetric(name, "total")},
+              failedCounter{makeMetric(name, "failed")},
+              jsonSchemaCounter{makeMetric(name, "jsonSchema")} {}
+
+        ValidatorCounter& operator=(const ValidatorCounter&) = delete;
+        ValidatorCounter(const ValidatorCounter&) = delete;
+
+        static Counter64& makeMetric(StringData name, StringData leaf) {
+            return *MetricBuilder<Counter64>{std::string{"commands."} + name + ".validator." +
+                                             leaf};
+        }
+
+        Counter64& totalCounter;
+        Counter64& failedCounter;
+        Counter64& jsonSchemaCounter;
     };
 
-    StringMap<std::unique_ptr<ValidatorCounter>> _validatorCounterMap = {};
+    StringMap<std::unique_ptr<ValidatorCounter>> _validatorCounterMap;
 };
 
 extern ValidatorCounters validatorCounters;
@@ -596,34 +627,34 @@ extern OperatorCounters operatorCountersGroupAccumulatorExpressions;
 extern OperatorCounters operatorCountersWindowAccumulatorExpressions;
 
 // Track the number of {multi:true} updates.
-extern CounterMetric updateManyCount;
+extern Counter64& updateManyCount;
 // Track the number of deleteMany calls.
-extern CounterMetric deleteManyCount;
+extern Counter64& deleteManyCount;
 // Track the number of targeted updateOne commands on sharded collections.
-extern CounterMetric updateOneTargetedShardedCount;
+extern Counter64& updateOneTargetedShardedCount;
 // Track the number of targeted deleteOne commands on sharded collections.
-extern CounterMetric deleteOneTargetedShardedCount;
+extern Counter64& deleteOneTargetedShardedCount;
 // Track the number of targeted findAndModify commands on sharded collections.
-extern CounterMetric findAndModifyTargetedShardedCount;
+extern Counter64& findAndModifyTargetedShardedCount;
 // Track the number of updateOne commands on unsharded collections.
-extern CounterMetric updateOneUnshardedCount;
+extern Counter64& updateOneUnshardedCount;
 // Track the number of deleteOne commands on unsharded collections.
-extern CounterMetric deleteOneUnshardedCount;
+extern Counter64& deleteOneUnshardedCount;
 // Track the number of findAndModify commands on unsharded collections.
-extern CounterMetric findAndModifyUnshardedCount;
+extern Counter64& findAndModifyUnshardedCount;
 // Track the number of non-targeted updateOne commands on sharded collections
-extern CounterMetric updateOneNonTargetedShardedCount;
+extern Counter64& updateOneNonTargetedShardedCount;
 // Track the number of non-targeted deleteOne commands on sharded collections
-extern CounterMetric deleteOneNonTargetedShardedCount;
+extern Counter64& deleteOneNonTargetedShardedCount;
 // Track the number of non-targeted findAndModify commands on sharded collections
-extern CounterMetric findAndModifyNonTargetedShardedCount;
+extern Counter64& findAndModifyNonTargetedShardedCount;
 // Track the number of non-targeted deleteOne commands (without shard key with _id) on sharded
 // collections.
-extern CounterMetric deleteOneWithoutShardKeyWithIdCount;
+extern Counter64& deleteOneWithoutShardKeyWithIdCount;
 // Track the number of retries for non-targeted updateOne commands (without shard key with _id) on
 // sharded collections
-extern CounterMetric updateOneWithoutShardKeyWithIdRetryCount;
+extern Counter64& updateOneWithoutShardKeyWithIdRetryCount;
 // Track the number of retries for non-targeted deleteOne commands (without shard key with _id) on
 // sharded collections
-extern CounterMetric deleteOneWithoutShardKeyWithIdRetryCount;
+extern Counter64& deleteOneWithoutShardKeyWithIdRetryCount;
 }  // namespace mongo

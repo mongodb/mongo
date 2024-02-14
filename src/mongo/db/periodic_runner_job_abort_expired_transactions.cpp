@@ -76,7 +76,7 @@ Milliseconds getPeriod(const Argument& transactionLifetimeLimitSeconds) {
 
 // Tracks the number of passes the "abortExpiredTransactions" thread makes to abort expired
 // transactions.
-CounterMetric abortExpiredTransactionsPasses("abortExpiredTransactions.passes");
+auto& abortExpiredTransactionsPasses = *MetricBuilder<Counter64>("abortExpiredTransactions.passes");
 
 auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContext)
     -> PeriodicThreadToAbortExpiredTransactions& {

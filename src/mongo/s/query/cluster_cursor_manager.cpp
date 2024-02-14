@@ -44,7 +44,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/cursor_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/session/kill_sessions_common.h"
@@ -447,39 +446,27 @@ size_t ClusterCursorManager::cursorsTimedOut() const {
     return _cursorsTimedOut;
 }
 
-void ClusterCursorManager::stats() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-
-    auto& stats = CursorStats::getInstance();
-    stats.reset();
-
-    stats.cursorStatsTimedOut.increment(_cursorsTimedOut);
-
+auto ClusterCursorManager::getOpenCursorStats() const -> OpenCursorStats {
+    OpenCursorStats stats{};
+    stdx::lock_guard lk(_mutex);
     for (auto&& [cursorId, entry] : _cursorEntryMap) {
-        if (entry.isKillPending()) {
-            // Killed cursors do not count towards the number of pinned cursors or the number of
-            // open cursors.
+        if (entry.isKillPending())
             continue;
-        }
-
-        if (entry.getOperationUsingCursor()) {
-            stats.cursorStatsOpenPinned.increment();
-        }
-
+        if (entry.getOperationUsingCursor())
+            ++stats.pinned;
         switch (entry.getCursorType()) {
             case CursorType::SingleTarget:
-                stats.cursorStatsSingleTarget.increment();
-                stats.cursorStatsOpen.increment();
+                ++stats.singleTarget;
                 break;
             case CursorType::MultiTarget:
-                stats.cursorStatsMultiTarget.increment();
-                stats.cursorStatsOpen.increment();
+                ++stats.multiTarget;
                 break;
             case CursorType::QueuedData:
-                stats.cursorStatsQueuedData.increment();
+                ++stats.queuedData;
                 break;
         }
     }
+    return stats;
 }
 
 void ClusterCursorManager::appendActiveSessions(LogicalSessionIdSet* lsids) const {

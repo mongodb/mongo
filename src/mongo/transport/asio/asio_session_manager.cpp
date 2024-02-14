@@ -112,7 +112,7 @@ void AsioSessionManager::appendStats(BSONObjBuilder* bob) const {
         adminExec->appendStats(&section);
     }
 
-    bob->append("loadBalanced", _loadBalancedConnections);
+    bob->append("loadBalanced", _loadBalancedConnections.get());
 }
 
 void AsioSessionManager::onClientConnect(Client* client) {

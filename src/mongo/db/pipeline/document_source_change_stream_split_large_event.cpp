@@ -57,7 +57,8 @@
 
 namespace mongo {
 namespace {
-CounterMetric changeStreamsLargeEventsSplitCounter("changeStreams.largeEventsSplit");
+auto& changeStreamsLargeEventsSplitCounter =
+    *MetricBuilder<Counter64>{"changeStreams.largeEventsSplit"};
 }
 REGISTER_DOCUMENT_SOURCE(changeStreamSplitLargeEvent,
                          LiteParsedDocumentSourceDefault::parse,

@@ -48,9 +48,9 @@ void ReplicaSetMonitorManagerStats::report(BSONObjBuilder* builder, bool forFTDC
     BSONObjBuilder rsmStats(builder->subobjStart(kRSMPrefix));
     {
         BSONObjBuilder getHostStats(rsmStats.subobjStart(kGetHostPrefix));
-        getHostStats.appendNumber("totalCalls", _getHostAndRefreshTotal);
-        getHostStats.appendNumber("currentlyActive", _getHostAndRefreshCurrent);
-        getHostStats.appendNumber("totalLatencyMicros", _getHostAndRefreshAggregateLatency);
+        getHostStats.appendNumber("totalCalls", _getHostAndRefreshTotal.get());
+        getHostStats.appendNumber("currentlyActive", _getHostAndRefreshCurrent.get());
+        getHostStats.appendNumber("totalLatencyMicros", _getHostAndRefreshAggregateLatency.get());
 
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         getHostStats.appendNumber("maxLatencyMicros",
@@ -58,9 +58,9 @@ void ReplicaSetMonitorManagerStats::report(BSONObjBuilder* builder, bool forFTDC
     }
     {
         BSONObjBuilder helloStats(rsmStats.subobjStart(kHelloPrefix));
-        helloStats.appendNumber("totalCalls", _helloTotal);
-        helloStats.appendNumber("currentlyActive", _helloCurrent);
-        helloStats.appendNumber("totalLatencyMicros", _helloAggregateLatency);
+        helloStats.appendNumber("totalCalls", _helloTotal.get());
+        helloStats.appendNumber("currentlyActive", _helloCurrent.get());
+        helloStats.appendNumber("totalLatencyMicros", _helloAggregateLatency.get());
 
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         helloStats.appendNumber("maxLatencyMicros", durationCount<Microseconds>(_helloMaxLatency));

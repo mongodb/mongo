@@ -313,7 +313,8 @@ BulkWriteReplyInfo processFLEResponse(const BatchedCommandRequest& request,
         case BulkWriteCRUDOp::kUpdate: {
             const auto& updateRequest = request.getUpdateRequest();
             const mongo::write_ops::UpdateOpEntry& updateOpEntry = updateRequest.getUpdates()[0];
-            bulk_write_common::incrementBulkWriteUpdateMetrics(updateOpEntry.getU(),
+            bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::RouterServer,
+                                                               updateOpEntry.getU(),
                                                                updateRequest.getNamespace(),
                                                                updateOpEntry.getArrayFilters());
             break;
@@ -1586,8 +1587,10 @@ BulkWriteReplyInfo BulkWriteOp::generateReplyInfo() {
                     const auto& bulkWriteOp = BulkWriteCRUDOp(_clientRequest.getOps()[opIdx]);
                     const auto& ns = _clientRequest.getNsInfo()[bulkWriteOp.getNsInfoIdx()].getNs();
 
-                    bulk_write_common::incrementBulkWriteUpdateMetrics(
-                        updateRef.getUpdateMods(), ns, updateRef.getArrayFilters());
+                    bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::RouterServer,
+                                                                       updateRef.getUpdateMods(),
+                                                                       ns,
+                                                                       updateRef.getArrayFilters());
                     break;
                 }
                 case BatchedCommandRequest::BatchType_Delete:

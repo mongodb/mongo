@@ -94,8 +94,7 @@ namespace mongo {
 
 class FindAndModifyCmd : public BasicCommand {
 public:
-    FindAndModifyCmd()
-        : BasicCommand("findAndModify", "findandmodify"), _updateMetrics{"findAndModify"} {}
+    FindAndModifyCmd() : BasicCommand("findAndModify", "findandmodify") {}
 
     const std::set<std::string>& apiVersions() const override {
         return kApiVersions1;
@@ -162,6 +161,12 @@ public:
                                                   Status responseStatus,
                                                   BSONObjBuilder* result);
 
+protected:
+    void doInitializeClusterRole(ClusterRole role) override {
+        BasicCommand::doInitializeClusterRole(role);
+        _updateMetrics.emplace(getName(), role);
+    }
+
 private:
     static bool getCrudProcessedFromCmd(const BSONObj& cmdObj);
 
@@ -216,7 +221,7 @@ private:
         BSONObjBuilder* result);
 
     // Update related command execution metrics.
-    UpdateMetrics _updateMetrics;
+    boost::optional<UpdateMetrics> _updateMetrics;
 };
 
 }  // namespace mongo

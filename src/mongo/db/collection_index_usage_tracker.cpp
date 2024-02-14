@@ -45,8 +45,9 @@
 
 namespace mongo {
 namespace {
-CounterMetric collectionScansCounter("queryExecutor.collectionScans.total");
-CounterMetric collectionScansNonTailableCounter("queryExecutor.collectionScans.nonTailable");
+auto& collectionScansCounter = *MetricBuilder<Counter64>("queryExecutor.collectionScans.total");
+auto& collectionScansNonTailableCounter =
+    *MetricBuilder<Counter64>("queryExecutor.collectionScans.nonTailable");
 }  // namespace
 
 CollectionIndexUsageTracker::CollectionIndexUsageTracker(

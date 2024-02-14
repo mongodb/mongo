@@ -97,7 +97,7 @@
 namespace mongo {
 namespace {
 
-auto& oplogGetMoreStats = makeServerStatusMetric<TimerStats>("repl.network.oplogGetMoresProcessed");
+auto& oplogGetMoreStats = *MetricBuilder<TimerStats>("repl.network.oplogGetMoresProcessed");
 
 BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                          const BSONObj& cmdObj,

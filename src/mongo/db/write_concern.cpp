@@ -78,10 +78,12 @@ namespace mongo {
 using repl::OpTime;
 using std::string;
 
-static TimerStats& gleWtimeStats = makeServerStatusMetric<TimerStats>("getLastError.wtime");
-static CounterMetric gleWtimeouts("getLastError.wtimeouts");
-static CounterMetric gleDefaultWtimeouts("getLastError.default.wtimeouts");
-static CounterMetric gleDefaultUnsatisfiable("getLastError.default.unsatisfiable");
+namespace {
+auto& gleWtimeStats = *MetricBuilder<TimerStats>{"getLastError.wtime"};
+auto& gleWtimeouts = *MetricBuilder<Counter64>{"getLastError.wtimeouts"};
+auto& gleDefaultWtimeouts = *MetricBuilder<Counter64>{"getLastError.default.wtimeouts"};
+auto& gleDefaultUnsatisfiable = *MetricBuilder<Counter64>{"getLastError.default.unsatisfiable"};
+}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeWaitingForWriteConcern);
 

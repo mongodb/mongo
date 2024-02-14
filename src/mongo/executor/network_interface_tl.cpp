@@ -89,9 +89,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
 
-CounterMetric numConnectionNetworkTimeouts("operation.numConnectionNetworkTimeouts");
-CounterMetric timeSpentWaitingBeforeConnectionTimeoutMillis(
-    "operation.totalTimeWaitingBeforeConnectionTimeoutMillis");
+auto& numConnectionNetworkTimeouts =
+    *MetricBuilder<Counter64>("operation.numConnectionNetworkTimeouts");
+auto& timeSpentWaitingBeforeConnectionTimeoutMillis =
+    *MetricBuilder<Counter64>("operation.totalTimeWaitingBeforeConnectionTimeoutMillis");
 
 Status appendMetadata(RemoteCommandRequestOnAny* request,
                       const std::unique_ptr<rpc::EgressMetadataHook>& hook) {

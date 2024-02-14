@@ -380,7 +380,8 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
 }
 
 // Counts the # of responses to completed operations that we were unable to send back to the client.
-CounterMetric unsendableCompletedResponses("operation.unsendableCompletedResponses");
+auto& unsendableCompletedResponses =
+    *MetricBuilder<Counter64>("operation.unsendableCompletedResponses");
 }  // namespace
 
 class SessionWorkflow::Impl {

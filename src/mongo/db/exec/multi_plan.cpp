@@ -93,38 +93,41 @@ void markShouldCollectTimingInfoOnSubtree(PlanStage* root) {
 /**
  * Aggregation of the total number of microseconds spent (in the classic multiplanner).
  */
-CounterMetric classicMicrosTotal("query.multiPlanner.classicMicros");
+auto& classicMicrosTotal = *MetricBuilder<Counter64>{"query.multiPlanner.classicMicros"};
 
 /**
  * Aggregation of the total number of "works" performed (in the classic multiplanner).
  */
-CounterMetric classicWorksTotal("query.multiPlanner.classicWorks");
+auto& classicWorksTotal = *MetricBuilder<Counter64>{"query.multiPlanner.classicWorks"};
 
 /**
  * Aggregation of the total number of invocations (of the classic multiplanner).
  */
-CounterMetric classicCount("query.multiPlanner.classicCount");
+auto& classicCount = *MetricBuilder<Counter64>{"query.multiPlanner.classicCount"};
 
 /**
  * An element in this histogram is the number of microseconds spent in an invocation (of the
  * classic multiplanner).
  */
-HistogramServerStatusMetric classicMicrosHistogram("query.multiPlanner.histograms.classicMicros",
-                                                   HistogramServerStatusMetric::pow(11, 1024, 4));
+auto& classicMicrosHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.classicMicros"}.bind(
+        HistogramServerStatusMetric::pow(11, 1024, 4));
 
 /**
  * An element in this histogram is the number of "works" performed during an invocation (of the
  * classic multiplanner).
  */
-HistogramServerStatusMetric classicWorksHistogram("query.multiPlanner.histograms.classicWorks",
-                                                  HistogramServerStatusMetric::pow(9, 128, 2));
+auto& classicWorksHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.classicWorks"}.bind(
+        HistogramServerStatusMetric::pow(9, 128, 2));
 
 /**
  * An element in this histogram is the number of plans in the candidate set of an invocation (of the
  * classic multiplanner).
  */
-HistogramServerStatusMetric classicNumPlansHistogram(
-    "query.multiPlanner.histograms.classicNumPlans", HistogramServerStatusMetric::pow(5, 2, 2));
+auto& classicNumPlansHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.classicNumPlans"}
+         .bind(HistogramServerStatusMetric::pow(5, 2, 2));
 
 }  // namespace
 

@@ -45,7 +45,7 @@ public:
     /**
      * Construct metrics for a command identified by commandName.
      */
-    UpdateMetrics(StringData commandName);
+    UpdateMetrics(StringData commandName, ClusterRole role);
 
     /**
      * Increment counter for how many times this command has executed with an aggregation
@@ -73,9 +73,9 @@ public:
 private:
     // A counter for how many times this command has been executed with an aggregation
     // pipeline-style update parameter.
-    std::shared_ptr<CounterMetric> _commandsWithAggregationPipeline;
+    Counter64* _commandsWithAggregationPipeline;
 
     // A counter for how many times this command has been executed with the arrayFilters option.
-    std::shared_ptr<CounterMetric> _commandsWithArrayFilters;
+    Counter64* _commandsWithArrayFilters;
 };
 }  // namespace mongo

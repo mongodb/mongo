@@ -73,37 +73,40 @@ namespace {
  * An element in this histogram is the number of plans in the candidate set of an invocation (of the
  * SBE multiplanner).
  */
-HistogramServerStatusMetric sbeNumPlansHistogram("query.multiPlanner.histograms.sbeNumPlans",
-                                                 HistogramServerStatusMetric::pow(5, 2, 2));
+auto& sbeNumPlansHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.sbeNumPlans"}.bind(
+        HistogramServerStatusMetric::pow(5, 2, 2));
 
 /**
  * Aggregation of the total number of invocations (of the SBE multiplanner).
  */
-CounterMetric sbeCount("query.multiPlanner.sbeCount");
+auto& sbeCount = *MetricBuilder<Counter64>{"query.multiPlanner.sbeCount"};
 
 /**
  * Aggregation of the total number of microseconds spent (in SBE multiplanner).
  */
-CounterMetric sbeMicrosTotal("query.multiPlanner.sbeMicros");
+auto& sbeMicrosTotal = *MetricBuilder<Counter64>{"query.multiPlanner.sbeMicros"};
 
 /**
  * Aggregation of the total number of reads done (in SBE multiplanner).
  */
-CounterMetric sbeNumReadsTotal("query.multiPlanner.sbeNumReads");
+auto& sbeNumReadsTotal = *MetricBuilder<Counter64>{"query.multiPlanner.sbeNumReads"};
 
 /**
  * An element in this histogram is the number of microseconds spent in an invocation (of the SBE
  * multiplanner).
  */
-HistogramServerStatusMetric sbeMicrosHistogram("query.multiPlanner.histograms.sbeMicros",
-                                               HistogramServerStatusMetric::pow(11, 1024, 4));
+auto& sbeMicrosHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.sbeMicros"}.bind(
+        HistogramServerStatusMetric::pow(11, 1024, 4));
 
 /**
  * An element in this histogram is the number of reads performance during an invocation (of the SBE
  * multiplanner).
  */
-HistogramServerStatusMetric sbeNumReadsHistogram("query.multiPlanner.histograms.sbeNumReads",
-                                                 HistogramServerStatusMetric::pow(9, 128, 2));
+auto& sbeNumReadsHistogram =
+    *MetricBuilder<HistogramServerStatusMetric>{"query.multiPlanner.histograms.sbeNumReads"}.bind(
+        HistogramServerStatusMetric::pow(9, 128, 2));
 }  // namespace
 
 CandidatePlans MultiPlanner::plan(

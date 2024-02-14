@@ -335,7 +335,7 @@ OpCounters globalOpCounters;
 OpCounters replOpCounters;
 NetworkCounter networkCounter;
 AuthCounter authCounter;
-AggStageCounters aggStageCounters;
+AggStageCounters aggStageCounters{"aggStageCounters."};
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 QueryFrameworkCounters queryFrameworkCounters;
 LookupPushdownCounters lookupPushdownCounters;
@@ -349,20 +349,24 @@ OperatorCounters operatorCountersMatchExpressions{"operatorCounters.match."};
 OperatorCounters operatorCountersGroupAccumulatorExpressions{"operatorCounters.groupAccumulators."};
 OperatorCounters operatorCountersWindowAccumulatorExpressions{
     "operatorCounters.windowAccumulators."};
-CounterMetric updateManyCount("query.updateManyCount");
-CounterMetric deleteManyCount("query.deleteManyCount");
-CounterMetric updateOneTargetedShardedCount("query.updateOneTargetedShardedCount");
-CounterMetric deleteOneTargetedShardedCount("query.deleteOneTargetedShardedCount");
-CounterMetric findAndModifyTargetedShardedCount("query.findAndModifyTargetedShardedCount");
-CounterMetric updateOneUnshardedCount("query.updateOneUnshardedCount");
-CounterMetric deleteOneUnshardedCount("query.deleteOneUnshardedCount");
-CounterMetric findAndModifyUnshardedCount("query.findAndModifyUnshardedCount");
-CounterMetric updateOneNonTargetedShardedCount("query.updateOneNonTargetedShardedCount");
-CounterMetric deleteOneNonTargetedShardedCount("query.deleteOneNonTargetedShardedCount");
-CounterMetric findAndModifyNonTargetedShardedCount("query.findAndModifyNonTargetedShardedCount");
-CounterMetric deleteOneWithoutShardKeyWithIdCount("query.deleteOneWithoutShardKeyWithIdCount");
-CounterMetric updateOneWithoutShardKeyWithIdRetryCount(
-    "query.updateOneWithoutShardKeyWithIdRetryCount");
-CounterMetric deleteOneWithoutShardKeyWithIdRetryCount(
-    "query.deleteOneWithoutShardKeyWithIdRetryCount");
+
+#define DEFN_QUERY_COUNTER(var)                  \
+    Counter64& var = *MetricBuilder<Counter64> { \
+        std::string{"query."} + #var             \
+    }
+DEFN_QUERY_COUNTER(updateManyCount);
+DEFN_QUERY_COUNTER(deleteManyCount);
+DEFN_QUERY_COUNTER(updateOneTargetedShardedCount);
+DEFN_QUERY_COUNTER(deleteOneTargetedShardedCount);
+DEFN_QUERY_COUNTER(findAndModifyTargetedShardedCount);
+DEFN_QUERY_COUNTER(updateOneUnshardedCount);
+DEFN_QUERY_COUNTER(deleteOneUnshardedCount);
+DEFN_QUERY_COUNTER(findAndModifyUnshardedCount);
+DEFN_QUERY_COUNTER(updateOneNonTargetedShardedCount);
+DEFN_QUERY_COUNTER(deleteOneNonTargetedShardedCount);
+DEFN_QUERY_COUNTER(findAndModifyNonTargetedShardedCount);
+DEFN_QUERY_COUNTER(deleteOneWithoutShardKeyWithIdCount);
+DEFN_QUERY_COUNTER(updateOneWithoutShardKeyWithIdRetryCount);
+DEFN_QUERY_COUNTER(deleteOneWithoutShardKeyWithIdRetryCount);
+#undef DEFN_QUERY_COUNTER
 }  // namespace mongo

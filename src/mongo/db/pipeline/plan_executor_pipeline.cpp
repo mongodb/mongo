@@ -55,7 +55,8 @@
 
 namespace mongo {
 namespace {
-CounterMetric changeStreamsLargeEventsFailedCounter("changeStreams.largeEventsFailed");
+auto& changeStreamsLargeEventsFailedCounter =
+    *MetricBuilder<Counter64>{"changeStreams.largeEventsFailed"};
 }
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,

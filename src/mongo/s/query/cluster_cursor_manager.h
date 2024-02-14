@@ -127,6 +127,14 @@ public:
         Exhausted,
     };
 
+    /** Count of open cursors, by type. */
+    struct OpenCursorStats {
+        size_t multiTarget;
+        size_t singleTarget;
+        size_t queuedData;
+        size_t pinned;
+    };
+
     // Represents a function that may be passed into a ClusterCursorManager method which checks
     // whether the current client is authorized to perform the operation in question. The function
     // will be passed the list of users authorized to use the cursor.
@@ -503,12 +511,8 @@ public:
      */
     void killAllCursors(OperationContext* opCtx);
 
-    /**
-     * Returns the number of open cursors on a ClusterCursorManager, broken down by type.
-     *
-     * Does not block.
-     */
-    void stats() const;
+    /** Counts of open cursors managed by this, broken down by type. */
+    OpenCursorStats getOpenCursorStats() const;
 
     /**
      * Appends sessions that have open cursors in this cursor manager to the given set of lsids.

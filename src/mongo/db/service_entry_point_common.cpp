@@ -198,11 +198,13 @@ MONGO_FAIL_POINT_DEFINE(enforceDirectShardOperationsCheck);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
-CounterMetric notPrimaryLegacyUnackWrites("repl.network.notPrimaryLegacyUnacknowledgedWrites");
+auto& notPrimaryLegacyUnackWrites =
+    *MetricBuilder<Counter64>{"repl.network.notPrimaryLegacyUnacknowledgedWrites"};
 
 // Tracks the number of times an unacknowledged write failed due to not primary error
 // resulted in network disconnection.
-CounterMetric notPrimaryUnackWrites("repl.network.notPrimaryUnacknowledgedWrites");
+auto& notPrimaryUnackWrites =
+    *MetricBuilder<Counter64>{"repl.network.notPrimaryUnacknowledgedWrites"};
 
 namespace {
 

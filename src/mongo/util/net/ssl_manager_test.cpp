@@ -769,7 +769,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
     }
 
     contexts.clear();
-    LOGV2(5906701, "Stress test completed", "iterations"_attr = iterations);
+    LOGV2(5906701, "Stress test completed", "iterations"_attr = iterations.get());
 }
 
 TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
@@ -820,7 +820,7 @@ TEST(SSLManager, TransientSSLParamsStressTestWithManager) {
     }
 
     managers.clear();
-    LOGV2(5906702, "Stress test completed", "iterations"_attr = iterations);
+    LOGV2(5906702, "Stress test completed", "iterations"_attr = iterations.get());
 }
 
 #endif  // MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL

@@ -29,6 +29,7 @@
 
 #include "mongo/db/commands/update_metrics.h"
 
+#include <fmt/format.h>
 #include <string>
 
 #include <boost/optional/optional.hpp>
@@ -38,25 +39,16 @@
 #include "mongo/db/ops/write_ops_parsers.h"
 
 namespace mongo {
-// We instantiate the UpdateMetrics once for a particular command name once per-process. This means
-// that router-role and shard-role commands have the same name and use UpdateMetrics, they will
-// share a single UpdateMetrics. So long as router-role and shard-role commands aren't running in
-// the same process, this has no affect on the metrics; when they are running in the same process,
-// the metrics are incorrect and will need to be separated based on role.
-// TODO: SERVER-79353 Register the update metrics in a role-aware manner.
-std::shared_ptr<CounterMetric> getSingletonMetricPtr(StringData commandName, StringData stat) {
+namespace {
+Counter64* getSingletonMetricPtr(StringData commandName, StringData stat, ClusterRole role) {
     using namespace fmt::literals;
-    static StaticImmortal cacheStorage = StringMap<std::shared_ptr<CounterMetric>>{};
-    std::string path = "commands.{}.{}"_format(commandName, stat);
-    auto& metric = (*cacheStorage)[path];
-    if (!metric)
-        metric = std::make_shared<CounterMetric>(path);
-    return metric;
+    return &*MetricBuilder<Counter64>{"commands.{}.{}"_format(commandName, stat)}.setRole(role);
 }
+}  // namespace
 
-UpdateMetrics::UpdateMetrics(StringData commandName)
-    : _commandsWithAggregationPipeline(getSingletonMetricPtr(commandName, "pipeline")),
-      _commandsWithArrayFilters(getSingletonMetricPtr(commandName, "arrayFilters")) {}
+UpdateMetrics::UpdateMetrics(StringData commandName, ClusterRole role)
+    : _commandsWithAggregationPipeline(getSingletonMetricPtr(commandName, "pipeline", role)),
+      _commandsWithArrayFilters(getSingletonMetricPtr(commandName, "arrayFilters", role)) {}
 
 void UpdateMetrics::incrementExecutedWithAggregationPipeline() {
     _commandsWithAggregationPipeline->increment();

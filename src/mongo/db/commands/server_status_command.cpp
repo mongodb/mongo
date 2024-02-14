@@ -176,14 +176,19 @@ public:
         }
 
         // --- counters
-        MetricTree& metricTree = getGlobalMetricTree();
         auto metricsEl = cmdObj["metrics"_sd];
         if (metricsEl.eoo() || metricsEl.trueValue()) {
-            if (metricsEl.type() == BSONType::Object) {
-                metricTree.appendTo(result, BSON("metrics" << metricsEl.embeddedObject()));
-            } else {
-                metricTree.appendTo(result);
-            }
+            // Always gather the role-agnostic metrics. If `opCtx` has a role,
+            // additionally merge that role's associated metrics.
+            std::vector<const MetricTree*> metricTrees;
+            auto& treeSet = globalMetricTreeSet();
+            metricTrees.push_back(&treeSet[ClusterRole::None]);
+            if (auto svc = opCtx->getService())
+                metricTrees.push_back(&treeSet[svc->role()]);
+            BSONObj excludePaths;
+            if (metricsEl.type() == BSONType::Object)
+                excludePaths = BSON("metrics" << metricsEl.embeddedObject());
+            appendMergedTrees(metricTrees, result, excludePaths);
         }
 
         // --- some hard coded global things hard to pull out
@@ -265,11 +270,10 @@ public:
 
 } asserts;
 
-class MemBase : public ServerStatusMetric {
-public:
-    void appendTo(BSONObjBuilder& bob, StringData leafName) const override {
+struct MemBaseMetricPolicy {
+    void appendTo(BSONObjBuilder& bob, StringData leafName) const {
         BSONObjBuilder b{bob.subobjStart(leafName)};
-        b.append("bits", sizeof(int*) == 4 ? 32 : 64);
+        b.append("bits", static_cast<int>(sizeof(void*) * CHAR_BIT));
 
         ProcessInfo p;
         if (p.supported()) {
@@ -288,8 +292,7 @@ public:
                        static_cast<int>(gSecureAllocCountInfo().getSecureAllocBytesInPages()));
     }
 };
-
-MemBase& memBase = addMetricToTree(".mem", std::make_unique<MemBase>());
+auto& memBase = *CustomMetricBuilder<MemBaseMetricPolicy>{".mem"};
 
 class HttpClientServerStatus : public ServerStatusSection {
 public:

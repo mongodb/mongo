@@ -1614,8 +1614,10 @@ bool handleUpdateOp(OperationContext* opCtx,
                 opCtx, bucketNs, updateRequest, executor, &out);
             responses.addUpdateReply(opCtx, currentOpIdx, out);
 
-            bulk_write_common::incrementBulkWriteUpdateMetrics(
-                op->getUpdateMods(), nsEntry.getNs(), op->getArrayFilters());
+            bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::ShardServer,
+                                                               op->getUpdateMods(),
+                                                               nsEntry.getNs(),
+                                                               op->getArrayFilters());
             return out.canContinue;
         }
 
@@ -1631,8 +1633,10 @@ bool handleUpdateOp(OperationContext* opCtx,
                 responses.addUpdateReply(
                     currentOpIdx, numMatched, numDocsModified, upserted, stmtId);
 
-                bulk_write_common::incrementBulkWriteUpdateMetrics(
-                    op->getUpdateMods(), nsEntry.getNs(), op->getArrayFilters());
+                bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::ShardServer,
+                                                                   op->getUpdateMods(),
+                                                                   nsEntry.getNs(),
+                                                                   op->getArrayFilters());
                 return true;
             }
         }
@@ -1698,8 +1702,10 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                 &updateRequest);
                     lastOpFixer.finishedOpSuccessfully();
                     responses.addUpdateReply(currentOpIdx, result, boost::none);
-                    bulk_write_common::incrementBulkWriteUpdateMetrics(
-                        op->getUpdateMods(), nsEntry.getNs(), op->getArrayFilters());
+                    bulk_write_common::incrementBulkWriteUpdateMetrics(ClusterRole::ShardServer,
+                                                                       op->getUpdateMods(),
+                                                                       nsEntry.getNs(),
+                                                                       op->getArrayFilters());
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                     auto cq = uassertStatusOK(

@@ -74,13 +74,13 @@ class PlanCacheEntryBase;
 /**
  * Tracks the approximate cumulative size of the plan cache entries across all the collections.
  */
-extern CounterMetric planCacheTotalSizeEstimateBytes;
+extern Counter64& planCacheTotalSizeEstimateBytes;
 
 /**
  * Tracks the number of query shapes in the plan cache entries across all the collections. Each
  * entry in the plan cache is a unique query shape.
  */
-extern CounterMetric planCacheEntries;
+extern Counter64& planCacheEntries;
 
 /**
  * Represents the security level of a plan to help us dictate if we whould filter it out during

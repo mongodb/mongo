@@ -101,9 +101,6 @@
 namespace mongo {
 namespace repl {
 
-extern Atomic64Metric& replicationWaiterListMetric;
-extern Atomic64Metric& opTimeWaiterListMetric;
-
 namespace {
 
 using executor::NetworkInterfaceMock;

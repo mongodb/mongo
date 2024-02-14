@@ -83,35 +83,19 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-using namespace fmt::literals;
-
 namespace mongo {
 
 const std::set<std::string> kNoApiVersions = {};
 const std::set<std::string> kApiVersions1 = {"1"};
 
 namespace {
+using namespace fmt::literals;
 
 const int kFailedFindCommandDebugLevel = 3;
 
 const char kWriteConcernField[] = "writeConcern";
 
-CounterMetric unknowns{"commands.<UNKNOWN>"};
-
-/**
- * Transitionally, these are all also co-owned by a singleton pool to avoid
- * collisions between commands of the same name but in different cluster roles.
- * When we have metric trees separated by Service, these will be constructed
- * to live under the right tree.
- */
-std::shared_ptr<CounterMetric> getSingletonMetricPtr(StringData commandName, StringData stat) {
-    static StaticImmortal cacheStorage = StringMap<std::shared_ptr<CounterMetric>>{};
-    std::string path = "commands.{}.{}"_format(commandName, stat);
-    auto& metric = (*cacheStorage)[path];
-    if (!metric)
-        metric = std::make_shared<CounterMetric>(path);
-    return metric;
-}
+auto& unknowns = *MetricBuilder<Counter64>{"commands.<UNKNOWN>"};
 
 // Returns true if found to be authorized, false if undecided. Throws if unauthorized.
 bool checkAuthorizationImplPreParse(OperationContext* opCtx,
@@ -1043,10 +1027,16 @@ std::unique_ptr<CommandInvocation> BasicCommandWithReplyBuilderInterface::parse(
 }
 
 Command::Command(StringData name, std::vector<StringData> aliases)
-    : _name(name.toString()),
-      _aliases(std::move(aliases)),
-      _commandsExecuted(getSingletonMetricPtr(_name, "total")),
-      _commandsFailed(getSingletonMetricPtr(_name, "failed")) {}
+    : _name(name.toString()), _aliases(std::move(aliases)) {}
+
+void Command::initializeClusterRole(ClusterRole role) {
+    for (auto&& [ptr, stat] : {
+             std::pair{&_commandsExecuted, "total"},
+             std::pair{&_commandsFailed, "failed"},
+         })
+        *ptr = &*MetricBuilder<Counter64>{"commands.{}.{}"_format(_name, stat)}.setRole(role);
+    doInitializeClusterRole(role);
+}
 
 const std::set<std::string>& Command::apiVersions() const {
     return kNoApiVersions;
@@ -1189,6 +1179,7 @@ void CommandConstructionPlan::execute(CommandRegistry* registry,
             continue;
         }
         auto c = entry->construct();
+        c->initializeClusterRole(service ? service->role() : ClusterRole{});
         LOGV2_DEBUG(8043404, 3, "Created", "command"_attr = c->getName(), "entry"_attr = *entry);
         registry->registerCommand(&*c);
 

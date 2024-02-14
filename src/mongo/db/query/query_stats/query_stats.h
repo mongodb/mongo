@@ -60,7 +60,7 @@
 
 namespace mongo::query_stats {
 
-extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
+extern Counter64& queryStatsStoreSizeEstimateBytesMetric;
 
 struct QueryStatsPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.

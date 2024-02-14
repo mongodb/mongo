@@ -41,17 +41,17 @@ namespace initial_sync_common_stats {
 // The number of initial sync attempts that have failed since server startup. Each instance of
 // InitialSyncer may run multiple attempts to fulfill an initial sync request that is triggered
 // when InitialSyncer::startup() is called.
-extern CounterMetric initialSyncFailedAttempts;
+extern Counter64& initialSyncFailedAttempts;
 
 // The number of initial sync requests that have been requested and failed. Each instance of
 // InitialSyncer (upon successful startup()) corresponds to a single initial sync request.
 // This value does not include the number of times where a InitialSyncer is created successfully
 // but failed in startup().
-extern CounterMetric initialSyncFailures;
+extern Counter64& initialSyncFailures;
 
 // The number of initial sync requests that have been requested and completed successfully. Each
 // instance of InitialSyncer corresponds to a single initial sync request.
-extern CounterMetric initialSyncCompletes;
+extern Counter64& initialSyncCompletes;
 
 void LogInitialSyncAttemptStats(const StatusWith<OpTimeAndWallTime>& attemptResult,
                                 bool hasRetries,

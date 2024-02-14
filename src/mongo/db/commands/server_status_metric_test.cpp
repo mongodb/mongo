@@ -63,12 +63,16 @@ void forEachPermutationOf(const std::vector<std::string>& seq, const F& func) {
 
 class MetricTreeTest : public unittest::Test {
 protected:
-    MetricTree& tree() const {
-        return *_tree;
+    MetricTreeSet& trees() {
+        return *_trees;
+    }
+
+    void resetTrees() {
+        _trees = std::make_unique<MetricTreeSet>();
     }
 
     BSONObj serialize() {
-        return serialize(tree());
+        return serialize(trees()[ClusterRole{}]);
     }
 
     BSONObj serialize(const MetricTree& mt) {
@@ -81,9 +85,16 @@ protected:
         return bob.obj();
     }
 
-    Counter64& addCounter(MetricTree& tree, StringData path) {
-        return addMetricToTree(path, std::make_unique<ServerStatusMetricField<Counter64>>(), tree)
-            .value();
+    Counter64& addCounter(StringData path, MetricTree& tree) {
+        auto m = std::make_unique<
+            BasicServerStatusMetric<ServerStatusMetricPolicySelectionT<Counter64>>>();
+        auto& ref = m->value();
+        tree.add(path, std::move(m));
+        return ref;
+    }
+
+    Counter64& addCounter(StringData path, ClusterRole role = {}) {
+        return addCounter(path, trees()[role]);
     }
 
     std::vector<std::string> extractTreeNodes(
@@ -152,7 +163,7 @@ protected:
 
     void appendJsonToTree(MetricTree& tree, StringData json) {
         for (auto&& path : extractTreeNodes(mJson(json)["metrics"].Obj()))
-            addCounter(tree, path);
+            addCounter(path, tree);
     }
 
     BSONObj actualMerged(const std::vector<std::string>& specs, BSONObj excludedPaths = {}) {
@@ -168,7 +179,7 @@ protected:
         BSONObjBuilder b;
         appendMergedTrees(ptrs, b, excludedPaths);
         return b.obj();
-    };
+    }
 
     BSONObj expectedMerged(const std::vector<std::string>& specs, BSONObj excludedPaths = {}) {
         BSONObjBuilder b;
@@ -180,18 +191,18 @@ protected:
     }
 
 private:
-    std::unique_ptr<MetricTree> _tree = std::make_unique<MetricTree>();
+    std::unique_ptr<MetricTreeSet> _trees = std::make_unique<MetricTreeSet>();
 };
 
 TEST_F(MetricTreeTest, DefaultMetricsSubtree) {
     for (StringData path : {"foo", "bar"})
-        addCounter(tree(), path);
+        addCounter(path);
     ASSERT_BSONOBJ_EQ(serialize(), mJson("{bar:0,foo:0}"));
 }
 
 TEST_F(MetricTreeTest, LeadingDotMeansRoot) {
     for (StringData path : {".foo", ".bar"})
-        addCounter(tree(), path);
+        addCounter(path);
     ASSERT_BSONOBJ_EQ(serialize(), fromjson("{bar:0,foo:0}"));
 }
 
@@ -204,15 +215,15 @@ TEST_F(MetricTreeTest, StableOrder) {
     // produce the same tree.
     BSONObj expected = mJson("{b:0,c:0,a:{a:0},d:{a:0,b:0}}");
     forEachPermutationOf(extractTreeNodes(expected["metrics"].Obj()), [&](auto&& in) {
-        MetricTree tree;
+        resetTrees();
         for (const auto& path : in)
-            addCounter(tree, path);
-        ASSERT_BSONOBJ_EQ(serialize(tree, {}), expected);
+            addCounter(path);
+        ASSERT_BSONOBJ_EQ(serialize(trees()[ClusterRole{}]), expected);
     });
 }
 
 TEST_F(MetricTreeTest, ValidateCounterMetric) {
-    auto& counter = addCounter(tree(), "tree.counter");
+    auto& counter = addCounter("tree.counter");
     for (auto&& incr : {1, 2}) {
         counter.increment(incr);
         ASSERT_BSONOBJ_EQ(serialize(), mJson("{{tree:{{counter:{}}}}}"_format(counter.get())));
@@ -220,9 +231,7 @@ TEST_F(MetricTreeTest, ValidateCounterMetric) {
 }
 
 TEST_F(MetricTreeTest, ValidateTextMetric) {
-    auto& text = addMetricToTree(
-                     "tree.text", std::make_unique<ServerStatusMetricField<std::string>>(), tree())
-                     .value();
+    auto& text = *MetricBuilder<std::string>{"tree.text"}.setTreeSet(&trees());
     for (auto&& str : {"hello", "bye"}) {
         text = std::string{str};
         ASSERT_BSONOBJ_EQ(serialize(), mJson("{{tree:{{text:\"{}\"}}}}"_format(str)));
@@ -234,10 +243,9 @@ TEST_F(MetricTreeTest, ExcludePaths) {
     // serialized result with excludePaths should be exactly equivalent to
     // making a result without exclusions and performing explicit subtree
     // removals on the result.
-    MetricTree tree;
     const BSONObj full = mJson("{b:0,c:0,a:{a:0},d:{a:0,b:0}}");
     for (auto&& path : extractTreeNodes(full["metrics"].Obj()))
-        addCounter(tree, path);
+        addCounter(path);
     for (auto&& exclusionTreeJson : std::vector<std::string>{
              "{b:true}",
              "{c:false,a:false}",
@@ -245,7 +253,7 @@ TEST_F(MetricTreeTest, ExcludePaths) {
              "{d:{a:false}}",
          }) {
         auto excludePaths = mJson(exclusionTreeJson);
-        ASSERT_BSONOBJ_EQ(serialize(tree, excludePaths),
+        ASSERT_BSONOBJ_EQ(serialize(trees()[ClusterRole{}], excludePaths),
                           erasePaths(full, extractTreeNodes(excludePaths, falseNodesPredicate)));
     }
 }
@@ -281,6 +289,7 @@ TEST_F(MetricTreeTest, MergedTreeView) {
                  "{}",
              },
          }) {
+        resetTrees();
         // A tree constructed from all nodes of the component trees
         // should produce the same result as `appendMergedTrees`.
         ASSERT_BSONOBJ_EQ(actualMerged(testCase), expectedMerged(testCase));
@@ -314,5 +323,23 @@ TEST_F(MetricTreeTest, MergedTreeViewWithCollision) {
     ASSERT_THROWS(actualMerged({"{a:0}", "{a:0}"}), BadValueEx);
     ASSERT_THROWS(actualMerged({"{a:{aa:0}}", "{a:{aa:0}}"}), BadValueEx);
 }
+
+TEST_F(MetricTreeTest, MetricTreeSet) {
+    auto& nTree = trees()[ClusterRole::None];
+    auto& sTree = trees()[ClusterRole::ShardServer];
+    auto& rTree = trees()[ClusterRole::RouterServer];
+    ASSERT_NE(&nTree, &sTree);
+    ASSERT_NE(&sTree, &rTree);
+
+    addCounter(".n", ClusterRole::None);
+    addCounter(".s", ClusterRole::ShardServer);
+    addCounter(".r", ClusterRole::RouterServer);
+}
+
+TEST_F(MetricTreeTest, MetricBuilderSetTreeSet) {
+    *MetricBuilder<Counter64>{"test.m1"}.setTreeSet(&trees());
+    ASSERT_BSONOBJ_EQ(serialize(trees()[ClusterRole::None]), mJson("{test:{m1:0}}"));
+}
+
 }  // namespace
 }  // namespace mongo

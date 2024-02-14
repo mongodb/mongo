@@ -45,7 +45,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/cursor_stats.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -99,8 +98,8 @@ protected:
         return &_clockSourceMock;
     }
 
-    CursorStats& stats() {
-        return cursor_stats;
+    ClusterCursorManager::OpenCursorStats stats() {
+        return getManager()->getOpenCursorStats();
     }
 
     /**
@@ -156,7 +155,6 @@ private:
     ClockSourceMock _clockSourceMock;
     ClusterCursorManager _manager{&_clockSourceMock};
     ServiceContext::UniqueOperationContext _opCtx;
-    CursorStats& cursor_stats = CursorStats::getInstance();
 };
 
 // Test that registering a cursor and checking it out returns a pin to the same cursor.
@@ -683,10 +681,10 @@ TEST_F(ClusterCursorManagerTest, CorrectlyRecordsOriginatingClient) {
 
 // Test that a new ClusterCursorManager's stats() is initially zero for the cursor counts.
 TEST_F(ClusterCursorManagerTest, StatsInitAsZero) {
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsMultiTarget);
-    ASSERT_EQ(0U, this->stats().cursorStatsSingleTarget);
-    ASSERT_EQ(0U, this->stats().cursorStatsOpenPinned);
+    auto stats = this->stats();
+    ASSERT_EQ(0U, stats.multiTarget);
+    ASSERT_EQ(0U, stats.singleTarget);
+    ASSERT_EQ(0U, stats.pinned);
 }
 
 // Test that registering a sharded cursor updates the corresponding counter in stats().
@@ -697,8 +695,7 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterShardedCursor) {
                                            ClusterCursorManager::CursorType::MultiTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
                                            boost::none));
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsMultiTarget);
+    ASSERT_EQ(1U, stats().multiTarget);
 }
 
 // Test that registering a not-sharded cursor updates the corresponding counter in stats().
@@ -709,8 +706,7 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterNotShardedCursor) {
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
                                            boost::none));
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsSingleTarget);
+    ASSERT_EQ(1U, stats().singleTarget);
 }
 
 // Test that checking out a cursor updates the pinned counter in stats().
@@ -725,8 +721,7 @@ TEST_F(ClusterCursorManagerTest, StatsPinCursor) {
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsOpenPinned);
+    ASSERT_EQ(1U, stats().pinned);
 }
 
 // Test that registering multiple sharded and not-sharded cursors updates the corresponding
@@ -741,9 +736,9 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterMultipleCursors) {
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
 
-        getManager()->stats();
-        ASSERT_EQ(i + 1, this->stats().cursorStatsMultiTarget);
-        ASSERT_EQ(0U, this->stats().cursorStatsSingleTarget);
+        auto stats = this->stats();
+        ASSERT_EQ(i + 1, stats.multiTarget);
+        ASSERT_EQ(0U, stats.singleTarget);
     }
     const size_t numNotShardedCursors = 10;
     for (size_t i = 0; i < numNotShardedCursors; ++i) {
@@ -754,9 +749,9 @@ TEST_F(ClusterCursorManagerTest, StatsRegisterMultipleCursors) {
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
 
-        getManager()->stats();
-        ASSERT_EQ(numShardedCursors, this->stats().cursorStatsMultiTarget);
-        ASSERT_EQ(i + 1, this->stats().cursorStatsSingleTarget);
+        auto stats = this->stats();
+        ASSERT_EQ(numShardedCursors, stats.multiTarget);
+        ASSERT_EQ(i + 1, stats.singleTarget);
     }
 }
 
@@ -770,12 +765,10 @@ TEST_F(ClusterCursorManagerTest, StatsKillShardedCursor) {
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsMultiTarget);
+    ASSERT_EQ(1U, stats().multiTarget);
     ASSERT_OK(getManager()->killCursor(getOperationContext(), cursorId));
 
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsMultiTarget);
+    ASSERT_EQ(0U, stats().multiTarget);
 }
 
 // Test that killing a not-sharded cursor decrements the corresponding counter in stats().
@@ -788,12 +781,10 @@ TEST_F(ClusterCursorManagerTest, StatsKillNotShardedCursor) {
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                boost::none));
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsSingleTarget);
+    ASSERT_EQ(1U, stats().singleTarget);
     ASSERT_OK(getManager()->killCursor(getOperationContext(), cursorId));
 
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsSingleTarget);
+    ASSERT_EQ(0U, stats().singleTarget);
 }
 
 // Test that killing a pinned cursor decrements the corresponding counter in stats().
@@ -808,14 +799,12 @@ TEST_F(ClusterCursorManagerTest, StatsKillPinnedCursor) {
     auto pinnedCursor =
         getManager()->checkOutCursor(cursorId, getOperationContext(), successAuthChecker);
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsOpenPinned);
+    ASSERT_EQ(1U, stats().pinned);
 
     killCursorFromDifferentOpCtx(cursorId);
 
     ASSERT_EQ(getOperationContext()->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsOpenPinned);
+    ASSERT_EQ(0U, stats().pinned);
 }
 
 // Test that exhausting a sharded cursor decrements the corresponding counter in stats().
@@ -832,12 +821,10 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustShardedCursor) {
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue()->next().getStatus());
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsMultiTarget);
+    ASSERT_EQ(1U, stats().multiTarget);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
 
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsMultiTarget);
+    ASSERT_EQ(0U, stats().multiTarget);
 }
 
 // Test that exhausting a not-sharded cursor decrements the corresponding counter in stats().
@@ -854,12 +841,10 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustNotShardedCursor) {
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue()->next().getStatus());
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsSingleTarget);
+    ASSERT_EQ(1U, stats().singleTarget);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
 
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsSingleTarget);
+    ASSERT_EQ(0U, stats().singleTarget);
 }
 
 // Test that checking a pinned cursor in as exhausted decrements the corresponding counter in
@@ -877,12 +862,10 @@ TEST_F(ClusterCursorManagerTest, StatsExhaustPinnedCursor) {
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue()->next().getStatus());
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsOpenPinned);
+    ASSERT_EQ(1U, stats().pinned);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::Exhausted);
 
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsOpenPinned);
+    ASSERT_EQ(0U, stats().pinned);
 }
 
 // Test that checking a pinned cursor in as *not* exhausted decrements the corresponding counter in
@@ -900,12 +883,10 @@ TEST_F(ClusterCursorManagerTest, StatsCheckInWithoutExhaustingPinnedCursor) {
     ASSERT_OK(pinnedCursor.getStatus());
     ASSERT_OK(pinnedCursor.getValue()->next().getStatus());
 
-    getManager()->stats();
-    ASSERT_EQ(1U, this->stats().cursorStatsOpenPinned);
+    ASSERT_EQ(1U, stats().pinned);
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
 
-    getManager()->stats();
-    ASSERT_EQ(0U, this->stats().cursorStatsOpenPinned);
+    ASSERT_EQ(0U, stats().pinned);
 }
 
 // Test that the PinnedCursor default constructor creates a pin that owns no cursor.

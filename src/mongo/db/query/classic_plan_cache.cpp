@@ -45,8 +45,9 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-CounterMetric planCacheTotalSizeEstimateBytes("query.planCache.totalSizeEstimateBytes");
-CounterMetric planCacheEntries("query.planCache.totalQueryShapes");
+Counter64& planCacheTotalSizeEstimateBytes =
+    *MetricBuilder<Counter64>{"query.planCache.totalSizeEstimateBytes"};
+Counter64& planCacheEntries = *MetricBuilder<Counter64>{"query.planCache.totalQueryShapes"};
 
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key) {
     stream << key.toString();

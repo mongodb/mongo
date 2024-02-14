@@ -133,6 +133,7 @@ BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
  * Helper for bulkWrite use of incrementUpdateMetrics.
  */
 void incrementBulkWriteUpdateMetrics(
+    ClusterRole role,
     const write_ops::UpdateModification& updateMod,
     const mongo::NamespaceString& ns,
     const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters);

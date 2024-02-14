@@ -96,8 +96,8 @@ constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
 
 // Tracks the number of times we decide to change sync sources in order to sync from a significantly
 // closer node.
-CounterMetric numSyncSourceChangesDueToSignificantlyCloserNode(
-    "repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode");
+auto& numSyncSourceChangesDueToSignificantlyCloserNode =
+    *MetricBuilder<Counter64>("repl.syncSource.numSyncSourceChangesDueToSignificantlyCloserNode");
 
 using namespace fmt::literals;
 

@@ -35,6 +35,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <variant>
 
@@ -49,44 +50,40 @@
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
-class Atomic64Metric;
+class Service;
 
-template <>
-struct BSONObjAppendFormat<Atomic64Metric> : FormatKind<NumberLong> {};
+namespace status_metric_detail {
 
+template <typename M>
+using HasValueFnOp = decltype(std::declval<M>().value());
+
+template <typename M>
+constexpr inline bool hasValueFn = stdx::is_detected_v<HasValueFnOp, M>;
+
+template <typename M>
+auto& voidlessValue(M& m) {
+    if constexpr (hasValueFn<M>) {
+        return m.value();
+    } else {
+        struct Dummy {};
+        static constexpr Dummy dummy;
+        return dummy;
+    }
+}
+}  // namespace status_metric_detail
+
+/**
+ * Polymorphic interface for a metric to be published in the payload of serverStatus.
+ */
 class ServerStatusMetric {
 public:
     virtual ~ServerStatusMetric() = default;
-    virtual void appendTo(BSONObjBuilder& b, StringData leafName) const = 0;
-};
 
-/**
- * ServerStatusMetricField is the generic class for storing and reporting server
- * status metrics.
- * Its recommended usage is through the addMetricToTree helper function. Here is an
- * example of a ServerStatusMetricField holding a Counter64.
- * Note that the metric is a reference.
- *
- * auto& metric =
- *      addMetricToTree("path.to.counter", std::make_unique<ServerStatusMetricField<Counter64>>());
- *      ...
- *      metric.value().increment();
- *
- * Or with `makeServerStatusMetric`:
- *
- *     auto& counter = makeServerStatusMetric<Counter64>("path.to.counter");
- *     ...
- *     counter.increment();
- *
- * To read the metric from JavaScript:
- *      db.serverStatus().metrics.path.to.counter
- */
-template <typename T>
-class ServerStatusMetricField : public ServerStatusMetric {
-public:
-    T& value() {
-        return _t;
-    }
+    /**
+     * Appends this metric to the current `b` as name `leafName`.
+     * Metrics do not know the name to appear under: `leafName` tells them.
+     */
+    virtual void appendTo(BSONObjBuilder& b, StringData leafName) const = 0;
 
     /**
      * If the predicate has been set, is is consulted when appending the metric.
@@ -96,15 +93,59 @@ public:
         _enabled = std::move(enabled);
     }
 
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        if (_enabled && !_enabled())
-            return;
-        b.append(leafName, _t);
+    bool isEnabled() const {
+        return !_enabled || _enabled();
     }
 
 private:
-    T _t;
     std::function<bool()> _enabled;
+};
+
+/**
+ * A generic `ServerStatusMetric` controlled by a policy to handle a common use
+ * case. `ValuePolicy` configures the `BasicServerStatusMetric` template.
+ *
+ * Has a `ValuePolicy` data member. Calls the policy's `doAppend` member
+ * function to perform serialization.
+ *
+ * For `ValuePolicy p`, require:
+ *
+ *     p.appendTo(bob, leafName)
+ *         A customization point, whereby this metric specifies how it will
+ *         append itself as a field `StringData leafName` to the
+ *         `BSONObjBuilder& bob`.
+ *
+ *     T& p.value()
+ *         [Optional]
+ *         Returns a reference to some object through which user code can
+ *         manipulate the metric. For example, a `Counter64&`.  This reference
+ *         is returned to the user by a metric builder's call operator.
+ *
+ *         If `ValuePolicy` has no `value()` member function, the builder will
+ *         return an empty placeholder value. This is the case for metrics that
+ *         don't need any input calls.
+ */
+template <typename ValuePolicy>
+class BasicServerStatusMetric : public ServerStatusMetric {
+public:
+    /** All ctor args are forwarded to the policy. */
+    template <typename... As,
+              std::enable_if_t<std::is_constructible_v<ValuePolicy, As...>, int> = 0>
+    explicit BasicServerStatusMetric(As&&... args) : _policy{std::forward<As>(args)...} {}
+
+    /** Returns the reference returned by the builder, for the user to retain. */
+    auto& value() {
+        return status_metric_detail::voidlessValue(_policy);
+    }
+
+    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
+        if (!isEnabled())
+            return;
+        _policy.appendTo(b, leafName);
+    }
+
+private:
+    MONGO_COMPILER_NO_UNIQUE_ADDRESS ValuePolicy _policy;
 };
 
 /**
@@ -144,9 +185,7 @@ public:
 
     using ChildMap = std::map<std::string, TreeNode, std::less<>>;
 
-    void add(StringData path,
-             std::unique_ptr<ServerStatusMetric> metric,
-             boost::optional<ClusterRole> role = {});
+    void add(StringData path, std::unique_ptr<ServerStatusMetric> metric);
 
     void appendTo(BSONObjBuilder& b, const BSONObj& excludePaths = {}) const;
 
@@ -155,37 +194,26 @@ public:
     }
 
 private:
-    void _add(StringData path,
-              std::unique_ptr<ServerStatusMetric> metric,
-              boost::optional<ClusterRole> role);
+    void _add(StringData path, std::unique_ptr<ServerStatusMetric> metric);
 
     ChildMap _children;
 };
 
-MetricTree& getGlobalMetricTree();
+class MetricTreeSet {
+public:
+    /**
+     * Returns the metric tree for the specified ClusterRole.
+     * The `role` must be exactly one of None, ShardServer, or RouterServer.
+     */
+    MetricTree& operator[](ClusterRole role);
 
-template <typename T>
-T& addMetricToTree(StringData name,
-                   std::unique_ptr<T> metric,
-                   MetricTree& tree = getGlobalMetricTree()) {
-    invariant(metric);
-    T& reference = *metric;
-    tree.add(name, std::move(metric));
-    return reference;
-}
+private:
+    MetricTree _none;
+    MetricTree _shard;
+    MetricTree _router;
+};
 
-template <typename T>
-T& makeServerStatusMetric(StringData path) {
-    return addMetricToTree(path, std::make_unique<ServerStatusMetricField<T>>()).value();
-}
-
-/** Make a metric that only appends itself when `predicate` is true. */
-template <typename T>
-T& makeServerStatusMetric(StringData path, std::function<bool()> predicate) {
-    auto ptr = std::make_unique<ServerStatusMetricField<T>>();
-    ptr->setEnabledPredicate(std::move(predicate));
-    return addMetricToTree(path, std::move(ptr)).value();
-}
+MetricTreeSet& globalMetricTreeSet();
 
 /**
  * Write a merger of the `trees` to `b`, under field `name`. `excludePaths` is a
@@ -196,70 +224,101 @@ void appendMergedTrees(std::vector<const MetricTree*> trees,
                        BSONObjBuilder& b,
                        const BSONObj& excludePaths = {});
 
-/** Replicates the public interface of Counter64. */
-class CounterMetric {
+template <typename Policy>
+class CustomMetricBuilder {
 public:
-    explicit CounterMetric(StringData name) : _counter{makeServerStatusMetric<Counter64>(name)} {}
-    CounterMetric(StringData name, std::function<bool()> predicate)
-        : _counter{makeServerStatusMetric<Counter64>(name, std::move(predicate))} {}
-    CounterMetric(CounterMetric&) = delete;
-    CounterMetric& operator=(CounterMetric&) = delete;
+    using Metric = BasicServerStatusMetric<Policy>;
 
-    operator Counter64&() {
-        return _counter;
+    explicit CustomMetricBuilder(std::string name) : _name{std::move(name)} {}
+
+    /** Execute the builder, creating a reference to the registered metric */
+    auto& operator*() && {
+        std::unique_ptr<Metric> ptr;
+        if (_construct)
+            ptr = _construct();
+        else if constexpr (std::is_constructible_v<Metric>)
+            ptr = std::make_unique<Metric>();
+        else
+            invariant(_construct, "No suitable constructor");
+        if (_pred)
+            ptr->setEnabledPredicate(std::move(_pred));
+        auto& reference = *ptr;
+        MetricTreeSet* trees = _trees ? _trees : &globalMetricTreeSet();
+        MetricTree* tree = &(*trees)[_role];
+        if (!tree)
+            tree = &globalMetricTreeSet()[ClusterRole::None];
+        tree->add(_name, std::move(ptr));
+        return status_metric_detail::voidlessValue(reference);
     }
 
-    void increment(uint64_t n = 1) const {
-        _counter.increment(n);
+    CustomMetricBuilder setTreeSet(MetricTreeSet* trees) && {
+        _trees = trees;
+        return std::move(*this);
     }
 
-    void decrement(uint64_t n = 1) const {
-        _counter.decrement(n);
+    CustomMetricBuilder setRole(ClusterRole role) && {
+        _role = role;
+        return std::move(*this);
     }
 
-    long long get() const {
-        return _counter.get();
+    CustomMetricBuilder setPredicate(std::function<bool()> pred) && {
+        _pred = std::move(pred);
+        return std::move(*this);
     }
 
-    operator long long() const {
-        return get();
+    /* Sets constructor arguments for the built product. */
+    template <typename... Args>
+    CustomMetricBuilder bind(Args... args) && {
+        _construct = [args...] {
+            return std::make_unique<Metric>(args...);
+        };
+        return std::move(*this);
     }
 
 private:
-    Counter64& _counter;
+    std::string _name;
+    std::function<bool()> _pred;
+    std::function<std::unique_ptr<Metric>()> _construct;
+    MetricTreeSet* _trees = nullptr;
+    ClusterRole _role{};
 };
+
+/** The ValuePolicy to be used for the simple case of BSON-appendable types. */
+template <typename T>
+class DefaultStatusMetricValuePolicy {
+public:
+    template <typename... As, std::enable_if_t<std::is_constructible_v<T, As...>, int> = 0>
+    explicit DefaultStatusMetricValuePolicy(As&&... args) : _v{std::forward<As>(args)...} {}
+
+    auto& value() {
+        return _v;
+    }
+
+    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+        b.append(leafName, _v);
+    }
+
+private:
+    T _v;
+};
+
+/** Trait for choosing a policy for a metric. */
+template <typename T>
+struct ServerStatusMetricPolicySelection {
+    using type = DefaultStatusMetricValuePolicy<T>;
+};
+template <typename T>
+using ServerStatusMetricPolicySelectionT = typename ServerStatusMetricPolicySelection<T>::type;
 
 /**
- * Atomic wrapper for long long type for Metrics.  This is for values which are set rather than
- * just incremented or decremented; if you want a counter, use Counter64 above.
+ * A CustomMetricBuilder, using a policy chosen by the ServerStatusMetricValuePolicy trait,
+ *
+ * Example (note the auto& reference):
+ *   auto& myMetric = *MetricBuilder<Counter64>("network.myMetric")
+ *                         .setPredicate(someNullaryPredicate);
  */
-class Atomic64Metric {
-public:
-    /** Set _value to the max of the current or newMax. */
-    void setIfMax(long long newMax) {
-        /*  Note: compareAndSwap will load into val most recent value. */
-        for (long long val = _value.load(); val < newMax && !_value.compareAndSwap(&val, newMax);) {
-        }
-    }
-
-    /** store val into value. */
-    void set(long long val) {
-        _value.storeRelaxed(val);
-    }
-
-    /** Return the current value. */
-    long long get() const {
-        return _value.loadRelaxed();
-    }
-
-    /** TODO: SERVER-73806 Avoid implicit conversion to long long */
-    operator long long() const {
-        return get();
-    }
-
-private:
-    mongo::AtomicWord<long long> _value;
-};
+template <typename T>
+using MetricBuilder = CustomMetricBuilder<ServerStatusMetricPolicySelectionT<T>>;
 
 /**
  * Leverage `synchronized_value<T>` to make a thread-safe `T` metric, for `T`
@@ -267,33 +326,49 @@ private:
  * T must be usable as an argument to `BSONObjBuilder::append`.
  */
 template <typename T>
-class SynchronizedMetric : public ServerStatusMetric {
-public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
-        b.append(leafName, **_v);
-    }
+struct ServerStatusMetricPolicySelection<synchronized_value<T>> {
+    class Policy {
+    public:
+        template <typename... As, std::enable_if_t<std::is_constructible_v<T, As...>, int> = 0>
+        explicit Policy(As&&... args) : _v{std::forward<As>(args)...} {}
 
-    synchronized_value<T>& value() {
+        auto& value() {
+            return _v;
+        }
+
+        void appendTo(BSONObjBuilder& b, StringData leafName) const {
+            b.append(leafName, **_v);
+        }
+
+    private:
+        synchronized_value<T> _v;
+    };
+    using type = Policy;
+};
+
+template <typename T>
+struct CounterMetricPolicy {
+public:
+    T& value() {
         return _v;
     }
 
+    void appendTo(BSONObjBuilder& b, StringData leafName) const {
+        b.append(leafName, static_cast<long long>(_v.get()));
+    }
+
 private:
-    synchronized_value<T> _v;
+    T _v;
 };
 
-/**
- * Make a `synchronized_value<T>`-backed metric.
- * Example (note the auto& reference):
- *
- *     auto& currSize = makeSynchronizedMetric<long long>("some.path.size");
- *     currSize = message.size();
- *
- *     auto& currName = makeSynchronizedMetric<std::string>("some.path.name");
- *     currName = message.size();
- */
-template <typename T>
-synchronized_value<T>& makeSynchronizedMetric(std::string path) {
-    return addMetricToTree(path, std::make_unique<SynchronizedMetric<T>>()).value();
-}
+template <>
+struct ServerStatusMetricPolicySelection<Counter64> {
+    using type = CounterMetricPolicy<Counter64>;
+};
+
+template <>
+struct ServerStatusMetricPolicySelection<Atomic64Metric> {
+    using type = CounterMetricPolicy<Atomic64Metric>;
+};
 
 }  // namespace mongo

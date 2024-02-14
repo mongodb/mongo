@@ -41,20 +41,22 @@ namespace mongo {
 namespace {
 
 // mongod only metrics
-CounterMetric deletedCounter("document.deleted");
-CounterMetric insertedCounter("document.inserted");
-CounterMetric returnedCounter("document.returned");
-CounterMetric updatedCounter("document.updated");
+auto& deletedCounter = *MetricBuilder<Counter64>("document.deleted");
+auto& insertedCounter = *MetricBuilder<Counter64>("document.inserted");
+auto& returnedCounter = *MetricBuilder<Counter64>("document.returned");
+auto& updatedCounter = *MetricBuilder<Counter64>("document.updated");
 
-CounterMetric scannedCounter("queryExecutor.scanned");
-CounterMetric scannedObjectCounter("queryExecutor.scannedObjects");
+auto& scannedCounter = *MetricBuilder<Counter64>("queryExecutor.scanned");
+auto& scannedObjectCounter = *MetricBuilder<Counter64>("queryExecutor.scannedObjects");
 
-CounterMetric scanAndOrderCounter("operation.scanAndOrder");
-CounterMetric writeConflictsCounter("operation.writeConflicts");
+auto& scanAndOrderCounter = *MetricBuilder<Counter64>("operation.scanAndOrder");
+auto& writeConflictsCounter = *MetricBuilder<Counter64>("operation.writeConflicts");
 
 // mongos and mongod metrics
-CounterMetric killedDueToClientDisconnectCounter("operation.killedDueToClientDisconnect");
-CounterMetric killedDueToMaxTimeMSExpiredCounter("operation.killedDueToMaxTimeMSExpired");
+auto& killedDueToClientDisconnectCounter =
+    *MetricBuilder<Counter64>("operation.killedDueToClientDisconnect");
+auto& killedDueToMaxTimeMSExpiredCounter =
+    *MetricBuilder<Counter64>("operation.killedDueToMaxTimeMSExpired");
 
 }  // namespace
 

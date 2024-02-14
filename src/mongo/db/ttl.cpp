@@ -363,13 +363,14 @@ MONGO_FAIL_POINT_DEFINE(hangTTLMonitorBetweenPasses);
 // consist of multiple sub-passes. Each sub-pass deletes all the expired documents it can up to
 // 'ttlSubPassTargetSecs'. It is possible for a sub-pass to complete before all expired documents
 // have been removed.
-CounterMetric ttlPasses("ttl.passes");
-CounterMetric ttlSubPasses("ttl.subPasses");
-CounterMetric ttlDeletedDocuments("ttl.deletedDocuments");
+auto& ttlPasses = *MetricBuilder<Counter64>{"ttl.passes"};
+auto& ttlSubPasses = *MetricBuilder<Counter64>{"ttl.subPasses"};
+auto& ttlDeletedDocuments = *MetricBuilder<Counter64>{"ttl.deletedDocuments"};
 
 // Counts the subpasses over TTL collections where the deletes on a collection are increased from
 // 'low' to 'normal' priority.
-CounterMetric ttlCollSubpassesIncreasedPriority("ttl.collSubpassesIncreasedPriority");
+auto& ttlCollSubpassesIncreasedPriority =
+    *MetricBuilder<Counter64>{"ttl.collSubpassesIncreasedPriority"};
 
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
 

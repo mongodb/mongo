@@ -130,15 +130,15 @@ BSONObj OplogBatchStats::getReport() const {
 }
 
 // The number and time spent reading batches off the network
-auto& oplogBatchStats = makeServerStatusMetric<OplogBatchStats>("repl.network.getmores");
+auto& oplogBatchStats = *MetricBuilder<OplogBatchStats>("repl.network.getmores");
 // The oplog entries read via the oplog reader
-CounterMetric opsReadStats("repl.network.ops");
+auto& opsReadStats = *MetricBuilder<Counter64>{"repl.network.ops"};
 // The bytes read via the oplog reader
-CounterMetric networkByteStats("repl.network.bytes");
+auto& networkByteStats = *MetricBuilder<Counter64>{"repl.network.bytes"};
 
-CounterMetric readersCreatedStats("repl.network.readersCreated");
+auto& readersCreatedStats = *MetricBuilder<Counter64>{"repl.network.readersCreated"};
 
-const Milliseconds maximumAwaitDataTimeoutMS(30 * 1000);
+const Milliseconds maximumAwaitDataTimeoutMS = Seconds{30};
 
 /**
  * Calculates await data timeout based on the current replica set configuration.

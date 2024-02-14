@@ -58,11 +58,34 @@ public:
         return _counter.load();
     }
 
-    operator long long() const {
-        return get();
+private:
+    AtomicWord<long long> _counter;
+};
+
+/**
+ * Atomic wrapper for Metrics. This is for values which are set rather than just
+ * incremented or decremented; if you want a counter, use Counter64 above.
+ */
+class Atomic64Metric {
+public:
+    using value_type = int64_t;
+
+    /** Sets value to the max of the current value and newValue. */
+    void setToMax(value_type newValue) {
+        auto current = _value.load();
+        while (current < newValue)
+            _value.compareAndSwap(&current, newValue);
+    }
+
+    void set(value_type val) {
+        _value.storeRelaxed(val);
+    }
+
+    value_type get() const {
+        return _value.loadRelaxed();
     }
 
 private:
-    AtomicWord<long long> _counter;
+    AtomicWord<value_type> _value;
 };
 }  // namespace mongo

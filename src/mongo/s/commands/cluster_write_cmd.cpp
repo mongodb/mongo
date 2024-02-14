@@ -655,11 +655,10 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
             }
             debug.additiveMetrics.nModified = response.getNModified();
 
-            invariant(_updateMetrics);
             for (auto&& update : _batchedRequest.getUpdateRequest().getUpdates()) {
                 incrementUpdateMetrics(update.getU(),
                                        _batchedRequest.getNS(),
-                                       *_updateMetrics,
+                                       *const_cast<ClusterWriteCmd*>(command())->getUpdateMetrics(),
                                        update.getArrayFilters());
             }
             break;

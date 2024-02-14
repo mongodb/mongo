@@ -54,9 +54,11 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
-
-static CounterMetric mongosCursorStatsTotalOpened("mongos.cursor.totalOpened");
-static CounterMetric mongosCursorStatsMoreThanOneBatch("mongos.cursor.moreThanOneBatch");
+namespace {
+auto& mongosCursorStatsTotalOpened = *MetricBuilder<Counter64>("mongos.cursor.totalOpened");
+auto& mongosCursorStatsMoreThanOneBatch =
+    *MetricBuilder<Counter64>("mongos.cursor.moreThanOneBatch");
+}  // namespace
 
 ClusterClientCursorGuard ClusterClientCursorImpl::make(
     OperationContext* opCtx,

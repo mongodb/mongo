@@ -322,14 +322,26 @@ BulkWriteCommandRequest makeSingleOpBulkWriteCommandRequest(
     return singleOpRequest;
 }
 
+namespace {
+template <ClusterRole::Value role>
+UpdateMetrics updateMetricsInstance{"bulkWrite", role};
+
 // Update related command execution metrics.
-static UpdateMetrics bulkWriteUpdateMetric{"bulkWrite"};
+UpdateMetrics& bulkWriteUpdateMetric(ClusterRole role) {
+    if (role.hasExclusively(ClusterRole::ShardServer))
+        return updateMetricsInstance<ClusterRole::ShardServer>;
+    if (role.hasExclusively(ClusterRole::RouterServer))
+        return updateMetricsInstance<ClusterRole::RouterServer>;
+    MONGO_UNREACHABLE;
+}
+}  // namespace
 
 void incrementBulkWriteUpdateMetrics(
+    ClusterRole role,
     const write_ops::UpdateModification& updateMod,
     const mongo::NamespaceString& ns,
     const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters) {
-    incrementUpdateMetrics(updateMod, ns, bulkWriteUpdateMetric, arrayFilters);
+    incrementUpdateMetrics(updateMod, ns, bulkWriteUpdateMetric(role), arrayFilters);
 }
 
 }  // namespace bulk_write_common

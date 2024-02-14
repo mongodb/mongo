@@ -559,7 +559,7 @@ public:
                 for (auto&& update : request().getUpdates()) {
                     incrementUpdateMetrics(update.getU(),
                                            request().getNamespace(),
-                                           CmdUpdate::updateMetrics,
+                                           _getUpdateMetrics(),
                                            update.getArrayFilters());
                 }
             }
@@ -571,6 +571,10 @@ public:
         }
 
     private:
+        UpdateMetrics& _getUpdateMetrics() const {
+            return *static_cast<const CmdUpdate&>(*definition())._updateMetrics;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final try {
             auth::checkAuthForUpdateCommand(AuthorizationSession::get(opCtx->getClient()),
                                             request().getBypassDocumentValidation(),
@@ -628,12 +632,16 @@ public:
         BSONObj _updateOpObj;
     };
 
+protected:
+    void doInitializeClusterRole(ClusterRole role) override {
+        write_ops::UpdateCmdVersion1Gen<CmdUpdate>::doInitializeClusterRole(role);
+        _updateMetrics.emplace(getName(), role);
+    }
+
     // Update related command execution metrics.
-    static UpdateMetrics updateMetrics;
+    mutable boost::optional<UpdateMetrics> _updateMetrics;
 };
 MONGO_REGISTER_COMMAND(CmdUpdate).forShard();
-
-UpdateMetrics CmdUpdate::updateMetrics{"update"};
 
 class CmdDelete final : public write_ops::DeleteCmdVersion1Gen<CmdDelete> {
 public:

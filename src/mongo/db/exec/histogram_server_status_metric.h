@@ -52,9 +52,7 @@ namespace mongo {
  */
 class HistogramServerStatusMetric {
 public:
-    HistogramServerStatusMetric(std::string name, std::vector<uint64_t> bounds)
-        : _hist{std::move(bounds)},
-          _metric{addMetricToTree(name, std::make_unique<Metric>(this))} {}
+    explicit HistogramServerStatusMetric(std::vector<uint64_t> bounds) : _hist{std::move(bounds)} {}
 
     void increment(uint64_t value) {
         _hist.increment(value);
@@ -73,29 +71,36 @@ public:
         return v;
     }
 
-private:
-    class Metric : public ServerStatusMetric {
-    public:
-        explicit Metric(const HistogramServerStatusMetric* owner) : _owner{owner} {}
-
-    private:
-        void appendTo(BSONObjBuilder& bob, StringData leafName) const override {
-            _owner->_appendTo(leafName, bob);
-        }
-
-        const HistogramServerStatusMetric* const _owner;
-    };
-
-    void _appendTo(StringData leafName, BSONObjBuilder& bob) const {
-        BSONArrayBuilder arr{bob.subarrayStart(leafName)};
-        for (auto&& [count, lower, upper] : _hist)
-            BSONObjBuilder{arr.subobjStart()}
-                .append("lowerBound", static_cast<long long>(lower ? *lower : 0))
-                .append("count", count);
+    const Histogram<uint64_t>& hist() const {
+        return _hist;
     }
 
+private:
     Histogram<uint64_t> _hist;
-    Metric& _metric;
+};
+
+template <>
+struct ServerStatusMetricPolicySelection<HistogramServerStatusMetric> {
+    class Policy {
+    public:
+        explicit Policy(std::vector<uint64_t> bounds) : _v{std::move(bounds)} {}
+
+        auto& value() {
+            return _v;
+        }
+
+        void appendTo(BSONObjBuilder& bob, StringData leafName) const {
+            BSONArrayBuilder arr{bob.subarrayStart(leafName)};
+            for (auto&& [count, lower, upper] : _v.hist())
+                BSONObjBuilder{arr.subobjStart()}
+                    .append("lowerBound", static_cast<long long>(lower ? *lower : 0))
+                    .append("count", count);
+        }
+
+    private:
+        HistogramServerStatusMetric _v;
+    };
+    using type = Policy;
 };
 
 }  // namespace mongo

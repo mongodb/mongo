@@ -481,6 +481,15 @@ public:
      */
     virtual const std::set<std::string>& apiVersions() const;
 
+    /**
+     * After a Command is created, we tell it what Cluster `role` it has.
+     * Role will be `ShardServer` or `RouterServer`, exclusively.
+     * In tests, `role` might be `None` as there's no associated Service.
+     * The virtual `doInitializeClsuterRole` is then invoked to allow
+     * derived types to perform additional role-aware initialization.
+     */
+    void initializeClusterRole(ClusterRole role);
+
     /*
      * Returns the list of API versions in which this command is deprecated.
      */
@@ -619,14 +628,16 @@ public:
      * Increment counter for how many times this command has executed.
      */
     void incrementCommandsExecuted() const {
-        _commandsExecuted->increment();
+        if (_commandsExecuted)
+            _commandsExecuted->increment();
     }
 
     /**
      * Increment counter for how many times this command has failed.
      */
     void incrementCommandsFailed() const {
-        _commandsFailed->increment();
+        if (_commandsFailed)
+            _commandsFailed->increment();
     }
 
     /**
@@ -712,13 +723,17 @@ public:
         return false;
     }
 
+protected:
+    /** For extended role-dependent initialization. */
+    virtual void doInitializeClusterRole(ClusterRole role) {}
+
 private:
     const std::string _name;
     const std::vector<StringData> _aliases;
 
     // Counters for how many times this command has been executed and failed
-    std::shared_ptr<CounterMetric> _commandsExecuted;
-    std::shared_ptr<CounterMetric> _commandsFailed;
+    Counter64* _commandsExecuted{};
+    Counter64* _commandsFailed{};
 };
 
 /**

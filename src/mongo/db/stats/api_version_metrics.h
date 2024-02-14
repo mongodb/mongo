@@ -72,8 +72,6 @@ public:
 
     void appendAPIVersionMetricsInfo_forTest(BSONObjBuilder* b);
 
-    class APIVersionMetricsSSM;
-
 private:
     void _removeStaleTimestamps(WithLock lk, Date_t now);
 

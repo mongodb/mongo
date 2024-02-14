@@ -219,10 +219,10 @@ public:
         _durationTotalMicroseconds.increment(durationCount<Microseconds>(duration));
         _durationTotalMs.set(
             durationCount<Milliseconds>(Microseconds{_durationTotalMicroseconds.get()}));
-        _durationMaxMs.setIfMax(durationCount<Milliseconds>(duration));
+        _durationMaxMs.setToMax(durationCount<Milliseconds>(duration));
 
         _numDocsTotal.increment(numDocs);
-        _numDocsMax.setIfMax(numDocs);
+        _numDocsMax.setToMax(numDocs);
     }
 
 private:
@@ -234,13 +234,13 @@ private:
     Counter64 _durationTotalMicroseconds;
 
     Atomic64Metric& _durationTotalMs =
-        makeServerStatusMetric<Atomic64Metric>("query.updateDeleteManyDurationTotalMs");
+        *MetricBuilder<Atomic64Metric>("query.updateDeleteManyDurationTotalMs");
     Atomic64Metric& _durationMaxMs =
-        makeServerStatusMetric<Atomic64Metric>("query.updateDeleteManyDurationMaxMs");
-
-    CounterMetric _numDocsTotal{"query.updateDeleteManyDocumentsTotalCount"};
+        *MetricBuilder<Atomic64Metric>("query.updateDeleteManyDurationMaxMs");
+    Counter64& _numDocsTotal =
+        *MetricBuilder<Counter64>{"query.updateDeleteManyDocumentsTotalCount"};
     Atomic64Metric& _numDocsMax =
-        makeServerStatusMetric<Atomic64Metric>("query.updateDeleteManyDocumentsMaxCount");
+        *MetricBuilder<Atomic64Metric>("query.updateDeleteManyDocumentsMaxCount");
 };
 
 MultiUpdateDeleteMetrics collectMultiUpdateDeleteMetrics;

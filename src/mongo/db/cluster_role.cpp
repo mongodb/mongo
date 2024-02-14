@@ -29,6 +29,8 @@
 
 #include "mongo/db/cluster_role.h"
 
+#include <iostream>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 
@@ -44,50 +46,9 @@ const std::array<std::pair<ClusterRole, StringData>, 3> roleNames{{
 
 }  // namespace
 
-ClusterRole::ClusterRole(Value role) : _roleMask(role) {}
-
-ClusterRole::ClusterRole(std::initializer_list<Value> roles) : _roleMask(None) {
-    for (const auto role : roles) {
-        _roleMask |= role;
-    }
+void ClusterRole::_checkRole() const {
     invariant(!hasExclusively(ClusterRole::ConfigServer),
               "Role cannot be set to config server only");
-}
-
-ClusterRole& ClusterRole::operator=(const ClusterRole& rhs) {
-    if (this != &rhs) {
-        _roleMask = rhs._roleMask;
-    }
-    invariant(!hasExclusively(ClusterRole::ConfigServer),
-              "Role cannot be set to config server only");
-    return *this;
-}
-
-ClusterRole& ClusterRole::operator+=(Value role) {
-    _roleMask |= role;
-    // TODO (SERVER-78810): Review these invariants as a node acting config and router roles (no
-    // shard role) would be allowed.
-    invariant(!hasExclusively(ClusterRole::ConfigServer),
-              "Role cannot be set to config server only");
-    return *this;
-}
-
-bool ClusterRole::has(const ClusterRole& role) const {
-    return role._roleMask == None ? _roleMask == None : _roleMask & role._roleMask;
-}
-
-bool ClusterRole::hasExclusively(const ClusterRole& role) const {
-    return _roleMask == role._roleMask;
-}
-
-logv2::LogService toLogService(ClusterRole role) {
-    if (role.hasExclusively(ClusterRole::ShardServer))
-        return logv2::LogService::shard;
-    else if (role.hasExclusively(ClusterRole::RouterServer))
-        return logv2::LogService::router;
-    else if (role.hasExclusively(ClusterRole::None))
-        return logv2::LogService::none;
-    MONGO_UNREACHABLE;
 }
 
 BSONArray toBSON(ClusterRole role) {

@@ -48,7 +48,6 @@
 #include "mongo/db/basic_types.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_id.h"
-#include "mongo/db/cursor_stats.h"
 #include "mongo/db/generic_cursor_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"

@@ -89,8 +89,8 @@ MONGO_FAIL_POINT_DEFINE(pauseBeforeMarkKeepOpen);
 MONGO_FAIL_POINT_DEFINE(alwaysLogConnAcquisitionToWireTime)
 
 namespace {
-CounterMetric totalTimeForEgressConnectionAcquiredToWireMicros(
-    "network.totalTimeForEgressConnectionAcquiredToWireMicros");
+auto& totalTimeForEgressConnectionAcquiredToWireMicros =
+    *MetricBuilder<Counter64>{"network.totalTimeForEgressConnectionAcquiredToWireMicros"};
 }  // namespace
 
 Future<AsyncDBClient::Handle> AsyncDBClient::connect(

@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-
-#define LOGV2_FOR_ELECTION(ID, DLEVEL, MESSAGE, ...) \
-    LOGV2_DEBUG_OPTIONS(                             \
-        ID, DLEVEL, {logv2::LogComponent::kReplicationElection}, MESSAGE, ##__VA_ARGS__)
-
 #include "mongo/db/repl/replication_coordinator_impl.h"
 
 #include <absl/container/flat_hash_map.h>
@@ -205,28 +200,28 @@ MONGO_FAIL_POINT_DEFINE(setCustomErrorInHelloResponseMongoD);
 // Throws right before the call into recoverTenantMigrationAccessBlockers.
 MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 
+Atomic64Metric& replicationWaiterListMetric =
+    *MetricBuilder<Atomic64Metric>("repl.waiters.replication");
+Atomic64Metric& opTimeWaiterListMetric = *MetricBuilder<Atomic64Metric>("repl.waiters.opTime");
+
+namespace {
+
 // Number of times we tried to go live as a secondary.
-CounterMetric attemptsToBecomeSecondary("repl.apply.attemptsToBecomeSecondary");
+auto& attemptsToBecomeSecondary = *MetricBuilder<Counter64>{"repl.apply.attemptsToBecomeSecondary"};
 
 // Tracks the last state transition performed in this replica set.
 auto& lastStateTransition =
-    makeSynchronizedMetric<std::string>("repl.stateTransition.lastStateTransition");
+    *MetricBuilder<synchronized_value<std::string>>{"repl.stateTransition.lastStateTransition"};
 
 // Tracks the number of operations killed on state transition.
-CounterMetric totalOpsKilled("repl.stateTransition.totalOperationsKilled");
-
+auto& totalOpsKilled = *MetricBuilder<Counter64>("repl.stateTransition.totalOperationsKilled");
 // Tracks the number of operations left running on state transition.
-CounterMetric totalOpsRunning("repl.stateTransition.totalOperationsRunning");
+auto& totalOpsRunning = *MetricBuilder<Counter64>("repl.stateTransition.totalOperationsRunning");
 
 // Tracks the number of times we have successfully performed automatic reconfigs to remove
 // 'newlyAdded' fields.
-CounterMetric numAutoReconfigsForRemovalOfNewlyAddedFields(
-    "repl.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields");
-
-Atomic64Metric& replicationWaiterListMetric =
-    makeServerStatusMetric<Atomic64Metric>("repl.waiters.replication");
-Atomic64Metric& opTimeWaiterListMetric =
-    makeServerStatusMetric<Atomic64Metric>("repl.waiters.opTime");
+auto& numAutoReconfigsForRemovalOfNewlyAddedFields =
+    *MetricBuilder<Counter64>{"repl.reconfig.numAutoReconfigsForRemovalOfNewlyAddedFields"};
 
 using namespace fmt::literals;
 
@@ -236,9 +231,6 @@ using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using EventHandle = executor::TaskExecutor::EventHandle;
 using executor::NetworkInterface;
 using NextAction = Fetcher::NextAction;
-
-namespace {
-
 
 void lockAndCall(stdx::unique_lock<Latch>* lk, const std::function<void()>& fn) {
     if (!lk->owns_lock()) {

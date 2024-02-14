@@ -111,16 +111,15 @@ namespace repl {
 
 namespace {
 constexpr StringData kInternalIncludeNewlyAddedFieldName = "$_internalIncludeNewlyAdded"_sd;
-}  // namespace
 
-class ReplExecutorSSM : public ServerStatusMetric {
-public:
-    void appendTo(BSONObjBuilder& b, StringData leafName) const override {
+struct ExecutorMetricPolicy {
+    void appendTo(BSONObjBuilder& b, StringData leafName) const {
         ReplicationCoordinator::get(getGlobalServiceContext())->appendDiagnosticBSON(&b, leafName);
     }
 };
 
-auto& replExecutorSSM = addMetricToTree("repl.executor", std::make_unique<ReplExecutorSSM>());
+auto& replExecutorSSM = *CustomMetricBuilder<ExecutorMetricPolicy>{"repl.executor"};
+}  // namespace
 
 // Test-only, enabled via command-line. See docs/test_commands.md.
 class CmdReplSetTest : public ReplSetCommand {
@@ -555,6 +554,15 @@ private:
 };
 MONGO_REGISTER_COMMAND(CmdReplSetFreeze).forShard();
 
+namespace {
+auto& stepDownCmdsWithForceExecuted =
+    *MetricBuilder<Counter64>{"commands.replSetStepDownWithForce.total"}.setRole(
+        ClusterRole::ShardServer);
+auto& stepDownCmdsWithForceFailed =
+    *MetricBuilder<Counter64>{"commands.replSetStepDownWithForce.failed"}.setRole(
+        ClusterRole::ShardServer);
+}  // namespace
+
 class CmdReplSetStepDown : public ReplSetCommand {
 public:
     std::string help() const override {
@@ -579,12 +587,12 @@ public:
         const bool force = cmdObj["force"].trueValue();
 
         if (force) {
-            _stepDownCmdsWithForceExecuted.increment();
+            stepDownCmdsWithForceExecuted.increment();
         }
 
         ScopeGuard onExitGuard([&] {
             if (force) {
-                _stepDownCmdsWithForceFailed.increment();
+                stepDownCmdsWithForceFailed.increment();
             }
         });
 
@@ -637,9 +645,6 @@ public:
     }
 
 private:
-    CounterMetric _stepDownCmdsWithForceExecuted{"commands.replSetStepDownWithForce.total"};
-    CounterMetric _stepDownCmdsWithForceFailed{"commands.replSetStepDownWithForce.failed"};
-
     ActionSet getAuthActionSet() const override {
         return ActionSet{ActionType::replSetStateChange};
     }

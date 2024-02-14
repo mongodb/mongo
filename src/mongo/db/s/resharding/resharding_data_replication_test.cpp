@@ -224,7 +224,7 @@ TEST_F(ReshardingDataReplicationTest,
         t.join();
     }
 
-    LOGV2(5930702, "Stress test completed", "iterations"_attr = iterations);
+    LOGV2(5930702, "Stress test completed", "iterations"_attr = iterations.get());
 }
 
 TEST_F(ReshardingDataReplicationTest, GetOplogFetcherResumeId) {

@@ -66,7 +66,8 @@
 
 namespace mongo::query_stats {
 
-CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
+Counter64& queryStatsStoreSizeEstimateBytesMetric =
+    *MetricBuilder<Counter64>{"queryStats.queryStatsStoreSizeEstimateBytes"};
 
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<QueryStatsStoreManager>>
     QueryStatsStoreManager::get =
@@ -79,9 +80,11 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<RateLimiting>>
 
 namespace {
 
-CounterMetric queryStatsEvictedMetric("queryStats.numEvicted");
-CounterMetric queryStatsRateLimitedRequestsMetric("queryStats.numRateLimitedRequests");
-CounterMetric queryStatsStoreWriteErrorsMetric("queryStats.numQueryStatsStoreWriteErrors");
+auto& queryStatsEvictedMetric = *MetricBuilder<Counter64>{"queryStats.numEvicted"};
+auto& queryStatsRateLimitedRequestsMetric =
+    *MetricBuilder<Counter64>{"queryStats.numRateLimitedRequests"};
+auto& queryStatsStoreWriteErrorsMetric =
+    *MetricBuilder<Counter64>{"queryStats.numQueryStatsStoreWriteErrors"};
 
 /**
  * Indicates whether or not query stats is enabled via the feature flag.

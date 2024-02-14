@@ -1966,5 +1966,8 @@ private:
     SplitPrepareSessionManager _splitSessionManager;  // (S)
 };
 
+extern Atomic64Metric& replicationWaiterListMetric;
+extern Atomic64Metric& opTimeWaiterListMetric;
+
 }  // namespace repl
 }  // namespace mongo

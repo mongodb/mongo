@@ -178,7 +178,7 @@ using std::stringstream;
 using std::unique_ptr;
 using NamespaceStringSet = stdx::unordered_set<NamespaceString>;
 
-CounterMetric allowDiskUseFalseCounter("query.allowDiskUseFalse");
+Counter64& allowDiskUseFalseCounter = *MetricBuilder<Counter64>{"query.allowDiskUseFalse"};
 
 namespace {
 

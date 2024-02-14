@@ -30,6 +30,7 @@
 #include "mongo/db/clientcursor.h"
 
 #include <boost/cstdint.hpp>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <mutex>
 #include <ratio>
@@ -61,29 +62,83 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
+namespace {
 
-using std::string;
-using std::stringstream;
+using namespace fmt::literals;
+
+class CursorStats {
+public:
+    CursorStats() = default;
+    /** Doesn't move, copy or die. */
+    ~CursorStats() = delete;
+    CursorStats(const CursorStats&) = delete;
+    CursorStats& operator=(const CursorStats&) = delete;
+    CursorStats(CursorStats&&) = delete;
+    CursorStats& operator=(CursorStats&&) = delete;
+
+    /** Resets all data members that are commented as "resettable". */
+    void reset() {
+        auto zero = [](auto& m) {
+            m.decrement(m.get());
+        };
+        zero(open);
+        zero(openPinned);
+        zero(multiTarget);
+        zero(singleTarget);
+        zero(queuedData);
+        zero(timedOut);
+    }
+
+    Counter64& open{_makeStat("open.total")};         // resettable
+    Counter64& openPinned{_makeStat("open.pinned")};  // resettable
+    Counter64& openNoTimeout{_makeStat("open.noTimeout")};
+    Counter64& timedOut{_makeStat("timedOut")};  // resettable
+    Counter64& totalOpened{_makeStat("totalOpened")};
+    Counter64& moreThanOneBatch{_makeStat("moreThanOneBatch")};
+
+    Counter64& multiTarget{_makeStat("open.multiTarget")};    // resettable
+    Counter64& singleTarget{_makeStat("open.singleTarget")};  // resettable
+    Counter64& queuedData{_makeStat("open.queuedData")};      // resettable
+
+    Counter64& lifespanLessThan1Second{_makeStat("lifespan.lessThan1Second")};
+    Counter64& lifespanLessThan5Seconds{_makeStat("lifespan.lessThan5Seconds")};
+    Counter64& lifespanLessThan15Seconds{_makeStat("lifespan.lessThan15Seconds")};
+    Counter64& lifespanLessThan30Seconds{_makeStat("lifespan.lessThan30Seconds")};
+    Counter64& lifespanLessThan1Minute{_makeStat("lifespan.lessThan1Minute")};
+    Counter64& lifespanLessThan10Minutes{_makeStat("lifespan.lessThan10Minutes")};
+    Counter64& lifespanGreaterThanOrEqual10Minutes{
+        _makeStat("lifespan.greaterThanOrEqual10Minutes")};
+
+private:
+    static Counter64& _makeStat(StringData name) {
+        static constexpr auto prefix = "cursor"_sd;
+        return *MetricBuilder<Counter64>("{}.{}"_format(prefix, name))
+                    .setRole(ClusterRole::ShardServer);
+    }
+};
+auto& gCursorStats = *new CursorStats{};
+
+CursorStats& cursorStats() {
+    return gCursorStats;
+}
+}  // namespace
 
 void incrementCursorLifespanMetric(Date_t birth, Date_t death) {
     auto elapsed = death - birth;
-
-    auto& cursorStats = CursorStats::getInstance();
-
     if (elapsed < Seconds(1)) {
-        cursorStats.cursorStatsLifespanLessThan1Second.increment();
+        cursorStats().lifespanLessThan1Second.increment();
     } else if (elapsed < Seconds(5)) {
-        cursorStats.cursorStatsLifespanLessThan5Seconds.increment();
+        cursorStats().lifespanLessThan5Seconds.increment();
     } else if (elapsed < Seconds(15)) {
-        cursorStats.cursorStatsLifespanLessThan15Seconds.increment();
+        cursorStats().lifespanLessThan15Seconds.increment();
     } else if (elapsed < Seconds(30)) {
-        cursorStats.cursorStatsLifespanLessThan30Seconds.increment();
+        cursorStats().lifespanLessThan30Seconds.increment();
     } else if (elapsed < Minutes(1)) {
-        cursorStats.cursorStatsLifespanLessThan1Minute.increment();
+        cursorStats().lifespanLessThan1Minute.increment();
     } else if (elapsed < Minutes(10)) {
-        cursorStats.cursorStatsLifespanLessThan10Minutes.increment();
+        cursorStats().lifespanLessThan10Minutes.increment();
     } else {
-        cursorStats.cursorStatsLifespanGreaterThanOrEqual10Minutes.increment();
+        cursorStats().lifespanGreaterThanOrEqual10Minutes.increment();
     }
 }
 
@@ -123,15 +178,13 @@ ClientCursor::ClientCursor(ClientCursorParams params,
     invariant(_exec);
     invariant(_operationUsingCursor);
 
-    auto& cursorStats = CursorStats::getInstance();
-
-    cursorStats.cursorStatsOpen.increment();
-    cursorStats.cursorStatsTotalOpened.increment();
+    cursorStats().open.increment();
+    cursorStats().totalOpened.increment();
 
     if (isNoTimeout()) {
         // cursors normally timeout after an inactivity period to prevent excess memory use
         // setting this prevents timeout of the cursor in question.
-        cursorStats.cursorStatsOpenNoTimeout.increment();
+        cursorStats().openNoTimeout.increment();
     }
 }
 
@@ -164,14 +217,13 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         incrementCursorLifespanMetric(_createdDate, *now);
     }
 
-    auto& cursorStats = CursorStats::getInstance();
-    cursorStats.cursorStatsOpen.decrement();
+    cursorStats().open.decrement();
     if (isNoTimeout()) {
-        cursorStats.cursorStatsOpenNoTimeout.decrement();
+        cursorStats().openNoTimeout.decrement();
     }
 
     if (_metrics.nBatches && *_metrics.nBatches > 1) {
-        cursorStats.cursorStatsMoreThanOneBatch.increment();
+        cursorStats().moreThanOneBatch.increment();
     }
 
     _exec->dispose(opCtx);
@@ -244,7 +296,7 @@ ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
     // either by being released back to the cursor manager or by being deleted. A cursor may be
     // transferred to another pin object via move construction or move assignment, but in this case
     // it is still considered pinned.
-    CursorStats::getInstance().cursorStatsOpenPinned.increment();
+    cursorStats().openPinned.increment();
 }
 
 ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
@@ -317,7 +369,7 @@ void ClientCursorPin::release() {
     // Unpin the cursor. This must be done by calling into the cursor manager, since the cursor
     // manager must acquire the appropriate mutex in order to safely perform the unpin operation.
     _cursorManager->unpin(_opCtx, std::unique_ptr<ClientCursor, ClientCursor::Deleter>(_cursor));
-    CursorStats::getInstance().cursorStatsOpenPinned.decrement();
+    cursorStats().openPinned.decrement();
 
     _cursor = nullptr;
 }
@@ -331,7 +383,7 @@ void ClientCursorPin::deleteUnderlying() {
     _cursor = nullptr;
     _cursorManager->deregisterAndDestroyCursor(_opCtx, std::move(ownedCursor));
 
-    CursorStats::getInstance().cursorStatsOpenPinned.decrement();
+    cursorStats().openPinned.decrement();
     _shouldSaveRecoveryUnit = false;
 }
 
@@ -381,7 +433,7 @@ public:
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
                 auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
                 try {
-                    CursorStats::getInstance().cursorStatsTimedOut.increment(
+                    cursorStats().timedOut.increment(
                         CursorManager::get(opCtx.get())->timeoutCursors(opCtx.get(), now));
                 } catch (const DBException& e) {
                     LOGV2_WARNING(

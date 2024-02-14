@@ -151,7 +151,7 @@ TEST_F(ReshardingCollectionTest, TestWritesToTempReshardingCollectionStressTest)
         t.join();
     }
 
-    LOGV2(5930701, "Stress test completed", "iterations"_attr = iterations);
+    LOGV2(5930701, "Stress test completed", "iterations"_attr = iterations.get());
 }
 
 }  // namespace

@@ -66,15 +66,17 @@ void logWriteConflictAndBackoff(size_t attempt,
 
 namespace {
 
-CounterMetric temporarilyUnavailableErrors{"operation.temporarilyUnavailableErrors"};
-CounterMetric temporarilyUnavailableErrorsEscaped{"operation.temporarilyUnavailableErrorsEscaped"};
-CounterMetric temporarilyUnavailableErrorsConvertedToWriteConflict{
-    "operation.temporarilyUnavailableErrorsConvertedToWriteConflict"};
+auto& temporarilyUnavailableErrors =
+    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrors"};
+auto& temporarilyUnavailableErrorsEscaped =
+    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrorsEscaped"};
+auto& temporarilyUnavailableErrorsConvertedToWriteConflict =
+    *MetricBuilder<Counter64>{"operation.temporarilyUnavailableErrorsConvertedToWriteConflict"};
 
-CounterMetric transactionTooLargeForCacheErrors{"operation.transactionTooLargeForCacheErrors"};
-CounterMetric transactionTooLargeForCacheErrorsConvertedToWriteConflict{
+auto& transactionTooLargeForCacheErrors =
+    *MetricBuilder<Counter64>{"operation.transactionTooLargeForCacheErrors"};
+auto& transactionTooLargeForCacheErrorsConvertedToWriteConflict = *MetricBuilder<Counter64>{
     "operation.transactionTooLargeForCacheErrorsConvertedToWriteConflict"};
-
 
 }  // namespace
 

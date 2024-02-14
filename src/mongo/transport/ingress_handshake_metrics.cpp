@@ -59,7 +59,8 @@ bool connHealthMetricsLoggingEnabled() {
     return gEnableDetailedConnectionHealthMetricLogLines.load();
 }
 
-CounterMetric totalTimeToFirstNonAuthCommandMillis("network.totalTimeToFirstNonAuthCommandMillis");
+auto& totalTimeToFirstNonAuthCommandMillis =
+    *MetricBuilder<Counter64>("network.totalTimeToFirstNonAuthCommandMillis");
 }  // namespace
 
 IngressHandshakeMetrics& IngressHandshakeMetrics::get(Session& session) {
