@@ -57,19 +57,8 @@ public:
 private:
     // VectorClock methods implementation
 
-    ComponentSet _gossipOutInternal() const override;
-    ComponentSet _gossipOutExternal() const override;
-
-    ComponentSet _gossipInInternal() const override;
-    ComponentSet _gossipInExternal() const override;
-
-    bool _permitGossipClusterTimeWithExternalClients() const override {
-        return true;
-    }
-
-    bool _permitRefreshDuringGossipOut() const override {
-        return false;
-    }
+    ComponentSet _getGossipInternalComponents() const override;
+    ComponentSet _getGossipExternalComponents() const override;
 
     // VectorClockMutable methods implementation
 
@@ -100,34 +89,21 @@ private:
 const auto vectorClockTrivialDecoration = ServiceContext::declareDecoration<VectorClockTrivial>();
 
 ServiceContext::ConstructorActionRegisterer vectorClockTrivialRegisterer(
-    "VectorClockTrivial-VectorClockRegistration",
-    {},
-    [](ServiceContext* service) {
+    "VectorClockTrivial", {"VectorClock"}, [](ServiceContext* service) {
         VectorClockTrivial::registerVectorClockOnServiceContext(
             service, &vectorClockTrivialDecoration(service));
-    },
-    {});
+    });
 
 VectorClockTrivial::VectorClockTrivial() = default;
 
 VectorClockTrivial::~VectorClockTrivial() = default;
 
-VectorClock::ComponentSet VectorClockTrivial::_gossipOutInternal() const {
+VectorClock::ComponentSet VectorClockTrivial::_getGossipInternalComponents() const {
     // Clocks are not gossipped in trivial (non-distributed) environments.
     return ComponentSet{};
 }
 
-VectorClock::ComponentSet VectorClockTrivial::_gossipOutExternal() const {
-    // Clocks are not gossipped in trivial (non-distributed) environments.
-    return ComponentSet{};
-}
-
-VectorClock::ComponentSet VectorClockTrivial::_gossipInInternal() const {
-    // Clocks are not gossipped in trivial (non-distributed) environments.
-    return ComponentSet{};
-}
-
-VectorClock::ComponentSet VectorClockTrivial::_gossipInExternal() const {
+VectorClock::ComponentSet VectorClockTrivial::_getGossipExternalComponents() const {
     // Clocks are not gossipped in trivial (non-distributed) environments.
     return ComponentSet{};
 }

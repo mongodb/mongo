@@ -46,6 +46,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/common_request_args_gen.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/db/vector_clock.h"
@@ -60,7 +61,15 @@
 namespace mongo {
 namespace {
 
+const auto vectorClockCommonDecoration = ServiceContext::declareDecoration<VectorClock>();
+
 const auto vectorClockDecoration = ServiceContext::declareDecoration<VectorClock*>();
+
+ServiceContext::ConstructorActionRegisterer vectorClockRegisterer(
+    "VectorClock", [](ServiceContext* service) {
+        VectorClock::registerVectorClockOnServiceContext(service,
+                                                         &vectorClockCommonDecoration(service));
+    });
 
 }  // namespace
 
@@ -82,16 +91,10 @@ const VectorClock* VectorClock::get(const OperationContext* ctx) {
     return get(ctx->getClient()->getServiceContext());
 }
 
-VectorClock::VectorClock() = default;
-
-VectorClock::~VectorClock() = default;
-
 void VectorClock::registerVectorClockOnServiceContext(ServiceContext* service,
                                                       VectorClock* vectorClock) {
-    invariant(!vectorClock->_service);
     vectorClock->_service = service;
     auto& clock = vectorClockDecoration(service);
-    invariant(!clock);
     clock = std::move(vectorClock);
 }
 
@@ -150,7 +153,6 @@ public:
 
     bool out(ServiceContext* service,
              OperationContext* opCtx,
-             bool permitRefresh,
              BSONObjBuilder* out,
              LogicalTime time,
              Component component) const override {
@@ -198,7 +200,6 @@ public:
 
     bool out(ServiceContext* service,
              OperationContext* opCtx,
-             bool permitRefresh,
              BSONObjBuilder* out,
              LogicalTime time,
              Component component) const override {
@@ -216,7 +217,7 @@ public:
             }
 
             // There are some contexts where refreshing is not permitted.
-            if (permitRefresh && opCtx) {
+            if (opCtx && opCtx->getService()->role().has(ClusterRole::RouterServer)) {
                 signedTime = validator->signLogicalTime(opCtx, time);
             } else {
                 signedTime = validator->trySignLogicalTime(time);
@@ -336,7 +337,8 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
         return false;
     }();
 
-    ComponentSet toGossip = isInternal ? _gossipOutInternal() : _gossipOutExternal();
+    ComponentSet toGossip =
+        isInternal ? _getGossipInternalComponents() : _getGossipExternalComponents();
 
     auto now = getTime();
     bool clusterTimeWasOutput = false;
@@ -363,7 +365,8 @@ void VectorClock::gossipIn(OperationContext* opCtx,
         }
     }
 
-    ComponentSet toGossip = isInternal ? _gossipInInternal() : _gossipInExternal();
+    ComponentSet toGossip =
+        isInternal ? _getGossipInternalComponents() : _getGossipExternalComponents();
 
     LogicalTimeArray newTime;
     for (auto component : toGossip) {
@@ -378,8 +381,8 @@ bool VectorClock::_gossipOutComponent(OperationContext* opCtx,
                                       BSONObjBuilder* out,
                                       const LogicalTimeArray& time,
                                       Component component) const {
-    bool wasOutput = _gossipFormatters[component]->out(
-        _service, opCtx, _permitRefreshDuringGossipOut(), out, time[component], component);
+    bool wasOutput =
+        _gossipFormatters[component]->out(_service, opCtx, out, time[component], component);
     return (component == Component::ClusterTime) ? wasOutput : false;
 }
 
@@ -417,6 +420,24 @@ void VectorClock::_advanceTime_forTest(Component component, LogicalTime newTime)
     LogicalTimeArray newTimeArray;
     newTimeArray[component] = newTime;
     _advanceTime(std::move(newTimeArray));
+}
+
+bool VectorClock::_permitGossipClusterTimeWithExternalClients() const {
+    // Permit gossiping with external clients in case this node is a standalone mongos.
+    if (serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
+        return true;
+    }
+
+    // If this node has no replication coordinator, permit gossiping with external clients. On
+    // the other hand, if this node has replication coordinator but it is in an unreadable state,
+    // skip gossiping because it may require reading a signing key from the keys collection.
+    auto replicationCoordinator = repl::ReplicationCoordinator::get(_service);
+    return !replicationCoordinator ||
+        (replicationCoordinator->getSettings().isReplSet() &&
+         // Check repl status without locks to prevent deadlocks. This is a best effort check
+         // as the repl state can change right after this check even when inspected under a
+         // lock or mutex.
+         replicationCoordinator->isInPrimaryOrSecondaryState_UNSAFE());
 }
 
 }  // namespace mongo

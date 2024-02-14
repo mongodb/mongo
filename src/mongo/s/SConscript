@@ -422,16 +422,6 @@ env.Library(
 )
 
 env.Library(
-    target='vector_clock_mongos',
-    source=[
-        'vector_clock_mongos.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/vector_clock',
-    ],
-)
-
-env.Library(
     target='startup_initialization',
     source=[
         'client_transport_observer_mongos.cpp',
@@ -482,6 +472,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/latency_server_stats',
+        '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/db/windows_options' if env.TargetOSIs('windows') else [],
         '$BUILD_DIR/mongo/executor/async_rpc_error_info',
         '$BUILD_DIR/mongo/executor/hedging_metrics',
@@ -511,7 +502,6 @@ env.Library(
         'query/cluster_cursor_cleanup_job',
         'sharding_initialization',
         'sharding_router_api',
-        'vector_clock_mongos',
     ],
     LIBDEPS=[
         # NOTE: This list must remain empty. Please only add to LIBDEPS_PRIVATE
@@ -740,6 +730,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/executor/async_rpc',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
@@ -753,6 +744,5 @@ env.CppUnitTest(
         'sharding_initialization',
         'sharding_mongos_test_fixture',
         'sharding_task_executor',
-        'vector_clock_mongos',
     ],
 )

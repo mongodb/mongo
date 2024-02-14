@@ -126,6 +126,9 @@ public:
         LogicalTimeArray _time;
     };
 
+    VectorClock() = default;
+    virtual ~VectorClock() = default;
+
     // There is a special logic in the storage engine which fixes up Timestamp(0, 0) to the latest
     // available time on the node. Because of this, we should never gossip or have a VectorClock
     // initialised with a value of Timestamp(0, 0), because that would cause the checkpointed value
@@ -211,7 +214,6 @@ protected:
         // Returns true if the time was output, false otherwise.
         virtual bool out(ServiceContext* service,
                          OperationContext* opCtx,
-                         bool permitRefresh,
                          BSONObjBuilder* out,
                          LogicalTime time,
                          Component component) const = 0;
@@ -223,9 +225,6 @@ protected:
 
         const std::string _fieldName;
     };
-
-    VectorClock();
-    virtual ~VectorClock();
 
     /**
      * The maximum permissible value for each part of a LogicalTime's Timestamp (ie. "secs" and
@@ -259,39 +258,25 @@ protected:
     /**
      * Returns the set of components that need to be gossiped to a node internal to the cluster.
      */
-    virtual ComponentSet _gossipOutInternal() const = 0;
-
-    /**
-     * As for _gossipOutInternal, except for the components to be sent to a client external to the
-     * cluster, eg. a driver or user client. By default, just the ClusterTime is gossiped, although
-     * it is disabled in some cases, e.g. when a node is in an unreadable state.
-     */
-    virtual ComponentSet _gossipOutExternal() const {
-        return _permitGossipClusterTimeWithExternalClients() ? ComponentSet{Component::ClusterTime}
-                                                             : ComponentSet{};
+    virtual ComponentSet _getGossipInternalComponents() const {
+        VectorClock::ComponentSet toGossip{Component::ClusterTime};
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
+            toGossip.insert(Component::ConfigTime);
+            toGossip.insert(Component::TopologyTime);
+        }
+        return toGossip;
     }
 
     /**
-     * Returns the set of components that should be processed during gossiping in of messages from
-     * internal clients.
+     * Returns the set of components that need to be gossiped to the external clients, eg. a driver
+     * or user client. By default, just the ClusterTime is gossiped, although it is disabled in some
+     * cases, e.g. when a node is in an unreadable state.
      */
-    virtual ComponentSet _gossipInInternal() const = 0;
-
-    /**
-     * As for _gossipInInternal, except from a client external to the cluster, eg. a driver or user
-     * client. By default, just the ClusterTime is gossiped, although it is disabled in some cases,
-     * e.g. when a node is in an unreadable state.
-     */
-    virtual ComponentSet _gossipInExternal() const {
+    virtual ComponentSet _getGossipExternalComponents() const {
         return _permitGossipClusterTimeWithExternalClients() ? ComponentSet{Component::ClusterTime}
                                                              : ComponentSet{};
     }
-
-    /**
-     * Whether or not it's permissable to refresh external state (eg. updating gossip signing keys)
-     * during gossip out.
-     */
-    virtual bool _permitRefreshDuringGossipOut() const = 0;
 
     /**
      * For each component in the LogicalTimeArray, sets the current time to newTime if the newTime >
@@ -334,7 +319,7 @@ private:
      * clients. In some circumstances such gossiping is disabled, e.g. for replica set nodes in
      * unreadable states.
      */
-    virtual bool _permitGossipClusterTimeWithExternalClients() const = 0;
+    bool _permitGossipClusterTimeWithExternalClients() const;
 
     /**
      * Called in order to output a Component time to the passed BSONObjBuilder, using the

@@ -67,12 +67,12 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_document_gen.h"
+#include "mongo/db/vector_clock_mongod.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
@@ -86,146 +86,22 @@
 namespace mongo {
 namespace {
 
-class VectorClockMongoD : public VectorClockMutable,
-                          public ReplicaSetAwareService<VectorClockMongoD> {
-    VectorClockMongoD(const VectorClockMongoD&) = delete;
-    VectorClockMongoD& operator=(const VectorClockMongoD&) = delete;
-
-public:
-    static VectorClockMongoD* get(ServiceContext* serviceContext);
-
-    VectorClockMongoD();
-    virtual ~VectorClockMongoD();
-
-private:
-    // VectorClock methods implementation
-
-    ComponentSet _gossipOutInternal() const override;
-    ComponentSet _gossipInInternal() const override;
-
-    bool _permitGossipClusterTimeWithExternalClients() const override {
-        // If this node is in an unreadable state, skip gossiping because it may require reading a
-        // signing key from the keys collection.
-        auto replicationCoordinator = repl::ReplicationCoordinator::get(_service);
-        return !replicationCoordinator ||
-            (replicationCoordinator->getSettings().isReplSet() &&
-             // Check repl status without locks to prevent deadlocks. This is a best effort check
-             // as the repl state can change right after this check even when inspected under a
-             // lock or mutex.
-             replicationCoordinator->isInPrimaryOrSecondaryState_UNSAFE());
-    }
-
-    bool _permitRefreshDuringGossipOut() const override {
-        return false;
-    }
-
-    // VectorClockMutable methods implementation
-
-    SharedSemiFuture<void> waitForDurableConfigTime() override;
-    SharedSemiFuture<void> waitForDurableTopologyTime() override;
-    SharedSemiFuture<void> waitForDurable() override;
-    VectorClock::VectorTime recoverDirect(OperationContext* opCtx) override;
-
-    LogicalTime _tick(Component component, uint64_t nTicks) override;
-    void _tickTo(Component component, LogicalTime newTime) override;
-
-    // ReplicaSetAwareService methods implementation
-
-    void onStartup(OperationContext* opCtx) override {}
-    void onSetCurrentConfig(OperationContext* opCtx) override {}
-    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override;
-    void onShutdown() override {}
-    void onStepUpBegin(OperationContext* opCtx, long long term) override;
-    void onStepUpComplete(OperationContext* opCtx, long long term) override {}
-    void onStepDown() override;
-    void onRollback() override {}
-    void onBecomeArbiter() override;
-    inline std::string getServiceName() const override final {
-        return "VectorClockMongoD";
-    }
-
-    /**
-     * Structure used as keys for the map of waiters for VectorClock durability.
-     */
-    struct ComparableVectorTime {
-        bool operator<(const ComparableVectorTime& other) const {
-            return vt.configTime() < other.vt.configTime() ||
-                vt.topologyTime() < other.vt.topologyTime();
-        }
-        bool operator>(const ComparableVectorTime& other) const {
-            return vt.configTime() > other.vt.configTime() ||
-                vt.topologyTime() > other.vt.topologyTime();
-        }
-        bool operator==(const ComparableVectorTime& other) const {
-            return vt.configTime() == other.vt.configTime() &&
-                vt.topologyTime() == other.vt.topologyTime();
-        }
-
-        VectorTime vt;
-    };
-
-    /**
-     * The way the VectorClock durability works is by maintaining an `_queue` of callers, which wait
-     * for a particular VectorTime to become durable.
-     *
-     * When the queue is empty, there is no persistence activity going on. The first caller, who
-     * finds `_loopScheduled` to be false, will set it to true, indicating it will schedule the
-     * asynchronous persistence task. The asynchronous persistence task is effectively the following
-     * loop:
-     *
-     *  while (!_queue.empty()) {
-     *      timeToPersist = getTime();
-     *      persistTime(timeToPersist);
-     *      _durableTime = timeToPersist;
-     *      // Notify entries in _queue, whose time is <= _durableTime and remove them
-     *  }
-     */
-    SharedSemiFuture<void> _enqueueWaiterAndScheduleLoopIfNeeded(stdx::unique_lock<Mutex> ul,
-                                                                 VectorTime time);
-    Future<void> _doWhileQueueNotEmptyOrError(ServiceContext* service);
-
-    // Protects the shared state below
-    Mutex _mutex = MONGO_MAKE_LATCH("VectorClockMongoD::_mutex");
-
-    // If set to true, means that another operation already scheduled the `_queue` draining loop, if
-    // false it means that this operation must do it
-    bool _loopScheduled{false};
-
-    // This value is only boost::none once, just after the object is constructuted. From the moment,
-    // the first operation schedules the `_queue`-draining loop, it will be set to a future, which
-    // will be signaled when the previously-scheduled `_queue` draining loop completes.
-    boost::optional<Future<void>> _currentWhileLoop;
-
-    // If boost::none, means the durable time needs to be recovered from disk, otherwise contains
-    // the latest-known durable time
-    boost::optional<VectorTime> _durableTime;
-
-    // Queue ordered in increasing order of the VectorTimes, which are waiting to be persisted
-    using Queue = std::map<ComparableVectorTime, std::unique_ptr<SharedPromise<void>>>;
-    Queue _queue;
-};
-
 const auto vectorClockMongoDDecoration = ServiceContext::declareDecoration<VectorClockMongoD>();
 
 const ReplicaSetAwareServiceRegistry::Registerer<VectorClockMongoD>
     vectorClockMongoDServiceRegisterer("VectorClockMongoD-ReplicaSetAwareServiceRegistration");
 
 const ServiceContext::ConstructorActionRegisterer vectorClockMongoDRegisterer(
-    "VectorClockMongoD-VectorClockRegistration",
-    {},
-    [](ServiceContext* service) {
+    "VectorClockMongoD", {"VectorClock"}, [](ServiceContext* service) {
         VectorClockMongoD::registerVectorClockOnServiceContext(
             service, &vectorClockMongoDDecoration(service));
-    },
-    {});
+    });
+
+}  // namespace
 
 VectorClockMongoD* VectorClockMongoD::get(ServiceContext* serviceContext) {
     return &vectorClockMongoDDecoration(serviceContext);
 }
-
-VectorClockMongoD::VectorClockMongoD() = default;
-
-VectorClockMongoD::~VectorClockMongoD() = default;
 
 void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
     stdx::lock_guard lg(_mutex);
@@ -451,25 +327,6 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
     return future;
 }
 
-VectorClock::ComponentSet VectorClockMongoD::_gossipOutInternal() const {
-    VectorClock::ComponentSet toGossip{Component::ClusterTime};
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
-        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        toGossip.insert(Component::ConfigTime);
-        toGossip.insert(Component::TopologyTime);
-    }
-    return toGossip;
-}
-
-VectorClock::ComponentSet VectorClockMongoD::_gossipInInternal() const {
-    VectorClock::ComponentSet toGossip{Component::ClusterTime};
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        toGossip.insert(Component::ConfigTime);
-        toGossip.insert(Component::TopologyTime);
-    }
-    return toGossip;
-}
-
 LogicalTime VectorClockMongoD::_tick(Component component, uint64_t nTicks) {
     if (component == Component::ClusterTime) {
         // Although conceptually ClusterTime can only be ticked when a mongod is able to take writes
@@ -514,5 +371,4 @@ void VectorClockMongoD::_tickTo(Component component, LogicalTime newTime) {
     MONGO_UNREACHABLE;
 }
 
-}  // namespace
 }  // namespace mongo
