@@ -148,7 +148,8 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
 
 Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
     const std::vector<BSONObj>::const_iterator begin,
-    const std::vector<BSONObj>::const_iterator end) {
+    const std::vector<BSONObj>::const_iterator end,
+    ParseRecordIdAndDocFunc fn) {
     auto iter = begin;
     while (iter != end) {
         std::vector<RecordId> locs;
@@ -165,11 +166,15 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
                 };
 
                 while (insertIter != end && bytesInBlock < collectionBulkLoaderBatchSizeInBytes) {
-                    const auto& doc = *insertIter++;
+                    const auto& [replRid, doc] = fn(*insertIter++);
                     bytesInBlock += doc.objsize();
                     // This version of insert will not update any indexes.
                     auto status = collection_internal::insertDocumentForBulkLoader(
-                        _opCtx.get(), _acquisition.getCollectionPtr(), doc, onRecordInserted);
+                        _opCtx.get(),
+                        _acquisition.getCollectionPtr(),
+                        doc,
+                        replRid,
+                        onRecordInserted);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -189,7 +194,8 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
         status = writeConflictRetry(_opCtx.get(), "_addDocumentToIndexBlocks", _nss, [&] {
             WriteUnitOfWork wunit(_opCtx.get());
             for (size_t index = 0; index < locs.size(); ++index) {
-                status = _addDocumentToIndexBlocks(*iter++, locs.at(index));
+                const auto& [_, doc] = fn(*iter++);
+                status = _addDocumentToIndexBlocks(doc, locs.at(index));
                 if (!status.isOK()) {
                     return status;
                 }
@@ -207,9 +213,16 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
 
 Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
     const std::vector<BSONObj>::const_iterator begin,
-    const std::vector<BSONObj>::const_iterator end) {
+    const std::vector<BSONObj>::const_iterator end,
+    ParseRecordIdAndDocFunc fn) {
     for (auto iter = begin; iter != end; ++iter) {
-        const auto& doc = *iter;
+        RecordId rid;
+        BSONObj doc;
+        std::tie(rid, doc) = fn(*iter);
+
+        invariant(rid.isNull(),
+                  str::stream() << "Expected null recordId to be returned by parser but was "
+                                << rid);
         Status status = writeConflictRetry(
             _opCtx.get(), "CollectionBulkLoaderImpl/insertDocumentsCapped", _nss, [&] {
                 WriteUnitOfWork wunit(_opCtx.get());
@@ -231,13 +244,14 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
 }
 
 Status CollectionBulkLoaderImpl::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                                 const std::vector<BSONObj>::const_iterator end) {
+                                                 const std::vector<BSONObj>::const_iterator end,
+                                                 ParseRecordIdAndDocFunc fn) {
     return _runTaskReleaseResourcesOnFailure([&] {
         UnreplicatedWritesBlock uwb(_opCtx.get());
         if (_idIndexBlock || _secondaryIndexesBlock) {
-            return _insertDocumentsForUncappedCollection(begin, end);
+            return _insertDocumentsForUncappedCollection(begin, end, fn);
         } else {
-            return _insertDocumentsForCappedCollection(begin, end);
+            return _insertDocumentsForCappedCollection(begin, end, fn);
         }
     });
 }

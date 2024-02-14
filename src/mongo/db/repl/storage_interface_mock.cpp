@@ -107,9 +107,10 @@ Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndex
 }
 
 Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
-                                                 const std::vector<BSONObj>::const_iterator end) {
+                                                 const std::vector<BSONObj>::const_iterator end,
+                                                 ParseRecordIdAndDocFunc fn) {
     LOGV2_DEBUG(21758, 1, "CollectionBulkLoaderMock::insertDocuments called");
-    auto status = insertDocsFn(begin, end);
+    auto status = insertDocsFn(begin, end, fn);
 
     // Only count if it succeeds.
     if (status.isOK()) {
