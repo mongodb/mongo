@@ -52,6 +52,35 @@ function assertNoInconsistencies() {
     });
 }
 
+function assertCollectionOptionsMismatch(inconsistencies, expectedOptions) {
+    assert(inconsistencies.some(object => {
+        return (object.type === "CollectionOptionsMismatch" &&
+                expectedOptions.every(expectedO => object.details.options.some(
+                                          o => tojson(o.options) === tojson(expectedO))));
+    }),
+           "Expected CollectionOptionsMismatch options: " + tojson(expectedOptions) + ", but got " +
+               tojson(inconsistencies));
+}
+
+// TODO SERVER-77915 We can get rid of isTrackedByConfigServer method once all unsharded collections
+// are being tracked by the config server
+function isTrackedByConfigServer(nss) {
+    return configDB.collections.countDocuments({_id: nss}, {limit: 1}) !== 0;
+}
+
+function isFcvGraterOrEqualTo(fcvRequired) {
+    // Requires all primary shard nodes to be running the fcvRequired version.
+    let isFcvGreater = true;
+    st.forEachConnection(function(conn) {
+        const fcvDoc = conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+        if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
+                                           fcvRequired) < 0) {
+            isFcvGreater = false;
+        }
+    });
+    return isFcvGreater;
+}
+
 (function testCursor() {
     const db = getNewDb();
 
@@ -213,6 +242,8 @@ function assertNoInconsistencies() {
     assert.commandWorked(shard0Coll.dropIndex('index1'));
     assert.commandWorked(shard1Coll.dropIndex('index1'));
     assertNoInconsistencies();
+
+    db.dropDatabase();
 })();
 
 (function testHiddenShardedCollections() {
@@ -417,4 +448,133 @@ function assertNoInconsistencies() {
     db.dropDatabase();
     assertNoInconsistencies();
 })();
+
+(function testTimeseriesOptionsMismatch() {
+    // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog("Skipping timeseriesOptionsMismatch test because required FCV is less than 8.0.");
+        return;
+    }
+
+    const db = getNewDb();
+    const kSourceCollName = "tracked_collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const kBucketNss = db.getName() + ".system.buckets." + kSourceCollName;
+
+    // Create a timeseries sharded collection.
+    assert.commandWorked(db.adminCommand({
+        shardCollection: kNss,
+        key: {time: 1},
+        timeseries: {timeField: "time", metaField: "meta", granularity: "minutes"}
+    }));
+    assertNoInconsistencies();
+    const localTimeseries = db.getCollectionInfos({name: kSourceCollName})[0].options.timeseries;
+    assert.eq("minutes", localTimeseries.granularity);
+
+    // Update the granularity on the sharding catalog only and catch the inconsistency.
+    assert.commandWorked(configDB.collections.update(
+        {_id: kBucketNss}, {$set: {'timeseriesFields.granularity': "seconds"}}));
+    let configTimeseries = localTimeseries;
+    configTimeseries.granularity = "seconds";
+
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length);
+    assertCollectionOptionsMismatch(
+        inconsistencies,
+        [{timeseriesFields: localTimeseries}, {timeseriesFields: configTimeseries}]);
+
+    // Clean up the database to pass the hooks that detect inconsistencies.
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testDefaultCollationMismatch1() {
+    // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testDefaultCollationMismatch2 test because required FCV is less than 8.0.");
+        return;
+    }
+
+    const db = getNewDb();
+    const kSourceCollName = "tracked_collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+
+    // Create a collection with a specific default collation.
+    assert.commandWorked(db.runCommand({create: kSourceCollName, collation: {locale: "ca"}}));
+    const localCollation = db.getCollectionInfos({name: kSourceCollName})[0].options.collation;
+    assertNoInconsistencies();
+
+    if (!isTrackedByConfigServer(kNss)) {
+        // Shard the collection to make it tracked.
+        // Note: we need to specify a simple collation on shardCollection command to make clear that
+        // chunks will be sorted using a simple collation, however, the default collation for the
+        // collection is preserved to {'locale':'ca'}.
+        assert.commandWorked(
+            db.adminCommand({shardCollection: kNss, key: {x: 1}, collation: {locale: "simple"}}));
+
+        const no_inconsistency = db.checkMetadataConsistency().toArray();
+        assert.eq(0, no_inconsistency.length);
+    }
+
+    // Update the default collation on the sharding catalog only and catch the inconsistency.
+    assert.commandWorked(
+        configDB.collections.update({_id: kNss}, {$unset: {defaultCollation: ""}}));
+
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length);
+    assertCollectionOptionsMismatch(inconsistencies,
+                                    [{defaultCollation: localCollation}, {defaultCollation: {}}]);
+
+    // Clean up the database to pass the hooks that detect inconsistencies.
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testCappedCollectionCantBeSharded() {
+    // TODO SERVER-79304 Remove FCV check when 8.0 becomes last LTS.
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testCappedCollectionCantBeSharded test because required FCV is less than 8.0.");
+        return;
+    }
+
+    const db = getNewDb();
+    const kSourceCollName = "capped_collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+
+    // Create a capped collection.
+    assert.commandWorked(db.runCommand({create: kSourceCollName, capped: true, size: 1000}));
+    assertNoInconsistencies();
+
+    if (isTrackedByConfigServer(kNss)) {
+        configDB.collections.update({_id: kNss}, {$set: {unsplittable: false}});
+
+    } else {
+        // Register another collection as sharded to be able to get a config.collections document as
+        // a reference.
+        const kNssSharded = db.getName() + ".sharded_collection";
+        assert.commandWorked(db.adminCommand({shardCollection: kNssSharded, key: {x: 1}}));
+
+        const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+
+        // Insert a new collection into config.collections with the nss and uuid from the unsharded
+        // capped collection previously created.
+        let collEntry = configDB.collections.findOne({_id: kNssSharded});
+        collEntry._id = kNss;
+        collEntry.uuid = uuid;
+        configDB.collections.insert(collEntry);
+    }
+
+    // Catch the inconsistency.
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.neq(0, inconsistencies.length);
+    assertCollectionOptionsMismatch(inconsistencies,
+                                    [{capped: true}, {capped: false, unsplittable: false}]);
+
+    // Clean up the database to pass the hooks that detect inconsistencies.
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
 st.stop();

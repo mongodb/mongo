@@ -62,6 +62,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -169,6 +170,91 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
 
     tmpInconsistencies.clear();
     performChecks(*ac, inconsistencies);
+}
+
+std::vector<MetadataInconsistencyItem> _checkInconsistenciesBetweenBothCatalogs(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardId& shardId,
+    const CollectionType& catalogColl,
+    const CollectionPtr& localColl) {
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+
+    const auto& catalogUUID = catalogColl.getUuid();
+    const auto& localUUID = localColl->uuid();
+    if (catalogUUID != localUUID) {
+        inconsistencies.emplace_back(
+            makeInconsistency(MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
+                              CollectionUUIDMismatchDetails{nss, shardId, localUUID, catalogUUID}));
+    }
+
+    const auto makeOptionsMismatchInconsistencyBetweenShardAndConfig =
+        [&](const NamespaceString& nss,
+            const ShardId& shardId,
+            const BSONObj& shardOptions,
+            const BSONObj& configOptions) {
+            constexpr StringData kShardsFieldName = "shards"_sd;
+            constexpr StringData kOptionsFieldName = "options"_sd;
+            const auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+
+            return metadata_consistency_util::makeInconsistency(
+                MetadataInconsistencyTypeEnum::kCollectionOptionsMismatch,
+                CollectionOptionsMismatchDetails{
+                    nss,
+                    {BSON(kOptionsFieldName << shardOptions << kShardsFieldName
+                                            << BSON_ARRAY(shardId)),
+                     BSON(kOptionsFieldName << configOptions << kShardsFieldName
+                                            << BSON_ARRAY(configShardId))}});
+        };
+
+    // A capped collection can't be sharded.
+    if (localColl->isCapped() && !catalogColl.getUnsplittable().value_or(false)) {
+        inconsistencies.emplace_back(makeOptionsMismatchInconsistencyBetweenShardAndConfig(
+            nss,
+            shardId,
+            BSON("capped" << true),
+            BSON("capped" << false << CollectionType::kUnsplittableFieldName << false)));
+    }
+
+    // Verifying timeseries options are consistent between the shard and the config server.
+    const auto& localTimeseriesOptions = localColl->getTimeseriesOptions();
+    const auto& catalogTimeseriesOptions = [&]() -> boost::optional<TimeseriesOptions> {
+        if (const auto& timeseriesFields = catalogColl.getTimeseriesFields()) {
+            return timeseriesFields->getTimeseriesOptions();
+        }
+        return boost::none;
+    }();
+    if ((localTimeseriesOptions && catalogTimeseriesOptions &&
+         SimpleBSONObjComparator::kInstance.evaluate(localTimeseriesOptions->toBSON() !=
+                                                     catalogTimeseriesOptions->toBSON())) ||
+        catalogTimeseriesOptions.has_value() != localTimeseriesOptions.has_value()) {
+        inconsistencies.emplace_back(makeOptionsMismatchInconsistencyBetweenShardAndConfig(
+            nss,
+            shardId,
+            BSON(CollectionType::kTimeseriesFieldsFieldName
+                 << (localTimeseriesOptions ? localTimeseriesOptions->toBSON() : BSONObj())),
+            BSON(CollectionType::kTimeseriesFieldsFieldName
+                 << (catalogTimeseriesOptions ? catalogTimeseriesOptions->toBSON() : BSONObj()))));
+    }
+
+    // Verify default collation is consistent between the shard and the config server.
+    if (localColl->getCollectionOptions().collation.woCompare(catalogColl.getDefaultCollation())) {
+        inconsistencies.emplace_back(makeOptionsMismatchInconsistencyBetweenShardAndConfig(
+            nss,
+            shardId,
+            BSON(CollectionType::kDefaultCollationFieldName
+                 << localColl->getCollectionOptions().collation),
+            BSON(CollectionType::kDefaultCollationFieldName
+                 << (catalogColl.getDefaultCollation()))));
+    }
+
+    // Check shardKey index inconsistencies.
+    if (catalogUUID == localUUID) {
+        _checkShardKeyIndexInconsistencies(
+            opCtx, nss, shardId, catalogColl.getKeyPattern().toBSON(), localColl, inconsistencies);
+    }
+
+    return inconsistencies;
 }
 }  // namespace
 
@@ -292,13 +378,13 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& shardingCatalogCollections,
     const std::vector<CollectionPtr>& localCatalogCollections) {
+
     std::vector<MetadataInconsistencyItem> inconsistencies;
     auto itLocalCollections = localCatalogCollections.begin();
     auto itCatalogCollections = shardingCatalogCollections.begin();
     while (itLocalCollections != localCatalogCollections.end() &&
            itCatalogCollections != shardingCatalogCollections.end()) {
         const auto& localColl = *itLocalCollections;
-        const auto& localUUID = localColl->uuid();
         const auto& localNss = localColl->ns();
         const auto& remoteNss = itCatalogCollections->getNss();
 
@@ -310,24 +396,15 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             // local catalog.
             itCatalogCollections++;
         } else if (isCollectionOnBothCatalogs) {
-            const auto& nss = remoteNss;
             // Case where we have found same collection in the catalog client than in the local
             // catalog.
-
-            // Check that local collection has the same UUID as the one in the catalog client.
-            const auto& UUID = itCatalogCollections->getUuid();
-            if (UUID != localUUID) {
-                inconsistencies.emplace_back(makeInconsistency(
-                    MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
-                    CollectionUUIDMismatchDetails{localNss, shardId, localUUID, UUID}));
-            } else {
-                _checkShardKeyIndexInconsistencies(opCtx,
-                                                   nss,
-                                                   shardId,
-                                                   itCatalogCollections->getKeyPattern().toBSON(),
-                                                   localColl,
-                                                   inconsistencies);
-            }
+            const auto inconsistenciesBetweenBothCatalogs =
+                _checkInconsistenciesBetweenBothCatalogs(
+                    opCtx, localNss, shardId, *itCatalogCollections, localColl);
+            inconsistencies.insert(
+                inconsistencies.end(),
+                std::make_move_iterator(inconsistenciesBetweenBothCatalogs.begin()),
+                std::make_move_iterator(inconsistenciesBetweenBothCatalogs.end()));
 
             itLocalCollections++;
             itCatalogCollections++;
@@ -340,7 +417,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             if (!nss.isNamespaceAlwaysUntracked() && shardId != primaryShardId) {
                 inconsistencies.emplace_back(
                     makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
-                                      MisplacedCollectionDetails{localNss, shardId, localUUID}));
+                                      MisplacedCollectionDetails{nss, shardId, localColl->uuid()}));
             }
             itLocalCollections++;
         }

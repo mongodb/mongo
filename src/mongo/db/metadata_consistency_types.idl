@@ -38,6 +38,7 @@ enums:
         description: "Type of metadata inconsistency."
         type: string
         values:
+            kCollectionOptionsMismatch: "CollectionOptionsMismatch"
             kCollectionUUIDMismatch: "CollectionUUIDMismatch"
             kCorruptedChunkShardKey: "CorruptedChunkShardKey"
             kCorruptedZoneShardKey: "CorruptedZoneShardKey"
@@ -60,6 +61,7 @@ enums:
         description: "Description of each metadata inconsistency."
         type: string
         values:
+            kCollectionOptionsMismatch: "Found collection with mismatching options between the shard and the config server"
             kCollectionUUIDMismatch: "Found collection on non primary shard with mismatching UUID"
             kCorruptedChunkShardKey: "Found chunk with a shard key pattern violation"
             kCorruptedZoneShardKey: "Found zone with a shard key pattern violation"
@@ -100,6 +102,18 @@ structs:
             localUUID:
                 type: uuid
                 description: "The UUID of the collection that is misplaced."
+
+    CollectionOptionsMismatchDetails:
+        description: "Details about a collection options mismatch inconsistency."
+        strict: false
+        fields:
+            namespace:
+                cpp_name: nss
+                type: namespacestring
+                description: "The namespace of the collection that has an options mismatch."
+            options:
+                type: array<object>
+                description: "A list of the different options found per shard or config server."
 
     CollectionUUIDMismatchDetails:
         description: "Details about a UUID mismatch inconsistency."
@@ -355,7 +369,7 @@ structs:
             shard:
                 description: "The shard where the collection was supposed to be found"
                 type: shard_id
-                
+            
     MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"
         strict: false
