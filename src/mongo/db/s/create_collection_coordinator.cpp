@@ -56,6 +56,7 @@
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
@@ -549,6 +550,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             // to skip the invariant check and we do nothing in case it was taken.
                             _releaseCriticalSections(opCtx, false /* throwIfReasonDiffers */);
 
+                            // Checkpoint configTime in order to preserve causality of operations in
+                            // case of a stepdown.
+                            VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
+
                             _result = createCollectionResponseOpt;
                             return;
                         }
@@ -598,6 +603,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                     // Return any previously acquired resource.
                     _releaseCriticalSections(opCtx);
+
+                    // Checkpoint configTime in order to preserve causality of operations in case of
+                    // a stepdown.
+                    VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
 
                     _result = createCollectionResponseOpt;
                     return;
@@ -1307,6 +1316,10 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
 
         throw;
     }
+
+
+    // Checkpoint configTime in order to preserve causality of operations in case of a stepdown.
+    VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
 
     // Best effort refresh to warm up cache of all involved shards so we can have a cluster
     // ready to receive operations.
