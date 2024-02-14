@@ -87,9 +87,9 @@ public:
             invariant(service->role().hasExclusively(ClusterRole::RouterServer),
                       "Attempted to run a router-only command directly from the shard role.");
             uassert(
-                ErrorCodes::IllegalOperation,
+                ErrorCodes::NoSuchKey,
                 str::stream()
-                    << "Invalid cluster parameter: "
+                    << "Unknown server parameter: "
                     << query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName,
                 !request().getCommandParameter()
                      [query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName]);

@@ -42,7 +42,7 @@ let test =
                 ]
             }
         }),
-                                     ErrorCodes.IllegalOperation);
+                                     ErrorCodes.NoSuchKey);
 
         // Ensure that 'querySettings' cluster parameter hasn't changed after invoking
         // 'setClusterParameter' command.
@@ -55,6 +55,22 @@ let test =
         // invoking setQuerySettings command.
         qsutils.assertQueryShapeConfiguration(
             [qsutils.makeQueryShapeConfiguration(querySetting, query)]);
+
+        // Ensure 'getClusterParameter' doesn't accept query settings parameter directly.
+        assert.commandFailedWithCode(db.adminCommand({getClusterParameter: "querySettings"}),
+                                     ErrorCodes.NoSuchKey);
+        assert.commandFailedWithCode(db.adminCommand({
+            getClusterParameter:
+                ["testIntClusterParameter", "querySettings", "testStrClusterParameter"]
+        }),
+                                     ErrorCodes.NoSuchKey);
+
+        // Ensure 'getClusterParameter' doesn't print query settings value with other cluster
+        // parameters.
+        const clusterParameters =
+            assert.commandWorked(db.adminCommand({getClusterParameter: "*"})).clusterParameters;
+        assert(!clusterParameters.some(parameter => parameter._id === "querySettings"),
+               "unexpected _id = 'querySettings' in " + tojson(clusterParameters));
 
         // Cleanup query settings.
         qsutils.removeAllQuerySettings();

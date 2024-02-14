@@ -41,6 +41,7 @@
 #include "mongo/db/commands/get_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_settings/query_settings_manager.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
@@ -66,20 +67,35 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
     audit::logGetClusterParameter(opCtx->getClient(), cmdBody);
 
     // For each parameter, generate a BSON representation of it and retrieve its name.
-    auto makeBSON = [&](ServerParameter* requestedParameter) {
-        // Skip any disabled cluster parameters.
-        if (requestedParameter->isEnabled()) {
-            BSONObjBuilder bob;
-            requestedParameter->append(opCtx, &bob, requestedParameter->name(), tenantId);
-            auto paramObj = bob.obj().getOwned();
-            if (excludeClusterParameterTime) {
-                parameterValues.push_back(
-                    paramObj.filterFieldsUndotted(BSON("clusterParameterTime" << true), false));
-            } else {
-                parameterValues.push_back(paramObj);
-            }
-            parameterNames.push_back(requestedParameter->name());
+    auto makeBSON = [&](ServerParameter* requestedParameter, bool skipOnError) {
+        if (!requestedParameter->isEnabled()) {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Server parameter: '" << requestedParameter->name()
+                                  << "' is disabled",
+                    skipOnError);
+            return;
         }
+
+        // The persistent query settings are stored in a cluster parameter, however, since this is
+        // an implementation detail, we don't want to expose it to our users.
+        if (requestedParameter->name() ==
+            query_settings::QuerySettingsManager::kQuerySettingsClusterParameterName) {
+            uassert(ErrorCodes::NoSuchKey,
+                    str::stream() << "Unknown server parameter: " << requestedParameter->name(),
+                    skipOnError);
+            return;
+        }
+
+        BSONObjBuilder bob;
+        requestedParameter->append(opCtx, &bob, requestedParameter->name(), tenantId);
+        auto paramObj = bob.obj().getOwned();
+        if (excludeClusterParameterTime) {
+            parameterValues.push_back(
+                paramObj.filterFieldsUndotted(BSON("clusterParameterTime" << true), false));
+        } else {
+            parameterValues.push_back(paramObj);
+        }
+        parameterNames.push_back(requestedParameter->name());
     };
 
     visit(OverloadedVisitor{[&](const std::string& strParameterName) {
@@ -89,18 +105,13 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
                                     parameterValues.reserve(clusterParameterMap.size());
                                     parameterNames.reserve(clusterParameterMap.size());
                                     for (const auto& param : clusterParameterMap) {
-                                        makeBSON(param.second);
+                                        makeBSON(param.second, true);
                                     }
                                 } else {
                                     // Any other string must correspond to a single parameter name.
                                     // Return an error if a disabled cluster parameter is explicitly
                                     // requested.
-                                    ServerParameter* sp = clusterParameters->get(strParameterName);
-                                    uassert(ErrorCodes::BadValue,
-                                            str::stream() << "Server parameter: '"
-                                                          << strParameterName << "' is disabled",
-                                            sp->isEnabled());
-                                    makeBSON(sp);
+                                    makeBSON(clusterParameters->get(strParameterName), false);
                                 }
                             },
                             [&](const std::vector<std::string>& listParameterNames) {
@@ -111,14 +122,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
                                 parameterValues.reserve(listParameterNames.size());
                                 parameterNames.reserve(listParameterNames.size());
                                 for (const auto& requestedParameterName : listParameterNames) {
-                                    ServerParameter* sp =
-                                        clusterParameters->get(requestedParameterName);
-                                    uassert(ErrorCodes::BadValue,
-                                            str::stream()
-                                                << "Server parameter: '" << requestedParameterName
-                                                << "' is disabled'",
-                                            sp->isEnabled());
-                                    makeBSON(sp);
+                                    makeBSON(clusterParameters->get(requestedParameterName), false);
                                 }
                             }},
           cmdBody);
