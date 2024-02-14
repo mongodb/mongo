@@ -416,7 +416,7 @@ Please complete the following steps to generate a certificate:
 
 ZIP_FILE=~/Downloads/engflow-mTLS.zip
 
-curl https://raw.githubusercontent.com/mongodb/mongo/master/buildscripts/setup_engflow_creds.py -o setup_engflow_creds.sh
+curl https://raw.githubusercontent.com/mongodb/mongo/master/buildscripts/setup_engflow_creds.sh -o setup_engflow_creds.sh
 chmod +x ./setup_engflow_creds.sh
 ./setup_engflow_creds.sh {getpass.getuser()} {public_hostname} $ZIP_FILE\n""")
         return False
