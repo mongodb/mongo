@@ -41,7 +41,9 @@ import mongo.toolchain as mongo_toolchain
 import mongo.generators as mongo_generators
 import mongo.install_actions as install_actions
 
-EnsurePythonVersion(3, 10)
+# TODO SERVER-79172
+# We cannot set the limit to python 3.10 since python 3.9 is needed for windows testing
+EnsurePythonVersion(3, 9)
 EnsureSConsVersion(3, 1, 1)
 
 utc_starttime = datetime.utcnow()
