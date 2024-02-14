@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/atomic_waitable.h"
+#include "mongo/platform/waitable_atomic.h"
 
 #include "mongo/util/errno_util.h"
 

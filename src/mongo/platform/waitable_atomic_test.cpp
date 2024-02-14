@@ -36,8 +36,8 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_waitable.h"
 #include "mongo/platform/random.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
