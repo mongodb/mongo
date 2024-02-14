@@ -25,7 +25,7 @@ import {
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // TODO(SERVER-86317): re-enable this test
-if (FeatureFlagUtil.isEnabled(
+if (FeatureFlagUtil.isPresentAndEnabled(
         db, "TimeseriesAlwaysUseCompressedBuckets", /*user=*/ undefined, /*ignoreFCV=*/ true)) {
     jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
     quit();

@@ -123,7 +123,7 @@ export const $config = (function() {
 
     const setup = function(db, collName, cluster) {
         // TODO(SERVER-86317): re-enable this test
-        if (FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
             jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
             quit();
         }
