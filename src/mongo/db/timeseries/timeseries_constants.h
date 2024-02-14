@@ -60,9 +60,17 @@ static constexpr StringData kKeyFieldName = "key"_sd;
 static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
 static constexpr StringData kPartialFilterExpressionFieldName = "partialFilterExpression"_sd;
 
+// There are 3 versions of buckets. The first is uncompressed, the second is compressed
+// and has its records sorted on time, and the third is compressed and does not have its
+// records sorted on time.
 static constexpr int kTimeseriesControlUncompressedVersion = 1;
-static constexpr int kTimeseriesControlCompressedVersion = 2;
-static constexpr int kTimeseriesControlLatestVersion = kTimeseriesControlCompressedVersion;
+static constexpr int kTimeseriesControlCompressedSortedVersion = 2;
+static constexpr int kTimeseriesControlCompressedUnsortedVersion = 3;
+
+// This is the latest version that we default to. Therefore, even though v3 > v2,
+// since by default we will still create v2 buckets and only promote them to v3
+// if they receive an out-of-order insert, this remains at v2.
+static constexpr int kTimeseriesControlLatestVersion = kTimeseriesControlCompressedSortedVersion;
 static constexpr int kTimeseriesControlMinVersion = kTimeseriesControlUncompressedVersion;
 
 // These are hard-coded control object subfields.

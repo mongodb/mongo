@@ -267,9 +267,15 @@ export var TimeseriesTest = class {
         // codes
         return assert.commandWorkedOrFailedWithCode(res, [8555700, 8555701]);
     }
+
+    static isBucketCompressed(version) {
+        return (version == TimeseriesTest.BucketVersion.kCompressedSorted ||
+                version == TimeseriesTest.BucketVersion.kCompressedUnsorted);
+    }
 };
 
 TimeseriesTest.BucketVersion = {
     kUncompressed: 1,
-    kCompressed: 2,
+    kCompressedSorted: 2,
+    kCompressedUnsorted: 3
 };

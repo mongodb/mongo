@@ -107,7 +107,7 @@ const runTest = function(ordered) {
     assert(buckets[0].data.t.hasOwnProperty("0"));
     assert(buckets[0].data.t.hasOwnProperty("1"));
     assert(!buckets[0].data.t.hasOwnProperty("2"));
-    assert.eq(buckets[1].control.version, TimeseriesTest.BucketVersion.kCompressed);
+    assert(TimeseriesTest.isBucketCompressed(buckets[1].control.version));
     assert.eq(buckets[1].control.count, 2);
 
     checkLog.containsJson(db, 8607200, {

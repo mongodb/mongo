@@ -299,7 +299,7 @@ if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
                     "_id": 1,
                     "ts": ISODate("1970-01-01T00:00:00Z"),
                 },
-                "version": TimeseriesTest.BucketVersion.kCompressed,
+                "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             },
             "data": {"ts": BinData(7, "CQDoAwAAAAAAAAA="), "_id": BinData(7, "AQAAAAAAAADwPwA=")},
             "meta": {"a": 1},

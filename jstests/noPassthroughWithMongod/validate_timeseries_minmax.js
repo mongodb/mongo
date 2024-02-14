@@ -270,8 +270,9 @@ jsTestLog("Running validate on a version 2 bucket with incorrect 'max' object fi
 setUpCollection(lotsOfData);
 coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
-bucket.updateOne({"meta.sensorId": 2, "control.version": TimeseriesTest.BucketVersion.kCompressed},
-                 {"$set": {"control.max.temp": 800}});
+bucket.updateOne(
+    {"meta.sensorId": 2, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
+    {"$set": {"control.max.temp": 800}});
 res = bucket.validate({checkBSONConformance: true});
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);

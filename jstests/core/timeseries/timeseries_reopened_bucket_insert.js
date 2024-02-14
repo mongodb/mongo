@@ -244,7 +244,7 @@ const checkIfBucketReopened = function(
     // Time forwards will open a new bucket, and close and compress the old one.
     checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
     assert.eq(2,
-              bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressed})
+              bucketsColl.find({"control.version": TimeseriesTest.BucketVersion.kCompressedSorted})
                   .toArray()
                   .length);
 
@@ -302,7 +302,7 @@ const checkIfBucketReopened = function(
     const compressedBucketDoc = {
         "_id": ObjectId("05091c2c050b7495eaef4583"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kCompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("63091c30138e9261fd70a903"),
                 "time": ISODate("2022-08-26T19:19:00Z")
@@ -319,7 +319,7 @@ const checkIfBucketReopened = function(
     const closedAndCompressedBucketDoc = {
         "_id": ObjectId("06091c2c050b7495eaef4584"),
         "control": {
-            "version": TimeseriesTest.BucketVersion.kCompressed,
+            "version": TimeseriesTest.BucketVersion.kCompressedSorted,
             "min": {
                 "_id": ObjectId("63091c30138e9261fd70a903"),
                 "time": ISODate("2022-08-26T19:19:00Z")
