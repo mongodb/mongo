@@ -217,10 +217,56 @@ inline AccumulationExpression parseCountAccumulator(ExpressionContext* const exp
             "$count takes no arguments, i.e. $count:{}",
             elem.type() == BSONType::Object && elem.Obj().isEmpty());
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
-    auto argument = ExpressionConstant::create(expCtx, Value(1));
+    const Value constantAddend = Value(1);
+    auto argument = ExpressionConstant::create(expCtx, constantAddend);
     return {initializer,
             argument,
-            [expCtx]() { return AccumulatorSum::create(expCtx); },
+            [expCtx, constantAddend]() {
+                return AccumulatorSum::create(expCtx, boost::make_optional(constantAddend));
+            },
+            AccumulatorSum::kName};
+}
+
+namespace {
+boost::optional<Value> getConstantArgument(boost::intrusive_ptr<Expression> arg) {
+    auto constArg = dynamic_cast<ExpressionConstant*>(arg.get());
+    if (!constArg) {
+        return boost::none;
+    }
+
+    // We can avoid using DoubleDoubleSummation if the type of 'value' is a NumberInt, NumberLong or
+    // NumberDouble.
+    auto value = constArg->getValue();
+    auto type = value.getType();
+    if (type == BSONType::NumberInt || type == BSONType::NumberLong ||
+        type == BSONType::NumberDouble) {
+        return value;
+    }
+
+    // 'value' is NumberDecimal type in which case, the 'sum' function may not be efficient due to
+    // the copying incurred when working with decimal data, which involves memory allocation. To
+    // avoid such inefficiency, we do not support NumberDecimal type for the simple sum
+    // optimization.
+    return boost::none;
+}
+}  // namespace
+
+/**
+ * A $sum accumulation statement parser that handles the case of a constant sum argument such as
+ * {$sum: 1}.
+ */
+template <class AccName>
+AccumulationExpression parseSumAccumulator(ExpressionContext* const expCtx,
+                                           BSONElement elem,
+                                           VariablesParseState vps) {
+    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
+    auto argument = Expression::parseOperand(expCtx, elem, vps);
+
+    return {initializer,
+            argument,
+            [expCtx, argument]() {
+                return AccumulatorSum::create(expCtx, getConstantArgument(argument));
+            },
             AccumulatorSum::kName};
 }
 

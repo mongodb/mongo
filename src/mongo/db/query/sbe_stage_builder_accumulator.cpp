@@ -366,14 +366,12 @@ SbExpr::Vector buildCombinePartialAggsSum(const AccumulationExpression& expr,
             inputSlots.size() == 1);
     auto arg = inputSlots[0];
 
-    // If the user specifies a count-like accumulator like {$sum: 1}, then we optimize the plan to
-    // use the simple "sum" accumulator rather than a DoubleDouble summation. Therefore, the partial
-    // aggregates are simple sums and we require nothing special to combine multiple DoubleDouble
-    // summations.
+    // Optimize for a count-like accumulator like {$sum: 1}. In particular, we will spill the
+    // constant sum, and we need to convert it to a 4 element array that can be used to initialize a
+    // DoubleDoubleSummation.
     if (auto [isCount, _1, _2] = getCountAddend(expr); isCount) {
-        return SbExpr::makeSeq(b.makeFunction("sum", std::move(arg)));
+        return SbExpr::makeSeq(b.makeFunction("convertSimpleSumToDoubleDoubleSum", std::move(arg)));
     }
-
     return SbExpr::makeSeq(b.makeFunction("aggMergeDoubleDoubleSums", std::move(arg)));
 }
 
@@ -406,8 +404,10 @@ SbExpr buildFinalizeSum(StageBuilderState& state,
     }
 
     if (auto [isCount, tag, val] = getCountAddend(expr); isCount) {
-        // The accumulation result is a scalar value. So, the final project is not necessary.
-        return {};
+        auto var = makeVariable(sumSlots[0]);
+        return sbe::makeE<sbe::EIf>(makeFunction("isNumber", var->clone()),
+                                    var->clone(),
+                                    makeFunction("doubleDoubleSumFinalize", var->clone()));
     }
 
     return b.makeFunction("doubleDoubleSumFinalize", sumSlots[0]);

@@ -2796,11 +2796,14 @@ TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsSimpleCount) {
     auto accStatement = makeAccumulationStatement(BSON("unused" << BSON("$sum" << 1)));
     auto compiledExpr = compileSingleInputNoCollator(accStatement);
 
-    // $sum:1 is a simple count of the incoming documents, and therefore does not require the
-    // DoubleDouble summation algorithm. In order to combine partial counts, we use a simple
-    // summation.
-    auto inputValues = BSON_ARRAY(5 << 8 << "MISSING" << 4);
-    auto expectedAggStates = BSON_ARRAY(5 << 13 << 13 << 17);
+    // $sum:1 is a simple count of the incoming documents, however, we cannot use a simple sum to
+    // combine partial counts. This is because we want unified behavior when merging across a
+    // sharded cluster along with merging partial counts spilled to disk. As such, we expect that
+    // the intermediate states will be a sequence of DoubleDoubleSummation arrays.
+    auto inputValues = BSON_ARRAY(5 << 8 << 0 << 4);
+    auto expectedAggStates =
+        BSON_ARRAY(BSON_ARRAY(0 << 5 << 0) << BSON_ARRAY(0 << 13 << 0) << BSON_ARRAY(0 << 13 << 0)
+                                           << BSON_ARRAY(0 << 17 << 0));
     aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
 }
 
