@@ -79,6 +79,13 @@ enum class PlanCachingMode {
     NeverCache,
 };
 
+/**
+ * Returns the stricter PlanCachingMode between 'lhs' and 'rhs'.
+ */
+inline PlanCachingMode stricter(PlanCachingMode lhs, PlanCachingMode rhs) {
+    return std::max(lhs, rhs);
+}
+
 namespace plan_cache_util {
 // The logging facility enforces the rule that logging should not be done in a header file. Since
 // the template classes and functions below must be defined in the header file and since they do use

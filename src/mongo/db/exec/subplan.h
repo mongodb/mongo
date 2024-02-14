@@ -36,6 +36,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_all_indices_stage.h"
@@ -83,7 +85,8 @@ public:
                  VariantCollectionPtrOrAcquisition collection,
                  WorkingSet* ws,
                  const QueryPlannerParams& params,
-                 CanonicalQuery* cq);
+                 CanonicalQuery* cq,
+                 PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache);
 
     static bool canUseSubplanning(const CanonicalQuery& query);
     static bool needsSubplanning(const CanonicalQuery& query) {
@@ -142,6 +145,35 @@ public:
         return _compositeSolution.get();
     }
 
+    /**
+     * Extracts the best query solution. If the sub planner falls back to the multi planner,
+     * extracts the best solution from the multi planner, otherwise extracts the composite solution.
+     */
+    std::unique_ptr<QuerySolution> extractBestWholeQuerySolution() {
+        if (usesMultiplanning()) {
+            return multiPlannerStage()->extractBestSolution();
+        }
+        return std::move(_compositeSolution);
+    }
+
+    /**
+     * Returns true if the sub planner fell back to multiplanning.
+     */
+    bool usesMultiplanning() const {
+        return _usesMultiplanning;
+    }
+
+    /**
+     * Returns the MultiPlan stage.
+     */
+    MultiPlanStage* multiPlannerStage() {
+        tassert(8524100,
+                "The sub planner stage should fall back to the multi planner.",
+                _usesMultiplanning);
+        return static_cast<MultiPlanStage*>(child().get());
+    }
+
+
 private:
     /**
      * Used as a fallback if subplanning fails. Helper for pickBestPlan().
@@ -162,5 +194,10 @@ private:
 
     // Indicates whether i-th branch of the rooted $or query was planned from a cached solution.
     std::vector<bool> _branchPlannedFromCache;
+
+    PlanCachingMode _planCachingMode;
+
+    // Indicates whether the sub planner has fallen back to multi planning.
+    bool _usesMultiplanning = false;
 };
 }  // namespace mongo

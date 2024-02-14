@@ -30,10 +30,12 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/document_source_internal_projection.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/query_solution.h"
@@ -43,26 +45,22 @@ namespace mongo::classic_runtime_planner_for_sbe {
 namespace {
 
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.collection");
+const BSONObj kFindFilter = fromjson("{a: {$gte: 0}, b: {$gte: 0}}");
+const BSONObj kAddFieldsSpec = fromjson(R"({sum: {$add: ["$a", "$b"]}})");
 /**
  * Fixture for classic_runtime_planner_for_sbe::PlannerInterface implementations. As a test query,
- * it uses an aggregation pipeline [{$match: {a: {$gte: 0}, b: {$gte: 0}}}, {$addFields: {sum:
- * {$add: ["$a", "$b"]}}}] where $match is pushed down to the find query and $addFields is left to
- * be a single-stage agg pipeline.
+ * it uses an aggregation pipeline [{$match: <match statement>}, {$addFields: <addFields statement>]
+ * where $match is pushed down to the find query and $addFields is left to be a single-stage agg
+ * pipeline.
  */
 class ClassicRuntimePlannerForSbeTest : public CatalogTestFixture {
 protected:
-    const BSONObj kFindFilter = fromjson("{a: {$gte: 0}, b: {$gte: 0}}");
-    const BSONObj kAddFieldsSpec = fromjson(R"({sum: {$add: ["$a", "$b"]}})");
-
     void setUp() final {
         CatalogTestFixture::setUp();
         OperationContext* opCtx = operationContext();
         expCtx = make_intrusive<ExpressionContextForTest>(opCtx, kNss);
 
         ASSERT_OK(storageInterface()->createCollection(opCtx, kNss, CollectionOptions{}));
-        _collections.emplace(acquireCollectionMaybeLockFree(
-            opCtx,
-            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kRead)));
     }
 
     void tearDown() final {
@@ -73,20 +71,28 @@ protected:
 
     /**
      * Creates PlannerData for the following pipeline: [
-     *   {$match: <kFindFilter>}},
-     *   {$addField: <kAddFieldsSpec>}}
+     *   {$match: 'findFilter'}},
+     *   {$addFields: 'addFieldsSpec'}}
      * ]
+     * Defaults to kFindFilter and kAddFieldsSpec for 'findFilter' and 'addFieldsSpec' respectively
+     * if arguments are not supplied.
      */
-    PlannerData createPlannerData() {
+    PlannerData createPlannerData(BSONObj findFilter = kFindFilter,
+                                  BSONObj addFieldsSpec = kAddFieldsSpec) {
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
-        findCommand->setFilter(kFindFilter);
+        findCommand->setFilter(findFilter);
 
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = expCtx,
             .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)},
             .pipeline = {make_intrusive<DocumentSourceInternalProjection>(
-                expCtx, kAddFieldsSpec, InternalProjectionPolicyEnum::kAddFields)}});
+                expCtx, addFieldsSpec, InternalProjectionPolicyEnum::kAddFields)}});
         cq->setSbeCompatible(true);
+
+        auto opCtx = operationContext();
+        _collections.emplace(acquireCollectionMaybeLockFree(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kRead)));
 
         return {
             .cq = std::move(cq),
@@ -114,6 +120,80 @@ protected:
         ASSERT_EQ(PlanExecutor::ExecState::IS_EOF, exec->getNextDocument(nullptr, nullptr));
     }
 
+    /**
+     * Create an 'index' on an empty collection with name 'indexName' and add the index to
+     * QueryPlannerParams.
+     */
+    void createIndexOnEmptyCollection(OperationContext* opCtx,
+                                      BSONObj index,
+                                      std::string indexName) {
+        auto acquisition = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, kNss, AcquisitionPrerequisites::kWrite),
+            MODE_X);
+        CollectionWriter coll(opCtx, &acquisition);
+
+        WriteUnitOfWork wunit(opCtx);
+        auto indexCatalog = coll.getWritableCollection(opCtx)->getIndexCatalog();
+        ASSERT(indexCatalog);
+        auto indexesBefore = indexCatalog->numIndexesReady();
+        ASSERT_OK(indexCatalog
+                      ->createIndexOnEmptyCollection(
+                          opCtx, coll.getWritableCollection(opCtx), makeIndexSpec(index, indexName))
+                      .getStatus());
+        wunit.commit();
+        ASSERT_EQ(indexesBefore + 1, indexCatalog->numIndexesReady());
+
+        // The QueryPlannerParams should also have information about the index to consider it when
+        // actually doing the planning.
+        _params.indices.push_back(
+            IndexEntry(index,
+                       IndexNames::nameToType(IndexNames::findPluginName(index)),
+                       IndexDescriptor::kLatestIndexVersion,
+                       false,
+                       {},
+                       {},
+                       false,
+                       false,
+                       IndexEntry::Identifier{indexName},
+                       nullptr,
+                       BSONObj(),
+                       nullptr,
+                       nullptr));
+    }
+
+    BSONObj makeIndexSpec(BSONObj index, StringData indexName) {
+        return BSON("v" << IndexDescriptor::kLatestIndexVersion << "key" << index << "name"
+                        << indexName);
+    }
+
+    // Creates indexes {a: 1} and {b: 1}, inserts 100 docs with {_id: i, a: i, b: i}, creates the
+    // subplanner with a rooted or filter and returns the PlanExecutor.
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getExecutorWithSubPlanning() {
+        auto opCtx = operationContext();
+
+        createIndexOnEmptyCollection(opCtx, BSON("a" << 1), "a_1");
+        createIndexOnEmptyCollection(opCtx, BSON("b" << 1), "b_1");
+
+        std::vector<InsertStatement> docs;
+        for (int i = 0; i < 100; ++i) {
+            docs.emplace_back(InsertStatement(BSON("_id" << i << "a" << i << "b" << i)));
+        }
+
+        ASSERT_OK(storageInterface()->insertDocuments(opCtx, kNss, docs));
+
+        // createPlannerData adds a cqPipeline with an $addFields stage.
+        SubPlanner planner{
+            opCtx,
+            createPlannerData(fromjson(
+                "{$or: [{a: {$lte: 10}, b: {$gte: 10}}, {a: {$lte: 90}, b: {$gte: 90}}]}")),
+            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY};
+
+        auto exec = planner.plan();
+        assertPlanExecutorReturnsCorrectSums({20, 180}, exec.get());
+        return exec;
+    }
+
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
 private:
@@ -137,7 +217,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
         BSON_ARRAY(int64_t{1} << BSON("a" << 2 << "b" << 2)),
         BSON_ARRAY(int64_t{2} << BSON("a" << 3 << "b" << 2))};
 
-    {  // Run SingleSolutionPassthroughPlanner to create pinned cached entry
+    {  // Run SingleSolutionPassthroughPlanner to create pinned cached entry.
         auto root = std::make_unique<VirtualScanNode>(
             kDocs, VirtualScanNode::ScanType::kIxscan, true /*hasRecordId*/, BSON("a" << 1));
         auto solution = std::make_unique<QuerySolution>();
@@ -149,7 +229,7 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
         assertPlanExecutorReturnsCorrectSums({3, 4, 5}, exec.get());
     }
 
-    {  // Run CachedPlanner to executed the cached plan
+    {  // Run CachedPlanner to execute the cached plan.
         PlannerData plannerData = createPlannerData();
         auto planCacheKey =
             plan_cache_key_factory::make(*plannerData.cq,
@@ -210,6 +290,42 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
                          PlanCachingMode::AlwaysCache};
     auto exec = planner.plan();
     assertPlanExecutorReturnsCorrectSums(std::move(expectedSums), exec.get());
+}
+
+TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksMoreEfficientPlanForEachBranch) {
+    auto exec = getExecutorWithSubPlanning();
+    PlanSummaryStats stats;
+    exec->getPlanExplainer().getSummaryStats(&stats);
+
+    // The most efficient solution should use index "a" for first branch, examining 10 keys (a: 1 to
+    // a: 10) and index "b" for second branch, examining 11 keys (b: 90 to b: 100).
+    ASSERT_EQ(2, stats.indexesUsed.size());
+    ASSERT_EQ(21, stats.totalKeysExamined);
+    ASSERT_TRUE(std::find(stats.indexesUsed.begin(), stats.indexesUsed.end(), "a_1") !=
+                stats.indexesUsed.end());
+    ASSERT_TRUE(std::find(stats.indexesUsed.begin(), stats.indexesUsed.end(), "b_1") !=
+                stats.indexesUsed.end());
+}
+
+TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksCachedPlanForWholeQuery) {
+    auto exec = getExecutorWithSubPlanning();
+
+    {  // Run CachedPlanner to execute the cached plan.
+        PlannerData plannerData = createPlannerData(
+            fromjson("{$or: [{a: {$lte: 10}, b: {$gte: 10}}, {a: {$lte: 90}, b: {$gte: 90}}]}"));
+        auto planCacheKey =
+            plan_cache_key_factory::make(*plannerData.cq,
+                                         plannerData.collections,
+                                         canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        auto&& planCache = sbe::getPlanCache(operationContext());
+        auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
+        ASSERT_TRUE(cacheEntry);
+        CachedPlanner cachedPlanner{
+            operationContext(), std::move(plannerData), std::move(cacheEntry)};
+
+        auto cachedExec = cachedPlanner.plan();
+        assertPlanExecutorReturnsCorrectSums({20, 180}, cachedExec.get());
+    }
 }
 
 }  // namespace

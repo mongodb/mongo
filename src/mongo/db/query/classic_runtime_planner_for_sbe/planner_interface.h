@@ -32,6 +32,7 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -117,6 +118,10 @@ protected:
         return std::move(_plannerData.workingSet);
     }
 
+    const QueryPlannerParams& plannerParams() const {
+        return _plannerData.plannerParams;
+    }
+
 private:
     OperationContext* _opCtx;
     PlannerData _plannerData;
@@ -175,6 +180,24 @@ private:
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
     PlanCachingMode _cachingMode;
+};
+
+class SubPlanner final : public PlannerBase {
+public:
+    SubPlanner(OperationContext* opCtx,
+               PlannerData plannerData,
+               PlanYieldPolicy::YieldPolicy yieldPolicy);
+
+    /**
+     * Picks the composite solution given by the classic engine subplanner, extends the composite
+     * solution with the cq pipeline, creates a pinned plan cache entry containing the resulting SBE
+     * plan, and returns a plan executor.
+     */
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
+
+private:
+    PlanYieldPolicy::YieldPolicy _yieldPolicy;
+    std::unique_ptr<SubplanStage> _subplanStage;
 };
 
 }  // namespace mongo::classic_runtime_planner_for_sbe

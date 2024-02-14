@@ -1028,14 +1028,14 @@ public:
     PrepareExecutionHelper(OperationContext* opCtx,
                            const MultipleCollectionAccessor& collections,
                            CanonicalQuery* cq,
-                           const QueryPlannerParams& plannerOptions)
+                           const QueryPlannerParams& plannerParams)
         : _opCtx{opCtx},
           _collections{collections},
           _cq{cq},
-          _providedPlannerParams{plannerOptions},
+          _providedPlannerParams{plannerParams},
           _result{std::make_unique<ResultType>()} {
         invariant(_cq);
-        _plannerParams = plannerOptions;
+        _plannerParams = plannerParams;
     }
 
     /**
@@ -1664,9 +1664,10 @@ private:
     };
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildSubPlan() final {
-        // TODO SERVER-85241 Use classic sub-planner to create composite solution.
-        MONGO_UNIMPLEMENTED_TASSERT(8523406);
-        return nullptr;
+        auto result = releaseResult();
+        result->runtimePlanner =
+            std::make_unique<crp_sbe::SubPlanner>(_opCtx, makePlannerData(), _yieldPolicy);
+        return result;
     }
 
     std::unique_ptr<SbeWithClassicRuntimePlanningResult> buildMultiPlan(
@@ -1806,7 +1807,7 @@ getSlotBasedExecutorWithClassicRuntimePlanning(OperationContext* opCtx,
         std::move(canonicalQuery),
         yieldPolicy,
         std::move(sbeYieldPolicy),
-        plannerParams.options,
+        plannerParams,
     };
     auto planningResultWithStatus = helper.prepare();
     if (!planningResultWithStatus.isOK()) {

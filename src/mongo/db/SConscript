@@ -1655,6 +1655,7 @@ execEnv.Library(
         'query/classic_runtime_planner_for_sbe/multi_planner.cpp',
         'query/classic_runtime_planner_for_sbe/planner_interface.cpp',
         'query/classic_runtime_planner_for_sbe/single_solution_passthrough_planner.cpp',
+        'query/classic_runtime_planner_for_sbe/sub_planner.cpp',
         'query/cost_model/on_coefficients_change_updater_impl.cpp',
         'query/cqf_command_utils.cpp',
         'query/cqf_fast_paths.cpp',
