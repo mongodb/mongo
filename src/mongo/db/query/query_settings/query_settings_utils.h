@@ -93,6 +93,11 @@ QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>&
 namespace utils {
 
 /**
+ * @brief Helper to check if QuerySettings are empty.
+ */
+bool isEmpty(const QuerySettings& settings);
+
+/**
  * Runs all validation rules on the 'setQuerySettings' command.
  */
 void validateQuerySettings(const QueryShapeConfiguration& config,

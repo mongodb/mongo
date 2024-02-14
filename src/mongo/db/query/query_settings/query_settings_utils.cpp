@@ -229,6 +229,15 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
 
 namespace utils {
 
+bool isEmpty(const QuerySettings& settings) {
+    // The `serialization_context` field is not significant.
+    // TODO: SERVER-86499 Consider having this generated from IDL.
+    static_assert(
+        QuerySettings::fieldNames.size() == 4,
+        "A new field has been added to QuerySettings, isEmpty should be updated appropriately.");
+    return !(settings.getQueryFramework() || settings.getIndexHints() || settings.getReject());
+}
+
 /**
  * Returns the namespace field of the hint, in case it is present. In case it is not present, it
  * returns the inferred namespace or throws an error if multiple collections are involved.

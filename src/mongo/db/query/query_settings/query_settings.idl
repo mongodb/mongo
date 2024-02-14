@@ -86,6 +86,9 @@ structs:
         type: QueryFramework
         optional: true
         stability: unstable
+      reject:
+        type: optionalBool
+        stability: unstable
 
   QueryShapeConfiguration:
     description: >-

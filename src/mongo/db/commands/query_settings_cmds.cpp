@@ -97,7 +97,21 @@ QuerySettings mergeQuerySettings(const QuerySettings& lhs, const QuerySettings& 
         querySettings.setIndexHints(rhs.getIndexHints());
     }
 
+    // Note: update if reject has a value in the rhs, not just if that value is true.
+    if (rhs.getReject().has_value()) {
+        querySettings.setReject(rhs.getReject());
+    }
+
     return querySettings;
+}
+
+void simplifyQuerySettings(QuerySettings& settings) {
+    // If reject is present, but is false, set to an empty optional.
+    // This is not strictly necessary, as isEmpty treats OptionalBool(false)
+    // as empty.
+    if (!settings.getReject().has_value()) {
+        settings.setReject({});
+    }
 }
 
 /**
@@ -196,6 +210,11 @@ public:
             utils::validateQuerySettings(newQueryShapeConfiguration,
                                          representativeQueryInfo,
                                          request().getDbName().tenantId());
+            simplifyQuerySettings(newQueryShapeConfiguration.getSettings());
+            uassert(8587401,
+                    "QuerySettings would be empty (all default settings), nothing to store, no "
+                    "action needed",
+                    !utils::isEmpty(newQueryShapeConfiguration.getSettings()));
 
             // Append 'newQueryShapeConfiguration' to the list of all 'QueryShapeConfigurations' for
             // the given database / tenant.
@@ -215,6 +234,11 @@ public:
             // Compute the merged query settings.
             auto mergedQuerySettings =
                 mergeQuerySettings(currentQueryShapeConfiguration.getSettings(), newQuerySettings);
+            simplifyQuerySettings(mergedQuerySettings);
+            uassert(8587402,
+                    "Resulting QuerySettings would be empty (all default settings), use "
+                    "removeQuerySettings instead",
+                    !utils::isEmpty(mergedQuerySettings));
 
             // Build the new 'settingsArray' by updating the existing QueryShapeConfiguration with
             // the 'mergedQuerySettings'.

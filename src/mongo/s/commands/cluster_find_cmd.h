@@ -159,7 +159,7 @@ public:
             // applied on the shards.
             auto querySettings = lookupQuerySettings(expCtx, *parsedFind);
             findCommand = std::move(parsedFind->findCommandRequest);
-            if (!querySettings.toBSON().isEmpty()) {
+            if (!query_settings::utils::isEmpty(querySettings)) {
                 findCommand->setQuerySettings(std::move(querySettings));
             }
 
