@@ -29,7 +29,7 @@
 # A python script to run the WT tool verify command.
 # This script wraps the wt util tool and takes in arguments for the tool,
 # handles the output and provides additional processing options on the output
-# such as pretty printed output and visualisation options.
+# such as pretty printed output and visualization options.
 
 # This script only supports Row store and Variable Length Column Store (VLCS).
 # Fixed Length Column Store (FLCS) is not supported.
@@ -37,13 +37,35 @@
 import argparse
 import os
 import subprocess
-import sys
 import json
-import matplotlib.pyplot as plt
+import sys
 import re
+import matplotlib
+matplotlib.use('WebAgg')
+import matplotlib.pyplot as plt
+import mpld3
+from mpld3._server import serve
 
 SEPARATOR = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n"
 WT_OUTPUT_FILE = "wt_output_file.txt"
+HISTOGRAM_CHOICES = ["page_mem_size", "dsk_mem_size", "entries"]
+PIE_CHART_CHOICES = ["page_type"]
+ALL_VISUALIZATION_CHOICES = HISTOGRAM_CHOICES + PIE_CHART_CHOICES
+
+PLOT_COLORS = {
+    "dsk_mem_size": {"internal": "#ff69b4", "leaf": "#ffb3ba"},
+    "page_mem_size": {"internal": "#4169e1", "leaf": "#bae1ff"},
+    "entries": {"internal": "#40e0d0", "leaf": "#baffc9"},
+    "page_type": ["#ff7f50", "#ffdfba"],
+}
+TITLE_SIZE = 20
+
+FIELD_TITLES = {
+    "dsk_mem_size": "on disk size",
+    "page_mem_size": "in memory size",
+    "entries": "entries",
+    "page_type": "page type ratio"
+}
 
 def output_pretty(output):
     """
@@ -148,11 +170,82 @@ def parse_output():
                 is_root_node = False
     return output
 
-def visualize(data, visualization_type):
+
+def histogram(field, chkpt, chkpt_name):
     """
-    Visualizing data
+    Rendering histogram in HTML for the specified field for leaf and internal pages 
     """
-    pass
+    internal = []
+    leaf = []
+    for metadata in chkpt.values():
+        if field in metadata:
+            if "internal" in metadata["page_type"]:
+                internal.append(metadata[field])
+            elif "leaf" in metadata["page_type"]:
+                leaf.append(metadata[field])
+
+    # plot the histograms
+    fig, ax = plt.subplots(2, figsize=(15, 10))
+    ax[0].hist(internal, bins=50, color=PLOT_COLORS[field]["internal"], label="internal")
+    ax[1].hist(leaf, bins=50, color=PLOT_COLORS[field]["leaf"], label="leaf")
+    ax[0].set_title(chkpt_name + " - Internal and leaf page " + FIELD_TITLES[field], fontsize=TITLE_SIZE)
+
+    for subplot in ax:
+        subplot.legend()
+        if field == "entries":
+            subplot.set_xlabel(field)
+        else:
+            subplot.set_xlabel(field + ' (bytes)')
+        subplot.set_ylabel('Number of pages')
+
+    imgs = mpld3.fig_to_html(fig) 
+    plt.close()
+    return imgs
+
+
+def pie_chart(field, chkpt, chkpt_name):
+    """
+    Rendering pie chart in HTML for the specified field for leaf and internal pages 
+    """
+    num_internal = 0
+    num_leaf = 0
+    for metadata in chkpt.values():
+        if field in metadata:
+            if "internal" in metadata["page_type"]:
+                num_internal += 1
+            elif "leaf" in metadata["page_type"]:
+                num_leaf += 1
+    labels = ["internal - " + str(num_internal), "leaf - " + str(num_leaf)]
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+    plt.title(chkpt_name + " - " + FIELD_TITLES[field], fontsize=TITLE_SIZE)
+    ax.pie([num_internal, num_leaf], labels=labels, autopct='%1.1f%%', colors=PLOT_COLORS[field])
+    imgs = mpld3.fig_to_html(fig)
+    plt.close()
+    return imgs
+
+
+def visualize_chkpt(tree_data, field):
+    """
+    Visualize a specified field for every existing checkpoint
+    """
+    imgs = ""
+    for chkpt_name, chkpt in tree_data.items():
+        if field in HISTOGRAM_CHOICES:
+            imgs += histogram(field, chkpt, chkpt_name)
+        elif field in PIE_CHART_CHOICES:
+            imgs += pie_chart(field, chkpt, chkpt_name)
+    return imgs
+
+
+def visualize(tree_data, fields):
+    """
+    Visualize all specified fields for all checkpoints
+    """
+    imgs = ""
+    for field in fields:
+        imgs += visualize_chkpt(tree_data, field)
+    serve(imgs)
 
 
 def execute_command(command):
@@ -182,7 +275,7 @@ def find_wt_exec_path():
     
     We expect to find exactly one wt binary. Otherwise exit and prompt the user to provide an explicit path to the binary
     """
-    wiredtiger_root_dir = f"{os.path.dirname(os.path.abspath(__file__))}/../."
+    wiredtiger_root_dir = f"{os.path.dirname(os.path.abspath(__file__))}/../../"
 
     try:
         result = subprocess.run(['find', wiredtiger_root_dir, '-maxdepth', '2', '-name', 'wt'],
@@ -232,8 +325,8 @@ def main():
     parser.add_argument('-o', '--output_file', help='Optionally save output to the provided output file.')
     parser.add_argument('-d', '--dump', required=True, choices=['dump_pages'], help='Option to specify dump_pages configuration.')
     parser.add_argument('-p', '--print_output', action='store_true', default=False, help='Print the output to stdout (default is off)')
-    parser.add_argument('-v', '--visualize', choices=['page_sizes', 'entries', 'dsk_image_sizes'], nargs='+',
-                        help='Type of visualization (multiple options allowed).')
+    parser.add_argument('-v', '--visualize', choices=ALL_VISUALIZATION_CHOICES, nargs='*',
+                        help='Type of visualization (multiple options allowed). If no options are provided, all available data is visualized.')
 
     args = parser.parse_args()
     command = construct_command(args)
@@ -257,7 +350,9 @@ def main():
     if args.print_output:
         print(output_pretty(parsed_data))
 
-    if args.visualize:
+    if args.visualize is not None:
+        if not args.visualize:
+            args.visualize = ALL_VISUALIZATION_CHOICES
         visualize(parsed_data, args.visualize)
 
 if __name__ == "__main__":
