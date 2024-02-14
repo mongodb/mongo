@@ -37,17 +37,16 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo::timeseries::bucket_catalog {
 const std::string testDbName = "db_timeseries_insertion_ordered_column_map_test";
 const TimeseriesOptions kTimeseriesOptions("time");
 
-class InsertionOrderedColumnMapTest : public CatalogTestFixture {
+class InsertionOrderedColumnMapTest : public unittest::Test {
 protected:
-    using CatalogTestFixture::setUp;
-
     void setUp() override {}
     void tearDown() override {
         iocm._assertInternalStateIdentical_forTest();
@@ -258,5 +257,24 @@ TEST_F(InsertionOrderedColumnMapTest, InitBuilders) {
     invariant(i == 3);
 }
 
+TEST_F(InsertionOrderedColumnMapTest, GetBuilder) {
+    std::vector<BSONElement> elems;
+    BSONObj bucketDocDataFields = genBucketDoc().getOwned();
+    for (auto dataField : bucketDocDataFields) {
+        elems.push_back(dataField);
+    }
+
+    iocm.insertOne(elems);
+
+    ASSERT_EQ(iocm.getBuilder("time").numInterleavedStartWritten(), 0);
+    ASSERT_EQ(iocm.getBuilder("a").numInterleavedStartWritten(), 0);
+    ASSERT_EQ(iocm.getBuilder("b").numInterleavedStartWritten(), 0);
+}
+
+DEATH_TEST_REGEX_F(InsertionOrderedColumnMapTest,
+                   GetBuilderForNonexistentField,
+                   "Invariant failure.*") {
+    iocm.getBuilder("time");
+}
 
 }  // namespace mongo::timeseries::bucket_catalog

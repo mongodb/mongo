@@ -39,8 +39,7 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
         const char* binData = columnValue.binData(binLength);
         // TODO(SERVER-84234): Handle BSONColumnConstructor throwing.
         _builders.emplace(key,
-                          std::make_pair(numMeasurements,
-                                         std::make_unique<BSONColumnBuilder>(binData, binLength)));
+                          std::make_pair(numMeasurements, BSONColumnBuilder(binData, binLength)));
         _insertionOrder.emplace_back(key);
         _insertionOrderSize += key.size();
     }
@@ -49,9 +48,9 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
 
 void InsertionOrderedColumnMap::_insertNewKey(const std::string& key,
                                               const BSONElement& elem,
-                                              std::unique_ptr<BSONColumnBuilder> builder,
+                                              BSONColumnBuilder builder,
                                               size_t numMeasurements) {
-    builder->append(elem);
+    builder.append(elem);
     _builders.emplace(key, std::make_pair(numMeasurements, std::move(builder)));
     _insertionOrder.emplace_back(key);
     _insertionOrderSize += key.size();
@@ -68,7 +67,7 @@ void InsertionOrderedColumnMap::_fillSkipsInMissingFields() {
         if (numMeasurements != numExpectedMeasurements) {
             invariant((numMeasurements + 1) == numExpectedMeasurements,
                       "Measurement count should only be off by one when inserting measurements.");
-            builder->skip();
+            builder.skip();
             ++numMeasurements;
         }
     }
@@ -80,15 +79,14 @@ void InsertionOrderedColumnMap::insertOne(std::vector<BSONElement> oneMeasuremen
 
         auto builderIt = _builders.find(key);
         if (builderIt == _builders.end()) {
-            std::unique_ptr<BSONColumnBuilder> columnBuilder =
-                std::make_unique<BSONColumnBuilder>();
+            BSONColumnBuilder columnBuilder;
             for (size_t i = 0; i < _measurementCount; ++i) {
-                columnBuilder->skip();
+                columnBuilder.skip();
             }
             _insertNewKey(key.toString(), elem, std::move(columnBuilder), _measurementCount + 1);
         } else {
             auto& [numMeasurements, columnBuilder] = builderIt->second;
-            columnBuilder->append(elem);
+            columnBuilder.append(elem);
             ++numMeasurements;
         }
     }
@@ -120,7 +118,7 @@ void InsertionOrderedColumnMap::_assertInternalStateIdentical_forTest() {
     for (auto& [key, pairValue] : _builders) {
         keySizes += key.size();
         auto& [numMeasurements, builder] = pairValue;
-        BSONBinData binData = builder->finalize();
+        BSONBinData binData = builder.finalize();
         BSONColumn col(binData);
 
         invariant(col.size() == numMeasurements);

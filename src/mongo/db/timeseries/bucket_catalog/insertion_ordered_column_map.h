@@ -76,8 +76,8 @@ public:
      */
     void initBuilders(BSONObj bucketDataDocWithCompressedBuilders, size_t numMeasurements);
 
-    BSONColumnBuilder* getBuilder(std::string key) {
-        return _builders[key].second.get();
+    BSONColumnBuilder& getBuilder(std::string key) {
+        return _builders[key].second;
     }
 
     /**
@@ -101,10 +101,10 @@ private:
     std::string _getDirect();
     void _insertNewKey(const std::string& key,
                        const BSONElement& elem,
-                       std::unique_ptr<BSONColumnBuilder> builder,
+                       BSONColumnBuilder builder,
                        size_t numMeasurements = 1);
 
-    using MeasurementCountAndBuilder = std::pair<size_t, std::unique_ptr<BSONColumnBuilder>>;
+    using MeasurementCountAndBuilder = std::pair<size_t, BSONColumnBuilder>;
     StringMap<MeasurementCountAndBuilder> _builders;
     std::vector<std::string> _insertionOrder;  // keys, stored in insertion order
     size_t _insertionOrderSize{0};

@@ -840,9 +840,9 @@ BSONObj buildCompressedBucketDataFieldDocEfficiently(
     BSONObjBuilder dataBuilder = bucketBuilder.subobjStart(kBucketDataFieldName);
     for (boost::optional<std::string> key = batchBuilders.begin(); key != boost::none;
          key = batchBuilders.next()) {
-        BSONColumnBuilder* dataFieldColumnBuilder = batchBuilders.getBuilder(*key);
+        BSONColumnBuilder& dataFieldColumnBuilder = batchBuilders.getBuilder(*key);
         BufBuilder buf;
-        std::pair<int, int> anchors = dataFieldColumnBuilder->intermediate(buf);
+        std::pair<int, int> anchors = dataFieldColumnBuilder.intermediate(buf);
         offsets[*key] = anchors.first;
         dataBuilder.append(*key, BSONBinData(buf.buf(), buf.len(), BinDataType::Column));
     }
