@@ -119,13 +119,6 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
 }
 
 void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
-    // Bucket is not compressed, likely because compression failed.
-    // TODO SERVER-86072: This should no longer be possible with a retry mechanism on bucket
-    // compression failure.
-    if (!bucket.compressedBucketDoc) {
-        return;
-    }
-
     ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, bucket.key.ns);
     stats.incNumBytesUncompressed(bucket.uncompressedBucketDoc.objsize());
     stats.incNumBytesCompressed(bucket.compressedBucketDoc->objsize());
