@@ -1,45 +1,93 @@
 # These paths are relative to the directory containing this configuration file
 files:
-    - evaluated_evergreen.yml
+  - evaluated_evergreen.yml
 help_url: https://wiki.corp.mongodb.com/pages/viewpage.action?pageId=133273894
 
 rules:
-    # keyval.inc is a deprecated command. This rule is to prevent the
-    # proliferation of it.
-    - rule: "limit-keyval-inc"
-      # the maximum number of keyval.inc commands to allow in your YAML
-      limit: 4
-    # With the extraction of shell scripts from the Evergreen YAML, we expect
-    # users to source a script called `prelude.sh`. This script requires that
-    # the user be in ${workdir}, so we forbid users from `cd`ing with
-    # `working_dir` parameter.
-    - rule: "no-working-dir-on-shell"
-    # Embedding shell.exec scripts in the Evergreen yaml has been a historical
-    # source of pain:
-    #  * No ability to lint/shellcheck
-    #  * Distraction from the build matrix
-    #  * Tons of scrolling to get anywhere.
-    # We completed a project to completely eject all shell scripts from the
-    # YAML, and now require this of all shell scripts. Add your scripts to the
-    # evergreen/ directory, and make use of subprocess.exec.
-    - rule: "no-shell-exec"
-    # Historically, expansions.update has been used to inject shell scripts
-    # into expansions, which were then used to inject commonly used snippets
-    # as required. With the extraction of the shell scripts, the correct
-    # paradigm is to source a script in the evergreen/ directory, or to add a
-    # function to `evergreen/prelude.sh`.
-    - rule: "no-multiline-expansions-update"
-    # To prevent the proliferation of undocumented build-parameters, we require
-    # params to have a non-empty description, and a name matching [a-z][a-z0-9_]*.
-    - rule: "invalid-build-parameter"
-    # To ensure that the expansions file loaded by prelude.sh is not stale, we
-    # require the user to add sometimes superfluous expansions.write calls to
-    # ere on side of correctness.
-#    - rule: "required-expansions-write"
-#      regex: .*\/evergreen\/.*\.sh
-    # Generated tests must depend on build_variant_gen (which generates the
-    # tasks that contain them) and archive_dist_test (which contains
-    # built assets).
-    - rule: "dependency-for-func"
-      dependencies:
-        generate resmoke tasks: ["build_variant_gen", "archive_dist_test"]
+  # keyval.inc is a deprecated command. This rule is to prevent the
+  # proliferation of it.
+  - rule: "limit-keyval-inc"
+    # the maximum number of keyval.inc commands to allow in your YAML
+    limit: 4
+
+  # # With the extraction of shell scripts from the Evergreen YAML, we expect
+  # # users to source a script called `prelude.sh`. This script requires that
+  # # the user be in ${workdir}, so we forbid users from `cd`ing with
+  # # `working_dir` parameter.
+  # - rule: "no-working-dir-on-shell"
+
+  # # Embedding shell.exec scripts in the Evergreen yaml has been a historical
+  # # source of pain:
+  # #  * No ability to lint/shellcheck
+  # #  * Distraction from the build matrix
+  # #  * Tons of scrolling to get anywhere.
+  # # We completed a project to completely eject all shell scripts from the
+  # # YAML, and now require this of all shell scripts. Add your scripts to the
+  # # evergreen/ directory, and make use of subprocess.exec.
+  # - rule: "no-shell-exec"
+
+  # Historically, expansions.update has been used to inject shell scripts
+  # into expansions, which were then used to inject commonly used snippets
+  # as required. With the extraction of the shell scripts, the correct
+  # paradigm is to source a script in the evergreen/ directory, or to add a
+  # function to `evergreen/prelude.sh`.
+  - rule: "no-multiline-expansions-update"
+
+  # To prevent the proliferation of undocumented build-parameters, we require
+  # params to have a non-empty description, and a name matching [a-z][a-z0-9_]*.
+  - rule: "invalid-build-parameter"
+
+  # # To ensure that the expansions file loaded by prelude.sh is not stale, we
+  # # require the user to add sometimes superfluous expansions.write calls to
+  # # ere on side of correctness.
+  # - rule: "required-expansions-write"
+  #   regex: .*\/evergreen\/.*\.sh
+
+  # Generated tests must depend on build_variant_gen (which generates the
+  # tasks that contain them) and archive_dist_test (which contains
+  # built assets).
+  - rule: "dependency-for-func"
+    dependencies:
+      generate resmoke tasks: ["version_gen", "archive_dist_test_debug"]
+
+  - rule: "enforce-tags-for-tasks"
+    tag_groups:
+      # All tasks should have team assignment tags
+      - group_name: "team_assignment_tags"
+        tag_regex: assigned_to_jira_team_.+
+        # Team names (the part after "assigned_to_jira_team_") should match `evergreen_tag_name`
+        # from team configurations in mothra: https://github.com/10gen/mothra/tree/main/mothra/teams
+        #
+        # If the tag list is missing your team:
+        #   1) make sure that your team configuration exists or add it in mothra
+        #   2) make sure that your team configuration has `evergreen_tag_name`
+        #   3) update the tag list with `assigned_to_jira_team_{evergreen_tag_name}` for your team
+        tag_list:
+          # https://github.com/10gen/mothra/blob/main/mothra/teams/database.yaml
+          - assigned_to_jira_team_server_catalog_and_routing
+          - assigned_to_jira_team_server_cluster_scalability
+          - assigned_to_jira_team_server_query_execution
+          - assigned_to_jira_team_server_query_optimization
+          - assigned_to_jira_team_server_query_integration
+          - assigned_to_jira_team_server_repl
+          - assigned_to_jira_team_server_security
+          - assigned_to_jira_team_server_servicearch
+          - assigned_to_jira_team_server_execution
+          - assigned_to_jira_team_server_storage_engines
+
+          # https://github.com/10gen/mothra/blob/main/mothra/teams/rnd_dev_prod.yaml
+          - assigned_to_jira_team_devprod_build
+          - assigned_to_jira_team_devprod_correctness
+          - assigned_to_jira_team_devprod_infrastructure
+          - assigned_to_jira_team_devprod_evergreen_app
+          - assigned_to_jira_team_devprod_evergreen_ui
+          - assigned_to_jira_team_devprod_performance_infrastructure
+          - assigned_to_jira_team_devprod_performance_analysis
+          - assigned_to_jira_team_devprod_release_infrastructure
+          - assigned_to_jira_team_devprod_runtime_environments
+          - assigned_to_jira_team_devprod_services_integrations
+
+          # https://github.com/10gen/mothra/blob/main/mothra/teams/et.yaml
+          - assigned_to_jira_team_streams
+        min_num_of_tags: 1
+        max_num_of_tags: 1

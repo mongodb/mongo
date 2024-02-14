@@ -7,6 +7,11 @@ variables:
 - &gen_burn_in_task_template
   name: gen_burn_in_task_template
   depends_on:
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
   - name: version_burn_in_gen
     variant: generate-tasks-for-version
     # This is added because of EVG-18211.
@@ -212,7 +217,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_streams
-  tags: ["assigned_to_jira_team_atlas_streams", "benchmarks"]
+  tags: ["assigned_to_jira_team_streams", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -224,14 +229,14 @@ tasks:
 
 - <<: *task_template
   name: streams
-  tags: ["assigned_to_jira_team_atlas_streams"]
+  tags: ["assigned_to_jira_team_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: streams_kafka
-  tags: ["assigned_to_jira_team_atlas_streams"]
+  tags: ["assigned_to_jira_team_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"

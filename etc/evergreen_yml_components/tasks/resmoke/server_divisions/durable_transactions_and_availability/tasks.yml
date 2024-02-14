@@ -756,7 +756,7 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
-- <<: *task_template
+- <<: *gen_task_template
   name: replica_sets_kill_secondaries_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_repl", "replica_sets", "san", "large", "non_live_record", "ignore_on_code_coverage"]
   commands:
@@ -1084,7 +1084,7 @@ tasks:
         --fuzzMongodConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
 
-- <<: *task_template
+- <<: *gen_task_template
   name: config_fuzzer_concurrency_replication_gen
   tags: ["assigned_to_jira_team_server_execution", "config_fuzzer", "large"]
   commands:
@@ -1110,7 +1110,7 @@ tasks:
       use_large_distro: "true"
       resmoke_jobs_max: 1
 
-- <<: *task_template
+- <<: *gen_task_template
   name: config_fuzzer_concurrency_simultaneous_replication_gen
   tags: ["assigned_to_jira_team_server_execution", "config_fuzzer", "large"]
   commands:
@@ -1134,7 +1134,7 @@ tasks:
         --fuzzMongodConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
 
-- <<: *task_template
+- <<: *gen_task_template
   name: config_fuzzer_replica_sets_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_execution", "config_fuzzer", "large"]
   commands:
@@ -1146,7 +1146,7 @@ tasks:
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
 
-- <<: *task_template
+- <<: *gen_task_template
   name: config_fuzzer_sharding_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_execution", "config_fuzzer", "large"]
   commands:
@@ -1159,7 +1159,7 @@ tasks:
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
 
-- <<: *task_template
+- <<: *gen_task_template
   name: config_fuzzer_simulate_crash_concurrency_replication_gen
   tags: ["assigned_to_jira_team_server_execution", "config_fuzzer", "large", "linux_only"]
   commands:
@@ -1171,7 +1171,7 @@ tasks:
         --excludeWithAnyTags=does_not_support_config_fuzzer
       use_large_distro: "true"
 
-- <<: *task_template
+- <<: *gen_task_template
   name: config_fuzzer_stress_concurrency_replication_gen
   tags: ["assigned_to_jira_team_server_execution", "config_fuzzer_stress"]
   commands:
@@ -1203,6 +1203,7 @@ tasks:
 
 - <<: *task_template
   name: disk_wiredtiger
+  tags: ["assigned_to_jira_team_server_execution"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1319,7 +1320,7 @@ tasks:
       resmoke_jobs_max: 1
       use_large_distro: "true"
 
-- <<: *task_template
+- <<: *gen_task_template
   name: timeseries_crud_jscore_passthrough_gen
   tags: ["assigned_to_jira_team_server_execution", "timeseries_crud"]
   commands:
