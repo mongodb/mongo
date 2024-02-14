@@ -5,14 +5,11 @@ selector:
   - jstests/core/**/*.js
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
+  - jstests/libs/random_data_shard_suite_selftest.js
 
   exclude_files:
   # These tests are run in sharded_jscore_txns.
   - jstests/core/txns/**/*.js
-  # TODO: SERVER-83396 Enable once unsplittable collections are created through the create command
-  - jstests/core/ddl/create_collection.js
-  - jstests/core/failcommand_failpoint.js
-  - jstests/core/views/views_collation.js
 
   # TODO: SERVER-82802 Enable after fixing system.js feature with collections living outside the primary
   - jstests/core/**/mr_stored.js
@@ -67,8 +64,6 @@ selector:
   - assumes_against_mongod_not_mongos
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
-  # TODO: SERVER-83396 Remove this.
-  - assumes_no_implicit_collection_creation_on_get_collection
   # TODO: SERVER-81937 Enable transaction tests
   - uses_transactions
 
@@ -79,9 +74,6 @@ executor:
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
     tests: true
-  config:
-    shell_options:
-      eval: load("jstests/libs/override_methods/implicitly_create_unsplittable_collections_on_random_shards.js")
   hooks:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
@@ -96,6 +88,10 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn

@@ -39,11 +39,9 @@ function getCacheEntryForQuery(query) {
     const match = {
         planCacheKey: getPlanCacheKeyFromShape({query: query, collection: coll, db: db})
     };
-    const aggRes = FixtureHelpers.getPrimaryForNodeHostingDatabase(db)
-                       .getCollection(coll.getFullName())
-                       .aggregate([{$planCacheStats: {}}, {$match: match}])
-                       .toArray();
-    assert.lte(aggRes.length, 1);
+    const aggRes = coll.aggregate([{$planCacheStats: {}}, {$match: match}]).toArray();
+
+    assert.lte(aggRes.length, FixtureHelpers.numberOfShardsForCollection(coll));
     if (aggRes.length > 0) {
         return aggRes[0];
     }

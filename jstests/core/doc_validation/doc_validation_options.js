@@ -35,22 +35,21 @@ assert.commandWorked(t.runCommand("collMod", {validationAction: "warn"}));
 t.update({}, {$set: {a: 2}});
 assert.eq(1, t.find({a: 2}).itcount());
 
-// check log for message
-// use getPrimaryForNodeHostingDatabase to return a connection to the db or the primary node
-// if the db is sharded, so we can specifically search logs of the node which owns the
-// document that generated the warning.
-const conn = FixtureHelpers.getPrimaryForNodeHostingDatabase(db);
+// check log for message. In case of sharded deployments, look on all shards and expect the log to
+// be found on one of them.
 const logId = 20294;
 const errInfo = {
     failingDocumentId: 1,
     details:
         {operatorName: "$eq", specifiedAs: {a: 1}, reason: "comparison failed", consideredValue: 2}
 };
-checkLog.containsJson(conn, logId, {
+
+const nodesToCheck = FixtureHelpers.isStandalone(db) ? [db] : FixtureHelpers.getPrimaries(db);
+assert(nodesToCheck.some((conn) => checkLog.checkContainsOnceJson(conn, logId, {
     "errInfo": function(obj) {
         return documentEq(obj, errInfo);
     }
-});
+})));
 
 // make sure persisted
 const info = db.getCollectionInfos({name: t.getName()})[0];

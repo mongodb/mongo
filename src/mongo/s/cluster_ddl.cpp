@@ -37,7 +37,6 @@
 #include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
@@ -53,13 +52,13 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_ddl.h"
-#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/router_role.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 
@@ -69,6 +68,8 @@
 namespace mongo {
 namespace cluster {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(createUnshardedCollectionRandomizeDataShard);
 
 std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
     OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
@@ -158,6 +159,35 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
 void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request) {
     const auto& nss = request.getNamespace();
     const auto dbInfo = createDatabase(opCtx, nss.dbName());
+
+    if (MONGO_unlikely(createUnshardedCollectionRandomizeDataShard.shouldFail()) &&
+        request.getUnsplittable() && !request.getDataShard()) {
+        // Select a random 'dataShard'.
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        const auto allShardIds = shardRegistry->getAllShardIds(opCtx);
+        std::random_device random_device;
+        std::mt19937 engine{random_device()};
+        std::uniform_int_distribution<int> dist(0, allShardIds.size() - 1);
+
+        ShardsvrCreateCollection requestWithRandomDataShard(request);
+        requestWithRandomDataShard.setDataShard(allShardIds[dist(engine)]);
+
+        LOGV2_DEBUG(8339600,
+                    2,
+                    "Selected a random data shard for createCollection",
+                    "nss"_attr = nss,
+                    "dataShard"_attr = *requestWithRandomDataShard.getDataShard());
+
+        try {
+            createCollection(opCtx, requestWithRandomDataShard);
+            return;
+        } catch (const ExceptionFor<ErrorCodes::AlreadyInitialized>&) {
+            // If the collection already exists but we randomly selected a dataShard that turns out
+            // to be different than the current one, then createCollection will fail with
+            // AlreadyInitialized error. However, this error can also occur for other reasons. So
+            // let's run createCollection again without selecting a random dataShard.
+        }
+    }
 
     auto cmdObj = request.toBSON({});
     BSONObjBuilder builder;

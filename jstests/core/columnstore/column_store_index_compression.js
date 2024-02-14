@@ -65,16 +65,31 @@ class IndexStatsReader {
             return nonConfigNodes.length > 0;
         });
 
+        const shardIdsOwningChunks = FixtureHelpers.isMongos(db)
+            ? FixtureHelpers.getShardsOwningDataForCollection(collection)
+            : undefined;
+
         for (let node of nonConfigNodes) {
             const conn = this.connections[node] ||
                 (this.connections[node] = IndexStatsReader.openConnectionToMongod(node));
             if (conn) {
                 const remoteDB = conn.getDB(collection.getDB().getName());
 
+                function nodeOwnsDataForCollection(conn) {
+                    if (FixtureHelpers.isMongos(db)) {
+                        const thisConnShardId = conn.getDB('admin')['system.version']
+                                                    .findOne({_id: 'shardIdentity'})
+                                                    .shardName;
+                        return shardIdsOwningChunks.includes(thisConnShardId);
+                    } else {
+                        // On non-sharded deployments, this mongod must always own the collection.
+                        true;
+                    }
+                }
+
                 // Check if this mongod has the collection - in same cases it may not, e.g. for
                 // non-sharded collections in sharded clusters.
-                if (!remoteDB.runCommand({listCollections: 1})
-                         .cursor.firstBatch.find(c => c.name.startsWith(collection.getName()))) {
+                if (!nodeOwnsDataForCollection(conn)) {
                     continue;
                 }
 

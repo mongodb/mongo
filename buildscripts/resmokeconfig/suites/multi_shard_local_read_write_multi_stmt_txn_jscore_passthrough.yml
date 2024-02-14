@@ -132,6 +132,7 @@ selector:
   - jstests/core/**/index_partial_read_ops.js
   - jstests/core/**/optimized_match_explain.js
   - jstests/core/**/sort_array.js
+  - jstests/core/views/views_collation.js
   - jstests/core/**/wildcard_index_count.js
   - jstests/core/**/explain_server_params.js
 

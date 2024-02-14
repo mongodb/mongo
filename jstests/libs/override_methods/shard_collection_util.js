@@ -148,40 +148,9 @@ export var ShardingOverrideCommon = (function() {
         return db.runCommand(createCmd);
     }
 
-    /**
-     * @param {*} collection name as string
-     * @returns true if unsupported, false otherwise
-     */
-    function nssCanBeTrackedByShardingCatalog(nss) {
-        for (const ns of denylistedNamespaces) {
-            if (nss.match(ns)) {
-                return true
-            }
-        }
-        return false;
-    }
-
-    // SERVER-83396 Get rid of this function
-    function createUnsplittableCollectionOnRandomShard({db, collName, opts}) {
-        let options = opts || {};
-
-        // Expected to be called only on sharded clusters
-        assert(FixtureHelpers.isMongos(db));
-
-        // Select a random shard
-        let shardName =
-            db.getSiblingDB('config').shards.aggregate([{$sample: {size: 1}}]).toArray()[0]._id;
-        options['dataShard'] = shardName;
-
-        return this.createUnsplittableCollection({db: db, collName: collName, opts: options});
-    }
-
     return {
         shardCollection: shardCollection,
         shardCollectionWithSpec: shardCollectionWithSpec,
-        nssCanBeTrackedByShardingCatalog: nssCanBeTrackedByShardingCatalog,
         createUnsplittableCollection: createUnsplittableCollection,
-        // SERVER-83396 Get rid of this function
-        createUnsplittableCollectionOnRandomShard: createUnsplittableCollectionOnRandomShard
     };
 })();

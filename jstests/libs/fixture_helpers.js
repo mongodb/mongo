@@ -75,6 +75,29 @@ export var FixtureHelpers = (function() {
     }
 
     /**
+     * Returns an array with the shardIds that own data for the given collection.
+     */
+    function getShardsOwningDataForCollection(coll) {
+        if (isSharded(coll) || isUnsplittable(coll)) {
+            return db.getSiblingDB('config')
+                .collections
+                .aggregate([
+                    {$match: {_id: coll.getFullName()}},
+                    {
+                        $lookup:
+                            {from: 'chunks', localField: 'uuid', foreignField: 'uuid', as: 'chunks'}
+                    },
+                    {$group: {_id: '$chunks.shard'}}
+                ])
+                .toArray()[0]
+                ._id;
+        } else {
+            const dbMetadata = db.getSiblingDB('config').databases.findOne({_id: coll.getDB()});
+            return dbMetadata ? dbMetadata.primary : [];
+        }
+    }
+
+    /**
      * Returns the resolved view definition for 'collName' if it is a view, 'undefined' otherwise.
      */
     function getViewDefinition(db, collName) {
@@ -215,6 +238,7 @@ export var FixtureHelpers = (function() {
         isMongos: isMongos,
         isSharded: isSharded,
         isUnsplittable: isUnsplittable,
+        getShardsOwningDataForCollection: getShardsOwningDataForCollection,
         getViewDefinition: getViewDefinition,
         numberOfShardsForCollection: numberOfShardsForCollection,
         awaitReplication: awaitReplication,

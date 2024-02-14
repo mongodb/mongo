@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/aggregation/**/*.js
+  - jstests/libs/random_data_shard_suite_selftest.js
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
@@ -34,21 +35,12 @@ selector:
   - assumes_against_mongod_not_mongos
   - requires_profiling
 
-  # This passthrough implicitly creates the accessed collections. Do not run tests where collections
-  # can't be created on `getCollection` call. (TODO SERVER-83396 Remove this).
-  - assumes_no_implicit_collection_creation_on_get_collection
-  - assumes_no_implicit_collection_creation_after_drop
-  - assumes_no_implicit_index_creation
-
 executor:
   archive:
     hooks:
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
       - ValidateCollections
-  config:
-    shell_options:
-      eval: await import("jstests/libs/override_methods/implicitly_create_unsplittable_collections_on_random_shards.js")
   hooks:
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
@@ -62,6 +54,10 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.createUnshardedCollectionRandomizeDataShard:
+          mode: alwaysOn
