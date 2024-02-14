@@ -61,6 +61,9 @@ public:
     boost::optional<Record> next() final {
         return {};
     }
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+        return {};
+    }
     boost::optional<Record> seekExact(const RecordId& id) final {
         return {};
     }

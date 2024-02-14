@@ -420,6 +420,8 @@ public:
 
     boost::optional<Record> next();
 
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion);
+
     boost::optional<Record> seekExact(const RecordId& id);
 
     boost::optional<Record> seekNear(const RecordId& start);
@@ -475,6 +477,7 @@ private:
     bool isVisible(const RecordId& id);
     void initCappedVisibility(OperationContext* opCtx);
     void reportOutOfOrderRead(RecordId& id, bool failWithOutOfOrderForTest);
+    Record getRecord(WT_CURSOR* c, const RecordId& id);
 
     /**
      * This value is used for visibility calculations on what oplog entries can be returned to a

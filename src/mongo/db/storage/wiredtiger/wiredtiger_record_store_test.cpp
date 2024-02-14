@@ -1298,7 +1298,8 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
         uow.commit();
     }
 
-    // Cursors should always ensure they are in an active transaction when seekExact() is called.
+    // Cursors should always ensure they are in an active transaction when seekExact() or seek() is
+    // called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
@@ -1317,6 +1318,15 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
         ASSERT(cursor->seekExact(rid1));
+        ASSERT_TRUE(ru->isActive());
+
+        // End the transaction and test seek()
+        {
+            WriteUnitOfWork wuow(opCtx.get());
+            wuow.commit();
+        }
+        ASSERT_FALSE(ru->isActive());
+        ASSERT(cursor->seek(rid1, SeekableRecordCursor::BoundInclusion::kInclude));
         ASSERT_TRUE(ru->isActive());
     }
 }

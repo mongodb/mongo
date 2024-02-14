@@ -350,7 +350,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
-    RecordId id1;
+    RecordId id1, id2, id3;
 
     {  // first insert a document
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -366,8 +366,14 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
+        ASSERT(record);
+        ASSERT_EQ(id1, record->id);
+        ASSERT(!cursor->next());
+
+        record = cursor->seek(id1, SeekableRecordCursor::BoundInclusion::kInclude);
         ASSERT(record);
         ASSERT_EQ(id1, record->id);
         ASSERT(!cursor->next());
@@ -395,10 +401,9 @@ TEST(RecordStoreTestHarness, OplogOrder) {
         auto client1 = harnessHelper->serviceContext()->getService()->makeClient("c1");
         auto t1 = harnessHelper->newOperationContext(client1.get());
         WriteUnitOfWork w1(t1.get());
-        RecordId id2 = _oplogOrderInsertOplog(t1.get(), rs, 20);
+        id2 = _oplogOrderInsertOplog(t1.get(), rs, 20);
         // do not commit yet
 
-        RecordId id3;
         {  // create 2nd doc
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto t2 = harnessHelper->newOperationContext(client2.get());
@@ -415,12 +420,33 @@ TEST(RecordStoreTestHarness, OplogOrder) {
 
             auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
             auto opCtx = harnessHelper->newOperationContext(client2.get());
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             auto cursor = rs->getCursor(opCtx.get());
             auto record = cursor->seekExact(id1);
             ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
             ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            // 1st doc is not yet committed, and 2nd doc (id3) is invisible to next()
             auto nextRecord = cursor->next();
             ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+            // id2 and id3 are also invisible to seekExact()
+            record = cursor->seekExact(id2);
+            ASSERT(!record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+
+            record = cursor->seek(id1, SeekableRecordCursor::BoundInclusion::kInclude);
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+            record = cursor->seek(id1, SeekableRecordCursor::BoundInclusion::kExclude);
+            ASSERT(!record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+
+            // seekExact and seekNear should still work after seek
+            record = cursor->seekExact(id1);
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            record = cursor->seekNear(id1);
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
         }
 
         {
@@ -447,6 +473,33 @@ TEST(RecordStoreTestHarness, OplogOrder) {
             ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         }
 
+        {  // Test reverse cursors and visibility
+            auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
+            auto opCtx = harnessHelper->newOperationContext(client2.get());
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
+            auto cursor = rs->getCursor(opCtx.get(), false);
+            // 2nd doc (id3) is committed and visibility filter does not apply to reverse cursor
+            auto record = cursor->seekExact(id3);
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id3, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            // 1st doc (id2) is not yet commited, so we should see id1 next.
+            auto nextRecord = cursor->next();
+            ASSERT(nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+            ASSERT_EQ(id1, nextRecord->id)
+                << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+            nextRecord = cursor->next();
+            ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+
+            record = cursor->seek(id3, SeekableRecordCursor::BoundInclusion::kInclude);
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id3, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            record = cursor->seek(id3, SeekableRecordCursor::BoundInclusion::kExclude);
+            ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+            record = cursor->seek(id1, SeekableRecordCursor::BoundInclusion::kExclude);
+            ASSERT(!record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+        }
+
         w1.commit();
     }
 
@@ -455,15 +508,25 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     {  // now all 3 docs should be visible
         auto client2 = harnessHelper->serviceContext()->getService()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         auto cursor = rs->getCursor(opCtx.get());
         auto record = cursor->seekExact(id1);
         ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
         auto nextRecord = cursor->next();
         ASSERT(nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+        ASSERT_EQ(id2, nextRecord->id) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         nextRecord = cursor->next();
         ASSERT(nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+        ASSERT_EQ(id3, nextRecord->id) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
         nextRecord = cursor->next();
         ASSERT(!nextRecord) << stringifyForDebug(opCtx.get(), nextRecord, cursor.get());
+
+        record = cursor->seek(id1, SeekableRecordCursor::BoundInclusion::kInclude);
+        ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+        ASSERT_EQ(id1, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
+        record = cursor->seek(id1, SeekableRecordCursor::BoundInclusion::kExclude);
+        ASSERT(record) << stringifyForDebug(opCtx.get(), record, cursor.get());
+        ASSERT_EQ(id2, record->id) << stringifyForDebug(opCtx.get(), record, cursor.get());
     }
 
     // Rollback the last two oplog entries, then insert entries with older optimes and ensure that

@@ -121,6 +121,9 @@ public:
     boost::optional<Record> seekNear(const RecordId& id) override {
         return boost::none;
     }
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) override {
+        return {};
+    }
     void save() override {}
     bool restore(bool tolerateCappedRepositioning) override {
         return true;

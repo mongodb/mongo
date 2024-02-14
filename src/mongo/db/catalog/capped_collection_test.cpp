@@ -751,5 +751,108 @@ TEST_F(CappedCollectionTest, SeekNearOplogWithReadTimestamp) {
     }
 }
 
+TEST_F(CappedCollectionTest, SeekOplogWithReadTimestamp) {
+    NamespaceString nss = NamespaceString::kRsOplogNamespace;
+    const auto oneSec = Timestamp(1, 0).asULL();
+    {
+        auto [c1, t1] = makeClientAndCtx("t1");
+        WriteUnitOfWork wuow(t1.get());
+        AutoGetCollection ac(t1.get(), nss, MODE_IX);
+        const CollectionPtr& oplog = ac.getCollection();
+        ASSERT_OK(_insertOplogBSON(t1.get(), oplog, RecordId(oneSec + 2)));
+        ASSERT_OK(_insertOplogBSON(t1.get(), oplog, RecordId(oneSec + 4)));
+        ASSERT_OK(_insertOplogBSON(t1.get(), oplog, RecordId(oneSec + 6)));
+        ASSERT_OK(_insertOplogBSON(t1.get(), oplog, RecordId(oneSec + 8)));
+        wuow.commit();
+    }
+
+#define checkSeek(cursor, recordNum, expectedInclusiveNum, expectedExclusiveNum)    \
+    do {                                                                            \
+        auto record = cursor->seek(RecordId(oneSec + recordNum),                    \
+                                   SeekableRecordCursor::BoundInclusion::kInclude); \
+        if (expectedInclusiveNum > 0) {                                             \
+            ASSERT(record);                                                         \
+            ASSERT_EQ(expectedInclusiveNum, record->id.getLong() - oneSec);         \
+        } else {                                                                    \
+            ASSERT(!record);                                                        \
+        }                                                                           \
+        record = cursor->seek(RecordId(oneSec + recordNum),                         \
+                              SeekableRecordCursor::BoundInclusion::kExclude);      \
+        if (expectedExclusiveNum > 0) {                                             \
+            ASSERT(record);                                                         \
+            ASSERT_EQ(expectedExclusiveNum, record->id.getLong() - oneSec);         \
+        } else {                                                                    \
+            ASSERT(!record);                                                        \
+        }                                                                           \
+    } while (0);
+
+    // Forward, no read timestamp.
+    {
+        auto [c2, t2] = makeClientAndCtx("t2");
+        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        shard_role_details::getRecoveryUnit(t2.get())->setOplogVisibilityTs(boost::none);
+        auto cursor = acr.getCollection()->getCursor(t2.get());
+        checkSeek(cursor, 1, 2, 2);
+        checkSeek(cursor, 2, 2, 4);
+        checkSeek(cursor, 3, 4, 4);
+        checkSeek(cursor, 4, 4, 6);
+        checkSeek(cursor, 5, 6, 6);
+        checkSeek(cursor, 6, 6, 8);
+        checkSeek(cursor, 7, 8, 8);
+        checkSeek(cursor, 8, 8, -1);
+        checkSeek(cursor, 9, -1, -1);
+    }
+    // Backward, no read timestamp.
+    {
+        auto [c2, t2] = makeClientAndCtx("t2");
+        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        auto cursor = acr.getCollection()->getCursor(t2.get(), false);
+        checkSeek(cursor, 1, -1, -1);
+        checkSeek(cursor, 2, 2, -1);
+        checkSeek(cursor, 3, 2, 2);
+        checkSeek(cursor, 4, 4, 2);
+        checkSeek(cursor, 5, 4, 4);
+        checkSeek(cursor, 6, 6, 4);
+        checkSeek(cursor, 7, 6, 6);
+        checkSeek(cursor, 8, 8, 6);
+        checkSeek(cursor, 9, 8, 8);
+    }
+    // Forward, with read timestamp.
+    {
+        auto [c2, t2] = makeClientAndCtx("t2");
+        shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, Timestamp(1, 6));
+        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        shard_role_details::getRecoveryUnit(t2.get())->setOplogVisibilityTs(boost::none);
+        auto cursor = acr.getCollection()->getCursor(t2.get());
+        checkSeek(cursor, 1, 2, 2);
+        checkSeek(cursor, 2, 2, 4);
+        checkSeek(cursor, 3, 4, 4);
+        checkSeek(cursor, 4, 4, 6);
+        checkSeek(cursor, 5, 6, 6);
+        checkSeek(cursor, 6, 6, -1);
+        checkSeek(cursor, 7, -1, -1);
+        checkSeek(cursor, 8, -1, -1);
+        checkSeek(cursor, 9, -1, -1);
+    }
+    // Backward, with read timestamp.
+    {
+        auto [c2, t2] = makeClientAndCtx("t2");
+        shard_role_details::getRecoveryUnit(t2.get())->setTimestampReadSource(
+            RecoveryUnit::ReadSource::kProvided, Timestamp(1, 6));
+        AutoGetCollectionForReadLockFree acr(t2.get(), nss);
+        auto cursor = acr.getCollection()->getCursor(t2.get(), false);
+        checkSeek(cursor, 1, -1, -1);
+        checkSeek(cursor, 2, 2, -1);
+        checkSeek(cursor, 3, 2, 2);
+        checkSeek(cursor, 4, 4, 2);
+        checkSeek(cursor, 5, 4, 4);
+        checkSeek(cursor, 6, 6, 4);
+        checkSeek(cursor, 7, 6, 6);
+        checkSeek(cursor, 8, 6, 6);
+        checkSeek(cursor, 9, 6, 6);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

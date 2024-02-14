@@ -2103,12 +2103,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         }
     }
 
-    if (_readTimestampForOplog && id.getLong() > *_readTimestampForOplog) {
-        _eof = true;
-        return {};
-    }
-
-    if (_forward && !isVisible(id)) {
+    if (!isVisible(id)) {
         _eof = true;
         return {};
     }
@@ -2120,14 +2115,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         reportOutOfOrderRead(id, failWithOutOfOrderForTest);
     }
 
-    WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value), c->session);
-
-    auto keyLength = computeRecordIdSize(id);
-    _metrics->incrementOneDocRead(_uri, value.size + keyLength);
-
-    _lastReturnedId = id;
-    return {{std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+    return getRecord(c, std::move(id));
 }
 
 void WiredTigerRecordStoreCursorBase::reportOutOfOrderRead(RecordId& id,
@@ -2176,15 +2164,73 @@ void WiredTigerRecordStoreCursorBase::reportOutOfOrderRead(RecordId& id,
                         "ns"_attr = namespaceForUUID(_opCtx, _uuid));
 }
 
+Record WiredTigerRecordStoreCursorBase::getRecord(WT_CURSOR* c, const RecordId& id) {
+    WT_ITEM value;
+    invariantWTOK(c->get_value(c, &value), c->session);
 
-boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
+    auto keyLength = computeRecordIdSize(id);
+    _metrics->incrementOneDocRead(_uri, value.size + keyLength);
+
+    _lastReturnedId = id;
+    return {id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}};
+}
+
+boost::optional<Record> WiredTigerRecordStoreCursorBase::seek(const RecordId& start,
+                                                              BoundInclusion boundInclusion) {
     invariant(_hasRestored);
-    if (_readTimestampForOplog && id.getLong() > *_readTimestampForOplog) {
+    dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
+
+    // Ensure an active transaction is open.
+    WiredTigerRecoveryUnit::get(_opCtx)->getSession();
+    _skipNextAdvance = false;
+    WT_CURSOR* c = _cursor->get();
+
+    // We must unposition our cursor by resetting so that we can set new bounds.
+    invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
+
+    const char* config;
+    // The default bound is inclusive.
+    if (_forward) {
+        auto key = makeCursorKey(start, _keyFormat);
+        setKey(c, &key);
+        config = boundInclusion == BoundInclusion::kExclude ? "bound=lower,inclusive=false"
+                                                            : "bound=lower";
+    } else {
+        if (_readTimestampForOplog && start.getLong() > *_readTimestampForOplog) {
+            auto key = makeCursorKey(RecordId(*_readTimestampForOplog), _keyFormat);
+            setKey(c, &key);
+            config = "bound=upper";
+        } else {
+            auto key = makeCursorKey(start, _keyFormat);
+            setKey(c, &key);
+            config = boundInclusion == BoundInclusion::kExclude ? "bound=upper,inclusive=false"
+                                                                : "bound=upper";
+        }
+    }
+    invariantWTOK(c->bound(c, config), c->session);
+
+    int ret =
+        wiredTigerPrepareConflictRetry(_opCtx, [&] { return _forward ? c->next(c) : c->prev(c); });
+    if (ret == WT_NOTFOUND) {
+        _eof = true;
+        return {};
+    }
+    invariantWTOK(ret, c->session);
+    RecordId id = getKey(c);
+
+    if (!isVisible(id)) {
         _eof = true;
         return {};
     }
 
-    if (_forward && !isVisible(id)) {
+    _eof = false;
+    _metrics->incrementOneCursorSeek(_uri);
+    return getRecord(c, std::move(id));
+}
+
+boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
+    invariant(_hasRestored);
+    if (!isVisible(id)) {
         _eof = true;
         return {};
     }
@@ -2196,6 +2242,10 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
 
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
+
+    // Reset the cursor before using it in case it has any saved bounds from a previous seek.
+    invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
+
     auto key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
     // Nothing after the next line can throw WCEs.
@@ -2208,18 +2258,12 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
 
     _metrics->incrementOneCursorSeek(_uri);
 
-    WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value), c->session);
-
-    auto keyLength = computeRecordIdSize(id);
-    _metrics->incrementOneDocRead(_uri, value.size + keyLength);
-
-    _lastReturnedId = id;
     _eof = false;
-    return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+    return getRecord(c, id);
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId& id) {
+    invariant(_hasRestored);
     dassert(shard_role_details::getLocker(_opCtx)->isReadLocked());
 
     // Oplog queries must manually implement read_timestamp visibility.
@@ -2238,6 +2282,9 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     _skipNextAdvance = false;
     WiredTigerRecoveryUnit::get(_opCtx)->getSession();
     WT_CURSOR* c = _cursor->get();
+
+    // Reset the cursor before using it in case it has any saved bounds from a previous seek.
+    invariantWTOK(WT_READ_CHECK(c->reset(c)), c->session);
 
     auto key = makeCursorKey(start, _keyFormat);
     setKey(c, &key);
@@ -2289,26 +2336,13 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     curId = getKey(c);
 
     // After we've positioned to the first document to return, apply visibility rules again.
-    if (_readTimestampForOplog && curId.getLong() > *_readTimestampForOplog) {
+    if (!isVisible(curId)) {
         _eof = true;
         return boost::none;
     }
 
-    if (_forward && !isVisible(curId)) {
-        _eof = true;
-        return boost::none;
-    }
-
-    WT_ITEM value;
-    invariantWTOK(c->get_value(c, &value), c->session);
-
-    auto keyLength = computeRecordIdSize(id);
-    _metrics->incrementOneDocRead(_uri, value.size + keyLength);
-
-    _lastReturnedId = curId;
     _eof = false;
-    return {
-        {std::move(curId), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+    return getRecord(c, std::move(curId));
 }
 
 void WiredTigerRecordStoreCursorBase::save() {
@@ -2323,6 +2357,12 @@ void WiredTigerRecordStoreCursorBase::save() {
 }
 
 bool WiredTigerRecordStoreCursorBase::isVisible(const RecordId& id) {
+    if (_readTimestampForOplog && id.getLong() > *_readTimestampForOplog) {
+        return false;
+    }
+    if (!_forward) {
+        return true;
+    }
     // The oplog does not use the capped snapshot mechanism, so it should be impossible for both to
     // exist at once.
     invariant(!(_oplogVisibleTs && _cappedSnapshot));

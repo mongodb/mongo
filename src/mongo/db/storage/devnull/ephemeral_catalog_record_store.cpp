@@ -138,6 +138,11 @@ public:
         return {{_it->first, _it->second.toRecordData()}};
     }
 
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+        // not implemented
+        return {};
+    }
+
     boost::optional<Record> seekExact(const RecordId& id) final {
         _lastMoveWasRestore = false;
         _needFirstSeek = false;
@@ -209,6 +214,11 @@ public:
         if (_it == _records.rend())
             return {};
         return {{_it->first, _it->second.toRecordData()}};
+    }
+
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+        // not implemented
+        return {};
     }
 
     boost::optional<Record> seekExact(const RecordId& id) final {

@@ -1014,6 +1014,73 @@ TEST_F(CollectionTest, CappedCursorRollover) {
     ASSERT(!cursor->next());
 }
 
+TEST_F(CollectionTest, BoundedSeek) {
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, {}));
+
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+    RecordStore* rs = coll->getRecordStore();
+
+    auto doInsert = [&](OperationContext* opCtx) -> RecordId {
+        Lock::GlobalLock globalLock{opCtx, MODE_IX};
+        std::string data = "data";
+        return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
+    };
+
+    // Insert 5 records and delete the first one.
+    const int numToInsert = 5;
+    RecordId recordIds[numToInsert];
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = 0; i < numToInsert; ++i) {
+            recordIds[i] = doInsert(operationContext());
+        }
+        Lock::GlobalLock globalLock{operationContext(), MODE_IX};
+        rs->deleteRecord(operationContext(), recordIds[0]);
+        wuow.commit();
+    }
+
+    // Forward inclusive seek
+    ASSERT_ID_EQ(rs->getCursor(operationContext())
+                     ->seek(recordIds[1], SeekableRecordCursor::BoundInclusion::kInclude),
+                 recordIds[1]);
+    ASSERT_ID_EQ(rs->getCursor(operationContext())
+                     ->seek(recordIds[0], SeekableRecordCursor::BoundInclusion::kInclude),
+                 recordIds[1]);
+    ASSERT(!rs->getCursor(operationContext())
+                ->seek(RecordId(recordIds[numToInsert - 1].getLong() + 1),
+                       SeekableRecordCursor::BoundInclusion::kInclude));
+
+    // Forward exclusive seek
+    ASSERT_ID_EQ(rs->getCursor(operationContext())
+                     ->seek(recordIds[1], SeekableRecordCursor::BoundInclusion::kExclude),
+                 recordIds[2]);
+    ASSERT(!rs->getCursor(operationContext())
+                ->seek(RecordId(recordIds[numToInsert - 1]),
+                       SeekableRecordCursor::BoundInclusion::kExclude));
+
+    // Reverse inclusive seek
+    ASSERT_ID_EQ(
+        rs->getCursor(operationContext(), false)
+            ->seek(recordIds[numToInsert - 1], SeekableRecordCursor::BoundInclusion::kInclude),
+        recordIds[numToInsert - 1]);
+    ASSERT_ID_EQ(rs->getCursor(operationContext(), false)
+                     ->seek(RecordId(recordIds[numToInsert - 1].getLong() + 1),
+                            SeekableRecordCursor::BoundInclusion::kInclude),
+                 recordIds[numToInsert - 1]);
+    ASSERT(!rs->getCursor(operationContext(), false)
+                ->seek(recordIds[0], SeekableRecordCursor::BoundInclusion::kInclude));
+
+    // Reverse exclusive seek
+    ASSERT_ID_EQ(
+        rs->getCursor(operationContext(), false)
+            ->seek(recordIds[numToInsert - 1], SeekableRecordCursor::BoundInclusion::kExclude),
+        recordIds[numToInsert - 2]);
+    ASSERT(!rs->getCursor(operationContext(), false)
+                ->seek(RecordId(recordIds[1]), SeekableRecordCursor::BoundInclusion::kExclude));
+}
+
 TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options;

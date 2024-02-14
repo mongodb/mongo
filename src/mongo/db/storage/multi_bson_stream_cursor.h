@@ -82,6 +82,12 @@ public:
         return boost::none;
     }
 
+    // Seeking is not currently supported.
+    boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) {
+        tasserted(6968320, "MultiBsonStreamCursor::seek is not supported");
+        return {};
+    }
+
 private:
     void expandBuffer(int32_t bsonSize);
     boost::optional<Record> nextFromCurrentStream();

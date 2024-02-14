@@ -118,8 +118,8 @@ struct Record {
  *     the end of the collection.
  *   - Reverse cursors must ignore the visibility filter. That means that they initially return the
  *     newest committed record in the collection and may skip over uncommitted records.
- *   - SeekableRecordCursor::seekExact() must ignore the visibility filter and return the requested
- *     document even if it is supposed to be invisible.
+ *   - SeekableRecordCursor::seek() and SeekableRecordCursor::seekExact() on forward cursors must
+ *     never return invisible documents.
  * TODO SERVER-18934 Handle this above the storage engine layer so storage engines don't have to
  * deal with capped visibility.
  */
@@ -196,6 +196,28 @@ public:
  */
 class SeekableRecordCursor : public RecordCursor {
 public:
+    /**
+     * Tells bounded 'seek' whether the bound excludes or includes the bound 'start'.
+     */
+    enum class BoundInclusion {
+        kExclude,
+        kInclude,
+    };
+
+    /**
+     * Seeks to a Record with the provided bound 'start'.
+     *
+     * For forward cursors, 'start' is a lower bound.
+     * For reverse cursors, 'start' is an upper bound.
+     *
+     * When 'boundInclusion' is 'kInclusive', positions the cursor at 'start' or the next record,
+     * if one exists. When 'boundInclusion' is 'kExclusive', positions the cursor at the first
+     * record after 'start', if one exists.
+     *
+     * Returns the Record at the cursor or boost::none if no matching records are found.
+     */
+    virtual boost::optional<Record> seek(const RecordId& start, BoundInclusion boundInclusion) = 0;
+
     /**
      * Seeks to a Record with the provided id.
      *
