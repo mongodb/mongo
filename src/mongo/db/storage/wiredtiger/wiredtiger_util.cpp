@@ -602,9 +602,12 @@ logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {
             return logv2::LogSeverity::Info();
         case WT_VERBOSE_INFO:
             return logv2::LogSeverity::Log();
-        case WT_VERBOSE_DEBUG:
-            return logv2::LogSeverity::Debug(1);
         default:
+            // MongoDB enables some WT debug compnonents by default. If performed a 1:1
+            // translation from WT log severity levels, MongoDB would not log anything
+            // below default level Log, even if a Debug message came through the message
+            // handler.  To solve this, we upgrade all Debug messages to the Log level
+            // to ensure they are seen.
             return logv2::LogSeverity::Log();
     }
 }
