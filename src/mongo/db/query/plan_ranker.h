@@ -65,7 +65,14 @@ void logScoringPlan(std::function<std::string()> solution,
 void logScore(double score);
 void logEOFBonus(double eofBonus);
 void logFailedPlan(std::function<std::string()> planSummary);
+void logTieBreaking(double score,
+                    double docsFetchedBonus,
+                    double indexPrefixBonus,
+                    bool isPlanTied);
 }  // namespace log_detail
+
+// Constant used for tie breakers.
+const double kBonusEpsilon = 1e-4;
 
 /**
  * Assigns the stats tree a 'goodness' score. The higher the score, the better the plan. The exact
@@ -89,7 +96,7 @@ public:
         const auto productivity = calculateProductivity(stats);
         const auto advances = getNumberOfAdvances(stats);
         const double epsilon =
-            std::min(1.0 / static_cast<double>(10 * (advances > 0 ? advances : 1)), 1e-4);
+            std::min(1.0 / static_cast<double>(10 * (advances > 0 ? advances : 1)), kBonusEpsilon);
 
 
         // We prefer queries that don't require a fetch stage.
@@ -194,4 +201,11 @@ struct BaseCandidatePlan {
 };
 
 using CandidatePlan = BaseCandidatePlan<PlanStage*, WorkingSetID, WorkingSet*>;
+
+/**
+ * Apply index prefix heuristic (see comment to 'getIndexBoundsScore' function in the cpp file) for
+ * the given list of solutions, if the solutions are compatible (have the same plan shape), the
+ * vector of winner indexes are returned, otherwise an empty vector is returned.
+ */
+std::vector<size_t> applyIndexPrefixHeuristic(const std::vector<const QuerySolution*>& solutions);
 }  // namespace mongo::plan_ranker

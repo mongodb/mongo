@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 
@@ -43,6 +45,130 @@ namespace mongo::plan_ranker {
  * A factory function to create a plan scorer for a plan stage stats tree.
  */
 std::unique_ptr<PlanScorer<PlanStageStats>> makePlanScorer();
+
+/**
+ * Takes a vector of pairs holding (score, planIndex).
+ * Returns an iterator pointing to the first non-tying plan, or the end of the vector.
+ */
+inline std::vector<std::pair<double, size_t>>::iterator findTopTiedPlans(
+    std::vector<std::pair<double, size_t>>& plans) {
+    return std::find_if(plans.begin(), plans.end(), [&plans](const auto& plan) {
+        return plan.first != plans[0].first;
+    });
+}
+
+/**
+ * Holds information about tie breaking heuristic bonuses. It is used to update candidate plan score
+ * and log the bonuses.
+ */
+struct TieBreakingScores {
+    TieBreakingScores(bool isPlanTied, double score)
+        : isPlanTied(isPlanTied), score(score), docsExaminedBonus(0.0), indexPrefixBonus(0.0) {}
+
+    double getTotalBonus() const {
+        return docsExaminedBonus + indexPrefixBonus;
+    }
+
+    const bool isPlanTied;
+    const double score;
+    double docsExaminedBonus;
+    double indexPrefixBonus;
+};
+
+/**
+ * Apply docs examined tie breaking heuristic and return bonuses in 'scores' list. 'candidates' and
+ * 'scores' are synchronized, with the i-th score from 'scores' corresponding to the i-th
+ * 'candidate.'
+ */
+template <typename PlanStageType, typename ResultType, typename Data>
+void calcDocsExaminedHeuristicBonus(
+    const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    size_t numberOfTiedPlans,
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::vector<size_t>& documentsExamined,
+    std::vector<TieBreakingScores>& scores) {
+    // The vector tiedPlans holds the number of documents and the plan's index.
+    std::vector<std::pair<double, size_t>> tiedPlans{};
+    tiedPlans.reserve(numberOfTiedPlans);
+    for (size_t i = 0; i < numberOfTiedPlans; ++i) {
+        const size_t candidateIndex = scoresAndCandidateIndices[i].second;
+        tiedPlans.emplace_back(std::make_pair(documentsExamined[candidateIndex], candidateIndex));
+    }
+
+    // Sort top plans by least documents examined, and allocate a bonus to each of the top plans.
+    std::stable_sort(tiedPlans.begin(), tiedPlans.end(), [](const auto& lhs, const auto& rhs) {
+        return lhs.first < rhs.first;
+    });
+    auto stillTiedPlansEnd = findTopTiedPlans(tiedPlans);
+    for (auto topPlan = tiedPlans.begin(); topPlan < stillTiedPlansEnd; ++topPlan) {
+        scores[topPlan->second].docsExaminedBonus = kBonusEpsilon;
+    }
+}
+
+/**
+ * Apply best index prefix tie breaking heuristic and return bonuses in 'scores' list. 'candidates'
+ * and 'scores' are synchronized, with the i-th score from 'scores' corresponding to the i-th
+ * 'candidate.'
+ */
+template <typename PlanStageType, typename ResultType, typename Data>
+void calcIndexPrefixHeuristicBonus(
+    const std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    size_t numberOfTiedPlans,
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    std::vector<TieBreakingScores>& scores) {
+    std::vector<const QuerySolution*> solutions{};
+    solutions.reserve(numberOfTiedPlans);
+
+    for (size_t i = 0; i < numberOfTiedPlans; ++i) {
+        const size_t candidateIndex = scoresAndCandidateIndices[i].second;
+        solutions.emplace_back(candidates[candidateIndex].solution.get());
+    }
+
+    auto winIndices = applyIndexPrefixHeuristic(solutions);
+    for (auto winIndex : winIndices) {
+        const auto candidateIndex = scoresAndCandidateIndices[winIndex].second;
+        scores[candidateIndex].indexPrefixBonus += 2 * kBonusEpsilon;
+    }
+}
+
+/**
+ * Apply tie-breaking hearistics and update candidate plan scores.
+ */
+template <typename PlanStageType, typename ResultType, typename Data>
+void addTieBreakingHeuristicsBonuses(
+    std::vector<std::pair<double, size_t>>& scoresAndCandidateIndices,
+    const std::vector<BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates,
+    const std::vector<size_t>& documentsExamined) {
+    auto tiedPlansEnd = findTopTiedPlans(scoresAndCandidateIndices);
+    int numberOfTiedPlans = std::distance(scoresAndCandidateIndices.begin(), tiedPlansEnd);
+
+    if (numberOfTiedPlans > 1) {
+        // Initialize 'scores' list. 'candidates' and 'scores' are synchronized, with the i-th score
+        // from 'scores' corresponding to the i-th 'candidate.'
+        std::vector<TieBreakingScores> scores{};
+        scores.reserve(candidates.size());
+        for (size_t i = 0; i < scoresAndCandidateIndices.size(); ++i) {
+            scores.emplace_back(/* isPlanTied */ i < static_cast<size_t>(numberOfTiedPlans),
+                                /* score */ scoresAndCandidateIndices[i].first);
+        }
+
+        calcDocsExaminedHeuristicBonus(
+            scoresAndCandidateIndices, numberOfTiedPlans, candidates, documentsExamined, scores);
+
+        calcIndexPrefixHeuristicBonus(
+            scoresAndCandidateIndices, numberOfTiedPlans, candidates, scores);
+
+        // Log tie breaking bonuses.
+        for (const auto& score : scores) {
+            log_detail::logTieBreaking(
+                score.score, score.docsExaminedBonus, score.indexPrefixBonus, score.isPlanTied);
+        }
+
+        for (auto& scoreAndIndex : scoresAndCandidateIndices) {
+            scoreAndIndex.first += scores[scoreAndIndex.second].getTotalBonus();
+        }
+    }
+}
 
 /**
  * Returns a PlanRankingDecision which has the ranking and the information about the ranking
@@ -75,6 +201,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     // Used to derive scores and candidate ordering.
     std::vector<std::pair<double, size_t>> scoresAndCandidateIndices;
     std::vector<size_t> failed;
+    std::vector<size_t> documentsExamined;
 
     // Compute score for each tree.  Record the best.
     for (size_t i = 0; i < statTrees.size(); ++i) {
@@ -116,6 +243,11 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
             }
 
             scoresAndCandidateIndices.push_back(std::make_pair(score, i));
+
+            // Collect some information about documents examined for tie breaking later.
+            PlanSummaryStats stats;
+            explainer->getSummaryStats(&stats);
+            documentsExamined.push_back(stats.totalDocsExamined);
         } else {
             failed.push_back(i);
             log_detail::logFailedPlan([&] { return explainer->getPlanSummary(); });
@@ -136,6 +268,16 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
                          // Ignore candidate array index in lhs.second and rhs.second.
                          return lhs.first > rhs.first;
                      });
+
+    // Apply tie-breaking heuristics.
+    if (internalQueryPlanTieBreakingWithIndexHeuristics.load()) {
+        addTieBreakingHeuristicsBonuses(scoresAndCandidateIndices, candidates, documentsExamined);
+
+        // Re-sort the candidates.
+        std::stable_sort(scoresAndCandidateIndices.begin(),
+                         scoresAndCandidateIndices.end(),
+                         [](const auto& lhs, const auto& rhs) { return lhs.first > rhs.first; });
+    }
 
     auto why = std::make_unique<PlanRankingDecision>();
 

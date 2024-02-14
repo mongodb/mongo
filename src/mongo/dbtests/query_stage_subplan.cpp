@@ -67,6 +67,16 @@ public:
         ASSERT_OK(dbtests::createIndex(opCtx(), nss.ns(), obj));
     }
 
+    void addIndexWithWildcardProjection(BSONObj keys, BSONObj wildcardProjection) {
+        auto indexSpec = BSON(
+            IndexDescriptor::kIndexNameFieldName
+            << DBClientBase::genIndexName(keys) << IndexDescriptor::kKeyPatternFieldName << keys
+            << IndexDescriptor::kUniqueFieldName << false << IndexDescriptor::kIndexVersionFieldName
+            << static_cast<int>(IndexDescriptor::IndexVersion::kV2)
+            << IndexDescriptor::kPathProjectionFieldName << wildcardProjection);
+        ASSERT_OK(dbtests::createIndexFromSpec(opCtx(), nss.ns(), indexSpec));
+    }
+
     void dropIndex(BSONObj keyPattern) {
         _client.dropIndex(nss.ns(), std::move(keyPattern));
     }
@@ -245,7 +255,10 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1));
     addIndex(BSON("c" << 1));
-    addIndex(BSON("$**" << 1));
+    // Exclude field 'c' from the wildcard index to make sure that the field has only one relevant
+    // index.
+    addIndexWithWildcardProjection(BSON("$**" << 1), BSON("c" << 0));
+
 
     for (int i = 0; i < 10; i++) {
         insert(BSON("a" << 1 << "b" << i << "c" << i));
@@ -301,7 +314,9 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
     addIndex(BSON("a" << 1 << "b" << 1));
     addIndex(BSON("a" << 1 << "c" << 1));
     addIndex(BSON("d" << 1));
-    addIndex(BSON("$**" << 1));
+    // Exclude field 'd' from the wildcard index to make sure that the field has only one relevant
+    // index.
+    addIndexWithWildcardProjection(BSON("$**" << 1), BSON("d" << 0));
 
     for (int i = 0; i < 10; i++) {
         insert(BSON("a" << 1 << "e" << 1 << "d" << 1));

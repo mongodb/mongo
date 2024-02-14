@@ -244,8 +244,22 @@ bool OrderedIntervalList::isMinToMax() const {
     return intervals.size() == 1 && intervals[0].isMinToMax();
 }
 
+bool OrderedIntervalList::isMaxToMin() const {
+    return intervals.size() == 1 && intervals[0].isMaxToMin();
+}
+
 bool OrderedIntervalList::isPoint() const {
     return intervals.size() == 1 && intervals[0].isPoint();
+}
+
+bool OrderedIntervalList::containsOnlyPointIntervals() const {
+    for (const auto& interval : intervals) {
+        if (!interval.isPoint()) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 // static
