@@ -64,8 +64,7 @@ const runTest = function(write, numExpectedDocs) {
     assert.commandWorked(write(coll));
     assert.eq(coll.find().itcount(), numExpectedDocs);
     assert.eq(bucketsColl.find().itcount(), 1);
-    assert.eq(bucketsColl.find().toArray()[0].control.version,
-              TimeseriesTest.BucketVersion.kCompressed);
+    assert(TimeseriesTest.isBucketCompressed(bucketsColl.find().toArray()[0].control.version));
 };
 
 runTest((coll) => coll.insert({t: time, m: 0, a: 2}, {ordered: false}), 3);

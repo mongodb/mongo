@@ -206,7 +206,8 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
         bool versionSet = false;
         for (const auto& controlField : controlElement.Obj()) {
             if (controlField.fieldNameStringData() == kBucketControlVersionFieldName) {
-                control.append(kBucketControlVersionFieldName, kTimeseriesControlCompressedVersion);
+                control.append(kBucketControlVersionFieldName,
+                               kTimeseriesControlCompressedSortedVersion);
                 versionSet = true;
             } else {
                 control.append(controlField);
@@ -215,7 +216,8 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
 
         // Set version if it was missing from uncompressed bucket
         if (!versionSet) {
-            control.append(kBucketControlVersionFieldName, kTimeseriesControlCompressedVersion);
+            control.append(kBucketControlVersionFieldName,
+                           kTimeseriesControlCompressedSortedVersion);
         }
 
         // Set count
@@ -388,7 +390,8 @@ boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) try {
                     // Check that we have a compressed bucket, and rewrite the version to signal
                     // it's uncompressed now.
                     if (e.type() != BSONType::NumberInt ||
-                        e.numberInt() != kTimeseriesControlCompressedVersion) {
+                        (e.numberInt() != kTimeseriesControlCompressedSortedVersion &&
+                         e.numberInt() != kTimeseriesControlCompressedUnsortedVersion)) {
                         // This bucket isn't compressed.
                         return boost::none;
                     }
@@ -448,7 +451,8 @@ bool isCompressedBucket(const BSONObj& bucketDoc) {
 
     if (version == kTimeseriesControlUncompressedVersion) {
         return false;
-    } else if (version == kTimeseriesControlCompressedVersion) {
+    } else if (version == kTimeseriesControlCompressedSortedVersion ||
+               version == kTimeseriesControlCompressedUnsortedVersion) {
         return true;
     } else {
         uasserted(6540602, "Invalid bucket version");

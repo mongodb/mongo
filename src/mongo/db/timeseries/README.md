@@ -74,8 +74,11 @@ Uncompressed bucket (version 1):
     }
 }
 ```
+There are two types of compressed buckets, version 2 and version 3. They differ only in that the
+entries in the data field of version 2 buckets are sorted on the time field, whereas this is not
+enforced for version 3 buckets.
 
-Compressed bucket (version 2):
+Compressed bucket (version 2 and version 3):
 ```
 {
     _id: <Object ID with time component equal to control.min.<time field>>,

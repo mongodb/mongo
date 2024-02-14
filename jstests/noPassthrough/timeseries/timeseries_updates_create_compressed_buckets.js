@@ -27,11 +27,11 @@ function insertAndCheckBuckets(value) {
     assert.commandWorked(coll.insert({[timeField]: ISODate(), x: value}));
     let buckets = bucketsColl.find().toArray();
     buckets.forEach((bucket, index) => {
-        assert.eq(
-            bucket.control.version,
-            TimeseriesTest.BucketVersion.kCompressed,
-            `Bucket ${index} does not have the correct version. Expected ${
-                TimeseriesTest.BucketVersion.kCompressed}, but got ${bucket.control.version}`);
+        assert(TimeseriesTest.isBucketCompressed(bucket.control.version),
+               `Bucket ${index} does not have the correct version. Expected ${
+                   TimeseriesTest.BucketVersion.kCompressedSorted} or ${
+                   TimeseriesTest.BucketVersion.kCompressedUnsorted}, but got ${
+                   bucket.control.version}`);
     });
 }
 

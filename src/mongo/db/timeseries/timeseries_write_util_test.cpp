@@ -179,7 +179,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatch) {
     // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
     // during compression. Check that compression was successful.
     ASSERT(!bucketDoc.compressionFailed);
-    ASSERT_EQ(timeseries::kTimeseriesControlCompressedVersion,
+    ASSERT_EQ(timeseries::kTimeseriesControlCompressedSortedVersion,
               bucketDoc.compressedBucket->getObjectField(timeseries::kBucketControlFieldName)
                   .getIntField(timeseries::kBucketControlVersionFieldName));
 
@@ -225,7 +225,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeNewCompressedBucketFromWriteBatchWithMeta) {
     // makeNewDocumentForWrite() can return the uncompressed bucket if an error was encountered
     // during compression. Check that compression was successful.
     ASSERT(!bucketDoc.compressionFailed);
-    ASSERT_EQ(timeseries::kTimeseriesControlCompressedVersion,
+    ASSERT_EQ(timeseries::kTimeseriesControlCompressedSortedVersion,
               bucketDoc.compressedBucket->getObjectField(timeseries::kBucketControlFieldName)
                   .getIntField(timeseries::kBucketControlVersionFieldName));
 
