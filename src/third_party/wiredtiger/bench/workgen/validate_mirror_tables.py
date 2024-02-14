@@ -46,46 +46,69 @@ def usage_exit():
     print('  database_dir is a POSIX pathname to a WiredTiger home directory')
     sys.exit(1)
 
-# Given a database directory, return all workgen tables.
-def get_wiredtiger_db_files(dir):
+# Given a database directory, return all Workgen tables using the WiredTiger metadata file.
+def get_wiredtiger_db_files(connection):
 
-    files = [f[:-3] for f in os.listdir(dir) \
-             if f.endswith('.wt') and not f.startswith('WiredTiger')]
+    session = connection.open_session()
+    c = session.open_cursor('metadata:', None, None)
+
+    prefix = 'file:'
+    c.set_key(prefix)
+    c.search_near()
+
+    files = []
+    for k,_ in c:
+        if not k.startswith(prefix):
+            break
+        if k.startswith(f'{prefix}WiredTiger'):
+            continue
+        # Skip the prefix and remove the extension.
+        files.append(k[len(prefix):-3])
+
+    c.close()
+    session.close()
     return files
 
 # Given a list of database tables, return a list of mirrored uri pairs.
-def get_mirrors(db_dir, db_files):
+def get_mirrors(connection, db_dir, db_files):
 
-    mirrors = []
     db_files_remaining = set(db_files)
+    mirrors = []
+    session = connection.open_session()
+    metadata_cursor = session.open_cursor('metadata:', None, None)
 
     for filename in db_files:
         if filename not in db_files_remaining:
             continue
         db_files_remaining.remove(filename)
-        mirror_filename = get_mirror_file(db_dir, f'table:{filename}')
+        mirror_filename = get_mirror_file(metadata_cursor, f'table:{filename}')
 
         # At this point, there is no guarantee that the database contains all the base/mirror pairs.
         # It is possible to have a base and no associated mirror and vice-versa. This may happen
         # when a drop is occurring when a snapshot of the database is taken and fed into this
         # script.
-        if mirror_filename is not None and mirror_filename in db_files_remaining:
+        if mirror_filename and mirror_filename in db_files_remaining:
             db_files_remaining.remove(mirror_filename)
             mirrors.append([f'{db_dir}/table:{filename}',
                             f'{db_dir}/table:{mirror_filename}'])
 
+    metadata_cursor.close()
+    session.close()
     return mirrors
 
 # Get the mirror for the specified file by examining the file's metadata. Mirror names
-# are stored in the 'app_metadata' by workgen when mirroring is enabled. If the file has
+# are stored in the 'app_metadata' by Workgen when mirroring is enabled. If the file has
 # a mirror, the name of the mirror is returned. Otherwise, the function returns None.
-def get_mirror_file(db_dir, filename):
+# It is possible that the requested file does not exist in the metadata file, return None in this
+# scenario as well.
+def get_mirror_file(metadata_cursor, filename):
 
-    connection = wiredtiger_open(db_dir, 'readonly')
-    session = connection.open_session()
-    c = session.open_cursor('metadata:', None, None)
-    metadata = c[filename]
-    c.close()
+    # It is possible that the file requested does not exist in the metadata file.
+    try:
+       metadata = metadata_cursor[filename]
+    except Exception as e:
+        if e.__class__.__name__ == 'KeyError':
+            return None
 
     result = re.findall('app_metadata="([^"]*)"', metadata)
     mirror = None
@@ -100,8 +123,6 @@ def get_mirror_file(db_dir, filename):
             mirror = app_metadata['workgen_table_mirror']
             mirror = mirror.split(':')[1]
 
-    session.close()
-    connection.close()
     return mirror
 
 # ------------------------------------------------------------------------------
@@ -112,8 +133,11 @@ def main(sysargs):
         usage_exit()
 
     db_dir = sysargs[0]
-    db_files = get_wiredtiger_db_files(db_dir)
-    mirrors = get_mirrors(db_dir, db_files)
+
+    connection = wiredtiger_open(db_dir, 'readonly')
+    db_files = get_wiredtiger_db_files(connection)
+    mirrors = get_mirrors(connection, db_dir, db_files)
+    connection.close()
     failure_count = 0
 
     for item in mirrors:
