@@ -6,12 +6,12 @@
  * @tags: [requires_persistence]
  */
 
-// Checking UUID and index consistency involves talking to the config servers, which are shut down
-// in this test.
+// The following checks involve talking to the config server, which is shut down in this test
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
+TestData.skipCheckMetadataConsistency = true;
 
 var st = new ShardingTest({
     shards: {

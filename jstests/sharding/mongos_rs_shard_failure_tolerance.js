@@ -10,12 +10,13 @@
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
 
-// Checking UUID and index consistency involves talking to shard primaries, but by the end of this
-// test, one shard does not have a primary.
+// The following checks involve talking to shard primaries, as by the end of this test, one shard
+// does not have a primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
+TestData.skipCheckMetadataConsistency = true;
 
 // The routing table consistency check runs with 'snapshot' level readConcern. This readConcern
 // level cannot be satisfied without a replica set primary, which we won't have because this test

@@ -17,7 +17,6 @@
  */
 
 import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function() {
     const testCollectionsState = 'testCollectionsState';
@@ -171,10 +170,6 @@ export const $config = (function() {
     };
 
     let setup = function(db, _, cluster) {
-        this.skipMetadataChecks =
-            // TODO SERVER-70396: remove this flag
-            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency');
-
         for (let i = 0; i < numTestCollections; ++i) {
             db[testCollectionsState].insert({
                 collName: `testColl_${i}`,

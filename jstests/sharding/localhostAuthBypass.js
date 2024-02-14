@@ -3,13 +3,14 @@
 // This test is to ensure that localhost authentication works correctly against a sharded
 // cluster whether they are hosted with "localhost" or a hostname.
 
-// Checking UUID and index consistency, which occurs on ShardingTest.stop, involves using a
-// mongos to read data on the config server, but this test uses a special shutdown function
-// which stops the mongoses before calling ShardingTest.stop.
+// The following checks, which occurs on ShardingTest.stop, involve using a mongos to read data on
+// the config server, but this test uses a special shutdown function which stops the mongoses before
+// calling ShardingTest.stop.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckShardFilteringMetadata = true;
+TestData.skipCheckMetadataConsistency = true;
 
 var replSetName = "replsets_server-6591";
 var keyfile = "jstests/libs/key1";

@@ -54,7 +54,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -385,9 +384,7 @@ public:
     };
 };
 
-MONGO_REGISTER_COMMAND(CheckMetadataConsistencyCmd)
-    .requiresFeatureFlag(&feature_flags::gCheckMetadataConsistency)
-    .forRouter();
+MONGO_REGISTER_COMMAND(CheckMetadataConsistencyCmd).forRouter();
 
 }  // namespace
 }  // namespace mongo

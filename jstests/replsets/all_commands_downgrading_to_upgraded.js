@@ -355,8 +355,6 @@ const allCommands = {
     checkMetadataConsistency: {
         isAdminCommand: true,
         isShardedOnly: true,
-        // TODO SERVER-70396: Remove check when this feature flag is removed.
-        checkFeatureFlag: "CheckMetadataConsistency",
         command: {checkMetadataConsistency: 1},
     },
     checkShardingIndex: {

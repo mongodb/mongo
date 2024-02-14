@@ -11,7 +11,6 @@
 import {
     uniformDistTransitions
 } from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
@@ -87,18 +86,12 @@ export const $config = (function() {
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {
-            if (this.skipMetadataChecks) {
-                return;
-            }
             db = getRandomDb(db);
             jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         checkCollectionMetadataConsistency: function(db, collName, connCache) {
-            if (this.skipMetadataChecks) {
-                return;
-            }
             db = getRandomDb(db);
             const coll = getRandomCollection(db);
             jsTestLog('Executing checkMetadataConsistency state for collection: ' +
@@ -109,10 +102,6 @@ export const $config = (function() {
     };
 
     let setup = function(db, collName, cluster) {
-        this.skipMetadataChecks =
-            // TODO SERVER-70396: remove this flag
-            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency');
-
         for (var i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);

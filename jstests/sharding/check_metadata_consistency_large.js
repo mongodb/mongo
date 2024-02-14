@@ -3,7 +3,6 @@
  * inconsistencies.
  *
  * @tags: [
- *    featureFlagCheckMetadataConsistency,
  *    requires_fcv_71,
  *    resource_intensive,
  * ]

@@ -13,9 +13,6 @@ INCOMPATIBLE_HOOKS = [
     "CleanEveryN",
     "ContinuousStepdown",
     "CheckOrphansDeleted",
-    # TODO SERVER-70396 re-enable hook once the checkMetadata feature flag is removed
-    # To check the feature flag we need to contact directly the config server that is not exposed in the ExternalFixture
-    "CheckMetadataConsistencyInBackground",
 ]
 
 

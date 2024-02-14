@@ -1,19 +1,7 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export var MetadataConsistencyChecker = (function() {
     const run = (mongos) => {
         const adminDB = mongos.getDB('admin');
-
-        // TODO (SERVER-70396): Remove once 7.0 becomes last LTS.
-        try {
-            if (!FeatureFlagUtil.isEnabled(adminDB, 'CheckMetadataConsistency')) {
-                jsTest.log('Skipped metadata consistency check: feature disabled');
-                return;
-            }
-        } catch (err) {
-            jsTest.log(`Skipped metadata consistency check: ${err}`);
-            return;
-        }
 
         // The isTransientError() function is responsible for setting an error as transient and
         // abort the metadata consistency check to be retried in the future.
@@ -29,6 +17,14 @@ export var MetadataConsistencyChecker = (function() {
                 // Metadata consistency check can fail with ShardNotFound if the router's
                 // ShardRegistry reloads after choosing which shards to target and a chosen
                 // shard is no longer in the cluster.
+                return true;
+            }
+
+            // TODO (SERVER-83881): Remove once checkMetadataConsistency can authenticate before
+            // running.
+            if (e.code === ErrorCodes.Unauthorized) {
+                // Metadata consistency check fails with Unauthorized if the test enables the
+                // authentication as the command run on a dedicated non-authenticated shell.
                 return true;
             }
 

@@ -2,7 +2,6 @@
  * Tests to validate the correct behaviour of checkMetadataConsistency command.
  *
  * @tags: [
- *    featureFlagCheckMetadataConsistency,
  *    requires_fcv_70,
  * ]
  */

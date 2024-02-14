@@ -6,13 +6,14 @@
 
 import {restartServerReplication, stopServerReplication} from "jstests/libs/write_concern_util.js";
 
-// Checking UUID and index consistency involves mongos being able to do a read from the config
-// server, but this test is designed to make mongos time out when reading from the config server.
+// The following checks involve reading from the config server, but this test is designed to make
+// mongos time out when reading from the config server.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckRoutingTableConsistency = true;
 TestData.skipCheckShardFilteringMetadata = true;
+TestData.skipCheckMetadataConsistency = true;
 
 var st = new ShardingTest({
     shards: 1,

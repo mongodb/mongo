@@ -8,8 +8,6 @@
  *  ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 export const $config = (function() {
     const kCollNamePrefix = 'unsharded_coll_';
     const kInitialCollSize = 100;
@@ -169,17 +167,11 @@ export const $config = (function() {
                 ]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {
-            if (this.skipMetadataChecks) {
-                return;
-            }
             jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         checkCollectionMetadataConsistency: function(db, collName, connCache) {
-            if (this.skipMetadataChecks) {
-                return;
-            }
             let coll = db[this.collName];
             jsTestLog(`Executing checkMetadataConsistency state for collection: ${coll}`);
             const inconsistencies = coll.checkMetadataConsistency().toArray();
@@ -214,9 +206,7 @@ export const $config = (function() {
     };
 
     let setup = function(db, collName, cluster) {
-        this.skipMetadataChecks =
-            // TODO SERVER-70396: remove this flag
-            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency');
+        return;
     };
 
     const standardTransition = {
