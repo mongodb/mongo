@@ -9,6 +9,13 @@ variables:
   - name: package_new_compile
     variant: amazon2-arm64-compile
 
+- &amazon_linux2_arm64_mongocrypt_compile_variant_dependency
+  depends_on:
+  - name: package_new_compile
+    variant: amazon2-arm64-compile
+  - name: compile_mongocrypt_shlib
+    variant: compile-amazon-linux2-arm64-mongocrypt-shlib
+
 - &schedule_variant_auto_tasks_task
   name: schedule_variant_auto_tasks
   activate: false
@@ -284,6 +291,31 @@ buildvariants:
     - *schedule_variant_auto_tasks_task
     - name: array_traversal_high_value
     - name: filter_with_complex_logical_expression_high_value
+
+- <<: *amazon_linux2_arm64_mongocrypt_compile_variant_dependency
+  name: perf-shard-lite-fle.arm.aws.2023-11
+  display_name: PERF Shard Lite FLE ARM AWS 2023-11
+  cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+  modules: *perf_modules
+  expansions:
+    mongodb_setup_release: 2022-11
+    mongodb_setup: shard-lite-fle
+    infrastructure_provisioning_release: 2023-09
+    infrastructure_provisioning: shard-lite
+    workload_setup: 2022-11
+    platform: linux
+    project_dir: *perf_project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+    compile_variant: amazon2-arm64-compile
+    requires_mongocrypt_shlib: true
+  run_on:
+    - "rhel70-perf-shard-lite"
+  tasks:
+    - *schedule_patch_auto_tasks_task
+    - *schedule_variant_auto_tasks_task
+    - name: medical_workload_diagnosis_50_50_high_value
+    - name: ycsb_like_queryable_encrypt1_cfdefault_high_value
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-mongo-perf-standalone.arm.aws.2023-11
