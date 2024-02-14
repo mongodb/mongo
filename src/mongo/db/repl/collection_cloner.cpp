@@ -392,6 +392,17 @@ void CollectionCloner::runQuery() {
 
     ExhaustMode exhaustMode = collectionClonerUsesExhaust ? ExhaustMode::kOn : ExhaustMode::kOff;
 
+    if (_collectionOptions.recordIdsReplicated) {
+        // The below projection returns a stream of documents in the format
+        // {r: <recordId>, d: <original document>}.
+        auto projection = BSON("_id" << 0 << "r"
+                                     << BSON("$meta"
+                                             << "recordId")
+                                     << "d"
+                                     << "$$ROOT");
+        findCmd.setProjection(std::move(projection));
+    }
+
     // We reset this every time we retry or resume a query.
     // We distinguish the first batch from the rest so that we only store the remote cursor id
     // the first time we get it.
@@ -495,9 +506,14 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         _progressMeter.hit(int(docs.size()));
         invariant(_collLoader);
 
+        CollectionBulkLoader::ParseRecordIdAndDocFunc fn = (_collectionOptions.recordIdsReplicated)
+            ? ([](const BSONObj& doc) {
+                  return std::make_pair(RecordId(doc["r"].Long()), doc["d"].Obj());
+              })
+            : ([](const BSONObj& doc) { return std::make_pair(RecordId(0), doc); });
         // The insert must be done within the lock, because CollectionBulkLoader is not
         // thread safe.
-        uassertStatusOK(_collLoader->insertDocuments(docs.cbegin(), docs.cend()));
+        uassertStatusOK(_collLoader->insertDocuments(docs.cbegin(), docs.cend(), fn));
     }
 
     initialSyncHangDuringCollectionClone.executeIf(
