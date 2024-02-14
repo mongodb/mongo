@@ -16,6 +16,9 @@ import {
     makeCreateUserCmdObj,
     waitForAutoBootstrap
 } from "jstests/noPassthrough/rs_endpoint/lib/util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     jsTest.log("Running tests for " + shard0Primary.host +
@@ -111,7 +114,8 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 
     // Add the second shard back but convert the config shard to dedicated config server.
     assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
-    assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard1Name}));
+    moveDatabaseAndUnshardedColls(mongos.getDB(dbName), shard1Name);
+    assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
 
     // Ensure the balancer is enabled so sharded data can be moved out by the transition to
     // dedicated command.

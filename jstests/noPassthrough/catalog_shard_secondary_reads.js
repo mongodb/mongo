@@ -7,6 +7,9 @@
  */
 import {moveChunkParallel} from "jstests/libs/chunk_manipulation_util.js";
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 var staticMongod = MongoRunner.runMongod({});
 
@@ -64,8 +67,8 @@ var joinMoveChunk = moveChunkParallel(staticMongod,
 
 joinMoveChunk();
 
-assert.commandWorked(st.s0.adminCommand({movePrimary: 'test', to: st.shard1.shardName}));
-assert.commandWorked(st.s0.adminCommand({movePrimary: 'sharded', to: st.shard1.shardName}));
+moveDatabaseAndUnshardedColls(st.s0.getDB('test'), st.shard1.shardName);
+moveDatabaseAndUnshardedColls(st.s0.getDB('sharded'), st.shard1.shardName);
 
 // A config shard can't be removed until all range deletions have finished.
 ConfigShardUtil.waitForRangeDeletions(st.s0);
@@ -118,7 +121,7 @@ assert.commandWorked(
 assert.commandWorked(st.configRS.getPrimary().getDB('sharded').dropDatabase());
 
 assert.commandWorked(st.s0.adminCommand({transitionFromDedicatedConfigServer: 1}));
-assert.commandWorked(st.s0.adminCommand({movePrimary: 'test', to: st.shard0.shardName}));
+moveDatabaseAndUnshardedColls(st.s0.getDB('test'), st.shard0.shardName);
 assert.commandWorked(
     st.s0.adminCommand({moveChunk: 'sharded.user', find: {_id: 0}, to: st.shard0.shardName}));
 

@@ -6,6 +6,9 @@
  * ]
  */
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 const dbName = "test";
 const collName = "collTest";
@@ -117,7 +120,8 @@ performFsyncLockUnlockWithReadWriteOperations();
 
 // Make sure the lock and unlock commands still work as expected after transitioning to a dedicated
 // config server.
-st.s.adminCommand({movePrimary: dbName, to: st.shard1.shardName});
+moveDatabaseAndUnshardedColls(st.s.getDB(dbName), st.shard1.shardName);
+
 ConfigShardUtil.transitionToDedicatedConfigServer(st);
 performFsyncLockUnlockWithReadWriteOperations();
 

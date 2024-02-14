@@ -1,5 +1,3 @@
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 // Auth test the BulkWrite command.
 // These test cover privilege combination scenarios that commands_lib.js format cannot.
 export function runTest(mongod) {

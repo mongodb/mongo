@@ -98,15 +98,70 @@ const st = new ShardingTest({mongos: 1, shards: 2});
         assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
     }
 
-    runTest('majority');
-
-    // TODO SERVER-86014: adapt test to work correctly with tracked collections.
-    // The test assume that moveCollection invalidate routing for unsharded collection.
-    // This is not the case for tracked unsharded collection because the router can use the
-    // shardVersioning protocol instead of the DB versioning protocol.
+    // These tests only make sense with untracked collections since movePrimary does not affect
+    // tracked collections
     const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
         st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
     if (!isTrackUnshardedEnabled) {
+        runTest('majority');
+
+        runTest('snapshot');
+    }
+}
+
+// Test transaction with concurrent move collection.
+{
+    const dbName1 = 'test';
+    const dbName2 = 'test2';
+    const collName1 = 'foo';
+    const collName2 = 'foo';
+    const ns2 = dbName2 + '.' + collName2;
+
+    function runTest(readConcernLevel) {
+        st.getDB(dbName1).dropDatabase();
+        st.getDB(dbName2).dropDatabase();
+        st.adminCommand({enableSharding: dbName1, primaryShard: st.shard0.shardName});
+        st.adminCommand({enableSharding: dbName2, primaryShard: st.shard1.shardName});
+
+        const coll1 = st.getDB(dbName1)[collName1];
+        coll1.insert({x: 1, c: 0});
+
+        const coll2 = st.getDB(dbName2)[collName2];
+        coll2.insert({x: 2, c: 0});
+
+        // Start a multi-document transaction. Execute one statement that will target shard0.
+        let session = st.s.startSession();
+        session.startTransaction({readConcern: {level: readConcernLevel}});
+        assert.eq(1, session.getDatabase(dbName1)[collName1].find().itcount());
+
+        // Run moveCollection to move dbName2.collName2 from shard1 to shard0.
+        assert.commandWorked(
+            st.s.adminCommand({moveCollection: ns2, toShard: st.shard0.shardName}));
+
+        // Make sure the router has fresh routing info to avoid causing the transaction to fail due
+        // to StaleConfig.
+        assert.eq(1, coll2.find().itcount());
+
+        // Execute a second statement, now on dbName2. With majority read concern, this is
+        // equivalent to the moveChunk scenario. However, since resharding changes the uuid, in the
+        // case of snapshot read concern, the router will fail to find chunk history for the
+        // timestamp before even sending the request to the shard.
+        const expectedError = readConcernLevel == 'snapshot' ? ErrorCodes.StaleChunkHistory
+                                                             : ErrorCodes.MigrationConflict;
+        let err = assert.throwsWithCode(() => {
+            session.getDatabase(dbName2)[collName2].find().itcount();
+        }, expectedError);
+
+        assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+    }
+
+    // These tests only make sense with tracked, unsharded collections since moveCollection does not
+    // affect untracked collections
+    const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    if (isTrackUnshardedEnabled) {
+        runTest('majority');
+
         runTest('snapshot');
     }
 }

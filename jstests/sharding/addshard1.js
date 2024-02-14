@@ -1,4 +1,7 @@
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 var s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false});
 
@@ -62,7 +65,7 @@ assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
           "DB primary is wrong");
 
 var origShard = s.getNonPrimaries("testDB")[0];
-assert.commandWorked(s.s.adminCommand({movePrimary: "testDB", to: origShard}));
+moveDatabaseAndUnshardedColls(s.s.getDB("testDB"), origShard);
 
 assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
           origShard,

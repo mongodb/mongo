@@ -1,5 +1,9 @@
 // Tests that a stale mongos would route writes correctly to the right shard after
 // an unsharded collection was moved to another shard.
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
+
 const st = new ShardingTest({
     shards: 2,
     mongos: 2,
@@ -21,7 +25,7 @@ const mongos2DB = st.s1.getDB(testName);
 const mongos2Coll = mongos2DB[testName];
 assert.commandWorked(mongos2Coll.insert({_id: 0, a: 0}));
 
-assert.commandWorked(mongosDB.adminCommand({movePrimary: mongosDB.getName(), to: st.rs0.getURL()}));
+moveDatabaseAndUnshardedColls(mongosDB, st.shard0.shardName);
 
 assert.commandWorked(mongos2Coll.insert({_id: 1, a: 0}));
 

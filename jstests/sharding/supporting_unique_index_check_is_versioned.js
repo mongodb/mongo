@@ -83,10 +83,7 @@ const st = new ShardingTest({shards: 2, rs: {nodes: 1}, mongos: 2});
 const sourceCollName = "sourceFoo";
 const targetCollName = "targetFoo";
 
-// TODO SERVER-77915 Remove isTrackUnshardedDisabled. Remove the dbVersion
-// check (or simply set it to false). Remove all the "sharded" cases: we now always use
-// shardVersion to run listIndexes on a user collection.
-const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
+const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
     st.shard0.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
 
 //
@@ -95,16 +92,22 @@ const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
 //
 
 (() => {
+    // Database versioning tests only make sense when all collections are not tracked.
+    if (isTrackUnshardedEnabled) {
+        return;
+    }
     const dbName = "testMovedPrimarySuccess";
     jsTestLog("Running test on database: " + dbName);
 
     setUpUnshardedSourceAndTargetCollections(st, dbName, sourceCollName, targetCollName);
 
     // Move the primary from shard0 to shard1 and create an index required for the merge only on the
-    // new primary. Because of database versioning, the stale router should discover the primary has
-    // changed when checking indexes for the merge and load them from the new primary.
+    // new primary. Because of database versioning (or shard versioning, if the collection is
+    // tracked), the stale router should discover the primary has changed when checking indexes for
+    // the merge and load them from the new primary.
     const otherRouter = st.s1;
     assert.commandWorked(otherRouter.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+
     assert.commandWorked(
         otherRouter.getDB(dbName)[targetCollName].createIndex({a: 1, b: 1}, {unique: true}));
 
@@ -119,11 +122,15 @@ const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
         profileDB: st.rs1.getPrimary().getDB(dbName),
         collName: targetCollName,
         expectShardVersion: true,
-        expectDbVersion: isTrackUnshardedDisabled
+        expectDbVersion: true
     });
 })();
 
 (() => {
+    // Database versioning tests only make sense when all collections are not tracked.
+    if (isTrackUnshardedEnabled) {
+        return;
+    }
     const dbName = "testMovedPrimaryFailure";
     jsTestLog("Running test on database: " + dbName);
 
@@ -154,7 +161,7 @@ const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
         profileDB: st.rs1.getPrimary().getDB(dbName),
         collName: targetCollName,
         expectShardVersion: true,
-        expectDbVersion: isTrackUnshardedDisabled
+        expectDbVersion: true
     });
 })();
 
@@ -268,6 +275,10 @@ const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
 })();
 
 (() => {
+    // Database versioning tests only make sense when all collections are not tracked.
+    if (isTrackUnshardedEnabled) {
+        return;
+    }
     const dbName = "testBecomeUnshardedFailure";
     jsTestLog("Running test on database: " + dbName);
 
@@ -297,7 +308,7 @@ const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
         profileDB: st.rs1.getPrimary().getDB(dbName),
         collName: targetCollName,
         expectShardVersion: true,
-        expectDbVersion: isTrackUnshardedDisabled
+        expectDbVersion: true
     });
 })();
 

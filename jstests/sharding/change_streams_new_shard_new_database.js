@@ -76,17 +76,8 @@ const newShard1 = addShardToCluster("newShard1");
 
 // .. make sure the primary shard of 'newShardDB' database is the new shard ..
 assert.commandWorked(
-    newShardDB.runCommand({create: "unusedCollection"}));  // To trigger creation of a database.
-const isNewShardDBOnNewShard =
-    configDB.databases.findOne({_id: newShardDB.getName(), primary: "newShard1"}) != null;
-if (!isNewShardDBOnNewShard) {
-    assert.commandWorked(st.s.adminCommand({movePrimary: newShardDB.getName(), to: "newShard1"}));
-
-    // Consume collection drop events from the existing change streams caused by the movePrimary
-    for (let csCursor of [wholeDBCS, wholeClusterCS]) {
-        assertCollectionDropEventObserved(csCursor, newShardDB.getName(), "unusedCollection");
-    }
-}
+    st.s.adminCommand({enableSharding: newShardDB.getName(), primaryShard: "newShard1"}));
+assert.neq(configDB.databases.findOne({_id: newShardDB.getName(), primary: "newShard1"}), null);
 
 //... create a new collection, and verify that it was placed on the new shard....
 assert.commandWorked(newShardDB.runCommand({create: newShardColl.getName()}));

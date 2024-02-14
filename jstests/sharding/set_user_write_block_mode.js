@@ -9,6 +9,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 import {ShardedIndexUtil} from "jstests/sharding/libs/sharded_index_util.js";
 
@@ -160,14 +161,28 @@ newShard.initiate();
     const toShard = st.getOther(fromShard);
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: toShard.name}));
 
-    // Check that the new primary has cloned the data.
-    assert.eq(1, toShard.getDB(dbName)[unshardedCollName].find().itcount());
+    // Check that the new primary has cloned the data. The data will only be moved if the collection
+    // is untracked.
+    const isTrackUnshardedDisabled = !FeatureFlagUtil.isPresentAndEnabled(
+        st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+    if (isTrackUnshardedDisabled) {
+        assert.eq(1, toShard.getDB(dbName)[unshardedCollName].find().itcount());
+    }
 
-    // Check that the collection has been removed from the former primary.
-    assert.eq(0,
-              fromShard.getDB(dbName)
-                  .runCommand({listCollections: 1, filter: {name: unshardedCollName}})
-                  .cursor.firstBatch.length);
+    if (isTrackUnshardedDisabled) {
+        // Check that the collection has been removed from the former primary.
+        assert.eq(0,
+                  fromShard.getDB(dbName)
+                      .runCommand({listCollections: 1, filter: {name: unshardedCollName}})
+                      .cursor.firstBatch.length);
+    } else {
+        // Check that the database primary has been changed to the new primary.
+        assert.eq(1,
+                  st.s.getDB("config")
+                      .getCollection("databases")
+                      .find({_id: dbName, primary: toShard.shardName})
+                      .itcount());
+    }
 
     assert.commandWorked(st.s.adminCommand({setUserWriteBlockMode: 1, global: false}));
 }

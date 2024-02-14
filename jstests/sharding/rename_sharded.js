@@ -3,6 +3,9 @@
  */
 
 import {getUUIDFromConfigCollections} from "jstests/libs/uuid_util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 /**
  * Initialize a "from" sharded collection with 2 chunks - on 2 different nodes - each containing 1
@@ -288,15 +291,17 @@ const mongos = st.s0;
 
     mongos.getCollection(collOnDB0).insert({a: 0});
 
-    assert.commandWorked(mongos.adminCommand({movePrimary: db0Name, to: st.shard1.name}));
-    assert.commandWorked(mongos.adminCommand({movePrimary: db1Name, to: st.shard1.name}));
+    moveDatabaseAndUnshardedColls(mongos.getDB(db0Name), st.shard1.shardName);
+    moveDatabaseAndUnshardedColls(mongos.getDB(db1Name), st.shard1.shardName);
+
     assert.commandWorked(mongos.adminCommand({
         renameCollection: collOnDB0,
         to: collOnDB1,
     }));
 
-    assert.commandWorked(mongos.adminCommand({movePrimary: db0Name, to: st.shard0.name}));
-    assert.commandWorked(mongos.adminCommand({movePrimary: db1Name, to: st.shard0.name}));
+    moveDatabaseAndUnshardedColls(mongos.getDB(db0Name), st.shard0.shardName);
+    moveDatabaseAndUnshardedColls(mongos.getDB(db1Name), st.shard0.shardName);
+
     assert.commandWorked(mongos.adminCommand({
         renameCollection: collOnDB1,
         to: collOnDB0,

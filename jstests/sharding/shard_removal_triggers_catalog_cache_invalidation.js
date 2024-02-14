@@ -2,6 +2,9 @@
  * Tests that shard removal triggers an update of the catalog cache so that routers don't continue
  * to target shards that have been removed.
  */
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // Checking UUID consistency involves talking to shards, but this test shuts down shards.
@@ -95,7 +98,7 @@ const dbName = 'TestDB';
  * 1. Create 2 shards and 2 routers. Make shard0 the primary shard for a database.
  * 2. Put data for an unsharded collection on shard0.
  * 3. Ensure both routers have up-to-date routing info.
- * 4. movePrimary for the database to shard1.
+ * 4. Move all data of the database to shard1.
  * 4. Remove shard0 by sending removeShard through router 0.
  * 5. Send a query through router 1 to target the sharded and unsharded collections. This should
  *    correctly target shard1.
@@ -123,8 +126,7 @@ const dbName = 'TestDB';
     assert.eq(1, router0UnshardedColl.find({}).itcount());
     assert.eq(1, router1UnshardedColl.find({}).itcount());
 
-    // Call movePrimary for the database so that shard0 can be removed.
-    assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+    moveDatabaseAndUnshardedColls(st.s0.getDB(dbName), st.shard1.shardName);
 
     // Remove shard0. We need assert.soon since chunks in the sessions collection may need to be
     // migrated off by the balancer.

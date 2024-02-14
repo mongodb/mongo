@@ -4,6 +4,7 @@
  * convert it up to majority WC),
  * 2) Issuing a metadata command directly to a config server with non-majority write concern fails.
  */
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {removeShard} from "jstests/sharding/libs/remove_shard_util.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
@@ -133,10 +134,18 @@ let st = new ShardingTest({shards: 1});
 // enableSharding
 checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
 
-// movePrimary
-checkCommandMongos({movePrimary: dbName, to: st.shard0.name},
-                   setupFuncs.createDatabase,
-                   cleanupFuncs.dropDatabase);
+// TODO SERVER-77915: remove once 8.0 becomes last-lts
+if (FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsOnShardingCatalog")) {
+    // changePrimary
+    checkCommandMongos({changePrimary: dbName, to: st.shard0.shardName},
+                       setupFuncs.createDatabase,
+                       cleanupFuncs.dropDatabase);
+} else {
+    // movePrimary
+    checkCommandMongos({movePrimary: dbName, to: st.shard0.shardName},
+                       setupFuncs.createDatabase,
+                       cleanupFuncs.dropDatabase);
+}
 
 // shardCollection
 checkCommandMongos(
@@ -145,7 +154,7 @@ checkCommandMongos(
 // createDatabase
 // Don't check createDatabase against mongos: there is no createDatabase command exposed on
 // mongos; a database is created implicitly when a collection in it is created.
-checkCommandConfigSvr({_configsvrCreateDatabase: dbName, to: st.shard0.name},
+checkCommandConfigSvr({_configsvrCreateDatabase: dbName, to: st.shard0.shardName},
                       setupFuncs.noop,
                       cleanupFuncs.dropDatabase);
 

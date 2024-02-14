@@ -10,6 +10,9 @@ import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 const dbName = "foo";
 const collName = "bar";
@@ -176,10 +179,11 @@ const newShardName =
 
     // Create a sharded and unsharded timeseries collection and verify they and their buckets
     // collections are correctly dropped. This provides coverage for views and sharded views.
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: timeseriesDbName, primaryShard: configShardName}));
     const timeseriesDB = st.s.getDB(timeseriesDbName);
     assert.commandWorked(timeseriesDB.createCollection(timeseriesUnshardedCollName,
                                                        {timeseries: {timeField: "time"}}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: timeseriesDbName, to: configShardName}));
     assert.commandWorked(timeseriesDB.createCollection(timeseriesShardedCollName,
                                                        {timeseries: {timeField: "time"}}));
     assert.commandWorked(st.s.adminCommand({shardCollection: timeseriesShardedNs, key: {time: 1}}));
@@ -224,9 +228,9 @@ const newShardName =
     assert.eq(isTrackUnshardedEnabled ? 2 : 1, removeRes.remaining.chunks);
     assert.eq(3, removeRes.remaining.dbs);
 
-    assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: newShardName}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: unshardedDbName, to: newShardName}));
-    assert.commandWorked(st.s.adminCommand({movePrimary: timeseriesDbName, to: newShardName}));
+    moveDatabaseAndUnshardedColls(st.s.getDB(dbName), newShardName);
+    moveDatabaseAndUnshardedColls(st.s.getDB(unshardedDbName), newShardName);
+    moveDatabaseAndUnshardedColls(st.s.getDB(timeseriesDbName), newShardName);
 
     // The draining sharded collections should not have been locally dropped yet.
     assert(configPrimary.getCollection(ns).exists());

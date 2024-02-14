@@ -21,6 +21,9 @@ import {
     profilerHasAtLeastOneMatchingEntryOrThrow,
     profilerHasZeroMatchingEntriesOrThrow
 } from "jstests/libs/profiler.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 const st = new ShardingTest({
     name: jsTestName(),
@@ -669,7 +672,8 @@ awaitShell = startParallelShell(
 // When we hit this failpoint, the nested $lookup will have just completed its first subpipeline.
 // Move the primary to the other shard to verify that $lookup execution changes correctly mid-query.
 failPoint.wait();
-assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: st.shard1.shardName}));
+moveDatabaseAndUnshardedColls(
+    st.s0.getDB(dbName), st.shard1.shardName, false /* moveShardedData */);
 
 // Let the aggregate complete.
 failPoint.off();

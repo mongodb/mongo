@@ -6,6 +6,9 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {getDBNameAndCollNameFromFullNamespace} from "jstests/libs/namespace_utils.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 function bulkWriteBasicTest(ordered) {
     jsTestLog(`Running bulkWrite command sharding test with ordered: ${ordered}`);
@@ -71,7 +74,6 @@ function bulkWriteBasicTest(ordered) {
     assert.eq(1, insertedDocs.length, `Inserted docs: '${tojson(insertedDocs)}'`);
     assert(checkLog.checkContainsOnce(st.s0, staleConfigOrangeLog));
 
-    jsTestLog("Case 3: StaleDbVersion when unsharded collection moves between shards.");
     const db_s1 = st.s1.getDB("test");
 
     const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
@@ -79,15 +81,8 @@ function bulkWriteBasicTest(ordered) {
 
     // Case 3: Move the 'test2' DB back and forth across shards. This will result in bulkWrite
     // getting a StaleDbVersion error. We run this on s1 so s0 doesn't know about the change.
-    if (isTrackUnshardedEnabled) {
-        assert.commandWorked(
-            db_s1.adminCommand({moveCollection: orange, toShard: st.shard0.shardName}));
-        assert.commandWorked(
-            db_s1.adminCommand({moveCollection: orange, toShard: st.shard1.shardName}));
-    } else {
-        assert.commandWorked(db_s1.adminCommand({movePrimary: 'test2', to: st.shard0.shardName}));
-        assert.commandWorked(db_s1.adminCommand({movePrimary: 'test2', to: st.shard1.shardName}));
-    }
+    moveDatabaseAndUnshardedColls(st.s1.getDB('test2'), st.shard0.shardName);
+    moveDatabaseAndUnshardedColls(st.s1.getDB('test2'), st.shard1.shardName);
 
     // Now run the bulk write command on s0.
     assert.commandWorked(db_s0.adminCommand(

@@ -17,6 +17,9 @@ import {
     getReplicaSetURL,
     waitForAutoBootstrap
 } from "jstests/noPassthrough/rs_endpoint/lib/util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 const keyFile = "jstests/libs/key1";
 
@@ -184,7 +187,9 @@ function runTests(shard0Primary, tearDownFunc) {
     assert(mongosAuthDB.auth(adminUser.userName, adminUser.password));
     assert.commandWorked(
         mongosAuthDB.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
-    assert.commandWorked(mongosAuthDB.adminCommand({movePrimary: dbName, to: shard1Name}));
+
+    moveDatabaseAndUnshardedColls(mongos.getDB(dbName), shard1Name);
+
     assert.commandWorked(mongosAuthDB.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert(mongosAuthDB.logout());
 

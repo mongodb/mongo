@@ -13,6 +13,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 import {awaitRSClientHosts} from "jstests/replsets/rslib.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 import {moveOutSessionChunks, removeShard} from "jstests/sharding/libs/remove_shard_util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -155,13 +158,15 @@ assert.eq(300, coll.find().itcount());
 
 jsTestLog("Verify that a database can be moved to the added shard.");
 st.s.getDB('test2').foo.insert({a: 1});
-assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: rst2.name}));
+
+moveDatabaseAndUnshardedColls(st.s.getDB("test2"), rst2.name);
+
 assert.eq(1, st.s.getDB('test2').foo.find().itcount());
 
 // Can't shut down with rst2 in the set or ShardingTest will fail trying to cleanup on shutdown.
 // Have to take out rst2 and put rst1 back into the set so that it can clean up.
 jsTestLog("Resetting the sharding test to its initial state to allow the test to shut down.");
-assert.commandWorked(st.admin.runCommand({movePrimary: 'test2', to: st.shard0.shardName}));
+moveDatabaseAndUnshardedColls(st.s.getDB("test2"), st.shard0.shardName);
 removeShardAndCleanup(st, coll, rst2);
 rst2.stopSet(null, true /* forRestart */);
 

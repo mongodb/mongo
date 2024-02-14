@@ -8,6 +8,9 @@
 
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
+import {
+    moveDatabaseAndUnshardedColls
+} from "jstests/sharding/libs/move_database_and_unsharded_coll_helper.js";
 
 function assertConfigQueryAnalyzerResponse(res, newConfig, oldConfig) {
     assert.eq(res.newConfiguration, newConfig, res);
@@ -44,7 +47,7 @@ function setUpCollection(conn, {isShardedColl, st}) {
     const dbName = "testDb-" + extractUUIDFromObject(UUID());
     if (st) {
         assert.commandWorked(
-            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name}));
+            st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
     }
     const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
     const ns = dbName + "." + collName;
@@ -229,8 +232,8 @@ function testConfigurationDeletionRenameCollection(conn, {sameDatabase, isSharde
     assert.commandWorked(dstDb.createCollection(dstCollName));
     if (!sameDatabase && st) {
         // On a sharded cluster, the src and dst collections must be on same shard.
-        assert.commandWorked(st.s.adminCommand(
-            {movePrimary: dstDbName, to: st.getPrimaryShardIdForDatabase(srcDbName)}));
+        moveDatabaseAndUnshardedColls(st.s.getDB(dstDbName),
+                                      st.getPrimaryShardIdForDatabase(srcDbName));
     }
     const dstCollUuid = QuerySamplingUtil.getCollectionUuid(dstDb, dstCollName);
 

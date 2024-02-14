@@ -16,6 +16,7 @@
  *      in enterprise modules, for instance.
  */
 
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {
     commandsAddedToMongosSinceLastLTS,
     commandsRemovedFromMongosSinceLastLTS
@@ -125,6 +126,7 @@ function testCommandAfterMovePrimary(testCase, st, dbName, collName) {
 
     // Run movePrimary through the second mongos.
     assert.commandWorked(st.s1.adminCommand({movePrimary: dbName, to: primaryShardAfter.name}));
+
     const dbVersionAfter =
         st.s1.getDB("config").getCollection("databases").findOne({_id: dbName}).version;
 
@@ -823,6 +825,14 @@ commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
 });
 
 const st = new ShardingTest({shards: 2, mongos: 2});
+
+// Database versioning tests only make sense when all collections are not tracked.
+const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
+    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
+if (isTrackUnshardedEnabled) {
+    st.stop();
+    quit();
+}
 
 const listCommandsRes = st.s0.adminCommand({listCommands: 1});
 assert.commandWorked(listCommandsRes);
