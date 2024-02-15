@@ -1792,7 +1792,8 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     sortTotalDataSizeBytes = planSummaryStats.sortTotalDataSizeBytes;
     keysSorted = planSummaryStats.keysSorted;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
-    fromPlanCache = planSummaryStats.fromPlanCache;
+    // Don't clobber flag which may have been set directly.
+    fromPlanCache = fromPlanCache || planSummaryStats.fromPlanCache;
     replanReason = planSummaryStats.replanReason;
     collectionScans = planSummaryStats.collectionScans;
     collectionScansNonTailable = planSummaryStats.collectionScansNonTailable;

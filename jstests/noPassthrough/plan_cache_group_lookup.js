@@ -1,6 +1,7 @@
 /**
  * Test that plans with $group and $lookup lowered to SBE are cached and invalidated correctly.
  * @tags: [
+ *   # TODO SERVER-85728: Enable Bonsai plan cache tests involving indices.
  *   cqf_experimental_incompatible,
  *   featureFlagSbeFull
  * ]
@@ -27,23 +28,20 @@ function setupForeignColl(index) {
 assert.commandWorked(db.setProfilingLevel(2));
 
 /**
- * Assert that the last aggregation command has a corresponding plan cache entry with the desired
- * properties. 'version' is 1 if it's classic cache, 2 if it's SBE cache. 'isActive' is true if the
- * cache entry is active. 'fromMultiPlanner' is true if the query part of aggregation has been
- * multi-planned. 'fromPlanCache' is true if the winning plan was retrieved from the plan cache.
- * 'forcesClassicEngine' is true if the query is forced to use classic engine.
+ * Assert that the last aggregation command has a corresponding plan cache entry with the
+ * desired properties. 'version' is 1 if it's classic cache, 2 if it's SBE cache. 'isActive' is
+ * true if the cache entry is active. 'fromMultiPlanner' is true if the query part of
+ * aggregation has been multi-planned. 'fromPlanCache' is true if the winning plan was retrieved
+ * from the plan cache. 'forcesClassicEngine' is true if the query is forced to use classic
+ * engine.
  */
 function assertCacheUsage(
-    {version, fromMultiPlanner, fromPlanCache, isActive, forcesClassicEngine = false}) {
+    {version, fromMultiPlanner, fromPlanCache, isActive, forcesClassicEngine}) {
     const profileObj = getLatestProfilerEntry(
         db, {op: "command", "command.pipeline": {$exists: true}, ns: coll.getFullName()});
+    assert.eq(fromMultiPlanner, !!profileObj.fromMultiPlanner, profileObj);
+
     assert.eq(fromPlanCache, !!profileObj.fromPlanCache, profileObj);
-    // When running under Bonsai, the `fromMultiPlanner` field is not returned in profiled objects.
-    // Note that some of the queries in the test may "fall back" to classic+SBE but we don't check
-    // for that when Bonsai is enabled.
-    if (!checkCascadesOptimizerEnabled(db)) {
-        assert.eq(fromMultiPlanner, !!profileObj.fromMultiPlanner, profileObj);
-    }
 
     const entries = coll.getPlanCache().list();
     assert.eq(entries.length, 1, entries);
@@ -65,7 +63,8 @@ function assertCacheUsage(
 }
 
 /**
- * Run the pipeline three times, assert that we have the following plan cache entries of "version".
+ * Run the pipeline three times, assert that we have the following plan cache entries of
+ * "version".
  *      1. The pipeline runs from the multi-planner, saving an inactive cache entry.
  *      2. The pipeline runs from the multi-planner, activating the cache entry.
  *      3. The pipeline runs from cached solution planner, using the active cache entry.
@@ -191,7 +190,8 @@ const groupStage = {
 (function testLookupSbeAndClassicPlanCacheKey() {
     setupForeignColl({b: 1} /* index */);
 
-    // When using SBE engine, the plan cache key of $match vs. $match + $lookup should be different.
+    // When using SBE engine, the plan cache key of $match vs. $match + $lookup should be
+    // different.
     coll.getPlanCache().clear();
     let matchEntry = testLoweredPipeline({pipeline: [matchStage], version: 2});
 
@@ -199,8 +199,8 @@ const groupStage = {
     let lookupEntry = testLoweredPipeline({pipeline: [matchStage, lookupStage], version: 2});
     assert.neq(matchEntry.planCacheKey, lookupEntry.planCacheKey, {matchEntry, lookupEntry});
 
-    // When using classic engine, the plan cache key of $match vs. $match + $lookup should be the
-    // same.
+    // When using classic engine, the plan cache key of $match vs. $match + $lookup should be
+    // the same.
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 

@@ -495,6 +495,7 @@ static ExecParams createExecutor(
 
     sbePlan->prepare(data.env.ctx);
     CurOp::get(opCtx)->stopQueryPlanningTimer();
+    CurOp::get(opCtx)->debug().fromPlanCache = fromCache;
 
     return {opCtx,
             nullptr /*solution*/,
