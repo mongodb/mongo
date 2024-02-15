@@ -71,7 +71,9 @@ MONGO_FAIL_POINT_DEFINE(throwClientDisconnectInSignLogicalTimeForExternalClients
 const auto getLogicalTimeValidator =
     ServiceContext::declareDecoration<std::shared_ptr<LogicalTimeValidator>>();
 
-Mutex validatorMutex;  // protects access to decoration instance of LogicalTimeValidator.
+Mutex validatorMutex =
+    MONGO_MAKE_LATCH("LogicalTimeValidatorMutex");  // protects access to decoration instance of
+                                                    // LogicalTimeValidator.
 
 Milliseconds kRefreshIntervalIfErrored(200);
 
