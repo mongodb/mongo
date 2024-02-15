@@ -169,7 +169,7 @@ variables:
   - name: unittest_shell_hang_analyzer_gen
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .timeseries_crud
   - name: vector_search
   - name: vector_search_auth
@@ -479,7 +479,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl

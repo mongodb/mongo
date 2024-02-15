@@ -56,7 +56,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -121,7 +121,7 @@ buildvariants:
   - name: .publish_crypt
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -186,7 +186,7 @@ buildvariants:
   - name: .crypt
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: crypt_push
   - name: push
   - name: generate_buildid_to_debug_symbols_mapping

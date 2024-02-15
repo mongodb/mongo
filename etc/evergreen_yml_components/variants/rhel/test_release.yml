@@ -82,7 +82,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .timeseries_crud
   - name: selinux_rhel7_org
   - name: .publish
@@ -160,7 +160,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .timeseries_crud
   - name: selinux_rhel8_org
   - name: .publish
@@ -297,7 +297,7 @@ buildvariants:
     - rhel80-large
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl

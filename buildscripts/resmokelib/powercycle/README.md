@@ -8,7 +8,7 @@ is remotely crashed by "server" regularly.
 In evergreen the localhost that runs the task acts as a "server" and the remote
 host which is created by `host.create` evergreen command acts as a "client".
 
-Powercycle test is the part of resmoke. Python 3.9+ with python venv is required to
+Powercycle test is the part of resmoke. Python 3.10+ with python venv is required to
 run the resmoke (python3 from [mongodbtoolchain](http://mongodbtoolchain.build.10gen.cc/)
 is highly recommended). Python venv can be set up by running in the root mongo repo
 directory:

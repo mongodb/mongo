@@ -133,7 +133,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -198,7 +198,7 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: test_packages
     distros:
-    - ubuntu2004-package
+    - ubuntu2204-large
   - name: .timeseries_crud
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
