@@ -89,16 +89,22 @@ public:
 protected:
     void checkRequestMetadata(executor::RemoteCommandRequest request,
                               StringData expectedCmd,
-                              bool expectTxnFields) {
+                              bool expectStartTxnFields,
+                              bool expectStartOrContinueTxnFields) {
         ASSERT(request.cmdObj.hasField(expectedCmd));
-        if (expectTxnFields) {
-            ASSERT(request.cmdObj.hasField("startTransaction"));
+        if (expectStartTxnFields || expectStartOrContinueTxnFields) {
+            if (expectStartTxnFields) {
+                ASSERT(request.cmdObj.hasField("startTransaction"));
+            } else {  // expectStartOrContinueTxnFields
+                ASSERT(request.cmdObj.hasField("startOrContinueTransaction"));
+            }
             ASSERT(request.cmdObj.hasField("autocommit"));
             ASSERT(request.cmdObj.hasField("txnNumber"));
             return;
         }
 
         ASSERT(!request.cmdObj.hasField("startTransaction"));
+        ASSERT(!request.cmdObj.hasField("startOrContinueTransaction"));
         ASSERT(!request.cmdObj.hasField("autocommit"));
         ASSERT(!request.cmdObj.hasField("txnNumber"));
     }
@@ -127,7 +133,10 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsNotAppendedIfNoTxn
     });
 
     onCommand([&](const auto& request) {
-        checkRequestMetadata(request, cmdName, false /* expectTxnFields */);
+        checkRequestMetadata(request,
+                             cmdName,
+                             false /* expectStartTxnFields */,
+                             false /* expectStartOrContinueTxnFields */);
         return BSON("ok" << true);
     });
 
@@ -164,7 +173,49 @@ TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfTxnRo
     });
 
     onCommand([&](const auto& request) {
-        checkRequestMetadata(request, cmdName, true /* expectTxnFields */);
+        checkRequestMetadata(request,
+                             cmdName,
+                             true /* expectStartTxnFields */,
+                             false /* expectStartOrContinueTxnFields */);
+
+        // The TransactionRouter will throw when parsing this response if
+        // "processParticipantResponse" does not exist
+        return BSON("ok" << true << "readOnly" << true);
+    });
+
+    future.default_timed_get();
+}
+
+TEST_F(MultiStatementTransactionRequestsSenderTest, TxnDetailsAreAppendedIfSubTxnRouter) {
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(TxnNumber(0));
+    operationContext()->setInMultiDocumentTransaction();
+    operationContext()->setActiveTransactionParticipant();
+    RouterOperationContextSession rocs(operationContext());
+
+    auto cmdName = "find";
+    std::vector<AsyncRequestsSender::Request> requests{{_remoteShardId,
+                                                        BSON("find"
+                                                             << "bar")}};
+
+    auto msars =
+        MultiStatementTransactionRequestsSender(operationContext(),
+                                                executor(),
+                                                _nss.dbName(),
+                                                requests,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                Shard::RetryPolicy::kNoRetry);
+
+    auto future = launchAsync([&]() {
+        auto response = msars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+    });
+
+    onCommand([&](const auto& request) {
+        checkRequestMetadata(request,
+                             cmdName,
+                             false /* expectStartTxnFields */,
+                             true /* expectStartOrContinueTxnFields */);
 
         // The TransactionRouter will throw when parsing this response if
         // "processParticipantResponse" does not exist

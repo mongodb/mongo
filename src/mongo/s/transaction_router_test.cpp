@@ -435,6 +435,51 @@ TEST_F(TransactionRouterTestWithDefaultSession, StartTxnWithStartOrContinue) {
     }
 }
 
+TEST_F(TransactionRouterTestWithDefaultSession, BeginOrContinueThrowsBecauseOldTxn) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    ASSERT_THROWS_CODE(
+        txnRouter.beginOrContinueTxn(operationContext(),
+                                     txnNum - 1,
+                                     TransactionRouter::TransactionActions::kStartOrContinue),
+        DBException,
+        ErrorCodes::TransactionTooOld);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, ContinueThrowsBecauseAPIParamMismatch) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    APIParameters::get(operationContext())
+        .setAPIStrict(!APIParameters::get(operationContext()).getAPIStrict());
+    ASSERT_THROWS_CODE(
+        txnRouter.beginOrContinueTxn(
+            operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue),
+        DBException,
+        ErrorCodes::APIMismatchError);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, BeginTxnThrowsBecauseInShutdown) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    auto sessionCatalog = SessionCatalog::get(operationContext());
+    sessionCatalog->setDisallowNewTransactions();
+    ASSERT_THROWS_CODE(txnRouter.beginOrContinueTxn(operationContext(),
+                                                    txnNum,
+                                                    TransactionRouter::TransactionActions::kStart),
+                       DBException,
+                       ErrorCodes::InterruptedAtShutdown);
+}
+
 TEST_F(TransactionRouterTestWithDefaultSession, SubRouterCannotCommit) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);

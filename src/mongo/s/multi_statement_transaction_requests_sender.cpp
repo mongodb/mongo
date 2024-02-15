@@ -55,7 +55,12 @@ std::vector<AsyncRequestsSender::Request> attachTxnDetails(
         return requests;
     }
 
-    // TODO SERVER-85165 Set up txnRouter state if activeTxnParticipantAddParticipants is true
+    if (activeTxnParticipantAddParticipants) {
+        auto opCtxTxnNum = opCtx->getTxnNumber();
+        invariant(opCtxTxnNum);
+        txnRouter.beginOrContinueTxn(
+            opCtx, *opCtxTxnNum, TransactionRouter::TransactionActions::kStartOrContinue);
+    }
 
     std::vector<AsyncRequestsSender::Request> newRequests;
     newRequests.reserve(requests.size());
