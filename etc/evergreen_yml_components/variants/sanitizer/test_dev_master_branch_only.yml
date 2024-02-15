@@ -640,7 +640,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared
     separate_debug: off
-    large_distro_name: rhel80-medium
+    large_distro_name: rhel80-xlarge
     core_analyzer_distro_name: rhel80-xlarge
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -655,7 +655,7 @@ buildvariants:
   - name: .aggfuzzer !.feature_flag_guarded !.timeseries !.multiversion !.optimization !.no_debug_mode
   - name: .aggregation !.feature_flag_guarded
   - name: audit
-  # - name: .auth  # Not passing
+  - name: .auth
   - name: buildscripts_test
   - name: unittest_shell_hang_analyzer_gen
   # - name: .config_fuzzer # Not passing
@@ -675,13 +675,13 @@ buildvariants:
   #   distros:
   #   - rhel80-medium
   - name: disk_wiredtiger
-  # - name: .encrypt # Not passing
+  - name: .encrypt
   - name: external_auth
   - name: initial_sync_fuzzer_gen
   - name: jsCore
     distros:
     - rhel80-xlarge
-  # - name: .jscore .common !jsCore # Not passing
+  - name: .jscore .common !jsCore
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -770,17 +770,11 @@ buildvariants:
   stepback: false
   expansions:
     <<: *enterprise-rhel80-debug-tsan-expansions-template
-    large_distro_name: rhel80-xlarge
-    core_analyzer_distro_name: rhel80-xlarge
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_serial_TG
-  - name: compile_test_parallel_unittest_stream_TG
-  - name: .auth
   - name: .concurrency !.no_txns !.compute_mode
   - name: .config_fuzzer
-  - name: .encrypt
-  - name: .jscore .common !jsCore
   # - name: libunwind_tests # Cant be used because tsan does not use libunwind
   # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
