@@ -88,7 +88,7 @@ bool isMemberOfClearedSet(BucketStateRegistry& registry, WithLock lock, Bucket* 
     for (auto it = registry.clearedSets.lower_bound(bucket->lastChecked + 1);
          it != registry.clearedSets.end();
          ++it) {
-        if (it->second(bucket->bucketId.ns)) {
+        if (it->second(bucket->bucketId.collectionUUID)) {
             return true;
         }
     }

@@ -119,7 +119,8 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
 }
 
 void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
-    ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, bucket.key.ns);
+    ExecutionStatsController stats =
+        getOrInitializeExecutionStats(catalog, bucket.key.collectionUUID);
     stats.incNumBytesUncompressed(bucket.uncompressedBucketDoc.objsize());
     stats.incNumBytesCompressed(bucket.compressedBucketDoc->objsize());
 }
@@ -194,7 +195,7 @@ StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes) {
 }
 
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
-    const NamespaceString& ns,
+    const UUID& collectionUUID,
     const StringDataComparator* comparator,
     const TimeseriesOptions& options,
     const BSONObj& doc) {
@@ -219,7 +220,8 @@ StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key = BucketKey{ns, BucketMetadata{metadata, comparator, options.getMetaField()}};
+    auto key =
+        BucketKey{collectionUUID, BucketMetadata{metadata, comparator, options.getMetaField()}};
 
     return {std::make_pair(key, time)};
 }
@@ -272,6 +274,7 @@ Bucket* useBucket(OperationContext* opCtx,
                   BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
+                  const NamespaceString& nss,
                   const CreationInfo& info,
                   AllowBucketCreation mode) {
     auto it = stripe.openBucketsByKey.find(info.key);
@@ -307,7 +310,7 @@ Bucket* useBucket(OperationContext* opCtx,
           stripeLock,
           *bucket,
           nullptr,
-          getTimeseriesBucketClearedError(bucket->bucketId.ns, bucket->bucketId.oid));
+          getTimeseriesBucketClearedError(nss, bucket->bucketId.oid));
 
     return mode == AllowBucketCreation::kYes
         ? &allocateBucket(opCtx, catalog, stripe, stripeLock, info)
@@ -317,6 +320,7 @@ Bucket* useBucket(OperationContext* opCtx,
 Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
+                           const NamespaceString& nss,
                            const CreationInfo& info) {
     auto it = stripe.openBucketsByKey.find(info.key);
     if (it == stripe.openBucketsByKey.end()) {
@@ -356,8 +360,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
                   stripeLock,
                   *potentialBucket,
                   nullptr,
-                  getTimeseriesBucketClearedError(potentialBucket->bucketId.ns,
-                                                  potentialBucket->bucketId.oid));
+                  getTimeseriesBucketClearedError(nss, potentialBucket->bucketId.oid));
         }
     }
 
@@ -367,7 +370,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
 StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                                                        BucketCatalog& catalog,
                                                        ExecutionStatsController& stats,
-                                                       const NamespaceString& ns,
+                                                       const UUID& collectionUUID,
                                                        const StringDataComparator* comparator,
                                                        const TimeseriesOptions& options,
                                                        const BucketToReopen& bucketToReopen,
@@ -407,7 +410,8 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key = BucketKey{ns, BucketMetadata{metadata, comparator, options.getMetaField()}};
+    auto key =
+        BucketKey{collectionUUID, BucketMetadata{metadata, comparator, options.getMetaField()}};
     if (expectedKey && key != *expectedKey) {
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }
@@ -415,7 +419,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
     auto minTime = controlField.getObjectField(kBucketControlMinFieldName)
                        .getField(options.getTimeField())
                        .Date();
-    BucketId bucketId{key.ns, bucketIdElem.OID()};
+    BucketId bucketId{key.collectionUUID, bucketIdElem.OID()};
     unique_tracked_ptr<Bucket> bucket = make_unique_tracked<Bucket>(catalog.trackingContext,
                                                                     catalog.trackingContext,
                                                                     bucketId,
@@ -497,10 +501,8 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         bucket->memoryUsage += bucket->intermediateBuilders.getMemoryUsage();
     }
 
-    // The namespace is stored two times: the bucket itself and openBucketsByKey. Since the metadata
-    // is stored in the bucket, we need to add that as well.
-
-    bucket->memoryUsage += (key.ns.size() * 2) + key.metadata.toBSON().objsize();
+    // The metadata is stored in the bucket, we need to account for that.
+    bucket->memoryUsage += key.metadata.toBSON().objsize();
 
     updateStatsOnError.dismiss();
     return {std::move(bucket)};
@@ -578,6 +580,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
 StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& catalog,
                                                                Stripe& stripe,
                                                                WithLock stripeLock,
+                                                               const NamespaceString& nss,
                                                                ExecutionStatsController& stats,
                                                                const BucketKey& key,
                                                                Bucket& existingBucket,
@@ -593,8 +596,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
               stripeLock,
               existingBucket,
               nullptr,
-              getTimeseriesBucketClearedError(existingBucket.bucketId.ns,
-                                              existingBucket.bucketId.oid));
+              getTimeseriesBucketClearedError(nss, existingBucket.bucketId.oid));
         return {ErrorCodes::WriteConflict, "Bucket may be stale"};
     } else if (conflictsWithReopening(state.value())) {
         // Avoid reusing the bucket if it conflicts with reopening.
@@ -603,7 +605,7 @@ StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& ca
 
     // It's possible to have two buckets with the same ID in different collections, so let's make
     // extra sure the existing bucket is the right one.
-    if (existingBucket.bucketId.ns != key.ns) {
+    if (existingBucket.bucketId.collectionUUID != key.collectionUUID) {
         return {ErrorCodes::BadValue, "Cannot re-use bucket: same ID but different namespace"};
     }
 
@@ -672,9 +674,8 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
         if (info.openedDuetoMetadata) {
             batch->openedDueToMetadata = true;
         }
-        // The namespace is stored two times: the bucket itself and openBucketsByKey. Also account
-        // for the size of the metadata.
-        bucket.memoryUsage += (info.key.ns.size() * 2) + bucket.key.metadata.toBSON().objsize();
+        // Account for the size of the metadata.
+        bucket.memoryUsage += bucket.key.metadata.toBSON().objsize();
 
         auto updateStatus = bucket.schema.update(
             doc, info.options.getMetaField(), info.key.metadata.getComparator());
@@ -747,7 +748,8 @@ void removeBucket(
     markBucketNotIdle(stripe, stripeLock, bucket);
 
     // If the bucket was rolled over, then there may be a different open bucket for this metadata.
-    auto openIt = stripe.openBucketsByKey.find({bucket.bucketId.ns, bucket.key.metadata});
+    auto openIt =
+        stripe.openBucketsByKey.find({bucket.bucketId.collectionUUID, bucket.key.metadata});
     if (openIt != stripe.openBucketsByKey.end()) {
         auto& openSet = openIt->second;
         auto bucketIt = openSet.find(&bucket);
@@ -1134,7 +1136,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
     bool inserted = false;
     for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
         std::tie(oid, roundedTime) = generateBucketOID(info.time, info.options);
-        auto bucketId = BucketId{info.key.ns, oid};
+        auto bucketId = BucketId{info.key.collectionUUID, oid};
         std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
             bucketId,
             make_unique_tracked<Bucket>(catalog.trackingContext,
@@ -1298,32 +1300,32 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
 }
 
 ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
-                                                       const NamespaceString& ns) {
+                                                       const UUID& collectionUUID) {
     stdx::lock_guard catalogLock{catalog.mutex};
-    auto it = catalog.executionStats.find(ns);
+    auto it = catalog.executionStats.find(collectionUUID);
     if (it != catalog.executionStats.end()) {
         return {it->second, catalog.globalExecutionStats};
     }
 
     auto res = catalog.executionStats.emplace(
-        ns, make_shared_tracked<ExecutionStats>(catalog.trackingContext));
+        collectionUUID, make_shared_tracked<ExecutionStats>(catalog.trackingContext));
     return {res.first->second, catalog.globalExecutionStats};
 }
 
 shared_tracked_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
-                                                     const NamespaceString& ns) {
+                                                     const UUID& collectionUUID) {
     static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
 
     stdx::lock_guard catalogLock{catalog.mutex};
 
-    auto it = catalog.executionStats.find(ns);
+    auto it = catalog.executionStats.find(collectionUUID);
     if (it != catalog.executionStats.end()) {
         return it->second;
     }
     return kEmptyStats;
 }
 
-std::pair<NamespaceString, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+std::pair<UUID, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
     BucketCatalog& sideBucketCatalog) {
     stdx::lock_guard catalogLock{sideBucketCatalog.mutex};
     invariant(sideBucketCatalog.executionStats.size() == 1);
@@ -1332,15 +1334,18 @@ std::pair<NamespaceString, shared_tracked_ptr<ExecutionStats>> getSideBucketCata
 
 void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
                                         shared_tracked_ptr<ExecutionStats> collStats,
-                                        const NamespaceString& viewNs) {
-    ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, viewNs);
+                                        const UUID& collectionUUID) {
+    ExecutionStatsController stats = getOrInitializeExecutionStats(catalog, collectionUUID);
     addCollectionExecutionStats(stats, *collStats);
 }
 
-Status getTimeseriesBucketClearedError(const NamespaceString& ns, const OID& oid) {
+Status getTimeseriesBucketClearedError(const NamespaceString& nss, const OID& oid) {
     return {ErrorCodes::TimeseriesBucketCleared,
-            str::stream() << "Time-series bucket " << oid << " for namespace "
-                          << ns.toStringForErrorMsg() << " was cleared"};
+            str::stream() << "Time-series bucket " << oid << " for collection "
+                          << (nss.isTimeseriesBucketsCollection()
+                                  ? nss.getTimeseriesViewNamespace().toStringForErrorMsg()
+                                  : nss.toStringForErrorMsg())
+                          << " was cleared"};
 }
 
 void closeOpenBucket(OperationContext* opCtx,
@@ -1364,11 +1369,12 @@ void closeOpenBucket(OperationContext* opCtx,
     invariant(!bucket.compressedBucketDoc);
     bool error = false;
     try {
-        closedBuckets.emplace_back(&catalog.bucketStateRegistry,
-                                   bucket.bucketId,
-                                   bucket.timeField,
-                                   bucket.numMeasurements,
-                                   getOrInitializeExecutionStats(catalog, bucket.bucketId.ns));
+        closedBuckets.emplace_back(
+            &catalog.bucketStateRegistry,
+            bucket.bucketId,
+            bucket.timeField,
+            bucket.numMeasurements,
+            getOrInitializeExecutionStats(catalog, bucket.bucketId.collectionUUID));
     } catch (...) {
         error = true;
     }
@@ -1397,11 +1403,12 @@ void closeOpenBucket(OperationContext* opCtx,
     invariant(!bucket.compressedBucketDoc);
     bool error = false;
     try {
-        closedBucket = boost::in_place(&catalog.bucketStateRegistry,
-                                       bucket.bucketId,
-                                       bucket.timeField,
-                                       bucket.numMeasurements,
-                                       getOrInitializeExecutionStats(catalog, bucket.bucketId.ns));
+        closedBucket =
+            boost::in_place(&catalog.bucketStateRegistry,
+                            bucket.bucketId,
+                            bucket.timeField,
+                            bucket.numMeasurements,
+                            getOrInitializeExecutionStats(catalog, bucket.bucketId.collectionUUID));
     } catch (...) {
         closedBucket = boost::none;
         error = true;
@@ -1421,23 +1428,23 @@ void closeArchivedBucket(BucketCatalog& catalog,
     }
 
     try {
-        closedBuckets.emplace_back(&catalog.bucketStateRegistry,
-                                   bucket.bucketId,
-                                   bucket.timeField.c_str(),
-                                   boost::none,
-                                   getOrInitializeExecutionStats(catalog, bucket.bucketId.ns));
+        closedBuckets.emplace_back(
+            &catalog.bucketStateRegistry,
+            bucket.bucketId,
+            bucket.timeField.c_str(),
+            boost::none,
+            getOrInitializeExecutionStats(catalog, bucket.bucketId.collectionUUID));
     } catch (...) {
     }
 }
 
 void runPostCommitDebugChecks(OperationContext* opCtx,
+                              const NamespaceString& nss,
                               const Bucket& bucket,
                               const WriteBatch& batch) {
     // Check in-memory and disk state, caller still has commit rights.
     DBDirectClient client{opCtx};
-    BSONObj queriedBucket =
-        client.findOne(batch.bucketHandle.bucketId.ns.makeTimeseriesBucketsNamespace(),
-                       BSON("_id" << batch.bucketHandle.bucketId.oid));
+    BSONObj queriedBucket = client.findOne(nss, BSON("_id" << batch.bucketHandle.bucketId.oid));
     if (!queriedBucket.isEmpty()) {
         uint32_t memCount = batch.numPreviouslyCommittedMeasurements + batch.measurements.size();
         uint32_t diskCount = isCompressedBucket(queriedBucket)

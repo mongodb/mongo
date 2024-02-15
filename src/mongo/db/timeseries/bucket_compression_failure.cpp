@@ -29,22 +29,34 @@
 
 #include "mongo/db/timeseries/bucket_compression_failure.h"
 #include "mongo/base/init.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::timeseries {
 namespace {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(BucketCompressionFailure);
 
+static constexpr StringData kUUIDFieldName = "collectionUUID"_sd;
 static constexpr StringData kBucketIdFieldName = "bucketId"_sd;
 }  // namespace
 
-BucketCompressionFailure::BucketCompressionFailure(OID bucketId) : _bucketId(std::move(bucketId)) {}
+BucketCompressionFailure::BucketCompressionFailure(const UUID& collectionUUID, OID bucketId)
+    : _collectionUUID(std::move(collectionUUID)), _bucketId(std::move(bucketId)) {}
 
 std::shared_ptr<const ErrorExtraInfo> BucketCompressionFailure::parse(const BSONObj& obj) {
-    return std::make_shared<BucketCompressionFailure>(obj[kBucketIdFieldName].OID());
+    auto uuidSW = UUID::parse(obj[kUUIDFieldName]);
+    invariant(uuidSW.isOK());
+    auto collectionUUID = uuidSW.getValue();
+    return std::make_shared<BucketCompressionFailure>(collectionUUID,
+                                                      obj[kBucketIdFieldName].OID());
 }
 
 void BucketCompressionFailure::serialize(BSONObjBuilder* builder) const {
+    _collectionUUID.appendToBuilder(builder, kUUIDFieldName);
     builder->append(kBucketIdFieldName, _bucketId);
+}
+
+const UUID& BucketCompressionFailure::collectionUUID() const {
+    return _collectionUUID;
 }
 
 OID BucketCompressionFailure::bucketId() const {

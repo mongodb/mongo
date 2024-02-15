@@ -2351,7 +2351,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
     auto metadata = getMetadata(bucketCatalog, batch->bucketHandle);
-    auto status = prepareCommit(bucketCatalog, batch);
+    auto status = prepareCommit(bucketCatalog, request.getNamespace(), batch);
     if (!status.isOK()) {
         invariant(timeseries::bucket_catalog::isWriteBatchFinished(*batch));
         docsToRetry->push_back(index);
@@ -2415,8 +2415,11 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
     timeseries::getOpTimeAndElectionId(opCtx, opTime, electionId);
 
-    auto closedBucket = finish(
-        opCtx, bucketCatalog, batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
+    auto closedBucket = finish(opCtx,
+                               bucketCatalog,
+                               request.getNamespace().makeTimeseriesBucketsNamespace(),
+                               batch,
+                               timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
@@ -2462,7 +2465,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
 
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(bucketCatalog, batch.get()->bucketHandle);
-            auto prepareCommitStatus = prepareCommit(bucketCatalog, batch);
+            auto prepareCommitStatus = prepareCommit(bucketCatalog, request.getNamespace(), batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return false;
@@ -2494,6 +2497,7 @@ bool commitTimeseriesBucketsAtomically(OperationContext* opCtx,
             auto closedBucket =
                 finish(opCtx,
                        bucketCatalog,
+                       request.getNamespace().makeTimeseriesBucketsNamespace(),
                        batch,
                        timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
             batch.get().reset();
@@ -2680,14 +2684,14 @@ void getTimeseriesBatchResultsNoTenantMigration(
                                                             docsToRetry);
 }
 
-std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> insertIntoBucketCatalog(
-    OperationContext* opCtx,
-    const write_ops::InsertCommandRequest& request,
-    size_t start,
-    size_t numDocs,
-    const std::vector<size_t>& indices,
-    std::vector<write_ops::WriteError>* errors,
-    bool* containsRetry) {
+std::tuple<UUID, TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */>
+insertIntoBucketCatalog(OperationContext* opCtx,
+                        const write_ops::InsertCommandRequest& request,
+                        size_t start,
+                        size_t numDocs,
+                        const std::vector<size_t>& indices,
+                        std::vector<write_ops::WriteError>* errors,
+                        bool* containsRetry) {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
     auto bucketsNs = makeTimeseriesBucketsNamespace(ns(request));
@@ -2746,7 +2750,6 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
         auto swResult = timeseries::attemptInsertIntoBucket(
             opCtx,
             bucketCatalog,
-            viewNs,
             bucketsColl,
             timeSeriesOptions,
             measurementDoc,
@@ -2784,7 +2787,7 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
         } else {
             for (size_t i = 0; i < numDocs; i++) {
                 if (!insert(i) && request.getOrdered()) {
-                    return {std::move(batches), std::move(stmtIds), i};
+                    return {bucketsColl->uuid(), std::move(batches), std::move(stmtIds), i};
                 }
             }
         }
@@ -2806,7 +2809,8 @@ std::tuple<TimeseriesBatches, TimeseriesStmtIds, size_t /* numInserted */> inser
         throw;
     }
 
-    return {std::move(batches), std::move(stmtIds), request.getDocuments().size()};
+    return {
+        bucketsColl->uuid(), std::move(batches), std::move(stmtIds), request.getDocuments().size()};
 }
 
 bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
@@ -2815,7 +2819,7 @@ bool performOrderedTimeseriesWritesAtomically(OperationContext* opCtx,
                                               boost::optional<repl::OpTime>* opTime,
                                               boost::optional<OID>* electionId,
                                               bool* containsRetry) {
-    auto [batches, stmtIds, numInserted] = insertIntoBucketCatalog(
+    auto [_, batches, stmtIds, numInserted] = insertIntoBucketCatalog(
         opCtx, request, 0, request.getDocuments().size(), {}, errors, containsRetry);
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
@@ -2849,8 +2853,9 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     boost::optional<OID>* electionId,
     bool* containsRetry,
     absl::flat_hash_map<int, int>& retryAttemptsForDup) {
-    auto [batches, bucketStmtIds, _] =
+    auto [uuid, batches, bucketStmtIds, _] =
         insertIntoBucketCatalog(opCtx, request, start, numDocs, indices, errors, containsRetry);
+    UUID collectionUUID = uuid;
 
     hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
@@ -2859,13 +2864,14 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
 
     stdx::unordered_set<timeseries::bucket_catalog::WriteBatch*> handledHere;
     int64_t handledElsewhere = 0;
-    auto reportMeasurementsGuard = ScopeGuard([&handledElsewhere, &request, opCtx]() {
-        if (handledElsewhere > 0) {
-            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-            timeseries::bucket_catalog::reportMeasurementsGroupCommitted(
-                bucketCatalog, request.getNamespace(), handledElsewhere);
-        }
-    });
+    auto reportMeasurementsGuard =
+        ScopeGuard([&collectionUUID, &handledElsewhere, &request, opCtx]() {
+            if (handledElsewhere > 0) {
+                auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+                timeseries::bucket_catalog::reportMeasurementsGroupCommitted(
+                    bucketCatalog, collectionUUID, handledElsewhere);
+            }
+        });
 
     size_t itr = 0;
     for (; itr < batches.size(); ++itr) {
@@ -2892,7 +2898,7 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
 
                 timeseries::bucket_catalog::freeze(
                     timeseries::bucket_catalog::BucketCatalog::get(opCtx),
-                    request.getNamespace(),
+                    collectionUUID,
                     bucketId);
 
                 LOGV2_WARNING(

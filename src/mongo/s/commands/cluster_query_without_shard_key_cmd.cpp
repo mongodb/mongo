@@ -431,11 +431,13 @@ public:
                 }
             }
 
+            const auto& collectionUUID = cri.cm.getUUID();
             const auto& timeseriesFields = cri.cm.isSharded() &&
                     cri.cm.getTimeseriesFields().has_value() &&
                     parsedInfoFromRequest.isTimeseriesNamespace
                 ? cri.cm.getTimeseriesFields()
                 : boost::none;
+
             auto cmdObj =
                 createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
 
@@ -530,6 +532,7 @@ public:
                 auto [upsertDoc, userUpsertDoc] = write_without_shard_key::generateUpsertDocument(
                     opCtx,
                     parsedInfoFromRequest.updateRequest.get(),
+                    collectionUUID,
                     timeseriesFields
                         ? boost::make_optional(timeseriesFields->getTimeseriesOptions())
                         : boost::none,

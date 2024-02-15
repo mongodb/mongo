@@ -150,6 +150,7 @@ void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
             auto newBucket =
                 timeseries::makeBucketDocument({newMeasurement},
                                                acq.nss(),
+                                               collectionPtr()->uuid(),
                                                *collectionPtr()->getTimeseriesOptions(),
                                                collectionPtr()->getDefaultCollator());
 

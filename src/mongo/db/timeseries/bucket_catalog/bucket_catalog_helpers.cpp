@@ -267,28 +267,24 @@ BSONObj findDocFromOID(OperationContext* opCtx, const Collection* coll, const OI
     return (foundDoc) ? bucketObj.value() : BSONObj();
 }
 
-void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const OID& bucketId) {
-    // Ensure we have the view namespace, as that's what the BucketCatalog operates on.
-    NamespaceString resolvedNs =
-        ns.isTimeseriesBucketsCollection() ? ns.getTimeseriesViewNamespace() : ns;
-
+void handleDirectWrite(OperationContext* opCtx, const UUID& collectionUUID, const OID& bucketId) {
     // First notify the BucketCatalog that we intend to start a direct write, so we can conflict
     // with any already-prepared operation, and also block bucket reopening if it's enabled.
     auto& bucketCatalog = BucketCatalog::get(opCtx);
-    directWriteStart(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
+    directWriteStart(bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
 
     // Then register callbacks so we can let the BucketCatalog know that we are done with our direct
     // write after the actual write takes place (or is abandoned), and allow reopening.
     shard_role_details::getRecoveryUnit(opCtx)->onCommit(
-        [svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](OperationContext*,
-                                                                    boost::optional<Timestamp>) {
+        [svcCtx = opCtx->getServiceContext(), collectionUUID, bucketId](
+            OperationContext*, boost::optional<Timestamp>) {
             auto& bucketCatalog = BucketCatalog::get(svcCtx);
-            directWriteFinish(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
+            directWriteFinish(bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
         });
     shard_role_details::getRecoveryUnit(opCtx)->onRollback(
-        [svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](OperationContext*) {
+        [svcCtx = opCtx->getServiceContext(), collectionUUID, bucketId](OperationContext*) {
             auto& bucketCatalog = BucketCatalog::get(svcCtx);
-            directWriteFinish(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
+            directWriteFinish(bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
         });
 }
 
