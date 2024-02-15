@@ -345,7 +345,6 @@ private:
                                       const ShardKeyPattern& shardKey,
                                       int nToAppend);
 
-    const NamespaceString _ns;
     const int _numInitialChunks;
     boost::optional<std::vector<TagsType>> _zones;
     std::unique_ptr<SampleDocumentSource> _samples;

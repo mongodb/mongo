@@ -346,7 +346,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
             auto txnObj = txnBob.obj();
 
             DocID txnDoc(txnObj, txnObj.firstElement(), transactionTableUUID.value());
-            txnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns();
+            txnDoc.ns = redactTenant(NamespaceString::kSessionTransactionsTableNamespace);
 
             fixUpInfo.docsToRefetch.insert(txnDoc);
             fixUpInfo.refetchTransactionDocs = true;
