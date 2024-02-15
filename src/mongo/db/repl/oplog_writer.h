@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_buffer.h"
+#include "mongo/db/repl/oplog_writer_batcher.h"
 #include "mongo/executor/task_executor.h"
 
 namespace mongo {
@@ -100,8 +101,12 @@ private:
      * Currently applicable to steady state replication only.
      * Implemented in subclasses but not visible otherwise.
      */
-    virtual void _run(OplogBuffer* writeBuffer) = 0;
+    virtual void _run() = 0;
 
+protected:
+    OplogWriterBatcher _batcher;
+
+private:
     // Protects member data of this OplogWriter.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogWriter::_mutex");
 
@@ -111,8 +116,6 @@ private:
 
     // Not owned by us.
     OplogBuffer* const _writeBuffer;
-
-    // TODO (SERVER-86026): add the batcher.
 
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;

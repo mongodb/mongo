@@ -497,6 +497,8 @@ public:
 
     boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
 
+    void setSecondaryDelaySecs(Seconds sec);
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);
@@ -532,6 +534,8 @@ private:
 
     SplitPrepareSessionManager _splitSessionManager;
     bool _updateCommittedSnapshot = true;
+
+    Seconds _secondaryDelaySecs = Seconds(0);
 };
 
 }  // namespace repl

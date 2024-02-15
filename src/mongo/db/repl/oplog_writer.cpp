@@ -39,7 +39,7 @@ using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 OplogWriter::OplogWriter(executor::TaskExecutor* executor,
                          OplogBuffer* writeBuffer,
                          const Options& options)
-    : _executor(executor), _writeBuffer(writeBuffer), _options(options) {}
+    : _batcher(writeBuffer), _executor(executor), _writeBuffer(writeBuffer), _options(options) {}
 
 Future<void> OplogWriter::startup() {
     auto pf = makePromiseFuture<void>();
@@ -48,7 +48,7 @@ Future<void> OplogWriter::startup() {
                      promise = std::move(pf.promise)](const CallbackArgs& args) mutable noexcept {
         invariant(args.status);
         LOGV2(8543100, "Starting oplog write");
-        _run(_writeBuffer);
+        _run();
         LOGV2(8543101, "Finished oplog write");
         promise.setWith([] {});
     };

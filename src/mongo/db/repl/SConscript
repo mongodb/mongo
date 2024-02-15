@@ -641,20 +641,22 @@ env.Benchmark(
 env.Library(
     target='oplog_write_interface',
     source=[
+        'oplog_writer_batcher.cpp',
         'oplog_writer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
+        'oplog_entry',
+        'repl_coordinator_interface',
     ],
 )
 
 env.Library(
     target='oplog_write',
-    source=['oplog_writer_batcher.cpp', 'oplog_writer_impl.cpp'],
+    source=['oplog_writer_impl.cpp'],
     LIBDEPS=[
         'oplog_write_interface',
-        'repl_coordinator_interface',
         'storage_interface',
     ],
     LIBDEPS_PRIVATE=[

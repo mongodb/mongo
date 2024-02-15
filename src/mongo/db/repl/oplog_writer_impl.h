@@ -118,7 +118,7 @@ private:
      * Retrieves operations from the writeBuffer in batches that will be applied using
      * writeOplogBatch(), after which the batches will be pushed to the applyBuffer.
      */
-    void _run(OplogBuffer* writeBuffer) override;
+    void _run() override;
 
     void _writeOplogBatchImpl(OperationContext* opCtx,
                               const std::vector<InsertStatement>& docs,

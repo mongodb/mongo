@@ -30,9 +30,12 @@
 #include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/oplog_batcher_test_fixture.h"
 #include "mongo/db/repl/oplog_writer_batcher.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
 namespace repl {
@@ -158,6 +161,7 @@ public:
     void setUp() override;
     void tearDown() override;
 
+    ReplicationCoordinator* getReplCoord() const;
     OperationContext* opCtx() const;
 
 protected:
@@ -168,12 +172,20 @@ protected:
 void OplogWriterBatcherTest::setUp() {
     ServiceContextMongoDTest::setUp();
 
+    _serviceContext = getServiceContext();
     _opCtxHolder = makeOperationContext();
+    ReplicationCoordinator::set(_serviceContext,
+                                std::make_unique<ReplicationCoordinatorMock>(_serviceContext));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 }
 
 void OplogWriterBatcherTest::tearDown() {
     _opCtxHolder = {};
     ServiceContextMongoDTest::tearDown();
+}
+
+ReplicationCoordinator* OplogWriterBatcherTest::getReplCoord() const {
+    return ReplicationCoordinator::get(_serviceContext);
 }
 
 OperationContext* OplogWriterBatcherTest::opCtx() const {
@@ -264,6 +276,26 @@ TEST_F(OplogWriterBatcherTest, BatcherWillNotWaitForMoreDataWhenAlreadyHaveBatch
 
     // The batcher should not wait for the batch pushed by pushBufferThread.
     ASSERT_EQ(16 * 1024 * 1024, batch.getByteSize());
+}
+
+TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecs) {
+    OplogWriterBufferMock writerBuffer;
+    OplogWriterBatcher writerBatcher(&writerBuffer);
+    dynamic_cast<ReplicationCoordinatorMock*>(getReplCoord())->setSecondaryDelaySecs(Seconds(5));
+    auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+
+    // Put one entry that is over secondaryDelaySecs and one entry not, the batcher will wait until
+    // all entries pass secondaryDelaySecs to return.
+    OplogBatchBSONObj batch1(
+        {makeNoopOplogEntry(Seconds(startTime - 100)), makeNoopOplogEntry(Seconds(startTime))},
+        16 * 1024 * 1024 /*16MB*/);
+    writerBuffer.push_forTest(batch1);
+
+    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
+    auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+
+    // getNextBatch() should return after delaying 5s as we configured.
+    ASSERT_TRUE(endTime - startTime >= 5);
 }
 
 }  // namespace repl

@@ -28,9 +28,8 @@
  */
 
 #include "mongo/db/repl/oplog_writer_batcher.h"
-#include "mongo/db/repl/oplog_batch.h"
-#include <cstddef>
-#include <iterator>
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -51,13 +50,16 @@ OplogBatchBSONObj OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seco
     OplogBatchBSONObj batch;
     size_t totalBytes = 0;
     size_t totalOps = 0;
+
     while (true) {
         while (_oplogBuffer->tryPopBatch(opCtx, &batch)) {
             auto batchSize = batch.getByteSize();
             invariant(batchSize <= kMinWriterBatchSize);
+
             totalBytes += batchSize;
             totalOps += batch.size();
             batches.push_back(std::move(batch));
+
             // Once the total bytes is between 16MB and 32MB, we return it as a writer batch. This
             // may not be optimistic on size but we can avoid waiting the next batch coming before
             // deciding whether we can return.
@@ -72,11 +74,14 @@ OplogBatchBSONObj OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seco
         }
     }
 
+    // We can't wait for any data from the buffer, return an empty batch.
     if (batches.empty()) {
         return OplogBatchBSONObj();
-    } else {
-        return _mergeBatches(batches, totalBytes, totalOps);
     }
+
+    auto finalBatch = _mergeBatches(batches, totalBytes, totalOps);
+    _waitSecondaryDelaySecsIfNecessary(opCtx, finalBatch);
+    return finalBatch;
 }
 
 OplogBatchBSONObj OplogWriterBatcher::_mergeBatches(std::vector<OplogBatchBSONObj>& batches,
@@ -104,6 +109,48 @@ bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Seconds maxWaitTi
               "error"_attr = e);
     }
     return false;
+}
+
+/**
+ * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any oplog
+ * entries that can be be returned in a batch.
+ */
+boost::optional<Date_t> OplogWriterBatcher::_calculateSecondaryDelaySecsLatestTimestamp() {
+    auto service = cc().getServiceContext();
+    auto replCoord = ReplicationCoordinator::get(service);
+    auto secondaryDelaySecs = replCoord->getSecondaryDelaySecs();
+    if (secondaryDelaySecs <= Seconds(0)) {
+        return {};
+    }
+    auto fastClockSource = service->getFastClockSource();
+    return fastClockSource->now() - secondaryDelaySecs;
+}
+
+void OplogWriterBatcher::_waitSecondaryDelaySecsIfNecessary(OperationContext* opCtx,
+                                                            const OplogBatchBSONObj& batch) {
+    invariant(!batch.empty());
+    auto& lastEntry = batch.back();
+    auto entryTime = Date_t::fromDurationSinceEpoch(
+        Seconds(lastEntry.getField(OplogEntry::kTimestampFieldName).timestamp().getSecs()));
+    boost::optional<Date_t> secondaryDelaySecsLatestTimestamp = boost::none;
+    while ((secondaryDelaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp())) {
+        // See if the last entry has passed secondaryDelaySecs, which means all entries in
+        // this batch has passed secondaryDelaySecs. This could cause earlier entries in the
+        // same batch got delayed longer but that only happens in a rare case and only in
+        // one batch.
+        if (entryTime <= *secondaryDelaySecsLatestTimestamp) {
+            return;
+        }
+
+        try {
+            opCtx->sleepFor(Seconds(1));
+        } catch (const ExceptionForCat<ErrorCategory::CancellationError>& ex) {
+            LOGV2(8602601,
+                  "Interrupted when waiting for secondaryDelaySecs, return a batch "
+                  "before secondaryDelaySecs is met.",
+                  "error"_attr = ex.toString());
+        }
+    }
 }
 
 }  // namespace repl

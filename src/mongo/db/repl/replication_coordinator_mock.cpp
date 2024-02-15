@@ -157,7 +157,11 @@ bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState_UNSAFE() const {
 }
 
 Seconds ReplicationCoordinatorMock::getSecondaryDelaySecs() const {
-    return Seconds(0);
+    return _secondaryDelaySecs;
+}
+
+void ReplicationCoordinatorMock::setSecondaryDelaySecs(Seconds sec) {
+    _secondaryDelaySecs = sec;
 }
 
 void ReplicationCoordinatorMock::clearSyncSourceDenylist() {}

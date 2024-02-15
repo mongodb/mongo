@@ -107,7 +107,7 @@ OplogWriterImpl::OplogWriterImpl(executor::TaskExecutor* executor,
       _writerPool(writerPool),
       _observer(observer) {}
 
-void OplogWriterImpl::_run(OplogBuffer* writeBuffer) {
+void OplogWriterImpl::_run() {
     // We don't start data replication for arbiters at all and it's not allowed to reconfig
     // arbiterOnly field for any member.
     invariant(!_replCoord->getMemberState().arbiter());
@@ -132,9 +132,8 @@ void OplogWriterImpl::_run(OplogBuffer* writeBuffer) {
         // Transition to SECONDARY state, if possible.
         _replCoord->finishRecoveryIfEligible(opCtx);
 
-        // TODO (SERVER-86026): Use the real implementation.
-        std::vector<BSONObj> batch{BSONObj()};
-        if (!writeBuffer->peek(opCtx, &batch[0])) {
+        auto batch = _batcher.getNextBatch(opCtx, Seconds(1)).releaseBatch();
+        if (batch.empty()) {
             if (inShutdown()) {
                 return;
             }

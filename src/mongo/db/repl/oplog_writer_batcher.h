@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/repl/oplog_batch.h"
 #include "mongo/db/repl/oplog_batcher.h"
 
 namespace mongo {
@@ -45,6 +46,8 @@ public:
     // Get a batch from the underlying OplogBuffer for the OplogWriter to write to disk. If the
     // buffer is empty, the batcher will wait for the next batch until the maxWaitTime timeout is
     // hit, so this function can return an empty batch.
+    // Note: If secondaryDelaySecs is set, we can wait until all entries in a batch meet
+    // secondaryDelaySecs, which can be longer than maxWaitTime.
     OplogBatchBSONObj getNextBatch(OperationContext* opCtx, Seconds maxWaitTime);
 
 private:
@@ -60,6 +63,18 @@ private:
      * next batch or false if we should stop processing.
      */
     bool _waitForData(OperationContext* opCtx, Seconds maxWaitTime);
+
+    /**
+     * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any
+     * oplog entries that can be be returned in a batch.
+     */
+    boost::optional<Date_t> _calculateSecondaryDelaySecsLatestTimestamp();
+
+    /**
+     * If secondaryDelaySecs is set, wait until all oplog entries in this batch has met
+     * secondaryDelaySecs before return.*/
+    void _waitSecondaryDelaySecsIfNecessary(OperationContext* opCtx,
+                                            const OplogBatchBSONObj& batch);
 
 private:
     // This should be a OplogBuffer that supports batch operations.
