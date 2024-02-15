@@ -284,8 +284,11 @@ class WiredTigerColumnStore::Cursor final : public ColumnStore::Cursor,
                                             public WiredTigerIndexCursorGeneric {
 public:
     Cursor(OperationContext* opCtx, const WiredTigerColumnStore* idx)
-        : WiredTigerIndexCursorGeneric(opCtx, true /* forward */), _idx(*idx) {
-        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _idx.uri(), _idx._tableId, false);
+        : WiredTigerIndexCursorGeneric(opCtx, true /* forward */),
+          _uri(idx->uri()),
+          _tableId(idx->_tableId),
+          _indexName(idx->indexName()) {
+        _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
     }
 
     boost::optional<FullCellView> next() override {
@@ -337,7 +340,7 @@ public:
 
     void restore() override {
         if (!_cursor) {
-            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _idx.uri(), _idx._tableId, false);
+            _cursor.emplace(*WiredTigerRecoveryUnit::get(_opCtx), _uri, _tableId, false);
         }
 
         // Ensure an active session exists, so any restored cursors will bind to it
@@ -443,7 +446,7 @@ private:
             LOGV2(6609700,
                   "Column store index {idxName} cmp after advance: {cmp}",
                   "cmp"_attr = cmp,
-                  "idxName"_attr = _idx.indexName());
+                  "idxName"_attr = _indexName);
 
             if (enforcingPrepareConflicts) {
                 // If we are enforcing prepare conflicts, calling next() must always give us a key
@@ -494,7 +497,9 @@ private:
     // false by any operation that moves the cursor, other than subsequent save/restore pairs.
     bool _lastMoveSkippedKey = false;
 
-    const WiredTigerColumnStore& _idx;  // not owned
+    std::string _uri;
+    uint64_t _tableId = 0;
+    std::string _indexName;
 };
 
 std::unique_ptr<ColumnStore::Cursor> WiredTigerColumnStore::newCursor(
