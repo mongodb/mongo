@@ -182,19 +182,26 @@ bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
     auto thisGroup = dynamic_cast<DocumentSourceGroup*>(this);
     if (constraints().canSwapWithMatch && nextMatch && !nextMatch->isTextQuery() &&
         (!thisGroup || groupMatchSwapVerified(*nextMatch, *thisGroup))) {
-        // We're allowed to swap with a $match and the stage after us is a $match. Furthermore, the
-        // $match does not contain a text search predicate, which we do not attempt to optimize
-        // because such a $match must already be the first stage in the pipeline. We can attempt to
-        // swap the $match or part of the $match before ourselves.
+        // If we reach this point we know:
+        // 1) The current stage is allowed to swap with a $match
+        // 2) The stage after us is a $match
+        // 3) The $match does not contain a text search predicate
+        // (We do not need to attempt this optimization if the $match contains a text search
+        // predicate because, in that scenario, $match is already required to be the first stage in
+        // the pipeline.)
         auto splitMatch =
             DocumentSourceMatch::splitMatchByModifiedFields(nextMatch, getModifiedPaths());
         invariant(splitMatch.first || splitMatch.second);
 
         if (splitMatch.first) {
-            // At least part of the $match can be moved before this stage. Erase the original $match
-            // and put the independent part before this stage. If splitMatch.second is not null,
-            // then there is a new $match stage to insert after ourselves which is dependent on the
-            // modified fields.
+            // If we reach this point: we know that at least part of the $match expression can be
+            // moved before this stage. So, we erase the original $match and move that independent
+            // part before this stage.
+            //
+            // If splitMatch.second is not null: the "independent part" of the $match expression was
+            // only one component of the original $match. So, we need to create a new $match stage
+            // for the remaining "dependent" component and insert it after ourselves--effectively
+            // keeping it in its original position in the pipeline.
             LOGV2_DEBUG(
                 5943503,
                 5,
