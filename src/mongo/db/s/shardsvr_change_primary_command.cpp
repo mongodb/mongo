@@ -120,7 +120,6 @@ public:
                     doc.setShardingDDLCoordinatorMetadata(
                         {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
                     doc.setToShardId(toShard->getId());
-                    doc.setCloneOnlyUntrackedColls(true);
                     return doc.toBSON();
                 }();
 

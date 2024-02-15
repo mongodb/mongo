@@ -1,4 +1,5 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function collectionExists(shard, dbName, collName) {
     return Array.contains(shard.getDB(dbName).getCollectionNames(), collName);
@@ -68,100 +69,6 @@ jsTest.log('Test preconditions');
     assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard0.shardName}));
 }
 
-jsTest.log('Test that unsharded and unsplittable collections are moved');
-{
-    {
-        // Expected documents placement before moving primary to shard1:
-        //   * shard0: 2 docs (3 with featureFlagTrackUnshardedCollectionsOnShardingCatalog)
-        //     1: { name : 'Tom'   }
-        //     2: { name : 'Dick'  }
-        //     3: { name : 'Harry' }
-        //     4: { name : 'Peter' } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
-        //     enabled)
-        //   * shard1: 0 docs (1 with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
-        //     1: { name : 'Jack'  } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
-        //     enabled)
-
-        // The unsharded collections' (1&3) documents are on shard0.
-        assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
-        assert.eq(0, shard1.getCollection(coll1NS).find().itcount());
-        if (ffTrackUnsharded) {
-            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
-            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
-        }
-
-        // The sharded collection's documents are on shard0.
-        assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
-        assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
-
-        if (ffTrackUnsharded) {
-            // Unsharded collection 4's documents are on shard1.
-            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
-            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
-        }
-    }
-
-    assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}));
-
-    {
-        // Expected documents placement after moving primary to shard1:
-        //   * shard0: 1 doc
-        //     1: { name : 'Harry' }
-        //   * shard1: 2 docs (4 with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
-        //     1: { name : 'Tom'   }
-        //     2: { name : 'Dick'  }
-        //     3: { name : 'Peter' } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
-        //     enabled)
-        //     4: { name : 'Jack'  } (if featureFlagTrackUnshardedCollectionsOnShardingCatalog is
-        //     enabled)
-
-        // The unsharded collections' (1&3&4) documents are now on shard1.
-        assert.eq(0, shard0.getCollection(coll1NS).find().itcount());
-        assert.eq(2, shard1.getCollection(coll1NS).find().itcount());
-        if (ffTrackUnsharded) {
-            assert.eq(0, shard0.getCollection(coll3NS).find().itcount());
-            assert.eq(1, shard1.getCollection(coll3NS).find().itcount());
-
-            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
-            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
-        }
-
-        // The sharded collection's documents are all on shard0.
-        assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
-        assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
-    }
-
-    assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard0.shardName}));
-
-    {
-        // Expected documents placement after moving primary back to shard0:
-        //   * shard0: 3 docs (5 with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
-        //     1: { name : 'Tom'   }
-        //     2: { name : 'Dick'  }
-        //     3: { name : 'Harry' }
-        //     4: { name : 'Peter' } (only with
-        //     featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
-        //     5: { name : 'Jack'  }
-        //     (only with featureFlagTrackUnshardedCollectionsOnShardingCatalog enabled)
-        //   * shard1: 0 docs
-
-        // The unsharded collections' documents are on shard0.
-        assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
-        assert.eq(0, shard1.getCollection(coll1NS).find().itcount());
-        if (ffTrackUnsharded) {
-            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
-            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
-
-            assert.eq(1, shard0.getCollection(coll4NS).find().itcount());
-            assert.eq(0, shard1.getCollection(coll4NS).find().itcount());
-        }
-
-        // The sharded collection's documents are on shard0.
-        assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
-        assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
-    }
-}
-
 jsTest.log('Test that orphaned documents on recipient causes the operation to fail');
 {
     // Insert an orphaned document on shard1.
@@ -171,8 +78,13 @@ jsTest.log('Test that orphaned documents on recipient causes the operation to fa
     assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
     assert.eq(1, shard1.getCollection(coll1NS).find().itcount());
 
+    // If the collection is being cloned by the movePrimary operation, this will fail with
+    // NamespaceExists. Otherwise, when the collection is being cloned, it will fail with
+    // InvalidOptions due to the UUIDS not matching.
+    let expectedErrorCode =
+        ffTrackUnsharded ? ErrorCodes.InvalidOptions : ErrorCodes.NamespaceExists;
     assert.commandFailedWithCode(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}),
-                                 ErrorCodes.NamespaceExists);
+                                 expectedErrorCode);
 
     // The documents are on both the shards.
     assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
@@ -183,10 +95,80 @@ jsTest.log('Test that orphaned documents on recipient causes the operation to fa
     assert.eq(0, shard1.getCollection(coll1NS).find().itcount());
 
     assert.commandFailedWithCode(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}),
-                                 ErrorCodes.NamespaceExists);
+                                 expectedErrorCode);
 
     // Drop the orphaned collection on shard1.
     shard1.getCollection(coll1NS).drop();
+}
+
+jsTest.log('Test that unsharded, untracked collections are moved');
+{
+    {
+        // Unsharded (maybe tracked) collection (1)'s documents are on shard 0.
+        assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll1NS).find().itcount());
+        // Sharded collection (2)'s documents are on shard 0.
+        assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
+        // Unsharded, tracked collection (3)'s documents are on shard 0.
+        if (ffTrackUnsharded) {
+            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
+            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
+        }
+        // Unsharded, tracked collection (4)'s documents are on shard 1.
+        if (ffTrackUnsharded) {
+            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
+            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
+        }
+    }
+
+    assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard1.shardName}));
+
+    {
+        // Unsharded collection (1) may or may not be tracked. If it is tracked, it's documents will
+        // still be on shard 0, otherwise, they will have moved to shard 1.
+        if (FixtureHelpers.isTracked(mongos.getCollection(coll1NS))) {
+            assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
+            assert.eq(0, shard1.getCollection(coll1NS).find().itcount());
+        } else {
+            assert.eq(0, shard0.getCollection(coll1NS).find().itcount());
+            assert.eq(2, shard1.getCollection(coll1NS).find().itcount());
+        }
+        // Sharded collection (2)'s documents are on shard 0
+        assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
+        // Unsharded, tracked collection (3)'s documents are on shard 0
+        if (ffTrackUnsharded) {
+            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
+            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
+        }
+        // Unsharded, tracked collection (4)'s documents are on shard 1
+        if (ffTrackUnsharded) {
+            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
+            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
+        }
+    }
+
+    assert.commandWorked(mongos.adminCommand({movePrimary: dbName, to: shard0.shardName}));
+
+    {
+        // Unsharded collection (1)'s documents are on shard 0.
+        assert.eq(2, shard0.getCollection(coll1NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll1NS).find().itcount());
+        // Sharded collection (2)'s documents are on shard 0
+        assert.eq(1, shard0.getCollection(coll2NS).find().itcount());
+        assert.eq(0, shard1.getCollection(coll2NS).find().itcount());
+        // Unsharded, tracked collection (3)'s documents are on shard 0
+        if (ffTrackUnsharded) {
+            assert.eq(1, shard0.getCollection(coll3NS).find().itcount());
+            assert.eq(0, shard1.getCollection(coll3NS).find().itcount());
+        }
+        // Unsharded, tracked collection (4)'s documents are on shard 1
+        if (ffTrackUnsharded) {
+            assert.eq(0, shard0.getCollection(coll4NS).find().itcount());
+            assert.eq(1, shard1.getCollection(coll4NS).find().itcount());
+        }
+    }
 }
 
 jsTest.log('Test that metadata has changed');

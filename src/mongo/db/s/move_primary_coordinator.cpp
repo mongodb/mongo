@@ -459,14 +459,8 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getCollectionsToClone(
         auto catalogClient = Grid::get(opCtx)->catalogClient();
         auto colls = catalogClient->getShardedCollectionNamespacesForDb(
             opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
-        auto unshardedTrackedColls = _doc.getCloneOnlyUntrackedColls()
-            ? catalogClient->getUnsplittableCollectionNamespacesForDb(
-                  opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern, {})
-            : catalogClient->getUnsplittableCollectionNamespacesForDbOutsideOfShards(
-                  opCtx,
-                  _dbName,
-                  {ShardingState::get(opCtx)->shardId().toString()},
-                  repl::ReadConcernLevel::kMajorityReadConcern);
+        auto unshardedTrackedColls = catalogClient->getUnsplittableCollectionNamespacesForDb(
+            opCtx, _dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
 
         std::move(
             unshardedTrackedColls.begin(), unshardedTrackedColls.end(), std::back_inserter(colls));
@@ -544,7 +538,6 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(Operat
             "_shardsvrCloneCatalogData",
             DatabaseNameUtil::serialize(_dbName, SerializationContext::stateDefault()));
         commandBuilder.append("from", fromShard->getConnString().toString());
-        commandBuilder.append("cloneOnlyUntrackedColls", _doc.getCloneOnlyUntrackedColls());
         if (osi.is_initialized()) {
             commandBuilder.appendElements(osi->toBSON());
         }
@@ -603,7 +596,6 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
     OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const {
     const auto commitCommand = [&] {
         ConfigsvrCommitMovePrimary request(_dbName, preCommitDbVersion, _doc.getToShardId());
-        request.setCloneOnlyUntrackedColls(_doc.getCloneOnlyUntrackedColls());
         request.setDbName(DatabaseName::kAdmin);
         return CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
     }();
@@ -658,35 +650,11 @@ void MovePrimaryCoordinator::clearDbMetadataOnPrimary(OperationContext* opCtx) c
     scopedDss->clearDbInfo(opCtx);
 }
 
-// TODO SERVER-83925 clearFilteringMetadata was forced after SERVER-79668 due to unsplittable
-// collection being moved without bumping the shardVersion. Remove this once movePrimary is
-// officially replaced by moveCollection or changePrimary in every test
-void MovePrimaryCoordinator::clearFilteringMetadata(OperationContext* opCtx) const {
-    if (_doc.getCollectionsToClone()) {
-        UninterruptibleLockGuard noInterrupt(shard_role_details::getLocker(opCtx));  // NOLINT.
-        for (const auto& nss : *_doc.getCollectionsToClone()) {
-            if (nss.isNamespaceAlwaysUntracked()) {
-                continue;
-            }
-            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
-                ->clearFilteringMetadata(opCtx);
-        }
-    }
-}
-
 void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const {
     // Enable write blocking bypass to allow cleaning of stale data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
     invariant(_doc.getCollectionsToClone());
-
-    auto trackedUnsplittableCollections =
-        Grid::get(opCtx)->catalogClient()->getUnsplittableCollectionNamespacesForDbOutsideOfShards(
-            opCtx,
-            _dbName,
-            {ShardingState::get(opCtx)->shardId().toString()},
-            repl::ReadConcernLevel::kMajorityReadConcern);
 
     const auto dropColl = [&](const NamespaceString& nssToDrop) {
         DropReply unusedDropReply;
@@ -706,9 +674,6 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
         }
     };
 
-    for (const auto& nss : trackedUnsplittableCollections) {
-        dropColl(nss);
-    }
     for (const auto& nss : *_doc.getCollectionsToClone()) {
         dropColl(nss);
     }
@@ -761,7 +726,6 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
     // The release of the critical section will clear db metadata on secondaries
     clearDbMetadataOnPrimary(opCtx);
-    clearFilteringMetadata(opCtx);
     // In case of step-down, this operation could be re-executed and trigger the invariant in case
     // the new primary runs a DDL that acquires the critical section in the old primary shard
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(

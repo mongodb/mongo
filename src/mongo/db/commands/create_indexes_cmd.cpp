@@ -348,10 +348,9 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss);
 
         auto collDesc = scopedCss->getCollectionDescription(opCtx);
-        // Currently all the unsharded collections owned by the primary are affected by the
+        // All the unsharded, untracked collections owned by the primary are affected by the
         // movePrimary.
-        // TODO SERVER-83925 set this to !collDesc.hasRoutingTable()
-        if (!collDesc.isSharded()) {
+        if (!collDesc.hasRoutingTable()) {
             if (scopedDss->isMovePrimaryInProgress()) {
                 LOGV2(4909200, "assertNoMovePrimaryInProgress", logAttrs(nss));
 

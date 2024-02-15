@@ -73,7 +73,6 @@ namespace {
 void cloneDatabase(OperationContext* opCtx,
                    const DatabaseName& dbName,
                    StringData from,
-                   bool cloneOnlyUntrackedColls,
                    BSONObjBuilder& result) {
     std::vector<NamespaceString> trackedColls;
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
@@ -83,11 +82,8 @@ void cloneDatabase(OperationContext* opCtx,
         catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern)
             .getPrimary()
             .toString();
-    auto unsplittableCollections = cloneOnlyUntrackedColls
-        ? catalogClient->getUnsplittableCollectionNamespacesForDb(
-              opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, {})
-        : catalogClient->getUnsplittableCollectionNamespacesForDbOutsideOfShards(
-              opCtx, dbName, {databasePrimary}, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto unsplittableCollections = catalogClient->getUnsplittableCollectionNamespacesForDb(
+        opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern, {});
 
     std::move(unsplittableCollections.begin(),
               unsplittableCollections.end(),
@@ -190,12 +186,6 @@ public:
                 str::stream() << "Can't run _shardsvrCloneCatalogData without a source",
                 !from.empty());
 
-        // If cloneOnlyUntrackedColls is true, the cloner will only copy data for collections not
-        // tracked on the config server (config, system, and admin collections plus any created via
-        // direct connection). If this is false, the cloner will also copy data for tracked
-        // collections that live on the current dbPrimary.
-        auto cloneOnlyUntrackedColls = cloneCatalogDataRequest.getCloneOnlyUntrackedColls();
-
         // For newer versions, execute the operation in another operation context with local write
         // concern to prevent doing waits while we're holding resources (we have a session checked
         // out).
@@ -215,7 +205,7 @@ public:
                     ->grantInternalAuthorization(newOpCtxPtr.get()->getClient());
                 newOpCtxPtr->setWriteConcern(ShardingCatalogClient::kLocalWriteConcern);
                 WriteBlockBypass::get(newOpCtxPtr.get()).set(true);
-                cloneDatabase(newOpCtxPtr.get(), dbName, from, cloneOnlyUntrackedColls, result);
+                cloneDatabase(newOpCtxPtr.get(), dbName, from, result);
             }
             // Since no write happened on this txnNumber, we need to make a dummy write to protect
             // against older requests with old txnNumbers.
@@ -227,7 +217,7 @@ public:
                           true /* upsert */,
                           false /* multi */);
         } else {
-            cloneDatabase(opCtx, dbName, from, cloneOnlyUntrackedColls, result);
+            cloneDatabase(opCtx, dbName, from, result);
         }
         return true;
     }

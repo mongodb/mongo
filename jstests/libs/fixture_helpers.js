@@ -75,6 +75,16 @@ export var FixtureHelpers = (function() {
     }
 
     /**
+     * Looks for an entry in the sharding catalog for the given collection to check whether it is
+     * present.
+     *
+     * TODO (SERVER-86443): remove this utility once all collections are tracked.
+     */
+    function isTracked(coll) {
+        return isSharded(coll) || isUnsplittable(coll);
+    }
+
+    /**
      * Returns an array with the shardIds that own data for the given collection.
      */
     function getShardsOwningDataForCollection(coll) {
@@ -238,6 +248,7 @@ export var FixtureHelpers = (function() {
         isMongos: isMongos,
         isSharded: isSharded,
         isUnsplittable: isUnsplittable,
+        isTracked: isTracked,
         getShardsOwningDataForCollection: getShardsOwningDataForCollection,
         getViewDefinition: getViewDefinition,
         numberOfShardsForCollection: numberOfShardsForCollection,

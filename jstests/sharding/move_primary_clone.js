@@ -1,4 +1,5 @@
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 function sortByName(a, b) {
     if (a.name < b.name)
@@ -27,8 +28,7 @@ function checkOptions(c, expectedOptions) {
         c.options, expectedOptions, 'Missing expected option(s) for collection ' + c.name);
 }
 
-function checkCollectionsCopiedCorrectly(
-    fromShard, toShard, sharded, barUUID, fooUUID, sameUUID = false) {
+function checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, barUUID, fooUUID) {
     var c1, c2;
     [c1, c2] = getCollections(toShard);
 
@@ -52,7 +52,7 @@ function checkCollectionsCopiedCorrectly(
                        ' should be different than the original collection but is the same');
     }
 
-    function checkIndexes(collName, expectedIndexes) {
+    function checkIndexes(collName, collTracked, expectedIndexes) {
         var res = toShard.getDB('test1').runCommand({listIndexes: collName});
         assert.commandWorked(res, 'Failed to get indexes for collection ' + collName);
         var indexes = res.cursor.firstBatch;
@@ -62,7 +62,7 @@ function checkCollectionsCopiedCorrectly(
         // field and the other we have created. However, in the case of sharded collections, only
         // the _id index is present. When running movePrimary, indexes of sharded collections are
         // not copied.
-        if (sharded)
+        if (collTracked)
             assert(indexes.length == 1);
         else
             assert(indexes.length == 2);
@@ -89,30 +89,27 @@ function checkCollectionsCopiedCorrectly(
     checkName(c1, 'bar');
     checkName(c2, 'foo');
     checkOptions(c1, Object.keys(barOptions));
-    checkIndexes('bar', barIndexes);
+    checkIndexes('bar', tracked[1], barIndexes);
     checkOptions(c2, Object.keys(fooOptions));
-    checkIndexes('foo', fooIndexes);
+    checkIndexes('foo', tracked[0], fooIndexes);
 
-    if (sharded) {
+    if (tracked[0]) {
         checkCount(fromShard, 'foo', 3);
-        checkCount(fromShard, 'bar', 3);
         checkCount(toShard, 'foo', 0);
-        checkCount(toShard, 'bar', 0);
-    } else {
-        checkCount(toShard, 'foo', 3);
-        checkCount(toShard, 'bar', 3);
-        checkCount(fromShard, 'foo', 0);
-        checkCount(fromShard, 'bar', 0);
-    }
-
-    if (sharded || sameUUID) {
-        // UUIDs should be the same as the original
-        checkUUIDsEqual(c1, barUUID);
         checkUUIDsEqual(c2, fooUUID);
     } else {
-        // UUIDs should not be the same as the original
-        checkUUIDsNotEqual(c1, barUUID);
+        checkCount(toShard, 'foo', 3);
+        checkCount(fromShard, 'foo', 0);
         checkUUIDsNotEqual(c2, fooUUID);
+    }
+    if (tracked[1]) {
+        checkCount(fromShard, 'bar', 3);
+        checkCount(toShard, 'bar', 0);
+        checkUUIDsEqual(c1, barUUID);
+    } else {
+        checkCount(toShard, 'bar', 3);
+        checkCount(fromShard, 'bar', 0);
+        checkUUIDsNotEqual(c1, barUUID);
     }
 }
 
@@ -143,6 +140,10 @@ function createCollections(sharded) {
 function movePrimaryWithFailpoint(sharded, sameUUID = false) {
     var db = st.getDB('test1');
     createCollections(sharded);
+    let tracked = [
+        FixtureHelpers.isTracked(st.s.getCollection('test1.foo')),
+        FixtureHelpers.isTracked(st.s.getCollection('test1.bar'))
+    ];
 
     var fromShard = st.getPrimaryShard('test1');
     var toShard = st.getOther(fromShard);
@@ -167,11 +168,11 @@ function movePrimaryWithFailpoint(sharded, sameUUID = false) {
     assert.commandWorked(toShard.getDB("admin").runCommand(
         {configureFailPoint: 'movePrimaryFailPoint', mode: 'off'}));
 
-    if (sharded) {
-        // If the collections are sharded, the UUID of the collection on the donor should be
-        // copied over and the options should be the same so retrying the move should succeed.
+    if (sharded || tracked.includes(true)) {
+        // If the collections are sharded or tracked, the UUID of the collection on the donor should
+        // be copied over and the options should be the same so retrying the move should succeed.
         assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
-        checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid, sameUUID);
+        checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, baruuid, foouuid);
 
         // Now change an option on the toShard, and verify that calling clone again succeeds
         // when the options don't match.
@@ -189,7 +190,7 @@ function movePrimaryWithFailpoint(sharded, sameUUID = false) {
         checkOptions(barOnFromShard, Object.keys(barOptions));
 
         // The docs should still be on the original primary shard (fromShard).
-        checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid, sameUUID);
+        checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, baruuid, foouuid);
 
         // Now drop and recreate the collection on the toShard. The collection should now have
         // a different UUID, so we should fail on movePrimary.
@@ -205,9 +206,13 @@ function movePrimaryWithFailpoint(sharded, sameUUID = false) {
     }
 }
 
-function movePrimaryNoFailpoint(sharded, sameUUID = false) {
+function movePrimaryNoFailpoint(sharded) {
     var db = st.getDB('test1');
     createCollections(sharded);
+    let tracked = [
+        FixtureHelpers.isTracked(st.s.getCollection('test1.foo')),
+        FixtureHelpers.isTracked(st.s.getCollection('test1.bar'))
+    ];
 
     var fromShard = st.getPrimaryShard('test1');
     var toShard = st.getOther(fromShard);
@@ -225,13 +230,10 @@ function movePrimaryNoFailpoint(sharded, sameUUID = false) {
 
     assert.commandWorked(st.s0.adminCommand({movePrimary: "test1", to: toShard.name}));
 
-    checkCollectionsCopiedCorrectly(fromShard, toShard, sharded, baruuid, foouuid, sameUUID);
+    checkCollectionsCopiedCorrectly(fromShard, toShard, tracked, baruuid, foouuid);
 }
 
 var st = new ShardingTest({shards: 2});
-
-const sameUUID =
-    FeatureFlagUtil.isPresentAndEnabled(st.s, "TrackUnshardedCollectionsOnShardingCatalog");
 
 var fooOptions = {validationLevel: "off"};
 var barOptions = {validator: {$jsonSchema: {required: ['a']}}};
@@ -239,9 +241,9 @@ var barOptions = {validator: {$jsonSchema: {required: ['a']}}};
 var fooIndexes = [{key: {a: 1}, name: 'index1', expireAfterSeconds: 5000}];
 var barIndexes = [{key: {a: -1}, name: 'index2'}];
 
-movePrimaryWithFailpoint(true, sameUUID);
-movePrimaryWithFailpoint(false, sameUUID);
-movePrimaryNoFailpoint(true, sameUUID);
-movePrimaryNoFailpoint(false, sameUUID);
+movePrimaryWithFailpoint(true);
+movePrimaryWithFailpoint(false);
+movePrimaryNoFailpoint(true);
+movePrimaryNoFailpoint(false);
 
 st.stop();

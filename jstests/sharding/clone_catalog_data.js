@@ -1,6 +1,7 @@
 // Test that the 'cloneCatalogData' command works correctly.
 // Eventually, _shardsvrMovePrimary will use this command.
 import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 // Do not check metadata consistency as unsharded collections are cloned to non-primary shards for
 // testing purposes.
@@ -110,17 +111,17 @@ TestData.skipCheckOrphans = true;
     checkOptions(c2, Object.keys(coll2Options));
     checkUUID(c2, coll2uuid);
 
-    function checkIndexes(collName, expectedIndexes, shardedColl) {
+    function checkIndexes(collName, expectedIndexes, trackedColl) {
         var res = toShard.getDB('test').runCommand({listIndexes: collName});
         assert.commandWorked(res, 'Failed to get indexes for collection ' + collName);
         var indexes = res.cursor.firstBatch;
         indexes.sort(sortByName);
 
-        // For each unsharded collection, there should be a total of 3 indexes - one for the _id
-        // field and the other two that we have created. However, in the case of sharded
-        // collections, only the _id index is present. When cloning sharded collections, indexes are
+        // For each unsharded, untracked collection, there should be a total of 3 indexes - one for
+        // the _id field and the other two that we have created. However, in the case of tracked
+        // collections, only the _id index is present. When cloning tracked collections, indexes are
         // not copied.
-        if (shardedColl)
+        if (trackedColl)
             assert(indexes.length === 1);
         else
             assert(indexes.length === 3);
@@ -137,10 +138,12 @@ TestData.skipCheckOrphans = true;
         });
     }
 
-    checkIndexes('coll1', coll1Indexes, /*shardedColl*/ false);
-    checkIndexes('coll2', coll2Indexes, /*shardedColl*/ true);
+    let unshardedColl = st.s.getDB(testDB).getCollection('coll1');
 
-    // Verify that the data from the unsharded collections resides on the new primary shard, and was
+    checkIndexes('coll1', coll1Indexes, FixtureHelpers.isTracked(unshardedColl) /*trackedColl*/);
+    checkIndexes('coll2', coll2Indexes, /*trackedColl*/ true);
+
+    // Verify that the data from the untracked collections resides on the new primary shard, and was
     // copied as part of the clone.
     function checkCount(shard, collName, count) {
         var res = shard.getDB('test').runCommand({count: collName});
@@ -150,7 +153,11 @@ TestData.skipCheckOrphans = true;
 
     checkCount(fromShard, 'coll1', 3);
     checkCount(fromShard, 'coll2', 3);
-    checkCount(toShard, 'coll1', 3);
+    if (FixtureHelpers.isTracked(unshardedColl)) {
+        checkCount(toShard, 'coll1', 0);
+    } else {
+        checkCount(toShard, 'coll1', 3);
+    }
     checkCount(toShard, 'coll2', 0);
 
     // Check that the command fails without writeConcern majority.
@@ -168,8 +175,9 @@ TestData.skipCheckOrphans = true;
     }),
                                  ErrorCodes.InvalidOptions);
 
-    if (TestData.configShard) {
-        // The config server is a shard and already has collections for the database.
+    if (TestData.configShard && !FixtureHelpers.isTracked(unshardedColl)) {
+        // The config server is a shard and already has collections for the database. This is only
+        // a problem if collections will be cloned.
         assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
             _shardsvrCloneCatalogData: 'test',
             from: fromShard.host,
@@ -192,13 +200,22 @@ TestData.skipCheckOrphans = true;
             {_shardsvrCloneCatalogData: 'test', from: '', writeConcern: {w: "majority"}}),
         ErrorCodes.InvalidOptions);
 
-    // Check that clone errors when the collection already exists on the destination.
-    assert.commandFailedWithCode(toShard.adminCommand({
-        _shardsvrCloneCatalogData: 'test',
-        from: fromShard.host,
-        writeConcern: {w: "majority"}
-    }),
-                                 ErrorCodes.NamespaceExists);
+    // Check that clone errors when the collection already exists on the destination. This is only a
+    // problem if some collection will be cloned (ie. coll1 is untracked).
+    if (FixtureHelpers.isTracked(unshardedColl)) {
+        assert.commandWorked(toShard.adminCommand({
+            _shardsvrCloneCatalogData: 'test',
+            from: fromShard.host,
+            writeConcern: {w: "majority"}
+        }));
+    } else {
+        assert.commandFailedWithCode(toShard.adminCommand({
+            _shardsvrCloneCatalogData: 'test',
+            from: fromShard.host,
+            writeConcern: {w: "majority"}
+        }),
+                                     ErrorCodes.NamespaceExists);
+    }
 
     st.stop();
 })();

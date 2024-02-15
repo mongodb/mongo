@@ -349,8 +349,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                                const DatabaseName& dbName,
                                                const DatabaseVersion& expectedDbVersion,
                                                const ShardId& toShardId,
-                                               const SerializationContext& serializationContext,
-                                               bool cloneOnlyUntrackedColls) {
+                                               const SerializationContext& serializationContext) {
     // Hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
@@ -371,135 +370,12 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
 
-    const auto transactionChain = [dbName,
-                                   expectedDbVersion,
-                                   toShardId,
-                                   validAfter,
-                                   cloneOnlyUntrackedColls,
-                                   serializationContext](
-                                      const txn_api::TransactionClient& txnClient,
-                                      ExecutorPtr txnExec) {
-        int currStmtId = 0;
-        // Find database entry to get current dbPrimary
-        FindCommandRequest findDb(NamespaceString::kConfigDatabasesNamespace);
-        const auto query = [&] {
-            BSONObjBuilder bsonBuilder;
-            bsonBuilder.append(DatabaseType::kDbNameFieldName,
-                               DatabaseNameUtil::serialize(dbName, serializationContext));
-            // Include the version in the update filter to be resilient to potential
-            // network retries and delayed messages.
-            for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
-                const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
-                bsonBuilder.appendAs(fieldValue, dottedFieldName);
-            }
-            return bsonBuilder.obj();
-        }();
-        findDb.setFilter(query);
-        findDb.setSingleBatch(true);
-        auto dbs = txnClient.exhaustiveFindSync(findDb);
-
-        // If we didn't find a database entry, this must be a retry of the transaction
-        if (dbs.size() == 0) {
-            return SemiFuture<void>::makeReady();
-        }
-
-        auto dbEntry = DatabaseType::parse(IDLParserContext("DatabaseType"), dbs.front());
-
-        // Only change the unsharded collection metadata on the config server if we are moving some
-        // tracked collections. Otherwise, there will be no collections or chunks to find here for
-        // the collections being moved, so we can skip the whole section.
-        if (!cloneOnlyUntrackedColls) {
-            // Find all collections in the database that are unsplittable
-            FindCommandRequest findColls(CollectionType::ConfigNS);
-            BSONObjBuilder b;
-            const auto db = DatabaseNameUtil::serialize(dbName, serializationContext);
-            b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(db)));
-            findColls.setFilter(b.obj());
-            auto colls = txnClient.exhaustiveFindSync(findColls);
-
-            // For each collection, we need to insert a placement entry for the collection and
-            // update the chunk entry.
-            std::vector<BSONObj> insertCollPlacementEntries;
-            insertCollPlacementEntries.reserve(colls.size());
-            std::vector<write_ops::UpdateOpEntry> updateChunksEntries;
-            updateChunksEntries.reserve(colls.size());
-            std::vector<int> chunkUpdateIds;
-            std::vector<int> collPlacementInsertIds;
-            for (const auto& collObj : colls) {
-                auto coll =
-                    CollectionTypeBase::parse(IDLParserContext("CommitMovePrimary"), collObj);
-                if (!coll.getUnsplittable()) {
-                    continue;
-                }
-                FindCommandRequest findChunk(ChunkType::ConfigNS);
-                findChunk.setFilter(BSON(ChunkType::collectionUUID.name() << coll.getUuid()));
-                findChunk.setSingleBatch(true);
-                auto chunks = txnClient.exhaustiveFindSync(findChunk);
-                invariant(chunks.size() == 1);
-                auto chunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
-                    chunks[0], *coll.getPre22CompatibleEpoch(), coll.getTimestamp()));
-                if (chunk.getShard() != dbEntry.getPrimary()) {
-                    continue;
-                }
-                chunk.setShard(toShardId);
-                auto currentVersion = chunk.getVersion();
-                chunk.setVersion(
-                    ChunkVersion({*coll.getPre22CompatibleEpoch(), coll.getTimestamp()},
-                                 {currentVersion.majorVersion() + 1, 0}));
-                auto newHistory = chunk.getHistory();
-                int entriesDeleted = 0;
-                while (newHistory.size() > 1 &&
-                       newHistory.back().getValidAfter().getSecs() + 10 < validAfter.getSecs()) {
-                    newHistory.pop_back();
-                    ++entriesDeleted;
-                }
-                logv2::DynamicAttributes attrs;
-                attrs.add("entriesDeleted", entriesDeleted);
-                if (!newHistory.empty()) {
-                    attrs.add("oldestEntryValidAfter", newHistory.back().getValidAfter());
-                }
-                chunk.setOnCurrentShardSince(validAfter);
-                newHistory.emplace(newHistory.begin(),
-                                   ChunkHistory(*chunk.getOnCurrentShardSince(), toShardId));
-                chunk.setHistory(std::move(newHistory));
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(BSON(ChunkType::collectionUUID.name() << coll.getUuid()));
-                entry.setU(
-                    write_ops::UpdateModification::parseFromClassicUpdate(chunk.toConfigBSON()));
-                updateChunksEntries.push_back(entry);
-
-                NamespacePlacementType placementInfo(coll.getNss(), validAfter, {toShardId});
-                placementInfo.setUuid(coll.getUuid());
-                insertCollPlacementEntries.push_back(placementInfo.toBSON());
-
-                collPlacementInsertIds.push_back(currStmtId);
-                chunkUpdateIds.push_back(currStmtId + colls.size());
-                currStmtId++;
-            }
-
-            // Execute chunk and collection placement updates if there were any generated.
-            if (updateChunksEntries.size() != 0) {
-                const auto updateChunksEntryOp = [&] {
-                    write_ops::UpdateCommandRequest updateOp(
-                        NamespaceString::kConfigsvrChunksNamespace);
-                    updateOp.setUpdates(updateChunksEntries);
-                    return updateOp;
-                }();
-                write_ops::InsertCommandRequest insertPlacementReq(
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                    insertCollPlacementEntries);
-                auto insertPlacementResponse =
-                    txnClient.runCRUDOpSync(insertPlacementReq, collPlacementInsertIds);
-                uassertStatusOK(insertPlacementResponse.toStatus());
-                auto updateChunksResponse =
-                    txnClient.runCRUDOpSync(updateChunksEntryOp, chunkUpdateIds);
-                uassertStatusOK(updateChunksResponse.toStatus());
-                currStmtId += colls.size();
-            }
-        }
-
-        // Update the database entry and insert a placement history entry for the database.
-        const auto updateDatabaseEntryOp = [&] {
+    const auto transactionChain =
+        [dbName, expectedDbVersion, toShardId, validAfter, serializationContext](
+            const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            int currStmtId = 0;
+            // Find database entry to get current dbPrimary
+            FindCommandRequest findDb(NamespaceString::kConfigDatabasesNamespace);
             const auto query = [&] {
                 BSONObjBuilder bsonBuilder;
                 bsonBuilder.append(DatabaseType::kDbNameFieldName,
@@ -512,49 +388,76 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                 }
                 return bsonBuilder.obj();
             }();
+            findDb.setFilter(query);
+            findDb.setSingleBatch(true);
+            auto dbs = txnClient.exhaustiveFindSync(findDb);
 
-            const auto update = [&] {
-                auto newDbVersion = expectedDbVersion.makeUpdated();
-                newDbVersion.setTimestamp(validAfter);
+            // If we didn't find a database entry, this must be a retry of the transaction
+            if (dbs.size() == 0) {
+                return SemiFuture<void>::makeReady();
+            }
 
-                tassert(8235300,
-                        "New database timestamp must be newer than previous one",
-                        newDbVersion.getTimestamp() > expectedDbVersion.getTimestamp());
+            auto dbEntry = DatabaseType::parse(IDLParserContext("DatabaseType"), dbs.front());
 
-                BSONObjBuilder bsonBuilder;
-                bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShardId);
-                bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
-                return BSON("$set" << bsonBuilder.obj());
+            // Update the database entry and insert a placement history entry for the database.
+            const auto updateDatabaseEntryOp = [&] {
+                const auto query = [&] {
+                    BSONObjBuilder bsonBuilder;
+                    bsonBuilder.append(DatabaseType::kDbNameFieldName,
+                                       DatabaseNameUtil::serialize(dbName, serializationContext));
+                    // Include the version in the update filter to be resilient to potential
+                    // network retries and delayed messages.
+                    for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
+                        const auto dottedFieldName =
+                            DatabaseType::kVersionFieldName + "." + fieldName;
+                        bsonBuilder.appendAs(fieldValue, dottedFieldName);
+                    }
+                    return bsonBuilder.obj();
+                }();
+
+                const auto update = [&] {
+                    auto newDbVersion = expectedDbVersion.makeUpdated();
+                    newDbVersion.setTimestamp(validAfter);
+
+                    tassert(8235300,
+                            "New database timestamp must be newer than previous one",
+                            newDbVersion.getTimestamp() > expectedDbVersion.getTimestamp());
+
+                    BSONObjBuilder bsonBuilder;
+                    bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShardId);
+                    bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
+                    return BSON("$set" << bsonBuilder.obj());
+                }();
+
+                write_ops::UpdateCommandRequest updateOp(
+                    NamespaceString::kConfigDatabasesNamespace);
+                updateOp.setUpdates({[&] {
+                    write_ops::UpdateOpEntry entry;
+                    entry.setQ(query);
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+                    return entry;
+                }()});
+
+                return updateOp;
             }();
 
-            write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigDatabasesNamespace);
-            updateOp.setUpdates({[&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(query);
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
-                return entry;
-            }()});
+            auto updateDatabaseEntryResponse =
+                txnClient.runCRUDOpSync(updateDatabaseEntryOp, {currStmtId++});
+            uassertStatusOK(updateDatabaseEntryResponse.toStatus());
 
-            return updateOp;
-        }();
+            NamespacePlacementType placementInfo(
+                NamespaceString(dbName), validAfter, std::vector<mongo::ShardId>{toShardId});
 
-        auto updateDatabaseEntryResponse =
-            txnClient.runCRUDOpSync(updateDatabaseEntryOp, {currStmtId++});
-        uassertStatusOK(updateDatabaseEntryResponse.toStatus());
+            write_ops::InsertCommandRequest insertPlacementHistoryOp(
+                NamespaceString::kConfigsvrPlacementHistoryNamespace);
+            insertPlacementHistoryOp.setDocuments({placementInfo.toBSON()});
 
-        NamespacePlacementType placementInfo(
-            NamespaceString(dbName), validAfter, std::vector<mongo::ShardId>{toShardId});
+            auto insertDatabasePlacementHistoryResponse =
+                txnClient.runCRUDOpSync(insertPlacementHistoryOp, {currStmtId++});
+            uassertStatusOK(insertDatabasePlacementHistoryResponse.toStatus());
 
-        write_ops::InsertCommandRequest insertPlacementHistoryOp(
-            NamespaceString::kConfigsvrPlacementHistoryNamespace);
-        insertPlacementHistoryOp.setDocuments({placementInfo.toBSON()});
-
-        auto insertDatabasePlacementHistoryResponse =
-            txnClient.runCRUDOpSync(insertPlacementHistoryOp, {currStmtId++});
-        uassertStatusOK(insertDatabasePlacementHistoryResponse.toStatus());
-
-        return SemiFuture<void>::makeReady();
-    };
+            return SemiFuture<void>::makeReady();
+        };
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();

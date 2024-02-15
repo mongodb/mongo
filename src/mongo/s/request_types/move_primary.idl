@@ -135,10 +135,3 @@ commands:
             to:
                 type: shard_id
                 description: Shard serving as the destination for un-sharded collections
-            cloneOnlyUntrackedColls:
-                type: bool
-                description: >-
-                    When set, the coordinator will only move untracked, local collections such as
-                    those in the config, system, and admin databases.
-                # TODO (SERVER-76436) Remove default once global balancing becomes last-lts
-                default: false

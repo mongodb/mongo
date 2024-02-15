@@ -2,6 +2,7 @@
  * @tags: [does_not_support_stepdowns]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 
 let st = new ShardingTest({
     mongos: 2,
@@ -11,8 +12,14 @@ let st = new ShardingTest({
 const dbName = "testdb";
 const otherDbName = "otherdb";
 
-function verifyDocuments(db, count) {
-    assert.eq(count, db.unshardedFoo.count());
+function verifyDocuments(mongos, dbName, fromShard, toShard, count) {
+    if (FixtureHelpers.isTracked(mongos.getDB(dbName).getCollection('unshardedFoo'))) {
+        assert.eq(count, fromShard.unshardedFoo.count());
+        assert.eq(0, toShard.unshardedFoo.count());
+    } else {
+        assert.eq(0, fromShard.unshardedFoo.count());
+        assert.eq(count, toShard.unshardedFoo.count());
+    }
 }
 
 function createCollections() {
@@ -190,9 +197,10 @@ function buildDDLCommands(collName) {
     return commands;
 }
 
-function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded) {
+function testMovePrimary(failpoint, fromShard, toShard, mongoS, dbName, shouldFail, sharded) {
     jsTestLog("Testing move primary with FP: " + failpoint + " shouldFail: " + shouldFail +
               " sharded: " + sharded);
+    let db = mongoS.getDB(dbName);
 
     let codeToRunInParallelShell = '{ db.getSiblingDB("admin").runCommand({movePrimary: "' +
         dbName + '", to: "' + toShard.name + '"}); }';
@@ -208,12 +216,12 @@ function testMovePrimary(failpoint, fromShard, toShard, db, shouldFail, sharded)
     // Test DML
 
     let collName;
-    let cmdShouldFail = !sharded;
     if (sharded) {
         collName = "shardedBar";
     } else {
         collName = "unshardedFoo";
     }
+    let cmdShouldFail = !FixtureHelpers.isTracked(mongoS.getDB(dbName).getCollection(collName));
 
     buildCommands(collName, cmdShouldFail).forEach(commandObj => {
         if (shouldFail && commandObj.shouldFail) {
@@ -292,22 +300,21 @@ st.forEachConnection(shard => {
 });
 
 let cloningDataFPName = "hangBeforeCloningData";
+let unshardedNss = dbName + '.unshardedFoo';
 
 createCollections();
 let fromShard = st.getPrimaryShard(dbName);
 let toShard = st.getOther(fromShard);
 
-testMovePrimary(cloningDataFPName, fromShard, toShard, st.s.getDB(dbName), true, false);
-verifyDocuments(toShard.getDB(dbName), 3);
-verifyDocuments(fromShard.getDB(dbName), 0);
+testMovePrimary(cloningDataFPName, fromShard, toShard, st.s, dbName, true, false);
+verifyDocuments(st.s, dbName, fromShard.getDB(dbName), toShard.getDB(dbName), 3);
 
 createCollections();
 fromShard = st.getPrimaryShard(dbName);
 toShard = st.getOther(fromShard);
 
-testMovePrimary(cloningDataFPName, fromShard, toShard, st.s.getDB(dbName), false, true);
-verifyDocuments(toShard.getDB(dbName), 3);
-verifyDocuments(fromShard.getDB(dbName), 0);
+testMovePrimary(cloningDataFPName, fromShard, toShard, st.s, dbName, false, true);
+verifyDocuments(st.s, dbName, fromShard.getDB(dbName), toShard.getDB(dbName), 3);
 
 createCollections();
 fromShard = st.getPrimaryShard(dbName);

@@ -1,3 +1,5 @@
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+
 var s = new ShardingTest({shards: 2});
 
 assert.commandWorked(s.getDB('test1').runCommand({dropDatabase: 1}));
@@ -30,9 +32,16 @@ assert.eq(s.normalize(s.config.databases.findOne({_id: "test1"}).primary),
           s.normalize(toShard.name),
           "to in config db didn't change after first move");
 
-assert.eq(0, fromShard.getDB("test1").foo.count(), "from still has data after move");
-assert.eq(3, toShard.getDB("test1").foo.count(), "to doesn't have data after move");
-assert.eq(1, s.s.getDB("test1").view.count(), "count on view incorrect after move");
+// Collection data should only be moved if the collection is untracked.
+if (FixtureHelpers.isTracked(s.s.getDB("test1").getCollection("foo"))) {
+    assert.eq(3, fromShard.getDB("test1").foo.count(), "from doesn't have data after move");
+    assert.eq(0, toShard.getDB("test1").foo.count(), "to has data after move");
+    assert.eq(1, s.s.getDB("test1").view.count(), "count on view incorrect after move");
+} else {
+    assert.eq(0, fromShard.getDB("test1").foo.count(), "from still has data after move");
+    assert.eq(3, toShard.getDB("test1").foo.count(), "to doesn't have data after move");
+    assert.eq(1, s.s.getDB("test1").view.count(), "count on view incorrect after move");
+}
 
 // Move back, now using shard name instead of server address
 assert.commandWorked(s.s0.adminCommand({movePrimary: "test1", to: oldShardName}));
