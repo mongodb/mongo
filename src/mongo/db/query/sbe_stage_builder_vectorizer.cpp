@@ -613,6 +613,22 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n,
             }
         }
 
+        if (arity == 5 && op.name() == "dateAdd"s &&
+            TypeSignature::kBlockType.isSubset(args[1].typeSignature)) {
+            optimizer::ABTVector functionArgs;
+            functionArgs.reserve(6);
+            functionArgs.emplace_back(generateMaskArg());
+            functionArgs.emplace_back(std::move(*args[1].expr));
+            functionArgs.emplace_back(std::move(*args[0].expr));
+            for (size_t i = 2; i < arity; i++) {
+                functionArgs.emplace_back(std::move(*args[i].expr));
+            }
+            return {makeABTFunction("valueBlockDateAdd"_sd, std::move(functionArgs)),
+                    TypeSignature::kBlockType.include(TypeSignature::kDateTimeType)
+                        .include(TypeSignature::kNothingType),
+                    args[1].sourceCell};
+        }
+
         if (arity == 2 && op.name() == "isMember"s &&
             TypeSignature::kBlockType.isSubset(args[0].typeSignature)) {
             optimizer::ABTVector functionArgs;

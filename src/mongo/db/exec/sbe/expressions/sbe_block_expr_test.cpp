@@ -2827,4 +2827,60 @@ TEST_F(SBEBlockExpressionTest, BlockMod) {
     }
 }
 
+TEST_F(SBEBlockExpressionTest, BlockDateAdd) {
+    value::ViewOfValueAccessor blockAccessor;
+    value::ViewOfValueAccessor bitsetAccessor;
+
+    auto blockSlot = bindAccessor(&blockAccessor);
+    auto bitsetSlot = bindAccessor(&bitsetAccessor);
+
+    auto block = makeTestDateBlock();
+
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+
+    auto expr = sbe::makeE<sbe::EFunction>(
+        "valueBlockDateAdd",
+        sbe::makeEs(makeE<EVariable>(bitsetSlot),
+                    makeE<EVariable>(blockSlot),
+                    makeE<EConstant>(value::TypeTags::timeZoneDB,
+                                     value::bitcastFrom<TimeZoneDatabase*>(tzdb.get())),
+                    makeE<EConstant>("millisecond"_sd),
+                    makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int>(1)),
+                    makeE<EConstant>("UTC"_sd)));
+
+    auto compiledExpr = compileExpression(*expr);
+
+    {
+        // empty bitset
+        bitsetAccessor.reset(value::TypeTags::Nothing, 0);
+        blockAccessor.reset(value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(block.get()));
+
+        ASSERT_THROWS_CODE(
+            runCompiledExpression(compiledExpr.get()), DBException, ErrorCodes::DurationOverflow);
+    }
+    {
+        // bitset masking the value that would overflow
+        auto bitset = makeHeterogeneousBoolBlock({true, true, true, true, false, true});
+        bitsetAccessor.reset(value::TypeTags::valueBlock,
+                             value::bitcastFrom<value::ValueBlock*>(bitset.get()));
+        blockAccessor.reset(value::TypeTags::valueBlock,
+                            value::bitcastFrom<value::ValueBlock*>(block.get()));
+
+        auto [runTag, runVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(runTag, runVal);
+
+        auto expectedResults = std::vector<std::pair<value::TypeTags, value::Value>>{
+            {value::TypeTags::Date, value::bitcastFrom<int64_t>(0)},
+            {value::TypeTags::Date, value::bitcastFrom<int64_t>(1)},
+            {value::TypeTags::Date, value::bitcastFrom<int64_t>(2)},
+            {value::TypeTags::Date,
+             value::bitcastFrom<int64_t>(std::numeric_limits<int64_t>::min() + 1)},
+            makeNothing(),
+            makeNothing(),
+        };
+
+        assertBlockEq(runTag, runVal, expectedResults);
+    }
+}
 }  // namespace mongo::sbe

@@ -721,6 +721,7 @@ enum class Builtin : uint16_t {
     valueBlockCount,
     valueBlockDateDiff,
     valueBlockDateTrunc,
+    valueBlockDateAdd,
     valueBlockTrunc,
     valueBlockRound,
     valueBlockSum,
@@ -1689,6 +1690,9 @@ private:
                                     TimeZone* timezone,
                                     DayOfWeek* startOfWeek);
 
+    template <bool IsBlockBuiltin = false>
+    bool validateDateAddParameters(TimeUnit* unit, int64_t* amount, TimeZone* timezone);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
@@ -2026,6 +2030,7 @@ private:
 
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateDiff(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateTrunc(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockDateAdd(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockRound(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockTrunc(ArityType arity);

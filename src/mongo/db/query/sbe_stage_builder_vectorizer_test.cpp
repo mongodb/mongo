@@ -2040,5 +2040,60 @@ TEST(VectorizerTest, ConvertNumConvert) {
         ASSERT_FALSE(processed.expr.has_value());
     }
 }
+
+TEST(VectorizerTest, ConvertDateAdd) {
+    auto tree = make<FunctionCall>("dateAdd",
+                                   makeSeq(make<Variable>("timezoneDB"),
+                                           make<Variable>("inputVar"),
+                                           Constant::str("hour"),
+                                           Constant::int64(5),
+                                           Constant::str("UTC")));
+
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace("inputVar"_sd,
+                     std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kDateTimeType),
+                                    boost::none));
+
+    auto processed =
+        Vectorizer{&generator, Vectorizer::Purpose::Project}.vectorize(tree, bindings, boost::none);
+
+    ASSERT_TRUE(processed.expr.has_value());
+    ASSERT_EXPLAIN_BSON_AUTO(
+        "{\n"
+        "    nodeType: \"FunctionCall\", \n"
+        "    name: \"valueBlockDateAdd\", \n"
+        "    arguments: [\n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"Nothing\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"inputVar\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Variable\", \n"
+        "            name: \"timezoneDB\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"StringSmall\", \n"
+        "            value: \"hour\"\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"NumberInt64\", \n"
+        "            value: 5\n"
+        "        }, \n"
+        "        {\n"
+        "            nodeType: \"Const\", \n"
+        "            tag: \"StringSmall\", \n"
+        "            value: \"UTC\"\n"
+        "        }\n"
+        "    ]\n"
+        "}\n",
+        *processed.expr);
+}
 }  // namespace
 }  // namespace mongo::stage_builder

@@ -247,6 +247,81 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityTy
     return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
 }
 
+
+/**
+ * The stack for builtinDateAdd is ordered as follows:
+ * (0) timezoneDB
+ * (1) date
+ * (2) timeUnit
+ * ...
+ *
+ * The stack for builtinValueBlockDateAdd is ordered as follows:
+ * (0) bitset
+ * (1) dateBlock
+ * (2) timezoneDB
+ * (3) timeUnit
+ * ...
+ *
+ * This difference in stack positions is handled by the isBlockBuiltin parameter.
+ */
+template <bool IsBlockBuiltin>
+bool ByteCode::validateDateAddParameters(TimeUnit* unit, int64_t* amount, TimeZone* timezone) {
+    size_t timezoneDBStackPos =
+        IsBlockBuiltin ? kTimezoneDBStackPosBlock : kTimezoneDBStackPosDefault;
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(timezoneDBStackPos);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return false;
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
+
+    size_t stackPosOffset = IsBlockBuiltin ? kStackPosOffsetBlock : 0u;
+
+    auto [unitOwn, unitTag, unitVal] = getFromStack(2 + stackPosOffset);
+    if (!value::isString(unitTag)) {
+        return false;
+    }
+    std::string unitStr{value::getStringView(unitTag, unitVal)};
+    if (!isValidTimeUnit(unitStr)) {
+        return false;
+    }
+    *unit = parseTimeUnit(unitStr);
+
+    auto [amountOwn, amountTag, amountVal] = getFromStack(3 + stackPosOffset);
+    if (amountTag != value::TypeTags::NumberInt64) {
+        return false;
+    }
+    *amount = value::bitcastTo<int64_t>(amountVal);
+
+    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(4 + stackPosOffset);
+    if (!value::isString(timezoneTag) || !isValidTimezone(timezoneTag, timezoneVal, timezoneDB)) {
+        return false;
+    }
+    *timezone = getTimezone(timezoneTag, timezoneVal, timezoneDB);
+    return true;
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateAdd(ArityType arity) {
+    invariant(arity == 5);
+
+    TimeUnit unit{TimeUnit::year};
+    int64_t amount;
+    TimeZone timezone{};
+
+    if (!validateDateAddParameters<>(&unit, &amount, &timezone)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [startDateOwn, startDateTag, startDateVal] = getFromStack(1);
+    if (!coercibleToDate(startDateTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto startDate = getDate(startDateTag, startDateVal);
+
+    auto resDate = dateAdd(startDate, unit, amount, timezone);
+    return {
+        false, value::TypeTags::Date, value::bitcastFrom<int64_t>(resDate.toMillisSinceEpoch())};
+}
+
 namespace {
 
 /**
@@ -348,6 +423,36 @@ struct DateDiffMillisecondFunctor {
 
 static const auto dateDiffMillisecondOp =
     value::makeColumnOpWithParams<dateDiffOpType, DateDiffMillisecondFunctor>();
+
+struct DateAddFunctor {
+    DateAddFunctor(TimeUnit unit, int64_t amount, TimeZone timeZone)
+        : _unit(unit), _amount(amount), _timeZone(timeZone) {}
+
+    std::pair<value::TypeTags, value::Value> operator()(value::TypeTags tag,
+                                                        value::Value val) const {
+        if (!coercibleToDate(tag)) {
+            return std::pair(value::TypeTags::Nothing, value::Value{0u});
+        }
+        auto date = getDate(tag, val);
+
+        auto res = dateAdd(date, _unit, _amount, _timeZone);
+
+        return std::pair(value::TypeTags::Date,
+                         value::bitcastFrom<int64_t>(res.toMillisSinceEpoch()));
+    }
+
+    TimeUnit _unit;
+    int64_t _amount;
+    TimeZone _timeZone;
+};
+
+static constexpr auto dateAddOpType =
+    ColumnOpType{ColumnOpType::kMonotonic | ColumnOpType::kOutputNonNothingOnExpectedInput,
+                 value::TypeTags::Date,
+                 value::TypeTags::Nothing,
+                 ColumnOpType::ReturnNothingOnMissing{}};
+
+static const auto dateAddOp = value::makeColumnOpWithParams<dateAddOpType, DateAddFunctor>();
 }  // namespace
 
 /**
@@ -431,4 +536,65 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateDi
     }
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockDateAdd(ArityType arity) {
+    invariant(arity == 6);
+
+    auto [inputOwned, inputTag, inputVal] = getFromStack(1);
+    tassert(8649700,
+            "Expected input argument to be of valueBlock type",
+            inputTag == value::TypeTags::valueBlock);
+    auto* valueBlockIn = value::bitcastTo<value::ValueBlock*>(inputVal);
+
+    auto [bitsetOwned, bitsetTag, bitsetVal] = getFromStack(0);
+    // A bitmap argument set to Nothing is equivalent to a bitmap made of all True values.
+    tassert(8649701,
+            "Expected bitset argument to be of either Nothing or valueBlock type",
+            bitsetTag == value::TypeTags::Nothing || bitsetTag == value::TypeTags::valueBlock);
+
+    TimeUnit unit{TimeUnit::year};
+    int64_t amount;
+    TimeZone timezone{};
+    if (!validateDateAddParameters<true /* isBlockBuiltin */>(&unit, &amount, &timezone)) {
+        return makeNothingBlock(valueBlockIn);
+    }
+
+    if (bitsetTag == value::TypeTags::valueBlock) {
+        // TODO SERVER-86457: refactor this after map() accepts bitmask argument
+        auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
+        auto bitset = bitsetBlock->extract();
+        auto bitsetVals = const_cast<value::Value*>(bitset.vals());
+        auto bitsetTags = const_cast<value::TypeTags*>(bitset.tags());
+        auto valsNum = bitset.count();
+
+        std::vector<value::TypeTags> tagsOut(valsNum, value::TypeTags::Nothing);
+        std::vector<value::Value> valuesOut(valsNum, 0);
+
+        DateAddFunctor dateAddFunc{unit, amount, timezone};
+        auto extractedValues = valueBlockIn->extract();
+
+        for (size_t i = 0; i < valsNum; ++i) {
+            if (bitsetTags[i] != value::TypeTags::Boolean ||
+                !value::bitcastTo<bool>(bitsetVals[i])) {
+                continue;
+            }
+
+            auto [resTag, resVal] =
+                dateAddFunc(extractedValues[i].first, extractedValues[i].second);
+            tagsOut[i] = resTag;
+            valuesOut[i] = resVal;
+        }
+
+        auto out =
+            std::make_unique<value::HeterogeneousBlock>(std::move(tagsOut), std::move(valuesOut));
+
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(out.release())};
+    } else {
+        auto out = valueBlockIn->map(dateAddOp.bindParams(unit, amount, timezone));
+        return {true,
+                value::TypeTags::valueBlock,
+                value::bitcastFrom<value::ValueBlock*>(out.release())};
+    }
+}
 }  // namespace mongo::sbe::vm

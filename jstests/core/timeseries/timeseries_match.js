@@ -238,6 +238,33 @@ TimeseriesTest.run((insert) => {
             ids: [4],
             usesBlockProcessing: true
         },
+        {
+            pred: {
+                "$expr": {
+                    "$eq": [
+                        {"$dateAdd": {"startDate": "$time", "unit": "millisecond", amount: 100}},
+                        new Date(datePrefix + 600)
+                    ]
+                }
+            },
+            ids: [4],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {
+                "$expr": {
+                    "$eq": [
+                        {
+                            "$dateSubtract":
+                                {"startDate": "$time", "unit": "millisecond", amount: 100}
+                        },
+                        new Date(datePrefix)
+                    ]
+                }
+            },
+            ids: [0],
+            usesBlockProcessing: true
+        },
 
         // Comparisons with an empty array.
         {pred: {"emptyArray": {$exists: true}}, ids: [0, 1], usesBlockProcessing: true},

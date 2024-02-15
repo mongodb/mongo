@@ -750,4 +750,38 @@ TimeseriesTest.run((insert) => {
         assert.docEq([{"_id": ISODate("1970-01-20T10:55:00Z"), "total1": 1, "total2": 456}],
                      coll.aggregate(pipeline).toArray());
     }
+    {
+        const res =
+            coll.aggregate([
+                    {
+                        $addFields: {
+                            "computedField":
+                                {$dateAdd: {startDate: "$time", unit: "millisecond", amount: 100}}
+                        }
+                    },
+                    {$match: {computedField: new Date(datePrefix + 400)}},
+                    {$count: "count"}
+                ])
+                .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
+
+    {
+        const res = coll.aggregate([
+                            {
+                                $addFields: {
+                                    "computedField": {
+                                        $dateSubtract:
+                                            {startDate: "$time", unit: "millisecond", amount: 100}
+                                    }
+                                }
+                            },
+                            {$match: {computedField: new Date(datePrefix)}},
+                            {$count: "count"}
+                        ])
+                        .toArray();
+        assert.eq(res.length, 1, res);
+        assert.eq(res[0].count, 1, res);
+    }
 });
