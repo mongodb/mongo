@@ -44,6 +44,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/stage_builder_util.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -56,7 +57,7 @@
 
 namespace mongo {
 namespace plan_cache_util {
-namespace log_detail {
+namespace {
 void logTieForBest(std::string&& query,
                    double winnerScore,
                    double runnerUpScore,
@@ -87,7 +88,244 @@ void logNotCachingNoData(std::string&& solution) {
                 "Not caching query because this solution has no cache data",
                 "solutions"_attr = redact(solution));
 }
-}  // namespace log_detail
+
+/**
+ * Returns a pair of PlanExplainers consisting of the explainer of 'winningPlan' and the explainer
+ * of the second best in 'candidates'. If there are less than two candidates, second one remains
+ * nullptr.
+ */
+std::pair<std::unique_ptr<PlanExplainer>, std::unique_ptr<PlanExplainer>> getClassicPlanExplainers(
+    const plan_ranker::CandidatePlan& winningPlan,
+    const plan_ranker::PlanRankingDecision& ranking,
+    const std::vector<plan_ranker::CandidatePlan>& candidates) {
+    std::unique_ptr<PlanExplainer> winnerExplainer = plan_explainer_factory::make(winningPlan.root);
+
+    std::unique_ptr<PlanExplainer> runnerUpExplainer;
+    if (ranking.candidateOrder.size() > 1) {
+        invariant(ranking.candidateOrder.size() > 1U);
+        auto runnerUpIdx = ranking.candidateOrder[1];
+        runnerUpExplainer = plan_explainer_factory::make(candidates[runnerUpIdx].root);
+    }
+
+    return std::make_pair(std::move(winnerExplainer), std::move(runnerUpExplainer));
+}
+
+}  // namespace
+
+bool shouldUpdatePlanCache(OperationContext* opCtx,
+                           PlanCachingMode cachingMode,
+                           const CanonicalQuery& query,
+                           const plan_ranker::PlanRankingDecision& ranking,
+                           const PlanExplainer* winnerExplainer,
+                           const PlanExplainer* runnerUpExplainer,
+                           const QuerySolution* winningPlan) {
+    // Even if the query is of a cacheable shape, the caller might have indicated that we shouldn't
+    // write to the plan cache.
+    //
+    // TODO: We can remove this if we introduce replanning logic to the SubplanStage.
+    bool canCache = (cachingMode == PlanCachingMode::AlwaysCache);
+    if (cachingMode == PlanCachingMode::SometimesCache) {
+        // In "sometimes cache" mode, we cache unless we hit one of the special cases below.
+        canCache = true;
+
+        if (ranking.tieForBest()) {
+            // The winning plan tied with the runner-up and we're using "sometimes cache" mode. We
+            // will not write a plan cache entry.
+            canCache = false;
+
+            // These arrays having two or more entries is implied by 'tieForBest'.
+            invariant(ranking.scores.size() > 1U);
+            invariant(runnerUpExplainer);
+            logTieForBest(query.toStringShort(),
+                          ranking.scores[0],
+                          ranking.scores[1],
+                          winnerExplainer->getPlanSummary(),
+                          runnerUpExplainer->getPlanSummary());
+        }
+
+        auto numResults =
+            visit(OverloadedVisitor{[](const plan_ranker::StatsDetails& details) {
+                                        return details.candidatePlanStats[0]->common.advanced;
+                                    },
+                                    [](const plan_ranker::SBEStatsDetails& details) {
+                                        return details.candidatePlanStats[0]->common.advances;
+                                    }},
+                  ranking.stats);
+
+        if (numResults == 0) {
+            // We're using the "sometimes cache" mode, and the winning plan produced no results
+            // during the plan ranking trial period. We will not write a plan cache entry.
+            canCache = false;
+            logNotCachingZeroResults(
+                query.toStringShort(), ranking.scores[0], winnerExplainer->getPlanSummary());
+        }
+    }
+
+    if (canCache && !query.isUncacheableSbe() && shouldCacheQuery(query) &&
+        winningPlan->isEligibleForPlanCache()) {
+        if (!winningPlan->cacheData) {
+            logNotCachingNoData(winningPlan->toString());
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void updateClassicPlanCacheFromClassicCandidates(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    PlanCachingMode cachingMode,
+    const CanonicalQuery& query,
+    std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+    std::vector<plan_ranker::CandidatePlan>& candidates) {
+    auto winnerIdx = ranking->candidateOrder[0];
+    invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
+    auto& winningPlan = candidates[winnerIdx];
+
+    auto&& [winnerExplainer, runnerUpExplainer] =
+        getClassicPlanExplainers(winningPlan, *ranking, candidates);
+
+    if (!shouldUpdatePlanCache(opCtx,
+                               cachingMode,
+                               query,
+                               *ranking,
+                               winnerExplainer.get(),
+                               runnerUpExplainer.get(),
+                               winningPlan.solution.get())) {
+        return;
+    }
+
+    const CollectionPtr& collection = collections.getMainCollection();
+    auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
+        return buildDebugInfo(query, std::move(ranking));
+    };
+    PlanCacheCallbacksImpl<PlanCacheKey, SolutionCacheData, plan_cache_debug_info::DebugInfo>
+        callbacks{query, buildDebugInfoFn};
+    winningPlan.solution->cacheData->indexFilterApplied = winningPlan.solution->indexFilterApplied;
+    winningPlan.solution->cacheData->solutionHash = winningPlan.solution->hash();
+    auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
+    uassertStatusOK(
+        CollectionQueryInfo::get(collection)
+            .getPlanCache()
+            ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
+                  winningPlan.solution->cacheData->clone(),
+                  *ranking,
+                  opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                  &callbacks,
+                  isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
+                  boost::none /* worksGrowthCoefficient */));
+}
+
+void updateSbePlanCache(OperationContext* opCtx,
+                        const MultipleCollectionAccessor& collections,
+                        const CanonicalQuery& query,
+                        const plan_ranker::PlanRankingDecision& ranking,
+                        QuerySolution* soln,
+                        std::unique_ptr<sbe::CachedSbePlan> cachedPlan) {
+    auto buildDebugInfoFn = [soln]() -> plan_cache_debug_info::DebugInfoSBE {
+        return buildDebugInfo(soln);
+    };
+    PlanCacheCallbacksImpl<sbe::PlanCacheKey,
+                           sbe::CachedSbePlan,
+                           plan_cache_debug_info::DebugInfoSBE>
+        callbacks{query, buildDebugInfoFn};
+
+    auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
+    uassertStatusOK(sbe::getPlanCache(opCtx).set(
+        plan_cache_key_factory::make(
+            query, collections, canonical_query_encoder::Optimizer::kSbeStageBuilders),
+        std::move(cachedPlan),
+        ranking,
+        opCtx->getServiceContext()->getPreciseClockSource()->now(),
+        &callbacks,
+        isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
+        boost::none /* worksGrowthCoefficient */));
+}
+
+void updateSbePlanCacheFromSbeCandidates(OperationContext* opCtx,
+                                         const MultipleCollectionAccessor& collections,
+                                         PlanCachingMode cachingMode,
+                                         const CanonicalQuery& query,
+                                         std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+                                         std::vector<sbe::plan_ranker::CandidatePlan>& candidates) {
+    auto winnerIdx = ranking->candidateOrder[0];
+    invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
+    auto& winningPlan = candidates[winnerIdx];
+
+    auto makeExplainer = [](const sbe::plan_ranker::CandidatePlan& candidate) {
+        return plan_explainer_factory::make(
+            candidate.root.get(), &candidate.data.stageData, candidate.solution.get());
+    };
+    std::unique_ptr<PlanExplainer> winnerExplainer = makeExplainer(winningPlan);
+
+    std::unique_ptr<PlanExplainer> runnerUpExplainer;
+    if (ranking->candidateOrder.size() > 1) {
+        invariant(ranking->candidateOrder.size() > 1U);
+        auto runnerUpIdx = ranking->candidateOrder[1];
+        runnerUpExplainer = makeExplainer(candidates[runnerUpIdx]);
+    }
+
+    if (!shouldUpdatePlanCache(opCtx,
+                               cachingMode,
+                               query,
+                               *ranking,
+                               winnerExplainer.get(),
+                               runnerUpExplainer.get(),
+                               winningPlan.solution.get())) {
+        return;
+    }
+
+    tassert(6142201,
+            "The winning CandidatePlan should contain the original plan",
+            winningPlan.clonedPlan);
+
+    // Clone the winning SBE plan and its auxiliary data.
+    auto cachedPlan =
+        std::make_unique<sbe::CachedSbePlan>(std::move(winningPlan.clonedPlan->first),
+                                             std::move(winningPlan.clonedPlan->second.stageData),
+                                             winningPlan.solution->hash());
+    cachedPlan->indexFilterApplied = winningPlan.solution->indexFilterApplied;
+
+    updateSbePlanCache(
+        opCtx, collections, query, *ranking, winningPlan.solution.get(), std::move(cachedPlan));
+}
+
+void updateSbePlanCacheFromClassicCandidates(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    PlanCachingMode cachingMode,
+    const CanonicalQuery& query,
+    const plan_ranker::PlanRankingDecision& ranking,
+    const std::vector<plan_ranker::CandidatePlan>& candidates,
+    const std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>& sbePlanAndData,
+    QuerySolution* winningSolution) {
+    auto winnerIdx = ranking.candidateOrder[0];
+    invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
+    auto& winningPlan = candidates[winnerIdx];
+
+    auto&& [winnerExplainer, runnerUpExplainer] =
+        getClassicPlanExplainers(winningPlan, ranking, candidates);
+
+    if (!shouldUpdatePlanCache(opCtx,
+                               cachingMode,
+                               query,
+                               ranking,
+                               winnerExplainer.get(),
+                               runnerUpExplainer.get(),
+                               winningSolution)) {
+        return;
+    }
+
+    // Clone the winning SBE plan and its auxiliary data.
+    auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
+        sbePlanAndData.first->clone(), sbePlanAndData.second, winningSolution->hash());
+    cachedPlan->indexFilterApplied = winningSolution->indexFilterApplied;
+
+    updateSbePlanCache(opCtx, collections, query, ranking, winningSolution, std::move(cachedPlan));
+}
 
 void updatePlanCache(OperationContext* opCtx,
                      const MultipleCollectionAccessor& collections,

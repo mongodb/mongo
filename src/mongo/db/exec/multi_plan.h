@@ -142,6 +142,27 @@ public:
     bool bestSolutionEof() const;
 
     /**
+     * Returns the PlanRankingDecision which captures scoring information from the trial period.
+     * Requires caching mode to be NeverCache and calling pickBestPlan() beforehand.
+     */
+    const plan_ranker::PlanRankingDecision& planRankingDecision() const {
+        tassert(8524800,
+                "The caching mode must be NeverCache to ensure planRankingDecision() is invoked by "
+                "Classic runtime planner for SBE",
+                _cachingMode == PlanCachingMode::NeverCache);
+        tassert(8524801, "Ranking decision must be determined by calling pickBestPlan()", _ranking);
+        return *_ranking;
+    }
+
+    /**
+     * Returns the candidate plans. Each candidate plan includes a child PlanStage tree and
+     * QuerySolution.
+     */
+    const std::vector<plan_ranker::CandidatePlan>& candidates() const {
+        return _candidates;
+    }
+
+    /**
      * Returns true if a backup plan was picked.
      * This is the case when the best plan has a blocking stage.
      * Exposed for testing.
@@ -203,6 +224,10 @@ private:
     // wraps this stage. Ownership of the PlanStages will be in PlanStage::_children which maps
     // one-to-one with _candidates.
     std::vector<plan_ranker::CandidatePlan> _candidates;
+
+    // Captures scoring information from the trial period. Nullptr until 'pickBestPlan()' returns
+    // with an OK status. Requires '_cachingMode' to be NeverCache to retain the ownership.
+    std::unique_ptr<plan_ranker::PlanRankingDecision> _ranking;
 
     // Rejected plans in saved and detached state.
     std::vector<std::unique_ptr<PlanStage>> _rejected;

@@ -390,7 +390,7 @@ CandidatePlans MultiPlanner::finalizeExecutionPlans(
     }
 
     // Writes a cache entry for the winning plan to the plan cache if possible.
-    plan_cache_util::updatePlanCacheFromCandidates(
+    plan_cache_util::updateSbePlanCacheFromSbeCandidates(
         _opCtx, _collections, _cachingMode, _cq, std::move(decision), candidates);
 
     return {std::move(candidates), winnerIdx};

@@ -1091,12 +1091,8 @@ private:
 
         if (solutions.size() > 1) {
             auto result = releaseResult();
-            result->runtimePlanner =
-                std::make_unique<crp_sbe::MultiPlanner>(_opCtx,
-                                                        makePlannerData(),
-                                                        _yieldPolicy,
-                                                        std::move(solutions),
-                                                        PlanCachingMode::NeverCache);
+            result->runtimePlanner = std::make_unique<crp_sbe::MultiPlanner>(
+                _opCtx, makePlannerData(), _yieldPolicy, std::move(solutions));
             return result;
         } else {
             return buildSingleSolutionPlan(std::move(solutions[0]));

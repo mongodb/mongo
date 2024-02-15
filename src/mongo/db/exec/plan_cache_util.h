@@ -87,19 +87,6 @@ inline PlanCachingMode stricter(PlanCachingMode lhs, PlanCachingMode rhs) {
 }
 
 namespace plan_cache_util {
-// The logging facility enforces the rule that logging should not be done in a header file. Since
-// the template classes and functions below must be defined in the header file and since they do use
-// the logging facility, we have to define the helper functions below to perform the actual logging
-// operation from template code.
-namespace log_detail {
-void logTieForBest(std::string&& query,
-                   double winnerScore,
-                   double runnerUpScore,
-                   std::string winnerPlanSummary,
-                   std::string runnerUpPlanSummary);
-void logNotCachingZeroResults(std::string&& query, double score, std::string winnerPlanSummary);
-void logNotCachingNoData(std::string&& solution);
-}  // namespace log_detail
 
 /**
  * Builds "DebugInfo" for storing in the classic plan cache.
@@ -113,166 +100,61 @@ plan_cache_debug_info::DebugInfo buildDebugInfo(
  */
 plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution);
 
-/**
- * Caches the best candidate execution plan for 'query', chosen from the given 'candidates' based on
- * the 'ranking' decision, if the 'query' is of a type that can be cached. Otherwise, does nothing.
- *
- * The 'cachingMode' specifies whether the query should be:
- *    * Always cached.
- *    * Never cached.
- *    * Cached, except in certain special cases.
- *
- * This method is shared between Classic and SBE. The plan roots 'candidates[i].root' have different
- * types between the two:
- *    * Classic - mongo::PlanStage*
- *    * SBE     - std::unique_ptr<sbe::PlanStage>>
- * This breaks polymorphism because native pointers and std::unique_ptr must be handled differently.
- * std::is_same_v is used to distinguish in these cases.
+/*
+ * Returns true if plan cache should be updated.
  */
-template <typename PlanStageType, typename ResultType, typename Data>
-void updatePlanCacheFromCandidates(
+bool shouldUpdatePlanCache(OperationContext* opCtx,
+                           PlanCachingMode cachingMode,
+                           const CanonicalQuery& query,
+                           const plan_ranker::PlanRankingDecision& ranking,
+                           const PlanExplainer* winnerExplainer,
+                           const PlanExplainer* runnerUpExplainer,
+                           const QuerySolution* winningPlan);
+
+/**
+ * Caches the best candidate execution plan for 'query' in Classic plan cache, chosen from the given
+ * 'candidates' from Classic based on the 'ranking' decision, if the 'query' is of a type that can
+ * be cached. Otherwise, does nothing.
+ */
+void updateClassicPlanCacheFromClassicCandidates(
     OperationContext* opCtx,
     const MultipleCollectionAccessor& collections,
     PlanCachingMode cachingMode,
     const CanonicalQuery& query,
     std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
-    std::vector<plan_ranker::BaseCandidatePlan<PlanStageType, ResultType, Data>>& candidates) {
-    auto winnerIdx = ranking->candidateOrder[0];
-    invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
-    auto& winningPlan = candidates[winnerIdx];
+    std::vector<plan_ranker::CandidatePlan>& candidates);
 
-    // Even if the query is of a cacheable shape, the caller might have indicated that we shouldn't
-    // write to the plan cache.
-    //
-    // TODO: We can remove this if we introduce replanning logic to the SubplanStage.
-    bool canCache = (cachingMode == PlanCachingMode::AlwaysCache);
-    if (cachingMode == PlanCachingMode::SometimesCache) {
-        // In "sometimes cache" mode, we cache unless we hit one of the special cases below.
-        canCache = true;
+/**
+ * Caches the best candidate execution plan for 'query' in SBE plan cache, chosen from the given
+ * 'candidates' from SBE based on the 'ranking' decision, if the 'query' is of a type that can be
+ * cached. Otherwise, does nothing.
+ */
+void updateSbePlanCacheFromSbeCandidates(OperationContext* opCtx,
+                                         const MultipleCollectionAccessor& collections,
+                                         PlanCachingMode cachingMode,
+                                         const CanonicalQuery& query,
+                                         std::unique_ptr<plan_ranker::PlanRankingDecision> ranking,
+                                         std::vector<sbe::plan_ranker::CandidatePlan>& candidates);
 
-        if (ranking->tieForBest()) {
-            // The winning plan tied with the runner-up and we're using "sometimes cache" mode. We
-            // will not write a plan cache entry.
-            canCache = false;
-
-            // These arrays having two or more entries is implied by 'tieForBest'.
-            invariant(ranking->scores.size() > 1U);
-            invariant(ranking->candidateOrder.size() > 1U);
-
-            auto runnerUpIdx = ranking->candidateOrder[1];
-
-            auto&& [winnerExplainer, runnerUpExplainer] = [&]() {
-                if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-                    return std::make_pair(
-                        plan_explainer_factory::make(winningPlan.root.get(),
-                                                     &winningPlan.data.stageData,
-                                                     winningPlan.solution.get()),
-                        plan_explainer_factory::make(candidates[runnerUpIdx].root.get(),
-                                                     &candidates[runnerUpIdx].data.stageData,
-                                                     candidates[runnerUpIdx].solution.get()));
-                } else {
-                    static_assert(std::is_same_v<PlanStageType, PlanStage*>);
-                    return std::make_pair(
-                        plan_explainer_factory::make(winningPlan.root),
-                        plan_explainer_factory::make(candidates[runnerUpIdx].root));
-                }
-            }();
-
-            log_detail::logTieForBest(query.toStringShort(),
-                                      ranking->scores[0],
-                                      ranking->scores[1],
-                                      winnerExplainer->getPlanSummary(),
-                                      runnerUpExplainer->getPlanSummary());
-        }
-
-        if (winningPlan.results.empty()) {
-            // We're using the "sometimes cache" mode, and the winning plan produced no results
-            // during the plan ranking trial period. We will not write a plan cache entry.
-            canCache = false;
-            auto winnerExplainer = [&]() {
-                if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-                    return plan_explainer_factory::make(winningPlan.root.get(),
-                                                        &winningPlan.data.stageData,
-                                                        winningPlan.solution.get());
-                } else {
-                    static_assert(std::is_same_v<PlanStageType, PlanStage*>);
-                    return plan_explainer_factory::make(winningPlan.root);
-                }
-            }();
-
-            log_detail::logNotCachingZeroResults(
-                query.toStringShort(), ranking->scores[0], winnerExplainer->getPlanSummary());
-        }
-    }
-
-    // Store the choice we just made in the cache, if the query is of a type that is safe to
-    // cache.
-    QuerySolution* solution = winningPlan.solution.get();
-    if (canCache && !query.isUncacheableSbe() && shouldCacheQuery(query) &&
-        solution->isEligibleForPlanCache()) {
-        const CollectionPtr& collection = collections.getMainCollection();
-        auto rankingDecision = ranking.get();
-
-        if (solution->cacheData != nullptr) {
-            if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-                tassert(6142201,
-                        "The winning CandidatePlan should contain the original plan",
-                        winningPlan.clonedPlan);
-
-                // Clone the winning SBE plan and its auxiliary data.
-                auto cachedPlan = std::make_unique<sbe::CachedSbePlan>(
-                    std::move(winningPlan.clonedPlan->first),
-                    std::move(winningPlan.clonedPlan->second.stageData),
-                    solution->hash());
-                cachedPlan->indexFilterApplied = solution->indexFilterApplied;
-
-                auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfoSBE {
-                    return buildDebugInfo(solution);
-                };
-                PlanCacheCallbacksImpl<sbe::PlanCacheKey,
-                                       sbe::CachedSbePlan,
-                                       plan_cache_debug_info::DebugInfoSBE>
-                    callbacks{query, buildDebugInfoFn};
-
-                auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
-                uassertStatusOK(sbe::getPlanCache(opCtx).set(
-                    plan_cache_key_factory::make(
-                        query, collections, canonical_query_encoder::Optimizer::kSbeStageBuilders),
-                    std::move(cachedPlan),
-                    *rankingDecision,
-                    opCtx->getServiceContext()->getPreciseClockSource()->now(),
-                    &callbacks,
-                    isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
-                    boost::none /* worksGrowthCoefficient */));
-            } else {
-                static_assert(std::is_same_v<PlanStageType, PlanStage*>);
-                auto buildDebugInfoFn = [&]() -> plan_cache_debug_info::DebugInfo {
-                    return buildDebugInfo(query, std::move(ranking));
-                };
-                PlanCacheCallbacksImpl<PlanCacheKey,
-                                       SolutionCacheData,
-                                       plan_cache_debug_info::DebugInfo>
-                    callbacks{query, buildDebugInfoFn};
-                solution->cacheData->indexFilterApplied = solution->indexFilterApplied;
-                solution->cacheData->solutionHash = solution->hash();
-                auto isSensitive = CurOp::get(opCtx)->getShouldOmitDiagnosticInformation();
-                uassertStatusOK(
-                    CollectionQueryInfo::get(collection)
-                        .getPlanCache()
-                        ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
-                              solution->cacheData->clone(),
-                              *rankingDecision,
-                              opCtx->getServiceContext()->getPreciseClockSource()->now(),
-                              &callbacks,
-                              isSensitive ? PlanSecurityLevel::kSensitive
-                                          : PlanSecurityLevel::kNotSensitive,
-                              boost::none /* worksGrowthCoefficient */));
-            }
-        } else {
-            log_detail::logNotCachingNoData(solution->toString());
-        }
-    }
-}
+/**
+ * Caches the best candidate execution plan for 'query' in SBE plan cache, chosen from the given
+ * 'candidates' based on the 'ranking' decision, if the 'query' is of a type that can be cached.
+ * Otherwise, does nothing.
+ *
+ * The 'cachingMode' specifies whether the query should be:
+ *    * Always cached.
+ *    * Never cached.
+ *    * Cached, except in certain special cases.
+ */
+void updateSbePlanCacheFromClassicCandidates(
+    OperationContext* opCtx,
+    const MultipleCollectionAccessor& collections,
+    PlanCachingMode cachingMode,
+    const CanonicalQuery& query,
+    const plan_ranker::PlanRankingDecision& ranking,
+    const std::vector<plan_ranker::CandidatePlan>& candidates,
+    const std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>& sbePlanAndData,
+    QuerySolution* winningSolution);
 
 /**
  * Caches the plan 'root' along with its accompanying 'data' if the 'query' is of a type that can be

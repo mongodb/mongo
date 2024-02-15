@@ -171,8 +171,7 @@ public:
     MultiPlanner(OperationContext* opCtx,
                  PlannerData plannerData,
                  PlanYieldPolicy::YieldPolicy yieldPolicy,
-                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans,
-                 PlanCachingMode cachingMode);
+                 std::vector<std::unique_ptr<QuerySolution>> candidatePlans);
 
     /**
      * Picks the best plan given by the classic engine multiplanner and returns a plan executor. If
@@ -184,7 +183,6 @@ public:
 private:
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
-    PlanCachingMode _cachingMode;
 };
 
 class SubPlanner final : public PlannerBase {

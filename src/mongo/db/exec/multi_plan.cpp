@@ -262,11 +262,11 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         return statusWithRanking.getStatus();
     }
 
-    auto ranking = std::move(statusWithRanking.getValue());
+    _ranking = std::move(statusWithRanking.getValue());
     // Since the status was ok there should be a ranking containing at least one successfully ranked
     // plan.
-    invariant(ranking);
-    _bestPlanIdx = ranking->candidateOrder[0];
+    invariant(_ranking);
+    _bestPlanIdx = _ranking->candidateOrder[0];
 
     MONGO_verify(_bestPlanIdx >= 0 && _bestPlanIdx < static_cast<int>(_candidates.size()));
 
@@ -287,7 +287,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
         LOGV2_DEBUG(20592, 5, "Winner has blocking stage, looking for backup plan...");
-        for (auto&& ix : ranking->candidateOrder) {
+        for (auto&& ix : _ranking->candidateOrder) {
             if (!_candidates[ix].solution->hasBlockingStage) {
                 LOGV2_DEBUG(20593, 5, "Backup child", "ix"_attr = ix);
                 _backupPlanIdx = ix;
@@ -301,12 +301,15 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         ? MultipleCollectionAccessor{coll.getAcquisition()}
         : MultipleCollectionAccessor{coll.getCollectionPtr()};
 
-    plan_cache_util::updatePlanCacheFromCandidates(expCtx()->opCtx,
-                                                   multipleCollection,
-                                                   _cachingMode,
-                                                   *_query,
-                                                   std::move(ranking),
-                                                   _candidates);
+    if (_cachingMode != PlanCachingMode::NeverCache) {
+        plan_cache_util::updateClassicPlanCacheFromClassicCandidates(expCtx()->opCtx,
+                                                                     multipleCollection,
+                                                                     _cachingMode,
+                                                                     *_query,
+                                                                     std::move(_ranking),
+                                                                     _candidates);
+    }
+
     removeRejectedPlans();
 
     return Status::OK();

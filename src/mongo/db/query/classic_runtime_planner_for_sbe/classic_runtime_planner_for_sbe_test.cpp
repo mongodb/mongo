@@ -247,6 +247,10 @@ TEST_F(ClassicRuntimePlannerForSbeTest, SingleSolutionPassthroughPlannerCreatesC
 }
 
 TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
+    // Ensures that cache entries are available immediately.
+    bool previousQueryKnobValue = internalQueryCacheDisableInactiveEntries.swap(true);
+    ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
+
     PlannerData plannerData = createPlannerData();
     std::vector<std::unique_ptr<QuerySolution>> solutions;
 
@@ -256,6 +260,9 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
         virtScan->filter = plannerData.cq->getPrimaryMatchExpression()->clone();
         auto solution = std::make_unique<QuerySolution>();
         solution->setRoot(std::move(virtScan));
+        solution->cacheData = std::make_unique<SolutionCacheData>();
+        solution->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
+        solution->cacheData->tree = std::make_unique<PlanCacheIndexTree>();
         solutions.push_back(std::move(solution));
     };
 
@@ -286,10 +293,24 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
     MultiPlanner planner{operationContext(),
                          std::move(plannerData),
                          PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                         std::move(solutions),
-                         PlanCachingMode::AlwaysCache};
+                         std::move(solutions)};
     auto exec = planner.plan();
-    assertPlanExecutorReturnsCorrectSums(std::move(expectedSums), exec.get());
+    assertPlanExecutorReturnsCorrectSums(expectedSums, exec.get());
+
+    {  // Run CachedPlanner to execute the cached plan.
+        PlannerData plannerData = createPlannerData();
+        auto planCacheKey =
+            plan_cache_key_factory::make(*plannerData.cq,
+                                         plannerData.collections,
+                                         canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        auto&& planCache = sbe::getPlanCache(operationContext());
+        auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
+        ASSERT_TRUE(cacheEntry);
+        CachedPlanner cachedPlanner{
+            operationContext(), std::move(plannerData), std::move(cacheEntry)};
+        auto cachedExec = cachedPlanner.plan();
+        assertPlanExecutorReturnsCorrectSums(std::move(expectedSums), cachedExec.get());
+    }
 }
 
 TEST_F(ClassicRuntimePlannerForSbeTest, SubPlannerPicksMoreEfficientPlanForEachBranch) {
