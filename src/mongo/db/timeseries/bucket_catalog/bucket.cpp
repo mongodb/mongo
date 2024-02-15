@@ -56,14 +56,20 @@ uint8_t numDigits(uint32_t num) {
 }
 }  // namespace
 
-Bucket::Bucket(
-    const BucketId& bId, const BucketKey& k, StringData tf, Date_t mt, BucketStateRegistry& bsr)
+Bucket::Bucket(TrackingContext& trackingContext,
+               const BucketId& bId,
+               const BucketKey& k,
+               StringData tf,
+               Date_t mt,
+               BucketStateRegistry& bsr)
     : bucketId(bId),
       key(k),
       timeField(tf.toString()),
       minTime(mt),
       bucketStateRegistry(bsr),
       lastChecked(getCurrentEraAndIncrementBucketCount(bucketStateRegistry)),
+      minmax(trackingContext),
+      schema(trackingContext),
       usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {}
 

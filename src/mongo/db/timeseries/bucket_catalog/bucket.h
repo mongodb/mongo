@@ -73,7 +73,8 @@ private:
 public:
     using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
 
-    Bucket(const BucketId& bucketId,
+    Bucket(TrackingContext&,
+           const BucketId& bucketId,
            const BucketKey& bucketKey,
            StringData timeField,
            Date_t minTime,

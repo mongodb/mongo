@@ -2339,18 +2339,24 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     ClosedBuckets closedBuckets;
 
     // Create dummy bucket and populate bucket state registry.
+    TrackingContext trackingContext;
     auto dummyBucketId = BucketId(NamespaceString(), OID());
     auto dummyBucketKey = BucketKey(NamespaceString(), BucketMetadata());
     sideBucketCatalog->bucketStateRegistry.bucketStates.emplace(dummyBucketId,
                                                                 BucketState::kNormal);
-    auto dummyBucket = std::make_unique<Bucket>(
-        dummyBucketId, dummyBucketKey, "time", Date_t(), sideBucketCatalog->bucketStateRegistry);
+    auto dummyBucket = std::make_unique<Bucket>(trackingContext,
+                                                dummyBucketId,
+                                                dummyBucketKey,
+                                                "time",
+                                                Date_t(),
+                                                sideBucketCatalog->bucketStateRegistry);
 
     // Create and populate stripe.
     auto& stripe = *sideBucketCatalog->stripes[0];
     stripe.openBucketsById.try_emplace(
         dummyBucketId,
         make_unique_tracked<Bucket>(sideBucketCatalog->trackingContext,
+                                    sideBucketCatalog->trackingContext,
                                     dummyBucketId,
                                     dummyBucketKey,
                                     "time",

@@ -111,11 +111,6 @@ void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
     } else {
         batch.min = bucket.minmax.min();
         batch.max = bucket.minmax.max();
-
-        // Approximate minmax memory usage by taking sizes of initial commit. Subsequent updates may
-        // add fields but are most likely just to update values.
-        bucket.memoryUsage += batch.min.objsize();
-        bucket.memoryUsage += batch.max.objsize();
     }
 
     // Move BSONColumnBuilders from Bucket to WriteBatch.

@@ -111,13 +111,14 @@ struct Measurement {
 };
 
 // Builds the data field of a bucket document. Computes the min and max fields if necessary.
-boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
+boost::optional<std::pair<BSONObj, BSONObj>> processTimeseriesMeasurements(
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
     StringDataMap<BSONObjBuilder>& dataBuilders,
     const boost::optional<TimeseriesOptions>& options = boost::none,
     const boost::optional<const StringDataComparator*>& comparator = boost::none) {
-    bucket_catalog::MinMax minmax;
+    TrackingContext trackingContext;
+    bucket_catalog::MinMax minmax{trackingContext};
     bool computeMinmax = options && comparator;
 
     auto metadataElem = metadata.firstElement();
@@ -148,7 +149,7 @@ boost::optional<bucket_catalog::MinMax> processTimeseriesMeasurements(
         auto controlDoc =
             bucket_catalog::buildControlMinTimestampDoc(options->getTimeField(), minTime);
         minmax.update(controlDoc, /*metaField=*/boost::none, *comparator);
-        return minmax;
+        return {{minmax.min(), minmax.max()}};
     }
 
     return boost::none;
@@ -598,8 +599,8 @@ BucketDocument makeNewDocumentForWrite(
 
     return makeNewDocument(bucketId,
                            metadata,
-                           minmax->min(),
-                           minmax->max(),
+                           minmax->first,
+                           minmax->second,
                            dataBuilders,
                            options.getTimeField(),
                            nss);

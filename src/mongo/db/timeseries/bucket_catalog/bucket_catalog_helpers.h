@@ -60,7 +60,8 @@ namespace mongo::timeseries::bucket_catalog {
  *
  * Returns a bad status if the bucket document is malformed.
  */
-StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
+StatusWith<MinMax> generateMinMaxFromBucketDoc(TrackingContext&,
+                                               const BSONObj& bucketDoc,
                                                const StringDataComparator* comparator);
 
 /**
@@ -69,7 +70,8 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
  *
  * Returns a bad status if the bucket document is malformed or contains mixed schema measurements.
  */
-StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
+StatusWith<Schema> generateSchemaFromBucketDoc(TrackingContext&,
+                                               const BSONObj& bucketDoc,
                                                const StringDataComparator* comparator);
 
 /**

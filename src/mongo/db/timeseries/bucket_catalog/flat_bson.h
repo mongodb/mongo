@@ -45,6 +45,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/timeseries/timeseries_tracked_types.h"
+#include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -79,6 +81,8 @@ public:
     public:
         friend class FlatBSONStore;
 
+        explicit Data(TrackingContext& trackingContext);
+
         /**
          * DataType stored by this Data
          */
@@ -107,8 +111,6 @@ public:
         void setUnset();
         void setValue(const BSONElement& elem);
 
-        int64_t calculateMemUsage() const;
-
     private:
         Value _value;
         Type _type = Type::kUnset;
@@ -123,6 +125,8 @@ public:
      */
     struct Entry {
     public:
+        explicit Entry(TrackingContext& trackingContext);
+
         // Iterator offset to the entry after the last subelement
         uint32_t _offsetEnd;
         // Iterator offset to the parent entry
@@ -131,9 +135,9 @@ public:
         Element _element;
         // Map for faster searches. Contain mapping from field name to iterator offset to
         // subelement. Only instantiated when we've depleted our allowed linear search depth.
-        std::unique_ptr<StringMap<uint32_t>> _fieldNameToIndex;
+        boost::optional<TrackedStringMap<uint32_t>> _fieldNameToIndex;
     };
-    using Entries = std::vector<Entry>;
+    using Entries = tracked_vector<Entry>;
 
     /**
      * Forward iterator over subelements in an Obj.
@@ -184,7 +188,7 @@ public:
         bool operator!=(const ConstIterator& rhs) const;
 
     private:
-        ConstIterator(typename std::vector<Entry>::const_iterator pos);
+        ConstIterator(typename Entries::const_iterator pos);
 
         typename Entries::const_iterator _pos;
     };
@@ -259,28 +263,31 @@ public:
         ConstIterator end() const;
 
     private:
-        Obj(std::vector<Entry>& entries, typename std::vector<Entry>::iterator pos);
+        Obj(TrackingContext&, Entries& entries, typename Entries::iterator pos);
 
         Entries& _entries;
         typename Entries::iterator _pos;
+
+        std::reference_wrapper<TrackingContext> _trackingContext;
     };
 
-    FlatBSONStore();
+    explicit FlatBSONStore(TrackingContext&);
+
+    FlatBSONStore(FlatBSONStore&& other) = default;
+
+    FlatBSONStore& operator=(FlatBSONStore&& other) = default;
 
     /**
      * Access to the root Obj for this store.
      */
     Obj root() {
-        return {entries, entries.begin()};
+        return {_trackingContext, entries, entries.begin()};
     }
-
-    /**
-     * Calculate and return the cumulative memory usage of all entries.
-     */
-    int64_t calculateMemUsage() const;
 
 private:
     Entries entries;
+
+    std::reference_wrapper<TrackingContext> _trackingContext;
 };
 
 /**
@@ -289,6 +296,12 @@ private:
 template <class Derived, class Element, class Value>
 class FlatBSON {
 public:
+    explicit FlatBSON(TrackingContext&);
+
+    FlatBSON(FlatBSON&& other) = default;
+
+    FlatBSON& operator=(FlatBSON&& other) = default;
+
     enum class UpdateStatus { Updated, Failed, NoChange };
     static std::string updateStatusString(UpdateStatus updateStatus);
 
@@ -298,8 +311,6 @@ public:
     UpdateStatus update(const BSONObj& doc,
                         boost::optional<StringData> metaField,
                         const StringDataComparator* stringComparator);
-
-    int64_t calculateMemUsage();
 
 protected:
     // Helper for update() above to provide recursion of FlatBSONStore element together with a
@@ -352,20 +363,24 @@ protected:
     static void _setTypeArray(typename FlatBSONStore<Element, Value>::Obj& obj, GetDataFn getData);
 
     FlatBSONStore<Element, Value> _store;
+
+    std::reference_wrapper<TrackingContext> _trackingContext;
 };
 
 /**
  * Buffer value for a Data of type kValue, storing a full BSONElement value.
  */
 struct BSONElementValueBuffer {
+    explicit BSONElementValueBuffer(TrackingContext&);
+
     BSONElement get() const;
     void set(const BSONElement&);
     BSONType type() const;
-    int64_t size() const;
+    size_t size() const;
 
 private:
-    std::unique_ptr<char[]> _buffer;
-    int _size = 0;
+    tracked_vector<char> _buffer;
+    size_t _size = 0;
 };
 
 /**
@@ -373,6 +388,8 @@ private:
  */
 class Element {
 public:
+    explicit Element(TrackingContext&);
+
     /**
      * Field name component
      */
@@ -387,10 +404,8 @@ public:
     bool isArrayFieldName() const;
     void claimArrayFieldNameForObject(std::string name);
 
-    int64_t calculateMemUsage() const;
-
 private:
-    std::string _fieldName;
+    tracked_string _fieldName;
 };
 
 
@@ -408,6 +423,8 @@ public:
         bool max = true;
     };
 
+    explicit MinMaxElement(TrackingContext&);
+
     void initializeRoot();
 
     /**
@@ -422,8 +439,6 @@ public:
     MinMaxStore::Data& max();
     const MinMaxStore::Data& max() const;
 
-    int64_t calculateMemUsage() const;
-
 private:
     MinMaxStore::Data _min;
     MinMaxStore::Data _max;
@@ -436,6 +451,12 @@ class MinMax : public FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer> {
     friend class FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>;
 
 public:
+    explicit MinMax(TrackingContext&);
+
+    MinMax(MinMax&&) = default;
+
+    MinMax& operator=(MinMax&&) = default;
+
     /**
      * Returns the full min/max object.
      */
@@ -452,7 +473,8 @@ public:
     /**
      * Generates and returns a MinMax object from the passed in min and max documents.
      */
-    static MinMax parseFromBSON(const BSONObj& min,
+    static MinMax parseFromBSON(TrackingContext&,
+                                const BSONObj& min,
                                 const BSONObj& max,
                                 const StringDataComparator* stringComparator);
 
@@ -498,13 +520,15 @@ private:
  * Buffer value for a Data of type kValue, storing just the BSONElement type.
  */
 struct BSONTypeValue {
+    BSONTypeValue(TrackingContext&) {}
+
     BSONElement get() const;
     void set(const BSONElement&);
     BSONType type() const;
     int64_t size() const;
 
 private:
-    BSONType _type;
+    BSONType _type = BSONType::EOO;
 };
 
 class SchemaElement;
@@ -517,6 +541,8 @@ class SchemaElement : public Element {
 public:
     struct UpdateContext {};
 
+    explicit SchemaElement(TrackingContext&);
+
     void initializeRoot();
 
     /**
@@ -524,8 +550,6 @@ public:
      */
     SchemaStore::Data& data();
     const SchemaStore::Data& data() const;
-
-    int64_t calculateMemUsage() const;
 
 private:
     SchemaStore::Data _data;
@@ -538,10 +562,13 @@ class Schema : public FlatBSON<Schema, SchemaElement, BSONTypeValue> {
     friend class FlatBSON<Schema, SchemaElement, BSONTypeValue>;
 
 public:
+    explicit Schema(TrackingContext&);
+
     /**
      * Generates and returns a Schema object from the passed in min and max documents.
      */
-    static Schema parseFromBSON(const BSONObj& min,
+    static Schema parseFromBSON(TrackingContext&,
+                                const BSONObj& min,
                                 const BSONObj& max,
                                 const StringDataComparator* stringComparator);
 

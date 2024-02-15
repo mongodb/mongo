@@ -417,6 +417,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                        .Date();
     BucketId bucketId{key.ns, bucketIdElem.OID()};
     unique_tracked_ptr<Bucket> bucket = make_unique_tracked<Bucket>(catalog.trackingContext,
+                                                                    catalog.trackingContext,
                                                                     bucketId,
                                                                     key,
                                                                     options.getTimeField(),
@@ -457,13 +458,13 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         bucket->fieldNames.emplace(hashedKey);
     }
 
-    auto swMinMax = generateMinMaxFromBucketDoc(bucketDoc, comparator);
+    auto swMinMax = generateMinMaxFromBucketDoc(catalog.trackingContext, bucketDoc, comparator);
     if (!swMinMax.isOK()) {
         return swMinMax.getStatus();
     }
     bucket->minmax = std::move(swMinMax.getValue());
 
-    auto swSchema = generateSchemaFromBucketDoc(bucketDoc, comparator);
+    auto swSchema = generateSchemaFromBucketDoc(catalog.trackingContext, bucketDoc, comparator);
     if (!swSchema.isOK()) {
         return swSchema.getStatus();
     }
@@ -496,12 +497,10 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         bucket->memoryUsage += bucket->intermediateBuilders.getMemoryUsage();
     }
 
-    // The namespace is stored two times: the bucket itself and openBucketsByKey. The bucket
-    // consists of minmax and schema data so add their memory usage. Since the metadata is stored in
-    // the bucket, we need to add that as well.
+    // The namespace is stored two times: the bucket itself and openBucketsByKey. Since the metadata
+    // is stored in the bucket, we need to add that as well.
 
-    bucket->memoryUsage += (key.ns.size() * 2) + bucket->minmax.calculateMemUsage() +
-        bucket->schema.calculateMemUsage() + key.metadata.toBSON().objsize();
+    bucket->memoryUsage += (key.ns.size() * 2) + key.metadata.toBSON().objsize();
 
     updateStatsOnError.dismiss();
     return {std::move(bucket)};
@@ -673,12 +672,9 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
         if (info.openedDuetoMetadata) {
             batch->openedDueToMetadata = true;
         }
-        // The namespace is stored two times: the bucket itself and openBucketsByKey.
-        // We don't have a great approximation for the
-        // _schema size, so we use initial document size minus metadata as an approximation.
-        // We can combine this with the metadata size to just use the document size.
-        // (doc size - metadata size + metadata size) = doc size.
-        bucket.memoryUsage += (info.key.ns.size() * 2) + doc.objsize();
+        // The namespace is stored two times: the bucket itself and openBucketsByKey. Also account
+        // for the size of the metadata.
+        bucket.memoryUsage += (info.key.ns.size() * 2) + bucket.key.metadata.toBSON().objsize();
 
         auto updateStatus = bucket.schema.update(
             doc, info.options.getMetaField(), info.key.metadata.getComparator());
@@ -1142,6 +1138,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
         std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
             bucketId,
             make_unique_tracked<Bucket>(catalog.trackingContext,
+                                        catalog.trackingContext,
                                         bucketId,
                                         info.key,
                                         info.options.getTimeField(),

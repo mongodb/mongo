@@ -164,7 +164,8 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
                                  ::mongo::fromjson(R"({control: {min: {a: 1}, max: {}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
+        TrackingContext trackingContext;
+        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(trackingContext, doc, collator);
         ASSERT_NOT_OK(swMinMax.getStatus());
     }
 }
@@ -190,7 +191,8 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxTest) {
                                         max:{a: 2, b: {c: 2, d: [4, 5, 6]}, e: [4, 5, 6]}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
+        TrackingContext trackingContext;
+        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(trackingContext, doc, collator);
         ASSERT_OK(swMinMax.getStatus());
 
         MinMax minmax = std::move(swMinMax.getValue());
@@ -216,7 +218,8 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) 
     // Lowercase compares less than uppercase with a {caseFirst: "lower"} collator.
     BSONObj doc = ::mongo::fromjson(R"({control: {min: {field: "a"}, max: {field: "A"}}})");
 
-    StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
+    TrackingContext trackingContext;
+    StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(trackingContext, doc, collator);
     ASSERT_OK(swMinMax.getStatus());
 
     MinMax minmax = std::move(swMinMax.getValue());
@@ -241,7 +244,8 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
     // Uppercase compares less than lowercase with a {caseFirst: "upper"} collator.
     BSONObj doc = ::mongo::fromjson(R"({control: {min: {field: "A"}, max: {field: "a"}}})");
 
-    StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
+    TrackingContext trackingContext;
+    StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(trackingContext, doc, collator);
     ASSERT_OK(swMinMax.getStatus());
 
     MinMax minmax = std::move(swMinMax.getValue());
@@ -265,7 +269,8 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocu
                                  ::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: "foo"}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
+        TrackingContext trackingContext;
+        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(trackingContext, doc, collator);
         ASSERT_OK(swMinMax.getStatus());
     }
 }
@@ -285,7 +290,8 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumen
                                  ::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: "foo"}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<Schema> swSchema = generateSchemaFromBucketDoc(doc, collator);
+        TrackingContext trackingContext;
+        StatusWith<Schema> swSchema = generateSchemaFromBucketDoc(trackingContext, doc, collator);
         ASSERT_NOT_OK(swSchema.getStatus());
     }
 }
@@ -324,7 +330,9 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
          ::mongo::fromjson(R"({a: {b: []}})")}};
 
     for (const auto& [minMaxDoc, measurementDoc] : docs) {
-        StatusWith<Schema> swSchema = generateSchemaFromBucketDoc(minMaxDoc, collator);
+        TrackingContext trackingContext;
+        StatusWith<Schema> swSchema =
+            generateSchemaFromBucketDoc(trackingContext, minMaxDoc, collator);
         ASSERT_OK(swSchema.getStatus());
 
         Schema schema = std::move(swSchema.getValue());
@@ -358,7 +366,9 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
          ::mongo::fromjson(R"({a: {b: 3}})")}};
 
     for (const auto& [minMaxDoc, measurementDoc] : docs) {
-        StatusWith<Schema> swSchema = generateSchemaFromBucketDoc(minMaxDoc, collator);
+        TrackingContext trackingContext;
+        StatusWith<Schema> swSchema =
+            generateSchemaFromBucketDoc(trackingContext, minMaxDoc, collator);
         ASSERT_OK(swSchema.getStatus());
 
         Schema schema = std::move(swSchema.getValue());

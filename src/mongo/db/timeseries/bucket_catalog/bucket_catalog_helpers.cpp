@@ -179,7 +179,8 @@ std::vector<BSONObj> generateReopeningPipeline(OperationContext* opCtx,
     return pipeline;
 }
 
-StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
+StatusWith<MinMax> generateMinMaxFromBucketDoc(TrackingContext& trackingContext,
+                                               const BSONObj& bucketDoc,
                                                const StringDataComparator* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);
     if (!swDocs.isOK()) {
@@ -189,13 +190,14 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
     const auto& [minObj, maxObj] = swDocs.getValue();
 
     try {
-        return MinMax::parseFromBSON(minObj, maxObj, comparator);
+        return MinMax::parseFromBSON(trackingContext, minObj, maxObj, comparator);
     } catch (...) {
         return exceptionToStatus();
     }
 }
 
-StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
+StatusWith<Schema> generateSchemaFromBucketDoc(TrackingContext& trackingContext,
+                                               const BSONObj& bucketDoc,
                                                const StringDataComparator* comparator) {
     auto swDocs = extractMinAndMax(bucketDoc);
     if (!swDocs.isOK()) {
@@ -205,7 +207,7 @@ StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
     const auto& [minObj, maxObj] = swDocs.getValue();
 
     try {
-        return Schema::parseFromBSON(minObj, maxObj, comparator);
+        return Schema::parseFromBSON(trackingContext, minObj, maxObj, comparator);
     } catch (...) {
         return exceptionToStatus();
     }

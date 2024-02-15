@@ -38,6 +38,7 @@
 #include "mongo/db/timeseries/timeseries_tracking_allocator.h"
 #include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries {
 
@@ -127,6 +128,17 @@ tracked_unordered_map<Key, Value, Hasher> make_tracked_unordered_map(
     TrackingContext& trackingContext) {
     return tracked_unordered_map<Key, Value, Hasher, KeyEqual>(
         trackingContext.makeAllocator<Value>());
+}
+
+template <class Value>
+using TrackedStringMap =
+    StringMap<Value,
+              std::scoped_allocator_adaptor<
+                  timeseries::TrackingAllocator<std::pair<const std::string, Value>>>>;
+
+template <class Value>
+TrackedStringMap<Value> makeTrackedStringMap(TrackingContext& trackingContext) {
+    return TrackedStringMap<Value>(trackingContext.makeAllocator<Value>());
 }
 
 using tracked_string =

@@ -57,6 +57,10 @@ int typeComp(const BSONElement& elem, BSONType type) {
 }  // namespace
 
 template <class Element, class Value>
+FlatBSONStore<Element, Value>::Data::Data(TrackingContext& trackingContext)
+    : _value(trackingContext) {}
+
+template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Type FlatBSONStore<Element, Value>::Data::type() const {
     return _type;
 }
@@ -108,9 +112,8 @@ void FlatBSONStore<Element, Value>::Data::setValue(const BSONElement& elem) {
 }
 
 template <class Element, class Value>
-int64_t FlatBSONStore<Element, Value>::Data::calculateMemUsage() const {
-    return sizeof(Value) + _value.size();
-}
+FlatBSONStore<Element, Value>::Entry::Entry(TrackingContext& trackingContext)
+    : _element(trackingContext) {}
 
 template <class Element, class Value>
 FlatBSONStore<Element, Value>::Iterator::Iterator(
@@ -185,9 +188,10 @@ bool FlatBSONStore<Element, Value>::ConstIterator::operator!=(
 
 template <class Element, class Value>
 FlatBSONStore<Element, Value>::Obj::Obj(
+    TrackingContext& trackingContext,
     FlatBSONStore<Element, Value>::Entries& entries,
     typename FlatBSONStore<Element, Value>::Entries::iterator pos)
-    : _entries(entries), _pos(pos) {}
+    : _entries(entries), _pos(pos), _trackingContext(trackingContext) {}
 
 
 template <class Element, class Value>
@@ -202,12 +206,12 @@ typename FlatBSONStore<Element, Value>::Obj& FlatBSONStore<Element, Value>::Obj:
 template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Obj FlatBSONStore<Element, Value>::Obj::object(
     FlatBSONStore<Element, Value>::Iterator pos) const {
-    return {_entries, pos._pos};
+    return {_trackingContext, _entries, pos._pos};
 }
 
 template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Obj FlatBSONStore<Element, Value>::Obj::parent() const {
-    return {_entries, _pos - _pos->_offsetParent};
+    return {_trackingContext, _entries, _pos - _pos->_offsetParent};
 }
 
 template <class Element, class Value>
@@ -263,7 +267,7 @@ typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::
 
     // We've exhausted the linear search limit, create a map to speedup future searches. Populate it
     // with all current subelements.
-    _pos->_fieldNameToIndex = std::make_unique<StringMap<uint32_t>>();
+    _pos->_fieldNameToIndex = makeTrackedStringMap<uint32_t>(_trackingContext);
     auto it = begin();
     auto itEnd = end();
     for (; it != itEnd; ++it) {
@@ -287,7 +291,7 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
                                            std::string fieldName) {
     // Remember our iterator position so we can restore it after inserting a new element.
     auto index = std::distance(_entries.begin(), _pos);
-    auto inserted = _entries.emplace(pos._pos);
+    auto inserted = _entries.emplace(pos._pos, _trackingContext);
     _pos = _entries.begin() + index;
 
     // Setup our newly created entry.
@@ -326,30 +330,6 @@ FlatBSONStore<Element, Value>::Obj::insert(FlatBSONStore<Element, Value>::Iterat
     return std::make_pair(Iterator(inserted), end());
 }
 
-size_t stringHeapUsage(const std::string& s) {
-    static const std::string emptyString;
-    return s.capacity() > emptyString.capacity() ? s.capacity() : 0;
-}
-
-template <class Element, class Value>
-int64_t FlatBSONStore<Element, Value>::calculateMemUsage() const {
-    auto memUsage = entries.capacity() * sizeof(Entry);
-    for (auto&& entry : entries) {
-        int64_t approxFieldNameToIndexMemUsage = 0;
-        if (entry._fieldNameToIndex) {
-            approxFieldNameToIndexMemUsage =
-                (sizeof(StringMap<uint32_t>::slot_type)) * entry._fieldNameToIndex->capacity();
-            auto it = entry._fieldNameToIndex->begin();
-            auto itEnd = entry._fieldNameToIndex->end();
-            for (; it != itEnd; ++it) {
-                approxFieldNameToIndexMemUsage += stringHeapUsage(it->first);
-            }
-        }
-        memUsage += entry._element.calculateMemUsage() + approxFieldNameToIndexMemUsage;
-    }
-    return memUsage;
-}
-
 template <class Element, class Value>
 typename FlatBSONStore<Element, Value>::Iterator FlatBSONStore<Element, Value>::Obj::begin() {
     return {_pos + 1};
@@ -373,12 +353,17 @@ typename FlatBSONStore<Element, Value>::ConstIterator FlatBSONStore<Element, Val
 }
 
 template <class Element, class Value>
-FlatBSONStore<Element, Value>::FlatBSONStore() {
-    auto& entry = entries.emplace_back();
+FlatBSONStore<Element, Value>::FlatBSONStore(TrackingContext& trackingContext)
+    : entries(make_tracked_vector<Entry>(trackingContext)), _trackingContext(trackingContext) {
+    auto& entry = entries.emplace_back(trackingContext);
     entry._offsetEnd = 1;
     entry._offsetParent = 0;
     entry._element.initializeRoot();
 }
+
+template <class Derived, class Element, class Value>
+FlatBSON<Derived, Element, Value>::FlatBSON(TrackingContext& trackingContext)
+    : _store(trackingContext), _trackingContext(trackingContext) {}
 
 template <class Derived, class Element, class Value>
 typename std::string FlatBSON<Derived, Element, Value>::updateStatusString(
@@ -404,11 +389,6 @@ typename FlatBSON<Derived, Element, Value>::UpdateStatus FlatBSON<Derived, Eleme
     return _updateObj(obj, doc, {}, stringComparator, [&omitField](StringData fieldName) {
         return omitField && fieldName == omitField;
     });
-}
-
-template <class Derived, class Element, class Value>
-int64_t FlatBSON<Derived, Element, Value>::calculateMemUsage() {
-    return sizeof(FlatBSONStore<Element, Value>) + _store.calculateMemUsage();
 }
 
 template <class Derived, class Element, class Value>
@@ -731,27 +711,30 @@ void FlatBSON<Derived, Element, Value>::_setTypeArray(
     }
 }
 
+BSONElementValueBuffer::BSONElementValueBuffer(TrackingContext& trackingContext)
+    : _buffer(make_tracked_vector<char>(trackingContext)) {}
+
 BSONElement BSONElementValueBuffer::get() const {
-    return BSONElement(_buffer.get(), 1, _size);
+    return BSONElement(_buffer.data(), 1, _size);
 }
 
 void BSONElementValueBuffer::set(const BSONElement& elem) {
-    auto requiredSize = elem.size() - elem.fieldNameSize() + 1;
-    if (_size < requiredSize) {
-        _buffer = std::make_unique<char[]>(requiredSize);
+    _size = elem.size() - elem.fieldNameSize() + 1;
+    if (_buffer.size() < _size) {
+        _buffer.resize(_size);
     }
+    auto buffer = _buffer.data();
     // Store element as BSONElement buffer but strip out the field name.
-    _buffer[0] = elem.type();
-    _buffer[1] = '\0';
-    memcpy(_buffer.get() + 2, elem.value(), elem.valuesize());
-    _size = requiredSize;
+    buffer[0] = elem.type();
+    buffer[1] = '\0';
+    memcpy(buffer + 2, elem.value(), elem.valuesize());
 }
 
 BSONType BSONElementValueBuffer::type() const {
     return (BSONType)_buffer[0];
 }
 
-int64_t BSONElementValueBuffer::size() const {
+size_t BSONElementValueBuffer::size() const {
     return _size;
 }
 
@@ -771,8 +754,11 @@ int64_t BSONTypeValue::size() const {
     return 0;
 }
 
+Element::Element(TrackingContext& trackingContext)
+    : _fieldName(make_tracked_string(trackingContext)) {}
+
 StringData Element::fieldName() const {
-    return _fieldName;
+    return {_fieldName.data(), _fieldName.size()};
 }
 
 void Element::setFieldName(std::string&& fieldName) {
@@ -780,7 +766,7 @@ void Element::setFieldName(std::string&& fieldName) {
 }
 
 bool Element::isArrayFieldName() const {
-    return _fieldName == kArrayFieldName;
+    return fieldName() == kArrayFieldName;
 }
 
 void Element::claimArrayFieldNameForObject(std::string name) {
@@ -788,9 +774,8 @@ void Element::claimArrayFieldNameForObject(std::string name) {
     _fieldName = std::move(name);
 }
 
-int64_t Element::calculateMemUsage() const {
-    return _fieldName.capacity();
-}
+MinMaxElement::MinMaxElement(TrackingContext& trackingContext)
+    : Element(trackingContext), _min(trackingContext), _max(trackingContext) {}
 
 void MinMaxElement::initializeRoot() {
     _min.setObject();
@@ -813,9 +798,8 @@ const MinMaxStore::Data& MinMaxElement::max() const {
     return _max;
 }
 
-int64_t MinMaxElement::calculateMemUsage() const {
-    return Element::calculateMemUsage() + _min.calculateMemUsage() + _max.calculateMemUsage();
-}
+MinMax::MinMax(TrackingContext& trackingContext)
+    : FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>(trackingContext) {}
 
 std::pair<MinMax::UpdateStatus, MinMaxElement::UpdateContext> MinMax::_shouldUpdateObj(
     MinMaxStore::Obj& obj, const BSONElement& elem, MinMaxElement::UpdateContext updateValues) {
@@ -917,10 +901,11 @@ BSONObj MinMax::maxUpdates() {
     return builder.obj();
 }
 
-MinMax MinMax::parseFromBSON(const BSONObj& min,
+MinMax MinMax::parseFromBSON(TrackingContext& trackingContext,
+                             const BSONObj& min,
                              const BSONObj& max,
                              const StringDataComparator* stringComparator) {
-    MinMax minmax;
+    MinMax minmax{trackingContext};
 
     // The metadata field is already excluded from generated min/max summaries.
     UpdateStatus status = minmax.update(min, /*metaField=*/boost::none, stringComparator);
@@ -940,6 +925,9 @@ MinMax MinMax::parseFromBSON(const BSONObj& min,
     return minmax;
 }
 
+SchemaElement::SchemaElement(TrackingContext& trackingContext)
+    : Element(trackingContext), _data(trackingContext) {}
+
 void SchemaElement::initializeRoot() {
     _data.setObject();
 }
@@ -952,14 +940,14 @@ const SchemaStore::Data& SchemaElement::data() const {
     return _data;
 }
 
-int64_t SchemaElement::calculateMemUsage() const {
-    return Element::calculateMemUsage() + _data.calculateMemUsage();
-}
+Schema::Schema(TrackingContext& trackingContext)
+    : FlatBSON<Schema, SchemaElement, BSONTypeValue>(trackingContext) {}
 
-Schema Schema::parseFromBSON(const BSONObj& min,
+Schema Schema::parseFromBSON(TrackingContext& trackingContext,
+                             const BSONObj& min,
                              const BSONObj& max,
                              const StringDataComparator* stringComparator) {
-    Schema schema;
+    Schema schema{trackingContext};
 
     // The metadata field is already excluded from generated min/max summaries.
     UpdateStatus status = schema.update(min, /*metaField=*/boost::none, stringComparator);
