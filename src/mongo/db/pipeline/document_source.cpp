@@ -215,25 +215,6 @@ bool DocumentSource::pushMatchBefore(Pipeline::SourceContainer::iterator itr,
     return false;
 }
 
-bool DocumentSource::pushRedactBefore(Pipeline::SourceContainer::iterator itr,
-                                      Pipeline::SourceContainer* container) {
-    if (constraints().canSwapWithRedact) {
-        auto nextItr = std::next(itr);
-        if (auto redactStage = dynamic_cast<DocumentSourceRedact*>(nextItr->get())) {
-            LOGV2_DEBUG(8584800,
-                        5,
-                        "Swapping a $redact stage in front of another stage: ",
-                        "redactStage"_attr = redact(redactStage->serializeToBSONForDebug()),
-                        "thisStage"_attr = redact(serializeToBSONForDebug()));
-
-            // Swap 'itr' and 'nextItr' list nodes.
-            container->splice(itr, *container, nextItr);
-            return true;
-        }
-    }
-    return false;
-}
-
 bool DocumentSource::pushSampleBefore(Pipeline::SourceContainer::iterator itr,
                                       Pipeline::SourceContainer* container) {
     auto nextSample = dynamic_cast<DocumentSourceSample*>((*std::next(itr)).get());
@@ -265,21 +246,24 @@ BSONObj DocumentSource::serializeToBSONForDebug() const {
     return serialized[0].getDocument().toBson();
 }
 
-bool DocumentSource::pushSingleDocumentTransformBefore(Pipeline::SourceContainer::iterator itr,
-                                                       Pipeline::SourceContainer* container) {
-    auto singleDocTransform =
-        dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get());
+bool DocumentSource::pushSingleDocumentTransformOrRedactBefore(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    if (constraints().canSwapWithSingleDocTransformOrRedact) {
+        auto nextItr = std::next(itr);
+        if (dynamic_cast<DocumentSourceSingleDocumentTransformation*>(nextItr->get()) ||
+            dynamic_cast<DocumentSourceRedact*>(nextItr->get())) {
+            LOGV2_DEBUG(5943500,
+                        5,
+                        "Pushing a single document transform stage or a redact stage in ahead of "
+                        "the current stage: ",
+                        "singleDocTransformOrRedactStage"_attr =
+                            redact((*nextItr)->serializeToBSONForDebug()),
+                        "currentStage"_attr = redact(serializeToBSONForDebug()));
 
-    if (constraints().canSwapWithSingleDocTransform && singleDocTransform) {
-        LOGV2_DEBUG(5943500,
-                    5,
-                    "Swapping a single document transform stage in front of another stage: ",
-                    "singleDocTransform"_attr =
-                        redact(singleDocTransform->serializeToBSONForDebug()),
-                    "thisStage"_attr = redact(serializeToBSONForDebug()));
-        container->insert(itr, std::move(singleDocTransform));
-        container->erase(std::next(itr));
-        return true;
+            // Swap 'itr' and 'nextItr' list nodes.
+            container->splice(itr, *container, nextItr);
+            return true;
+        }
     }
     return false;
 }

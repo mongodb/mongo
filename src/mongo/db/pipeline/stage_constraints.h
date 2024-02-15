@@ -350,9 +350,6 @@ struct StageConstraints {
     // $match predicates be swapped before itself.
     bool canSwapWithMatch = false;
 
-    // True if this stage can be safely swapped with a subsequent $redact stage.
-    bool canSwapWithRedact = false;
-
     // True if this stage can be safely swapped with a stage which alters the number of documents in
     // the stream.
     //
@@ -366,9 +363,9 @@ struct StageConstraints {
     //   documents because our implementation of $sample shuffles the order
     bool canSwapWithSkippingOrLimitingStage = false;
 
-    // If true, then any stage of kind 'DocumentSourceSingleDocumentTransformation' can be swapped
-    // ahead of this stage.
-    bool canSwapWithSingleDocTransform = false;
+    // If true, then any stage of kind 'DocumentSourceSingleDocumentTransformation' or $redact can
+    // be swapped ahead of this stage.
+    bool canSwapWithSingleDocTransformOrRedact = false;
 
     // Indicates that a stage is allowed within a pipeline-style update.
     bool isAllowedWithinUpdatePipeline = false;
@@ -400,8 +397,7 @@ struct StageConstraints {
             isIndependentOfAnyCollection == other.isIndependentOfAnyCollection &&
             canSwapWithMatch == other.canSwapWithMatch &&
             canSwapWithSkippingOrLimitingStage == other.canSwapWithSkippingOrLimitingStage &&
-            canSwapWithSingleDocTransform == other.canSwapWithSingleDocTransform &&
-            canSwapWithRedact == other.canSwapWithRedact &&
+            canSwapWithSingleDocTransformOrRedact == other.canSwapWithSingleDocTransformOrRedact &&
             canAppearOnlyOnceInPipeline == other.canAppearOnlyOnceInPipeline &&
             isAllowedWithinUpdatePipeline == other.isAllowedWithinUpdatePipeline &&
             unionRequirement == other.unionRequirement &&

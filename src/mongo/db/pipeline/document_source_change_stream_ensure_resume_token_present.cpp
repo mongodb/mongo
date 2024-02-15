@@ -88,8 +88,7 @@ StageConstraints DocumentSourceChangeStreamEnsureResumeTokenPresent::constraints
     // inter-node parallelism and potentially reducing the amount of data sent form each shard to
     // the mongoS.
     constraints.canSwapWithMatch = true;
-    constraints.canSwapWithRedact = true;
-    constraints.canSwapWithSingleDocTransform = true;
+    constraints.canSwapWithSingleDocTransformOrRedact = true;
 
     return constraints;
 }

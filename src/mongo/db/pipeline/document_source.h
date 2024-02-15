@@ -558,13 +558,6 @@ private:
                          Pipeline::SourceContainer* container);
 
     /**
-     * Attempts to push a $redact stage directly ahead of the stage present at the 'itr' position if
-     * matches the constraints. Returns true if optimization was performed, false otherwise.
-     */
-    bool pushRedactBefore(Pipeline::SourceContainer::iterator itr,
-                          Pipeline::SourceContainer* container);
-
-    /**
      * Attempt to push a sample stage from directly ahead of the current stage given by itr to
      * before the current stage. Returns whether the optimization was performed.
      */
@@ -572,15 +565,15 @@ private:
                           Pipeline::SourceContainer* container);
 
     /**
-     * Attempts to push any kind of 'DocumentSourceSingleDocumentTransformation' stage directly
-     * ahead of the stage present at the 'itr' position if matches the constraints. Returns true if
-     * optimization was performed, false otherwise.
+     * Attempts to push any kind of 'DocumentSourceSingleDocumentTransformation' stage or a $redact
+     * stage directly ahead of the stage present at the 'itr' position if matches the constraints.
+     * Returns true if optimization was performed, false otherwise.
      *
      * Note that this optimization is oblivious to the transform function. The only stages that are
      * eligible to swap are those that can safely swap with any transform.
      */
-    bool pushSingleDocumentTransformBefore(Pipeline::SourceContainer::iterator itr,
-                                           Pipeline::SourceContainer* container);
+    bool pushSingleDocumentTransformOrRedactBefore(Pipeline::SourceContainer::iterator itr,
+                                                   Pipeline::SourceContainer* container);
 
     /**
      * Wraps various optimization methods and returns the call immediately if any one of them
@@ -592,8 +585,8 @@ private:
             return false;
         }
 
-        return pushMatchBefore(itr, container) || pushRedactBefore(itr, container) ||
-            pushSampleBefore(itr, container) || pushSingleDocumentTransformBefore(itr, container);
+        return pushMatchBefore(itr, container) || pushSampleBefore(itr, container) ||
+            pushSingleDocumentTransformOrRedactBefore(itr, container);
     }
 
 public:
