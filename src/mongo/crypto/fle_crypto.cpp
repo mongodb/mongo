@@ -2349,7 +2349,7 @@ StatusWith<EncryptedStateCollectionTokensV2> EncryptedStateCollectionTokensV2::d
 
 StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokensV2::serialize(ECOCToken token) {
     const bool encodeLeaf = isLeaf &&
-        gFeatureFlagQERangeV2.isEnabled(
+        gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot());
     if (encodeLeaf) {
         auto escCDR = esc.toCDR();

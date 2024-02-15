@@ -239,7 +239,7 @@ void validateRangeIndex(BSONType fieldType, QueryTypeConfig& query) {
             uasserted(7018202, "Range index only supports numeric types and the Date type.");
     }
 
-    if (gFeatureFlagQERangeV2.isEnabled(
+    if (gFeatureFlagQERangeV2.isEnabledUseLastLTSFCVWhenUninitialized(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
         query.getTrimFactor().has_value()) {
         uint32_t tf = query.getTrimFactor().value();
