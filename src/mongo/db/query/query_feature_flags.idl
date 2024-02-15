@@ -39,7 +39,7 @@ feature_flags:
     featureFlagOptimizerPlanCache:
       description: "Enables the plan cache for the Cascades-based query optimizer"
       cpp_varname: gFeatureFlagOptimizerPlanCache
-      default: false
+      default: true
       shouldBeFCVGated: false
 
     featureFlagColumnstoreIndexes:
