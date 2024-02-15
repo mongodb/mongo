@@ -66,24 +66,25 @@ public:
     ~NoOpContainerForTest() {}
 
     // Increment the counter to return the number of elements processed.
-    void insert(int pos, const T& element) {
-        _size++;
-        return;
-    }
-
     void push_back(const T& element) {
         _size++;
         return;
     }
 
-    int size() {
-        return _size;
+    // This is called in  'appendLast()'.
+    void push_back(int element) {
+        _size++;
+        return;
     }
 
     // Called by the Collector class. Means nothing in this case, since we do not insert elements
     // into this container, but we must return something.
-    int end() {
+    int back() {
         return 0;
+    }
+
+    int size() {
+        return _size;
     }
 
 private:
@@ -243,20 +244,21 @@ void benchmarkBlockBasedDecompression(benchmark::State& state,
     uint64_t totalElements = 0;
     uint64_t totalBytes = 0;
 
-    auto decompress = [&](NoOpContainerForTest<BSONElement>& container) {
+    auto decompress = [&](NoOpContainerForTest<BSONElement>& collection) {
         bsoncolumn::BSONColumnBlockBased col(bin);
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-        col.decompressIterative<bsoncolumn::BSONElementMaterializer>(container, allocator);
+        col.decompress<bsoncolumn::BSONElementMaterializer, NoOpContainerForTest<BSONElement>>(
+            collection, allocator);
         return true;
     };
 
     // Begin benchmarking loop.
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        NoOpContainerForTest<BSONElement> container;
-        benchmark::DoNotOptimize(decompress(container));
+        NoOpContainerForTest<BSONElement> collection;
+        benchmark::DoNotOptimize(decompress(collection));
         totalBytes += compressedElement.size();
-        totalElements += container.size();
+        totalElements += collection.size();
     }
 
     state.SetItemsProcessed(totalElements);
@@ -275,20 +277,21 @@ void benchmarkBlockBasedDecompression_SBE(benchmark::State& state,
     uint64_t totalElements = 0;
     uint64_t totalBytes = 0;
 
-    auto decompress = [&](NoOpContainerForTest<SBEMaterializer::Element>& container) {
+    auto decompress = [&](NoOpContainerForTest<SBEMaterializer::Element>& collection) {
         bsoncolumn::BSONColumnBlockBased col(bin);
         boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-        col.decompressIterative<SBEMaterializer>(container, allocator);
+        col.decompress<SBEMaterializer, NoOpContainerForTest<SBEMaterializer::Element>>(collection,
+                                                                                        allocator);
         return true;
     };
 
     // Begin benchmarking loop.
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        NoOpContainerForTest<SBEMaterializer::Element> container;
-        benchmark::DoNotOptimize(decompress(container));
+        NoOpContainerForTest<SBEMaterializer::Element> collection;
+        benchmark::DoNotOptimize(decompress(collection));
         totalBytes = compressedElement.size();
-        totalElements += container.size();
+        totalElements += collection.size();
     }
 
     state.SetItemsProcessed(totalElements);
