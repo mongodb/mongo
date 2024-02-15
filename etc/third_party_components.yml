@@ -336,6 +336,7 @@ components:
     local_directory_path: src/third_party/schemastore.org
     is_test_only: true
     team_owner: "Query"
+    # Note: This is a test-only library and not compiled into the server.
 
   "SCons - a Software Construction tool":
     homepage_url: https://www.scons.org/
