@@ -8,7 +8,7 @@
  *   requires_timeseries,
  *   requires_non_retryable_writes,
  *   featureFlagTimeseriesUpdatesSupport,
- *   featureFlagLargeBatchedOperations,
+ *   requires_fcv_80,
  * ]
  */
 
