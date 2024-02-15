@@ -463,6 +463,10 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
         getMoreRequest.setMaxTimeMS(
             static_cast<std::int64_t>(durationCount<Milliseconds>(*_awaitDataTimeout)));
     }
+
+    if (_params.getRequestQueryStatsFromRemotes()) {
+        getMoreRequest.setIncludeQueryStatsMetrics(true);
+    }
     BSONObj cmdObj = getMoreRequest.toBSON({});
 
     if (_params.getSessionId()) {

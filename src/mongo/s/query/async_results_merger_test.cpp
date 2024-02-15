@@ -2204,5 +2204,49 @@ TEST_F(AsyncResultsMergerTest, ShouldNotScheduleGetMoresWithoutAnOperationContex
     killFuture.wait();
 }
 
+TEST_F(AsyncResultsMergerTest, IncludeQueryStatsMetricsIncludedInGetMore) {
+    auto runGetMore = [this](bool requestParams) {
+        BSONObj findCmd = fromjson("{find: 'testcoll', sort: {_id: 1}}");
+        std::vector<RemoteCursor> cursors;
+        cursors.push_back(makeRemoteCursor(
+            kTestShardIds[0], kTestShardHosts[0], CursorResponse(kTestNss, 5, {})));
+
+        auto params = makeARMParamsFromExistingCursors(std::move(cursors), findCmd);
+        params.setRequestQueryStatsFromRemotes(requestParams);
+        auto arm =
+            std::make_unique<AsyncResultsMerger>(operationContext(), executor(), std::move(params));
+
+        // Schedule the request for the getMore.
+        auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+        // Stash the request so we can inspect it.
+        auto cmd = getNthPendingRequest(0u).cmdObj;
+
+        // Schedule a response.
+        std::vector<CursorResponse> responses;
+        std::vector<BSONObj> nonEmptyBatch = {fromjson("{_id: 1}")};
+        responses.emplace_back(kTestNss, CursorId(0), nonEmptyBatch);
+        scheduleNetworkResponses(std::move(responses));
+
+        // Kill the ARM.
+        auto killFuture = arm->kill(operationContext());
+        killFuture.wait();
+
+        return cmd;
+    };
+
+    {
+        // The original query was not selected for query stats - we don't expect to see the flag.
+        auto cmd = runGetMore(false);
+        ASSERT_TRUE(cmd["includeQueryStatsMetrics"].eoo());
+    }
+
+    {
+        // The original query was selected for query stats - we expect to see the flag true.
+        auto cmd = runGetMore(true);
+        ASSERT_TRUE(cmd["includeQueryStatsMetrics"].Bool());
+    }
+}
+
 }  // namespace
 }  // namespace mongo

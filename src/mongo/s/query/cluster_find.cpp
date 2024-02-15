@@ -208,7 +208,8 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
                                                              const std::set<ShardId>& shardIds,
                                                              const CanonicalQuery& query,
                                                              const boost::optional<UUID> sampleId,
-                                                             bool appendGeoNearDistanceProjection) {
+                                                             bool appendGeoNearDistanceProjection,
+                                                             bool requestQueryStatsFromRemotes) {
     std::unique_ptr<FindCommandRequest> findCommand;
     if (shardIds.size() > 1) {
         findCommand = uassertStatusOK(transformQueryForShards(query.getFindCommandRequest(),
@@ -245,16 +246,12 @@ std::unique_ptr<FindCommandRequest> makeFindCommandForShards(OperationContext* o
         findCommand->setQuerySettings(query.getExpCtx()->getQuerySettings());
     }
 
-    // Set includeQueryStatsMetrics if necessary.
-    if (feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        auto& opDebug = CurOp::get(opCtx)->debug();
+    // Request metrics if necessary.
+    {
+        // We'll set includeQueryStatsMetrics if our configuration (e.g., feature flag, sample
+        // rate) dictates we should gather metrics, or the user sent the flag to us.
         auto origValue = query.getFindCommandRequest().getIncludeQueryStatsMetrics();
-        if (origValue.has_value()) {
-            // If the original command specified includeQueryStatsMetrics, just pass it through.
-            findCommand->setIncludeQueryStatsMetrics(origValue);
-        } else if (!opDebug.queryStatsInfo.wasRateLimited) {
-            // If the query wasn't rate limited, we can add the field.
+        if (origValue.value_or(false) || requestQueryStatsFromRemotes) {
             findCommand->setIncludeQueryStatsMetrics(true);
         }
     }
@@ -272,7 +269,8 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
     const boost::optional<UUID> sampleId,
-    bool appendGeoNearDistanceProjection) {
+    bool appendGeoNearDistanceProjection,
+    bool requestQueryStatsFromRemotes) {
     const auto& cm = cri.cm;
 
     // Choose the shard to sample the query on if needed.
@@ -303,8 +301,12 @@ std::vector<AsyncRequestsSender::Request> constructRequestsForShards(
 
     // Constructs the shard request by appending additional attributes to the serialized
     // 'findCommandToForward'.
-    auto findCommandToForward =
-        makeFindCommandForShards(opCtx, shardIds, query, sampleId, appendGeoNearDistanceProjection);
+    auto findCommandToForward = makeFindCommandForShards(opCtx,
+                                                         shardIds,
+                                                         query,
+                                                         sampleId,
+                                                         appendGeoNearDistanceProjection,
+                                                         requestQueryStatsFromRemotes);
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto makeShardRequest = [&](const auto& shardId) {
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
@@ -350,6 +352,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     auto shardIds = getTargetedShardsForQuery(
         query.getExpCtx(), cm, findCommand.getFilter(), findCommand.getCollation());
 
+    bool requestQueryStatsFromRemotes =
+        feature_flags::gFeatureFlagQueryStatsDataBearingNodes.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
+        CurOp::get(opCtx)->debug().queryStatsInfo.key != nullptr;
+
     // Construct the query and parameters. Defer setting skip and limit here until
     // we determine if the query is targeting multi-shards or a single shard below.
     ClusterClientCursorParams params(
@@ -370,6 +377,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     params.isAllowPartialResults = findCommand.getAllowPartialResults();
     params.originatingPrivileges = {
         Privilege(ResourcePattern::forExactNamespace(query.nss()), ActionType::find)};
+    params.requestQueryStatsFromRemotes = requestQueryStatsFromRemotes;
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a
@@ -442,8 +450,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                 readPref,
                 // Construct the requests that we will use to establish cursors on the targeted
                 // shards, attaching the shardVersion and txnNumber, if necessary.
-                constructRequestsForShards(
-                    opCtx, cri, shardIds, query, sampleId, appendGeoNearDistanceProjection),
+                constructRequestsForShards(opCtx,
+                                           cri,
+                                           shardIds,
+                                           query,
+                                           sampleId,
+                                           appendGeoNearDistanceProjection,
+                                           requestQueryStatsFromRemotes),
                 findCommand.getAllowPartialResults());
         });
     } catch (const DBException& ex) {

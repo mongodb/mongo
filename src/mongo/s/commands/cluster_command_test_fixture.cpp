@@ -368,23 +368,23 @@ void ClusterCommandTestFixture::testIncludeQueryStatsMetrics(BSONObj cmd, bool i
 
         {
             // No rate limit i.e., no requests are rate limited and each one is allowed to gather
-            // stats.
+            // stats. We'll always request metrics, even if the user set includeQueryStatsMetrics
+            // to false.
             RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", -1);
 
             runCommandInspectRequests(cmd, expectFieldIs(true), isTargeted);
-
-            // Putting includeQueryStatsMetrics into the original command overrides rate limits.
             runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
-            runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
+            runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(true), isTargeted);
         }
 
         {
             // Rate limit is 0 i.e., every request is rate-limited.
             RAIIServerParameterControllerForTest rateLimit("internalQueryStatsRateLimit", 0);
 
+            // If the user doesn't give includeQueryStatsMetrics, we won't insert the field.
             runCommandInspectRequests(cmd, expectNoField, isTargeted);
 
-            // Putting includeQueryStatsMetrics into the original command overrides rate limits.
+            // If the user passed us includeQueryStatsMetrics, we'll pass it through.
             runCommandInspectRequests(cmdIncludeTrue, expectFieldIs(true), isTargeted);
             runCommandInspectRequests(cmdIncludeFalse, expectFieldIs(false), isTargeted);
         }

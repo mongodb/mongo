@@ -55,6 +55,7 @@ AsyncResultsMergerParams ClusterClientCursorParams::extractARMParams() {
     armParams.setNss(nsString);
     armParams.setAllowPartialResults(isAllowPartialResults);
     armParams.setOperationSessionInfo(osi);
+    armParams.setRequestQueryStatsFromRemotes(requestQueryStatsFromRemotes);
 
     return armParams;
 }

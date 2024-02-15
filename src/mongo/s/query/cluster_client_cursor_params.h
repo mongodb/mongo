@@ -124,6 +124,9 @@ struct ClusterClientCursorParams {
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.
     bool isAllowPartialResults = false;
+
+    // Whether to request query stats when making requests to remote hosts.
+    bool requestQueryStatsFromRemotes = false;
 };
 
 }  // namespace mongo

@@ -605,7 +605,8 @@ TEST_F(DocumentSourceMergeCursorsShapeTest, QueryShape) {
                 ],
                 "nss": "HASH<test.mergeCursors>",
                 "allowPartialResults": false,
-                "recordRemoteOpWaitTime": false
+                "recordRemoteOpWaitTime": false,
+                "requestQueryStatsFromRemotes": false
             }
         })",
         redact(*stage));
