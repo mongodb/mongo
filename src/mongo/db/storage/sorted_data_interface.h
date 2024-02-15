@@ -396,18 +396,6 @@ public:
 
     virtual Status initAsEmpty(OperationContext* opCtx) = 0;
 
-    /**
-     * Insert an entry into the index with the specified KeyString, without a RecordId
-     * appended to the end.
-     *
-     * This generates index entries consistent with index keys created in the server prior to 4.2.
-     *
-     * For testing only.
-     */
-    virtual void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                                   const key_string::Value& keyString,
-                                                   RecordId rid) = 0;
-
 protected:
     std::shared_ptr<Ident> _ident;
 

@@ -679,6 +679,8 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
     auto opCtx = operationContext();
 
     {
+        FailPointEnableBlock createOldFormatIndex("WTIndexCreateUniqueIndexesInOldFormat");
+
         // Durable catalog expects metadata updates to be timestamped but this is
         // not necessary in our case - we just want to check the contents of the index table.
         // The alternative here would be to provide a commit timestamp with a TimestamptBlock.
@@ -716,27 +718,22 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
         // Check key in index for only document.
         auto firstKeyString = makeFirstKeyString(*sortedDataInterface);
         key_string::Value keyStringWithRecordId;
-        RecordId recordId;
         {
             auto cursor = sortedDataInterface->newCursor(opCtx);
             auto indexEntry = cursor->seekForKeyString(firstKeyString);
             ASSERT(indexEntry);
             ASSERT(cursor->isRecordIdAtEndOfKeyString());
             keyStringWithRecordId = indexEntry->keyString;
-            recordId = indexEntry->loc;
             ASSERT_FALSE(cursor->nextKeyString());
         }
-
-        auto keyStringWithoutRecordId = makeKeyStringWithoutRecordId(
-            keyStringWithRecordId, sortedDataInterface->getKeyStringVersion());
 
         // Replace key with old format (without record id).
         {
             WriteUnitOfWork wuow(opCtx);
             bool dupsAllowed = false;
             sortedDataInterface->unindex(opCtx, keyStringWithRecordId, dupsAllowed);
-            sortedDataInterface->insertWithRecordIdInValue_forTest(
-                opCtx, keyStringWithoutRecordId, recordId);
+            FailPointEnableBlock insertOldFormatKeys("WTIndexInsertUniqueKeysInOldFormat");
+            ASSERT_OK(sortedDataInterface->insert(opCtx, keyStringWithRecordId, dupsAllowed));
             wuow.commit();
         }
 

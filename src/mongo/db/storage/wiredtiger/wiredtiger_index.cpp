@@ -935,6 +935,7 @@ public:
           _tableId(idx.tableId()),
           _unique(idx.unique()),
           _isIdIndex(idx.isIdIndex()),
+          _hasOldUniqueIndexFormat(idx.hasOldFormatVersion()),
           _indexName(idx.indexName()),
           _collectionUUID(idx.getCollectionUUID()),
           _metrics(&ResourceConsumption::MetricsCollector::get(opCtx)),
@@ -1286,9 +1287,13 @@ protected:
         // and timestamp unsafe unique indexes. The contract of this function is to always return a
         // KeyString with a RecordId, so append one if it does not exists already.
         if (_unique &&
+            // _id index has no RecordId. Unique index version 11 or 12 needs to parse the keys to
+            // tell if they are still in old format.
             (_isIdIndex ||
-             _key.getSize() ==
-                 key_string::getKeySize(_key.getBuffer(), _key.getSize(), _ordering, _typeBits))) {
+             (_hasOldUniqueIndexFormat &&
+              _key.getSize() ==
+                  key_string::getKeySize(
+                      _key.getBuffer(), _key.getSize(), _ordering, _typeBits)))) {
             // Create a copy of _key with a RecordId. Because _key is used during cursor restore(),
             // appending the RecordId would cause the cursor to be repositioned incorrectly.
             key_string::Builder keyWithRecordId(_key);
@@ -1324,6 +1329,7 @@ protected:
     const uint64_t _tableId;
     const bool _unique;
     const bool _isIdIndex;
+    const bool _hasOldUniqueIndexFormat;
     const std::string _indexName;
     const UUID _collectionUUID;
 
@@ -1578,32 +1584,6 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void WiredTigerIndexUnique::insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                                              const key_string::Value& keyString,
-                                                              RecordId rid) {
-    WiredTigerCursor curwrap(*WiredTigerRecoveryUnit::get(opCtx), _uri, _tableId, false);
-    curwrap.assertInActiveTxn();
-    WT_CURSOR* c = curwrap.get();
-
-    // Now create the table key/value, the actual data record.
-    WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
-
-    key_string::Builder valueBuilder(keyString.getVersion(), rid);
-    valueBuilder.appendTypeBits(keyString.getTypeBits());
-
-    WiredTigerItem valueItem(valueBuilder.getBuffer(), valueBuilder.getSize());
-    setKey(c, keyItem.Get());
-    c->set_value(c, valueItem.Get());
-    int ret = WT_OP_CHECK(wiredTigerCursorInsert(*WiredTigerRecoveryUnit::get(opCtx), c));
-
-    invariantWTOK(
-        ret,
-        c->session,
-        fmt::format("WiredTigerIndexUnique::insertWithRecordIdInValue_forTest: {}; uri: {}",
-                    _indexName,
-                    _uri));
-}
-
 WiredTigerIdIndex::WiredTigerIdIndex(OperationContext* ctx,
                                      const std::string& uri,
                                      const UUID& collectionUUID,
@@ -1741,10 +1721,7 @@ Status WiredTigerIndexUnique::_insert(OperationContext* opCtx,
         }
     }
 
-    const bool hasOldFormatVersion =
-        _dataFormatVersion == kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
-        _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2;
-    if (MONGO_unlikely(!dupsAllowed && hasOldFormatVersion && _rsKeyFormat == KeyFormat::Long &&
+    if (MONGO_unlikely(!dupsAllowed && hasOldFormatVersion() && _rsKeyFormat == KeyFormat::Long &&
                        WTIndexInsertUniqueKeysInOldFormat.shouldFail())) {
         // To support correctness testing of old-format index keys that might still be in the index
         // after an upgrade, this failpoint can be configured to insert keys in the old format,

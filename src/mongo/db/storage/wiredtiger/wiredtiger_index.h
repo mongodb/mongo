@@ -215,10 +215,10 @@ public:
                        const key_string::Value& keyString) = 0;
     virtual bool unique() const = 0;
     virtual bool isTimestampSafeUniqueIdx() const = 0;
-    void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                           const key_string::Value& keyString,
-                                           RecordId rid) override {
-        MONGO_UNREACHABLE;
+
+    bool hasOldFormatVersion() const {
+        return _dataFormatVersion == kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+            _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2;
     }
 
 protected:
@@ -335,9 +335,6 @@ public:
 
     bool isDup(OperationContext* opCtx, WT_CURSOR* c, const key_string::Value& keyString) override;
 
-    void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                           const key_string::Value& keyString,
-                                           RecordId rid) override;
 
 protected:
     Status _insert(OperationContext* opCtx,
