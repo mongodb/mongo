@@ -32,10 +32,14 @@
 #include <vector>
 
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/canonical_distinct.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_hint.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
@@ -84,15 +88,6 @@ struct TraversalPreference {
 };
 
 struct QueryPlannerParams {
-    QueryPlannerParams(size_t options = DEFAULT)
-        : options(options),
-          indexFiltersApplied(false),
-          querySettingsApplied(false),
-          collscanDirection(boost::none),
-          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
-          clusteredCollectionCollator(nullptr),
-          availableMemoryBytes(0) {}
-
     enum Options {
         // You probably want to set this.
         DEFAULT = 0,
@@ -169,6 +164,43 @@ struct QueryPlannerParams {
         STRICT_NO_TABLE_SCAN = 1 << 12,
     };
 
+    /**
+     * Struct containing all the arguments that are required for QueryPlannerParams initialization
+     * for distinct commands.
+     */
+    struct ArgsForDistinct {
+        OperationContext* opCtx;
+        const CanonicalDistinct& canonicalDistinct;
+        const MultipleCollectionAccessor& collections;
+        size_t plannerOptions;
+        bool flipDistinctScanDirection;
+        bool ignoreQuerySettings;
+    };
+
+    QueryPlannerParams(size_t options = DEFAULT) : options(options) {}
+
+    /**
+     * Initializes query planner parameters by fetching relevant indexes and appling query settings,
+     * index filters.
+     */
+    explicit QueryPlannerParams(const ArgsForDistinct& args);
+
+    /**
+     * Fills planner parameters for main and secondary collections as well as applies query
+     * settings, index filters.
+     */
+    void fillOutPlannerParams(OperationContext* opCtx,
+                              const CanonicalQuery& canonicalQuery,
+                              const MultipleCollectionAccessor& collections,
+                              bool ignoreQuerySettings);
+
+    /**
+     * Fills planner parameters for the secondary collections.
+     */
+    void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
+                                                  const CanonicalQuery& canonicalQuery,
+                                                  const MultipleCollectionAccessor& collections);
+
     // See Options enum above.
     size_t options;
 
@@ -186,31 +218,25 @@ struct QueryPlannerParams {
     // forcing a fetch.
     BSONObj shardKey;
 
-    // Were index filters applied to indices?
-    bool indexFiltersApplied;
-
-    // Were query settings applied?
-    bool querySettingsApplied;
-
     // TODO SERVER-85321 Centralize the COLLSCAN direction hinting mechanism.
     //
     // Optional hint for specifying the allowed collection scan direction. Unlike cursor '$natural'
     // hints, this does not force the planner to prefer collection scans over other candidate
     // solutions. This is currently used for applying query settings '$natural' hints.
-    boost::optional<NaturalOrderHint::Direction> collscanDirection;
+    boost::optional<NaturalOrderHint::Direction> collscanDirection = boost::none;
 
     // What's the max number of indexed solutions we want to output?  It's expensive to compare
     // plans via the MultiPlanStage, and the set of possible plans is very large for certain
     // index+query combinations.
-    size_t maxIndexedSolutions;
+    size_t maxIndexedSolutions = internalQueryPlannerMaxIndexedSolutions.load();
 
     // Specifies the clusteredIndex information necessary to utilize the cluster key in bounded
     // collection scans and other query operations.
-    boost::optional<ClusteredCollectionInfo> clusteredInfo;
+    boost::optional<ClusteredCollectionInfo> clusteredInfo = boost::none;
 
     // Specifies the collator information necessary to utilize the cluster key in bounded
     // collection scans and other query operations.
-    const CollatorInterface* clusteredCollectionCollator;
+    const CollatorInterface* clusteredCollectionCollator = nullptr;
 
     // List of information about any secondary collections that can be executed against.
     std::map<NamespaceString, SecondaryCollectionInfo> secondaryCollectionsInfo;
@@ -218,7 +244,80 @@ struct QueryPlannerParams {
     boost::optional<TraversalPreference> traversalPreference = boost::none;
 
     // Size of available memory in bytes.
-    long long availableMemoryBytes;
+    long long availableMemoryBytes{0};
+
+    // Were index filters applied to indices?
+    bool indexFiltersApplied{false};
+
+    // Were query settings applied?
+    bool querySettingsApplied{false};
+
+private:
+    /**
+     * Fills planner parameters for the main collection.
+     */
+    void fillOutMainCollectionPlannerParams(OperationContext* opCtx,
+                                            const CanonicalQuery& canonicalQuery,
+                                            const CollectionPtr& collection);
+
+    /**
+     * Applies query settings to the query if applicable. If not, tries to apply index filters.
+     */
+    void applyQuerySettingsOrIndexFilters(const CanonicalQuery& canonicalQuery,
+                                          const MultipleCollectionAccessor& collections,
+                                          bool shouldIgnoreQuerySettings);
+
+    /**
+     * If query supports index filters, filters params.indices according to the configuration. In
+     * addition, sets that there were index filters.
+     */
+    void applyIndexFilters(const CanonicalQuery& canonicalQuery, const CollectionPtr& collection);
+
+    /**
+     * If query has query settings index hints set, filters params.indices according to the
+     * configuration. In addition, sets that there were index filters or query settings applied.
+     */
+    void applyQuerySettings(const CanonicalQuery& canonicalQuery,
+                            const MultipleCollectionAccessor& collections);
+
+    /**
+     * Applies 'indexHints' query settings for the given 'collection'.
+     */
+    void applyQuerySettingsForCollection(
+        const CanonicalQuery& canonicalQuery,
+        const CollectionPtr& collection,
+        const std::variant<std::vector<mongo::query_settings::IndexHintSpec>,
+                           mongo::query_settings::IndexHintSpec>& indexHintSpecs,
+        std::vector<IndexEntry>& indexes);
+
+    void applyQuerySettingsIndexHintsForCollection(const CanonicalQuery& canonicalQuery,
+                                                   const CollectionPtr& collection,
+                                                   const std::vector<mongo::IndexHint>& indexHints,
+                                                   std::vector<IndexEntry>& indexes);
+
+    void applyQuerySettingsNaturalHintsForCollection(
+        const CanonicalQuery& canonicalQuery,
+        const CollectionPtr& collection,
+        const std::vector<mongo::IndexHint>& indexHints,
+        std::vector<IndexEntry>& indexes);
 };
 
+/**
+ * Return whether or not any component of the path 'path' is multikey given an index key pattern
+ * and multikeypaths. If no multikey metdata is available for the index, and the index is marked
+ * multikey, conservatively assumes that a component of 'path' _is_ multikey. The 'isMultikey'
+ * property of an index is false for indexes that definitely have no multikey paths.
+ */
+bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
+                                  bool isMultikey,
+                                  const MultikeyPaths& indexMultikeyInfo,
+                                  StringData path);
+
+/**
+ * Determines whether or not to wait for oplog visibility for a query. This is only used for
+ * collection scans on the oplog.
+ */
+bool shouldWaitForOplogVisibility(OperationContext* opCtx,
+                                  const CollectionPtr& collection,
+                                  bool tailable);
 }  // namespace mongo

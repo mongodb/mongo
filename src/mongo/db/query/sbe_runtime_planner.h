@@ -134,7 +134,7 @@ protected:
     OperationContext* const _opCtx;
     const MultipleCollectionAccessor& _collections;
     CanonicalQuery& _cq;
-    const QueryPlannerParams _queryParams;
+    QueryPlannerParams _queryParams;
     PlanYieldPolicySBE* const _yieldPolicy;
     const AllIndicesRequiredChecker _indexExistenceChecker;
 

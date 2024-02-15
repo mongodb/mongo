@@ -188,7 +188,8 @@ public:
         // Get planner params.
         QueryPlannerParams plannerParams;
         MultipleCollectionAccessor collectionsAccessor(collection);
-        fillOutPlannerParams(&_opCtx, collectionsAccessor, cq, &plannerParams);
+        plannerParams.fillOutPlannerParams(
+            &_opCtx, *cq, collectionsAccessor, true /* shouldIgnoreQuerySettings */);
 
         const size_t decisionWorks = 10;
         const size_t mockWorks =
@@ -245,7 +246,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     // Get planner params.
     QueryPlannerParams plannerParams;
     MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
-    fillOutPlannerParams(&_opCtx, collectionsAccessor, cq.get(), &plannerParams);
+    plannerParams.fillOutPlannerParams(
+        &_opCtx, *cq, collectionsAccessor, true /* shouldIgnoreQuerySettings */);
 
     // Mock stage will return a failure during the cached plan trial period.
     auto mockChild = std::make_unique<MockStage>(_expCtx.get(), &_ws);
@@ -297,7 +299,8 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     // Get planner params.
     QueryPlannerParams plannerParams;
     MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
-    fillOutPlannerParams(&_opCtx, collectionsAccessor, cq.get(), &plannerParams);
+    plannerParams.fillOutPlannerParams(
+        &_opCtx, *cq, collectionsAccessor, true /* shouldIgnoreQuerySettings */);
 
     // Set up queued data stage to take a long time before returning EOF. Should be long
     // enough to trigger a replan.
@@ -527,7 +530,8 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
     // Get planner params.
     QueryPlannerParams plannerParams;
     MultipleCollectionAccessor collectionsAccessor(collection);
-    fillOutPlannerParams(&_opCtx, collectionsAccessor, cq.get(), &plannerParams);
+    plannerParams.fillOutPlannerParams(
+        &_opCtx, *cq, collectionsAccessor, true /* shouldIgnoreQuerySettings */);
 
     const size_t decisionWorks = 10;
     CachedPlanStage cachedPlanStage(_expCtx.get(),
@@ -572,7 +576,8 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
     // Get planner params.
     QueryPlannerParams plannerParams;
     MultipleCollectionAccessor collectionsAccessor(collection);
-    fillOutPlannerParams(&_opCtx, collectionsAccessor, cq.get(), &plannerParams);
+    plannerParams.fillOutPlannerParams(
+        &_opCtx, *cq, collectionsAccessor, true /* shouldIgnoreQuerySettings */);
 
     const size_t decisionWorks = 10;
     CachedPlanStage cachedPlanStage(_expCtx.get(),

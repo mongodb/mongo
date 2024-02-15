@@ -52,7 +52,7 @@ struct PlannerData {
     std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy;
     std::unique_ptr<WorkingSet> workingSet;
     const MultipleCollectionAccessor& collections;
-    const QueryPlannerParams& plannerParams;
+    QueryPlannerParams plannerParams;
     boost::optional<size_t> cachedPlanHash;
 };
 
@@ -119,6 +119,11 @@ protected:
     }
 
     const QueryPlannerParams& plannerParams() const {
+        return _plannerData.plannerParams;
+    }
+
+    // TODO: Make QueryPlannerParams to only be filled out on construction.
+    QueryPlannerParams& plannerParams() {
         return _plannerData.plannerParams;
     }
 

@@ -94,83 +94,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
 /**
- * Filters indexes retrieved from index catalog by allowed indices in query settings.
- */
-void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
-                               std::vector<IndexEntry>* indexEntries);
-
-/**
- * Fills out information about secondary collections held by 'collections' in 'plannerParams'.
- */
-std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    const CanonicalQuery* canonicalQuery);
-
-/**
- * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
- * 'collection'.
- */
-void fillOutMainCollectionPlannerParams(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
-                                        const CanonicalQuery* canonicalQuery,
-                                        QueryPlannerParams* plannerParams);
-/**
- * Fills out the 'plannerParams':
- * - Calls the single collection overload of 'fillOutPlannerParams' on the main collection held
- * by 'collections'
- * - Calls 'fillOutSecondaryCollectionsInformation' to store information about the set of
- * secondary collections held by 'collections' on 'plannerParams'.
- */
-void fillOutPlannerParams(OperationContext* opCtx,
-                          const MultipleCollectionAccessor& collections,
-                          const CanonicalQuery* canonicalQuery,
-                          QueryPlannerParams* plannerParams,
-                          bool ignoreQuerySettings = false);
-
-/**
- * Return whether or not any component of the path 'path' is multikey given an index key pattern
- * and multikeypaths. If no multikey metdata is available for the index, and the index is marked
- * multikey, conservatively assumes that a component of 'path' _is_ multikey. The 'isMultikey'
- * property of an index is false for indexes that definitely have no multikey paths.
- */
-bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
-                                  bool isMultikey,
-                                  const MultikeyPaths& indexMultikeyInfo,
-                                  StringData path);
-
-/**
- * Converts the catalog metadata for an index into an IndexEntry, which is a format that is meant to
- * be consumed by the query planner. This function can perform index reads and should not be called
- * unless access to the storage engine is permitted.
- *
- * When 'canonicalQuery' is not null, only multikey metadata paths that intersect with the query
- * field set will be retrieved for a multikey wildcard index. Otherwise all multikey metadata paths
- * will be retrieved.
- */
-IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
-                                           const CollectionPtr& collection,
-                                           const IndexCatalogEntry& ice,
-                                           const CanonicalQuery* canonicalQuery = nullptr);
-
-/**
- * Converts the catalog metadata for an index into an ColumnIndexEntry, which is a format that is
- * meant to be consumed by the query planner. This function can perform index reads and should not
- * be called unless access to the storage engine is permitted.
- */
-ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
-                                                       const CollectionPtr& collection,
-                                                       const IndexCatalogEntry& ice);
-
-/**
- * Determines whether or not to wait for oplog visibility for a query. This is only used for
- * collection scans on the oplog.
- */
-bool shouldWaitForOplogVisibility(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
-                                  bool tailable);
-
-/**
  * Gets a plan executor for a query. If the query is valid and an executor could be created, returns
  * a StatusWith with the PlanExecutor. If the query cannot be executed, returns a Status indicating
  * why.
@@ -234,9 +157,9 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * STRICT_DISTINCT_ONLY option to preserve the arrays.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorDistinct(
-    VariantCollectionPtrOrAcquisition coll,
+    const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
-    CanonicalDistinct* canonicalDistinct,
+    CanonicalDistinct& canonicalDistinct,
     bool flipDistinctScanDirection = false);
 
 /*
@@ -321,6 +244,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
 
 bool isExpressEligible(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const CanonicalQuery* cq);
+                       const CanonicalQuery& cq);
 
 }  // namespace mongo

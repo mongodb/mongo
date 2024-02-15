@@ -1062,9 +1062,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> prepareExecutor
         //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
         //    arrays shouldn't be traversed.
         StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> swExecutorGrouped =
-            tryGetExecutorDistinct(&collections.getMainCollection(),
+            tryGetExecutorDistinct(collections,
                                    plannerOpts.options | QueryPlannerParams::STRICT_DISTINCT_ONLY,
-                                   &canonicalDistinct,
+                                   canonicalDistinct,
                                    flipDistinctScanDirection);
 
         if (swExecutorGrouped.isOK()) {

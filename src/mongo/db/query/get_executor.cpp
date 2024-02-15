@@ -74,7 +74,6 @@
 #include "mongo/db/exec/plan_cache_util.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/projection.h"
-#include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/exec/record_store_fast_count.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
@@ -90,10 +89,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_metadata_access_stats.h"
-#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -219,594 +215,11 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextForGetExecutor(
     return expCtx;
 }
 
-// static
-void filterAllowedIndexEntries(const AllowedIndicesFilter& allowedIndicesFilter,
-                               std::vector<IndexEntry>* indexEntries) {
-    invariant(indexEntries);
-
-    // Filter index entries
-    // Check BSON objects in AllowedIndices::_indexKeyPatterns against IndexEntry::keyPattern.
-    // Removes IndexEntrys that do not match _indexKeyPatterns.
-    std::vector<IndexEntry> temp;
-    for (std::vector<IndexEntry>::const_iterator i = indexEntries->begin();
-         i != indexEntries->end();
-         ++i) {
-        const IndexEntry& indexEntry = *i;
-        if (allowedIndicesFilter.allows(indexEntry)) {
-            // Copy index entry into temp vector if found in query settings.
-            temp.push_back(indexEntry);
-        }
-    }
-
-    // Update results.
-    temp.swap(*indexEntries);
-}
-
 namespace {
 namespace wcp = ::mongo::wildcard_planning;
 // The body is below in the "count hack" section but getExecutor calls it.
 bool turnIxscanIntoCount(QuerySolution* soln);
 }  // namespace
-
-bool isAnyComponentOfPathMultikey(const BSONObj& indexKeyPattern,
-                                  bool isMultikey,
-                                  const MultikeyPaths& indexMultikeyInfo,
-                                  StringData path) {
-    if (!isMultikey) {
-        return false;
-    }
-
-    size_t keyPatternFieldIndex = 0;
-    bool found = false;
-    if (indexMultikeyInfo.empty()) {
-        // There is no path-level multikey information available, so we must assume 'path' is
-        // multikey.
-        return true;
-    }
-
-    for (auto&& elt : indexKeyPattern) {
-        if (elt.fieldNameStringData() == path) {
-            found = true;
-            break;
-        }
-        keyPatternFieldIndex++;
-    }
-    invariant(found);
-
-    invariant(indexMultikeyInfo.size() > keyPatternFieldIndex);
-    return !indexMultikeyInfo[keyPatternFieldIndex].empty();
-}
-
-IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
-                                           const CollectionPtr& collection,
-                                           const IndexCatalogEntry& ice,
-                                           const CanonicalQuery* canonicalQuery) {
-    auto desc = ice.descriptor();
-    invariant(desc);
-
-    if (desc->isIdIndex()) {
-        // _id indexes are guaranteed to be non-multikey. Determining whether the index is multikey
-        // has a small cost associated with it, so we skip that here to make _id lookups faster.
-        return {desc->keyPattern(),
-                desc->getIndexType(),
-                desc->version(),
-                false, /* isMultikey */
-                {},    /* MultikeyPaths */
-                {},    /* multikey Pathset */
-                desc->isSparse(),
-                desc->unique(),
-                IndexEntry::Identifier{desc->indexName()},
-                ice.getFilterExpression(),
-                desc->infoObj(),
-                ice.getCollator(),
-                nullptr /* wildcard projection */};
-    }
-
-    auto accessMethod = ice.accessMethod();
-    invariant(accessMethod);
-
-    const bool isMultikey = ice.isMultikey(opCtx, collection);
-
-    const WildcardProjection* wildcardProjection = nullptr;
-    std::set<FieldRef> multikeyPathSet;
-    if (desc->getIndexType() == IndexType::INDEX_WILDCARD) {
-        wildcardProjection =
-            static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection();
-        if (isMultikey) {
-            MultikeyMetadataAccessStats mkAccessStats;
-
-            if (canonicalQuery) {
-                RelevantFieldIndexMap fieldIndexProps;
-                QueryPlannerIXSelect::getFields(canonicalQuery->getPrimaryMatchExpression(),
-                                                &fieldIndexProps);
-                stdx::unordered_set<std::string> projectedFields;
-                for (auto&& [fieldName, _] : fieldIndexProps) {
-                    if (projection_executor_utils::applyProjectionToOneField(
-                            wildcardProjection->exec(), fieldName)) {
-                        projectedFields.insert(fieldName);
-                    }
-                }
-
-                multikeyPathSet =
-                    getWildcardMultikeyPathSet(opCtx, &ice, projectedFields, &mkAccessStats);
-            } else {
-                multikeyPathSet = getWildcardMultikeyPathSet(opCtx, &ice, &mkAccessStats);
-            }
-
-            LOGV2_DEBUG(20920,
-                        2,
-                        "Multikey path metadata range index scan stats",
-                        "index"_attr = desc->indexName(),
-                        "numSeeks"_attr = mkAccessStats.keysExamined,
-                        "keysExamined"_attr = mkAccessStats.keysExamined);
-        }
-    }
-
-    return {desc->keyPattern(),
-            desc->getIndexType(),
-            desc->version(),
-            isMultikey,
-            // The fixed-size vector of multikey paths stored in the index catalog.
-            ice.getMultikeyPaths(opCtx, collection),
-            // The set of multikey paths from special metadata keys stored in the index itself.
-            // Indexes that have these metadata keys do not store a fixed-size vector of multikey
-            // metadata in the index catalog. Depending on the index type, an index uses one of
-            // these mechanisms (or neither), but not both.
-            std::move(multikeyPathSet),
-            desc->isSparse(),
-            desc->unique(),
-            IndexEntry::Identifier{desc->indexName()},
-            ice.getFilterExpression(),
-            desc->infoObj(),
-            ice.getCollator(),
-            wildcardProjection};
-}
-
-ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
-                                                       const CollectionPtr& collection,
-                                                       const IndexCatalogEntry& ice) {
-
-    auto desc = ice.descriptor();
-    invariant(desc);
-
-    auto accessMethod = ice.accessMethod();
-    invariant(accessMethod);
-
-    auto cam = static_cast<const ColumnStoreAccessMethod*>(accessMethod);
-    const auto columnstoreProjection = cam->getColumnstoreProjection();
-
-    return {desc->keyPattern(),
-            desc->getIndexType(),
-            desc->version(),
-            desc->isSparse(),
-            desc->unique(),
-            ColumnIndexEntry::Identifier{desc->indexName()},
-            ice.getFilterExpression(),
-            ice.getCollator(),
-            columnstoreProjection};
-}
-
-/**
- * If query has query settings index hints set, filters params.indices according to the
- * configuration. In addition, sets that there were index filters or query settings applied.
- * Returns true if query settings were applied.
- */
-bool applyQuerySettings(const CollectionPtr& collection,
-                        const CanonicalQuery& canonicalQuery,
-                        QueryPlannerParams* plannerParams) {
-    // If 'querySettings' has no index hints specified, then there are no settings to be applied to
-    // this query.
-    auto indexHintSpecs = canonicalQuery.getExpCtx()->getQuerySettings().getIndexHints();
-    if (!indexHintSpecs) {
-        return false;
-    }
-
-    // Retrieving the allowed indexes for the given collection.
-    auto allowedIndexes = visit(
-        OverloadedVisitor{
-            [&](const std::vector<mongo::query_settings::IndexHintSpec>& hints) {
-                // TODO: SERVER-79231 Apply QuerySettings for aggregate commands.
-                // Implement the proper nss comparison.
-                auto hintIt = std::find_if(
-                    hints.begin(),
-                    hints.end(),
-                    [&](const mongo::query_settings::IndexHintSpec& hint) {
-                        return hint.getNs()->getDb() ==
-                            canonicalQuery.nss().dbName().serializeWithoutTenantPrefix_UNSAFE() &&
-                            hint.getNs()->getColl() == canonicalQuery.nss().coll();
-                    });
-                return hintIt->getAllowedIndexes();
-            },
-            [](const mongo::query_settings::IndexHintSpec& hints) {
-                return hints.getAllowedIndexes();
-            },
-        },
-        *indexHintSpecs);
-
-    // Checks if index entry is present in the 'allowedIndexes' list.
-    auto notInAllowedIndexes = [&](const IndexEntry& indexEntry) {
-        return std::none_of(
-            allowedIndexes.begin(), allowedIndexes.end(), [&](const IndexHint& allowedIndex) {
-                return visit(OverloadedVisitor{
-                                 [&](const mongo::IndexKeyPattern& indexKeyPattern) {
-                                     return indexKeyPattern.woCompare(indexEntry.keyPattern) == 0;
-                                 },
-                                 [&](const mongo::IndexName& indexName) {
-                                     return indexName == indexEntry.identifier.catalogName;
-                                 },
-                                 [](const mongo::NaturalOrderHint&) { return false; },
-                             },
-                             allowedIndex.getHint());
-            });
-    };
-
-    // Remove indices from the planner parameters if the index is not in the 'allowedIndexes' list.
-    plannerParams->indices.erase(std::remove_if(plannerParams->indices.begin(),
-                                                plannerParams->indices.end(),
-                                                notInAllowedIndexes),
-                                 plannerParams->indices.end());
-
-    // Handle the '$natural' and cluster key (for clustered indexes) cases. Iterate over the
-    // 'allowedIndexes' list and resolve the allowed directions for performing collection scans. If
-    // no '$natural' hint is present then collection scans are forbidden.
-    //
-    // The possible cases for '$natural' allowed indexes are:
-    //     * [] - All collection scans are forbidden.
-    //        * Sets the 'NO_TABLE_SCAN' planner parameter flag to 'true'.
-    //        * Sets the 'collscanDirection' planner parameter to 'boost::none'.
-    //
-    //    * [{$natural: 1}] - Only forward collection scans are allowed.
-    //        * Unsets the 'NO_TABLE_SCAN' planner parameter flag.
-    //        * Sets the 'collscanDirection' to 'NaturalOrderHint::Direction::kForward'.
-    //
-    //    * [{$natural: -1}] - Only backward collection scans are allowed.
-    //        * Unsets the 'NO_TABLE_SCAN' planner parameter flag.
-    //        * Sets the 'collscanDirection' to 'NaturalOrderHint::Direction::kBackward'.
-    //
-    //    * [{$natural: 1}, {$natural: -1}] - All collection scan directions are allowed.
-    //        * Unsets the 'NO_TABLE_SCAN' planner parameter flag.
-    //        * Sets the 'collscanDirection' planner parameter to 'boost::none'.
-    const auto& clusteredInfo = plannerParams->clusteredInfo;
-    bool forwardAllowed = false;
-    bool backwardAllowed = false;
-    for (const auto& allowedIndex : allowedIndexes) {
-        visit(OverloadedVisitor{
-                  // If the collection is clustered, then allow both collection scan directions when
-                  // the provided index key pattern matches the cluster key.
-                  [&](const mongo::IndexKeyPattern& indexKeyPattern) {
-                      if (!clusteredInfo) {
-                          return;
-                      }
-                      const auto& clusteredKeyPattern = clusteredInfo->getIndexSpec().getKey();
-                      if (indexKeyPattern.woCompare(clusteredKeyPattern) == 0) {
-                          forwardAllowed = backwardAllowed = true;
-                      }
-                  },
-                  // Similarly, if the collection is clustered and the provided index name matches
-                  // the clustered index name then allow both collection scan directions.
-                  [&](const mongo::IndexName& indexName) {
-                      if (!clusteredInfo) {
-                          return;
-                      }
-
-                      const auto& clusteredIndexName = clusteredInfo->getIndexSpec().getName();
-                      tassert(7923300,
-                              "clusteredIndex's name should be filled in by default after creation",
-                              clusteredIndexName.has_value());
-                      if (indexName == *clusteredIndexName) {
-                          forwardAllowed = backwardAllowed = true;
-                      }
-                  },
-                  // Allow only the direction specified by the explicit '$natural' hint.
-                  [&](const mongo::NaturalOrderHint& hint) {
-                      switch (hint.direction) {
-                          case NaturalOrderHint::Direction::kForward:
-                              forwardAllowed = true;
-                              break;
-                          case NaturalOrderHint::Direction::kBackward:
-                              backwardAllowed = true;
-                              break;
-                      }
-                  },
-              },
-              allowedIndex.getHint());
-    }
-
-    if (!forwardAllowed && !backwardAllowed) {
-        // No '$natural' or cluster key hint present. Ensure that table scans are forbidden.
-        plannerParams->options |= QueryPlannerParams::Options::NO_TABLE_SCAN;
-    } else {
-        // At least one direction is allowed. Clear out the 'NO_TABLE_SCAN' flag if it exists,
-        // as query settings should have a higher precedence over server parameters.
-        plannerParams->options &= ~QueryPlannerParams::Options::NO_TABLE_SCAN;
-
-        // Enforce the scan direction if needed.
-        const bool bothDirectionsAllowed = forwardAllowed && backwardAllowed;
-        if (!bothDirectionsAllowed) {
-            plannerParams->collscanDirection = forwardAllowed
-                ? NaturalOrderHint::Direction::kForward
-                : NaturalOrderHint::Direction::kBackward;
-        }
-    }
-
-    plannerParams->querySettingsApplied = true;
-    return true;
-}
-
-/**
- * If query supports index filters, filters params.indices according to the configuration. In
- * addition, sets that there were index filters or query settings applied.
- */
-void applyIndexFilters(const CollectionPtr& collection,
-                       const CanonicalQuery& canonicalQuery,
-                       QueryPlannerParams* plannerParams) {
-    const QuerySettings* querySettings =
-        QuerySettingsDecoration::get(collection->getSharedDecorations());
-    const auto key = canonicalQuery.encodeKeyForPlanCacheCommand();
-
-    // Filter index catalog if index filters are specified for query.
-    // Also, signal to planner that application hint should be ignored.
-    if (boost::optional<AllowedIndicesFilter> allowedIndicesFilter =
-            querySettings->getAllowedIndicesFilter(key)) {
-        filterAllowedIndexEntries(*allowedIndicesFilter, &plannerParams->indices);
-        plannerParams->indexFiltersApplied = true;
-    }
-}
-
-/**
- * Applies query settings to the query if applicable. If not, tries to apply index filters.
- */
-void applyQuerySettingsOrIndexFilters(const MultipleCollectionAccessor& collections,
-                                      const CanonicalQuery& canonicalQuery,
-                                      QueryPlannerParams* plannerParams,
-                                      bool ignoreQuerySettings) {
-    bool didApplyQuerySettings = [&] {
-        // Skip 'querySettings' application for this query. The 'ignoreQuerySettings' flag
-        // denotes that the planner previously failed to generate a viable plan using the
-        // provided index hints and engaged the fallback to multi-planning.
-        if (ignoreQuerySettings) {
-            return false;
-        }
-        return applyQuerySettings(collections.getMainCollection(), canonicalQuery, plannerParams);
-    }();
-
-    // Try to apply index filters only if query settings were not applied.
-    if (!didApplyQuerySettings) {
-        applyIndexFilters(collections.getMainCollection(), canonicalQuery, plannerParams);
-    }
-}
-
-namespace {
-void fillOutIndexEntries(OperationContext* opCtx,
-                         bool apiStrict,
-                         const CanonicalQuery* canonicalQuery,
-                         const CollectionPtr& collection,
-                         std::vector<IndexEntry>& entries,
-                         std::vector<ColumnIndexEntry>& columnEntries) {
-    std::vector<const IndexCatalogEntry*> columnIndexes, plainIndexes;
-    auto ii = collection->getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady);
-    while (ii->more()) {
-        const IndexCatalogEntry* ice = ii->next();
-
-        // Indexes excluded from API version 1 should _not_ be used for planning if apiStrict is
-        // set to true.
-        auto indexType = ice->descriptor()->getIndexType();
-        if (apiStrict &&
-            (indexType == IndexType::INDEX_HAYSTACK || indexType == IndexType::INDEX_TEXT ||
-             indexType == IndexType::INDEX_COLUMN || ice->descriptor()->isSparse()))
-            continue;
-
-        // Skip the addition of hidden indexes to prevent use in query planning.
-        if (ice->descriptor()->hidden())
-            continue;
-
-        if (indexType == IndexType::INDEX_COLUMN) {
-            columnIndexes.push_back(ice);
-        } else {
-            plainIndexes.push_back(ice);
-        }
-    }
-    columnEntries.reserve(columnIndexes.size());
-    for (auto ice : columnIndexes) {
-        columnEntries.emplace_back(columnIndexEntryFromIndexCatalogEntry(opCtx, collection, *ice));
-    }
-    entries.reserve(plainIndexes.size());
-    for (auto ice : plainIndexes) {
-        entries.emplace_back(
-            indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));
-    }
-}
-}  // namespace
-
-void fillOutPlannerCollectionInfo(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
-                                  PlannerCollectionInfo* out,
-                                  bool includeSizeStats) {
-    out->isTimeseries = static_cast<bool>(collection->getTimeseriesOptions());
-    if (includeSizeStats) {
-        // We only include these sometimes, since they are slightly expensive to compute.
-        auto recordStore = collection->getRecordStore();
-        out->noOfRecords = recordStore->numRecords(opCtx);
-        out->approximateDataSizeBytes = recordStore->dataSize(opCtx);
-        out->storageSizeBytes = recordStore->storageSize(opCtx);
-    }
-}
-
-void fillOutMainCollectionPlannerParams(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
-                                        const CanonicalQuery* canonicalQuery,
-                                        QueryPlannerParams* plannerParams) {
-    invariant(canonicalQuery);
-    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-
-    // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
-    // overrides this behavior by not outputting a collscan even if there are no indexed
-    // solutions.
-    if (storageGlobalParams.noTableScan.load()) {
-        const auto& nss = canonicalQuery->nss();
-        // There are certain cases where we ignore this restriction:
-        bool ignore =
-            canonicalQuery->getQueryObj().isEmpty() || nss.isSystem() || nss.isOnInternalDb();
-        if (!ignore) {
-            plannerParams->options |= QueryPlannerParams::NO_TABLE_SCAN;
-        }
-    }
-
-    // If the caller wants a shard filter, make sure we're actually sharded.
-    if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        if (collection.isSharded_DEPRECATED()) {
-            const auto& shardKeyPattern = collection.getShardKeyPattern();
-
-            // If the shard key is specified exactly, the query is guaranteed to only target one
-            // shard. Shards cannot own orphans for the key ranges they own, so there is no need
-            // to include a shard filtering stage. By omitting the shard filter, it may be possible
-            // to get a more efficient plan (for example, a COUNT_SCAN may be used if the query is
-            // eligible).
-            const BSONObj extractedKey = extractShardKeyFromQuery(shardKeyPattern, *canonicalQuery);
-
-            if (extractedKey.isEmpty()) {
-                plannerParams->shardKey = shardKeyPattern.toBSON();
-            } else {
-                plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-            }
-        } else {
-            // If there's no metadata don't bother w/the shard filter since we won't know what
-            // the key pattern is anyway...
-            plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
-        }
-    }
-
-    if (internalQueryPlannerEnableIndexIntersection.load()) {
-        plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
-    }
-
-    if (internalQueryEnumerationPreferLockstepOrEnumeration.load()) {
-        plannerParams->options |= QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
-    }
-
-    if (internalQueryPlannerGenerateCoveredWholeIndexScans.load()) {
-        plannerParams->options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
-    }
-
-    if (shouldWaitForOplogVisibility(
-            opCtx, collection, canonicalQuery->getFindCommandRequest().getTailable())) {
-        plannerParams->options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
-    }
-
-    if (collection->isClustered()) {
-        plannerParams->clusteredInfo = collection->getClusteredInfo();
-        plannerParams->clusteredCollectionCollator = collection->getDefaultCollator();
-    }
-
-    // _id queries can skip checking the catalog for indices since they will always use the _id
-    // index.
-    if (isIdHackEligibleQuery(
-            collection, canonicalQuery->getFindCommandRequest(), canonicalQuery->getCollator())) {
-        return;
-    }
-
-    // If it's not NULL, we may have indices. Access the catalog and fill out IndexEntry(s)
-    fillOutIndexEntries(opCtx,
-                        apiStrict,
-                        canonicalQuery,
-                        collection,
-                        plannerParams->indices,
-                        plannerParams->columnStoreIndexes);
-
-    fillOutPlannerCollectionInfo(opCtx,
-                                 collection,
-                                 &plannerParams->collectionStats,
-                                 // Only include the full size stats when there's a CSI.
-                                 !plannerParams->columnStoreIndexes.empty());
-    if (!plannerParams->columnStoreIndexes.empty()) {
-        // Only fill this out when a CSI is present.
-        const auto kMB = 1024 * 1024;
-        plannerParams->availableMemoryBytes =
-            static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
-    }
-}
-
-std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
-    OperationContext* opCtx,
-    const MultipleCollectionAccessor& collections,
-    const CanonicalQuery* canonicalQuery) {
-    std::map<NamespaceString, SecondaryCollectionInfo> infoMap;
-    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
-    auto fillOutSecondaryInfo = [&](const NamespaceString& nss,
-                                    const CollectionPtr& secondaryColl) {
-        auto secondaryInfo = SecondaryCollectionInfo();
-        if (secondaryColl) {
-            fillOutIndexEntries(opCtx,
-                                apiStrict,
-                                canonicalQuery,
-                                secondaryColl,
-                                secondaryInfo.indexes,
-                                secondaryInfo.columnIndexes);
-            fillOutPlannerCollectionInfo(
-                opCtx, secondaryColl, &secondaryInfo.stats, true /* include size stats */);
-        } else {
-            secondaryInfo.exists = false;
-        }
-        infoMap.emplace(nss, std::move(secondaryInfo));
-    };
-    for (auto& [collName, secondaryColl] : collections.getSecondaryCollections()) {
-        fillOutSecondaryInfo(collName, secondaryColl);
-    }
-
-    // In the event of a self $lookup, we must have an entry for the main collection in the map
-    // of secondary collections.
-    if (collections.hasMainCollection()) {
-        const auto& mainColl = collections.getMainCollection();
-        fillOutSecondaryInfo(mainColl->ns(), mainColl);
-    }
-    return infoMap;
-}
-
-void fillOutPlannerParams(OperationContext* opCtx,
-                          const MultipleCollectionAccessor& collections,
-                          const CanonicalQuery* canonicalQuery,
-                          QueryPlannerParams* plannerParams,
-                          bool ignoreQuerySettings) {
-    fillOutMainCollectionPlannerParams(
-        opCtx, collections.getMainCollection(), canonicalQuery, plannerParams);
-    if (!canonicalQuery->cqPipeline().empty()) {
-        plannerParams->secondaryCollectionsInfo =
-            fillOutSecondaryCollectionsInformation(opCtx, collections, canonicalQuery);
-    }
-
-    // If query supports query settings or index filters, filter params.indices.
-    applyQuerySettingsOrIndexFilters(
-        collections, *canonicalQuery, plannerParams, ignoreQuerySettings);
-}
-
-bool shouldWaitForOplogVisibility(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
-                                  bool tailable) {
-
-    // Only non-tailable cursors on the oplog are affected. Only forward cursors, not reverse
-    // cursors, are affected, but this is checked when the cursor is opened.
-    if (!collection->ns().isOplog() || tailable) {
-        return false;
-    }
-
-    // Only primaries should require readers to wait for oplog visibility. In any other replication
-    // state, readers read at the most visible oplog timestamp. The reason why readers on primaries
-    // need to wait is because multiple optimes can be allocated for operations before their entries
-    // are written to the storage engine. "Holes" will appear when an operation with a later optime
-    // commits before an operation with an earlier optime, and readers should wait so that all data
-    // is consistent.
-    //
-    // On secondaries, the wait is done while holding a global lock, and the oplog visibility
-    // timestamp is updated at the end of every batch on a secondary, signalling the wait to
-    // complete. If a replication worker had a global lock and temporarily released it, a reader
-    // could acquire the lock to read the oplog. If the secondary reader were to wait for the oplog
-    // visibility timestamp to be updated, it would wait for a replication batch that would never
-    // complete because it couldn't reacquire its own lock, the global lock held by the waiting
-    // reader.
-    return repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-        opCtx, DatabaseName::kAdmin);
-}
 
 namespace {
 /**
@@ -1199,7 +612,7 @@ protected:
         }
 
         _plannerParams = _providedPlannerParams;
-        fillOutPlannerParams(_opCtx, getCollections(), _cq, &_plannerParams, ignoreQuerySettings);
+        _plannerParams.fillOutPlannerParams(_opCtx, *_cq, getCollections(), ignoreQuerySettings);
         _plannerParamsInitialized = true;
     }
 
@@ -1278,8 +691,8 @@ public:
                                   const MultipleCollectionAccessor& collections,
                                   WorkingSet* ws,
                                   CanonicalQuery* cq,
-                                  const QueryPlannerParams& plannerOptions)
-        : PrepareExecutionHelper{opCtx, collections, std::move(cq), plannerOptions}, _ws{ws} {}
+                                  const QueryPlannerParams& plannerParams)
+        : PrepareExecutionHelper{opCtx, collections, std::move(cq), plannerParams}, _ws{ws} {}
 
 private:
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& solution) const {
@@ -1498,8 +911,8 @@ public:
                                     const MultipleCollectionAccessor& collections,
                                     CanonicalQuery* cq,
                                     PlanYieldPolicy* yieldPolicy,
-                                    size_t plannerOptions)
-        : PrepareExecutionHelper{opCtx, collections, cq, QueryPlannerParams{plannerOptions}},
+                                    const QueryPlannerParams& plannerParams)
+        : PrepareExecutionHelper{opCtx, collections, cq, plannerParams},
           _yieldPolicy(yieldPolicy) {}
 
 private:
@@ -1595,7 +1008,7 @@ public:
         std::unique_ptr<CanonicalQuery> cq,
         PlanYieldPolicy::YieldPolicy policy,
         std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
-        const QueryPlannerParams& plannerParams)
+        QueryPlannerParams plannerParams)
         : PrepareExecutionHelper{opCtx, collections, cq.get(), plannerParams},
           _ws{std::move(ws)},
           _ownedCq{std::move(cq)},
@@ -1608,7 +1021,7 @@ private:
                                     .sbeYieldPolicy = std::move(_sbeYieldPolicy),
                                     .workingSet = std::move(_ws),
                                     .collections = _collections,
-                                    .plannerParams = _plannerParams,
+                                    .plannerParams = std::move(_plannerParams),
                                     .cachedPlanHash = _cachedPlanHash};
     }
 
@@ -1707,7 +1120,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     const MultipleCollectionAccessor& collections,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    const QueryPlannerParams& plannerParams) {
+    QueryPlannerParams plannerParams) {
     auto ws = std::make_unique<WorkingSet>();
     ClassicPrepareExecutionHelper helper{
         opCtx, collections, ws.get(), canonicalQuery.get(), plannerParams};
@@ -1747,14 +1160,18 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     boost::optional<size_t> decisionWorks,
     bool needsSubplanning,
     PlanYieldPolicySBE* yieldPolicy,
-    size_t plannerOptions,
+    QueryPlannerParams plannerParams,
     boost::optional<const stage_builder::PlanStageData&> planStageData) {
     // If we have multiple solutions, we always need to do the runtime planning.
     if (numSolutions > 1) {
         invariant(!needsSubplanning && !decisionWorks);
-        QueryPlannerParams plannerParams(plannerOptions);
-        fillOutPlannerParams(opCtx, collections, canonicalQuery, &plannerParams);
 
+        // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
+        // fillOutSecondaryCollectionsInformation() planner param calls.
+        // The SBE PrepareExecutionHelper could have already filled out the planner params, so this
+        // could be redundant.
+        plannerParams.fillOutPlannerParams(
+            opCtx, *canonicalQuery, collections, false /* ignoreQuerySettings */);
         return std::make_unique<sbe::MultiPlanner>(opCtx,
                                                    collections,
                                                    *canonicalQuery,
@@ -1769,9 +1186,12 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     if (needsSubplanning) {
         invariant(numSolutions == 0);
 
-        QueryPlannerParams plannerParams(plannerOptions);
-        fillOutPlannerParams(opCtx, collections, canonicalQuery, &plannerParams);
-
+        // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
+        // fillOutSecondaryCollectionsInformation() planner param calls.
+        // The SBE PrepareExecutionHelper could have already filled out the planner params, so this
+        // could be redundant.
+        plannerParams.fillOutPlannerParams(
+            opCtx, *canonicalQuery, collections, false /* ignoreQuerySettings */);
         return std::make_unique<sbe::SubPlanner>(
             opCtx, collections, *canonicalQuery, plannerParams, yieldPolicy);
     }
@@ -1784,7 +1204,6 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     tassert(6693503, "PlanStageData must be present", planStageData);
     const bool hasHashLookup = !planStageData->staticData->foreignHashJoinCollections.empty();
     if (decisionWorks || hasHashLookup) {
-        QueryPlannerParams plannerParams(plannerOptions);
         return std::make_unique<sbe::CachedSolutionPlanner>(
             opCtx, collections, *canonicalQuery, plannerParams, decisionWorks, yieldPolicy);
     }
@@ -1799,7 +1218,7 @@ getSlotBasedExecutorWithClassicRuntimePlanning(OperationContext* opCtx,
                                                std::unique_ptr<CanonicalQuery> canonicalQuery,
                                                PlanYieldPolicy::YieldPolicy yieldPolicy,
                                                std::unique_ptr<PlanYieldPolicySBE> sbeYieldPolicy,
-                                               const QueryPlannerParams& plannerParams) {
+                                               QueryPlannerParams plannerParams) {
     SbeWithClassicRuntimePlanningPrepareExecutionHelper helper{
         opCtx,
         collections,
@@ -1807,7 +1226,7 @@ getSlotBasedExecutorWithClassicRuntimePlanning(OperationContext* opCtx,
         std::move(canonicalQuery),
         yieldPolicy,
         std::move(sbeYieldPolicy),
-        plannerParams,
+        std::move(plannerParams),
     };
     auto planningResultWithStatus = helper.prepare();
     if (!planningResultWithStatus.isOK()) {
@@ -1823,14 +1242,9 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                            const MultipleCollectionAccessor& collections,
                                            std::unique_ptr<CanonicalQuery> cq,
                                            std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
-                                           const QueryPlannerParams& plannerParams) {
+                                           QueryPlannerParams plannerParams) {
     SlotBasedPrepareExecutionHelper helper{
-        opCtx,
-        collections,
-        cq.get(),
-        yieldPolicy.get(),
-        plannerParams.options,
-    };
+        opCtx, collections, cq.get(), yieldPolicy.get(), plannerParams};
     auto planningResultWithStatus = helper.prepare();
     if (!planningResultWithStatus.isOK()) {
         return planningResultWithStatus.getStatus();
@@ -1870,7 +1284,7 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                                          planningResult->decisionWorks(),
                                                          planningResult->needsSubplanning(),
                                                          yieldPolicy.get(),
-                                                         plannerParams.options,
+                                                         plannerParams,
                                                          planStageData)) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = runTimePlanner->plan(std::move(solutions), std::move(roots));
@@ -1887,6 +1301,7 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                            std::move(nss),
                                            std::move(yieldPolicy));
     }
+
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(solutions.size() == 1);
     invariant(roots.size() == 1);
@@ -1895,10 +1310,11 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
     if (!planningResult->recoveredPinnedCacheEntry()) {
         if (!cq->cqPipeline().empty()) {
             // Need to extend the solution with the agg pipeline and rebuild the execution tree.
+            // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
+            // fillOutSecondaryCollectionsInformation() planner param calls.
+            plannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx, *cq.get(), collections);
             solutions[0] = QueryPlanner::extendWithAggPipeline(
-                *cq,
-                std::move(solutions[0]),
-                fillOutSecondaryCollectionsInformation(opCtx, collections, cq.get()));
+                *cq, std::move(solutions[0]), plannerParams.secondaryCollectionsInfo);
             roots[0] = stage_builder::buildSlotBasedExecutableTree(
                 opCtx, collections, *cq, *(solutions[0]), yieldPolicy.get());
         }
@@ -1992,9 +1408,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     auto exec = [&]() -> StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> {
         invariant(canonicalQuery);
         const auto& mainColl = collections.getMainCollection();
-
-        if (isExpressEligible(opCtx, mainColl, canonicalQuery.get())) {
-            fillOutPlannerParams(opCtx, collections, canonicalQuery.get(), &plannerParams);
+        const auto& canonicalQueryRef = *canonicalQuery.get();
+        if (isExpressEligible(opCtx, mainColl, canonicalQueryRef)) {
+            plannerParams.fillOutPlannerParams(
+                opCtx, canonicalQueryRef, collections, true /* ignoreQuerySettings */);
             PlanExecutor::Deleter planExDeleter(opCtx);
             boost::optional<ScopedCollectionFilter> collFilter = boost::none;
             VariantCollectionPtrOrAcquisition collOrAcq =
@@ -2078,13 +1495,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
                                                                           std::move(canonicalQuery),
                                                                           yieldPolicy,
                                                                           std::move(sbeYieldPolicy),
-                                                                          plannerParams);
+                                                                          std::move(plannerParams));
                 } else {
                     return getSlotBasedExecutorWithSbeRuntimePlanning(opCtx,
                                                                       collections,
                                                                       std::move(canonicalQuery),
                                                                       std::move(sbeYieldPolicy),
-                                                                      plannerParams);
+                                                                      std::move(plannerParams));
                 }
             }
         }
@@ -2092,7 +1509,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
         // If we are here, it means the query cannot run in SBE and we should fallback to classic.
         canonicalQuery->setSbeCompatible(false);
         return getClassicExecutor(
-            opCtx, collections, std::move(canonicalQuery), yieldPolicy, plannerParams);
+            opCtx, collections, std::move(canonicalQuery), yieldPolicy, std::move(plannerParams));
     }();
 
     if (exec.isOK()) {
@@ -2336,10 +1753,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     // identify the record to update.
     cq->setForceGenerateRecordId(true);
 
-    const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     MultipleCollectionAccessor collectionsAccessor(coll);
     ClassicPrepareExecutionHelper helper{
-        opCtx, collectionsAccessor, ws.get(), cq.get(), defaultPlannerOptions};
+        opCtx, collectionsAccessor, ws.get(), cq.get(), QueryPlannerParams::DEFAULT};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2398,7 +1814,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                        std::move(root),
                                        coll,
                                        policy,
-                                       defaultPlannerOptions,
+                                       QueryPlannerParams::DEFAULT,
                                        NamespaceString::kEmpty,
                                        std::move(querySolution),
                                        executionResult.getValue()->cachedPlanHash());
@@ -2537,10 +1953,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // identify the record to update.
     cq->setForceGenerateRecordId(true);
 
-    const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     MultipleCollectionAccessor collectionsAccessor(coll);
     ClassicPrepareExecutionHelper helper{
-        opCtx, collectionsAccessor, ws.get(), cq.get(), defaultPlannerOptions};
+        opCtx, collectionsAccessor, ws.get(), cq.get(), QueryPlannerParams::DEFAULT};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2599,7 +2014,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                        std::move(root),
                                        coll,
                                        policy,
-                                       defaultPlannerOptions,
+                                       QueryPlannerParams::DEFAULT,
                                        NamespaceString::kEmpty,
                                        std::move(querySolution),
                                        executionResult.getValue()->cachedPlanHash());
@@ -3125,111 +2540,21 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
 
 namespace {
 
-// Get the list of indexes that include the "distinct" field.
-QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
-                                                   const CollectionPtr& collection,
-                                                   size_t plannerOptions,
-                                                   const CanonicalDistinct& canonicalDistinct,
-                                                   bool flipDistinctScanDirection,
-                                                   bool ignoreQuerySettings) {
-    QueryPlannerParams plannerParams(QueryPlannerParams::NO_TABLE_SCAN | plannerOptions);
-
-    // If the caller did not request a "strict" distinct scan then we may choose a plan which
-    // unwinds arrays and treats each element in an array as its own key.
-    const bool mayUnwindArrays = !(plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
-    auto ii = collection->getIndexCatalog()->getIndexIterator(
-        opCtx, IndexCatalog::InclusionPolicy::kReady);
-    auto query = canonicalDistinct.getQuery()->getFindCommandRequest().getFilter();
-    while (ii->more()) {
-        const IndexCatalogEntry* ice = ii->next();
-        const IndexDescriptor* desc = ice->descriptor();
-
-        // Skip the addition of hidden indexes to prevent use in query planning.
-        if (desc->hidden())
-            continue;
-        if (desc->keyPattern().hasField(canonicalDistinct.getKey())) {
-            // This handles regular fields of Compound Wildcard Indexes as well.
-            if (flipDistinctScanDirection && ice->isMultikey(opCtx, collection)) {
-                // This CanonicalDistinct was generated as a result of transforming a $group with
-                // $last accumulators using the GroupFromFirstTransformation. We cannot use a
-                // DISTINCT_SCAN if $last is being applied to an indexed field which is multikey,
-                // even if the 'canonicalDistinct' key does not include multikey paths. This is
-                // because changing the sort direction also changes the comparison semantics for
-                // arrays, which means that flipping the scan may not exactly flip the order that we
-                // see documents in. In the case of using DISTINCT_SCAN for $group, that would mean
-                // that $first of the flipped scan may not be the same document as $last from the
-                // user's requested sort order.
-                continue;
-            }
-            if (!mayUnwindArrays &&
-                isAnyComponentOfPathMultikey(desc->keyPattern(),
-                                             ice->isMultikey(opCtx, collection),
-                                             ice->getMultikeyPaths(opCtx, collection),
-                                             canonicalDistinct.getKey())) {
-                // If the caller requested "strict" distinct that does not "pre-unwind" arrays,
-                // then an index which is multikey on the distinct field may not be used. This is
-                // because when indexing an array each element gets inserted individually. Any plan
-                // which involves scanning the index will have effectively "unwound" all arrays.
-                continue;
-            }
-
-            plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(
-                opCtx, collection, *ice, canonicalDistinct.getQuery()));
-        } else if (desc->getIndexType() == IndexType::INDEX_WILDCARD && !query.isEmpty()) {
-            // Check whether the $** projection captures the field over which we are distinct-ing.
-            auto* proj = static_cast<const WildcardAccessMethod*>(ice->accessMethod())
-                             ->getWildcardProjection()
-                             ->exec();
-            if (projection_executor_utils::applyProjectionToOneField(proj,
-                                                                     canonicalDistinct.getKey())) {
-                plannerParams.indices.push_back(indexEntryFromIndexCatalogEntry(
-                    opCtx, collection, *ice, canonicalDistinct.getQuery()));
-            }
-
-            // It is not necessary to do any checks about 'mayUnwindArrays' in this case, because:
-            // 1) If there is no predicate on the distinct(), a wildcard indices may not be used.
-            // 2) distinct() _with_ a predicate may not be answered with a DISTINCT_SCAN on _any_
-            // multikey index.
-
-            // So, we will not distinct scan a wildcard index that's multikey on the distinct()
-            // field, regardless of the value of 'mayUnwindArrays'.
-        }
-    }
-
-    const CanonicalQuery* canonicalQuery = canonicalDistinct.getQuery();
-    const BSONObj& hint = canonicalQuery->getFindCommandRequest().getHint();
-
-    applyQuerySettingsOrIndexFilters(MultipleCollectionAccessor(collection),
-                                     *canonicalQuery,
-                                     &plannerParams,
-                                     ignoreQuerySettings);
-
-    // If there exists an index filter, we ignore all hints. Else, we only keep the index specified
-    // by the hint. Since we cannot have an index with name $natural, that case will clear the
-    // plannerParams.indices.
-    if (!plannerParams.indexFiltersApplied && !plannerParams.querySettingsApplied &&
-        !hint.isEmpty()) {
-        std::vector<IndexEntry> temp =
-            QueryPlannerIXSelect::findIndexesByHint(hint, plannerParams.indices);
-        temp.swap(plannerParams.indices);
-    }
-
-    return plannerParams;
-}
-
-std::unique_ptr<QuerySolution> createDistinctScanSolution(CanonicalDistinct* canonicalDistinct,
-                                                          const QueryPlannerParams& plannerParams,
-                                                          bool flipDistinctScanDirection) {
-    if (canonicalDistinct->getQuery()->getFindCommandRequest().getFilter().isEmpty() &&
-        !canonicalDistinct->getQuery()->getSortPattern()) {
+std::unique_ptr<QuerySolution> createDistinctScanSolution(
+    const CanonicalDistinct& canonicalDistinct,
+    const QueryPlannerParams& plannerParams,
+    bool flipDistinctScanDirection) {
+    const auto& canonicalQuery = *canonicalDistinct.getQuery();
+    if (canonicalQuery.getFindCommandRequest().getFilter().isEmpty() &&
+        !canonicalQuery.getSortPattern()) {
         // If a query has neither a filter nor a sort, the query planner won't attempt to use an
         // index for it even if the index could provide the distinct semantics on the key from the
         // 'canonicalDistinct'. So, we create the solution "manually" from a suitable index.
         // The direction of the index doesn't matter in this case.
         size_t distinctNodeIndex = 0;
-        auto collator = canonicalDistinct->getQuery()->getCollator();
+        auto collator = canonicalQuery.getCollator();
         if (getDistinctNodeIndex(
-                plannerParams.indices, canonicalDistinct->getKey(), collator, &distinctNodeIndex)) {
+                plannerParams.indices, canonicalDistinct.getKey(), collator, &distinctNodeIndex)) {
             auto dn = std::make_unique<DistinctNode>(plannerParams.indices[distinctNodeIndex]);
             dn->direction = 1;
             IndexBoundsBuilder::allValuesBounds(
@@ -3252,15 +2577,15 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(CanonicalDistinct* can
             // data access are important, it's hard to say, this code has been like this since long
             // ago (and it has always passed in new 'QueryPlannerParams').
             auto soln = QueryPlannerAnalysis::analyzeDataAccess(
-                *canonicalDistinct->getQuery(), QueryPlannerParams{}, std::move(solnRoot));
+                canonicalQuery, QueryPlannerParams(), std::move(solnRoot));
             uassert(8404000, "Failed to finalize a DISTINCT_SCAN plan", soln);
             return soln;
         }
     } else {
         // Ask the QueryPlanner for a list of solutions that scan one of the indexes from
-        // fillOutPlannerParamsForDistinct() (i.e., the indexes that include the distinct field).
-        // Then try to convert one of these plans to a DISTINCT_SCAN.
-        auto multiPlanSolns = QueryPlanner::plan(*canonicalDistinct->getQuery(), plannerParams);
+        // 'plannerParams' (i.e., the indexes that include the distinct field). Then try to convert
+        // one of these plans to a DISTINCT_SCAN.
+        auto multiPlanSolns = QueryPlanner::plan(canonicalQuery, plannerParams);
         if (multiPlanSolns.isOK()) {
             auto& solutions = multiPlanSolns.getValue();
             const bool strictDistinctOnly =
@@ -3268,7 +2593,7 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(CanonicalDistinct* can
 
             for (size_t i = 0; i < solutions.size(); ++i) {
                 if (turnIxscanIntoDistinctIxscan(solutions[i].get(),
-                                                 canonicalDistinct->getKey(),
+                                                 canonicalDistinct.getKey(),
                                                  strictDistinctOnly,
                                                  flipDistinctScanDirection)) {
                     // The first suitable distinct scan is as good as any other.
@@ -3282,29 +2607,31 @@ std::unique_ptr<QuerySolution> createDistinctScanSolution(CanonicalDistinct* can
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorDistinct(
-    VariantCollectionPtrOrAcquisition coll,
+    const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
-    CanonicalDistinct* canonicalDistinct,
+    CanonicalDistinct& canonicalDistinct,
     bool flipDistinctScanDirection) {
-    const auto& collectionPtr = coll.getCollectionPtr();
+    const auto& collectionPtr = collections.getMainCollection();
     if (!collectionPtr) {
         // The caller should create EOF plan for the appropriate engine.
         return {ErrorCodes::NoQueryExecutionPlans, "No viable DISTINCT_SCAN plan"};
     }
 
-    OperationContext* opCtx = canonicalDistinct->getQuery()->getExpCtx()->opCtx;
+    const auto& canonicalQuery = *canonicalDistinct.getQuery();
+    auto* opCtx = canonicalQuery.getExpCtx()->opCtx;
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "distinct command is not eligible for bonsai",
-            !isEligibleForBonsai(opCtx, collectionPtr, *canonicalDistinct->getQuery()));
+            !isEligibleForBonsai(opCtx, collectionPtr, canonicalQuery));
 
     auto getQuerySolution = [&](bool ignoreQuerySettings) -> std::unique_ptr<QuerySolution> {
-        auto plannerParams = fillOutPlannerParamsForDistinct(opCtx,
-                                                             collectionPtr,
-                                                             plannerOptions,
-                                                             *canonicalDistinct,
-                                                             flipDistinctScanDirection,
-                                                             ignoreQuerySettings);
+        QueryPlannerParams plannerParams(
+            QueryPlannerParams::ArgsForDistinct{opCtx,
+                                                canonicalDistinct,
+                                                collections,
+                                                plannerOptions,
+                                                flipDistinctScanDirection,
+                                                ignoreQuerySettings});
 
         // Can't create a DISTINCT_SCAN stage if no suitable indexes are present.
         if (plannerParams.indices.empty()) {
@@ -3313,7 +2640,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
         return createDistinctScanSolution(
             canonicalDistinct, plannerParams, flipDistinctScanDirection);
     };
-
     auto soln = getQuerySolution(/* ignoreQuerySettings */ false);
     if (!soln) {
         // Try again this time without query settings applied.
@@ -3325,13 +2651,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> tryGetExecutorD
 
     // Convert the solution into an executable tree.
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    auto collPtrOrAcq = collections.getMainCollectionPtrOrAcquisition();
     auto&& root = stage_builder::buildClassicExecutableTree(
-        opCtx, coll, *canonicalDistinct->getQuery(), *soln, ws.get());
+        opCtx, collPtrOrAcq, canonicalQuery, *soln, ws.get());
 
-    auto exec = plan_executor_factory::make(canonicalDistinct->releaseQuery(),
+    auto exec = plan_executor_factory::make(canonicalDistinct.releaseQuery(),
                                             std::move(ws),
                                             std::move(root),
-                                            coll,
+                                            collPtrOrAcq,
                                             PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                             plannerOptions,
                                             NamespaceString::kEmpty,
@@ -3360,10 +2687,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
 
 bool isExpressEligible(OperationContext* opCtx,
                        const CollectionPtr& coll,
-                       const CanonicalQuery* cq) {
-    auto findCommandReq = cq->getFindCommandRequest();
-    return (coll && (cq->getProj() == nullptr || cq->getProj()->isSimple()) &&
-            isIdHackEligibleQuery(coll, findCommandReq, cq->getExpCtx()->getCollator()) &&
+                       const CanonicalQuery& cq) {
+    auto findCommandReq = cq.getFindCommandRequest();
+    return (coll && (cq.getProj() == nullptr || cq.getProj()->isSimple()) &&
+            isIdHackEligibleQuery(coll, findCommandReq, cq.getExpCtx()->getCollator()) &&
             !findCommandReq.getReturnKey() && !findCommandReq.getBatchSize() &&
             (coll->getIndexCatalog()->haveIdIndex(opCtx) ||
              clustered_util::isClusteredOnId(coll->getClusteredInfo())));

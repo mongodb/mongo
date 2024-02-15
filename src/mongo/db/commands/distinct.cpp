@@ -193,18 +193,18 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
     const CollectionAcquisition& coll) {
     const auto yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
     const auto& collectionPtr = coll.getCollectionPtr();
+    const MultipleCollectionAccessor collections{coll};
 
     // If the collection doesn't exist 'getExecutor()' should create an EOF plan for it no matter
     // the query.
     if (!collectionPtr) {
-        return uassertStatusOK(getExecutorFind(opCtx,
-                                               MultipleCollectionAccessor{coll},
-                                               canonicalDistinct.releaseQuery(),
-                                               yieldPolicy));
+        return uassertStatusOK(
+            getExecutorFind(opCtx, collections, canonicalDistinct.releaseQuery(), yieldPolicy));
     }
 
     // Try creating a plan that does DISTINCT_SCAN.
-    auto executor = tryGetExecutorDistinct(coll, QueryPlannerParams::DEFAULT, &canonicalDistinct);
+    auto executor =
+        tryGetExecutorDistinct(collections, QueryPlannerParams::DEFAULT, canonicalDistinct);
     if (executor.isOK()) {
         return std::move(executor.getValue());
     }
@@ -226,8 +226,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> createExecutorForDistinctCo
                 .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures},
     });
 
-    return uassertStatusOK(getExecutorFind(
-        opCtx, MultipleCollectionAccessor{coll}, std::move(cqWithoutProjection), yieldPolicy));
+    return uassertStatusOK(
+        getExecutorFind(opCtx, collections, std::move(cqWithoutProjection), yieldPolicy));
 }
 }  // namespace
 

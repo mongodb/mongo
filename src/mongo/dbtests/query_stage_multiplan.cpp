@@ -455,7 +455,8 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     // Get planner params.
     QueryPlannerParams plannerParams;
     MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
-    fillOutPlannerParams(_opCtx.get(), collectionsAccessor, cq.get(), &plannerParams);
+    plannerParams.fillOutPlannerParams(
+        _opCtx.get(), *cq.get(), collectionsAccessor, true /* shouldIgnoreQuerySettings */);
 
     // Plan.
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);

@@ -57,7 +57,7 @@ assertStagesForExplainOfCommand({
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: 1, b: 1, text: "text"}));
 
-let result = assertStagesForExplainOfCommand({
+assertStagesForExplainOfCommand({
     coll: coll,
     cmdObj: cmdObj,
     expectedStages: ["COLLSCAN"],

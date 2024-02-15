@@ -53,8 +53,6 @@ namespace mongo::sbe {
  * Runs a trial period in order to evaluate the cost of a cached plan. If the cost is unexpectedly
  * high, the plan cache entry is deactivated and we use multi-planning to select an entirely new
  * winning plan. This process is called "replanning".
- *
- * TODO: refresh the list of indexes in 'queryParams' during replanning.
  */
 class CachedSolutionPlanner final : public BaseRuntimePlanner {
 public:

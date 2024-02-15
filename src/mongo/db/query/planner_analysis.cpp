@@ -957,6 +957,7 @@ QueryPlannerAnalysis::determineLookupStrategy(
         return boost::none;
     }();
 
+    // TODO: SERVER-85242: Ensure the robustness of the 'QuerySettings' fallback mechanism.
     if (!foreignCollItr->second.exists) {
         return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
     } else if (foreignIndex) {

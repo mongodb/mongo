@@ -50,6 +50,7 @@
 #include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/sbe_cached_solution_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/sbe_plan_cache.h"
@@ -76,8 +77,11 @@ CandidatePlans CachedSolutionPlanner::plan(
         // We'd like to check if there is any foreign collection in the hash_lookup stage that is no
         // longer eligible for using a hash_lookup plan. In this case we invalidate the cache and
         // immediately replan without ever running a trial period.
-        auto secondaryCollectionsInfo =
-            fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
+        // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
+        // fillOutSecondaryCollectionsInformation() planner param calls.
+        _queryParams.fillOutSecondaryCollectionsPlannerParams(_opCtx, _cq, _collections);
+
+        const auto& secondaryCollectionsInfo = _queryParams.secondaryCollectionsInfo;
 
         for (const auto& foreignCollection :
              roots[0].second.staticData->foreignHashJoinCollections) {
@@ -233,19 +237,20 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
         return std::make_pair(std::move(root), std::move(data));
     };
 
-    QueryPlannerParams plannerParams;
-    plannerParams.options = _queryParams.options;
-    fillOutPlannerParams(_opCtx, _collections, &_cq, &plannerParams);
+    QueryPlannerParams plannerParams(_queryParams.options);
+    // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
+    // fillOutSecondaryCollectionsInformation() planner param calls.
+    // QueryPlannerParams could be reused from the plan() method.
+    plannerParams.fillOutPlannerParams(_opCtx, _cq, _collections, false /* ignoreQuerySettings */);
+
     // Use the query planning module to plan the whole query.
     auto statusWithMultiPlanSolns = QueryPlanner::plan(_cq, plannerParams);
     auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 
     if (solutions.size() == 1) {
         if (!_cq.cqPipeline().empty()) {
-            auto secondaryCollectionsInfo =
-                fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
             solutions[0] = QueryPlanner::extendWithAggPipeline(
-                _cq, std::move(solutions[0]), secondaryCollectionsInfo);
+                _cq, std::move(solutions[0]), plannerParams.secondaryCollectionsInfo);
         }
 
         // Only one possible plan. Build the stages from the solution.

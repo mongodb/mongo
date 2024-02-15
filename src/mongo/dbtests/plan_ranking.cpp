@@ -139,7 +139,8 @@ public:
 
         QueryPlannerParams plannerParams;
         MultipleCollectionAccessor collectionsAccessor(collection.getCollection());
-        fillOutPlannerParams(&_opCtx, collectionsAccessor, cq, &plannerParams);
+        plannerParams.fillOutPlannerParams(
+            &_opCtx, *cq, collectionsAccessor, true /* shouldIgnoreQuerySettings */);
 
         // Plan.
         auto statusWithMultiPlanSolns = QueryPlanner::plan(*cq, plannerParams);

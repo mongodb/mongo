@@ -71,9 +71,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> SubPlanner::plan() {
     // Extend the winning solution with the agg pipeline and build the execution tree.
     if (!cq()->cqPipeline().empty()) {
         solution = QueryPlanner::extendWithAggPipeline(
-            *cq(),
-            std::move(solution),
-            fillOutSecondaryCollectionsInformation(opCtx(), collections(), cq()));
+            *cq(), std::move(solution), plannerParams().secondaryCollectionsInfo);
     }
 
     auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(

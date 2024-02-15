@@ -76,10 +76,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
 
     // Extend the winning solution with the agg pipeline and build the execution tree.
     if (!cq()->cqPipeline().empty()) {
+        // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
+        // fillOutSecondaryCollectionsInformation() planner param calls.
+        auto& queryPlannerParams = plannerParams();
+        queryPlannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx(), *cq(), collections());
         winningSolution = QueryPlanner::extendWithAggPipeline(
-            *cq(),
-            std::move(winningSolution),
-            fillOutSecondaryCollectionsInformation(opCtx(), collections(), cq()));
+            *cq(), std::move(winningSolution), queryPlannerParams.secondaryCollectionsInfo);
     }
 
     auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
