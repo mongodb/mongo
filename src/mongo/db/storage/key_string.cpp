@@ -2913,7 +2913,7 @@ RecordId decodeRecordIdStrAtEnd(const void* bufferRaw, size_t bufSize) {
         keyStringAssert(
             8273002,
             fmt::format("size bytes too long. bufSize: {}, sizeByteId: {}", bufSize, sizeByteId),
-            bufSize >= sizeByteId + 1 /* non-cont byte */);
+            bufSize > sizeByteId + 1 /* this is cont, so next byte must be within buffer */);
         keyStringAssert(
             8273003,
             fmt::format("size bytes longer than maximum allowed bytes. sizeByteId: {}", sizeByteId),
