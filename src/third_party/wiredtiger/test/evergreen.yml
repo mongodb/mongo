@@ -3605,7 +3605,8 @@ tasks:
       - func: "compile wiredtiger"
       - func: "split stress test"
 
-  - name: model-test
+  - name: model-unit-test
+    tags: ["pull_request", "model_checking"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -5176,7 +5177,7 @@ buildvariants:
     - name: chunkcache-test
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
-    - name: model-test
+    - name: model-unit-test
     - name: csuite-long-running
       batchtime: 1440 # once a day
 
@@ -5193,7 +5194,7 @@ buildvariants:
       export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libeatmydata.so:$LD_PRELOAD"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
   tasks:
-    - name: ".pull_request !.pull_request_compilers !.python !.tiered_unittest"
+    - name: ".pull_request !.pull_request_compilers !.model_checking !.python !.tiered_unittest"
     - name: examples-c-test
     - name: format-asan-smoke-test
 
@@ -5526,7 +5527,7 @@ buildvariants:
       batchtime: 40320 # 28 days
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
-    - name: model-test
+    - name: model-unit-test
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
