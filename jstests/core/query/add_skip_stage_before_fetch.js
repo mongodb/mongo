@@ -6,6 +6,8 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   operations_longer_than_stepdown_interval_in_txns,
+//   # The test inserts a lot of data which can fail in stepdown suites.
+//   does_not_support_stepdowns,
 // ]
 
 import {isIndexOnly} from "jstests/libs/analyze_plan.js";
