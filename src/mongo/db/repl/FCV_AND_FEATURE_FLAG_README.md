@@ -672,7 +672,7 @@ Because of this, each feature team should think about whether the feature could 
 
 If the feature will never run during initial sync, it's fine to continue using `isEnabled`. However, if the feature could be run during initial sync, the feature team 
 should use one of these options instead: 
- * Use `isEnabledUseLastLTSFCVWhenUninitialized`. This is currently the same as the `isEnabled` function. It checks against the default last LTS FCV version if the FCV version is unset, but note that this could result in the feature not being turned on even though the FCV will be set to latest once initial sync is complete.
+ * Use `isEnabledUseLastLTSFCVWhenUninitialized`. This checks against the default last LTS FCV version if the FCV version is unset, but note that this could result in the feature not being turned on even though the FCV will be set to latest once initial sync is complete.
  * Use `isEnabledUseLatestFCVWhenUninitialized`. This instead checks against the 
 latest FCV version if the FCV version is unset, but note that this could result in the feature being turned on
 even though the FCV has not been upgraded yet and will be set to lastLTS once initial sync is complete.
