@@ -53,6 +53,7 @@
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -292,8 +293,11 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveCollectionRequest) {
     }});
     _scheduler.start(operationContext());
 
-    auto futureResponse =
-        _scheduler.requestMoveCollection(operationContext(), kNss, kShardId0, kShardId1);
+    auto catalogClient = ShardingCatalogManager::get(operationContext())->localCatalogClient();
+    const auto dbEntry = catalogClient->getDatabase(
+        operationContext(), kNss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+    auto futureResponse = _scheduler.requestMoveCollection(
+        operationContext(), kNss, kShardId0, kShardId1, dbEntry.getVersion());
     ASSERT_OK(futureResponse.getNoThrow());
     remoteResponsesFuture.default_timed_get();
     _scheduler.stop();

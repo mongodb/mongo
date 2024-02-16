@@ -3,6 +3,8 @@
  * concurrently, and makes sure that all operations will succeed eventually when using the correct
  * 'collectionUUID' obtained from 'CollectionUUIDMismatch' error.
  * @tags: [
+ *   # balancer may move unsplittable collections and change the uuid
+ *   assumes_balancer_off,
  *   # This test just performs rename operations that can't be executed in transactions.
  *   does_not_support_transactions,
  *   requires_non_retryable_writes,

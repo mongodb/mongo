@@ -192,6 +192,9 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           useActionPermittedFile: true
+          fsmPreOverridesLoadedCallback:
+            import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+
   hooks:
   - class: ContinuousInitialSync
     use_action_permitted_file: true

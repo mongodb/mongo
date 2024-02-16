@@ -2,6 +2,8 @@
  * Tests running sharding operations with 'collectionUUID' parameter while the sharded collection is
  * being renamed concurrenlty.
  * @tags: [
+ *   # balancer may move unsplittable collections and change the uuid
+ *   assumes_balancer_off,
  *   # This test just performs rename operations that can't be executed in transactions.
  *   does_not_support_transactions,
  *   requires_non_retryable_writes,

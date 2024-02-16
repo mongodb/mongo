@@ -116,6 +116,10 @@ protected:
                          const ShardId& shardId,
                          const ChunkVersion& version);
 
+    CollectionType setUpUnsplittableCollection(const NamespaceString& collName,
+                                               const ShardId& shardId,
+                                               boost::optional<const UUID> collUUID = boost::none);
+
     /**
      * Inserts a document into the config.tags collection so that the zone defined by the
      * parameters exists.

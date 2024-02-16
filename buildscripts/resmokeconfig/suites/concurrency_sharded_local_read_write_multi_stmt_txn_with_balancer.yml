@@ -126,6 +126,9 @@ executor:
           runningWithSessions: true
           traceExceptions: false
           runningWithBalancer: true
+          fsmPreOverridesLoadedCallback:
+            import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+
   hooks:
   - class: CheckShardFilteringMetadata
   - class: CheckReplDBHashInBackground
@@ -152,6 +155,10 @@ executor:
         queryAnalysisWriterIntervalSecs: 1
         defaultConfigCommandTimeoutMS: 90000
         skipDroppingHashedShardKeyIndex: true
+        failpoint.overrideDDLLockTimeout:
+          mode: alwaysOn
+          data:
+              blockTimeMS: 900000 # 15 * 60 * 1000
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2

@@ -117,6 +117,9 @@ executor:
           runningWithSessions: true
           traceExceptions: false
           runningWithBalancer: true
+          fsmPreOverridesLoadedCallback:
+            import("jstests/libs/override_methods/implicitly_retry_on_migration_in_progress.js");
+
   hooks:
   - class: CheckShardFilteringMetadata
   - class: CheckReplDBHashInBackground

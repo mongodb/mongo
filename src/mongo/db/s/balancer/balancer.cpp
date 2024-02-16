@@ -397,13 +397,11 @@ void enqueueCollectionMigrations(OperationContext* opCtx,
                                  MigrationsAndResponses& migrationsAndResponses) {
     auto requestMigration = [&](const MigrateInfo& migrateInfo) -> SemiFuture<void> {
         auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-        auto dbPrimaryShardId = catalogClient
-                                    ->getDatabase(opCtx,
-                                                  migrateInfo.nss.dbName(),
-                                                  repl::ReadConcernLevel::kMajorityReadConcern)
-                                    .getPrimary();
+        const auto dbEntry = catalogClient->getDatabase(
+            opCtx, migrateInfo.nss.dbName(), repl::ReadConcernLevel::kMajorityReadConcern);
+
         return scheduler.requestMoveCollection(
-            opCtx, migrateInfo.nss, migrateInfo.to, dbPrimaryShardId);
+            opCtx, migrateInfo.nss, migrateInfo.to, dbEntry.getPrimary(), dbEntry.getVersion());
     };
 
     for (auto& migrationAndResponse : migrationsAndResponses) {

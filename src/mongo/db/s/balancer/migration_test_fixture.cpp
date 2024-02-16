@@ -70,6 +70,17 @@ void MigrationTestFixture::setUpCollection(
         operationContext(), CollectionType::ConfigNS, coll.toBSON(), kMajorityWriteConcern));
 }
 
+CollectionType MigrationTestFixture::setUpUnsplittableCollection(
+    const NamespaceString& collName, const ShardId& shardId, boost::optional<const UUID> collUUID) {
+    ChunkVersion defaultVersion({OID::gen(), Timestamp(42)}, {2, 0});
+    UUID uuid = collUUID.get_value_or(UUID::gen());
+    std::vector<ChunkType> chunks;
+    ChunkRange keyRange{kKeyPattern.globalMin(), kKeyPattern.globalMax()};
+    chunks.emplace_back(uuid, keyRange, defaultVersion, shardId);
+    return setupCollection(
+        collName, kKeyPattern, chunks, [](CollectionType& coll) { coll.setUnsplittable(true); });
+}
+
 ChunkType MigrationTestFixture::setUpChunk(const UUID& collUUID,
                                            const BSONObj& chunkMin,
                                            const BSONObj& chunkMax,

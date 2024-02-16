@@ -39,7 +39,7 @@ namespace mongo {
 
 class MoveUnshardedPolicy : public ActionsStreamPolicy {
 public:
-    MoveUnshardedPolicy() = default;
+    MoveUnshardedPolicy();
 
     virtual StringData getName() const {
         static StringData name("MoveUnshardedPolicy");
@@ -59,9 +59,10 @@ public:
     MigrateInfoVector selectCollectionsToMove(
         OperationContext* opCtx,
         const std::vector<ClusterStatistics::ShardStatistics>& allShards,
-        stdx::unordered_set<ShardId>* availableShards) {
-        return {};  // Not yet implemented
-    }
+        stdx::unordered_set<ShardId>* availableShards);
+
+private:
+    FailPoint* fpBalancerShouldReturnRandomMigrations;
 };
 
 }  // namespace mongo

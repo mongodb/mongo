@@ -10,7 +10,11 @@
  * Unfortunately, there aren't very many assertions we can make here, so this is mostly to test that
  * the server doesn't deadlock or crash.
  *
- * @tags: [requires_capped]
+ * @tags: [
+ *   # TODO SERVER-86622: Disabled due to problems with moving unsplittable collections
+ *   assumes_balancer_off,
+ *   requires_capped,
+ * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";

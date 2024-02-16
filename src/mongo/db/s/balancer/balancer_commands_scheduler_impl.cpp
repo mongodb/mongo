@@ -269,9 +269,10 @@ SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardId& toShardId,
-    const ShardId& dbPrimaryShardId) {
+    const ShardId& dbPrimaryShardId,
+    const DatabaseVersion& dbVersion) {
     auto commandInfo =
-        std::make_shared<MoveCollectionCommandInfo>(nss, toShardId, dbPrimaryShardId);
+        std::make_shared<MoveCollectionCommandInfo>(nss, toShardId, dbPrimaryShardId, dbVersion);
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
         .then([](const executor::RemoteCommandResponse& remoteResponse) {

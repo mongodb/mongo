@@ -305,9 +305,11 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opC
     return ShardType::fromBSON(doc.getValue());
 }
 
-CollectionType ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
-                                                        const KeyPattern& shardKey,
-                                                        const std::vector<ChunkType>& chunks) {
+CollectionType ConfigServerTestFixture::setupCollection(
+    const NamespaceString& nss,
+    const KeyPattern& shardKey,
+    const std::vector<ChunkType>& chunks,
+    std::function<void(CollectionType& coll)> collectionCustomizer) {
     auto dbDoc = findOneOnConfigCollection(
         operationContext(),
         NamespaceString::kConfigDatabasesNamespace,
@@ -329,6 +331,8 @@ CollectionType ConfigServerTestFixture::setupCollection(const NamespaceString& n
                         Date_t::now(),
                         chunks[0].getCollectionUUID(),
                         shardKey);
+    collectionCustomizer(coll);
+
     ASSERT_OK(
         insertToConfigCollection(operationContext(), CollectionType::ConfigNS, coll.toBSON()));
 

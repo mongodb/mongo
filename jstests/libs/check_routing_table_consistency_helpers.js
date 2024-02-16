@@ -212,6 +212,13 @@ export var RoutingTableConsistencyChecker = (function() {
                        namespaceMetadata.placement.length === 2,
                    `Unexpected output format from collectPlacementMetadataByNamespace(): ${
                        tojson(namespaceMetadata)}`);
+            // Moving unsplittable collections may fail in the following check because some
+            // collections might be on flight
+            const collName = namespaceMetadata._id.substring(namespaceMetadata._id.indexOf('.') + 1,
+                                                             namespaceMetadata._id.length);
+            if (collName.startsWith("system.resharding")) {
+                return;
+            }
             // Information missing from either the routing table or placement history.
             assert(namespaceMetadata.placement.length === 2,
                    `Incomplete placement metadata for namespace ${
