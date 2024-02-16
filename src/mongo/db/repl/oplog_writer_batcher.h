@@ -46,8 +46,6 @@ public:
     // Get a batch from the underlying OplogBuffer for the OplogWriter to write to disk. If the
     // buffer is empty, the batcher will wait for the next batch until the maxWaitTime timeout is
     // hit, so this function can return an empty batch.
-    // Note: If secondaryDelaySecs is set, we can wait until all entries in a batch meet
-    // secondaryDelaySecs, which can be longer than maxWaitTime.
     OplogBatchBSONObj getNextBatch(OperationContext* opCtx, Seconds maxWaitTime);
 
 private:
@@ -71,15 +69,22 @@ private:
     boost::optional<Date_t> _calculateSecondaryDelaySecsLatestTimestamp();
 
     /**
-     * If secondaryDelaySecs is set, wait until all oplog entries in this batch has met
-     * secondaryDelaySecs before return.*/
-    void _waitSecondaryDelaySecsIfNecessary(OperationContext* opCtx,
-                                            const OplogBatchBSONObj& batch);
+     * Get a batch from either the _stashedBatch or _oplogBuffer. If there is an entry in the batch
+     * not passing delaySecsLatestTimestamp, keep the whole batch in _stashedBatch and revisit next
+     * time.
+     */
+    bool _pollFromBuffer(OperationContext* opCtx,
+                         OplogBatchBSONObj* batch,
+                         boost::optional<Date_t>& delaySecsLatestTimestamp);
 
 private:
     // This should be a OplogBuffer that supports batch operations.
     // Not owned by us.
     OplogBuffer* const _oplogBuffer;
+
+    // Keep the last batch from buffer when the batch is not passing secondaryDelaySecs. This will
+    // be reset to null once that batch passes secondaryDelaySecs and return to the caller.
+    boost::optional<OplogBatchBSONObj> _stashedBatch = boost::none;
 };
 
 }  // namespace repl

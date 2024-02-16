@@ -281,7 +281,8 @@ TEST_F(OplogWriterBatcherTest, BatcherWillNotWaitForMoreDataWhenAlreadyHaveBatch
 TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecs) {
     OplogWriterBufferMock writerBuffer;
     OplogWriterBatcher writerBatcher(&writerBuffer);
-    dynamic_cast<ReplicationCoordinatorMock*>(getReplCoord())->setSecondaryDelaySecs(Seconds(5));
+    // Set SecondaryDelaySecs to a large number, so we should get empty batches at the beginning.
+    dynamic_cast<ReplicationCoordinatorMock*>(getReplCoord())->setSecondaryDelaySecs(Seconds(500));
     auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
 
     // Put one entry that is over secondaryDelaySecs and one entry not, the batcher will wait until
@@ -291,11 +292,33 @@ TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecs) {
         16 * 1024 * 1024 /*16MB*/);
     writerBuffer.push_forTest(batch1);
 
+    for (auto i = 0; i < 5; i++) {
+        ASSERT_TRUE(writerBatcher.getNextBatch(opCtx(), Seconds(1)).empty());
+    }
+
+    // Set SecondaryDelaySecs to a small number, then we can get the batch.
+    dynamic_cast<ReplicationCoordinatorMock*>(getReplCoord())->setSecondaryDelaySecs(Seconds(5));
+
     auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
     auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
-
-    // getNextBatch() should return after delaying 5s as we configured.
     ASSERT_TRUE(endTime - startTime >= 5);
+}
+
+TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecsReturnFirstBatch) {
+    OplogWriterBufferMock writerBuffer;
+    OplogWriterBatcher writerBatcher(&writerBuffer);
+    dynamic_cast<ReplicationCoordinatorMock*>(getReplCoord())->setSecondaryDelaySecs(Seconds(5));
+    auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+    // If we have two batches from the buffer that can be merged into one and the second batch
+    // doesn't meet secondaryDelaySecs, we should return the first batch immediately.
+    OplogBatchBSONObj batch1({makeNoopOplogEntry(Seconds(startTime - 100))},
+                             16 * 1024 * 1024 /*16MB*/);
+    OplogBatchBSONObj batch2({makeNoopOplogEntry(Seconds(startTime))}, 16 * 1024 * 1024 /*16MB*/);
+    writerBuffer.push_forTest(batch1);
+    writerBuffer.push_forTest(batch2);
+
+    auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
+    ASSERT_EQ(16 * 1024 * 1024, batch.getByteSize());
 }
 
 }  // namespace repl

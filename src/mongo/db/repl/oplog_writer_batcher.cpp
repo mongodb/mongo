@@ -50,16 +50,15 @@ OplogBatchBSONObj OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seco
     OplogBatchBSONObj batch;
     size_t totalBytes = 0;
     size_t totalOps = 0;
+    auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp();
 
     while (true) {
-        while (_oplogBuffer->tryPopBatch(opCtx, &batch)) {
+        while (_pollFromBuffer(opCtx, &batch, delaySecsLatestTimestamp)) {
             auto batchSize = batch.getByteSize();
             invariant(batchSize <= kMinWriterBatchSize);
-
             totalBytes += batchSize;
             totalOps += batch.size();
             batches.push_back(std::move(batch));
-
             // Once the total bytes is between 16MB and 32MB, we return it as a writer batch. This
             // may not be optimistic on size but we can avoid waiting the next batch coming before
             // deciding whether we can return.
@@ -69,7 +68,7 @@ OplogBatchBSONObj OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seco
             }
         }
 
-        if (totalBytes != 0 || !_waitForData(opCtx, maxWaitTime)) {
+        if (!batches.empty() || !_waitForData(opCtx, maxWaitTime)) {
             break;
         }
     }
@@ -79,10 +78,36 @@ OplogBatchBSONObj OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seco
         return OplogBatchBSONObj();
     }
 
-    auto finalBatch = _mergeBatches(batches, totalBytes, totalOps);
-    _waitSecondaryDelaySecsIfNecessary(opCtx, finalBatch);
-    return finalBatch;
+    return _mergeBatches(batches, totalBytes, totalOps);
 }
+
+bool OplogWriterBatcher::_pollFromBuffer(OperationContext* opCtx,
+                                         OplogBatchBSONObj* batch,
+                                         boost::optional<Date_t>& delaySecsLatestTimestamp) {
+    if (_stashedBatch) {
+        *batch = std::move(*_stashedBatch);
+        _stashedBatch = boost::none;
+    } else if (!_oplogBuffer->tryPopBatch(opCtx, batch)) {
+        return false;
+    }
+
+    if (delaySecsLatestTimestamp) {
+        auto& lastEntry = batch->back();
+        auto entryTime = Date_t::fromDurationSinceEpoch(
+            Seconds(lastEntry.getField(OplogEntry::kTimestampFieldName).timestamp().getSecs()));
+        // See if the last entry has passed secondaryDelaySecs, which means all entries in
+        // this batch has passed secondaryDelaySecs. This could cause earlier entries in the
+        // same batch got delayed longer but that only happens in a rare case and only in
+        // one batch.
+        if (entryTime > *delaySecsLatestTimestamp) {
+            _stashedBatch = std::move(*batch);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 
 OplogBatchBSONObj OplogWriterBatcher::_mergeBatches(std::vector<OplogBatchBSONObj>& batches,
                                                     size_t totalBytes,
@@ -99,6 +124,14 @@ OplogBatchBSONObj OplogWriterBatcher::_mergeBatches(std::vector<OplogBatchBSONOb
 }
 
 bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Seconds maxWaitTime) {
+    // If there is a stashedBatch, meaning we only have this batch and it is not passing
+    // secondaryDelaySecs yet, so we wait 1s here and return an empty batch to the caller of this
+    // batcher.
+    if (_stashedBatch) {
+        sleepsecs(1);
+        return false;
+    }
+
     try {
         if (_oplogBuffer->waitForDataFor(duration_cast<Milliseconds>(maxWaitTime), opCtx)) {
             return true;
@@ -124,33 +157,6 @@ boost::optional<Date_t> OplogWriterBatcher::_calculateSecondaryDelaySecsLatestTi
     }
     auto fastClockSource = service->getFastClockSource();
     return fastClockSource->now() - secondaryDelaySecs;
-}
-
-void OplogWriterBatcher::_waitSecondaryDelaySecsIfNecessary(OperationContext* opCtx,
-                                                            const OplogBatchBSONObj& batch) {
-    invariant(!batch.empty());
-    auto& lastEntry = batch.back();
-    auto entryTime = Date_t::fromDurationSinceEpoch(
-        Seconds(lastEntry.getField(OplogEntry::kTimestampFieldName).timestamp().getSecs()));
-    boost::optional<Date_t> secondaryDelaySecsLatestTimestamp = boost::none;
-    while ((secondaryDelaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp())) {
-        // See if the last entry has passed secondaryDelaySecs, which means all entries in
-        // this batch has passed secondaryDelaySecs. This could cause earlier entries in the
-        // same batch got delayed longer but that only happens in a rare case and only in
-        // one batch.
-        if (entryTime <= *secondaryDelaySecsLatestTimestamp) {
-            return;
-        }
-
-        try {
-            opCtx->sleepFor(Seconds(1));
-        } catch (const ExceptionForCat<ErrorCategory::CancellationError>& ex) {
-            LOGV2(8602601,
-                  "Interrupted when waiting for secondaryDelaySecs, return a batch "
-                  "before secondaryDelaySecs is met.",
-                  "error"_attr = ex.toString());
-        }
-    }
 }
 
 }  // namespace repl
