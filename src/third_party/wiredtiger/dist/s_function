@@ -1,12 +1,14 @@
 #!/bin/bash
 
 # Check various WiredTiger function behaviors.
-t=__wt.$$
-trap 'rm -f $t' 0 1 2 3 13 15
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+setup_trap
+cd_top
 
 fast=1
 case "$1" in
     -F) # Run fast.
+        check_fast_mode
         fast=0
         shift;;
     *)
@@ -16,8 +18,6 @@ case "$1" in
         fi
         ;;
 esac
-
-cd ..
 
 # Turn a C file into a line per function so we can use grep on it.
 file_parse()
@@ -35,8 +35,7 @@ file_parse()
 if test $fast -eq 1 ; then
     files=`find bench examples ext src test -name '*.c' -o -name '*_inline.h'`
 else
-    last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
-    files=`git diff --name-only "${last_commit_from_dev}" bench examples ext src test | grep -E '(.c|_inline.h)$'`
+    files=`git diff --name-only "$(last_commit_from_dev)" bench examples ext src test | grep -E '(.c|_inline.h)$'`
 fi
 
 # Returns in functions after a jump to the error label, or an infinite loop
@@ -131,8 +130,7 @@ done
 if test $fast -eq 1 ; then
     files=`find src -name '*.c' -o -name '*._inline.h'`
 else
-    last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
-    files=`git diff --name-only "${last_commit_from_dev}" src | grep -E '(.c|_inline.h)$'`
+    files=`git diff --name-only "$(last_commit_from_dev)" src | grep -E '(.c|_inline.h)$'`
 fi
 
 # __wt_verbose with a bitwise OR category parameter.

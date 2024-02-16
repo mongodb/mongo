@@ -1,13 +1,15 @@
 #!/bin/bash
 
-t=__wt.$$
-trap 'rm -f $t' 0 1 2 3 13 15
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+setup_trap
+cd_top
 
 fast=false
 exit1=0
 exit2=0
 case "$1" in
     -F) # Run fast.
+        check_fast_mode
         fast=true
         shift;;
     *)
@@ -21,14 +23,12 @@ esac
 if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
     if $fast ; then
         # Check the evergreen.yml files for modifications.
-        last_commit_from_dev=$(python3 ./common_functions.py last_commit_from_dev)
-        search=`git diff --name-only "${last_commit_from_dev}" | grep -E 'evergreen.*\.yml$'`
+        search=`git diff --name-only "$(last_commit_from_dev)" | grep -E 'evergreen.*\.yml$'`
         # If we didn't find any files then exit.
         if test -z "$search"; then
             exit 0
         fi
     fi
-    cd ..
     echo "Validating evergreen.yml " > dist/$t
     evergreen validate -p wiredtiger test/evergreen.yml >> dist/$t 2>&1
     exit1=$?

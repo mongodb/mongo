@@ -1,9 +1,9 @@
 #! /bin/bash
 
 set -o pipefail
-
-t=__wt.$$
-trap 'rm -rf $t' 0 1 2 3 13 15
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+setup_trap
+cd_top
 
 download_clang_format() {
     version=$1
@@ -35,17 +35,6 @@ download_clang_format() {
     fi
 }
 
-# Find the top-level WiredTiger directory.
-dest_dir=$(git rev-parse --show-toplevel)
-
-# If this is a MongoDB source tree, move to the WiredTiger subtree.
-git_repo_str=$(git config remote.origin.url)
-is_mongo_repo=$(echo "$git_repo_str" | grep "mongodb/mongo")
-if [ -n "$is_mongo_repo" ] ; then
-       dest_dir="$dest_dir/src/third_party/wiredtiger"
-fi
-cd "$dest_dir" || exit 1
-
 # Override existing Clang-Format versions in the PATH.
 export PATH="${PWD}/dist":$PATH
 
@@ -71,8 +60,8 @@ case $# in
     # If the -F option is not specified then find every source file.
     if [ $1 == "-F" ]; then
         # We are running in fast mode, get all the source files modified according to git.
-        last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
-        search=`git diff --name-only ${last_commit_from_dev} | grep -E '\.(c|h|cpp)$'`
+        check_fast_mode
+        search=`git diff --name-only $(last_commit_from_dev) | grep -E '\.(c|h|cpp)$'`
     else
         search="$1"
         exclude=false

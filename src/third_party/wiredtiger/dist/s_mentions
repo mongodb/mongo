@@ -9,6 +9,11 @@
 # build directories, and when the Git repository is checkout out with the Jira ticket in the name
 # of the repo, and the current branch name matches the Jira ticket as well.
 
+# This script is not supposed to work outside of main WT repo.
+
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+cd_dist
+
 # Retrieve the current branch name.
 branch_name=$(git rev-parse --abbrev-ref HEAD 2>&1 || echo "BRANCH_NOT_FOUND")
 

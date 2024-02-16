@@ -2,7 +2,8 @@
 
 # Run standard scripts.
 
-t=__wt.$$
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+cd_dist
 t_pfx=__s_all_tmp_
 
 allchildpids() { # Recursively get PIDs of all child processes.
@@ -87,6 +88,7 @@ while [[ "$#" -gt 0 ]]
         force="-f"
         shift;;
     -F)                # Run fast.
+        check_fast_mode
         echo "dist/s_all running in fast mode..."
         fast="-F"
         shift;;

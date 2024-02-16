@@ -1,11 +1,10 @@
 #!/bin/bash
 
-t=__wt.$$
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+cd_top
 t_pfx=__s_clang_tidy_tmp_
 trap 'rm -rf $t $t_pfx*' 0 1 2 3 13 15
 
-# Find the top-level WiredTiger directory and move to there.
-top=`git rev-parse --show-toplevel` && cd $top || exit 1
 echo "$0: running clang-tidy in $PWD"
 
 # Clang isn't installed in any standard place, find a binary we can use.

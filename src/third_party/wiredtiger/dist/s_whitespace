@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Single space, newline at the end of file, and remove trailing whitespace from source files.
-t=__wt.$$
-trap 'rm -f $t' 0 1 2 3 13 15
-cd -- "$(dirname -- "${BASH_SOURCE[0]}")"/.. || exit $?
-[[ `uname -s` == Darwin ]] && EGREP="dist/pygrep.py -E" FGREP="dist/pygrep.py -F" || EGREP=egrep FGREP=fgrep
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+setup_trap
+cd_top
+use_pygrep
 
 # Clear lines that only contain whitespace, compress multiple empty lines
 # into a single line, discard trailing empty lines.
@@ -28,8 +28,8 @@ whitespace()
 SUBDIRS="bench examples ext src test"
 {
     if [[ "$1" = "-F" ]]; then
-        last_commit_from_dev=$(python3 dist/common_functions.py last_commit_from_dev)
-        git diff --name-only "${last_commit_from_dev}" $SUBDIRS | \
+        check_fast_mode
+        git diff --name-only "$(last_commit_from_dev)" $SUBDIRS | \
             $EGREP \
                 -e '\.[ch]$' \
                 -e '\.cpp$' \

@@ -1,6 +1,7 @@
 #! /bin/bash
 
-t=__wt.$$
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+cd_dist
 t2=__wt.$$.2
 trap 'rm -f $t $t2' 0 1 2 3 13 15
 

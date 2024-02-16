@@ -2,6 +2,8 @@
 
 # Only run when building a release
 test -z "$WT_RELEASE_BUILD" && exit 0
+. `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
+cd_dist
 
 # Check the copyrights.
 
