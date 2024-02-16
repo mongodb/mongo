@@ -126,7 +126,7 @@ StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Collection not found looking for state document: "
-                                    << redactTenant(NamespaceString::kShardSplitDonorsNamespace));
+                                    << NamespaceString::kShardSplitDonorsNamespace.ns());
     }
 
     BSONObj result;
