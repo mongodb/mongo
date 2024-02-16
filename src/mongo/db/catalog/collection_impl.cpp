@@ -329,7 +329,6 @@ CollectionImpl::SharedState::SharedState(OperationContext* opCtx,
                                          std::unique_ptr<RecordStore> recordStore,
                                          const CollectionOptions& options)
     : _recordStore(std::move(recordStore)),
-      _recordIdsReplicated(options.recordIdsReplicated),
       // Capped collections must preserve insertion order, so we serialize writes. One exception are
       // clustered capped collections because they only guarantee insertion order when cluster keys
       // are inserted in monotonically-increasing order.
@@ -967,7 +966,7 @@ void CollectionImpl::setChangeStreamPreAndPostImages(OperationContext* opCtx,
 }
 
 bool CollectionImpl::areRecordIdsReplicated() const {
-    return _shared->_recordIdsReplicated;
+    return _metadata->options.recordIdsReplicated;
 }
 
 bool CollectionImpl::isCapped() const {

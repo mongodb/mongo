@@ -457,8 +457,6 @@ private:
         // default collation is simple binary compare.
         std::unique_ptr<CollatorInterface> _collator;
 
-        const bool _recordIdsReplicated;
-
         const bool _isCapped;
         const bool _needCappedLock;
 
