@@ -10,7 +10,7 @@
  * __insert_simple_func --
  *     Worker function to add a WT_INSERT entry to the middle of a skiplist.
  */
-static inline int
+static WT_INLINE int
 __insert_simple_func(
   WT_SESSION_IMPL *session, WT_INSERT ***ins_stack, WT_INSERT *new_ins, u_int skipdepth)
 {
@@ -50,7 +50,7 @@ __insert_simple_func(
  * __insert_serial_func --
  *     Worker function to add a WT_INSERT entry to a skiplist.
  */
-static inline int
+static WT_INLINE int
 __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack,
   WT_INSERT *new_ins, u_int skipdepth)
 {
@@ -96,7 +96,7 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_INSE
  *     Worker function to allocate a record number as necessary, then add a WT_INSERT entry to a
  *     skiplist.
  */
-static inline int
+static WT_INLINE int
 __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack,
   WT_INSERT *new_ins, uint64_t *recnop, u_int skipdepth)
 {
@@ -143,7 +143,7 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_
  * __wt_col_append_serial --
  *     Append a new column-store entry.
  */
-static inline int
+static WT_INLINE int
 __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *ins_head,
   WT_INSERT ***ins_stack, WT_INSERT **new_insp, size_t new_ins_size, uint64_t *recnop,
   u_int skipdepth, bool exclusive)
@@ -188,7 +188,7 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *
  * __wt_insert_serial --
  *     Insert a row or column-store entry.
  */
-static inline int
+static WT_INLINE int
 __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *ins_head,
   WT_INSERT ***ins_stack, WT_INSERT **new_insp, size_t new_ins_size, u_int skipdepth,
   bool exclusive)
@@ -240,7 +240,7 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *ins_
  * __wt_update_serial --
  *     Update a row or column-store entry.
  */
-static inline int
+static WT_INLINE int
 __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page,
   WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size, bool exclusive)
 {

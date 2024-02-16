@@ -10,7 +10,7 @@
  * __wt_cache_aggressive --
  *     Indicate if the cache is operating in aggressive mode.
  */
-static inline bool
+static WT_INLINE bool
 __wt_cache_aggressive(WT_SESSION_IMPL *session)
 {
     return (S2C(session)->cache->evict_aggressive_score >= WT_EVICT_SCORE_CUTOFF);
@@ -20,7 +20,7 @@ __wt_cache_aggressive(WT_SESSION_IMPL *session)
  * __wt_cache_read_gen --
  *     Get the current read generation number.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_read_gen(WT_SESSION_IMPL *session)
 {
     return (S2C(session)->cache->read_gen);
@@ -30,7 +30,7 @@ __wt_cache_read_gen(WT_SESSION_IMPL *session)
  * __wt_cache_read_gen_incr --
  *     Increment the current read generation number.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
 {
     ++S2C(session)->cache->read_gen;
@@ -40,7 +40,7 @@ __wt_cache_read_gen_incr(WT_SESSION_IMPL *session)
  * __wt_cache_read_gen_bump --
  *     Update the page's read generation.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /* Ignore pages set for forcible eviction. */
@@ -65,7 +65,7 @@ __wt_cache_read_gen_bump(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_cache_read_gen_new --
  *     Get the read generation for a new page in memory.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_CACHE *cache;
@@ -78,7 +78,7 @@ __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_cache_stuck --
  *     Indicate if the cache is stuck (i.e., not making progress).
  */
-static inline bool
+static WT_INLINE bool
 __wt_cache_stuck(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
@@ -93,7 +93,7 @@ __wt_cache_stuck(WT_SESSION_IMPL *session)
  * __wt_page_evict_soon --
  *     Set a page to be evicted as soon as possible.
  */
-static inline void
+static WT_INLINE void
 __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_UNUSED(session);
@@ -105,7 +105,7 @@ __wt_page_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
  * __wt_page_dirty_and_evict_soon --
  *     Mark a page dirty and set it to be evicted as soon as possible.
  */
-static inline int
+static WT_INLINE int
 __wt_page_dirty_and_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_RET(__wt_page_modify_init(session, ref->page));
@@ -119,7 +119,7 @@ __wt_page_dirty_and_evict_soon(WT_SESSION_IMPL *session, WT_REF *ref)
  * __wt_cache_pages_inuse --
  *     Return the number of pages in use.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache)
 {
     return (cache->pages_inmem - cache->pages_evicted);
@@ -129,7 +129,7 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
  * __wt_cache_bytes_plus_overhead --
  *     Apply the cache overhead to a size in bytes.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_bytes_plus_overhead(WT_CACHE *cache, uint64_t sz)
 {
     if (cache->overhead_pct != 0)
@@ -142,7 +142,7 @@ __wt_cache_bytes_plus_overhead(WT_CACHE *cache, uint64_t sz)
  * __wt_cache_bytes_inuse --
  *     Return the number of bytes in use.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
     return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_inmem));
@@ -152,7 +152,7 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
  * __wt_cache_dirty_inuse --
  *     Return the number of dirty bytes in use.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_dirty_inuse(WT_CACHE *cache)
 {
     return (
@@ -163,7 +163,7 @@ __wt_cache_dirty_inuse(WT_CACHE *cache)
  * __wt_cache_dirty_leaf_inuse --
  *     Return the number of dirty bytes in use by leaf pages.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
 {
     return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_dirty_leaf));
@@ -173,7 +173,7 @@ __wt_cache_dirty_leaf_inuse(WT_CACHE *cache)
  * __wt_cache_bytes_updates --
  *     Return the number of bytes in use for updates.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_bytes_updates(WT_CACHE *cache)
 {
     return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_updates));
@@ -183,7 +183,7 @@ __wt_cache_bytes_updates(WT_CACHE *cache)
  * __wt_cache_bytes_image --
  *     Return the number of page image bytes in use.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_bytes_image(WT_CACHE *cache)
 {
     return (
@@ -194,7 +194,7 @@ __wt_cache_bytes_image(WT_CACHE *cache)
  * __wt_cache_bytes_other --
  *     Return the number of bytes in use not for page images.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_cache_bytes_other(WT_CACHE *cache)
 {
     uint64_t bytes_other;
@@ -211,7 +211,7 @@ __wt_cache_bytes_other(WT_CACHE *cache)
  * __wt_session_can_wait --
  *     Return if a session available for a potentially slow operation.
  */
-static inline bool
+static WT_INLINE bool
 __wt_session_can_wait(WT_SESSION_IMPL *session)
 {
     /*
@@ -233,7 +233,7 @@ __wt_session_can_wait(WT_SESSION_IMPL *session)
  * __wt_eviction_clean_needed --
  *     Return if an application thread should do eviction due to the total volume of data in cache.
  */
-static inline bool
+static WT_INLINE bool
 __wt_eviction_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
     WT_CACHE *cache;
@@ -257,7 +257,7 @@ __wt_eviction_clean_needed(WT_SESSION_IMPL *session, double *pct_fullp)
  * __wt_eviction_dirty_target --
  *     Return the effective dirty target (including checkpoint scrubbing).
  */
-static inline double
+static WT_INLINE double
 __wt_eviction_dirty_target(WT_CACHE *cache)
 {
     double dirty_target, scrub_target;
@@ -273,7 +273,7 @@ __wt_eviction_dirty_target(WT_CACHE *cache)
  *     Return if an application thread should do eviction due to the total volume of dirty data in
  *     cache.
  */
-static inline bool
+static WT_INLINE bool
 __wt_eviction_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
     WT_CACHE *cache;
@@ -298,7 +298,7 @@ __wt_eviction_dirty_needed(WT_SESSION_IMPL *session, double *pct_fullp)
  *     Return if an application thread should do eviction due to the total volume of updates in
  *     cache.
  */
-static inline bool
+static WT_INLINE bool
 __wt_eviction_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
 {
     WT_CACHE *cache;
@@ -322,7 +322,7 @@ __wt_eviction_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
  * __wt_btree_dominating_cache --
  *     Return if a single btree is occupying at least half of any of our target's cache usage.
  */
-static inline bool
+static WT_INLINE bool
 __wt_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
     WT_CACHE *cache;
@@ -349,7 +349,7 @@ __wt_btree_dominating_cache(WT_SESSION_IMPL *session, WT_BTREE *btree)
  *     Return if an application thread should do eviction, and the cache full percentage as a
  *     side-effect.
  */
-static inline bool
+static WT_INLINE bool
 __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pct_fullp)
 {
     WT_CACHE *cache;
@@ -399,7 +399,7 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double 
  * __wt_cache_full --
  *     Return if the cache is at (or over) capacity.
  */
-static inline bool
+static WT_INLINE bool
 __wt_cache_full(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
@@ -415,7 +415,7 @@ __wt_cache_full(WT_SESSION_IMPL *session)
  * __wt_cache_hs_dirty --
  *     Return if a major portion of the cache is dirty due to history store content.
  */
-static inline bool
+static WT_INLINE bool
 __wt_cache_hs_dirty(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
@@ -433,7 +433,7 @@ __wt_cache_hs_dirty(WT_SESSION_IMPL *session)
  * __wt_cache_eviction_check --
  *     Evict pages if the cache crosses its boundaries.
  */
-static inline int
+static WT_INLINE int
 __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bool *didworkp)
 {
     WT_BTREE *btree;

@@ -8,14 +8,14 @@
 
 #include "wt_internal.h"
 
-static inline int __validate_next_stack(
+static WT_INLINE int __validate_next_stack(
   WT_SESSION_IMPL *session, WT_INSERT *next_stack[WT_SKIP_MAXDEPTH], WT_ITEM *srch_key);
 
 /*
  * __search_insert_append --
  *     Fast append search of a row-store insert list, creating a skiplist stack as we go.
  */
-static inline int
+static WT_INLINE int
 __search_insert_append(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head,
   WT_ITEM *srch_key, bool *donep)
 {
@@ -217,7 +217,7 @@ __wt_search_insert(
  *     to larger inserts than lower levels, and all inserts are larger than the srch_key used in
  *     building the next_stack.
  */
-static inline int
+static WT_INLINE int
 __validate_next_stack(
   WT_SESSION_IMPL *session, WT_INSERT *next_stack[WT_SKIP_MAXDEPTH], WT_ITEM *srch_key)
 {
@@ -286,7 +286,7 @@ __validate_next_stack(
  * __check_leaf_key_range --
  *     Check the search key is in the leaf page's key range.
  */
-static inline int
+static WT_INLINE int
 __check_leaf_key_range(
   WT_SESSION_IMPL *session, WT_ITEM *srch_key, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {

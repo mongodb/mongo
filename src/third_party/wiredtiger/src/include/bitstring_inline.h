@@ -64,7 +64,7 @@
  * __bit_alloc --
  *	Allocate a bitstring.
  */
-static inline int
+static WT_INLINE int
 __bit_alloc(WT_SESSION_IMPL *session, uint64_t nbits, void *retp)
 {
 	return (__wt_calloc(
@@ -75,8 +75,9 @@ __bit_alloc(WT_SESSION_IMPL *session, uint64_t nbits, void *retp)
  * __bit_test --
  *	Test one bit in name.
  */
-static inline bool
+static WT_INLINE bool
 __bit_test(const uint8_t *bitf, uint64_t bit)
+
 {
 	return ((bitf[__bit_byte(bit)] & __bit_mask(bit)) != 0);
 }
@@ -85,7 +86,7 @@ __bit_test(const uint8_t *bitf, uint64_t bit)
  * __bit_set --
  *	Set one bit in name.
  */
-static inline void
+static WT_INLINE void
 __bit_set(uint8_t *bitf, uint64_t bit)
 {
 	bitf[__bit_byte(bit)] |= __bit_mask(bit);
@@ -95,7 +96,7 @@ __bit_set(uint8_t *bitf, uint64_t bit)
  * __bit_clear --
  *	Clear one bit in name.
  */
-static inline void
+static WT_INLINE void
 __bit_clear(uint8_t *bitf, uint64_t bit)
 {
 	bitf[__bit_byte(bit)] &= ~__bit_mask(bit);
@@ -105,7 +106,7 @@ __bit_clear(uint8_t *bitf, uint64_t bit)
  * __bit_nclr --
  *	Clear bits start-to-stop in name.
  */
-static inline void
+static WT_INLINE void
 __bit_nclr(uint8_t *bitf, uint64_t start, uint64_t stop)
 {
 	uint64_t startbyte, stopbyte;
@@ -129,7 +130,7 @@ __bit_nclr(uint8_t *bitf, uint64_t start, uint64_t stop)
  * __bit_nset --
  *	Set bits start-to-stop in name.
  */
-static inline void
+static WT_INLINE void
 __bit_nset(uint8_t *bitf, uint64_t start, uint64_t stop)
 {
 	uint64_t startbyte, stopbyte;
@@ -151,7 +152,7 @@ __bit_nset(uint8_t *bitf, uint64_t start, uint64_t stop)
  * __bit_ffc --
  *	Find first clear bit in name, return 0 on success, -1 on no bit clear.
  */
-static inline int
+static WT_INLINE int
 __bit_ffc(const uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
 	uint64_t byte, stopbyte, value;
@@ -182,7 +183,7 @@ __bit_ffc(const uint8_t *bitf, uint64_t nbits, uint64_t *retp)
  * __bit_ffs --
  *	Find first set bit in name, return 0 on success, -1 on no bit set.
  */
-static inline int
+static WT_INLINE int
 __bit_ffs(const uint8_t *bitf, uint64_t nbits, uint64_t *retp)
 {
 	uint64_t byte, stopbyte, value;
@@ -213,7 +214,7 @@ __bit_ffs(const uint8_t *bitf, uint64_t nbits, uint64_t *retp)
  * __bit_getv --
  *	Return a fixed-length column store bit-field value.
  */
-static inline uint8_t
+static WT_INLINE uint8_t
 __bit_getv(const uint8_t *bitf, uint64_t entry, uint8_t width)
 {
 	uint64_t bit;
@@ -278,7 +279,7 @@ __bit_getv(const uint8_t *bitf, uint64_t entry, uint8_t width)
  * __bit_getv_recno --
  *	Return a record number's bit-field value.
  */
-static inline uint8_t
+static WT_INLINE uint8_t
 __bit_getv_recno(const WT_REF *ref, uint64_t recno, uint8_t width)
 {
 	return (__bit_getv(
@@ -289,7 +290,7 @@ __bit_getv_recno(const WT_REF *ref, uint64_t recno, uint8_t width)
  * __bit_setv --
  *	Set a fixed-length column store bit-field value.
  */
-static inline void
+static WT_INLINE void
 __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
 {
 	uint64_t bit;
@@ -366,7 +367,7 @@ __bit_setv(uint8_t *bitf, uint64_t entry, uint8_t width, uint8_t value)
  * __bit_clear_end --
  *     Clear the leftover end bits of a fixed-length column store bitstring.
  */
-static inline void
+static WT_INLINE void
 __bit_clear_end(uint8_t *bitf, uint64_t numentries, uint8_t width)
 {
 	uint64_t byte, firstbit;
@@ -393,7 +394,7 @@ __bit_clear_end(uint8_t *bitf, uint64_t numentries, uint8_t width)
  * __bit_end_is_clear --
  *     Check the leftover end bits of a fixed-length column store bitstring.
  */
-static inline bool
+static WT_INLINE bool
 __bit_end_is_clear(const uint8_t *bitf, uint64_t numentries, uint8_t width)
 {
 	uint64_t byte, firstbit;

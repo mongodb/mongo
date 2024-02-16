@@ -10,7 +10,7 @@
  * __wt_log_cmp --
  *     Compare 2 LSNs, return -1 if lsn1 < lsn2, 0if lsn1 == lsn2 and 1 if lsn1 > lsn2.
  */
-static inline int
+static WT_INLINE int
 __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)
 {
     uint64_t l1, l2;
@@ -29,7 +29,7 @@ __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)
  * __wt_log_op --
  *     Return if an operation should be logged.
  */
-static inline bool
+static WT_INLINE bool
 __wt_log_op(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;

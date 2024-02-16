@@ -10,7 +10,7 @@
  * __wt_fs_file_system --
  *     Get the active file system handle.
  */
-static inline WT_FILE_SYSTEM *
+static WT_INLINE WT_FILE_SYSTEM *
 __wt_fs_file_system(WT_SESSION_IMPL *session)
 {
     return (S2FS(session));
@@ -20,7 +20,7 @@ __wt_fs_file_system(WT_SESSION_IMPL *session)
  * __wt_fs_directory_list --
  *     Return a list of files from a directory.
  */
-static inline int
+static WT_INLINE int
 __wt_fs_directory_list(
   WT_SESSION_IMPL *session, const char *dir, const char *prefix, char ***dirlistp, u_int *countp)
 {
@@ -49,7 +49,7 @@ __wt_fs_directory_list(
  * __wt_fs_directory_list_single --
  *     Return a single matching file from a directory.
  */
-static inline int
+static WT_INLINE int
 __wt_fs_directory_list_single(
   WT_SESSION_IMPL *session, const char *dir, const char *prefix, char ***dirlistp, u_int *countp)
 {
@@ -79,7 +79,7 @@ __wt_fs_directory_list_single(
  * __wt_fs_directory_list_free --
  *     Free memory allocated by __wt_fs_directory_list.
  */
-static inline int
+static WT_INLINE int
 __wt_fs_directory_list_free(WT_SESSION_IMPL *session, char ***dirlistp, u_int count)
 {
     WT_DECL_RET;
@@ -100,7 +100,7 @@ __wt_fs_directory_list_free(WT_SESSION_IMPL *session, char ***dirlistp, u_int co
  * __wt_fs_exist --
  *     Return if the file exists.
  */
-static inline int
+static WT_INLINE int
 __wt_fs_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
 {
     WT_DECL_RET;
@@ -124,7 +124,7 @@ __wt_fs_exist(WT_SESSION_IMPL *session, const char *name, bool *existp)
  * __wt_fs_remove --
  *     Remove the file.
  */
-static inline int
+static WT_INLINE int
 __wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable, bool locked)
 {
     WT_DECL_RET;
@@ -161,7 +161,7 @@ __wt_fs_remove(WT_SESSION_IMPL *session, const char *name, bool durable, bool lo
  * __wt_fs_rename --
  *     Rename the file.
  */
-static inline int
+static WT_INLINE int
 __wt_fs_rename(WT_SESSION_IMPL *session, const char *from, const char *to, bool durable)
 {
     WT_DECL_RET;
@@ -203,7 +203,7 @@ err:
  * __wt_fs_size --
  *     Return the size of a file in bytes, by file name.
  */
-static inline int
+static WT_INLINE int
 __wt_fs_size(WT_SESSION_IMPL *session, const char *name, wt_off_t *sizep)
 {
     WT_DECL_RET;

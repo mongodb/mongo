@@ -82,7 +82,7 @@
  * __wt_vpack_posint --
  *     Packs a positive variable-length integer in the specified location.
  */
-static inline int
+static WT_INLINE int
 __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
     uint8_t *p;
@@ -107,7 +107,7 @@ __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
  * __wt_vpack_negint --
  *     Packs a negative variable-length integer in the specified location.
  */
-static inline int
+static WT_INLINE int
 __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
     uint8_t *p;
@@ -136,7 +136,7 @@ __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
  * __wt_vunpack_posint --
  *     Reads a variable-length positive integer from the specified location.
  */
-static inline int
+static WT_INLINE int
 __wt_vunpack_posint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
     uint64_t x;
@@ -160,7 +160,7 @@ __wt_vunpack_posint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
  * __wt_vunpack_negint --
  *     Reads a variable-length negative integer from the specified location.
  */
-static inline int
+static WT_INLINE int
 __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 {
     uint64_t x;
@@ -184,7 +184,7 @@ __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
  * __wt_vpack_uint --
  *     Variable-sized packing for unsigned integers
  */
-static inline int
+static WT_INLINE int
 __wt_vpack_uint(uint8_t **pp, size_t maxlen, uint64_t x)
 {
     uint8_t *p;
@@ -219,7 +219,7 @@ __wt_vpack_uint(uint8_t **pp, size_t maxlen, uint64_t x)
  * __wt_vpack_int --
  *     Variable-sized packing for signed integers
  */
-static inline int
+static WT_INLINE int
 __wt_vpack_int(uint8_t **pp, size_t maxlen, int64_t x)
 {
     uint8_t *p;
@@ -250,7 +250,7 @@ __wt_vpack_int(uint8_t **pp, size_t maxlen, int64_t x)
  * __wt_vunpack_uint --
  *     Variable-sized unpacking for unsigned integers
  */
-static inline int
+static WT_INLINE int
 __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
 {
     const uint8_t *p;
@@ -288,7 +288,7 @@ __wt_vunpack_uint(const uint8_t **pp, size_t maxlen, uint64_t *xp)
  * __wt_vunpack_int --
  *     Variable-sized packing for signed integers
  */
-static inline int
+static WT_INLINE int
 __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
 {
     const uint8_t *p;
@@ -326,7 +326,7 @@ __wt_vunpack_int(const uint8_t **pp, size_t maxlen, int64_t *xp)
  * __wt_vsize_posint --
  *     Return the packed size of a positive variable-length integer.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_vsize_posint(uint64_t x)
 {
     int lz;
@@ -339,7 +339,7 @@ __wt_vsize_posint(uint64_t x)
  * __wt_vsize_negint --
  *     Return the packed size of a negative variable-length integer.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_vsize_negint(uint64_t x)
 {
     int lz;
@@ -352,7 +352,7 @@ __wt_vsize_negint(uint64_t x)
  * __wt_vsize_uint --
  *     Return the packed size of an unsigned integer.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_vsize_uint(uint64_t x)
 {
     if (x <= POS_1BYTE_MAX)
@@ -367,7 +367,7 @@ __wt_vsize_uint(uint64_t x)
  * __wt_vsize_int --
  *     Return the packed size of a signed integer.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_vsize_int(int64_t x)
 {
     if (x < NEG_2BYTE_MIN)

@@ -12,7 +12,7 @@
 #define __builtin_crypto_vpmsumd __builtin_crypto_vpmsumb
 #endif
 
-static inline __vector unsigned long long __attribute__((overloadable))
+static WT_INLINE __vector unsigned long long __attribute__((overloadable))
 vec_ld(int __a, const __vector unsigned long long *__b)
 {
     return (__vector unsigned long long)__builtin_altivec_lvx(__a, __b);
@@ -25,7 +25,7 @@ vec_ld(int __a, const __vector unsigned long long *__b)
  *
  * Clang has vec_xxpermdi intrinsics. It was implemented in 4.0.0.
  */
-static inline __vector unsigned long long
+static WT_INLINE __vector unsigned long long
 __builtin_pack_vector(unsigned long __a, unsigned long __b)
 {
 #if defined(__BIG_ENDIAN__)
@@ -43,7 +43,7 @@ __builtin_pack_vector(unsigned long __a, unsigned long __b)
  */
 #if !defined vec_xxpermdi || __clang_major__ <= 6
 
-static inline unsigned long
+static WT_INLINE unsigned long
 __builtin_unpack_vector(__vector unsigned long long __v, int __o)
 {
     return __v[__o];
@@ -63,7 +63,7 @@ __builtin_unpack_vector(__vector unsigned long long __v, int __o)
 
 #else
 
-static inline unsigned long
+static WT_INLINE unsigned long
 __builtin_unpack_vector_0(__vector unsigned long long __v)
 {
 #if defined(__BIG_ENDIAN__)
@@ -74,7 +74,7 @@ __builtin_unpack_vector_0(__vector unsigned long long __v)
 }
 
 #ifndef REFLECT
-static inline unsigned long
+static WT_INLINE unsigned long
 __builtin_unpack_vector_1(__vector unsigned long long __v)
 {
 #if defined(__BIG_ENDIAN__)

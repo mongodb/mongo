@@ -24,7 +24,7 @@
  * __spin_init_internal --
  *     Initialize the WT portion of a spinlock.
  */
-static inline void
+static WT_INLINE void
 __spin_init_internal(WT_SPINLOCK *t, const char *name)
 {
     t->name = name;
@@ -45,7 +45,7 @@ __spin_init_internal(WT_SPINLOCK *t, const char *name)
  * __wt_spin_init --
  *     Initialize a spinlock.
  */
-static inline int
+static WT_INLINE int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
     WT_UNUSED(session);
@@ -59,7 +59,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
  * __wt_spin_destroy --
  *     Destroy a spinlock.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -71,7 +71,7 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_trylock --
  *     Try to lock a spinlock or fail immediately if it is busy.
  */
-static inline int
+static WT_INLINE int
 __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -87,7 +87,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_lock --
  *     Spin until the lock is acquired.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     int i;
@@ -108,7 +108,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_unlock --
  *     Release the spinlock.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -123,7 +123,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_init --
  *     Initialize a spinlock.
  */
-static inline int
+static WT_INLINE int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
@@ -149,7 +149,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
  * __wt_spin_destroy --
  *     Destroy a spinlock.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -166,7 +166,7 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_trylock --
  *     Try to lock a spinlock or fail immediately if it is busy.
  */
-static inline int
+static WT_INLINE int
 __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_DECL_RET;
@@ -182,7 +182,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_lock --
  *     Spin until the lock is acquired.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_DECL_RET;
@@ -197,7 +197,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_unlock --
  *     Release the spinlock.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_DECL_RET;
@@ -213,7 +213,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_init --
  *     Initialize a spinlock.
  */
-static inline int
+static WT_INLINE int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
     DWORD windows_error;
@@ -233,7 +233,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
  * __wt_spin_destroy --
  *     Destroy a spinlock.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -248,7 +248,7 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_trylock --
  *     Try to lock a spinlock or fail immediately if it is busy.
  */
-static inline int
+static WT_INLINE int
 __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -264,7 +264,7 @@ __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_lock --
  *     Spin until the lock is acquired.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -277,7 +277,7 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_unlock --
  *     Release the spinlock.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -296,7 +296,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_locked --
  *     Check whether the spinlock is locked, irrespective of which session locked it.
  */
-static inline bool
+static WT_INLINE bool
 __wt_spin_locked(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     WT_UNUSED(session);
@@ -307,7 +307,7 @@ __wt_spin_locked(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_owned --
  *     Check whether the session owns the spinlock.
  */
-static inline bool
+static WT_INLINE bool
 __wt_spin_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     return (t->session_id == WT_SPIN_SESSION_ID_SAFE(session));
@@ -317,7 +317,7 @@ __wt_spin_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_unlock_if_owned --
  *     Unlock the spinlock only if it is acquired by the specified session.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_unlock_if_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     if (__wt_spin_owned(session, t))
@@ -359,7 +359,7 @@ __wt_spin_unlock_if_owned(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_lock_track --
  *     Spinlock acquisition, with tracking.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     uint64_t time_diff, time_start, time_stop;
@@ -393,7 +393,7 @@ __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
  * __wt_spin_trylock_track --
  *     Try to lock a spinlock or fail immediately if it is busy. Track if successful.
  */
-static inline int
+static WT_INLINE int
 __wt_spin_trylock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
     int64_t **stats;

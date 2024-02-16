@@ -100,7 +100,7 @@
 
 #ifdef INLINE_FUNCTIONS_INSTEAD_OF_MACROS
 /* Set "ret" if not already set. */
-static NO_INLINE_FOR_CODE_COVERAGE void
+static WT_INLINE void
 __wt_tret(int *pret, int a)
 {
     int __ret;
@@ -114,7 +114,7 @@ __wt_tret(int *pret, int a)
 }
 #define WT_TRET(a) __wt_tret(&ret, a)
 
-static NO_INLINE_FOR_CODE_COVERAGE void
+static WT_INLINE void
 __wt_tret_error_ok(int *pret, int a, int e)
 {
     int __ret;

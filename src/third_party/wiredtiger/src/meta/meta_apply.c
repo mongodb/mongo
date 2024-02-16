@@ -12,7 +12,7 @@
  * __meta_btree_apply --
  *     Apply a function to all files listed in the metadata, apart from the metadata file.
  */
-static inline int
+static WT_INLINE int
 __meta_btree_apply(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]),
   int (*name_func)(WT_SESSION_IMPL *, const char *, bool *), const char *cfg[])

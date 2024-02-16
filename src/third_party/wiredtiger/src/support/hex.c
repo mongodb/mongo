@@ -12,7 +12,7 @@
  * __fill_hex --
  *     In-memory conversion of raw bytes to a hexadecimal representation.
  */
-static inline void
+static WT_INLINE void
 __fill_hex(const uint8_t *src, size_t src_max, uint8_t *dest, size_t dest_max, size_t *lenp)
 {
     uint8_t *dest_orig;

@@ -25,7 +25,7 @@
  * __pack_encode_uintAny --
  *     Pack an unsigned integer.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_uintAny(uint8_t **pp, uint8_t *end, uint64_t item)
 {
     /* Check that there is at least one byte available:
@@ -38,7 +38,7 @@ __pack_encode_uintAny(uint8_t **pp, uint8_t *end, uint64_t item)
  * __pack_encode_WT_ITEM --
  *     Pack a WT_ITEM structure - size and WT_ITEM.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_WT_ITEM(uint8_t **pp, uint8_t *end, WT_ITEM *item)
 {
     WT_RET(__wt_vpack_uint(pp, WT_PTRDIFF(end, *pp), item->size));
@@ -54,7 +54,7 @@ __pack_encode_WT_ITEM(uint8_t **pp, uint8_t *end, WT_ITEM *item)
  * __pack_encode_WT_ITEM_last --
  *     Pack a WT_ITEM structure without its size.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_WT_ITEM_last(uint8_t **pp, uint8_t *end, WT_ITEM *item)
 {
     if (item->size != 0) {
@@ -69,7 +69,7 @@ __pack_encode_WT_ITEM_last(uint8_t **pp, uint8_t *end, WT_ITEM *item)
  * __pack_encode_string --
  *     Pack a string.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_string(uint8_t **pp, uint8_t *end, const char *item)
 {
     size_t s, sz;
@@ -251,7 +251,7 @@ __logrec_make_hex_str(WT_SESSION_IMPL *session, WT_ITEM **escapedp, WT_ITEM *ite
  * __wt_struct_size_col_modify --
  *     Calculate size of col_modify struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_col_modify(uint32_t fileid, uint64_t recno, WT_ITEM *value)
 {
     return (__wt_vsize_uint(fileid) + __wt_vsize_uint(recno) + value->size);
@@ -262,7 +262,7 @@ __wt_struct_size_col_modify(uint32_t fileid, uint64_t recno, WT_ITEM *value)
  *     Pack the col_modify struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_col_modify(
   uint8_t **pp, uint8_t *end, uint32_t fileid, uint64_t recno, WT_ITEM *value)
 {
@@ -278,7 +278,7 @@ __wt_struct_pack_col_modify(
  *     Unpack the col_modify struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_col_modify(
   const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, uint64_t *recnop, WT_ITEM *valuep)
 {
@@ -390,7 +390,7 @@ err:
  * __wt_struct_size_col_put --
  *     Calculate size of col_put struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_col_put(uint32_t fileid, uint64_t recno, WT_ITEM *value)
 {
     return (__wt_vsize_uint(fileid) + __wt_vsize_uint(recno) + value->size);
@@ -401,7 +401,7 @@ __wt_struct_size_col_put(uint32_t fileid, uint64_t recno, WT_ITEM *value)
  *     Pack the col_put struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_col_put(
   uint8_t **pp, uint8_t *end, uint32_t fileid, uint64_t recno, WT_ITEM *value)
 {
@@ -417,7 +417,7 @@ __wt_struct_pack_col_put(
  *     Unpack the col_put struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_col_put(
   const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, uint64_t *recnop, WT_ITEM *valuep)
 {
@@ -529,7 +529,7 @@ err:
  * __wt_struct_size_col_remove --
  *     Calculate size of col_remove struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_col_remove(uint32_t fileid, uint64_t recno)
 {
     return (__wt_vsize_uint(fileid) + __wt_vsize_uint(recno));
@@ -540,7 +540,7 @@ __wt_struct_size_col_remove(uint32_t fileid, uint64_t recno)
  *     Pack the col_remove struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_col_remove(uint8_t **pp, uint8_t *end, uint32_t fileid, uint64_t recno)
 {
     WT_RET(__pack_encode_uintAny(pp, end, fileid));
@@ -554,7 +554,7 @@ __wt_struct_pack_col_remove(uint8_t **pp, uint8_t *end, uint32_t fileid, uint64_
  *     Unpack the col_remove struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_col_remove(
   const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, uint64_t *recnop)
 {
@@ -652,7 +652,7 @@ __wt_logop_col_remove_print(
  * __wt_struct_size_col_truncate --
  *     Calculate size of col_truncate struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_col_truncate(uint32_t fileid, uint64_t start, uint64_t stop)
 {
     return (__wt_vsize_uint(fileid) + __wt_vsize_uint(start) + __wt_vsize_uint(stop));
@@ -663,7 +663,7 @@ __wt_struct_size_col_truncate(uint32_t fileid, uint64_t start, uint64_t stop)
  *     Pack the col_truncate struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_col_truncate(
   uint8_t **pp, uint8_t *end, uint32_t fileid, uint64_t start, uint64_t stop)
 {
@@ -679,7 +679,7 @@ __wt_struct_pack_col_truncate(
  *     Unpack the col_truncate struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_col_truncate(
   const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, uint64_t *startp, uint64_t *stopp)
 {
@@ -780,7 +780,7 @@ __wt_logop_col_truncate_print(
  * __wt_struct_size_row_modify --
  *     Calculate size of row_modify struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_row_modify(uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
 {
     return (__wt_vsize_uint(fileid) + __wt_vsize_uint(key->size) + key->size + value->size);
@@ -791,7 +791,7 @@ __wt_struct_size_row_modify(uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
  *     Pack the row_modify struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_row_modify(
   uint8_t **pp, uint8_t *end, uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
 {
@@ -807,7 +807,7 @@ __wt_struct_pack_row_modify(
  *     Unpack the row_modify struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_row_modify(
   const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, WT_ITEM *keyp, WT_ITEM *valuep)
 {
@@ -925,7 +925,7 @@ err:
  * __wt_struct_size_row_put --
  *     Calculate size of row_put struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_row_put(uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
 {
     return (__wt_vsize_uint(fileid) + __wt_vsize_uint(key->size) + key->size + value->size);
@@ -936,7 +936,7 @@ __wt_struct_size_row_put(uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
  *     Pack the row_put struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_row_put(uint8_t **pp, uint8_t *end, uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
 {
     WT_RET(__pack_encode_uintAny(pp, end, fileid));
@@ -951,7 +951,7 @@ __wt_struct_pack_row_put(uint8_t **pp, uint8_t *end, uint32_t fileid, WT_ITEM *k
  *     Unpack the row_put struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_row_put(
   const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, WT_ITEM *keyp, WT_ITEM *valuep)
 {
@@ -1069,7 +1069,7 @@ err:
  * __wt_struct_size_row_remove --
  *     Calculate size of row_remove struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_row_remove(uint32_t fileid, WT_ITEM *key)
 {
     return (__wt_vsize_uint(fileid) + key->size);
@@ -1080,7 +1080,7 @@ __wt_struct_size_row_remove(uint32_t fileid, WT_ITEM *key)
  *     Pack the row_remove struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_row_remove(uint8_t **pp, uint8_t *end, uint32_t fileid, WT_ITEM *key)
 {
     WT_RET(__pack_encode_uintAny(pp, end, fileid));
@@ -1094,7 +1094,7 @@ __wt_struct_pack_row_remove(uint8_t **pp, uint8_t *end, uint32_t fileid, WT_ITEM
  *     Unpack the row_remove struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_row_remove(
   const uint8_t **pp, const uint8_t *end, uint32_t *fileidp, WT_ITEM *keyp)
 {
@@ -1202,7 +1202,7 @@ err:
  * __wt_struct_size_row_truncate --
  *     Calculate size of row_truncate struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_row_truncate(uint32_t fileid, WT_ITEM *start, WT_ITEM *stop, uint32_t mode)
 {
     return (__wt_vsize_uint(fileid) + __wt_vsize_uint(start->size) + start->size +
@@ -1214,7 +1214,7 @@ __wt_struct_size_row_truncate(uint32_t fileid, WT_ITEM *start, WT_ITEM *stop, ui
  *     Pack the row_truncate struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_row_truncate(
   uint8_t **pp, uint8_t *end, uint32_t fileid, WT_ITEM *start, WT_ITEM *stop, uint32_t mode)
 {
@@ -1231,7 +1231,7 @@ __wt_struct_pack_row_truncate(
  *     Unpack the row_truncate struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_row_truncate(const uint8_t **pp, const uint8_t *end, uint32_t *fileidp,
   WT_ITEM *startp, WT_ITEM *stopp, uint32_t *modep)
 {
@@ -1352,7 +1352,7 @@ err:
  * __wt_struct_size_checkpoint_start --
  *     Calculate size of checkpoint_start struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_checkpoint_start(void)
 {
     return (0);
@@ -1363,7 +1363,7 @@ __wt_struct_size_checkpoint_start(void)
  *     Pack the checkpoint_start struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_checkpoint_start(uint8_t **pp, uint8_t *end)
 {
     WT_UNUSED(pp);
@@ -1376,7 +1376,7 @@ __wt_struct_pack_checkpoint_start(uint8_t **pp, uint8_t *end)
  *     Unpack the checkpoint_start struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_checkpoint_start(const uint8_t **pp, const uint8_t *end)
 {
     WT_UNUSED(pp);
@@ -1464,7 +1464,7 @@ __wt_logop_checkpoint_start_print(
  * __wt_struct_size_prev_lsn --
  *     Calculate size of prev_lsn struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_prev_lsn(WT_LSN *prev_lsn)
 {
     return (__wt_vsize_uint(prev_lsn->l.file) + __wt_vsize_uint(prev_lsn->l.offset));
@@ -1475,7 +1475,7 @@ __wt_struct_size_prev_lsn(WT_LSN *prev_lsn)
  *     Pack the prev_lsn struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_prev_lsn(uint8_t **pp, uint8_t *end, WT_LSN *prev_lsn)
 {
     WT_RET(__pack_encode_uintAny(pp, end, prev_lsn->l.file));
@@ -1489,7 +1489,7 @@ __wt_struct_pack_prev_lsn(uint8_t **pp, uint8_t *end, WT_LSN *prev_lsn)
  *     Unpack the prev_lsn struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_prev_lsn(const uint8_t **pp, const uint8_t *end, WT_LSN *prev_lsnp)
 {
     __pack_decode_uintAny(pp, end, uint32_t, &prev_lsnp->l.file);
@@ -1580,7 +1580,7 @@ __wt_logop_prev_lsn_print(
  * __wt_struct_size_backup_id --
  *     Calculate size of backup_id struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_backup_id(uint32_t index, uint64_t granularity, const char *id)
 {
     return (__wt_vsize_uint(index) + __wt_vsize_uint(granularity) + strlen(id) + 1);
@@ -1591,7 +1591,7 @@ __wt_struct_size_backup_id(uint32_t index, uint64_t granularity, const char *id)
  *     Pack the backup_id struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_backup_id(
   uint8_t **pp, uint8_t *end, uint32_t index, uint64_t granularity, const char *id)
 {
@@ -1607,7 +1607,7 @@ __wt_struct_pack_backup_id(
  *     Unpack the backup_id struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_backup_id(const uint8_t **pp, const uint8_t *end, uint32_t *indexp,
   uint64_t *granularityp, const char **idp)
 {
@@ -1704,7 +1704,7 @@ __wt_logop_backup_id_print(
  * __wt_struct_size_txn_timestamp --
  *     Calculate size of txn_timestamp struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_txn_timestamp(uint64_t time_sec, uint64_t time_nsec, uint64_t commit_ts,
   uint64_t durable_ts, uint64_t first_commit_ts, uint64_t prepare_ts, uint64_t read_ts)
 {
@@ -1718,7 +1718,7 @@ __wt_struct_size_txn_timestamp(uint64_t time_sec, uint64_t time_nsec, uint64_t c
  *     Pack the txn_timestamp struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_txn_timestamp(uint8_t **pp, uint8_t *end, uint64_t time_sec, uint64_t time_nsec,
   uint64_t commit_ts, uint64_t durable_ts, uint64_t first_commit_ts, uint64_t prepare_ts,
   uint64_t read_ts)
@@ -1739,7 +1739,7 @@ __wt_struct_pack_txn_timestamp(uint8_t **pp, uint8_t *end, uint64_t time_sec, ui
  *     Unpack the txn_timestamp struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_txn_timestamp(const uint8_t **pp, const uint8_t *end, uint64_t *time_secp,
   uint64_t *time_nsecp, uint64_t *commit_tsp, uint64_t *durable_tsp, uint64_t *first_commit_tsp,
   uint64_t *prepare_tsp, uint64_t *read_tsp)

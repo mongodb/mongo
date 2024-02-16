@@ -149,7 +149,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
  * __clsm_enter --
  *     Start an operation on an LSM cursor, update if the tree has changed.
  */
-static inline int
+static WT_INLINE int
 __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 {
     WT_DECL_RET;
@@ -282,7 +282,7 @@ static const WT_ITEM __tombstone = {"\x14\x14", 2, NULL, 0, 0};
  * __clsm_deleted --
  *     Check whether the current value is a tombstone.
  */
-static inline bool
+static WT_INLINE bool
 __clsm_deleted(WT_CURSOR_LSM *clsm, const WT_ITEM *item)
 {
     return (!F_ISSET(clsm, WT_CLSM_MINOR_MERGE) && item->size == __tombstone.size &&
@@ -293,7 +293,7 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, const WT_ITEM *item)
  * __clsm_deleted_encode --
  *     Encode values that are in the encoded name space.
  */
-static inline int
+static WT_INLINE int
 __clsm_deleted_encode(
   WT_SESSION_IMPL *session, const WT_ITEM *value, WT_ITEM *final_value, WT_ITEM **tmpp)
 {
@@ -324,7 +324,7 @@ __clsm_deleted_encode(
  * __clsm_deleted_decode --
  *     Decode values that start with the tombstone.
  */
-static inline void
+static WT_INLINE void
 __clsm_deleted_decode(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 {
     /*
@@ -1382,7 +1382,7 @@ err:
  * __clsm_put --
  *     Put an entry into the in-memory tree, trigger a file switch if necessary.
  */
-static inline int
+static WT_INLINE int
 __clsm_put(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, const WT_ITEM *key, const WT_ITEM *value,
   bool position, bool reserve)
 {

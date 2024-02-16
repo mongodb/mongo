@@ -19,14 +19,14 @@ def clean_function_name(filename, fn):
         ret = " ".join(ret.split())
 
     # If it's not an inline function, prefix with "extern".
-    if not 'inline' in ret:
+    if 'inline' not in ret and 'WT_INLINE' not in ret:
         ret = 'extern ' + ret
 
     # Switch to the include file version of any gcc attributes.
     ret = ret.replace("WT_GCC_FUNC_ATTRIBUTE", "WT_GCC_FUNC_DECL_ATTRIBUTE")
 
     # Everything but void requires using any return value.
-    if not re.match(r'(static inline|extern) void', ret):
+    if not re.match(r'(static inline|static WT_INLINE|extern) void', ret):
         ret = ret + " WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))"
 
     # If a line ends in #endif, appending a semicolon results in an illegal

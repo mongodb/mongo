@@ -359,7 +359,7 @@ err:
  *     Increment the given buffer by one bit, return true if we incremented the buffer or not. If
  *     all of the values inside the buffer are UINT8_MAX value we do not increment the buffer.
  */
-static inline bool
+static WT_INLINE bool
 __increment_bound_array(WT_ITEM *user_item)
 {
     size_t usz, i;

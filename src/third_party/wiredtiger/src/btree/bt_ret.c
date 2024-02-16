@@ -12,7 +12,7 @@
  * __key_return --
  *     Change the cursor to reference an internal return key.
  */
-static inline int
+static WT_INLINE int
 __key_return(WT_CURSOR_BTREE *cbt)
 {
     WT_CURSOR *cursor;
@@ -191,7 +191,7 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
  *     Helper function to copy the time window and set a buffer to reference the data from an
  *     unpacked key value cell. Return WT_RESTART if the cell is an overflow removed value.
  */
-static inline int
+static WT_INLINE int
 __read_page_cell_data_ref_kv(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unpack,
   WT_ITEM *buf, WT_TIME_WINDOW *tw)
 {

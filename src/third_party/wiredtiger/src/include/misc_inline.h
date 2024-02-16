@@ -10,7 +10,7 @@
  * __wt_cond_wait --
  *     Wait on a mutex, optionally timing out.
  */
-static inline void
+static WT_INLINE void
 __wt_cond_wait(
   WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool (*run_func)(WT_SESSION_IMPL *))
 {
@@ -23,7 +23,7 @@ __wt_cond_wait(
  * __wt_hex --
  *     Convert a byte to a hex character.
  */
-static inline u_char
+static WT_INLINE u_char
 __wt_hex(int c)
 {
     return ((u_char) "0123456789abcdef"[c]);
@@ -33,7 +33,7 @@ __wt_hex(int c)
  * __wt_safe_sub --
  *     Subtract unsigned integers, rounding to zero if the result would be negative.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_safe_sub(uint64_t v1, uint64_t v2)
 {
     return (v2 > v1 ? 0 : v1 - v2);
@@ -43,7 +43,7 @@ __wt_safe_sub(uint64_t v1, uint64_t v2)
  * __wt_strdup --
  *     ANSI strdup function.
  */
-static inline int
+static WT_INLINE int
 __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
 {
     return (__wt_strndup(session, str, (str == NULL) ? 0 : strlen(str), retp));
@@ -53,7 +53,7 @@ __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
  * __wt_strnlen --
  *     Determine the length of a fixed-size string
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_strnlen(const char *s, size_t maxlen)
 {
     size_t i;
@@ -68,7 +68,7 @@ __wt_strnlen(const char *s, size_t maxlen)
  *     A safe version of string concatenation, which checks the size of the destination buffer;
  *     return ERANGE on error.
  */
-static inline int
+static WT_INLINE int
 __wt_strcat(char *dest, size_t size, const char *src)
 {
     size_t dest_length;
@@ -89,7 +89,7 @@ __wt_strcat(char *dest, size_t size, const char *src)
  * __wt_snprintf --
  *     snprintf convenience function, ignoring the returned size.
  */
-static inline int
+static WT_INLINE int
 __wt_snprintf(char *buf, size_t size, const char *fmt, ...)
   WT_GCC_FUNC_ATTRIBUTE((format(printf, 3, 4)))
 {
@@ -112,7 +112,7 @@ __wt_snprintf(char *buf, size_t size, const char *fmt, ...)
  * __wt_vsnprintf --
  *     vsnprintf convenience function, ignoring the returned size.
  */
-static inline int
+static WT_INLINE int
 __wt_vsnprintf(char *buf, size_t size, const char *fmt, va_list ap)
 {
     size_t len;
@@ -129,7 +129,7 @@ __wt_vsnprintf(char *buf, size_t size, const char *fmt, va_list ap)
  * __wt_snprintf_len_set --
  *     snprintf convenience function, setting the returned size.
  */
-static inline int
+static WT_INLINE int
 __wt_snprintf_len_set(char *buf, size_t size, size_t *retsizep, const char *fmt, ...)
   WT_GCC_FUNC_ATTRIBUTE((format(printf, 4, 5)))
 {
@@ -148,7 +148,7 @@ __wt_snprintf_len_set(char *buf, size_t size, size_t *retsizep, const char *fmt,
  * __wt_vsnprintf_len_set --
  *     vsnprintf convenience function, setting the returned size.
  */
-static inline int
+static WT_INLINE int
 __wt_vsnprintf_len_set(char *buf, size_t size, size_t *retsizep, const char *fmt, va_list ap)
 {
     *retsizep = 0;
@@ -160,7 +160,7 @@ __wt_vsnprintf_len_set(char *buf, size_t size, size_t *retsizep, const char *fmt
  * __wt_snprintf_len_incr --
  *     snprintf convenience function, incrementing the returned size.
  */
-static inline int
+static WT_INLINE int
 __wt_snprintf_len_incr(char *buf, size_t size, size_t *retsizep, const char *fmt, ...)
   WT_GCC_FUNC_ATTRIBUTE((format(printf, 4, 5)))
 {
@@ -179,7 +179,7 @@ __wt_snprintf_len_incr(char *buf, size_t size, size_t *retsizep, const char *fmt
  *     consume enough CPU to block real work being done. The algorithm spins a few times, then
  *     yields for a while, then falls back to sleeping.
  */
-static inline void
+static WT_INLINE void
 __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
 {
     if ((*yield_count) < 10) {
@@ -201,7 +201,7 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
  * __wt_timing_stress --
  *     Optionally add delay to stress code paths.
  */
-static inline void
+static WT_INLINE void
 __wt_timing_stress(WT_SESSION_IMPL *session, uint32_t flag)
 {
 #ifdef ENABLE_ANTITHESIS
@@ -230,7 +230,7 @@ __wt_timing_stress(WT_SESSION_IMPL *session, uint32_t flag)
  * __wt_timing_stress_sleep_random --
  *     Sleep for a random time, with a bias towards shorter sleeps.
  */
-static inline void
+static WT_INLINE void
 __wt_timing_stress_sleep_random(WT_SESSION_IMPL *session)
 {
     double pct;
@@ -270,7 +270,7 @@ __wt_timing_stress_sleep_random(WT_SESSION_IMPL *session)
  *     A generic failpoint function, it will return true if the failpoint triggers. Takes an
  *     unsigned integer from 0 to 10000 representing an X in 10000 chance of occurring.
  */
-static inline bool
+static WT_INLINE bool
 __wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
 {
     WT_CONNECTION_IMPL *conn;
@@ -300,7 +300,7 @@ __wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
  * __wt_checksum_match --
  *     Return if a checksum matches either the primary or alternate values.
  */
-static inline bool
+static WT_INLINE bool
 __wt_checksum_match(const void *chunk, size_t len, uint32_t v)
 {
     return (__wt_checksum(chunk, len) == v || __wt_checksum_alt_match(chunk, len, v));
@@ -312,7 +312,7 @@ __wt_checksum_match(const void *chunk, size_t len, uint32_t v)
  * __wt_checksum_match --
  *     Return if a checksum matches.
  */
-static inline bool
+static WT_INLINE bool
 __wt_checksum_match(const void *chunk, size_t len, uint32_t v)
 {
     return (__wt_checksum(chunk, len) == v);

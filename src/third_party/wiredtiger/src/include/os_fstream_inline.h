@@ -10,7 +10,7 @@
  * __wt_getline --
  *     Get a line from a stream.
  */
-static inline int
+static WT_INLINE int
 __wt_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, WT_ITEM *buf)
 {
     return (fstr->fstr_getline(session, fstr, buf));
@@ -20,7 +20,7 @@ __wt_getline(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, WT_ITEM *buf)
  * __wt_fclose --
  *     Close a stream.
  */
-static inline int
+static WT_INLINE int
 __wt_fclose(WT_SESSION_IMPL *session, WT_FSTREAM **fstrp)
 {
     WT_FSTREAM *fstr;
@@ -35,7 +35,7 @@ __wt_fclose(WT_SESSION_IMPL *session, WT_FSTREAM **fstrp)
  * __wt_fflush --
  *     Flush a stream.
  */
-static inline int
+static WT_INLINE int
 __wt_fflush(WT_SESSION_IMPL *session, WT_FSTREAM *fstr)
 {
     return (fstr->fstr_flush(session, fstr));
@@ -45,7 +45,7 @@ __wt_fflush(WT_SESSION_IMPL *session, WT_FSTREAM *fstr)
  * __wt_vfprintf --
  *     ANSI C vfprintf.
  */
-static inline int
+static WT_INLINE int
 __wt_vfprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, va_list ap)
 {
     return (fstr->fstr_printf(session, fstr, fmt, ap));
@@ -55,7 +55,7 @@ __wt_vfprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, va_li
  * __wt_fprintf --
  *     ANSI C fprintf.
  */
-static inline int
+static WT_INLINE int
 __wt_fprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, ...)
   WT_GCC_FUNC_ATTRIBUTE((format(printf, 3, 4)))
 {
@@ -73,7 +73,7 @@ __wt_fprintf(WT_SESSION_IMPL *session, WT_FSTREAM *fstr, const char *fmt, ...)
  * __wt_sync_and_rename --
  *     Flush and close a stream, then swap it into place.
  */
-static inline int
+static WT_INLINE int
 __wt_sync_and_rename(WT_SESSION_IMPL *session, WT_FSTREAM **fstrp, const char *from, const char *to)
 {
     WT_DECL_RET;

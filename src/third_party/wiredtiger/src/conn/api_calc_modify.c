@@ -94,7 +94,7 @@ __cm_extend(WT_CM_STATE *cms, const uint8_t *m1, const uint8_t *m2, WT_CM_MATCH 
  * __cm_fingerprint --
  *     Calculate an integral "fingerprint" of a block of bytes.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __cm_fingerprint(const uint8_t *p)
 {
     uint64_t h;

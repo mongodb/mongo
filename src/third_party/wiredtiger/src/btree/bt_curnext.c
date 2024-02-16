@@ -12,7 +12,7 @@
  * __cursor_fix_append_next --
  *     Return the next entry on the append list.
  */
-static inline int
+static WT_INLINE int
 __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 {
     WT_SESSION_IMPL *session;
@@ -74,7 +74,7 @@ restart_read:
  * __cursor_fix_next --
  *     Move to the next, fixed-length column-store item.
  */
-static inline int
+static WT_INLINE int
 __cursor_fix_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 {
     WT_PAGE *page;
@@ -148,7 +148,7 @@ restart_read:
  * __cursor_var_append_next --
  *     Return the next variable-length entry on the append list.
  */
-static inline int
+static WT_INLINE int
 __cursor_var_append_next(
   WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
@@ -207,7 +207,7 @@ restart_read:
  * __cursor_var_next --
  *     Move to the next, variable-length column-store item.
  */
-static inline int
+static WT_INLINE int
 __cursor_var_next(
   WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
@@ -385,7 +385,7 @@ restart_read:
  * __cursor_row_next --
  *     Move to the next row-store item.
  */
-static inline int
+static WT_INLINE int
 __cursor_row_next(
   WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {

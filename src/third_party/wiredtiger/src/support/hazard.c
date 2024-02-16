@@ -281,7 +281,7 @@ __wt_hazard_close(WT_SESSION_IMPL *session)
  * hazard_get_reference --
  *     Return a consistent reference to a hazard pointer array.
  */
-static inline void
+static WT_INLINE void
 hazard_get_reference(WT_SESSION_IMPL *session, WT_HAZARD **hazardp, uint32_t *hazard_inusep)
 {
     /*

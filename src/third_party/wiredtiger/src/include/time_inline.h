@@ -12,7 +12,7 @@
  * __wt_rdtsc --
  *     Get a timestamp from CPU registers.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_rdtsc(void)
 {
 #if defined(__i386)
@@ -47,7 +47,7 @@ __wt_rdtsc(void)
  *     to the previous values, making time stand still until we see a time in the future of the
  *     highest value seen so far.
  */
-static inline void
+static WT_INLINE void
 __time_check_monotonic(WT_SESSION_IMPL *session, struct timespec *tsp)
 {
     /*
@@ -68,7 +68,7 @@ __time_check_monotonic(WT_SESSION_IMPL *session, struct timespec *tsp)
  * __wt_epoch --
  *     Return the time since the Epoch.
  */
-static inline void
+static WT_INLINE void
 __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 {
     struct timespec tmp;
@@ -91,7 +91,7 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
  *     Obtain a timestamp via either a CPU register or via a system call on platforms where
  *     obtaining it directly from the hardware register is not supported.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_clock(WT_SESSION_IMPL *session)
 {
     struct timespec tsp;
@@ -117,7 +117,7 @@ __wt_clock(WT_SESSION_IMPL *session)
  * __wt_seconds --
  *     Return the seconds since the Epoch.
  */
-static inline void
+static WT_INLINE void
 __wt_seconds(WT_SESSION_IMPL *session, uint64_t *secondsp)
 {
     struct timespec t;
@@ -131,7 +131,7 @@ __wt_seconds(WT_SESSION_IMPL *session, uint64_t *secondsp)
  * __wt_seconds32 --
  *     Return the seconds since the Epoch in 32 bits.
  */
-static inline void
+static WT_INLINE void
 __wt_seconds32(WT_SESSION_IMPL *session, uint32_t *secondsp)
 {
     uint64_t seconds;
@@ -145,7 +145,7 @@ __wt_seconds32(WT_SESSION_IMPL *session, uint32_t *secondsp)
  * __wt_clock_to_nsec --
  *     Convert from clock ticks to nanoseconds.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_clock_to_nsec(uint64_t end, uint64_t begin)
 {
     double clock_diff;
@@ -164,7 +164,7 @@ __wt_clock_to_nsec(uint64_t end, uint64_t begin)
  * __wt_op_timer_start --
  *     Start the operations timer.
  */
-static inline void
+static WT_INLINE void
 __wt_op_timer_start(WT_SESSION_IMPL *session)
 {
     uint64_t timeout_us;
@@ -180,7 +180,7 @@ __wt_op_timer_start(WT_SESSION_IMPL *session)
  * __wt_op_timer_stop --
  *     Stop the operations timer.
  */
-static inline void
+static WT_INLINE void
 __wt_op_timer_stop(WT_SESSION_IMPL *session)
 {
     session->operation_start_us = session->operation_timeout_us = 0;
@@ -190,7 +190,7 @@ __wt_op_timer_stop(WT_SESSION_IMPL *session)
  * __wt_op_timer_fired --
  *     Check the operations timers.
  */
-static inline bool
+static WT_INLINE bool
 __wt_op_timer_fired(WT_SESSION_IMPL *session)
 {
     uint64_t diff, now;
@@ -208,7 +208,7 @@ __wt_op_timer_fired(WT_SESSION_IMPL *session)
  * __wt_timer_start --
  *     Start the timer.
  */
-static inline void
+static WT_INLINE void
 __wt_timer_start(WT_SESSION_IMPL *session, WT_TIMER *start_time)
 {
     __wt_epoch(session, start_time);
@@ -219,7 +219,7 @@ __wt_timer_start(WT_SESSION_IMPL *session, WT_TIMER *start_time)
  *     Evaluate the difference between the current time and start time and output the difference in
  *     milliseconds.
  */
-static inline void
+static WT_INLINE void
 __wt_timer_evaluate_ms(WT_SESSION_IMPL *session, WT_TIMER *start_time, uint64_t *time_diff_ms)
 {
     struct timespec cur_time;

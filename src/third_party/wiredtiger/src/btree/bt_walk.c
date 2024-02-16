@@ -12,7 +12,7 @@
  * __ref_index_slot --
  *     Return the page's index and slot for a reference.
  */
-static inline void
+static WT_INLINE void
 __ref_index_slot(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
     WT_PAGE_INDEX *pindex;
@@ -76,7 +76,7 @@ found:
  * __ref_ascend --
  *     Ascend the tree one level.
  */
-static inline void
+static WT_INLINE void
 __ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp, uint32_t *slotp)
 {
     WT_REF *parent_ref, *ref;
@@ -147,7 +147,7 @@ __ref_ascend(WT_SESSION_IMPL *session, WT_REF **refp, WT_PAGE_INDEX **pindexp, u
  * __split_prev_race --
  *     Check for races when descending the tree during a previous-cursor walk.
  */
-static inline bool
+static WT_INLINE bool
 __split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp)
 {
     WT_PAGE_INDEX *pindex;
@@ -238,7 +238,7 @@ __split_prev_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX **pindexp
  *     for other reasons. Those other reasons are generally controlled by the flags passed in to
  *     this function.
  */
-static inline int
+static WT_INLINE int
 __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp,
   int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool, bool *), void *func_cookie,
   uint32_t flags)

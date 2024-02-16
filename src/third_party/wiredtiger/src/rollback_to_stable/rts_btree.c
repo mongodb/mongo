@@ -190,7 +190,7 @@ err:
  * __rts_btree_col_modify --
  *     Add the provided update to the head of the update list.
  */
-static inline int
+static WT_INLINE int
 __rts_btree_col_modify(WT_SESSION_IMPL *session, WT_REF *ref, WT_UPDATE *upd, uint64_t recno)
 {
     WT_CURSOR_BTREE cbt;
@@ -220,7 +220,7 @@ err:
  * __rts_btree_row_modify --
  *     Add the provided update to the head of the update list.
  */
-static inline int
+static WT_INLINE int
 __rts_btree_row_modify(WT_SESSION_IMPL *session, WT_REF *ref, WT_UPDATE *upd, WT_ITEM *key)
 {
     WT_CURSOR_BTREE cbt;

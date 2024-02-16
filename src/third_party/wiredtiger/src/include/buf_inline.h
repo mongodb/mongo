@@ -10,7 +10,7 @@
  * __wt_buf_grow --
  *     Grow a buffer that may be in-use, and ensure that all data is local to the buffer.
  */
-static inline int
+static WT_INLINE int
 __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
     /*
@@ -27,7 +27,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
  * __wt_buf_extend --
  *     Grow a buffer that's currently in-use.
  */
-static inline int
+static WT_INLINE int
 __wt_buf_extend(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
     /*
@@ -42,7 +42,7 @@ __wt_buf_extend(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
  * __wt_buf_init --
  *     Create an empty buffer at a specific size.
  */
-static inline int
+static WT_INLINE int
 __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
     /*
@@ -59,7 +59,7 @@ __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
  * __wt_buf_initsize --
  *     Create an empty buffer at a specific size, and set the data length.
  */
-static inline int
+static WT_INLINE int
 __wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
     WT_RET(__wt_buf_init(session, buf, size));
@@ -73,7 +73,7 @@ __wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
  * __wt_buf_set --
  *     Set the contents of the buffer.
  */
-static inline int
+static WT_INLINE int
 __wt_buf_set(WT_SESSION_IMPL *session, WT_ITEM *buf, const void *data, size_t size)
 {
     /*
@@ -90,7 +90,7 @@ __wt_buf_set(WT_SESSION_IMPL *session, WT_ITEM *buf, const void *data, size_t si
  * __wt_buf_setstr --
  *     Set the contents of the buffer to a NUL-terminated string.
  */
-static inline int
+static WT_INLINE int
 __wt_buf_setstr(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *s)
 {
     return (__wt_buf_set(session, buf, s, strlen(s) + 1));
@@ -100,7 +100,7 @@ __wt_buf_setstr(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *s)
  * __wt_buf_free --
  *     Free a buffer.
  */
-static inline void
+static WT_INLINE void
 __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
     __wt_free(session, buf->mem);
@@ -112,7 +112,7 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
  * __wt_scr_free --
  *     Release a scratch buffer.
  */
-static inline void
+static WT_INLINE void
 __wt_scr_free(WT_SESSION_IMPL *session, WT_ITEM **bufp)
 {
     WT_ITEM *buf;

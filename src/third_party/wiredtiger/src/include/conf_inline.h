@@ -11,7 +11,7 @@
  *     Return true if and only if the given string is a dummy compiled string, and if so, return the
  *     compiled structure.
  */
-static inline bool
+static WT_INLINE bool
 __wt_conf_get_compiled(WT_CONNECTION_IMPL *conn, const char *config, WT_CONF **confp)
 {
     if (!__wt_conf_is_compiled(conn, config))
@@ -25,7 +25,7 @@ __wt_conf_get_compiled(WT_CONNECTION_IMPL *conn, const char *config, WT_CONF **c
  * __wt_conf_is_compiled --
  *     Return true if and only if the given string is a dummy compiled string.
  */
-static inline bool
+static WT_INLINE bool
 __wt_conf_is_compiled(WT_CONNECTION_IMPL *conn, const char *config)
 {
     return (config >= conn->conf_dummy && config < conn->conf_dummy + conn->conf_size);
@@ -36,7 +36,7 @@ __wt_conf_is_compiled(WT_CONNECTION_IMPL *conn, const char *config)
  *     Check the string value against a list of choices, if it is found, set up the value so it can
  *     be checked against a particular choice quickly.
  */
-static inline int
+static WT_INLINE int
 __wt_conf_check_choice(
   WT_SESSION_IMPL *session, const char **choices, const char *str, size_t len, const char **result)
 {
@@ -75,7 +75,7 @@ __wt_conf_check_choice(
  * __wt_conf_check_one --
  *     Do all configuration checks for a single value.
  */
-static inline int
+static WT_INLINE int
 __wt_conf_check_one(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *check, WT_CONFIG_ITEM *value)
 {
     if (check->checkf != NULL)
@@ -109,7 +109,7 @@ __wt_conf_check_one(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *check, WT_C
  * __wt_conf_gets_def_func --
  *     Get a value from the compiled configuration. If the value is a default, return that.
  */
-static inline int
+static WT_INLINE int
 __wt_conf_gets_def_func(
   WT_SESSION_IMPL *session, const WT_CONF *conf, uint64_t keys, int def, WT_CONFIG_ITEM *value)
 {

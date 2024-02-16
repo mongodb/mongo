@@ -12,7 +12,7 @@
  * __rec_col_fix_bulk_insert_split_check --
  *     Check if a bulk-loaded fixed-length column store page needs to split.
  */
-static inline int
+static WT_INLINE int
 __rec_col_fix_bulk_insert_split_check(WT_CURSOR_BULK *cbulk)
 {
     WT_BTREE *btree;

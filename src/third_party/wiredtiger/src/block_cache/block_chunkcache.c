@@ -64,7 +64,7 @@ __chunkcache_bitmap_find_free(WT_SESSION_IMPL *session, size_t *bit_index)
  * __set_bit_index --
  *     Allocate a specific bit from the chunk usage bitmap.
  */
-static inline int
+static WT_INLINE int
 __set_bit_index(WT_SESSION_IMPL *session, size_t bit_index)
 {
     WT_CHUNKCACHE *chunkcache;
@@ -228,7 +228,7 @@ __chunkcache_metadata_queue_delete(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK
  * __name_in_pinned_list --
  *     Return true if the chunk belongs to the object in pinned object array.
  */
-static inline bool
+static WT_INLINE bool
 __name_in_pinned_list(WT_SESSION_IMPL *session, const char *name)
 {
     WT_CHUNKCACHE *chunkcache;
@@ -248,7 +248,7 @@ __name_in_pinned_list(WT_SESSION_IMPL *session, const char *name)
  * __insert_update_stats --
  *     Increment chunk's disk usage and update statistics.
  */
-static inline void
+static WT_INLINE void
 __insert_update_stats(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
 {
     WT_CHUNKCACHE *chunkcache;
@@ -269,7 +269,7 @@ __insert_update_stats(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
  * __delete_update_stats --
  *     Decrement chunk's disk usage and update statistics.
  */
-static inline void
+static WT_INLINE void
 __delete_update_stats(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
 {
     WT_CHUNKCACHE *chunkcache;
@@ -481,7 +481,7 @@ __chunkcache_free_chunk(WT_SESSION_IMPL *session, WT_CHUNKCACHE_CHUNK *chunk)
  *     populate will contain a pointer to the block name, thus the block name must outlive the hash
  *     ID.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __chunkcache_tmp_hash(WT_CHUNKCACHE *chunkcache, WT_CHUNKCACHE_HASHID *hash_id,
   const char *object_name, uint32_t objectid, wt_off_t offset)
 {
@@ -520,7 +520,7 @@ __chunkcache_tmp_hash(WT_CHUNKCACHE *chunkcache, WT_CHUNKCACHE_HASHID *hash_id,
  * __hash_id_eq --
  *     Compare two hash IDs and return whether they're equal.
  */
-static inline bool
+static WT_INLINE bool
 __hash_id_eq(WT_CHUNKCACHE_HASHID *a, WT_CHUNKCACHE_HASHID *b)
 {
     return (a->objectid == b->objectid && a->offset == b->offset &&
@@ -536,7 +536,7 @@ __hash_id_eq(WT_CHUNKCACHE_HASHID *a, WT_CHUNKCACHE_HASHID *b)
  *     the access count. As a result, we will only evict a chunk that has not been accessed for a
  *     time proportional to the number of accesses made to it.
  */
-static inline bool
+static WT_INLINE bool
 __chunkcache_should_evict(WT_CHUNKCACHE_CHUNK *chunk)
 {
     bool valid;

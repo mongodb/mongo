@@ -328,7 +328,7 @@ struct __wt_log_record {
  * __wt_log_record_byteswap --
  *     Handle big- and little-endian transformation of the log record header block.
  */
-static inline void
+static WT_INLINE void
 __wt_log_record_byteswap(WT_LOG_RECORD *record)
 {
 #ifdef WORDS_BIGENDIAN
@@ -379,7 +379,7 @@ struct __wt_log_desc {
  * __wt_log_desc_byteswap --
  *     Handle big- and little-endian transformation of the log file description block.
  */
-static inline void
+static WT_INLINE void
 __wt_log_desc_byteswap(WT_LOG_DESC *desc)
 {
 #ifdef WORDS_BIGENDIAN

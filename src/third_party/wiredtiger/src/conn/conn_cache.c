@@ -13,7 +13,7 @@
  *     Cache configuration values can be either a percentage or an absolute size, this function
  *     converts an absolute size to a percentage.
  */
-static inline int
+static WT_INLINE int
 __cache_config_abs_to_pct(
   WT_SESSION_IMPL *session, double *param, const char *param_name, bool shared)
 {

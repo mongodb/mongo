@@ -10,7 +10,7 @@
  * __wt_txn_context_prepare_check --
  *     Return an error if the current transaction is in the prepare state.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_context_prepare_check(WT_SESSION_IMPL *session)
 {
     if (F_ISSET(session->txn, WT_TXN_PREPARE_IGNORE_API_CHECK))
@@ -24,7 +24,7 @@ __wt_txn_context_prepare_check(WT_SESSION_IMPL *session)
  * __wt_txn_context_check --
  *     Complain if a transaction is/isn't running.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_context_check(WT_SESSION_IMPL *session, bool requires_txn)
 {
     if (requires_txn && !F_ISSET(session->txn, WT_TXN_RUNNING))
@@ -38,7 +38,7 @@ __wt_txn_context_check(WT_SESSION_IMPL *session, bool requires_txn)
  * __wt_txn_err_set --
  *     Set an error in the current transaction.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_err_set(WT_SESSION_IMPL *session, int ret)
 {
     WT_TXN *txn;
@@ -69,7 +69,7 @@ __wt_txn_err_set(WT_SESSION_IMPL *session, int ret)
  * __wt_txn_op_set_recno --
  *     Set the latest transaction operation with the given recno.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_op_set_recno(WT_SESSION_IMPL *session, uint64_t recno)
 {
     WT_TXN *txn;
@@ -100,7 +100,7 @@ __wt_txn_op_set_recno(WT_SESSION_IMPL *session, uint64_t recno)
  * __wt_txn_op_set_key --
  *     Set the latest transaction operation with the given key.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_op_set_key(WT_SESSION_IMPL *session, const WT_ITEM *key)
 {
     WT_TXN *txn;
@@ -132,7 +132,7 @@ __wt_txn_op_set_key(WT_SESSION_IMPL *session, const WT_ITEM *key)
  * __txn_apply_prepare_state_update --
  *     Change the prepared state of an update.
  */
-static inline void
+static WT_INLINE void
 __txn_apply_prepare_state_update(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool commit)
 {
     WT_TXN *txn;
@@ -170,7 +170,7 @@ __txn_apply_prepare_state_update(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool 
  * __txn_apply_prepare_state_page_del --
  *     Change a prepared page deleted structure's prepared state.
  */
-static inline void
+static WT_INLINE void
 __txn_apply_prepare_state_page_del(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool commit)
 {
     WT_TXN *txn;
@@ -203,7 +203,7 @@ __txn_apply_prepare_state_page_del(WT_SESSION_IMPL *session, WT_PAGE_DELETED *pa
  * __txn_next_op --
  *     Mark a WT_UPDATE object modified by the current transaction.
  */
-static inline int
+static WT_INLINE int
 __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 {
     WT_TXN *txn;
@@ -233,7 +233,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
  * __txn_swap_snapshot --
  *     Swap the snapshot pointers.
  */
-static inline void
+static WT_INLINE void
 __txn_swap_snapshot(uint64_t **snap_a, uint64_t **snap_b)
 {
     uint64_t *temp;
@@ -248,7 +248,7 @@ __txn_swap_snapshot(uint64_t **snap_a, uint64_t **snap_b)
  *     If threads race making updates, they may discard the last referenced WT_UPDATE item while the
  *     transaction is still active. This function removes the last update item from the "log".
  */
-static inline void
+static WT_INLINE void
 __wt_txn_unmodify(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
@@ -268,7 +268,7 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
  *     Apply the correct prepare state and the timestamp to the ref and to any updates in the page
  *     del update list.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bool commit)
 {
     WT_PAGE_DELETED *page_del;
@@ -313,7 +313,7 @@ __wt_txn_op_delete_apply_prepare_state(WT_SESSION_IMPL *session, WT_REF *ref, bo
  * __txn_op_delete_commit_apply_page_del_timestamp --
  *     Apply the correct start and durable timestamps to the page delete structure.
  */
-static inline void
+static WT_INLINE void
 __txn_op_delete_commit_apply_page_del_timestamp(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_PAGE_DELETED *page_del;
@@ -334,7 +334,7 @@ __txn_op_delete_commit_apply_page_del_timestamp(WT_SESSION_IMPL *session, WT_REF
  * __wt_txn_op_delete_commit_apply_timestamps --
  *     Apply the correct start and durable timestamps to any updates in the page del update list.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_TXN *txn;
@@ -386,7 +386,7 @@ __wt_txn_op_delete_commit_apply_timestamps(WT_SESSION_IMPL *session, WT_REF *ref
  *     timestamps to an update that should not have them, so make the check explicit in this
  *     function.
  */
-static inline bool
+static WT_INLINE bool
 __txn_should_assign_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
     if (!F_ISSET(session->txn, WT_TXN_HAS_TS_COMMIT))
@@ -403,7 +403,7 @@ __txn_should_assign_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
  *     populated update or ref field or is in prepared state there won't be any check for an
  *     existing timestamp.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
 {
     WT_TXN *txn;
@@ -448,7 +448,7 @@ __wt_txn_op_set_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
  * __wt_txn_modify --
  *     Mark a WT_UPDATE object modified by the current transaction.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
     WT_TXN *txn;
@@ -490,7 +490,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
  * __wt_txn_modify_page_delete --
  *     Remember a page truncated by the current transaction.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_DECL_RET;
@@ -525,7 +525,7 @@ err:
  * __wt_txn_oldest_id --
  *     Return the oldest transaction ID that has to be kept for the current tree.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
@@ -576,7 +576,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
  * __wt_txn_pinned_timestamp --
  *     Get the first timestamp that has to be kept for the current tree.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
 {
     WT_TXN_GLOBAL *txn_global;
@@ -619,7 +619,7 @@ __wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
  *     Check if a given transaction ID is "globally visible". This is, if all sessions in the system
  *     will see the transaction ID including the ID that belongs to a running checkpoint.
  */
-static inline bool
+static WT_INLINE bool
 __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
 {
     WT_TXN *txn;
@@ -672,7 +672,7 @@ __txn_visible_all_id(WT_SESSION_IMPL *session, uint64_t id)
  *     time and made obsolete before it can be included in a checkpoint - which leads to bugs in
  *     checkpoint correctness.
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp)
 {
     wt_timestamp_t pinned_ts;
@@ -711,7 +711,7 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
  * __wt_txn_upd_visible_all --
  *     Is the given update visible to all (possible) readers?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
     uint8_t prepare_state;
@@ -732,7 +732,7 @@ __wt_txn_upd_visible_all(WT_SESSION_IMPL *session, WT_UPDATE *upd)
  * __wt_txn_upd_value_visible_all --
  *     Is the given update value visible to all (possible) readers?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_upd_value_visible_all(WT_SESSION_IMPL *session, WT_UPDATE_VALUE *upd_value)
 {
     WT_ASSERT(session, upd_value->tw.prepare == 0);
@@ -745,7 +745,7 @@ __wt_txn_upd_value_visible_all(WT_SESSION_IMPL *session, WT_UPDATE_VALUE *upd_va
  * __wt_txn_tw_stop_visible --
  *     Is the given stop time window visible?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_tw_stop_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
     return (WT_TIME_WINDOW_HAS_STOP(tw) && !tw->prepare &&
@@ -756,7 +756,7 @@ __wt_txn_tw_stop_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
  * __wt_txn_tw_start_visible --
  *     Is the given start time window visible?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_tw_start_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
     /*
@@ -774,7 +774,7 @@ __wt_txn_tw_start_visible(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
  * __wt_txn_tw_start_visible_all --
  *     Is the given start time window visible to all (possible) readers?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_tw_start_visible_all(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
     /*
@@ -792,7 +792,7 @@ __wt_txn_tw_start_visible_all(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
  * __wt_txn_tw_stop_visible_all --
  *     Is the given stop time window visible to all (possible) readers?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_tw_stop_visible_all(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
 {
     return (WT_TIME_WINDOW_HAS_STOP(tw) && !tw->prepare &&
@@ -803,7 +803,7 @@ __wt_txn_tw_stop_visible_all(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw)
  * __wt_txn_visible_id_snapshot --
  *     Is the id visible in terms of the given snapshot?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_visible_id_snapshot(
   uint64_t id, uint64_t snap_min, uint64_t snap_max, uint64_t *snapshot, uint32_t snapshot_count)
 {
@@ -834,7 +834,7 @@ __wt_txn_visible_id_snapshot(
  * __txn_visible_id --
  *     Can the current transaction see the given ID?
  */
-static inline bool
+static WT_INLINE bool
 __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
 {
     WT_TXN *txn;
@@ -868,7 +868,7 @@ __txn_visible_id(WT_SESSION_IMPL *session, uint64_t id)
  * __wt_txn_timestamp_visible --
  *     Can the current transaction see the given timestamp?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_timestamp_visible(
   WT_SESSION_IMPL *session, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
 {
@@ -903,7 +903,7 @@ __wt_txn_timestamp_visible(
  *     visibility check should only be used when assessing broader visibility based on aggregated
  *     time window. It does not reflect whether a specific update is visible to a transaction.
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_snap_min_visible(
   WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
 {
@@ -923,7 +923,7 @@ __wt_txn_snap_min_visible(
  * __wt_txn_visible --
  *     Can the current transaction see the given ID/timestamp?
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_visible(
   WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
 {
@@ -942,7 +942,7 @@ __wt_txn_visible(
  * __wt_txn_upd_visible_type --
  *     Visible type of given update for the current transaction.
  */
-static inline WT_VISIBLE_TYPE
+static WT_INLINE WT_VISIBLE_TYPE
 __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
     uint8_t prepare_state;
@@ -989,7 +989,7 @@ __wt_txn_upd_visible_type(WT_SESSION_IMPL *session, WT_UPDATE *upd)
  * __wt_txn_upd_visible --
  *     Can the current transaction see the given update.
  */
-static inline bool
+static WT_INLINE bool
 __wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
     return (__wt_txn_upd_visible_type(session, upd) == WT_VISIBLE_TRUE);
@@ -999,7 +999,7 @@ __wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
  * __wt_upd_alloc --
  *     Allocate a WT_UPDATE structure and associated value and fill it in.
  */
-static inline int
+static WT_INLINE int
 __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type, WT_UPDATE **updp,
   size_t *sizep)
 {
@@ -1050,7 +1050,7 @@ __wt_upd_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value, u_int modify_type
  * __wt_upd_alloc_tombstone --
  *     Allocate a tombstone update.
  */
-static inline int
+static WT_INLINE int
 __wt_upd_alloc_tombstone(WT_SESSION_IMPL *session, WT_UPDATE **updp, size_t *sizep)
 {
     return (__wt_upd_alloc(session, NULL, WT_UPDATE_TOMBSTONE, updp, sizep));
@@ -1061,7 +1061,7 @@ __wt_upd_alloc_tombstone(WT_SESSION_IMPL *session, WT_UPDATE **updp, size_t *siz
  *     Internal helper function to get the first visible update in a list (or NULL if none are
  *     visible).
  */
-static inline int
+static WT_INLINE int
 __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd,
   WT_UPDATE **prepare_updp, WT_UPDATE **restored_updp)
 {
@@ -1186,7 +1186,7 @@ __wt_txn_read_upd_list_internal(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, 
  * __wt_txn_read_upd_list --
  *     Get the first visible update in a list (or NULL if none are visible).
  */
-static inline int
+static WT_INLINE int
 __wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 {
     return (__wt_txn_read_upd_list_internal(session, cbt, upd, NULL, NULL));
@@ -1199,7 +1199,7 @@ __wt_txn_read_upd_list(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE
  *     value for the given key. Finally, if the onpage value is not visible to the reader, the
  *     function will search the history store for a visible update.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_read(
   WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, WT_UPDATE *upd)
 {
@@ -1338,7 +1338,7 @@ retry:
  * __wt_txn_begin --
  *     Begin a transaction.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
 {
     WT_TXN *txn;
@@ -1385,7 +1385,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
  * __wt_txn_autocommit_check --
  *     If an auto-commit transaction is required, start one.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
@@ -1404,7 +1404,7 @@ __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
  *     If there is no transaction active in this thread and we haven't checked if the cache is full,
  *     do it now. If we have to block for eviction, this is the best time to do it.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
@@ -1430,7 +1430,7 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
  * __wt_txn_id_alloc --
  *     Allocate a new transaction ID.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
 {
     WT_TXN_GLOBAL *txn_global;
@@ -1476,7 +1476,7 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
  * __wt_txn_id_check --
  *     A transaction is going to do an update, allocate a transaction ID.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_id_check(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
@@ -1520,7 +1520,7 @@ __wt_txn_id_check(WT_SESSION_IMPL *session)
  * __wt_txn_search_check --
  *     Check if a search by the current transaction violates timestamp rules.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_search_check(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
@@ -1564,7 +1564,7 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
  * __txn_modify_block --
  *     Check if the current transaction can modify an item.
  */
-static inline int
+static WT_INLINE int
 __txn_modify_block(
   WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, wt_timestamp_t *prev_tsp)
 {
@@ -1675,7 +1675,7 @@ err:
  * __wt_txn_modify_check --
  *     Check if the current transaction can modify an item.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_modify_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd,
   wt_timestamp_t *prev_tsp, u_int modify_type)
 {
@@ -1718,7 +1718,7 @@ __wt_txn_modify_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE 
  * __wt_txn_read_last --
  *     Called when the last page for a session is released.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_read_last(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
@@ -1740,7 +1740,7 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
  * __wt_txn_cursor_op --
  *     Called for each cursor operation.
  */
-static inline void
+static WT_INLINE void
 __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
@@ -1781,7 +1781,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
  * __wt_txn_activity_check --
  *     Check whether there are any running transactions.
  */
-static inline int
+static WT_INLINE int
 __wt_txn_activity_check(WT_SESSION_IMPL *session, bool *txn_active)
 {
     WT_TXN_GLOBAL *txn_global;
@@ -1811,7 +1811,7 @@ __wt_txn_activity_check(WT_SESSION_IMPL *session, bool *txn_active)
  *     Point an update value at a given update. We're specifically not getting the value to own the
  *     memory since this exists in an update list somewhere.
  */
-static inline void
+static WT_INLINE void
 __wt_upd_value_assign(WT_UPDATE_VALUE *upd_value, WT_UPDATE *upd)
 {
     uint8_t prepare_state;
@@ -1842,7 +1842,7 @@ __wt_upd_value_assign(WT_UPDATE_VALUE *upd_value, WT_UPDATE *upd)
  * __wt_upd_value_clear --
  *     Clear an update value to its defaults.
  */
-static inline void
+static WT_INLINE void
 __wt_upd_value_clear(WT_UPDATE_VALUE *upd_value)
 {
     /*

@@ -20,7 +20,7 @@ def generate_string_conversion(docstring, name, define_regex, srcfile, out):
     out.write(' * __wt_{}_str --\n'.format(name))
     out.write(' *     {}\n'.format(docstring))
     out.write(' */\n')
-    out.write('static inline const char *\n')
+    out.write('static WT_INLINE const char *\n')
     out.write('__wt_{}_str(uint8_t val)\n'.format(name))
     out.write('{\n')
     out.write('    switch (val) {\n')

@@ -12,7 +12,7 @@
  * __sync_checkpoint_can_skip --
  *     There are limited conditions under which we can skip writing a dirty page during checkpoint.
  */
-static inline bool
+static WT_INLINE bool
 __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_MULTI *multi;
@@ -71,7 +71,7 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_REF *ref)
  * __sync_dup_hazard_pointer --
  *     Get a duplicate hazard pointer.
  */
-static inline int
+static WT_INLINE int
 __sync_dup_hazard_pointer(WT_SESSION_IMPL *session, WT_REF *walk)
 {
     bool busy;
@@ -95,7 +95,7 @@ __sync_dup_hazard_pointer(WT_SESSION_IMPL *session, WT_REF *walk)
  * __sync_dup_walk --
  *     Duplicate a tree walk point.
  */
-static inline int
+static WT_INLINE int
 __sync_dup_walk(WT_SESSION_IMPL *session, WT_REF *walk, uint32_t flags, WT_REF **dupp)
 {
     WT_REF *old;

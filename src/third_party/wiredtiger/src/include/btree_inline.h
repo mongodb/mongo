@@ -10,7 +10,7 @@
  * __wt_ref_is_root --
  *     Return if the page reference is for the root page.
  */
-static inline bool
+static WT_INLINE bool
 __wt_ref_is_root(WT_REF *ref)
 {
     return (ref->home == NULL);
@@ -20,7 +20,7 @@ __wt_ref_is_root(WT_REF *ref)
  * __wt_ref_cas_state_int --
  *     Try to do a compare and swap, if successful update the ref history in diagnostic mode.
  */
-static inline bool
+static WT_INLINE bool
 __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state, uint8_t new_state,
   const char *func, int line)
 {
@@ -48,7 +48,7 @@ __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state,
  * __wt_btree_disable_bulk --
  *     Disable bulk loads into a tree.
  */
-static inline void
+static WT_INLINE void
 __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -80,7 +80,7 @@ __wt_btree_disable_bulk(WT_SESSION_IMPL *session)
  * __wt_page_is_empty --
  *     Return if the page is empty.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_is_empty(WT_PAGE *page)
 {
     /*
@@ -95,7 +95,7 @@ __wt_page_is_empty(WT_PAGE *page)
  * __wt_page_evict_soon_check --
  *     Check whether the page should be evicted urgently.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_evict_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_split)
 {
     WT_BTREE *btree;
@@ -125,7 +125,7 @@ __wt_page_evict_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_sp
  * __wt_page_evict_clean --
  *     Return if the page can be evicted without dirtying the tree.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_evict_clean(WT_PAGE *page)
 {
     /*
@@ -141,7 +141,7 @@ __wt_page_evict_clean(WT_PAGE *page)
  * __wt_page_is_modified --
  *     Return if the page is dirty.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_is_modified(WT_PAGE *page)
 {
     /*
@@ -156,7 +156,7 @@ __wt_page_is_modified(WT_PAGE *page)
  * __wt_page_is_reconciling --
  *     Return if the page is being reconciled.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_is_reconciling(WT_PAGE *page)
 {
     /*
@@ -171,7 +171,7 @@ __wt_page_is_reconciling(WT_PAGE *page)
  * __wt_btree_block_free --
  *     Helper function to free a block from the current tree.
  */
-static inline int
+static WT_INLINE int
 __wt_btree_block_free(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
     WT_BM *bm;
@@ -187,7 +187,7 @@ __wt_btree_block_free(WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr
  * __wt_btree_bytes_inuse --
  *     Return the number of bytes in use.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_btree_bytes_inuse(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -203,7 +203,7 @@ __wt_btree_bytes_inuse(WT_SESSION_IMPL *session)
  * __wt_btree_bytes_evictable --
  *     Return the number of bytes that can be evicted (i.e. bytes apart from the pinned root page).
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -227,7 +227,7 @@ __wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
  * __wt_btree_dirty_inuse --
  *     Return the number of dirty bytes in use.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_btree_dirty_inuse(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -244,7 +244,7 @@ __wt_btree_dirty_inuse(WT_SESSION_IMPL *session)
  * __wt_btree_dirty_leaf_inuse --
  *     Return the number of bytes in use by dirty leaf pages.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_btree_dirty_leaf_inuse(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -260,7 +260,7 @@ __wt_btree_dirty_leaf_inuse(WT_SESSION_IMPL *session)
  * __wt_btree_bytes_updates --
  *     Return the number of bytes in use by dirty leaf pages.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_btree_bytes_updates(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -276,7 +276,7 @@ __wt_btree_bytes_updates(WT_SESSION_IMPL *session)
  * __wt_cache_page_inmem_incr --
  *     Increment a page's memory footprint in the cache.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
     WT_BTREE *btree;
@@ -334,7 +334,7 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
  * __wt_cache_decr_check_size --
  *     Decrement a size_t cache value and check for underflow.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_decr_check_size(WT_SESSION_IMPL *session, size_t *vp, size_t v, const char *fld)
 {
     if (v == 0 || __wt_atomic_subsize(vp, v) < WT_EXABYTE)
@@ -356,7 +356,7 @@ __wt_cache_decr_check_size(WT_SESSION_IMPL *session, size_t *vp, size_t v, const
  * __wt_cache_decr_check_uint64 --
  *     Decrement a uint64_t cache value and check for underflow.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_decr_check_uint64(WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v, const char *fld)
 {
     uint64_t orig = *vp;
@@ -381,7 +381,7 @@ __wt_cache_decr_check_uint64(WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v,
  * __wt_cache_page_byte_dirty_decr --
  *     Decrement the page's dirty byte count, guarding from underflow.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_page_byte_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
     WT_BTREE *btree;
@@ -443,7 +443,7 @@ __wt_cache_page_byte_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t 
  * __wt_cache_page_byte_updates_decr --
  *     Decrement the page's update byte count, guarding from underflow.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_page_byte_updates_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
     WT_BTREE *btree;
@@ -475,7 +475,7 @@ __wt_cache_page_byte_updates_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_
  * __wt_cache_page_inmem_decr --
  *     Decrement a page's memory footprint in the cache.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
     WT_BTREE *btree;
@@ -510,7 +510,7 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
  * __wt_cache_dirty_incr --
  *     Page switch from clean to dirty: increment the cache dirty page/byte counts.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
@@ -547,7 +547,7 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_cache_dirty_decr --
  *     Page switch from dirty to clean: decrement the cache dirty page/byte counts.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_CACHE *cache;
@@ -570,7 +570,7 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_cache_page_image_decr --
  *     Decrement a page image's size to the cache.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_page_image_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_CACHE *cache;
@@ -589,7 +589,7 @@ __wt_cache_page_image_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_cache_page_image_incr --
  *     Increment a page image's size to the cache.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_CACHE *cache;
@@ -605,7 +605,7 @@ __wt_cache_page_image_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_cache_page_evict --
  *     Evict pages from the cache.
  */
-static inline void
+static WT_INLINE void
 __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
@@ -669,7 +669,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_update_list_memsize --
  *     The size in memory of a list of updates.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_update_list_memsize(WT_UPDATE *upd)
 {
     size_t upd_size;
@@ -684,7 +684,7 @@ __wt_update_list_memsize(WT_UPDATE *upd)
  * __wt_page_modify_init --
  *     A page is about to be modified, allocate the modification structure.
  */
-static inline int
+static WT_INLINE int
 __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     return (page->modify == NULL ? __wt_page_modify_alloc(session, page) : 0);
@@ -694,7 +694,7 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_page_only_modify_set --
  *     Mark the page (but only the page) dirty.
  */
-static inline void
+static WT_INLINE void
 __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     uint64_t last_running;
@@ -752,7 +752,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_tree_modify_set --
  *     Mark the tree dirty.
  */
-static inline void
+static WT_INLINE void
 __wt_tree_modify_set(WT_SESSION_IMPL *session)
 {
     /*
@@ -790,7 +790,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
  * __wt_page_modify_clear --
  *     Clean a modified page.
  */
-static inline void
+static WT_INLINE void
 __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /*
@@ -823,7 +823,7 @@ __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_page_modify_set --
  *     Mark the page and tree dirty.
  */
-static inline void
+static WT_INLINE void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     /*
@@ -859,7 +859,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_page_parent_modify_set --
  *     Mark the parent page, and optionally the tree, dirty.
  */
-static inline int
+static WT_INLINE int
 __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_only)
 {
     WT_PAGE *parent;
@@ -886,7 +886,7 @@ __wt_page_parent_modify_set(WT_SESSION_IMPL *session, WT_REF *ref, bool page_onl
  * __wt_off_page --
  *     Return if a pointer references off-page data.
  */
-static inline bool
+static WT_INLINE bool
 __wt_off_page(WT_PAGE *page, const void *p)
 {
     /*
@@ -900,7 +900,7 @@ __wt_off_page(WT_PAGE *page, const void *p)
  * __wt_ref_key --
  *     Return a reference to a row-store internal page key as cheaply as possible.
  */
-static inline void
+static WT_INLINE void
 __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
 {
     uintptr_t v;
@@ -946,7 +946,7 @@ __wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, size_t *sizep)
  * __wt_ref_key_onpage_set --
  *     Set a WT_REF to reference an on-page key.
  */
-static inline void
+static WT_INLINE void
 __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK_ADDR *unpack)
 {
     uintptr_t v;
@@ -963,7 +963,7 @@ __wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK_ADDR *unpack)
  * __wt_ref_key_instantiated --
  *     Return if a WT_REF key is instantiated.
  */
-static inline WT_IKEY *
+static WT_INLINE WT_IKEY *
 __wt_ref_key_instantiated(WT_REF *ref)
 {
     uintptr_t v;
@@ -979,7 +979,7 @@ __wt_ref_key_instantiated(WT_REF *ref)
  * __wt_ref_key_clear --
  *     Clear a WT_REF key.
  */
-static inline void
+static WT_INLINE void
 __wt_ref_key_clear(WT_REF *ref)
 {
     /*
@@ -996,7 +996,7 @@ __wt_ref_key_clear(WT_REF *ref)
  *     Return a row-store leaf page key referenced by a WT_ROW if it can be had without unpacking a
  *     cell, and information about the cell, if the key isn't cheaply available.
  */
-static inline void
+static WT_INLINE void
 __wt_row_leaf_key_info(WT_PAGE *page, void *copy, WT_IKEY **ikeyp, WT_CELL **cellp, void *datap,
   size_t *sizep, uint8_t *prefixp)
 {
@@ -1173,7 +1173,7 @@ __wt_row_leaf_key_info(WT_PAGE *page, void *copy, WT_IKEY **ikeyp, WT_CELL **cel
  * __wt_row_leaf_key_set --
  *     Set a WT_ROW to reference an on-page row-store leaf key.
  */
-static inline void
+static WT_INLINE void
 __wt_row_leaf_key_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK_KV *unpack)
 {
     uintptr_t key_offset, v;
@@ -1199,7 +1199,7 @@ __wt_row_leaf_key_set(WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK_KV *unpack)
  * __wt_row_leaf_value_set --
  *     Set a WT_ROW to reference an on-page row-store leaf key and value pair, if possible.
  */
-static inline void
+static WT_INLINE void
 __wt_row_leaf_value_set(WT_ROW *rip, WT_CELL_UNPACK_KV *unpack)
 {
     uintptr_t value_offset, value_size, v;
@@ -1244,7 +1244,7 @@ __wt_row_leaf_value_set(WT_ROW *rip, WT_CELL_UNPACK_KV *unpack)
  * __wt_row_leaf_key_free --
  *     Discard any memory allocated for an instantiated key.
  */
-static inline void
+static WT_INLINE void
 __wt_row_leaf_key_free(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
 {
     WT_IKEY *ikey;
@@ -1265,7 +1265,7 @@ __wt_row_leaf_key_free(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip)
  * __wt_row_leaf_key --
  *     Set a buffer to reference a row-store leaf page key as cheaply as possible.
  */
-static inline int
+static WT_INLINE int
 __wt_row_leaf_key(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, bool instantiate)
 {
@@ -1324,7 +1324,7 @@ __wt_row_leaf_key(
  * __wt_row_leaf_key_instantiate --
  *     Instantiate the keys on a leaf page as needed.
  */
-static inline int
+static WT_INLINE int
 __wt_row_leaf_key_instantiate(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_CELL *cell;
@@ -1406,7 +1406,7 @@ err:
  * __wt_row_leaf_value_is_encoded --
  *     Return if the value for a row-store leaf page is an encoded key/value pair.
  */
-static inline bool
+static WT_INLINE bool
 __wt_row_leaf_value_is_encoded(WT_ROW *rip)
 {
     uintptr_t v;
@@ -1424,7 +1424,7 @@ __wt_row_leaf_value_is_encoded(WT_ROW *rip)
  * __wt_row_leaf_value --
  *     Return the value for a row-store leaf page encoded key/value pair.
  */
-static inline bool
+static WT_INLINE bool
 __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
 {
     uintptr_t v;
@@ -1458,7 +1458,7 @@ __wt_row_leaf_value(WT_PAGE *page, WT_ROW *rip, WT_ITEM *value)
  * __wt_row_leaf_value_cell --
  *     Return the unpacked value for a row-store leaf page key.
  */
-static inline void
+static WT_INLINE void
 __wt_row_leaf_value_cell(
   WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip, WT_CELL_UNPACK_KV *vpack)
 {
@@ -1524,7 +1524,7 @@ struct __wt_addr_copy {
  * __wt_ref_addr_copy --
  *     Return a copy of the WT_REF address information.
  */
-static inline bool
+static WT_INLINE bool
 __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
 {
     WT_ADDR *addr;
@@ -1596,7 +1596,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
  * __wt_ref_block_free --
  *     Free the on-disk block for a reference and clear the address.
  */
-static inline int
+static WT_INLINE int
 __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_ADDR_COPY addr;
@@ -1620,7 +1620,7 @@ err:
  * __wt_page_del_visible_all --
  *     Check if a truncate operation is visible to everyone and the data under it is obsolete.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool hide_prepared)
 {
     uint8_t prepare_state;
@@ -1664,7 +1664,7 @@ __wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, b
  *     Return if a truncate operation is visible to the caller. The same considerations apply as in
  *     the visible_all version.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool hide_prepared)
 {
     uint8_t prepare_state;
@@ -1696,7 +1696,7 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
  *     list in the page modify structure should be checked instead, as the page_del structure might
  *     have been discarded already. (The update list is non-null if the transaction is unresolved.)
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_del_committed_set(WT_PAGE_DELETED *page_del)
 {
     /*
@@ -1715,7 +1715,7 @@ __wt_page_del_committed_set(WT_PAGE_DELETED *page_del)
  * __wt_btree_syncing_by_other_session --
  *     Returns true if the session's current btree is being synced by another thread.
  */
-static inline bool
+static WT_INLINE bool
 __wt_btree_syncing_by_other_session(WT_SESSION_IMPL *session)
 {
     WT_BTREE *btree;
@@ -1729,7 +1729,7 @@ __wt_btree_syncing_by_other_session(WT_SESSION_IMPL *session)
  * __wt_leaf_page_can_split --
  *     Check whether a page can be split in memory.
  */
-static inline bool
+static WT_INLINE bool
 __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_BTREE *btree;
@@ -1833,7 +1833,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_page_evict_retry --
  *     Avoid busy-spinning attempting to evict the same page all the time.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
     WT_PAGE_MODIFY *mod;
@@ -1878,7 +1878,7 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __wt_page_can_evict --
  *     Check whether a page can be evicted.
  */
-static inline bool
+static WT_INLINE bool
 __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 {
     WT_PAGE *page;
@@ -1990,7 +1990,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
  * __wt_page_release --
  *     Release a reference to a page.
  */
-static inline int
+static WT_INLINE int
 __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
     WT_BTREE *btree;
@@ -2043,7 +2043,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
  * __wt_skip_choose_depth --
  *     Randomly choose a depth for a skiplist insert.
  */
-static inline u_int
+static WT_INLINE u_int
 __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 {
     u_int depth, probability;
@@ -2066,7 +2066,7 @@ __wt_skip_choose_depth(WT_SESSION_IMPL *session)
  *     If called on anything other than a simple tree with a single leaf page, returns true so our
  *     LSM caller will switch to a new tree.
  */
-static inline bool
+static WT_INLINE bool
 __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
 {
     WT_BTREE *btree;
@@ -2109,7 +2109,7 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
  * __wt_split_descent_race --
  *     Return if we raced with an internal page split when descending the tree.
  */
-static inline bool
+static WT_INLINE bool
 __wt_split_descent_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX *saved_pindex)
 {
     WT_PAGE_INDEX *pindex;
@@ -2190,7 +2190,7 @@ __wt_split_descent_race(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_INDEX *sa
  * __wt_page_swap_func --
  *     Swap one page's hazard pointer for another one when hazard pointer coupling up/down the tree.
  */
-static inline int
+static WT_INLINE int
 __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32_t flags
 #ifdef HAVE_DIAGNOSTIC
   ,
@@ -2263,7 +2263,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
  *     Performs bound comparison to check if the key is within bounds, if not, increment the
  *     appropriate stat, early exit, and return WT_NOTFOUND.
  */
-static inline int
+static WT_INLINE int
 __wt_btcur_bounds_early_exit(
   WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next, bool *key_out_of_boundsp)
 {
@@ -2290,7 +2290,7 @@ __wt_btcur_bounds_early_exit(
  *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
  *     traversal.
  */
-static inline int
+static WT_INLINE int
 __wt_btcur_skip_page(
   WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {

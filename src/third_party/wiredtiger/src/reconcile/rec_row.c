@@ -12,7 +12,7 @@
  * __rec_key_state_update --
  *     Update prefix and suffix compression based on the last key.
  */
-static inline void
+static WT_INLINE void
 __rec_key_state_update(WT_RECONCILE *r, bool ovfl_key)
 {
     WT_ITEM *a;
@@ -639,7 +639,7 @@ err:
  * __rec_cell_repack --
  *     Repack a cell.
  */
-static inline int
+static WT_INLINE int
 __rec_cell_repack(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_RECONCILE *r,
   WT_CELL_UNPACK_KV *vpack, WT_TIME_WINDOW *tw)
 {

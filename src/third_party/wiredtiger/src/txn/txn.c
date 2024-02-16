@@ -65,7 +65,7 @@ __snapsort(uint64_t *array, uint32_t size)
  * __txn_remove_from_global_table --
  *     Remove the transaction id from the global transaction table.
  */
-static inline void
+static WT_INLINE void
 __txn_remove_from_global_table(WT_SESSION_IMPL *session)
 {
 #ifdef HAVE_DIAGNOSTIC
@@ -921,7 +921,7 @@ err:
  * __txn_timestamp_usage_check --
  *     Check if a commit will violate timestamp rules.
  */
-static inline int
+static WT_INLINE int
 __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *upd)
 {
     WT_BTREE *btree;
@@ -1576,7 +1576,7 @@ err:
  * __txn_mod_sortable_key --
  *     Given an operation return a boolean indicating if it has a sortable key.
  */
-static inline bool
+static WT_INLINE bool
 __txn_mod_sortable_key(WT_TXN_OP *opt)
 {
     switch (opt->type) {

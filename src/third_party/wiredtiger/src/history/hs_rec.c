@@ -251,7 +251,7 @@ err:
  * __hs_next_upd_full_value --
  *     Get the next update and its full value.
  */
-static inline int
+static WT_INLINE int
 __hs_next_upd_full_value(WT_SESSION_IMPL *session, WT_UPDATE_VECTOR *updates,
   WT_ITEM *older_full_value, WT_ITEM *full_value, WT_UPDATE **updp)
 {
@@ -287,7 +287,7 @@ __hs_next_upd_full_value(WT_SESSION_IMPL *session, WT_UPDATE_VECTOR *updates,
  * __hs_pack_key --
  *     Pack the history store key
  */
-static inline int
+static WT_INLINE int
 __hs_pack_key(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_RECONCILE *r, WT_INSERT *ins,
   WT_ROW *rip, WT_ITEM *key)
 {

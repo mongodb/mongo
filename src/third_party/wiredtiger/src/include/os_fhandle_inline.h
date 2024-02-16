@@ -16,7 +16,7 @@ WT_STAT_MSECS_HIST_INCR_FUNC(fswrite, perf_hist_fswrite_latency)
  * __wt_fsync --
  *     POSIX fsync.
  */
-static inline int
+static WT_INLINE int
 __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
 {
     WT_DECL_RET;
@@ -47,7 +47,7 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh, bool block)
  * __wt_fextend --
  *     Extend a file.
  */
-static inline int
+static WT_INLINE int
 __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
     WT_FILE_HANDLE *handle;
@@ -84,7 +84,7 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
  * __wt_file_lock --
  *     Lock/unlock a file.
  */
-static inline int
+static WT_INLINE int
 __wt_file_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
 {
     WT_FILE_HANDLE *handle;
@@ -100,7 +100,7 @@ __wt_file_lock(WT_SESSION_IMPL *session, WT_FH *fh, bool lock)
  * __wt_read --
  *     POSIX pread.
  */
-static inline int
+static WT_INLINE int
 __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
 {
     WT_DECL_RET;
@@ -129,7 +129,7 @@ __wt_read(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void
  * __wt_filesize --
  *     Get the size of a file in bytes, by file handle.
  */
-static inline int
+static WT_INLINE int
 __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
     __wt_verbose(session, WT_VERB_HANDLEOPS, "%s: handle-size", fh->handle->name);
@@ -141,7 +141,7 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
  * __wt_ftruncate --
  *     Truncate a file.
  */
-static inline int
+static WT_INLINE int
 __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
     WT_FILE_HANDLE *handle;
@@ -175,7 +175,7 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
  * __wt_write --
  *     POSIX pwrite.
  */
-static inline int
+static WT_INLINE int
 __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
 {
     WT_DECL_RET;

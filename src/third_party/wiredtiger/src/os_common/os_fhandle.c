@@ -182,7 +182,7 @@ __open_verbose_file_type_tag(WT_FS_OPEN_FILE_TYPE file_type)
  * __open_verbose --
  *     Optionally output a verbose message on handle open.
  */
-static inline int
+static WT_INLINE int
 __open_verbose(
   WT_SESSION_IMPL *session, const char *name, WT_FS_OPEN_FILE_TYPE file_type, u_int flags)
 {

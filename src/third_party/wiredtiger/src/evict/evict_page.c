@@ -17,7 +17,7 @@ static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t, bool *);
  * __evict_exclusive_clear --
  *     Release exclusive access to a page.
  */
-static inline void
+static WT_INLINE void
 __evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state)
 {
     WT_ASSERT(session, ref->state == WT_REF_LOCKED && ref->page != NULL);
@@ -29,7 +29,7 @@ __evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_
  * __evict_exclusive --
  *     Acquire exclusive access to a page.
  */
-static inline int
+static WT_INLINE int
 __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_ASSERT(session, ref->state == WT_REF_LOCKED);

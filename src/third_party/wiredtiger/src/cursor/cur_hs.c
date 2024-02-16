@@ -163,7 +163,7 @@ __curhs_file_cursor_search_near(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int
  * __curhs_set_key_ptr --
  *     Copy the key buffer pointer from file cursor to the history store cursor.
  */
-static inline void
+static WT_INLINE void
 __curhs_set_key_ptr(WT_CURSOR *hs_cursor, WT_CURSOR *file_cursor)
 {
     hs_cursor->key.data = file_cursor->key.data;
@@ -176,7 +176,7 @@ __curhs_set_key_ptr(WT_CURSOR *hs_cursor, WT_CURSOR *file_cursor)
  * __curhs_set_value_ptr --
  *     Copy the value buffer pointer from file cursor to the history store cursor.
  */
-static inline void
+static WT_INLINE void
 __curhs_set_value_ptr(WT_CURSOR *hs_cursor, WT_CURSOR *file_cursor)
 {
     hs_cursor->value.data = file_cursor->value.data;
@@ -1031,7 +1031,7 @@ err:
  * __curhs_remove_int --
  *     Remove a record from the history store.
  */
-static inline int
+static WT_INLINE int
 __curhs_remove_int(WT_CURSOR_BTREE *cbt, const WT_ITEM *value, u_int modify_type)
 {
     WT_DECL_RET;

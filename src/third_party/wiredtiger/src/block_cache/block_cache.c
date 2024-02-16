@@ -12,7 +12,7 @@
  * __blkcache_verbose --
  *     Block cache verbose logging.
  */
-static inline void
+static WT_INLINE void
 __blkcache_verbose(WT_SESSION_IMPL *session, WT_VERBOSE_LEVEL level, const char *tag, uint64_t hash,
   const uint8_t *addr, size_t addr_size)
 {
@@ -128,7 +128,7 @@ __blkcache_print_reference_hist(WT_SESSION_IMPL *session, const char *header, ui
  *     Estimate the overhead of using the cache. The overhead comes from block insertions and
  *     removals, which produce writes. Writes disproportionally slow down the reads on Optane NVRAM.
  */
-static inline bool
+static WT_INLINE bool
 __blkcache_high_overhead(WT_SESSION_IMPL *session)
 {
     WT_BLKCACHE *blkcache;

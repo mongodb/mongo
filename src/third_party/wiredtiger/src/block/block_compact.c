@@ -93,7 +93,7 @@ __wt_block_compact_get_progress_stats(WT_SESSION_IMPL *session, WT_BM *bm,
  * __block_compact_trim_extent --
  *     Trim the extent to the given range mask, specified via start and end offsets.
  */
-static inline void
+static WT_INLINE void
 __block_compact_trim_extent(WT_SESSION_IMPL *session, wt_off_t mask_start, wt_off_t mask_end,
   wt_off_t *ext_startp, wt_off_t *ext_sizep)
 {

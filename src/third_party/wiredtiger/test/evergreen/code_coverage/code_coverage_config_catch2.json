@@ -6,7 +6,7 @@
     "// See the README.md file in this directory for details."
   ],
   "setup_actions" : [
-    "cmake -DHAVE_UNITTEST=1 -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1 -DCMAKE_BUILD_TYPE=Coverage -G Ninja ../.",
+    "cmake -DHAVE_UNITTEST=1 -DHAVE_DIAGNOSTIC=0 -DCODE_COVERAGE_MEASUREMENT=1 -DINLINE_FUNCTIONS_INSTEAD_OF_MACROS=1 -DCMAKE_BUILD_TYPE=Coverage -G Ninja ../.",
     "ninja"
   ],
   "test_tasks" : [

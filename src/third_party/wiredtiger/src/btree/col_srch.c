@@ -12,7 +12,7 @@
  * __check_leaf_key_range --
  *     Check the search key is in the leaf page's key range.
  */
-static inline int
+static WT_INLINE int
 __check_leaf_key_range(WT_SESSION_IMPL *session, uint64_t recno, WT_REF *leaf, WT_CURSOR_BTREE *cbt)
 {
     WT_PAGE_INDEX *pindex;

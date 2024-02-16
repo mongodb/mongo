@@ -58,7 +58,7 @@ __evict_lock_handle_list(WT_SESSION_IMPL *session)
  * __evict_entry_priority --
  *     Get the adjusted read generation for an eviction entry.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 {
     WT_BTREE *btree;
@@ -143,7 +143,7 @@ __evict_lru_cmp(const void *a_arg, const void *b_arg)
  * __evict_list_clear --
  *     Clear an entry in the LRU eviction list.
  */
-static inline void
+static WT_INLINE void
 __evict_list_clear(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 {
     if (e->ref != NULL) {
@@ -219,7 +219,7 @@ __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref)
  *     Is the queue empty? Note that the eviction server is pessimistic and treats a half full queue
  *     as empty.
  */
-static inline bool
+static WT_INLINE bool
 __evict_queue_empty(WT_EVICT_QUEUE *queue, bool server_check)
 {
     uint32_t candidates, used;
@@ -240,7 +240,7 @@ __evict_queue_empty(WT_EVICT_QUEUE *queue, bool server_check)
  *     Is the queue full (i.e., it has been populated with candidates and none of them have been
  *     evicted yet)?
  */
-static inline bool
+static WT_INLINE bool
 __evict_queue_full(WT_EVICT_QUEUE *queue)
 {
     return (queue->evict_current == queue->evict_queue && queue->evict_candidates != 0);

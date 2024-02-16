@@ -32,4 +32,10 @@ elseif(${CMAKE_C_COMPILER_VERSION} VERSION_EQUAL 6)
     list(APPEND gcc_flags "-Wunsafe-loop-optimizations")
 endif()
 
+# In code coverage builds inline functions may not be inlined, which can result in additional
+# unused copies of those functions, so the unused-function warning much be turned off.
+if(CODE_COVERAGE_MEASUREMENT)
+    list(APPEND gcc_flags "-Wno-unused-function")
+endif ()
+
 set(COMPILER_DIAGNOSTIC_C_FLAGS ${gcc_flags})

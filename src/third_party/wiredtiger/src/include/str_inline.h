@@ -2,7 +2,7 @@
  * __wt_prepare_state_str --
  *     Convert a prepare state to its string representation.
  */
-static inline const char *
+static WT_INLINE const char *
 __wt_prepare_state_str(uint8_t val)
 {
     switch (val) {
@@ -23,7 +23,7 @@ __wt_prepare_state_str(uint8_t val)
  * __wt_update_type_str --
  *     Convert an update type to its string representation.
  */
-static inline const char *
+static WT_INLINE const char *
 __wt_update_type_str(uint8_t val)
 {
     switch (val) {
@@ -46,7 +46,7 @@ __wt_update_type_str(uint8_t val)
  * __wt_page_type_str --
  *     Convert a page type to its string representation.
  */
-static inline const char *
+static WT_INLINE const char *
 __wt_page_type_str(uint8_t val)
 {
     switch (val) {

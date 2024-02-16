@@ -158,7 +158,7 @@ static const uint64_t k3 = 0xc949d7c7509e6557ULL;
  * Hash 128 input bits down to 64 bits of output.
  * This is intended to be a reasonably good hash function.
  */
-static inline uint64_t Hash128to64(const uint128 x) {
+static WT_INLINE uint64_t Hash128to64(const uint128 x) {
 	/* Murmur-inspired hashing. */
 	const uint64_t kMul = 0x9ddfea08eb382d69ULL;
 	uint64_t a, b;
@@ -299,7 +299,7 @@ static uint64_t HashLen33to64(const char *s, size_t len) {
 	return ShiftMix(r * k0 + vs) * k2;
 }
 
-static inline uint64_t CityHash64(const char *s, size_t len) {
+static WT_INLINE uint64_t CityHash64(const char *s, size_t len) {
 	uint64_t temp, x, y, z;
 	uint128 v, w;
 

@@ -709,7 +709,7 @@ use_syscall:
  * __posix_open_file_cloexec --
  *     Prevent child access to file handles.
  */
-static inline int
+static WT_INLINE int
 __posix_open_file_cloexec(WT_SESSION_IMPL *session, int fd, const char *name)
 {
 #if defined(FD_CLOEXEC) && !defined(O_CLOEXEC)

@@ -236,7 +236,7 @@ def run():
  * __pack_encode_uintAny --
  *     Pack an unsigned integer.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_uintAny(uint8_t **pp, uint8_t *end, uint64_t item)
 {
     /* Check that there is at least one byte available:
@@ -249,7 +249,7 @@ __pack_encode_uintAny(uint8_t **pp, uint8_t *end, uint64_t item)
  * __pack_encode_WT_ITEM --
  *     Pack a WT_ITEM structure - size and WT_ITEM.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_WT_ITEM(uint8_t **pp, uint8_t *end, WT_ITEM *item)
 {
     WT_RET(__wt_vpack_uint(pp, WT_PTRDIFF(end, *pp), item->size));
@@ -265,7 +265,7 @@ __pack_encode_WT_ITEM(uint8_t **pp, uint8_t *end, WT_ITEM *item)
  * __pack_encode_WT_ITEM_last --
  *     Pack a WT_ITEM structure without its size.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_WT_ITEM_last(uint8_t **pp, uint8_t *end, WT_ITEM *item)
 {
     if (item->size != 0) {
@@ -280,7 +280,7 @@ __pack_encode_WT_ITEM_last(uint8_t **pp, uint8_t *end, WT_ITEM *item)
  * __pack_encode_string --
  *     Pack a string.
  */
-static inline int
+static WT_INLINE int
 __pack_encode_string(uint8_t **pp, uint8_t *end, const char *item)
 {
     size_t s, sz;
@@ -467,7 +467,7 @@ __logrec_make_hex_str(WT_SESSION_IMPL *session, WT_ITEM **escapedp, WT_ITEM *ite
  * __wt_struct_size_%(name)s --
  *     Calculate size of %(name)s struct.
  */
-static inline size_t
+static WT_INLINE size_t
 __wt_struct_size_%(name)s(%(arg_decls_in_or_void)s)
 {
     return (%(size_body)s);
@@ -479,7 +479,7 @@ __wt_struct_size_%(name)s(%(arg_decls_in_or_void)s)
  *     Pack the %(name)s struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_pack_%(name)s(uint8_t **pp, uint8_t *end%(comma)s
     %(arg_decls_in)s)
 {
@@ -492,7 +492,7 @@ __wt_struct_pack_%(name)s(uint8_t **pp, uint8_t *end%(comma)s
  *     Unpack the %(name)s struct.
  */
 WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result))
-static inline int
+static WT_INLINE int
 __wt_struct_unpack_%(name)s(const uint8_t **pp, const uint8_t *end%(comma)s
     %(arg_decls_out)s)
 {

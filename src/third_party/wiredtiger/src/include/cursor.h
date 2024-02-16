@@ -274,7 +274,7 @@ struct __wt_cursor_btree {
  * __wt_curbt2bt --
  *     Safely return the WT_BTREE pointed to by the cursor_btree's dhandle.
  */
-static NO_INLINE_FOR_CODE_COVERAGE WT_BTREE *
+static WT_INLINE WT_BTREE *
 __wt_curbt2bt(WT_CURSOR_BTREE *cursor_btree)
 {
     WT_DATA_HANDLE *dhandle;

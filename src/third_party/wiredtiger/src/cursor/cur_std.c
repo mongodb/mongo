@@ -13,7 +13,7 @@
  *     Returns NULL if the string being searched for isn't found, or the string after the "=" sign
  *     in the config string.
  */
-static inline char *
+static WT_INLINE char *
 __curstd_config_value_for(const char *config, const char *var, size_t len)
 {
     char *cfg;

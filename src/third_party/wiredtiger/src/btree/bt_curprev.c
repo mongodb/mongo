@@ -31,7 +31,7 @@
  * __cursor_skip_prev --
  *     Move back one position in a skip list stack (aka "finger").
  */
-static inline int
+static WT_INLINE int
 __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 {
     WT_INSERT *current, *ins, *next_ins;
@@ -137,7 +137,7 @@ restart:
  * __cursor_fix_append_prev --
  *     Return the previous fixed-length entry on the append list.
  */
-static inline int
+static WT_INLINE int
 __cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 {
     WT_SESSION_IMPL *session;
@@ -235,7 +235,7 @@ restart_read:
  * __cursor_fix_prev --
  *     Move to the previous, fixed-length column-store item.
  */
-static inline int
+static WT_INLINE int
 __cursor_fix_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart)
 {
     WT_PAGE *page;
@@ -313,7 +313,7 @@ restart_read:
  * __cursor_var_append_prev --
  *     Return the previous variable-length entry on the append list.
  */
-static inline int
+static WT_INLINE int
 __cursor_var_append_prev(
   WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
@@ -375,7 +375,7 @@ restart_read:
  * __cursor_var_prev --
  *     Move to the previous, variable-length column-store item.
  */
-static inline int
+static WT_INLINE int
 __cursor_var_prev(
   WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
@@ -561,7 +561,7 @@ restart_read:
  * __cursor_row_prev --
  *     Move to the previous row-store item.
  */
-static inline int
+static WT_INLINE int
 __cursor_row_prev(
   WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {

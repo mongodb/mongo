@@ -10,9 +10,9 @@
 
 static int __json_unpack_put(
   WT_SESSION_IMPL *, void *, u_char *, size_t, WT_CONFIG_ITEM *, size_t *);
-static inline int __json_struct_size(
+static WT_INLINE int __json_struct_size(
   WT_SESSION_IMPL *, const void *, size_t, const char *, WT_CONFIG_ITEM *, bool, size_t *);
-static inline int __json_struct_unpackv(WT_SESSION_IMPL *, const void *, size_t, const char *,
+static WT_INLINE int __json_struct_unpackv(WT_SESSION_IMPL *, const void *, size_t, const char *,
   WT_CONFIG_ITEM *, u_char *, size_t, bool, va_list);
 static int json_string_arg(WT_SESSION_IMPL *, const char **, WT_ITEM *);
 static int json_int_arg(WT_SESSION_IMPL *, const char **, int64_t *);
@@ -169,7 +169,7 @@ __json_unpack_put(WT_SESSION_IMPL *session, void *voidpv, u_char *buf, size_t bu
  * __json_struct_size --
  *     Calculate the size of a packed byte string as formatted for JSON.
  */
-static inline int
+static WT_INLINE int
 __json_struct_size(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt,
   WT_CONFIG_ITEM *names, bool iskey, size_t *presult)
 {
@@ -210,7 +210,7 @@ __json_struct_size(WT_SESSION_IMPL *session, const void *buffer, size_t size, co
  * __json_struct_unpackv --
  *     Unpack a byte string to JSON (va_list version).
  */
-static inline int
+static WT_INLINE int
 __json_struct_unpackv(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt,
   WT_CONFIG_ITEM *names, u_char *jbuf, size_t jbufsize, bool iskey, va_list ap)
 {

@@ -447,7 +447,7 @@ __tombstone_update_alloc(
  * __instantiate_tombstone --
  *     Instantiate a single tombstone on a page.
  */
-static inline int
+static WT_INLINE int
 __instantiate_tombstone(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del,
   WT_UPDATE **update_list, uint32_t *countp, const WT_TIME_WINDOW *tw, WT_UPDATE **updp,
   size_t *sizep)

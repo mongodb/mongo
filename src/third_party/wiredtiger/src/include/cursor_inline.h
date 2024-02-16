@@ -10,7 +10,7 @@
  * __wt_curhs_get_btree --
  *     Convert a history store cursor to the underlying btree.
  */
-static inline WT_BTREE *
+static WT_INLINE WT_BTREE *
 __wt_curhs_get_btree(WT_CURSOR *cursor)
 {
     WT_CURSOR_HS *hs_cursor;
@@ -23,7 +23,7 @@ __wt_curhs_get_btree(WT_CURSOR *cursor)
  * __wt_curhs_get_cbt --
  *     Convert a history store cursor to the underlying btree cursor.
  */
-static inline WT_CURSOR_BTREE *
+static WT_INLINE WT_CURSOR_BTREE *
 __wt_curhs_get_cbt(WT_CURSOR *cursor)
 {
     WT_CURSOR_HS *hs_cursor;
@@ -37,7 +37,7 @@ __wt_curhs_get_cbt(WT_CURSOR *cursor)
  *     The cursor value in the interface has to track the value in the underlying cursor, update
  *     them in parallel.
  */
-static inline void
+static WT_INLINE void
 __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 {
     cbt->iface.recno = cbt->recno = v;
@@ -47,7 +47,7 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
  * __cursor_copy_release --
  *     Release memory used by the key and value in cursor copy debug mode.
  */
-static inline int
+static WT_INLINE int
 __cursor_copy_release(WT_CURSOR *cursor)
 {
     if (FLD_ISSET(S2C(CUR2S(cursor))->debug_flags, WT_CONN_DEBUG_CURSOR_COPY)) {
@@ -68,7 +68,7 @@ __cursor_copy_release(WT_CURSOR *cursor)
  *     Release any cached value before an operation that could update the transaction context and
  *     free data a value is pointing to.
  */
-static inline void
+static WT_INLINE void
 __cursor_novalue(WT_CURSOR *cursor)
 {
     F_CLR(cursor, WT_CURSTD_VALUE_INT);
@@ -78,7 +78,7 @@ __cursor_novalue(WT_CURSOR *cursor)
  * __wt_cursor_bound_reset --
  *     Clear any bounds on the cursor if they are set.
  */
-static inline void
+static WT_INLINE void
 __wt_cursor_bound_reset(WT_CURSOR *cursor)
 {
     WT_SESSION_IMPL *session;
@@ -103,7 +103,7 @@ __wt_cursor_bound_reset(WT_CURSOR *cursor)
  * __cursor_checkkey --
  *     Check if a key is set without making a copy.
  */
-static inline int
+static WT_INLINE int
 __cursor_checkkey(WT_CURSOR *cursor)
 {
     return (F_ISSET(cursor, WT_CURSTD_KEY_SET) ? 0 : __wt_cursor_kv_not_set(cursor, true));
@@ -113,7 +113,7 @@ __cursor_checkkey(WT_CURSOR *cursor)
  * __cursor_checkvalue --
  *     Check if a value is set without making a copy.
  */
-static inline int
+static WT_INLINE int
 __cursor_checkvalue(WT_CURSOR *cursor)
 {
     return (F_ISSET(cursor, WT_CURSTD_VALUE_SET) ? 0 : __wt_cursor_kv_not_set(cursor, false));
@@ -123,7 +123,7 @@ __cursor_checkvalue(WT_CURSOR *cursor)
  * __wt_cursor_localkey --
  *     If the key points into the tree, get a local copy.
  */
-static inline int
+static WT_INLINE int
 __wt_cursor_localkey(WT_CURSOR *cursor)
 {
     if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
@@ -139,7 +139,7 @@ __wt_cursor_localkey(WT_CURSOR *cursor)
  * __cursor_localvalue --
  *     If the value points into the tree, get a local copy.
  */
-static inline int
+static WT_INLINE int
 __cursor_localvalue(WT_CURSOR *cursor)
 {
     if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
@@ -158,7 +158,7 @@ __cursor_localvalue(WT_CURSOR *cursor)
  *     tree, get a local copy of whatever we're referencing in the tree, there's an obvious race
  *     with the cursor moving and the reference.
  */
-static inline int
+static WT_INLINE int
 __cursor_needkey(WT_CURSOR *cursor)
 {
     WT_RET(__wt_cursor_localkey(cursor));
@@ -171,7 +171,7 @@ __cursor_needkey(WT_CURSOR *cursor)
  *     tree, get a local copy of whatever we're referencing in the tree, there's an obvious race
  *     with the cursor moving and the reference.
  */
-static inline int
+static WT_INLINE int
 __cursor_needvalue(WT_CURSOR *cursor)
 {
     WT_RET(__cursor_localvalue(cursor));
@@ -182,7 +182,7 @@ __cursor_needvalue(WT_CURSOR *cursor)
  * __cursor_pos_clear --
  *     Reset the cursor's location.
  */
-static inline void
+static WT_INLINE void
 __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
 {
     /*
@@ -205,7 +205,7 @@ __cursor_pos_clear(WT_CURSOR_BTREE *cbt)
  * __cursor_enter --
  *     Activate a cursor.
  */
-static inline int
+static WT_INLINE int
 __cursor_enter(WT_SESSION_IMPL *session)
 {
     /*
@@ -221,7 +221,7 @@ __cursor_enter(WT_SESSION_IMPL *session)
  * __cursor_leave --
  *     Deactivate a cursor.
  */
-static inline void
+static WT_INLINE void
 __cursor_leave(WT_SESSION_IMPL *session)
 {
     /* Decrement the count of active cursors in the session. */
@@ -233,7 +233,7 @@ __cursor_leave(WT_SESSION_IMPL *session)
  * __cursor_reset --
  *     Reset the cursor, it no longer holds any position.
  */
-static inline int
+static WT_INLINE int
 __cursor_reset(WT_CURSOR_BTREE *cbt)
 {
     WT_CURSOR *cursor;
@@ -300,7 +300,7 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
  * __wt_curindex_get_valuev --
  *     Internal implementation of WT_CURSOR->get_value for index cursors
  */
-static inline int
+static WT_INLINE int
 __wt_curindex_get_valuev(WT_CURSOR *cursor, va_list ap)
 {
     WT_CURSOR_INDEX *cindex;
@@ -326,7 +326,7 @@ __wt_curindex_get_valuev(WT_CURSOR *cursor, va_list ap)
  * __wt_curtable_get_valuev --
  *     Internal implementation of WT_CURSOR->get_value for table cursors.
  */
-static inline int
+static WT_INLINE int
 __wt_curtable_get_valuev(WT_CURSOR *cursor, va_list ap)
 {
     WT_CURSOR *primary;
@@ -354,7 +354,7 @@ __wt_curtable_get_valuev(WT_CURSOR *cursor, va_list ap)
  * __wt_cursor_dhandle_incr_use --
  *     Increment the in-use counter in the cursor's data source.
  */
-static inline void
+static WT_INLINE void
 __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
 {
     WT_DATA_HANDLE *dhandle;
@@ -370,7 +370,7 @@ __wt_cursor_dhandle_incr_use(WT_SESSION_IMPL *session)
  * __wt_cursor_dhandle_decr_use --
  *     Decrement the in-use counter in the cursor's data source.
  */
-static inline void
+static WT_INLINE void
 __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
 {
     WT_DATA_HANDLE *dhandle;
@@ -391,7 +391,7 @@ __wt_cursor_dhandle_decr_use(WT_SESSION_IMPL *session)
  * __cursor_kv_return --
  *     Return a page referenced key/value pair to the application.
  */
-static inline int
+static WT_INLINE int
 __cursor_kv_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
 {
     WT_RET(__wt_key_return(cbt));
@@ -404,7 +404,7 @@ __cursor_kv_return(WT_CURSOR_BTREE *cbt, WT_UPDATE_VALUE *upd_value)
  * __wt_cursor_func_init --
  *     Cursor call setup.
  */
-static inline int
+static WT_INLINE int
 __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 {
     WT_SESSION_IMPL *session;
@@ -442,7 +442,7 @@ __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
  * __cursor_row_slot_key_return --
  *     Return a row-store leaf page slot's key.
  */
-static inline int
+static WT_INLINE int
 __cursor_row_slot_key_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_CELL_UNPACK_KV *kpack)
 {
     WT_CELL *cell;

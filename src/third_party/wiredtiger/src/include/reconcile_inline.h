@@ -39,7 +39,7 @@
  * __rec_cell_addr_stats --
  *     Track statistics for time values associated with an address.
  */
-static inline void
+static WT_INLINE void
 __rec_cell_addr_stats(WT_RECONCILE *r, WT_TIME_AGGREGATE *ta)
 {
     if (ta->newest_start_durable_ts != WT_TS_NONE)
@@ -62,7 +62,7 @@ __rec_cell_addr_stats(WT_RECONCILE *r, WT_TIME_AGGREGATE *ta)
  * __rec_cell_tw_stats --
  *     Gather statistics about this cell.
  */
-static inline void
+static WT_INLINE void
 __rec_cell_tw_stats(WT_RECONCILE *r, WT_TIME_WINDOW *tw)
 {
     if (tw->durable_start_ts != WT_TS_NONE)
@@ -85,7 +85,7 @@ __rec_cell_tw_stats(WT_RECONCILE *r, WT_TIME_WINDOW *tw)
  * __rec_page_time_stats_clear --
  *     Clear page statistics.
  */
-static inline void
+static WT_INLINE void
 __rec_page_time_stats_clear(WT_RECONCILE *r)
 {
     r->count_durable_start_ts = 0;
@@ -103,7 +103,7 @@ __rec_page_time_stats_clear(WT_RECONCILE *r)
  * __rec_page_time_stats --
  *     Update statistics about this page.
  */
-static inline void
+static WT_INLINE void
 __rec_page_time_stats(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
     /* Time window statistics */
@@ -178,7 +178,7 @@ __rec_page_time_stats(WT_SESSION_IMPL *session, WT_RECONCILE *r)
  * __wt_rec_need_split --
  *     Check whether adding some bytes to the page requires a split.
  */
-static inline bool
+static WT_INLINE bool
 __wt_rec_need_split(WT_RECONCILE *r, size_t len)
 {
     uint32_t page_items;
@@ -209,7 +209,7 @@ __wt_rec_need_split(WT_RECONCILE *r, size_t len)
  * __wt_rec_incr --
  *     Update the memory tracking structure for a set of new entries.
  */
-static inline void
+static WT_INLINE void
 __wt_rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size)
 {
     /*
@@ -240,7 +240,7 @@ __wt_rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size
  * __wt_rec_image_copy --
  *     Copy a key/value cell and buffer pair into the new image.
  */
-static inline void
+static WT_INLINE void
 __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv)
 {
     size_t len;
@@ -268,7 +268,7 @@ __wt_rec_image_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_KV *kv)
  * __wt_rec_auxincr --
  *     Update the memory tracking structure for a set of new entries in the auxiliary image.
  */
-static inline void
+static WT_INLINE void
 __wt_rec_auxincr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t size)
 {
     /*
@@ -288,7 +288,7 @@ __wt_rec_auxincr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, size_t s
  * __wt_rec_auximage_copy --
  *     Copy a key/value cell and buffer pair into the new auxiliary image.
  */
-static inline void
+static WT_INLINE void
 __wt_rec_auximage_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t count, WT_REC_KV *kv)
 {
     size_t len;
@@ -321,7 +321,7 @@ __wt_rec_auximage_copy(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t count
  * __wt_rec_cell_build_addr --
  *     Process an address or unpack reference and return a cell structure to be stored on the page.
  */
-static inline void
+static WT_INLINE void
 __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *addr,
   WT_CELL_UNPACK_ADDR *vpack, uint64_t recno, WT_PAGE_DELETED *page_del)
 {
@@ -400,7 +400,7 @@ __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *add
  * __wt_rec_cell_build_val --
  *     Process a data item and return a WT_CELL structure and byte string to be stored on the page.
  */
-static inline int
+static WT_INLINE int
 __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *data, size_t size,
   WT_TIME_WINDOW *tw, uint64_t rle)
 {
@@ -443,7 +443,7 @@ __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *d
  * __wt_rec_dict_replace --
  *     Check for a dictionary match.
  */
-static inline int
+static WT_INLINE int
 __wt_rec_dict_replace(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_TIME_WINDOW *tw, uint64_t rle, WT_REC_KV *val)
 {
@@ -492,7 +492,7 @@ __wt_rec_dict_replace(
  * __wt_rec_time_window_clear_obsolete --
  *     Where possible modify time window values to avoid writing obsolete values to the cell later.
  */
-static inline void
+static WT_INLINE void
 __wt_rec_time_window_clear_obsolete(
   WT_SESSION_IMPL *session, WT_UPDATE_SELECT *upd_select, WT_CELL_UNPACK_KV *vpack, WT_RECONCILE *r)
 {

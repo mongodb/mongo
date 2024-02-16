@@ -56,7 +56,7 @@ __config_check_compare(const void *keyvoid, const void *checkvoid)
  * __config_check_search --
  *     Search a set of checks for a matching name.
  */
-static inline int
+static WT_INLINE int
 __config_check_search(WT_SESSION_IMPL *session, const WT_CONFIG_CHECK *checks, u_int entries,
   const WT_CONFIG_ITEM *item, const uint8_t *check_jump, const WT_CONFIG_CHECK **resultp)
 {

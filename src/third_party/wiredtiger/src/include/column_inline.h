@@ -10,7 +10,7 @@
  * __col_insert_search_gt --
  *     Search a column-store insert list for the next larger record.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
     WT_INSERT *ins, **insp, *ret_ins;
@@ -81,7 +81,7 @@ __col_insert_search_gt(WT_INSERT_HEAD *ins_head, uint64_t recno)
  * __col_insert_search_lt --
  *     Search a column-store insert list for the next smaller record.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
     WT_INSERT *ins, **insp, *ret_ins;
@@ -130,7 +130,7 @@ __col_insert_search_lt(WT_INSERT_HEAD *ins_head, uint64_t recno)
  * __col_insert_search_match --
  *     Search a column-store insert list for an exact match.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
 {
     WT_INSERT *ins, **insp;
@@ -190,7 +190,7 @@ __col_insert_search_match(WT_INSERT_HEAD *ins_head, uint64_t recno)
  * __col_insert_search --
  *     Search a column-store insert list, creating a skiplist stack as we go.
  */
-static inline WT_INSERT *
+static WT_INLINE WT_INSERT *
 __col_insert_search(
   WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT **next_stack, uint64_t recno)
 {
@@ -275,7 +275,7 @@ __col_insert_search(
  * __col_var_last_recno --
  *     Return the last record number for a variable-length column-store page.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __col_var_last_recno(WT_REF *ref)
 {
     WT_COL_RLE *repeat;
@@ -298,7 +298,7 @@ __col_var_last_recno(WT_REF *ref)
  * __col_fix_last_recno --
  *     Return the last record number for a fixed-length column-store page.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __col_fix_last_recno(WT_REF *ref)
 {
     WT_PAGE *page;
@@ -316,7 +316,7 @@ __col_fix_last_recno(WT_REF *ref)
  * __col_var_search --
  *     Search a variable-length column-store page for a record.
  */
-static inline WT_COL *
+static WT_INLINE WT_COL *
 __col_var_search(WT_REF *ref, uint64_t recno, uint64_t *start_recnop)
 {
     WT_COL_RLE *repeat;

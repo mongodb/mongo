@@ -6,6 +6,8 @@
  * See the file LICENSE for redistribution information.
  */
 
+#include "misc.h"
+
 #if defined(_MSC_VER) && (_MSC_VER >= 1300)
 #include <stdlib.h>
 #define __wt_bswap16(v) _byteswap_ushort(v)
@@ -42,7 +44,7 @@
  * __wt_bswap64 --
  *     64-bit unsigned little-endian to/from big-endian value.
  */
-static inline uint64_t
+static WT_INLINE uint64_t
 __wt_bswap64(uint64_t v)
 {
     return (
@@ -59,7 +61,7 @@ __wt_bswap64(uint64_t v)
  * __wt_bswap32 --
  *     32-bit unsigned little-endian to/from big-endian value.
  */
-static inline uint32_t
+static WT_INLINE uint32_t
 __wt_bswap32(uint32_t v)
 {
     return (((v << 24) & 0xff000000) | ((v << 8) & 0x00ff0000) | ((v >> 8) & 0x0000ff00) |
@@ -72,7 +74,7 @@ __wt_bswap32(uint32_t v)
  * __wt_bswap16 --
  *     16-bit unsigned little-endian to/from big-endian value.
  */
-static inline uint16_t
+static WT_INLINE uint16_t
 __wt_bswap16(uint16_t v)
 {
     return (((v << 8) & 0xff00) | ((v >> 8) & 0x00ff));

@@ -99,7 +99,7 @@ struct __wt_page_header {
  * __wt_page_header_byteswap --
  *     Handle big- and little-endian transformation of a page header.
  */
-static inline void
+static WT_INLINE void
 __wt_page_header_byteswap(WT_PAGE_HEADER *dsk)
 {
 #ifdef WORDS_BIGENDIAN

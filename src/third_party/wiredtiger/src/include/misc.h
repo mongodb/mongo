@@ -6,6 +6,29 @@
  * See the file LICENSE for redistribution information.
  */
 
+#ifndef __WT_MISC_H
+#define __WT_MISC_H
+
+/*
+ * When compiling for code coverage measurement it is necessary to ensure that inline functions in
+ * header files that are #included in multiple source files are not inlined.
+ *
+ * Otherwise, it is possible that there will be multiple copies of the function across the linked
+ * executable with the result that the code coverage counts for branch coverage (both in terms of
+ * branches in the code and the number of branches executed) will be too high and incorrect.
+ *
+ * In non-code coverage builds, preventing inlining would impact performance and so this must only
+ * take place when performing code coverage.
+ */
+#ifdef CODE_COVERAGE_MEASUREMENT
+#ifdef _WIN32
+#error "Code coverage measurement is not currently supported for WiredTiger on Windows."
+#endif /* _WIN32 */
+#define WT_INLINE __attribute__((noinline))
+#else
+#define WT_INLINE inline
+#endif /* CODE_COVERAGE_MEASUREMENT */
+
 /*
  * Quiet compiler warnings about unused function parameters and variables, and unused function
  * return values.
@@ -306,7 +329,7 @@
  */
 #define WT_STRING_MATCH(str, bytes, len) __wt_string_match(str, bytes, len)
 
-static inline bool
+static WT_INLINE bool
 __wt_string_match(const char *str, const char *bytes, size_t len)
 {
     return (len == 0 || (strncmp(str, bytes, len) == 0 && str[len] == '\0'));
@@ -426,19 +449,4 @@ union __wt_rand_state {
         }                                                                       \
     } while (0)
 
-/*
- * When compiling for code coverage measurement it is necessary to ensure that inline functions in
- * header files that are #included in multiple source files are not inlined.
- *
- * Otherwise, it is possible that there will be multiple copies of the function across the linked
- * executable with the result that the code coverage counts for branch coverage (both in terms of
- * branches in the code and the number of branches executed) will be too high and incorrect.
- *
- * In non-code coverage builds, preventing inlining would impact performance and so this must only
- * take place when performing code coverage.
- */
-#ifdef CODE_COVERAGE_MEASUREMENT
-#define NO_INLINE_FOR_CODE_COVERAGE __attribute__((noinline))
-#else
-#define NO_INLINE_FOR_CODE_COVERAGE inline
-#endif
+#endif /* __WT_MISC_H */

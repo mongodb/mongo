@@ -75,7 +75,7 @@ WT_STAT_USECS_HIST_INCR_FUNC(opwrite, perf_hist_opwrite_latency)
  *     Enforce restrictions on nesting checkpoint cursors. The only nested cursors we should get to
  *     from a checkpoint cursor are cursors for the corresponding history store checkpoint.
  */
-static inline int
+static WT_INLINE int
 __curfile_check_cbt_txn(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
     WT_TXN *txn;
