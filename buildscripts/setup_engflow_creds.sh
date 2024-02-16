@@ -14,5 +14,8 @@ ssh ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p ~/.engflow/creds"
 scp ${ZIP_FILE} ${REMOTE_USER}@${REMOTE_HOST}:~/.engflow/creds
 ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ~/.engflow/creds; unzip -o engflow-mTLS.zip; rm engflow-mTLS.zip"
 
+ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo chown ${REMOTE_USER}:${REMOTE_USER} /home/${REMOTE_USER}/.engflow/creds/engflow.crt /home/${REMOTE_USER}/.engflow/creds/engflow.key"
+ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo chmod 600 /home/${REMOTE_USER}/.engflow/creds/engflow.crt /home/${REMOTE_USER}/.engflow/creds/engflow.key"
+
 ssh ${REMOTE_USER}@${REMOTE_HOST} "echo \"build --tls_client_certificate=/home/${REMOTE_USER}/.engflow/creds/engflow.crt\" >> ~/.bazelrc"
 ssh ${REMOTE_USER}@${REMOTE_HOST} "echo \"build --tls_client_key=/home/${REMOTE_USER}/.engflow/creds/engflow.key\" >> ~/.bazelrc"

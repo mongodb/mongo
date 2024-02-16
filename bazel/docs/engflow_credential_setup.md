@@ -11,7 +11,7 @@ To install the necessary credentials to enable remote execution, run scons.py wi
 - Go to https://sodalite.cluster.engflow.com/gettingstarted
 - Login with OKTA, then click the "GENERATE AND DOWNLOAD MTLS CERTIFICATE" button
   - (If logging in with OKTA doesn't work) Login with Google using your MongoDB email, then click the "GENERATE AND DOWNLOAD MTLS CERTIFICATE" button
-- On your local system, open a shell terminal and, after setting the variables on the first three lines, run:
+- On your local system (usually your MacBook), open a shell terminal and, after setting the variables on the first three lines, run:
 
         REMOTE_USER=<SSH User from https://spruce.mongodb.com/spawn/host>
         REMOTE_HOST=<DNS Name from https://spruce.mongodb.com/spawn/host>

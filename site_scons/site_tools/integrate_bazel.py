@@ -412,13 +412,28 @@ Please complete the following steps to generate a certificate:
 - Go to https://sodalite.cluster.engflow.com/gettingstarted (Uses mongodbcorp.okta.com auth URL)
 - Login with OKTA, then click the \"GENERATE AND DOWNLOAD MTLS CERTIFICATE\" button
   - (If logging in with OKTA doesn't work) Login with Google using your MongoDB email, then click the "GENERATE AND DOWNLOAD MTLS CERTIFICATE" button
-- On your local system, open a terminal and run:
+- On your local system (usually your MacBook), open a terminal and run:
 
 ZIP_FILE=~/Downloads/engflow-mTLS.zip
 
 curl https://raw.githubusercontent.com/mongodb/mongo/master/buildscripts/setup_engflow_creds.sh -o setup_engflow_creds.sh
 chmod +x ./setup_engflow_creds.sh
 ./setup_engflow_creds.sh {getpass.getuser()} {public_hostname} $ZIP_FILE\n""")
+        return False
+
+    if not running_in_evergreen and \
+        (not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.crt", os.R_OK) or
+        not os.access(f"/home/{getpass.getuser()}/.engflow/creds/engflow.key", os.R_OK)):
+        print(
+            "Invalid permissions set on ~/.engflow/creds/engflow.crt or ~/.engflow/creds/engflow.key"
+        )
+        print("Please run the following command to fix the permissions:\n")
+        print(
+            f"sudo chown {getpass.getuser()}:{getpass.getuser()} /home/{getpass.getuser()}/.engflow/creds/engflow.crt /home/{getpass.getuser()}/.engflow/creds/engflow.key"
+        )
+        print(
+            f"sudo chmod 600 /home/{getpass.getuser()}/.engflow/creds/engflow.crt /home/{getpass.getuser()}/.engflow/creds/engflow.key"
+        )
         return False
     return True
 
