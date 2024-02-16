@@ -352,6 +352,7 @@ roles:
                   - setChangeStreamState
                   - getChangeStreamState
                   - queryStatsRead
+                  - queryStatsReadTransformed
                   - checkMetadataConsistency
                   - transitionFromDedicatedConfigServer
                   - transitionToDedicatedConfigServer

@@ -35,18 +35,18 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
 namespace mongo {
 namespace {
 CounterMetric queryStatsHmacApplicationErrors("queryStats.numHmacApplicationErrors");
 }
 
-REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
-                                           DocumentSourceQueryStats::LiteParsed::parse,
-                                           DocumentSourceQueryStats::createFromBson,
-                                           AllowedWithApiStrict::kNeverInVersion1,
-                                           feature_flags::gFeatureFlagQueryStats);
+// TODO SERVER-79494 Use REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG
+REGISTER_DOCUMENT_SOURCE(queryStats,
+                         DocumentSourceQueryStats::LiteParsed::parse,
+                         DocumentSourceQueryStats::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 namespace {
 
@@ -71,9 +71,12 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
     if (transformIdentifiers) {
         algorithm = transformIdentifiers->getAlgorithm();
         boost::optional<ConstDataRange> hmacKeyContainer = transformIdentifiers->getHmacKey();
-        if (hmacKeyContainer) {
-            hmacKey = std::string(hmacKeyContainer->data(), (size_t)hmacKeyContainer->length());
-        }
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "The 'hmacKey' parameter of the $queryStats stage must be "
+                                 "specified when applying the hmac-sha-256 algorithm",
+                algorithm != TransformAlgorithmEnum::kHmacSha256 ||
+                    hmacKeyContainer != boost::none);
+        hmacKey = std::string(hmacKeyContainer->data(), (size_t)hmacKeyContainer->length());
     }
     return ctor(algorithm, hmacKey);
 }
@@ -97,6 +100,13 @@ std::vector<std::pair<size_t, QueryStatsEntry>> copyPartition(
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
+    // TODO SERVER-79494 Remove this manual feature flag check once we're registering doc source
+    // with REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "$queryStats is not allowed in the current configuration. You may need to enable the "
+            "correponding feature flag",
+            query_stats::isQueryStatsFeatureEnabled(/*requiresFullQueryStatsFeatureFlag*/ false));
+
     return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
             spec.fieldName(), algorithm, hmacKey);
@@ -105,12 +115,25 @@ std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx) {
+    // TODO SERVER-79494 Remove this manual feature flag check once we're registering doc source
+    // with REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            "$queryStats is not allowed in the current configuration. You may need to enable the "
+            "correponding feature flag",
+            query_stats::isQueryStatsFeatureEnabled(/*requiresFullQueryStatsFeatureFlag*/ false));
+
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
             "$queryStats must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
+    LOGV2_DEBUG_OPTIONS(7808300,
+                        1,
+                        {logv2::LogTruncation::Disabled},
+                        "Logging invocation $queryStats",
+                        "commandSpec"_attr =
+                            spec.Obj().redact(BSONObj::RedactLevel::sensitiveOnly));
     return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return new DocumentSourceQueryStats(pExpCtx, algorithm, hmacKey);
     });
@@ -145,12 +168,20 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
      * The inner iterator iterates over a materialized container of all entries in the partition.
      * This is done to reduce the time under which the partition lock is held.
      */
+    bool shouldLog = _algorithm != TransformAlgorithmEnum::kNone;
     while (true) {
         // First, attempt to exhaust all elements in the materialized partition.
         if (!_materializedPartition.empty()) {
             // Move out of the container reference.
             auto doc = std::move(_materializedPartition.front());
             _materializedPartition.pop_front();
+            if (shouldLog) {
+                LOGV2_DEBUG_OPTIONS(7808301,
+                                    3,
+                                    {logv2::LogTruncation::Disabled},
+                                    "Logging all outputs of $queryStats",
+                                    "thisOutput"_attr = doc);
+            }
             return {std::move(doc)};
         }
 
@@ -159,6 +190,12 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
         // Materialized partition is exhausted, move to the next.
         _currentPartition++;
         if (_currentPartition >= _queryStatsStore.numPartitions()) {
+            if (shouldLog) {
+                LOGV2_DEBUG_OPTIONS(7808302,
+                                    3,
+                                    {logv2::LogTruncation::Disabled},
+                                    "Finished logging outout of $queryStats");
+            }
             return DocumentSource::GetNextResult::makeEOF();
         }
 

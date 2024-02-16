@@ -1,9 +1,10 @@
 /**
- * Test that calls to read from telemetry store fail when sampling rate is not greater than 0 even
+ * Test that calls to read from query stats store fail when sampling rate is not greater than 0 even
  * if feature flag is on.
- * @tags: [featureFlagQueryStats]
+ * @tags: [featureFlagQueryStatsFindCommand]
  */
 load('jstests/libs/analyze_plan.js');
+load("jstests/libs/query_stats_utils.js");
 
 (function() {
 "use strict";
@@ -20,19 +21,17 @@ for (var i = 0; i < 20; i++) {
     coll.insert({foo: 0, bar: Math.floor(Math.random() * 3)});
 }
 
-coll.aggregate([{$match: {foo: 1}}], {cursor: {batchSize: 2}});
+coll.find({foo: 1}).batchSize(2).toArray();
 
-// Reading telemetry store with a sampling rate of 0 should return 0 documents.
-let telStore = testdb.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}});
-assert.eq(telStore.cursor.firstBatch.length, 0);
+// Reading query stats store with a sampling rate of 0 should return 0 documents.
+let stats = getQueryStats(testdb);
+assert.eq(stats.length, 0);
 
-// Reading telemetry store should work now with a sampling rate of greater than 0.
-assert.commandWorked(
-    testdb.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}));
-coll.aggregate([{$match: {foo: 1}}], {cursor: {batchSize: 2}});
-telStore = assert.commandWorked(
-    testdb.adminCommand({aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}}));
-assert.eq(telStore.cursor.firstBatch.length, 1);
+// Reading query stats store should work now with a sampling rate of greater than 0.
+assert.commandWorked(testdb.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1}));
+coll.find({foo: 1}).batchSize(2).toArray();
+stats = getQueryStats(testdb);
+assert.eq(stats.length, 1);
 
 MongoRunner.stopMongod(conn);
 }());

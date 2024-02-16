@@ -33,7 +33,7 @@
 #include <functional>
 #include <queue>
 
-#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 

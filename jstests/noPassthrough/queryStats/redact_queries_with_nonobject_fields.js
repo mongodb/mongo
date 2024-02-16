@@ -1,5 +1,5 @@
 /**
- * Test that telemetry key generation works for queries with non-object fields.
+ * Test that query stats key generation works for queries with non-object fields.
  * @tags: [featureFlagQueryStats]
  */
 load('jstests/libs/analyze_plan.js');
@@ -7,7 +7,7 @@ load('jstests/libs/analyze_plan.js');
 (function() {
 "use strict";
 
-// Turn on the collecting of telemetry metrics.
+// Turn on the collecting of query stats metrics.
 let options = {
     setParameter: {internalQueryStatsRateLimit: -1},
 };

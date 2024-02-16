@@ -48,7 +48,7 @@
 #include "mongo/db/cursor_server_params.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/background.h"

@@ -1,6 +1,6 @@
 /**
  * Test that telemetry works properly for a find command that uses regex.
- * @tags: [featureFlagQueryStats]
+ * @tags: [featureFlagQueryStatsFindCommand]
  */
 (function() {
 "use strict";

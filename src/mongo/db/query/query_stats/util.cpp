@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats_util.h"
+#include "mongo/db/query/query_stats/util.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/d_concurrency.h"

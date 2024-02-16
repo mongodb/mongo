@@ -1,10 +1,10 @@
 /**
  * Test the $queryStats hmac properties.
- * @tags: [featureFlagQueryStats]
+ * @tags: [featureFlagQueryStatsFindCommand]
  */
 
 load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
-load("jstests/libs/query_stats_utils.js");
+load("jstests/libs/query_stats_utils.js");    // For getQueryStatsFindCmd
 
 (function() {
 "use strict";
@@ -83,6 +83,14 @@ function runTest(conn) {
         pipeline,
         40414,
         "BSON field '$queryStats.transformIdentifiers.algorithm' is missing but a required field");
+
+    // TransformIdentifiers with algorithm but missing hmacKey throws error.
+    pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256"}}}];
+    assertAdminDBErrCodeAndErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.FailedToParse,
+        "The 'hmacKey' parameter of the $queryStats stage must be specified when applying the hmac-sha-256 algorithm");
 
     // Parameter object with unrecognized key throws error.
     pipeline =

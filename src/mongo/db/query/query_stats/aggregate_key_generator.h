@@ -32,7 +32,7 @@
 #include "mongo/db/collection_type.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
 
 namespace mongo::query_stats {
 
@@ -51,15 +51,17 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         stdx::unordered_set<NamespaceString> involvedNamespaces,
         const NamespaceString& origNss,
-        query_shape::CollectionType collectionType = query_shape::CollectionType::unknown)
+        query_shape::CollectionType collectionType = query_shape::CollectionType ::kUnknown)
         : KeyGenerator(
               expCtx->opCtx,
               // TODO: SERVER-76330 Store representative agg query shape in telemetry store.
               BSONObj(),
+              request.getHint(),
               collectionType),
           _request(std::move(request)),
           _involvedNamespaces(std::move(involvedNamespaces)),
           _origNss(origNss),
+          _inMongos(expCtx->inMongos),
           _initialQueryStatsKey(_makeQueryStatsKeyHelper(
               SerializationOptions::kDebugQueryShapeSerializeOptions, expCtx, pipeline)) {
         _queryShapeHash = query_shape::hash(*_initialQueryStatsKey);
@@ -104,6 +106,7 @@ private:
         // per a given query.
         expCtx->stopExpressionCounters();
         expCtx->addResolvedNamespaces(_involvedNamespaces);
+        expCtx->inMongos = _inMongos;
 
         return expCtx;
     }
@@ -117,6 +120,10 @@ private:
 
     // The original NSS of the request before views are resolved.
     const NamespaceString _origNss;
+
+    // Flag to denote if the query was run on mongos. Needed to rebuild the "dummy" expression
+    // context for re-parsing.
+    bool _inMongos;
 
     // This is computed and cached upon construction until asked for once - at which point this
     // transitions to boost::none. This both a performance and a memory optimization.

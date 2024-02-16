@@ -33,9 +33,10 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/query_stats.h"
-#include "mongo/db/query/query_stats_aggregate_key_generator.h"
-#include "mongo/db/query/query_stats_find_key_generator.h"
+#include "mongo/db/query/query_stats/aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/find_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/inline_auto_update.h"
@@ -55,7 +56,7 @@ std::size_t hash(const BSONObj& obj) {
 
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
-    static constexpr auto collectionType = query_shape::CollectionType::collection;
+    static constexpr auto collectionType = query_shape::CollectionType::kCollection;
     BSONObj makeQueryStatsKeyFindRequest(const FindCommandRequest& fcr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          bool applyHmac) {
@@ -94,19 +95,19 @@ public:
 };
 
 TEST_F(QueryStatsStoreTest, BasicUsage) {
-    QueryStatsStore telStore{5000000, 1000};
+    QueryStatsStore queryStatsStore{5000000, 1000};
 
     auto getMetrics = [&](const BSONObj& key) {
-        auto lookupResult = telStore.lookup(hash(key));
+        auto lookupResult = queryStatsStore.lookup(hash(key));
         return *lookupResult.getValue();
     };
 
     auto collectMetrics = [&](BSONObj& key) {
         std::shared_ptr<QueryStatsEntry> metrics;
-        auto lookupResult = telStore.lookup(hash(key));
+        auto lookupResult = queryStatsStore.lookup(hash(key));
         if (!lookupResult.isOK()) {
-            telStore.put(hash(key), std::make_shared<QueryStatsEntry>(nullptr));
-            lookupResult = telStore.lookup(hash(key));
+            queryStatsStore.put(hash(key), std::make_shared<QueryStatsEntry>(nullptr));
+            lookupResult = queryStatsStore.lookup(hash(key));
         }
         metrics = *lookupResult.getValue();
         metrics->execCount += 1;
@@ -128,7 +129,7 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
     ASSERT_EQ(getMetrics(query2)->execCount, 1);
 
     auto collectMetricsWithLock = [&](BSONObj& key) {
-        auto [lookupResult, lock] = telStore.getWithPartitionLock(hash(key));
+        auto [lookupResult, lock] = queryStatsStore.getWithPartitionLock(hash(key));
         auto metrics = *lookupResult.getValue();
         metrics->execCount += 1;
         metrics->lastExecutionMicros += 123456;
@@ -143,31 +144,154 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
 
     int numKeys = 0;
 
-    telStore.forEach(
+    queryStatsStore.forEach(
         [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
 
     ASSERT_EQ(numKeys, 2);
 }
 
+TEST_F(QueryStatsStoreTest, EvictionTest) {
+    // This creates a queryStats store with a single partition to specifically test the eviction
+    // behavior with very large queries.
+    const auto cacheSize = 500;
+    const auto numPartitions = 1;
+    QueryStatsStore queryStatsStore{cacheSize, numPartitions};
 
-TEST_F(QueryStatsStoreTest, EvictEntries) {
-    // This creates a queryStats store with 2 partitions, each with a size of 1200 bytes.
-    const auto cacheSize = 2400;
-    const auto numPartitions = 2;
-    QueryStatsStore telStore{cacheSize, numPartitions};
-
-    for (int i = 0; i < 30; i++) {
-        auto query = BSON("query" + std::to_string(i) << 1 << "xEquals" << 42);
-        telStore.put(hash(query), std::make_shared<QueryStatsEntry>(nullptr));
-    }
+    // Add an entry that is smaller than the max partition size.
+    auto query = BSON("query" << 1 << "xEquals" << 42);
+    queryStatsStore.put(hash(query), std::make_shared<QueryStatsEntry>(nullptr));
     int numKeys = 0;
-    telStore.forEach(
+    queryStatsStore.forEach(
         [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
+    ASSERT_EQ(numKeys, 1);
+    // Add an entry that is larger than the max partition size to the non-empty partition. This
+    // should evict both entries, the first small entry written to the partition and the current too
+    // large entry we wish to write to the partition. The reason is because entries are evicted from
+    // the partition in order of least recently used. Thus, the small entry will be evicted first
+    // but the partition will still be over budget so the final, too large entry will also be
+    // evicted.
+    auto opCtx = makeOperationContext();
+    auto fcr = std::make_unique<FindCommandRequest>(
+        NamespaceStringOrUUID(NamespaceString::createNamespaceString_forTest("testDB.testColl")));
+    fcr->setLet(BSON("var" << 2));
+    fcr->setFilter(fromjson("{$expr: [{$eq: ['$a', '$$var']}]}"));
+    fcr->setProjection(fromjson("{varIs: '$$var'}"));
+    fcr->setLimit(5);
+    fcr->setSkip(2);
+    fcr->setBatchSize(25);
+    fcr->setMaxTimeMS(1000);
+    fcr->setNoCursorTimeout(false);
+    opCtx->setComment(BSON("comment"
+                           << " foo"));
+    fcr->setSingleBatch(false);
+    fcr->setAllowDiskUse(false);
+    fcr->setAllowPartialResults(true);
+    fcr->setAllowDiskUse(false);
+    fcr->setShowRecordId(true);
+    fcr->setMirrored(true);
+    fcr->setHint(BSON("z" << 1 << "c" << 1));
+    fcr->setMax(BSON("z" << 25));
+    fcr->setMin(BSON("z" << 80));
+    fcr->setSort(BSON("sortVal" << 1 << "otherSort" << -1));
 
-    int entriesPerPartition =
-        (cacheSize / numPartitions) / (sizeof(std::size_t) + sizeof(QueryStatsEntry));
+    auto&& [expCtx, parsedFind] =
+        uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
+    auto queryShape = query_shape::extractQueryShape(
+        *parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx);
+    QueryStatsEntry testMetrics{std::make_unique<query_stats::FindKeyGenerator>(
+        expCtx, *parsedFind, queryShape, collectionType)};
+    queryStatsStore.put(hash(testMetrics.computeQueryStatsKey(
+                            opCtx.get(), TransformAlgorithmEnum::kNone, std::string{})),
+                        std::make_shared<QueryStatsEntry>(testMetrics));
+    numKeys = 0;
+    queryStatsStore.forEach(
+        [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
+    ASSERT_EQ(numKeys, 0);
 
-    ASSERT_EQ(numKeys, entriesPerPartition * numPartitions);
+    // This creates a queryStats store where each partition has a max size of 500 bytes.
+    QueryStatsStore queryStatsStoreTwo{/*cacheSize*/ 1500, /*numPartitions*/ 3};
+    // Adding a queryStats store entry that is smaller than the overal cache size but larger than a
+    // single partition max size, will cause an eviction. testMetrics is larger than 500 bytes and
+    // thus over budget for the partitions of this cache.
+    queryStatsStoreTwo.put(hash(testMetrics.computeQueryStatsKey(
+                               opCtx.get(), TransformAlgorithmEnum::kNone, std::string{})),
+                           std::make_shared<QueryStatsEntry>(testMetrics));
+    queryStatsStoreTwo.forEach(
+        [&](std::size_t key, const std::shared_ptr<QueryStatsEntry>& entry) { numKeys++; });
+    ASSERT_EQ(numKeys, 0);
+}
+
+TEST_F(QueryStatsStoreTest, GenerateMaxBsonSizeQueryShape) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("testDB.testColl");
+    FindCommandRequest fcr((NamespaceStringOrUUID(nss)));
+    // This creates a query that is just below the 16 MB memory limit.
+    int limit = 225500;
+    BSONObjBuilder bob;
+    BSONArrayBuilder andBob(bob.subarrayStart("$and"));
+    for (int i = 1; i <= limit; i++) {
+        BSONObjBuilder childrenBob;
+        childrenBob.append("x", BSON("$lt" << i << "$gte" << i));
+        andBob.append(childrenBob.obj());
+    }
+    andBob.doneFast();
+    fcr.setFilter(bob.obj());
+    auto fcrCopy = std::make_unique<FindCommandRequest>(fcr);
+    auto opCtx = makeOperationContext();
+    auto parsedFindPair =
+        uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcrCopy)));
+
+    // TODO SERVER-84011 backport: re-enable SERVER-79794 test. This test is currently
+    // broken since the queryStatsfeatureFlags are off by default. Query stats assumes that the
+    // feature flag can never change without a restart, so enabling the flag in the test still
+    // doesn't allow for query stats functionality. The following replicates what queryStats would
+    // have done.
+
+    auto& opDebug = CurOp::get(*opCtx)->debug();
+    ASSERT_DOES_NOT_THROW(
+        try {
+            BSONObj queryShape = query_shape::extractQueryShape(
+                *parsedFindPair.second,
+                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                parsedFindPair.first);
+            opDebug.queryStatsKeyGenerator = std::make_unique<query_stats::FindKeyGenerator>(
+                parsedFindPair.first,
+                *parsedFindPair.second,
+                std::move(queryShape),
+                query_shape::CollectionType::kCollection);
+        } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) { return; })
+
+    opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
+    ASSERT_EQ(opDebug.queryStatsStoreKeyHash, boost::none);
+
+    // TODO SERVER-84011 backport. Below is the proper test using queryStats.
+    // RAIIServerParameterControllerForTest controller("featureFlagQueryStats", true);
+    // RAIIServerParameterControllerForTest queryKnobController{"internalQueryStatsRateLimit", -1};
+
+    // auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(opCtx->getServiceContext());
+    // globalQueryStatsStoreManager = std::make_unique<QueryStatsStoreManager>(500000, 1000);
+
+    // // The shapification process will bloat the input query over the 16 MB memory limit. Assert
+    // that
+    // // calling registerRequest() doesn't throw and that the opDebug isn't registered with a key
+    // hash
+    // // (thus metrics won't be tracked for this query).
+    // ASSERT_DOES_NOT_THROW(query_stats::registerRequest(
+    //     opCtx.get(),
+    //     nss,
+    //     [&]() {
+    //         BSONObj queryShape = query_shape::extractQueryShape(
+    //             *parsedFindPair.second,
+    //             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+    //             parsedFindPair.first);
+    //         return std::make_unique<query_stats::FindKeyGenerator>(
+    //             parsedFindPair.first,
+    //             *parsedFindPair.second,
+    //             std::move(queryShape),
+    //             query_shape::CollectionType::kCollection);
+    //     },
+    //     /*requiresFullQueryStatsFeatureFlag*/ false));
+    // auto& opDebug = CurOp::get(*opCtx)->debug();
+    // ASSERT_EQ(opDebug.queryStatsStoreKeyHash, boost::none);
 }
 
 TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
@@ -313,10 +437,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -328,7 +448,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<otherSort>": -1
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -363,10 +487,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -382,7 +502,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "maxTimeMS": "?number",
             "batchSize": "?number",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -417,10 +541,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -441,7 +561,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "allowPartialResults": true,
             "maxTimeMS": "?number",
             "batchSize": "?number",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -470,10 +594,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<f>": true,
                     "HASH<_id>": true
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -494,7 +614,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "allowPartialResults": false,
             "maxTimeMS": "?number",
             "batchSize": "?number",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -512,13 +636,13 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 },
                 "command": "find",
                 "filter": {},
-                "hint": {
-                    "$natural": 1
-                },
                 "tailable": true,
                 "awaitData": true
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "$natural": 1
+            }
         })",
         key);
 }
@@ -570,10 +694,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "z": 1,
-                    "c": 1
-                },
                 "max": {
                     "z": "?number"
                 },
@@ -581,7 +701,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "z": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "z": 1,
+                "c": 1
+            }
         })",
         key);
     // Test with a string hint. Note that this is the internal representation of the string hint
@@ -603,9 +727,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "$hint": "z"
-                },
                 "max": {
                     "z": "?number"
                 },
@@ -613,7 +734,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "z": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "$hint": "z"
+            }
         })",
         key);
 
@@ -632,10 +756,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -643,7 +763,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "HASH<z>": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         key);
 
@@ -663,9 +787,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                         "$eq": "?number"
                     }
                 },
-                "hint": {
-                    "$natural": -1
-                },
                 "max": {
                     "HASH<z>": "?number"
                 },
@@ -673,7 +794,10 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                     "HASH<z>": "?number"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "$natural": -1
+            }
         })",
         key);
 }
@@ -758,7 +882,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
                     "adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=": "?number"
                 },
                 "projection": {
-                    "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
+                    "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=":
+                    "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
                     "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
                 }
             },
@@ -967,13 +1092,13 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "allowDiskUse": false,
                 "collation": {
                     "locale": "simple"
-                },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         shapified);
 
@@ -1040,16 +1165,16 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "collation": {
                     "locale": "simple"
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "let": {
                     "HASH<var1>": "$HASH<foo>",
                     "HASH<var2>": "?string"
                 }
             },
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         shapified);
 
@@ -1119,10 +1244,6 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
                 "collation": {
                     "locale": "simple"
                 },
-                "hint": {
-                    "HASH<z>": 1,
-                    "HASH<c>": 1
-                },
                 "let": {
                     "HASH<var1>": "$HASH<foo>",
                     "HASH<var2>": "?string"
@@ -1134,7 +1255,11 @@ TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSi
             "maxTimeMS": "?number",
             "bypassDocumentValidation": "?bool",
             "comment": "?string",
-            "collectionType": "collection"
+            "collectionType": "collection",
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            }
         })",
         shapified);
 }

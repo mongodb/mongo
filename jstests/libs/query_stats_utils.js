@@ -199,10 +199,73 @@ function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
     assert.eq(fieldsCounter, Object.keys(expectedKey).length, resultingKey);
 }
 
+function assertExpectedResults(results,
+                               expectedQueryStatsKey,
+                               expectedExecCount,
+                               expectedDocsReturnedSum,
+                               expectedDocsReturnedMax,
+                               expectedDocsReturnedMin,
+                               expectedDocsReturnedSumOfSq,
+                               getMores) {
+    const {key, metrics} = results;
+    confirmAllExpectedFieldsPresent(expectedQueryStatsKey, key);
+    assert.eq(expectedExecCount, metrics.execCount);
+    assert.docEq({
+        sum: NumberLong(expectedDocsReturnedSum),
+        max: NumberLong(expectedDocsReturnedMax),
+        min: NumberLong(expectedDocsReturnedMin),
+        sumOfSquares: NumberLong(expectedDocsReturnedSumOfSq)
+    },
+                 metrics.docsReturned);
+
+    const {
+        firstSeenTimestamp,
+        latestSeenTimestamp,
+        lastExecutionMicros,
+        totalExecMicros,
+        firstResponseExecMicros
+    } = metrics;
+
+    // The tests can't predict exact timings, so just assert these three fields have been set (are
+    // non-zero).
+    assert.neq(lastExecutionMicros, NumberLong(0));
+    assert.neq(firstSeenTimestamp.getTime(), 0);
+    assert.neq(latestSeenTimestamp.getTime(), 0);
+
+    const distributionFields = ['sum', 'max', 'min', 'sumOfSquares'];
+    for (const field of distributionFields) {
+        assert.neq(totalExecMicros[field], NumberLong(0));
+        assert.neq(firstResponseExecMicros[field], NumberLong(0));
+        if (getMores) {
+            // If there are getMore calls, totalExecMicros fields should be greater than or equal to
+            // firstResponseExecMicros.
+            if (field == 'min' || field == 'max') {
+                // In the case that we've executed multiple queries with the same shape, it is
+                // possible for the min or max to be equal.
+                assert.gte(totalExecMicros[field], firstResponseExecMicros[field]);
+            } else {
+                assert.gt(totalExecMicros[field], firstResponseExecMicros[field]);
+            }
+        } else {
+            // If there are no getMore calls, totalExecMicros fields should be equal to
+            // firstResponseExecMicros.
+            assert.eq(totalExecMicros[field], firstResponseExecMicros[field]);
+        }
+    }
+}
+
 function asFieldPath(str) {
     return "$" + str;
 }
 
 function asVarRef(str) {
     return "$$" + str;
+}
+
+function resetQueryStatsStore(conn, queryStatsStoreSize) {
+    // Set the cache size to 0MB to clear the queryStats store, and then reset to
+    // queryStatsStoreSize.
+    assert.commandWorked(conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: "0MB"}));
+    assert.commandWorked(
+        conn.adminCommand({setParameter: 1, internalQueryStatsCacheSize: queryStatsStoreSize}));
 }

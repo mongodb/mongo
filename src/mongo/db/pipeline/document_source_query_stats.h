@@ -32,7 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_query_stats_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/util/producer_consumer_queue.h"
 
 namespace mongo {
@@ -59,8 +59,14 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::queryStatsRead)};
-            ;
+            return _algorithm == TransformAlgorithmEnum::kNone
+
+                ? PrivilegeVector{Privilege(ResourcePattern::forClusterResource(),
+                                            ActionType::queryStatsReadTransformed),
+                                  Privilege(ResourcePattern::forClusterResource(),
+                                            ActionType::queryStatsRead)}
+                : PrivilegeVector{Privilege(ResourcePattern::forClusterResource(),
+                                            ActionType::queryStatsReadTransformed)};
         }
 
         bool allowedToPassthroughFromMongos() const final {

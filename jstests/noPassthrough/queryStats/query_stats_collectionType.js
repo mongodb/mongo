@@ -1,5 +1,7 @@
 /**
- * Test that collectionType is returned properly in $queryStats.
+ * Test that collectionType is returned properly in $queryStats. Checks for collection types
+ * "collection", "view", "timeseries", "nonExistent", and "virtual". Type "changeStream" is covered
+ * in query_stats_changeStreams.js.
  * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");
@@ -38,15 +40,16 @@ function runTest(conn) {
     coll.insert({v: 3, time: ISODate("2021-05-18T02:00:00.000Z")});
     coll.find({v: 6}).toArray();
     coll.aggregate().toArray();
+
     // QueryStats should still be collected for queries run on nonexistent collections.
     assert.commandWorked(testDB.runCommand({find: jsTestName() + "_nonExistent", filter: {v: 6}}));
     assert.commandWorked(
         testDB.runCommand({aggregate: jsTestName() + "_nonExistent", pipeline: [], cursor: {}}));
 
-    // Verify that we have two telemetry entries for the collection type. This assumes we have
+    // Verify that we have two query stats entries for the collection type. This assumes we have
     // executed one find and one agg query for the given collection type.
-    function verifyTelemetryForCollectionType(collectionType) {
-        const telemetry = getQueryStats(conn, {
+    function verifyQueryStatsForCollectionType(collectionType) {
+        const queryStats = getQueryStats(conn, {
             extraMatch: {
                 "key.collectionType": collectionType,
                 "key.queryShape.cmdNs.coll": jsTestName() + "_" + collectionType
@@ -57,13 +60,27 @@ function runTest(conn) {
         // that find() queries over views are rewritten to
         // aggregate(). Ie, the query shapes are different because the
         // queries are different.
-        assert.eq(2, telemetry.length, "Expected result for collection type " + collectionType);
+        assert.eq(2, queryStats.length, "Expected result for collection type " + collectionType);
     }
 
-    verifyTelemetryForCollectionType("collection");
-    verifyTelemetryForCollectionType("view");
-    verifyTelemetryForCollectionType("timeseries");
-    verifyTelemetryForCollectionType("nonExistent");
+    verifyQueryStatsForCollectionType("collection");
+    verifyQueryStatsForCollectionType("view");
+    verifyQueryStatsForCollectionType("timeseries");
+    verifyQueryStatsForCollectionType("nonExistent");
+
+    // Run commands that should be tracked as "virtual" collection type.
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$currentOp: {}}], cursor: {}}));
+    assert.commandWorked(testDB.adminCommand(
+        {aggregate: 1, pipeline: [{$documents: [{a: 1}, {a: 4}]}], cursor: {}}));
+    assert.commandWorked(
+        testDB.adminCommand({aggregate: 1, pipeline: [{$listLocalSessions: {}}], cursor: {}}));
+
+    // Verify the queries on "virtual" collection types were tracked appropriately. This includes
+    // the 3 queries directly run above, in addition to 1 entry for the $queryStats aggregations
+    // run for the test.
+    let queryStats = getQueryStats(conn, {extraMatch: {"key.collectionType": "virtual"}});
+    assert.eq(4, queryStats.length);
 
     // Verify that, for views, we capture the original query before it's rewritten. The view would
     // include a $gt predicate on 'v'.
@@ -101,7 +118,6 @@ if (false) {
             setParameter: {
                 internalQueryStatsSamplingRate: -1,
                 featureFlagQueryStats: true,
-                'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
             }
         },
     });

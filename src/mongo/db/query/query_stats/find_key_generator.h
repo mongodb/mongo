@@ -35,7 +35,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
 
 namespace mongo::query_stats {
 
@@ -45,8 +45,11 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ParsedFindCommand& request,
         BSONObj parseableQueryShape,
-        query_shape::CollectionType collectionType = query_shape::CollectionType::unknown)
-        : KeyGenerator(expCtx->opCtx, parseableQueryShape, collectionType),
+        query_shape::CollectionType collectionType = query_shape::CollectionType::kUnknown)
+        : KeyGenerator(expCtx->opCtx,
+                       parseableQueryShape,
+                       request.findCommandRequest->getHint(),
+                       collectionType),
           _readConcern(request.findCommandRequest->getReadConcern().has_value()
                            ? request.findCommandRequest->getReadConcern()->copy()
                            : BSONObj()),

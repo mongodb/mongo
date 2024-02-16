@@ -34,6 +34,7 @@
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_shape_gen.h"
+#include "mongo/db/query/shape_helpers.h"
 #include "mongo/db/query/sort_pattern.h"
 
 namespace mongo::query_shape {
@@ -100,7 +101,6 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
     return bob.obj();
 }
 
-static std::string hintSpecialField = "$hint";
 void addShapeLiterals(BSONObjBuilder* bob,
                       const FindCommandRequest& findCommand,
                       const SerializationOptions& opts) {
@@ -144,34 +144,6 @@ void addRemainingFindCommandFields(BSONObjBuilder* bob,
     }
 }
 
-BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool preserveValue) {
-    BSONObjBuilder bob;
-    for (BSONElement elem : obj) {
-        if (hintSpecialField.compare(elem.fieldName()) == 0) {
-            if (elem.type() == BSONType::String) {
-                bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
-            } else if (elem.type() == BSONType::Object) {
-                opts.appendLiteral(&bob, hintSpecialField, elem.Obj());
-            } else {
-                uasserted(ErrorCodes::FailedToParse, "$hint must be a string or an object");
-            }
-            continue;
-        }
-
-        // $natural doesn't need to be redacted.
-        if (elem.fieldNameStringData().compare(query_request_helper::kNaturalSortField) == 0) {
-            bob.append(elem);
-            continue;
-        }
-
-        if (preserveValue) {
-            bob.appendAs(elem, opts.serializeFieldPathFromString(elem.fieldName()));
-        } else {
-            opts.appendLiteral(&bob, opts.serializeFieldPathFromString(elem.fieldName()), elem);
-        }
-    }
-    return bob.obj();
-}
 
 /**
  * In a let specification all field names are variable names, and all values are either expressions
@@ -195,18 +167,8 @@ void appendCmdNs(BSONObjBuilder& bob,
                  const NamespaceString& nss,
                  const SerializationOptions& opts) {
     BSONObjBuilder nsObj = bob.subobjStart("cmdNs");
-    appendNamespaceShape(nsObj, nss, opts);
+    shape_helpers::appendNamespaceShape(nsObj, nss, opts);
     nsObj.doneFast();
-}
-
-void appendNamespaceShape(BSONObjBuilder& bob,
-                          const NamespaceString& nss,
-                          const SerializationOptions& opts) {
-    if (nss.tenantId()) {
-        bob.append("tenantId", opts.serializeIdentifier(nss.tenantId().value().toString()));
-    }
-    bob.append("db", opts.serializeIdentifier(nss.db()));
-    bob.append("coll", opts.serializeIdentifier(nss.coll()));
 }
 
 BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
@@ -231,7 +193,6 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
     std::unique_ptr<MatchExpression> filterExpr;
     // Filter.
     bob.append(FindCommandRequest::kFilterFieldName, findRequest.filter->serialize(opts));
-
     // Let Spec.
     if (auto letSpec = findCmd.getLet()) {
         auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
@@ -244,21 +205,13 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
                    projection_ast::serialize(*findRequest.proj->root(), opts));
     }
 
-    // Assume the hint is correct and contains field names. It is possible that this hint
-    // doesn't actually represent an index, but we can't detect that here.
-    // Hint, max, and min won't serialize if the object is empty.
-    if (!findCmd.getHint().isEmpty()) {
-        bob.append(FindCommandRequest::kHintFieldName,
-                   extractHintShape(findCmd.getHint(), opts, true));
-        // Max/Min aren't valid without hint.
-        if (!findCmd.getMax().isEmpty()) {
-            bob.append(FindCommandRequest::kMaxFieldName,
-                       extractHintShape(findCmd.getMax(), opts, false));
-        }
-        if (!findCmd.getMin().isEmpty()) {
-            bob.append(FindCommandRequest::kMinFieldName,
-                       extractHintShape(findCmd.getMin(), opts, false));
-        }
+    if (!findCmd.getMax().isEmpty()) {
+        bob.append(FindCommandRequest::kMaxFieldName,
+                   shape_helpers::extractMinOrMaxShape(findCmd.getMax(), opts));
+    }
+    if (!findCmd.getMin().isEmpty()) {
+        bob.append(FindCommandRequest::kMinFieldName,
+                   shape_helpers::extractMinOrMaxShape(findCmd.getMin(), opts));
     }
 
     // Sort.
@@ -316,12 +269,6 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
         bob.append(AggregateCommandRequest::kCollationFieldName, param.get());
     }
 
-    // hint
-    if (auto hint = aggregateCommand.getHint()) {
-        bob.append(AggregateCommandRequest::kHintFieldName,
-                   extractHintShape(hint.get(), opts, true));
-    }
-
     // let
     if (auto letSpec = aggregateCommand.getLet()) {
         auto redactedObj = extractLetSpecShape(letSpec.get(), opts, expCtx);
@@ -329,26 +276,6 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
         bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
     }
     return bob.obj();
-}
-
-NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt) {
-    tassert(7632900, "cmdNs must be an object.", cmdNsElt.type() == BSONType::Object);
-    auto cmdNs = CommandNamespace::parse(IDLParserContext("cmdNs"), cmdNsElt.embeddedObject());
-
-    boost::optional<TenantId> tenantId = cmdNs.getTenantId().map(TenantId::parseFromString);
-
-    if (cmdNs.getColl().has_value()) {
-        tassert(7632903,
-                "Exactly one of 'uuid' and 'coll' can be defined.",
-                !cmdNs.getUuid().has_value());
-        return NamespaceString(cmdNs.getDb(), cmdNs.getColl().value());
-    } else {
-        tassert(7632904,
-                "Exactly one of 'uuid' and 'coll' can be defined.",
-                !cmdNs.getColl().has_value());
-        UUID uuid = uassertStatusOK(UUID::parse(cmdNs.getUuid().value().toString()));
-        return NamespaceStringOrUUID(cmdNs.getDb().toString(), uuid, tenantId);
-    }
 }
 
 QueryShapeHash hash(const BSONObj& queryShape) {

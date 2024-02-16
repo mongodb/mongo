@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/rate_limiting.h"
+#include "mongo/db/query/query_stats/rate_limiting.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 

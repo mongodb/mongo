@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats_find_key_generator.h"
+#include "mongo/db/query/query_stats/find_key_generator.h"
 
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
@@ -45,7 +45,7 @@ std::unique_ptr<FindCommandRequest> FindKeyGenerator::reparse(OperationContext* 
     // TODO: SERVER-76330 factor out building the parseable cmdObj into a helper function in
     // query_shape.h.
     BSONObjBuilder cmdBuilder;
-    NamespaceStringOrUUID nss = query_shape::parseNamespaceShape(_parseableQueryShape["cmdNs"]);
+    NamespaceStringOrUUID nss = shape_helpers::parseNamespaceShape(_parseableQueryShape["cmdNs"]);
     nss.serialize(&cmdBuilder, FindCommandRequest::kCommandName);
     cmdBuilder.append("$db", nss.dbname());
 

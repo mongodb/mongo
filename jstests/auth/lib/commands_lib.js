@@ -6515,14 +6515,24 @@ export const authCommandsLib = {
           ]
         },
         {
-            // Test that only clusterManager has permission to run $queryStats
-            testname: "testTelemetryReadPrivilege",
-            command: {aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}},
-            skipSharded: false,
-            skipTest: (conn) => {
-                return !TestData.setParameters.featureFlagQueryStats;
-            },
-            testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
+          // Test that only clusterManager has permission to run $queryStats without transformation
+          testname: "testQueryStatsReadPrivilege",
+          command: {aggregate: 1, pipeline: [{$queryStats: {}}], cursor: {}},
+          skipSharded: false,
+          skipTest: (conn) => {
+              return !TestData.setParameters.featureFlagQueryStats && !TestData.setParameters.featureFlagQueryStatsFindCommand;
+          },
+          testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
+        },
+        {
+          // Test that only clusterManager has permission to run $queryStats with transformation
+          testname: "testQueryStatsReadTransformedPrivilege",
+          command: {aggregate: 1, pipeline: [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey: BinData(8, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")}}}], cursor: {}},
+          skipSharded: false,
+          skipTest: (conn) => {
+              return !TestData.setParameters.featureFlagQueryStats && !TestData.setParameters.featureFlagQueryStatsFindCommand;
+          },
+          testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
         },
         {
           testname: "top",

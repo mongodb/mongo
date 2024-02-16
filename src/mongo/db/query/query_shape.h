@@ -37,6 +37,7 @@
 namespace mongo::query_shape {
 
 using QueryShapeHash = SHA256Block;
+
 /**
  * Computes a BSONObj that is meant to be used to classify queries according to their shape, for the
  * purposes of collecting queryStats.
@@ -72,11 +73,6 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
                           const SerializationOptions& opts,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           const NamespaceString& nss);
-
-NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt);
-void appendNamespaceShape(BSONObjBuilder& bob,
-                          const NamespaceString& nss,
-                          const SerializationOptions& opts);
 
 QueryShapeHash hash(const BSONObj& queryShape);
 }  // namespace mongo::query_shape

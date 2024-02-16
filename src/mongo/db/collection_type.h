@@ -29,18 +29,42 @@
 
 #pragma once
 
-#include "mongo/db/query/util/named_enum.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::query_shape {
 
-#define COLLECTION_TYPE(F) \
-    F(unknown)             \
-    F(timeseries)          \
-    F(view)                \
-    F(nonExistent)         \
-    F(collection)          \
-    F(end)
-QUERY_UTIL_NAMED_ENUM_DEFINE(CollectionType, COLLECTION_TYPE)
-#undef COLLECTION_TYPE
+// This enum is not compatible with the QUERY_UTIL_NAMED_ENUM_DEFINE util since the "virtual" type
+// conflicts with the C++ keyword "virtual". Instead, we manually define the enum and the
+// toStringData function below.
+enum class CollectionType {
+    kUnknown,
+    kCollection,
+    kView,
+    kTimeseries,
+    kChangeStream,
+    kVirtual,
+    kNonExistent,
+};
+
+static StringData toStringData(CollectionType type) {
+    switch (type) {
+        case CollectionType::kUnknown:
+            return "unknown"_sd;
+        case CollectionType::kCollection:
+            return "collection"_sd;
+        case CollectionType::kView:
+            return "view"_sd;
+        case CollectionType::kTimeseries:
+            return "timeseries"_sd;
+        case CollectionType::kChangeStream:
+            return "changeStream"_sd;
+        case CollectionType::kVirtual:
+            return "virtual"_sd;
+        case CollectionType::kNonExistent:
+            return "nonExistent"_sd;
+        default:
+            MONGO_UNREACHABLE_TASSERT(7804900);
+    }
+}
 
 }  // namespace mongo::query_shape

@@ -40,7 +40,7 @@
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
-#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/write_concern_options.h"

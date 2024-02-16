@@ -136,7 +136,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/query/stats/query_stats',
+        '$BUILD_DIR/mongo/db/query/stats/stats',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/util/summation',
@@ -504,8 +504,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/query/query_stats_parse',
-        '$BUILD_DIR/mongo/db/serialization_options',
+        '$BUILD_DIR/mongo/db/query/query_stats/query_stats_parse',
+        '$BUILD_DIR/mongo/db/query_shape_common',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/idl/idl_parser',

@@ -4,6 +4,8 @@
  * @tags: [featureFlagQueryStats]
  */
 load("jstests/libs/query_stats_utils.js");  // For getQueryStatsFindCmd.
+(function() {
+"use strict";
 
 // Test that no QueryStats entry is written when (1) dispatching an initial find query, (2)
 // disabling QueryStats, then (3) completing the command. Below, we run variations of this test
@@ -67,3 +69,4 @@ testStatsAreNotCollectedWhenDisabledBeforeCommandCompletion({
 });
 
 MongoRunner.stopMongod(conn);
+}());

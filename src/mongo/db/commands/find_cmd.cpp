@@ -55,8 +55,9 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_shape.h"
-#include "mongo/db/query/query_stats.h"
-#include "mongo/db/query/query_stats_find_key_generator.h"
+#include "mongo/db/query/query_stats/find_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
@@ -155,14 +156,20 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
     if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
-        query_stats::registerRequest(opCtx, nss, [&]() {
-            BSONObj queryShape = query_shape::extractQueryShape(
-                *parsedRequest,
-                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                expCtx);
-            return std::make_unique<query_stats::FindKeyGenerator>(
-                expCtx, *parsedRequest, std::move(queryShape), ctx.getCollectionType());
-        });
+        query_stats::registerRequest(
+            opCtx,
+            nss,
+            [&]() {
+                // This callback is either never invoked or invoked immediately within
+                // registerRequest, so use-after-move of parsedRequest isn't an issue.
+                BSONObj queryShape = query_shape::extractQueryShape(
+                    *parsedRequest,
+                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                    expCtx);
+                return std::make_unique<query_stats::FindKeyGenerator>(
+                    expCtx, *parsedRequest, std::move(queryShape), ctx.getCollectionType());
+            },
+            /*requiresFullQueryStatsFeatureFlag*/ false);
     }
 
     return uassertStatusOK(

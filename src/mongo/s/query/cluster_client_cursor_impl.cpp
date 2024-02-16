@@ -32,7 +32,7 @@
 #include <memory>
 
 #include "mongo/db/curop.h"
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"

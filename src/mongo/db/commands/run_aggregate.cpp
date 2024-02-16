@@ -73,8 +73,9 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_stats.h"
-#include "mongo/db/query/query_stats_aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/key_generator.h"
+#include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -981,6 +982,14 @@ Status _runAggregate(OperationContext* opCtx,
             return std::make_pair(expCtx, std::move(pipeline));
         };
 
+        auto collectionType =
+            ctx ? ctx->getCollectionType() : query_shape::CollectionType::kUnknown;
+        if (liteParsedPipeline.hasChangeStream()) {
+            collectionType = query_shape::CollectionType::kChangeStream;
+        } else if (nss.isCollectionlessAggregateNS()) {
+            collectionType = query_shape::CollectionType::kVirtual;
+        }
+
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
         // recursively calling runAggregate(), which will re-acquire locks on the underlying
@@ -994,7 +1003,7 @@ Status _runAggregate(OperationContext* opCtx,
             (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
             try {
                 invariant(collatorToUse.has_value());
-                query_stats::registerRequest(opCtx, nss, [&]() {
+                query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
                     // In this path we haven't yet parsed the pipeline, but we need to do so for
                     // query shape stats - which should track the queries before views are resolved.
                     // Inside this callback we know we have already checked that query stats are
@@ -1011,7 +1020,7 @@ Status _runAggregate(OperationContext* opCtx,
                         expCtx,
                         pipelineInvolvedNamespaces,
                         origNss,
-                        ctx->getCollectionType());
+                        collectionType);
                 });
             } catch (const DBException& ex) {
                 if (ex.code() == 6347902) {
@@ -1053,14 +1062,14 @@ Status _runAggregate(OperationContext* opCtx,
         // with encrypted fields. We still collect query stats on collection-less aggregations.
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerRequest(opCtx, nss, [&]() {
+            query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
                     request,
                     *pipeline,
                     expCtx,
                     pipelineInvolvedNamespaces,
-                    nss,
-                    ctx ? ctx->getCollectionType() : query_shape::CollectionType::unknown);
+                    request.getNamespace(),
+                    collectionType);
             });
         }
 

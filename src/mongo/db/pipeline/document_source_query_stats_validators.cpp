@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_query_stats_validators.h"
-#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
+#include "mongo/db/query/query_stats/transform_algorithm_gen.h"
 #include "mongo/util/str.h"
 #include <set>
 

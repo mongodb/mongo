@@ -27,7 +27,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/query/op_metrics',
+        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options_servers',
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
@@ -104,7 +104,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/query/op_metrics',
+        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',

@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats/query_stats.h"
+
 
 #include "mongo/crypto/hash_block.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
@@ -45,8 +45,7 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
-#include "mongo/db/query/query_stats_util.h"
-#include "mongo/db/query/rate_limiting.h"
+#include "mongo/db/query/query_stats/util.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/logv2/log.h"
@@ -59,11 +58,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-namespace mongo {
-
-namespace query_stats {
-
-CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
+namespace mongo::query_stats {
 
 namespace {
 
@@ -98,59 +93,6 @@ size_t getQueryStatsStoreSize() {
     return capQueryStatsStoreSize(requestedSize);
 }
 
-/**
- * A manager for the queryStats store allows a "pointer swap" on the queryStats store itself. The
- * usage patterns are as follows:
- *
- * - Updating the queryStats store uses the `getQueryStatsStore()` method. The queryStats store
- *   instance is obtained, entries are looked up and mutated, or created anew.
- * - The queryStats store is "reset". This involves atomically allocating a new instance, once
- * there are no more updaters (readers of the store "pointer"), and returning the existing
- * instance.
- */
-class QueryStatsStoreManager {
-public:
-    template <typename... QueryStatsStoreArgs>
-    QueryStatsStoreManager(size_t cacheSize, size_t numPartitions)
-        : _queryStatsStore(std::make_unique<QueryStatsStore>(cacheSize, numPartitions)),
-          _maxSize(cacheSize) {}
-
-    /**
-     * Acquire the instance of the queryStats store.
-     */
-    QueryStatsStore& getQueryStatsStore() {
-        return *_queryStatsStore;
-    }
-
-    size_t getMaxSize() {
-        return _maxSize;
-    }
-
-    /**
-     * Resize the queryStats store and return the number of evicted
-     * entries.
-     */
-    size_t resetSize(size_t cacheSize) {
-        _maxSize = cacheSize;
-        return _queryStatsStore->reset(cacheSize);
-    }
-
-private:
-    std::unique_ptr<QueryStatsStore> _queryStatsStore;
-
-    /**
-     * Max size of the queryStats store. Tracked here to avoid having to recompute after it's
-     * divided up into partitions.
-     */
-    size_t _maxSize;
-};
-
-const auto queryStatsStoreDecoration =
-    ServiceContext::declareDecoration<std::unique_ptr<QueryStatsStoreManager>>();
-
-const auto queryStatsRateLimiter =
-    ServiceContext::declareDecoration<std::unique_ptr<RateLimiting>>();
-
 class TelemetryOnParamChangeUpdaterImpl final : public query_stats_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
@@ -171,7 +113,9 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
         // It is possible that this is called before FCV is properly set up. Setting up the store if
         // the flag is enabled but FCV is incorrect is safe, and guards against the FCV being
         // changed to a supported version later.
-        if (!feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        if (!feature_flags::gFeatureFlagQueryStats.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+            !feature_flags::gFeatureFlagQueryStatsFindCommand
+                 .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
             // to not create a queryStats store in ConstructorActionRegisterer at start up with the
             // flag off - because the flag can not be turned on at any point afterwards.
@@ -184,7 +128,6 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
             std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
         size_t size = getQueryStatsStoreSize();
         auto&& globalQueryStatsStoreManager = queryStatsStoreDecoration(serviceCtx);
-
         // Initially the queryStats store used the same number of partitions as the plan cache, that
         // is the number of cpu cores. However, with performance investigation we found that when
         // the size of the partitions was too large, it took too long to copy out and read one
@@ -207,21 +150,20 @@ ServiceContext::ConstructorActionRegisterer queryStatsStoreManagerRegisterer{
             std::make_unique<QueryStatsStoreManager>(size, numPartitions);
         auto configuredSamplingRate = internalQueryStatsRateLimit.load();
         queryStatsRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
-            configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate);
+            configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate, Seconds{1});
     }};
 
 /**
  * Top-level checks for whether queryStats collection is enabled. If this returns false, we must go
  * no further.
+ * TODO SERVER-79494 Remove requiresFullQueryStatsFeatureFlag parameter.
  */
-bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
-    // During initialization FCV may not yet be setup but queries could be run. We can't
+bool isQueryStatsEnabled(const ServiceContext* serviceCtx, bool requiresFullQueryStatsFeatureFlag) {
+    // During initialization, FCV may not yet be setup but queries could be run. We can't
     // check whether queryStats should be enabled without FCV, so default to not recording
     // those queries.
     // TODO SERVER-75935 Remove FCV Check.
-    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
-    return fcvSnapshot.isVersionInitialized() &&
-        feature_flags::gFeatureFlagQueryStats.isEnabled(fcvSnapshot) &&
+    return isQueryStatsFeatureEnabled(requiresFullQueryStatsFeatureFlag) &&
         queryStatsStoreDecoration(serviceCtx)->getMaxSize() > 0;
 }
 
@@ -230,10 +172,6 @@ bool isQueryStatsEnabled(const ServiceContext* serviceCtx) {
  * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
  */
 bool shouldCollect(const ServiceContext* serviceCtx) {
-    // Quick escape if queryStats is turned off.
-    if (!isQueryStatsEnabled(serviceCtx)) {
-        return false;
-    }
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
     auto samplingRate = queryStatsRateLimiter(serviceCtx)->getSamplingRate();
@@ -249,33 +187,29 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     return true;
 }
 
-std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
-    auto hashed = SHA256Block::computeHmac(
-        (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
-    return hashed.toString();
-}
-
-std::size_t hash(const BSONObj& obj) {
-    return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
-}
-
 }  // namespace
 
-BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              TransformAlgorithmEnum algorithm,
-                                              std::string hmacKey) const {
-    return keyGenerator->generate(
-        opCtx,
-        algorithm == TransformAlgorithmEnum::kHmacSha256
-            ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
-                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
-            : boost::none);
+/**
+ * Indicates whether or not query stats is enabled via the feature flags. If
+ * requiresFullQueryStatsFeatureFlag is true, it will only return true if featureFlagQueryStats is
+ * enabled. Otherwise, it will return true if either featureFlagQueryStats or
+ * featureFlagQueryStatsFindCommand is enabled.
+ *
+ * TODO SERVER-79494 Remove this function and collapse feature flag check into isQueryStatsEnabled.
+ */
+bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    return fcvSnapshot.isVersionInitialized() &&
+        (feature_flags::gFeatureFlagQueryStats.isEnabled(fcvSnapshot) ||
+         (!requiresFullQueryStatsFeatureFlag &&
+          feature_flags::gFeatureFlagQueryStatsFindCommand.isEnabled(fcvSnapshot)));
 }
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
-    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator,
+                     bool requiresFullQueryStatsFeatureFlag) {
+    if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
         return;
     }
 
@@ -298,16 +232,30 @@ void registerRequest(OperationContext* opCtx,
                     "collection"_attr = collection);
         return;
     }
-
-    opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    // There are a few cases where a query shape can be larger than the original query. For example,
+    // {$exists: false} in the input query serializes to {$not: {$exists: true}. In rare cases where
+    // an input query has thousands of clauses, the cumulative bloat that shapification adds results
+    // in a BSON object that exceeds the 16 MB memory limit. In these cases, we want to exclude the
+    // original query from queryStats metrics collection and let it execute normally.
+    try {
+        opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+        LOGV2_DEBUG(7979400,
+                    1,
+                    "Query Stats shapification has exceeded the 16 MB memory limit. Metrics will "
+                    "not be collected ");
+        queryStatsStoreWriteErrorsMetric.increment();
+        return;
+    }
     opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
     uassert(6579000,
-            "Telemetry is not enabled without the feature flag on and a cache size greater than 0 "
-            "bytes",
-            isQueryStatsEnabled(opCtx->getServiceContext()));
+            "Query stats is not enabled without the feature flag on and a cache size greater than "
+            "0 bytes",
+            isQueryStatsEnabled(opCtx->getServiceContext(),
+                                /*requiresFullQueryStatsFeatureFlag*/ false));
     return queryStatsStoreDecoration(opCtx->getServiceContext())->getQueryStatsStore();
 }
 
@@ -321,11 +269,12 @@ void writeQueryStats(OperationContext* opCtx,
         return;
     }
 
-    // It's possible that telemetry was enabled in registerRequest but has been disabled since
+    // It's possible that query stats was enabled in registerRequest but has been disabled since
     // (e.g., by FCV downgrade or setting the store size to 0). Rather than calling
-    // getTelemetryStore (which would trigger a uassert if telemetry is disabled), we return and
-    // log a message if telemetry is disabled, and otherwise grab the telemetry store directly.
-    if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
+    // getQueryStatsStore (which would trigger a uassert if telemetry is disabled), we return and
+    // log a message if query stats is disabled, and otherwise grab the query stats store directly.
+    if (!isQueryStatsEnabled(opCtx->getServiceContext(),
+                             /*requiresFullQueryStatsFeatureFlag*/ false)) {
         LOGV2_DEBUG(8456700,
                     2,
                     "Query stats was enabled when the command started but is now disabled. "
@@ -371,5 +320,4 @@ void writeQueryStats(OperationContext* opCtx,
     metrics->firstResponseExecMicros.aggregate(firstResponseExecMicros);
     metrics->docsReturned.aggregate(docsReturned);
 }
-}  // namespace query_stats
-}  // namespace mongo
+}  // namespace mongo::query_stats
