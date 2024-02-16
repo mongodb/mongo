@@ -23,10 +23,10 @@ assert.commandWorked(
     st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: collName, key: {_id: 1}}));
 
-// Initialize TTL index: delete documents with field `a: <current date>` after 10 seconds
-assert.commandWorked(coll.createIndex({a: 1}, {expireAfterSeconds: 10}));
+// Initialize TTL index: delete documents with field `a: <current date>` after 20 seconds
+assert.commandWorked(coll.createIndex({a: 1}, {expireAfterSeconds: 20}));
 
-// Insert documents that are going to be deleted in 10 seconds
+// Insert documents that are going to be deleted in 20 seconds
 const currTime = new Date();
 var bulk = coll.initializeUnorderedBulkOp();
 const nDocs = 100;
