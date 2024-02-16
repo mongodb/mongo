@@ -99,7 +99,7 @@ std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMin(
     std::vector<BlockAggAndRowAgg> pairs;
 
     pairs.emplace_back(
-        BlockAggAndRowAgg{b.makeFunction("valueBlockMin"_sd, bitmapInternalSlot, std::move(arg)),
+        BlockAggAndRowAgg{b.makeFunction("valueBlockAggMin"_sd, bitmapInternalSlot, std::move(arg)),
                           b.makeFunction("min"_sd, accInternalSlot)});
 
     return pairs;
@@ -157,7 +157,7 @@ std::vector<BlockAggAndRowAgg> buildBlockAccumulatorMax(
     std::vector<BlockAggAndRowAgg> pairs;
 
     pairs.emplace_back(
-        BlockAggAndRowAgg{b.makeFunction("valueBlockMax"_sd, bitmapInternalSlot, std::move(arg)),
+        BlockAggAndRowAgg{b.makeFunction("valueBlockAggMax"_sd, bitmapInternalSlot, std::move(arg)),
                           b.makeFunction("max"_sd, accInternalSlot)});
 
     return pairs;

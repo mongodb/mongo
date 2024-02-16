@@ -431,7 +431,7 @@ TEST_F(SBEBlockExpressionTest, BlockCountTest) {
         bitsetAccessor.reset(sbe::value::TypeTags::valueBlock,
                              value::bitcastFrom<value::ValueBlock*>(bitset.get()));
 
-        auto compiledExpr = sbe::makeE<sbe::EFunction>("valueBlockCount",
+        auto compiledExpr = sbe::makeE<sbe::EFunction>("valueBlockAggCount",
                                                        sbe::makeEs(makeE<EVariable>(bitsetSlot)));
         auto compiledCountExpr = compileExpression(*compiledExpr);
 
@@ -475,7 +475,7 @@ TEST_F(SBEBlockExpressionTest, BlockSumTest) {
                              value::bitcastFrom<value::ValueBlock*>(bitset.get()));
 
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockSum",
+            "valueBlockAggSum",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledCountExpr = compileExpression(*compiledExpr);
 
@@ -561,7 +561,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
 
     {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockMin",
+            "valueBlockAggMin",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileExpression(*compiledExpr);
 
@@ -578,7 +578,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxTest) {
 
     {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockMax",
+            "valueBlockAggMax",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileExpression(*compiledExpr);
 
@@ -618,7 +618,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
 
     {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockMin",
+            "valueBlockAggMin",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileExpression(*compiledExpr);
 
@@ -635,7 +635,7 @@ TEST_F(SBEBlockExpressionTest, BlockMinMaxDeepTest) {
 
     {
         auto compiledExpr = sbe::makeE<sbe::EFunction>(
-            "valueBlockMax",
+            "valueBlockAggMax",
             sbe::makeEs(makeE<EVariable>(bitsetSlot), makeE<EVariable>(blockSlot)));
         auto compiledMinExpr = compileExpression(*compiledExpr);
 

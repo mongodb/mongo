@@ -714,15 +714,15 @@ enum class Builtin : uint16_t {
     valueBlockExists = 256,
     valueBlockFillEmpty,
     valueBlockFillEmptyBlock,
-    valueBlockMin,
-    valueBlockMax,
-    valueBlockCount,
+    valueBlockAggMin,
+    valueBlockAggMax,
+    valueBlockAggCount,
     valueBlockDateDiff,
     valueBlockDateTrunc,
     valueBlockDateAdd,
     valueBlockTrunc,
     valueBlockRound,
-    valueBlockSum,
+    valueBlockAggSum,
     valueBlockAdd,
     valueBlockSub,
     valueBlockMult,
@@ -1974,12 +1974,12 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmpty(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockFillEmptyBlock(ArityType arity);
     template <bool less>
-    FastTuple<bool, value::TypeTags, value::Value> valueBlockMinMaxImpl(
+    FastTuple<bool, value::TypeTags, value::Value> valueBlockAggMinMaxImpl(
         value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMin(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockMax(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockCount(ArityType arity);
-    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockSum(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggMin(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggMax(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggCount(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinValueBlockAggSum(ArityType arity);
 
     template <int operation>
     FastTuple<bool, value::TypeTags, value::Value> builtinBlockBlockArithmeticOperation(

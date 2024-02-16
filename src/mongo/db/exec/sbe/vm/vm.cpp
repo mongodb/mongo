@@ -9486,12 +9486,12 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockFillEmpty(arity);
         case Builtin::valueBlockFillEmptyBlock:
             return builtinValueBlockFillEmptyBlock(arity);
-        case Builtin::valueBlockMin:
-            return builtinValueBlockMin(arity);
-        case Builtin::valueBlockMax:
-            return builtinValueBlockMax(arity);
-        case Builtin::valueBlockCount:
-            return builtinValueBlockCount(arity);
+        case Builtin::valueBlockAggMin:
+            return builtinValueBlockAggMin(arity);
+        case Builtin::valueBlockAggMax:
+            return builtinValueBlockAggMax(arity);
+        case Builtin::valueBlockAggCount:
+            return builtinValueBlockAggCount(arity);
         case Builtin::valueBlockDateDiff:
             return builtinValueBlockDateDiff(arity);
         case Builtin::valueBlockDateTrunc:
@@ -9502,8 +9502,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinValueBlockTrunc(arity);
         case Builtin::valueBlockRound:
             return builtinValueBlockRound(arity);
-        case Builtin::valueBlockSum:
-            return builtinValueBlockSum(arity);
+        case Builtin::valueBlockAggSum:
+            return builtinValueBlockAggSum(arity);
         case Builtin::valueBlockAdd:
             return builtinValueBlockAdd(arity);
         case Builtin::valueBlockSub:
@@ -9996,12 +9996,12 @@ std::string builtinToString(Builtin b) {
             return "valueBlockFillEmpty";
         case Builtin::valueBlockFillEmptyBlock:
             return "valueBlockFillEmptyBlock";
-        case Builtin::valueBlockMin:
-            return "valueBlockMin";
-        case Builtin::valueBlockMax:
-            return "valueBlockMax";
-        case Builtin::valueBlockCount:
-            return "valueBlockCount";
+        case Builtin::valueBlockAggMin:
+            return "valueBlockAggMin";
+        case Builtin::valueBlockAggMax:
+            return "valueBlockAggMax";
+        case Builtin::valueBlockAggCount:
+            return "valueBlockAggCount";
         case Builtin::valueBlockDateDiff:
             return "valueBlockDateDiff";
         case Builtin::valueBlockDateTrunc:
@@ -10012,8 +10012,8 @@ std::string builtinToString(Builtin b) {
             return "valueBlockTrunc";
         case Builtin::valueBlockRound:
             return "valueBlockRound";
-        case Builtin::valueBlockSum:
-            return "valueBlockSum";
+        case Builtin::valueBlockAggSum:
+            return "valueBlockAggSum";
         case Builtin::valueBlockAdd:
             return "valueBlockAdd";
         case Builtin::valueBlockSub:

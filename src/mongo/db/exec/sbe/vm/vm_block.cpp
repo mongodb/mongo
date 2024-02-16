@@ -162,7 +162,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
 }
 
 template <bool less>
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockAggMinMaxImpl(
     value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock) {
     auto block = inputBlock->extract();
     auto bitset = bitsetBlock->extract();
@@ -197,7 +197,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockMinMaxImpl(
  * in the block based on compareValue. Values whose corresponding bit is set to false get ignored.
  * This function will return a non-Nothing value if the block contains any non-Nothing values.
  */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMin(ArityType arity) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggMin(ArityType arity) {
     invariant(arity == 2);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
@@ -212,7 +212,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMin(Ar
             bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
-    return valueBlockMinMaxImpl<true /* less */>(valueBlockIn, bitsetBlock);
+    return valueBlockAggMinMaxImpl<true /* less */>(valueBlockIn, bitsetBlock);
 }
 
 /*
@@ -220,7 +220,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMin(Ar
  * in the block based on compareValue. Values whose corresponding bit is set to false get ignored.
  * This function will return a non-Nothing value if the block contains any non-Nothing values.
  */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMax(ArityType arity) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggMax(ArityType arity) {
     invariant(arity == 2);
 
     auto [inputOwned, inputTag, inputVal] = getFromStack(1);
@@ -235,13 +235,14 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMax(Ar
             bitsetTag == value::TypeTags::valueBlock);
     auto* bitsetBlock = value::bitcastTo<value::ValueBlock*>(bitsetVal);
 
-    return valueBlockMinMaxImpl<false /* less */>(valueBlockIn, bitsetBlock);
+    return valueBlockAggMinMaxImpl<false /* less */>(valueBlockIn, bitsetBlock);
 }
 
 /*
  * Given a ValueBlock bitset, count how many "true" elements there are.
  */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCount(ArityType arity) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggCount(
+    ArityType arity) {
     // TODO SERVER-83450 add monoblock fast path.
     invariant(arity == 1);
 
@@ -270,7 +271,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCount(
  * elements where the bitset indicates true, we return a value. If there are only Nothing elements,
  * we return Nothing.
  */
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockSum(ArityType arity) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggSum(ArityType arity) {
     // TODO SERVER-83450 add monoblock fast path.
     invariant(arity == 2);
 

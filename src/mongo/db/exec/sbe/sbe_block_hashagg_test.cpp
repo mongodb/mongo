@@ -190,8 +190,8 @@ public:
             for (const auto& [blockAcc, rowAcc] : accNames) {
                 auto outputSlot = generateSlotId();
                 std::unique_ptr<sbe::EExpression> blockAccFunc;
-                if (blockAcc == "valueBlockCount") {
-                    // valueBlockCount is the exception - it takes just the bitset.
+                if (blockAcc == "valueBlockAggCount") {
+                    // valueBlockAggCount is the exception - it takes just the bitset.
                     blockAccFunc =
                         stage_builder::makeFunction(blockAcc, makeE<EVariable>(accumulatorBitset));
                 } else {
@@ -238,7 +238,7 @@ TEST_F(BlockHashAggStageTest, NoData) {
     // We should have an empty block with no data.
     TestResultType expected = {};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected, {});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggMin", "min"}}, expected, {});
 }
 
 TEST_F(BlockHashAggStageTest, AllDataFiltered) {
@@ -248,7 +248,7 @@ TEST_F(BlockHashAggStageTest, AllDataFiltered) {
     // We should have an empty block with no data.
     TestResultType expected = {};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected, {});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggMin", "min"}}, expected, {});
 }
 
 TEST_F(BlockHashAggStageTest, SingleAccumulatorMin) {
@@ -267,7 +267,7 @@ TEST_F(BlockHashAggStageTest, SingleAccumulatorMin) {
      */
     TestResultType expected = {{0, {20}}, {1, {10}}, {2, {30}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockMin", "min"}}, expected, {3});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggMin", "min"}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, Count1) {
@@ -278,7 +278,7 @@ TEST_F(BlockHashAggStageTest, Count1) {
                                            makeInputArray(1, {true, true, false})});
     TestResultType expected = {{0, {5}}, {1, {4}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockCount", "sum"}}, expected, {2});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggCount", "sum"}}, expected, {2});
 }
 
 TEST_F(BlockHashAggStageTest, Sum1) {
@@ -296,7 +296,7 @@ TEST_F(BlockHashAggStageTest, Sum1) {
      */
     TestResultType expected = {{0, {3}}, {1, {24}}, {2, {39}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {3});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggSum", "sum"}}, expected, {3});
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulators) {
@@ -321,7 +321,7 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulators) {
     runBlockHashAggTest(
         std::make_pair(inputTag, inputVal),
         4,
-        {{"valueBlockMin", "min"}, {"valueBlockCount", "sum"}, {"valueBlockMin", "min"}},
+        {{"valueBlockAggMin", "min"}, {"valueBlockAggCount", "sum"}, {"valueBlockAggMin", "min"}},
         expected,
         {3});
 }
@@ -344,7 +344,7 @@ TEST_F(BlockHashAggStageTest, SumBlockGroupByKey1) {
      */
     TestResultType expected = {{0, {3}}, {1, {24}}, {2, {39}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {3});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggSum", "sum"}}, expected, {3});
 }
 
 // Similar to the test above, but we change the groupby keys so they are different within each
@@ -367,7 +367,7 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeys2) {
      */
     TestResultType expected = {{1, {37}}, {2, {36}}, {3, {18}}, {4, {12}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {4});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggSum", "sum"}}, expected, {4});
 }
 
 // Similar test as above but the "2" key appears in every block but is always false, so we make
@@ -400,7 +400,7 @@ TEST_F(BlockHashAggStageTest, SumDifferentBlockGroupByKeysMissingKey) {
      */
     TestResultType expected = {{1, {37}}, {3, {18}}, {4, {12}}, {5, {7}}, {6, {22}}, {7, {21}}};
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {6});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggSum", "sum"}}, expected, {6});
 }
 
 TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
@@ -435,7 +435,7 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentBlockGroupByKeys) {
     runBlockHashAggTest(
         std::make_pair(inputTag, inputVal),
         4,
-        {{"valueBlockMin", "min"}, {"valueBlockCount", "sum"}, {"valueBlockMin", "min"}},
+        {{"valueBlockAggMin", "min"}, {"valueBlockAggCount", "sum"}, {"valueBlockAggMin", "min"}},
         expected,
         {3});
 }
@@ -476,7 +476,7 @@ TEST_F(BlockHashAggStageTest, BlockOutSizeTest) {
     auto [inputTag, inputVal] = makeArray(vals);
     runBlockHashAggTest(std::make_pair(inputTag, inputVal),
                         3,
-                        {{"valueBlockSum", "sum"}},
+                        {{"valueBlockAggSum", "sum"}},
                         expected,
                         {BlockHashAggStage::kBlockOutSize,
                          BlockHashAggStage::kBlockOutSize,
@@ -527,6 +527,6 @@ TEST_F(BlockHashAggStageTest, MultipleAccumulatorsDifferentPartitionSizes) {
 
     auto [inputTag, inputVal] = makeArray(vals);
     runBlockHashAggTest(
-        std::make_pair(inputTag, inputVal), 3, {{"valueBlockSum", "sum"}}, expected, {8});
+        std::make_pair(inputTag, inputVal), 3, {{"valueBlockAggSum", "sum"}}, expected, {8});
 }
 }  // namespace mongo::sbe
