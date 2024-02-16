@@ -57,6 +57,23 @@
 #endif
 
 /*
+ * WT_WRITE_ONCE --
+ *
+ * Ensure a single write to memory in the source code produces a single write to memory in the
+ * compiled output.
+ *
+ * See the read once macro description for more details.
+ *
+ * FIXME-WT-11718 - Once Windows build machines that support C11 _Generics are available this macro
+ * will be updated to use _Generic on all platforms.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+#define WT_WRITE_ONCE(v, val) ((*(volatile __typeof__(v) *)&(v)) = (val))
+#else
+#define WT_WRITE_ONCE(v, val) WT_PUBLISH(v, val)
+#endif
+
+/*
  * Read a shared location and guarantee that subsequent reads do not see any earlier state.
  */
 #define WT_ACQUIRE_READ_WITH_BARRIER(v, val) \
