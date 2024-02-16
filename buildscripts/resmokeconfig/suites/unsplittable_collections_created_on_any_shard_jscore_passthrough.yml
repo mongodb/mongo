@@ -68,8 +68,6 @@ selector:
   - assumes_against_mongod_not_mongos
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
-  # TODO: SERVER-81937 Enable transaction tests
-  - uses_transactions
 
 executor:
   archive:

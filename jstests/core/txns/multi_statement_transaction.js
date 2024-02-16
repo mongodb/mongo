@@ -169,4 +169,25 @@ assert.eq(null, testColl.findOne({_id: "doc-1"}));
 assert.eq(null, testColl.findOne({_id: "doc-2"}));
 assert.eq(null, testColl.findOne({_id: "doc-3"}));
 
+// Transaction involving several collections
+{
+    assert.commandWorked(testColl.remove({}, {writeConcern: {w: "majority"}}));
+
+    const collName2 = "multi_statement_transaction_2";
+    const testColl2 = testDB[collName2];
+    testColl2.drop();
+    assert.commandWorked(testDB.createCollection(collName2));
+
+    const sessionColl2 = sessionDb[collName2];
+    withTxnAndAutoRetryOnMongos(session, () => {
+        assert.commandWorked(sessionColl.insert({_id: "doc-1"}));
+        assert.commandWorked(sessionColl2.insert({_id: "doc-2"}));
+    });
+
+    assert.eq(1, testColl.find().itcount());
+    assert.eq(1, testColl2.find().itcount());
+    assert.eq({_id: "doc-1"}, testColl.findOne({_id: "doc-1"}));
+    assert.eq({_id: "doc-2"}, testColl2.findOne({_id: "doc-2"}));
+}
+
 session.endSession();

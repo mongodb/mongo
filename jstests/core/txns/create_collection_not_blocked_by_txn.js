@@ -1,7 +1,12 @@
 /**
  * Test that create collection only takes database IX lock and will not be blocked by transactions.
  *
- * @tags: [uses_transactions, requires_db_locking, assumes_unsharded_collection]
+ * @tags: [
+ *   uses_transactions,
+ *   requires_db_locking,
+ *   # TODO SERVER-86727 Can probably enable for sharded collections.
+ *   assumes_unsharded_collection,
+ * ]
  */
 
 let dbName = 'create_collection_not_blocked_by_txn';

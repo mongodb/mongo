@@ -40,7 +40,7 @@ selector:
   - jstests/core/txns/transactions_profiling.js
   - jstests/core/txns/transactions_profiling_with_drops.js
   # Implicitly creates a database through a collection rename, which does not work in a sharded
-  # cluster.
+  # cluster. TODO SERVER-84330
   - jstests/core/txns/transactions_block_ddl.js
   # transactionLifetimeLimitSeconds parameter is not available in mongos.
   - jstests/core/txns/abort_expired_transaction.js

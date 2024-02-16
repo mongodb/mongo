@@ -59,7 +59,7 @@ selector:
   - jstests/core/txns/transactions_profiling_with_drops.js
 
   # Implicitly creates a database through a collection rename, which does not work in a sharded
-  # cluster.
+  # cluster. TODO SERVER-84330
   - jstests/core/txns/transactions_block_ddl.js
 
   exclude_with_any_tags:
