@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
-#include "mongo/util/uuid.h"
 
 #include <memory>
 
@@ -44,17 +43,15 @@ class BucketCompressionFailure final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TimeseriesBucketCompressionFailed;
 
-    explicit BucketCompressionFailure(const UUID& collectionUUID, OID bucketId);
+    explicit BucketCompressionFailure(OID bucketId);
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
     virtual void serialize(BSONObjBuilder*) const override;
 
-    const UUID& collectionUUID() const;
     OID bucketId() const;
 
 private:
-    const UUID& _collectionUUID;
     OID _bucketId;
 };
 

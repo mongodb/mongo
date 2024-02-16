@@ -162,8 +162,7 @@ BucketDocument makeNewDocument(const OID& bucketId,
                                const BSONObj& max,
                                StringDataMap<BSONObjBuilder>& dataBuilders,
                                StringData timeField,
-                               const NamespaceString& nss,
-                               const UUID& collectionUUID) {
+                               const NamespaceString& nss) {
     auto metadataElem = metadata.firstElement();
     BSONObjBuilder builder;
     builder.append("_id", bucketId);
@@ -193,7 +192,7 @@ BucketDocument makeNewDocument(const OID& bucketId,
     const bool validateCompression = gValidateTimeseriesCompression.load();
     auto compressed = timeseries::compressBucket(
         bucketDoc.uncompressedBucket, timeField, nss, validateCompression);
-    uassert(BucketCompressionFailure(collectionUUID, bucketId),
+    uassert(BucketCompressionFailure{bucketId},
             "Failed to compress time-series bucket",
             compressed.compressedBucket);
     bucketDoc.compressedBucket = std::move(*compressed.compressedBucket);
@@ -496,14 +495,14 @@ BSONObj getSuitableBucketForReopening(OperationContext* opCtx,
 StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
+    const NamespaceString& viewNs,
     const Collection* bucketsColl,
     const TimeseriesOptions& options,
     const BSONObj& measurementDoc,
     bucket_catalog::CombineWithInsertsFromOtherClients combine) {
     auto swResult = bucket_catalog::tryInsert(opCtx,
                                               bucketCatalog,
-                                              bucketsColl->ns().getTimeseriesViewNamespace(),
-                                              bucketsColl->uuid(),
+                                              viewNs,
                                               bucketsColl->getDefaultCollator(),
                                               options,
                                               measurementDoc,
@@ -527,16 +526,14 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
                         }};
                 }
 
-                return bucket_catalog::insertWithReopeningContext(
-                    opCtx,
-                    bucketCatalog,
-                    bucketsColl->ns().getTimeseriesViewNamespace(),
-                    bucketsColl->uuid(),
-                    bucketsColl->getDefaultCollator(),
-                    options,
-                    measurementDoc,
-                    combine,
-                    reopeningContext);
+                return bucket_catalog::insertWithReopeningContext(opCtx,
+                                                                  bucketCatalog,
+                                                                  viewNs,
+                                                                  bucketsColl->getDefaultCollator(),
+                                                                  options,
+                                                                  measurementDoc,
+                                                                  combine,
+                                                                  reopeningContext);
             },
             [](bucket_catalog::InsertWaiter& waiter) -> StatusWith<bucket_catalog::InsertResult> {
                 // Need to wait for another operation to finish, then retry. This could be another
@@ -572,8 +569,7 @@ void assertTimeseriesBucketsCollection(const Collection* bucketsColl) {
             bucketsColl->getTimeseriesOptions());
 }
 
-BucketDocument makeNewDocumentForWrite(const NamespaceString& nss,
-                                       std::shared_ptr<bucket_catalog::WriteBatch> batch,
+BucketDocument makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
                                        const BSONObj& metadata) {
     StringDataMap<BSONObjBuilder> dataBuilders;
     processTimeseriesMeasurements(
@@ -585,13 +581,11 @@ BucketDocument makeNewDocumentForWrite(const NamespaceString& nss,
                            batch->max,
                            dataBuilders,
                            batch->timeField,
-                           nss,
-                           batch->bucketHandle.bucketId.collectionUUID);
+                           batch->bucketHandle.bucketId.ns);
 }
 
 BucketDocument makeNewDocumentForWrite(
     const NamespaceString& nss,
-    const UUID& collectionUUID,
     const OID& bucketId,
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
@@ -609,22 +603,20 @@ BucketDocument makeNewDocumentForWrite(
                            minmax->second,
                            dataBuilders,
                            options.getTimeField(),
-                           nss,
-                           collectionUUID);
+                           nss);
 }
 
 BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const NamespaceString& nss,
-                           const UUID& collectionUUID,
                            const TimeseriesOptions& options,
                            const StringDataComparator* comparator) {
     std::vector<write_ops::InsertCommandRequest> insertOps;
     auto res = uassertStatusOK(bucket_catalog::internal::extractBucketingParameters(
-        collectionUUID, comparator, options, measurements[0]));
+        nss, comparator, options, measurements[0]));
     auto time = res.second;
     auto [oid, _] = bucket_catalog::internal::generateBucketOID(time, options);
     BucketDocument bucketDoc = makeNewDocumentForWrite(
-        nss, collectionUUID, oid, measurements, res.first.metadata.toBSON(), options, comparator);
+        nss, oid, measurements, res.first.metadata.toBSON(), options, comparator);
 
     invariant(bucketDoc.compressedBucket ||
               !feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -657,7 +649,6 @@ std::variant<write_ops::UpdateCommandRequest, write_ops::DeleteCommandRequest> m
     }();
 
     BucketDocument bucketDoc = makeNewDocumentForWrite(coll->ns(),
-                                                       coll->uuid(),
                                                        bucketId,
                                                        measurements,
                                                        metadata,
@@ -705,7 +696,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     const NamespaceString& bucketsNs,
     const BSONObj& metadata,
     std::vector<StmtId>&& stmtIds) {
-    BucketDocument bucketDoc = makeNewDocumentForWrite(bucketsNs, batch, metadata);
+    BucketDocument bucketDoc = makeNewDocumentForWrite(batch, metadata);
     BSONObj bucketToInsert = bucketDoc.uncompressedBucket;
 
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
@@ -755,8 +746,8 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
 
     auto compressionResult = timeseries::compressBucket(
         updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
-    uassert(BucketCompressionFailure(batch->bucketHandle.bucketId.collectionUUID,
-                                     batch->bucketHandle.bucketId.oid),
+
+    uassert(BucketCompressionFailure{batch->bucketHandle.bucketId.oid},
             "Failed to compress time-series bucket",
             compressionResult.compressedBucket);
 
@@ -917,6 +908,7 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
 StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
+    const NamespaceString& viewNs,
     const Collection* bucketsColl,
     TimeseriesOptions& timeSeriesOptions,
     const BSONObj& measurementDoc,
@@ -925,8 +917,13 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
     switch (reopening) {
         case BucketReopeningPermittance::kAllowed:
             while (true) {
-                auto result = attemptInsertIntoBucketWithReopening(
-                    opCtx, bucketCatalog, bucketsColl, timeSeriesOptions, measurementDoc, combine);
+                auto result = attemptInsertIntoBucketWithReopening(opCtx,
+                                                                   bucketCatalog,
+                                                                   viewNs,
+                                                                   bucketsColl,
+                                                                   timeSeriesOptions,
+                                                                   measurementDoc,
+                                                                   combine);
                 if (!result.isOK() && result.getStatus().code() == ErrorCodes::WriteConflict) {
                     // If there is an era offset (between the bucket we want to reopen and the
                     // catalog's current era), we could hit a WriteConflict error indicating we will
@@ -938,8 +935,7 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucket(
         case BucketReopeningPermittance::kDisallowed:
             return bucket_catalog::insert(opCtx,
                                           bucketCatalog,
-                                          bucketsColl->ns().getTimeseriesViewNamespace(),
-                                          bucketsColl->uuid(),
+                                          viewNs,
                                           bucketsColl->getDefaultCollator(),
                                           timeSeriesOptions,
                                           measurementDoc,
@@ -980,11 +976,13 @@ TimeseriesBatches insertIntoBucketCatalogForUpdate(OperationContext* opCtx,
                                                    const NamespaceString& bucketsNs,
                                                    TimeseriesOptions& timeSeriesOptions) {
     TimeseriesBatches batches;
+    auto viewNs = bucketsNs.getTimeseriesViewNamespace();
 
     for (const auto& measurement : measurements) {
         auto result = uassertStatusOK(
             attemptInsertIntoBucket(opCtx,
                                     bucketCatalog,
+                                    viewNs,
                                     bucketsColl.get(),
                                     timeSeriesOptions,
                                     measurement,
@@ -1102,8 +1100,7 @@ void commitTimeseriesBucketsAtomically(
         auto& mainBucketCatalog = bucket_catalog::BucketCatalog::get(opCtx);
         for (auto batch : batchesToCommit) {
             auto metadata = getMetadata(sideBucketCatalog, batch.get()->bucketHandle);
-            auto prepareCommitStatus =
-                prepareCommit(sideBucketCatalog, coll->ns().getTimeseriesViewNamespace(), batch);
+            auto prepareCommitStatus = prepareCommit(sideBucketCatalog, batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return;
@@ -1117,7 +1114,9 @@ void commitTimeseriesBucketsAtomically(
             // write to prevent other writers from modifying it.
             if (batch.get()->numPreviouslyCommittedMeasurements == 0) {
                 auto bucketId = batch.get()->bucketHandle.bucketId.oid;
-                directWriteStart(mainBucketCatalog.bucketStateRegistry, coll->uuid(), bucketId);
+                directWriteStart(mainBucketCatalog.bucketStateRegistry,
+                                 bucketsNs.getTimeseriesViewNamespace(),
+                                 bucketId);
                 bucketIds->insert(bucketId);
             }
         }
@@ -1130,11 +1129,7 @@ void commitTimeseriesBucketsAtomically(
         getOpTimeAndElectionId(opCtx, &opTime, &electionId);
 
         for (auto batch : batchesToCommit) {
-            finish(opCtx,
-                   sideBucketCatalog,
-                   coll->ns(),
-                   batch,
-                   bucket_catalog::CommitInfo{opTime, electionId});
+            finish(opCtx, sideBucketCatalog, batch, bucket_catalog::CommitInfo{opTime, electionId});
             batch.get().reset();
         }
     } catch (const DBException& ex) {

@@ -65,8 +65,7 @@ boost::optional<OID> initializeRequest(BucketCatalog& catalog,
 
     list.push_back(make_shared_tracked<ReopeningRequest>(
         catalog.trackingContext,
-        ExecutionStatsController{
-            internal::getOrInitializeExecutionStats(catalog, key.collectionUUID)},
+        ExecutionStatsController{internal::getOrInitializeExecutionStats(catalog, key.ns)},
         oid));
 
     return oid;

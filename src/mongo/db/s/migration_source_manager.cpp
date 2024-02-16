@@ -658,7 +658,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     // out are no longer updatable.
     if (nss().isTimeseriesBucketsCollection()) {
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(_opCtx);
-        clear(bucketCatalog, _collectionUUID.get());
+        clear(bucketCatalog, nss().getTimeseriesViewNamespace());
     }
 
     _coordinator->setMigrationDecision(DecisionEnum::kCommitted);

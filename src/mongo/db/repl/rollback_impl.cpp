@@ -446,26 +446,20 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     LOGV2(21597, "Finished waiting for background operations to complete before rollback");
 }
 
-StatusWith<std::pair<std::set<NamespaceString>, std::set<UUID>>>
-RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
+StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const OplogEntry& oplogEntry) {
     NamespaceString opNss = oplogEntry.getNss();
-
     OpTypeEnum opType = oplogEntry.getOpType();
     std::set<NamespaceString> namespaces;
-    std::set<UUID> uuids;
-    if (auto opUUID = oplogEntry.getUuid()) {
-        uuids.insert(opUUID.get());
-    }
 
     // No namespaces for a no-op.
     if (opType == OpTypeEnum::kNoop) {
-        return std::make_pair(std::set<NamespaceString>(), std::set<UUID>());
+        return std::set<NamespaceString>();
     }
 
     // CRUD ops have the proper namespace in the operation 'ns' field.
     if (opType == OpTypeEnum::kInsert || opType == OpTypeEnum::kUpdate ||
         opType == OpTypeEnum::kDelete) {
-        return std::make_pair(std::set<NamespaceString>({opNss}), uuids);
+        return std::set<NamespaceString>({opNss});
     }
 
     // If the operation is a command, then we need to extract the appropriate namespaces from the
@@ -476,7 +470,7 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
 
         // Does not handle 'applyOps' entries.
         invariant(oplogEntry.getCommandType() != OplogEntry::CommandType::kApplyOps,
-                  "_namespacesAndUUIDsForOp does not handle 'applyOps' oplog entries.");
+                  "_namespacesForOp does not handle 'applyOps' oplog entries.");
 
         switch (oplogEntry.getCommandType()) {
             case OplogEntry::CommandType::kRenameCollection: {
@@ -489,9 +483,6 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
                     NamespaceStringUtil::deserialize(opNss.tenantId(),
                                                      obj.getStringField("to"),
                                                      SerializationContext::stateDefault()));
-                if (auto uuidSW = UUID::parse(obj.getField("dropTarget")); uuidSW.isOK()) {
-                    uuids.insert(uuidSW.getValue());
-                }
                 break;
             }
             case OplogEntry::CommandType::kDropDatabase: {
@@ -541,7 +532,7 @@ RollbackImpl::_namespacesAndUUIDsForOp(const OplogEntry& oplogEntry) {
         }
     }
 
-    return std::make_pair(namespaces, uuids);
+    return namespaces;
 }
 
 void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* opCtx,
@@ -969,15 +960,13 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
         return Status::OK();
     }
 
-    // Extract the appropriate namespaces and UUIDs from the oplog operation.
-    auto namespacesAndUUIDsSW = _namespacesAndUUIDsForOp(oplogEntry);
-    if (!namespacesAndUUIDsSW.isOK()) {
-        return namespacesAndUUIDsSW.getStatus();
+    // Extract the appropriate namespaces from the oplog operation.
+    auto namespacesSW = _namespacesForOp(oplogEntry);
+    if (!namespacesSW.isOK()) {
+        return namespacesSW.getStatus();
     } else {
-        _observerInfo.rollbackNamespaces.insert(namespacesAndUUIDsSW.getValue().first.begin(),
-                                                namespacesAndUUIDsSW.getValue().first.end());
-        _observerInfo.rollbackUUIDs.insert(namespacesAndUUIDsSW.getValue().second.begin(),
-                                           namespacesAndUUIDsSW.getValue().second.end());
+        _observerInfo.rollbackNamespaces.insert(namespacesSW.getValue().begin(),
+                                                namespacesSW.getValue().end());
     }
 
     // If the operation being rolled back has a session id, then we add it to the set of
@@ -1500,7 +1489,6 @@ void RollbackImpl::_summarizeRollback(OperationContext* opCtx) const {
               _observerInfo.configServerConfigVersionRolledBack);
     attrs.add("affectedSessions", _observerInfo.rollbackSessionIds);
     attrs.add("affectedNamespaces", _observerInfo.rollbackNamespaces);
-    attrs.add("affectedUUIDs", _observerInfo.rollbackUUIDs);
     attrs.add("rollbackCommandCounts", _observerInfo.rollbackCommandCounts);
     attrs.add("totalEntriesRolledBackIncludingNoops", _observerInfo.numberOfEntriesObserved);
     LOGV2(21612, "Rollback summary", attrs);

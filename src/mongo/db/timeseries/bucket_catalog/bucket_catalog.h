@@ -53,6 +53,7 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
@@ -75,12 +76,11 @@
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
 using StripeNumber = std::uint8_t;
-using ShouldClearFn = std::function<bool(const UUID&)>;
+using ShouldClearFn = std::function<bool(const NamespaceString&)>;
 
 /**
  * Whether to allow inserts to be batched together with those from other clients.
@@ -197,8 +197,9 @@ public:
     // Per-namespace execution stats. This map is protected by 'mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the
     // lock. The object itself is thread-safe (using atomics).
+    // TODO SERVER-85655: Track NamespaceString memory usage.
     mutable Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::mutex");
-    tracked_unordered_map<UUID, shared_tracked_ptr<ExecutionStats>> executionStats;
+    tracked_unordered_map<NamespaceString, shared_tracked_ptr<ExecutionStats>> executionStats;
 
     // Global execution stats used to report aggregated metrics in server status.
     ExecutionStats globalExecutionStats;
@@ -251,8 +252,7 @@ uint64_t getMemoryUsage(const BucketCatalog& catalog);
  */
 StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
                                    BucketCatalog& catalog,
-                                   const NamespaceString& nss,
-                                   const UUID& collectionUUID,
+                                   const NamespaceString& ns,
                                    const StringDataComparator* comparator,
                                    const TimeseriesOptions& options,
                                    const BSONObj& doc,
@@ -269,8 +269,7 @@ StatusWith<InsertResult> tryInsert(OperationContext* opCtx,
  */
 StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
                                                     BucketCatalog& catalog,
-                                                    const NamespaceString& nss,
-                                                    const UUID& collectionUUID,
+                                                    const NamespaceString& ns,
                                                     const StringDataComparator* comparator,
                                                     const TimeseriesOptions& options,
                                                     const BSONObj& doc,
@@ -286,8 +285,7 @@ StatusWith<InsertResult> insertWithReopeningContext(OperationContext* opCtx,
  */
 StatusWith<InsertResult> insert(OperationContext* opCtx,
                                 BucketCatalog& catalog,
-                                const NamespaceString& nss,
-                                const UUID& collectionUUID,
+                                const NamespaceString& ns,
                                 const StringDataComparator* comparator,
                                 const TimeseriesOptions& options,
                                 const BSONObj& doc,
@@ -306,9 +304,7 @@ void waitToInsert(InsertWaiter* waiter);
  * on the same bucket, or there is an outstanding 'ReopeningRequest' for the same series (metaField
  * value), this operation will block waiting for it to complete.
  */
-Status prepareCommit(BucketCatalog& catalog,
-                     const NamespaceString& nss,
-                     std::shared_ptr<WriteBatch> batch);
+Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch);
 
 /**
  * Records the result of a batch commit. Caller must already have commit rights on batch, and batch
@@ -320,7 +316,6 @@ Status prepareCommit(BucketCatalog& catalog,
  */
 boost::optional<ClosedBucket> finish(OperationContext* opCtx,
                                      BucketCatalog& catalog,
-                                     const NamespaceString& nss,
                                      std::shared_ptr<WriteBatch> batch,
                                      const CommitInfo& info);
 
@@ -337,7 +332,7 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
  * This should be followed by a call to 'directWriteFinish' after the write has been committed,
  * rolled back, or otherwise finished.
  */
-void directWriteStart(BucketStateRegistry& registry, const UUID& collectionUUID, const OID& oid);
+void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid);
 
 /**
  * Notifies the catalog that a pending direct write to the bucket document with the specified ID has
@@ -345,7 +340,7 @@ void directWriteStart(BucketStateRegistry& registry, const UUID& collectionUUID,
  * in-memory representation of the on-disk bucket data from before the direct write should have been
  * cleared from the catalog, and it may be safely reopened from the on-disk state.
  */
-void directWriteFinish(BucketStateRegistry& registry, const UUID& collectionUUID, const OID& oid);
+void directWriteFinish(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid);
 
 /**
  * Clears any bucket whose namespace satisfies the predicate by removing the bucket from the catalog
@@ -357,12 +352,18 @@ void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear);
  * Clears the buckets for the given namespace by removing the bucket from the catalog asynchronously
  * through the BucketStateRegistry.
  */
-void clear(BucketCatalog& catalog, const UUID& collectionUUID);
+void clear(BucketCatalog& catalog, const NamespaceString& ns);
+
+/**
+ * Clears the buckets for the given database by removing the bucket from the catalog asynchronously
+ * through the BucketStateRegistry.
+ */
+void clear(BucketCatalog& catalog, const DatabaseName& dbName);
 
 /**
  * Freezes the given bucket in the registry so that this bucket will never be used in the future.
  */
-void freeze(BucketCatalog&, const UUID&, const OID&);
+void freeze(BucketCatalog&, const NamespaceString&, const OID&);
 
 /**
  * Resets the counter used for bucket OID generation. Should be called after a bucket _id collision.
@@ -373,7 +374,7 @@ void resetBucketOIDCounter();
  * Appends the execution stats for the given namespace to the builder.
  */
 void appendExecutionStats(const BucketCatalog& catalog,
-                          const UUID& collectionUUID,
+                          const NamespaceString& ns,
                           BSONObjBuilder& builder);
 
 /**
@@ -382,7 +383,7 @@ void appendExecutionStats(const BucketCatalog& catalog,
  * commit".
  */
 void reportMeasurementsGroupCommitted(BucketCatalog& catalog,
-                                      const UUID& collectionUUID,
+                                      const NamespaceString& ns,
                                       int64_t count);
 
 

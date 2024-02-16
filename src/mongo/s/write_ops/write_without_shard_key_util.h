@@ -58,7 +58,6 @@ const BSONObj targetDocForExplain = BSON("_id"
 std::pair<BSONObj, BSONObj> generateUpsertDocument(
     OperationContext* opCtx,
     const UpdateRequest& updateRequest,
-    const UUID& collectionUUID,
     boost::optional<TimeseriesOptions> timeseriesOptions,
     const StringDataComparator* comparator);
 

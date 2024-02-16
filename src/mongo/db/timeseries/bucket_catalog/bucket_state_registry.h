@@ -41,6 +41,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/timeseries_tracked_types.h"
 #include "mongo/db/timeseries/timeseries_tracking_context.h"
@@ -48,7 +49,6 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -123,7 +123,7 @@ using DirectWriteCounter = std::int32_t;
  */
 struct BucketStateRegistry {
     using Era = std::uint64_t;
-    using ShouldClearFn = std::function<bool(const UUID&)>;
+    using ShouldClearFn = std::function<bool(const NamespaceString&)>;
 
     mutable Mutex mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketStateRegistry::mutex");
@@ -159,7 +159,7 @@ BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
  * predicate.
  */
 void clearSetOfBuckets(BucketStateRegistry& registry,
-                       std::function<bool(const UUID&)>&& shouldClear);
+                       std::function<bool(const NamespaceString&)>&& shouldClear);
 
 /**
  * Returns the number of clear operations currently stored in the clear registry.

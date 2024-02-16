@@ -124,7 +124,7 @@ void TimeSeriesOpObserver::onUpdate(OperationContext* opCtx,
                     !mixedSchema());
 
         OID bucketId = args.updateArgs->updatedDoc["_id"].OID();
-        timeseries::bucket_catalog::handleDirectWrite(opCtx, args.coll->uuid(), bucketId);
+        timeseries::bucket_catalog::handleDirectWrite(opCtx, nss, bucketId);
     }
 }
 
@@ -140,7 +140,12 @@ void TimeSeriesOpObserver::aboutToDelete(OperationContext* opCtx,
     }
 
     OID bucketId = doc["_id"].OID();
-    timeseries::bucket_catalog::handleDirectWrite(opCtx, coll->uuid(), bucketId);
+    timeseries::bucket_catalog::handleDirectWrite(opCtx, nss, bucketId);
+}
+
+void TimeSeriesOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
+    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    timeseries::bucket_catalog::clear(bucketCatalog, dbName);
 }
 
 repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
@@ -151,7 +156,8 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
                                                     bool markFromMigrate) {
     if (collectionName.isTimeseriesBucketsCollection()) {
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-        timeseries::bucket_catalog::clear(bucketCatalog, uuid);
+        timeseries::bucket_catalog::clear(bucketCatalog,
+                                          collectionName.getTimeseriesViewNamespace());
     }
 
     return {};
@@ -159,17 +165,23 @@ repl::OpTime TimeSeriesOpObserver::onDropCollection(OperationContext* opCtx,
 
 void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
                                                  const RollbackObserverInfo& rbInfo) {
-    if (!std::any_of(
-            rbInfo.rollbackNamespaces.begin(),
-            rbInfo.rollbackNamespaces.end(),
-            [](const NamespaceString& ns) { return ns.isTimeseriesBucketsCollection(); })) {
+    stdx::unordered_set<NamespaceString> timeseriesNamespaces;
+    for (const auto& ns : rbInfo.rollbackNamespaces) {
+        if (ns.isTimeseriesBucketsCollection()) {
+            timeseriesNamespaces.insert(ns.getTimeseriesViewNamespace());
+        }
+    }
+
+    if (timeseriesNamespaces.empty()) {
         return;
     }
 
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
     timeseries::bucket_catalog::clear(
         bucketCatalog,
-        [uuids = rbInfo.rollbackUUIDs](const UUID& uuid) { return uuids.contains(uuid); });
+        [timeseriesNamespaces = std::move(timeseriesNamespaces)](const NamespaceString& bucketNs) {
+            return timeseriesNamespaces.contains(bucketNs);
+        });
 }
 
 }  // namespace mongo

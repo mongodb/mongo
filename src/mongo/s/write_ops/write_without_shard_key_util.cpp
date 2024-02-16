@@ -109,7 +109,6 @@ bool shardKeyHasCollatableType(const BSONObj& shardKey) {
 std::pair<BSONObj, BSONObj> generateUpsertDocument(
     OperationContext* opCtx,
     const UpdateRequest& updateRequest,
-    const UUID& collectionUUID,
     boost::optional<TimeseriesOptions> timeseriesOptions,
     const StringDataComparator* comparator) {
     // We are only using this to parse the query for producing the upsert document.
@@ -135,11 +134,8 @@ std::pair<BSONObj, BSONObj> generateUpsertDocument(
     tassert(7777500,
             "Expected timeseries buckets collection namespace",
             updateRequest.getNamespaceString().isTimeseriesBucketsCollection());
-    auto upsertBucketObj = timeseries::makeBucketDocument(std::vector{upsertDoc},
-                                                          updateRequest.getNamespaceString(),
-                                                          collectionUUID,
-                                                          *timeseriesOptions,
-                                                          comparator);
+    auto upsertBucketObj = timeseries::makeBucketDocument(
+        std::vector{upsertDoc}, updateRequest.getNamespaceString(), *timeseriesOptions, comparator);
     return {upsertBucketObj, upsertDoc};
 }
 

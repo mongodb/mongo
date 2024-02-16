@@ -87,9 +87,7 @@ struct BucketDocument {
  * Returns the document for writing a new bucket with a write batch.
  */
 BucketDocument makeNewDocumentForWrite(
-    const NamespaceString& nss,
-    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
-    const BSONObj& metadata);
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch, const BSONObj& metadata);
 
 /**
  * Returns the document for writing a new bucket with 'measurements'. Calculates the min and max
@@ -99,7 +97,6 @@ BucketDocument makeNewDocumentForWrite(
  */
 BucketDocument makeNewDocumentForWrite(
     const NamespaceString& nss,
-    const UUID& collectionUUID,
     const OID& bucketId,
     const std::vector<BSONObj>& measurements,
     const BSONObj& metadata,
@@ -114,7 +111,6 @@ BucketDocument makeNewDocumentForWrite(
  */
 BSONObj makeBucketDocument(const std::vector<BSONObj>& measurements,
                            const NamespaceString& nss,
-                           const UUID& collectionUUID,
                            const TimeseriesOptions& options,
                            const StringDataComparator* comparator);
 
@@ -187,6 +183,7 @@ enum class BucketReopeningPermittance {
 StatusWith<timeseries::bucket_catalog::InsertResult> attemptInsertIntoBucket(
     OperationContext* opCtx,
     bucket_catalog::BucketCatalog& bucketCatalog,
+    const NamespaceString& viewNs,
     const Collection* bucketsColl,
     TimeseriesOptions& timeSeriesOptions,
     const BSONObj& measurementDoc,

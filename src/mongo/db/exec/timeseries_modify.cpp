@@ -142,7 +142,7 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
 
 TimeseriesModifyStage::~TimeseriesModifyStage() {
     if (_sideBucketCatalog && !_insertedBucketIds.empty()) {
-        auto [collectionUUID, collStats] =
+        auto [viewNs, collStats] =
             timeseries::bucket_catalog::internal::getSideBucketCatalogCollectionStats(
                 *_sideBucketCatalog);
         // Finishes tracking the newly inserted buckets in the main bucket catalog as direct
@@ -150,11 +150,11 @@ TimeseriesModifyStage::~TimeseriesModifyStage() {
         auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx());
         for (const auto bucketId : _insertedBucketIds) {
             timeseries::bucket_catalog::directWriteFinish(
-                bucketCatalog.bucketStateRegistry, collectionUUID, bucketId);
+                bucketCatalog.bucketStateRegistry, viewNs, bucketId);
         }
         // Merges the execution stats of the side bucket catalog to the main one.
         timeseries::bucket_catalog::internal::mergeExecutionStatsToBucketCatalog(
-            bucketCatalog, collStats, collectionUUID);
+            bucketCatalog, collStats, viewNs);
     }
 }
 
@@ -476,7 +476,6 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
         _checkUpdateChangesShardKeyFields(
             timeseries::makeBucketDocument({modifiedMeasurements[0]},
                                            collectionPtr()->ns(),
-                                           collectionPtr()->uuid(),
                                            *collectionPtr()->getTimeseriesOptions(),
                                            collectionPtr()->getDefaultCollator()),
             _bucketUnpacker.bucket(),

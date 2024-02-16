@@ -67,28 +67,32 @@ assert.commandWorked(coll.insert({[metaFieldName]: 2, [timeFieldName]: ISODate()
 expected.bucketsManaged++;
 checkServerStatus();
 
-// Dropping and recreating the collection will not immediately remove the old bucket states.
+// Clearing the collection will not immediately remove the old bucket states.
 resetCollection();
 expected.currentEra++;
 expected.trackedClearOperations++;
 checkServerStatus();
 
-// Inserting more measurements will not remove the old bucket for that meta, as the recreated
-// collection has a different UUID. This opens a new one in a new era. The other meta value still
-// has an old bucket.
+// Inserting more measurements will check and remove the old bucket for that meta, and open a new
+// one. The other meta value still has an old bucket.
 assert.commandWorked(coll.insert({[metaFieldName]: 1, [timeFieldName]: ISODate()}));
-expected.bucketsManaged++;
 expected.erasWithRemainingBuckets++;
 checkServerStatus();
 
-// If we clear an unrelated collection and add a third metadata value, we'll get another bucket in
-// a third era.
+// If we clear an unrelated collection and add a third metadata value, we'll get a bucket in a third
+// era.
 dropUnrelatedCollection();
 assert.commandWorked(coll.insert({[metaFieldName]: 3, [timeFieldName]: ISODate()}));
 expected.bucketsManaged++;
 expected.currentEra++;
 expected.erasWithRemainingBuckets++;
 expected.trackedClearOperations++;
+checkServerStatus();
+
+// If we access the oldest bucket, we'll clear it and garbage collect a tracked clear.
+assert.commandWorked(coll.insert({[metaFieldName]: 2, [timeFieldName]: ISODate()}));
+expected.erasWithRemainingBuckets--;
+expected.trackedClearOperations--;
 checkServerStatus();
 
 MongoRunner.stopMongod(conn);
