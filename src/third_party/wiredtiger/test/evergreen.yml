@@ -5233,7 +5233,7 @@ buildvariants:
     # some csuite tests to take an extended amount of time. These are excluded from the
     # make-check-test task and are covered by the csuite-long-running task.
     extra_args: -LE "cppsuite|long_running"
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
+    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tasks:
     - name: clang-analyzer
     - name: compile
