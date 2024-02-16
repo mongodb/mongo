@@ -500,10 +500,12 @@ def generate(env: SCons.Environment.Environment) -> None:
 
         if env.GetOption("release") is not None:
             build_mode = "release"
-        elif env.GetOption("dbg") == "on":
+        elif env.GetOption("dbg") == "on" and mongo_generators.get_opt_options(env) == "off":
             build_mode = "dbg"
+        elif env.GetOption("dbg") == "on" and mongo_generators.get_opt_options(env) == "on":
+            build_mode = "opt_debug"
         else:
-            build_mode = f"opt_{mongo_generators.get_opt_options(env)}"  # one of "on", "size", "debug"
+            build_mode = f"opt_{mongo_generators.get_opt_options(env)}"  # one of "on", "size", "off"
 
         # Deprecate tcmalloc-experimental
         allocator = "tcmalloc" if env.GetOption(
