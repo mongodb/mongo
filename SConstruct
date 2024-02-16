@@ -105,7 +105,7 @@ def use_system_version_of_library(name):
 # add a new C++ library dependency that may be shimmed out to the system, add it to the below
 # list.
 def using_system_version_of_cxx_libraries():
-    cxx_library_names = ["tcmalloc", "boost"]
+    cxx_library_names = ["tcmalloc-google", "boost", "tcmalloc-gperf"]
     return True in [use_system_version_of_library(x) for x in cxx_library_names]
 
 
@@ -415,7 +415,7 @@ add_option(
 
 add_option(
     'allocator',
-    choices=["auto", "system", "tcmalloc", "tcmalloc-experimental"],
+    choices=["auto", "system", "tcmalloc-google", "tcmalloc-gperf"],
     default=build_profile.allocator,
     help='allocator to use (use "auto" for best choice for current platform)',
     type='choice',
@@ -485,7 +485,8 @@ for pack in [
     ('protobuf', "Protocol Buffers"),
     ('snappy', ),
     ('stemmer', ),
-    ('tcmalloc', ),
+    ('tcmalloc-google', ),
+    ('tcmalloc-gperf', ),
     ('libunwind', ),
     ('valgrind', ),
     ('wiredtiger', ),
@@ -2124,16 +2125,47 @@ env['TARGET_OS_FAMILY'] = 'posix' if env.TargetOSIs('posix') else env.GetTargetO
 # would be nicer to use SetOption here, but you can't reset user
 # options for some strange reason in SCons. Instead, we store this
 # option as a new variable in the environment.
+try:
+    kernel_version = platform.release().split(".")
+    kernel_major = int(kernel_version[0])
+    kernel_minor = int(kernel_version[1])
+except (ValueError, IndexError):
+    print(
+        f"Failed to extract kernel major and minor versions, tcmalloc-google will not be available for use: {kernel_version}"
+    )
+    kernel_major = 0
+    kernel_minor = 0
+
 if get_option('allocator') == "auto":
-    # using an allocator besides system on android would require either fixing or disabling
-    # gperftools on android
-    if env.TargetOSIs('windows') or \
-       env.TargetOSIs('linux') and not env.TargetOSIs('android'):
-        env['MONGO_ALLOCATOR'] = "tcmalloc"
+    if env.TargetOSIs('linux') and env['TARGET_ARCH'] in ('x86_64', 'aarch64'):
+
+        # TODO SERVER-86472 make bazel support both tcmalloc implementations
+        if env.get("BAZEL_BUILD_ENABLED"):
+            env['MONGO_ALLOCATOR'] = "tcmalloc-gperf"
+        else:
+            env['MONGO_ALLOCATOR'] = "tcmalloc-google"
+
+        # googles tcmalloc uses the membarrier() system call which was added in Linux 4.3,
+        # so fall back to gperf implementation for older kernels
+        if kernel_major < 4 or (kernel_major == 4 and kernel_minor < 3):
+            env['MONGO_ALLOCATOR'] = "tcmalloc-gperf"
+
+    elif env.TargetOSIs('windows') or (env.TargetOSIs('linux')
+                                       and env['TARGET_ARCH'] in ('ppc64le', 's390x')):
+        env['MONGO_ALLOCATOR'] = "tcmalloc-gperf"
     else:
         env['MONGO_ALLOCATOR'] = "system"
 else:
     env['MONGO_ALLOCATOR'] = get_option('allocator')
+
+    if env['MONGO_ALLOCATOR'] == "tcmalloc-google":
+        if kernel_major < 4 or (kernel_major == 4 and kernel_minor < 3):
+            env.ConfError(
+                f"tcmalloc-google allocator only supported on linux kernel 4.3 or greater: kenerl verison={platform.release()}"
+            )
+
+if env['MONGO_ALLOCATOR'] == "tcmalloc-google":
+    env.Append(CPPDEFINES=["ABSL_ALLOCATOR_NOTHROW"])
 
 if has_option("cache"):
     if has_option("gcov"):
@@ -2444,6 +2476,13 @@ if not env.TargetOSIs('windows'):
 
     env["LINKCOM"] = env["LINKCOM"].replace("$LINKFLAGS", "$PROGLINKFLAGS")
     env["PROGLINKFLAGS"] = ['$LINKFLAGS']
+
+    # CPPFLAGS is used for assembler commands, this condition below assumes assembler files
+    # will be only directly assembled in librarys and not programs
+    if link_model.startswith("dynamic"):
+        env.Append(CPPFLAGS=["-fPIC"])
+    else:
+        env.Append(CPPFLAGS=["-fPIE"])
 
 # When it is necessary to supply additional SHLINKFLAGS without modifying the toolset default,
 # following appends contents of SHLINKFLAGS_EXTRA variable to the linker command
@@ -3070,7 +3109,9 @@ if env.TargetOSIs('posix'):
             # If runtime hardening is requested, then build anything
             # destined for an executable with the necessary flags for PIE.
             env.AppendUnique(
+                PROGCFLAGS=['-fPIE'],
                 PROGCCFLAGS=['-fPIE'],
+                PROGCXXFLAGS=['-fPIE'],
                 PROGLINKFLAGS=['-pie'],
             )
 
@@ -3102,7 +3143,8 @@ if env.TargetOSIs('posix'):
 
     # For debug builds with tcmalloc, we need the frame pointer so it can
     # record the stack of allocations.
-    can_nofp &= not (debugBuild and (env['MONGO_ALLOCATOR'] == 'tcmalloc'))
+    can_nofp &= not (debugBuild and
+                     (env['MONGO_ALLOCATOR'] in ['tcmalloc-google', 'tcmalloc-gperf']))
 
     # Only disable frame pointers if requested
     can_nofp &= ("nofp" in selected_experimental_optimizations)
@@ -4116,6 +4158,10 @@ def doConfigure(myenv):
         if not myenv.ToolchainIs('clang', 'gcc'):
             env.FatalError('sanitize is only supported with clang or gcc')
 
+        # sanitizer libs may inject undefined refs (for hooks) at link time, but
+        # the symbols will be available at runtime via the compiler runtime lib.
+        env.Append(LINKFLAGS='-Wl,--allow-shlib-undefined')
+
         if myenv.ToolchainIs('gcc'):
             # GCC's implementation of ASAN depends on libdl.
             env.Append(LIBS=['dl'])
@@ -4157,11 +4203,14 @@ def doConfigure(myenv):
                 get_san_lib_path(sanitizer) for sanitizer in sanitizer_list
             ]
 
+        if 'thread' not in sanitizer_list:
+            env.Append(LINKFLAGS=['-rtlib=compiler-rt', '-unwindlib=libgcc'])
+
         if using_lsan:
             env.FatalError("Please use --sanitize=address instead of --sanitize=leak")
 
         if (using_asan
-                or using_msan) and env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
+                or using_msan) and env['MONGO_ALLOCATOR'] in ['tcmalloc-google', 'tcmalloc-gperf']:
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
             env.FatalError("Cannot use --sanitize=address or --sanitize=memory with tcmalloc")
@@ -4236,7 +4285,7 @@ def doConfigure(myenv):
         else:
             myenv.ConfError('Failed to enable sanitizers with flag: {0}', sanitizer_option)
 
-        if get_option('shared-libsan') == 'on':
+        if get_option("shared-libsan") == "on":
             shared_libsan_option = '-shared-libsan'
             if myenv.AddToCCFLAGSIfSupported(shared_libsan_option):
                 myenv.Append(LINKFLAGS=[shared_libsan_option])
@@ -5279,13 +5328,16 @@ def doConfigure(myenv):
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this
     # point.
-    if myenv['MONGO_ALLOCATOR'] == 'tcmalloc':
-        if use_system_version_of_library('tcmalloc'):
-            conf.FindSysLibDep("tcmalloc", ["tcmalloc"])
-    elif myenv['MONGO_ALLOCATOR'] in ['system', 'tcmalloc-experimental']:
+    if myenv['MONGO_ALLOCATOR'] == 'tcmalloc-google':
+        if use_system_version_of_library('tcmalloc-google'):
+            conf.FindSysLibDep("tcmalloc-google", ["tcmalloc"])
+    elif myenv['MONGO_ALLOCATOR'] == 'tcmalloc-gperf':
+        if use_system_version_of_library('tcmalloc-gperf'):
+            conf.FindSysLibDep("tcmalloc-gperf", ["tcmalloc"])
+    elif myenv['MONGO_ALLOCATOR'] in ['system']:
         pass
     else:
-        myenv.FatalError("Invalid --allocator parameter: $MONGO_ALLOCATOR")
+        myenv.FatalError(f"Invalid --allocator parameter: {env['MONGO_ALLOCATOR']}")
 
     def CheckStdAtomic(context, base_type, extra_message):
         test_body = """

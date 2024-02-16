@@ -83,9 +83,14 @@ def injectMozJS(thisEnv):
 
 env.AddMethod(injectMozJS, 'InjectMozJS')
 
-if not use_system_version_of_library('tcmalloc'):
+if not use_system_version_of_library('tcmalloc-gperf'):
     # GPerftools does this slightly differently than the others.
     thirdPartyEnvironmentModifications['gperftools'] = {}
+
+if not use_system_version_of_library('tcmalloc-google'):
+    thirdPartyEnvironmentModifications['tcmalloc'] = {
+        'CPPPATH': ['#/src/third_party/tcmalloc/dist'],
+    }
 
 if not use_system_version_of_library('pcre2'):
     thirdPartyEnvironmentModifications['pcre2'] = {
@@ -422,6 +427,12 @@ boostEnv.ShimLibrary(name="boost")
 
 abseilDirectory = 'abseil-cpp'
 abseilEnv = env.Clone()
+
+# We can't depend on the allocator if we are using tcmalloc as its depends
+# on us (abseil-cpp)
+if abseilEnv['MONGO_ALLOCATOR'] in ['tcmalloc-google']:
+    abseilEnv = abseilEnv.Clone(LIBDEPS_NO_INHERIT=['$BUILD_DIR/third_party/shim_allocator'])
+
 abseilEnv.InjectThirdParty(libraries=['abseil-cpp'])
 abseilEnv.SConscript(abseilDirectory + '/SConscript', exports={'env': abseilEnv})
 abseilEnv = abseilEnv.Clone(LIBDEPS_INTERFACE=[
@@ -510,17 +521,34 @@ if "tom" in env["MONGO_CRYPTO"]:
 
     tomcryptEnv.ShimLibrary(name="tomcrypt", )
 
-gperftoolsEnv = env.Clone(LIBDEPS_NO_INHERIT=[
+# tcmallocEnv implements this shim, so it rejects the implicit dependency.
+tcmallocEnv = env.Clone(LIBDEPS_NO_INHERIT=[
     '$BUILD_DIR/third_party/shim_allocator',
 ], )
-if gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
-    if use_system_version_of_library("tcmalloc"):
-        gperftoolsEnv = gperftoolsEnv.Clone(SYSLIBDEPS=[
+if tcmallocEnv['MONGO_ALLOCATOR'] in ["tcmalloc-google"]:
+    if use_system_version_of_library("tcmalloc-google"):
+        tcmallocEnv = tcmallocEnv.Clone(SYSLIBDEPS=[
             env['LIBDEPS_TCMALLOC_SYSLIBDEP'],
         ])
     else:
-        gperftoolsEnv = gperftoolsEnv.Clone()
-        gperftoolsEnv.InjectThirdParty(libraries=['gperftools'])
+        tcmallocDirectory = 'tcmalloc'
+        tcmallocEnv = tcmallocEnv.Clone()
+        tcmallocEnv.InjectThirdParty(libraries=['tcmalloc'])
+        tcmallocEnv.SConscript(
+            tcmallocDirectory + '/SConscript',
+            exports={'env': tcmallocEnv},
+        )
+        tcmallocEnv = tcmallocEnv.Clone(LIBDEPS_INTERFACE=[
+            'tcmalloc/tcmalloc',
+        ])
+elif tcmallocEnv['MONGO_ALLOCATOR'] in ["tcmalloc-gperf"]:
+    if use_system_version_of_library("tcmalloc-gperf"):
+        tcmallocEnv = tcmallocEnv.Clone(SYSLIBDEPS=[
+            env['LIBDEPS_TCMALLOC_SYSLIBDEP'],
+        ])
+    else:
+        tcmallocEnv = tcmallocEnv.Clone()
+        tcmallocEnv.InjectThirdParty(libraries=['gperftools'])
 
         # Allow gperftools to determine its own consumer-side include/ dirs.
         # Needed because those are in a platform-specific subdirectory.
@@ -528,16 +556,16 @@ if gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
             for k, v in kwargs.items():
                 thirdPartyEnvironmentModifications['gperftools'][k] = v
 
-        gperftoolsEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
-        gperftoolsEnv.SConscript(
+        tcmallocEnv.AddMethod(registerConsumerModifications, 'RegisterConsumerModifications')
+        tcmallocEnv.SConscript(
             'gperftools' + '/SConscript',
-            exports={'env': gperftoolsEnv},
+            exports={'env': tcmallocEnv},
         )
-        gperftoolsEnv = gperftoolsEnv.Clone(LIBDEPS_INTERFACE=[
+        tcmallocEnv = tcmallocEnv.Clone(LIBDEPS_INTERFACE=[
             'gperftools/tcmalloc_minimal',
         ])
 
-gperftoolsEnv.ShimLibrary(
+tcmallocEnv.ShimLibrary(
     name="allocator",
     LIBDEPS_TAGS=[
         # TODO: Remove when SERVER-48291 is merged into stable build tools.

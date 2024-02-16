@@ -10,27 +10,6 @@ if env.ToolchainIs('msvc'):
         CCFLAGS=[],
     )
 
-if env.GetOption('sanitize') and 'undefined' in env.GetOption('sanitize').split(','):
-    # UBSAN causes the __muloti4 reference to be in the library. This is not defined in libgcc, so
-    # we will just opt out of this check in this third party library. Related issues below:
-    #
-    # abseil issue showing the commit it was introduced
-    # https://github.com/abseil/abseil-cpp/issues/841
-    #
-    # GCC bug saying the symbol is missing
-    # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=103034
-    #
-    # LLVM bug saying the symbol requires extra linkage
-    # https://bugs.llvm.org/show_bug.cgi?id=16404
-    env.Append(
-        CCFLAGS=[
-            '-fno-sanitize=signed-integer-overflow',
-        ],
-        LINKFLAGS=[
-            '-fno-sanitize=signed-integer-overflow',
-        ],
-    )
-
 if env.ToolchainIs('gcc'):
     env.Append(CCFLAGS=[
         '-Wno-error=ignored-attributes',

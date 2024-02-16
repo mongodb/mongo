@@ -38,6 +38,7 @@ env['LINK'] = [f'{base_toolchain_bin}/g++']
 env['SHLINK'] = [f'{base_toolchain_bin}/g++']
 env['CPPPATH'] = [str(tidy_include)]
 env['LIBPATH'] = []
+env['CPPFLAGS'] = []
 env['CCFLAGS'] = [
     '-DGTEST_HAS_RTTI=0',
     '-D_GNU_SOURCE',

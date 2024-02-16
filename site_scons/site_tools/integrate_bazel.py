@@ -522,9 +522,13 @@ def generate(env: SCons.Environment.Environment) -> None:
         else:
             build_mode = f"opt_{mongo_generators.get_opt_options(env)}"  # one of "on", "size", "off"
 
-        # Deprecate tcmalloc-experimental
-        allocator = "tcmalloc" if env.GetOption(
-            "allocator") == "tcmalloc-experimental" else env.GetOption("allocator")
+        # TODO SERVER-86472 make bazel support both tcmalloc implementations
+        if env.GetOption("allocator") == "tcmalloc-google":
+            env.ConfError("Bazel build currently does not support tcmalloc-google allocator.")
+        if env.GetOption("allocator") == "tcmalloc-gperf":
+            allocator = "tcmalloc"
+        else:
+            allocator = env.GetOption("allocator")
 
         bazel_internal_flags = [
             f'--//bazel/config:compiler_type={env.ToolchainName()}',

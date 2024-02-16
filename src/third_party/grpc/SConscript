@@ -152,13 +152,6 @@ upb_env.Library(
     ],
 )
 
-upb_generated_protobuf_descriptor_obj = upb_env.LibraryObject(
-    target="upb_generated_protobuf_descriptor",
-    source=[
-        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
-    ],
-)[0]
-
 upb_env.Library(
     target="upb_wire",
     source=[
@@ -230,7 +223,7 @@ upb_env.Library(
         "dist/third_party/upb/upb/reflection/method_def.c",
         "dist/third_party/upb/upb/reflection/oneof_def.c",
         "dist/third_party/upb/upb/reflection/service_def.c",
-        upb_generated_protobuf_descriptor_obj,
+        "dist/src/core/ext/upb-generated/google/protobuf/descriptor.upb.c",
     ],
     LIBDEPS=[
         "upb_collections",
@@ -1231,7 +1224,6 @@ grpc_env.Library(
         "dist/src/core/tsi/ssl_transport_security_utils.cc",
         "dist/src/core/tsi/transport_security.cc",
         "dist/src/core/tsi/transport_security_grpc.cc",
-        upb_generated_protobuf_descriptor_obj,
     ],
     OBJPREFIX=env.get('OBJPREFIX', '') + 'grpc_',
     LIBDEPS=[

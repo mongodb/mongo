@@ -348,6 +348,7 @@ buildvariants:
       archive-mongocryptd-debug
     lang_environment: LANG=C
     san_options: *ubsan_options
+    # TODO SERVER-86610 set --allocator=tcmalloc-google
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --dbg=on
@@ -355,6 +356,7 @@ buildvariants:
       --sanitize=undefined
       --ssl
       --ocsp-stapling=off
+      --allocator=tcmalloc-gperf
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
       --use-diagnostic-latches=on
