@@ -16,6 +16,9 @@ activate_venv
 
 set -o pipefail
 
+echo "Setting evergreen tmp dir to $TMPDIR"
+compile_flags="$compile_flags --evergreen-tmp-dir='${TMPDIR}'"
+
 eval ${compile_env} $python ./buildscripts/scons.py \
   ${compile_flags} ${task_compile_flags} \
   ${targets} | tee scons_stdout.log
