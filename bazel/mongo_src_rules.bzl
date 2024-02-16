@@ -124,7 +124,7 @@ REQUIRED_SETTINGS_SANITIZER_ERROR_MESSAGE = (
     "\nError:\n" +
     "    any sanitizer requires these configurations:\n" +
     "    --//bazel/config:compiler_type=clang\n" +
-    "    --//bazel/config:build_mode=opt_on [OR] --//bazel/config:build_mode=opt_debug"
+    "    --//bazel/config:build_mode=opt_on [OR] --//bazel/config:build_mode=opt_debug [OR] --//bazel/config:build_mode=dbg"
 )
 
 # -fno-omit-frame-pointer should be added if any sanitizer flag is used by user

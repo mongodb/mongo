@@ -780,6 +780,7 @@ selects.config_setting_group(
     match_any = [
         ":opt_on",
         ":opt_debug",
+        ":dbg",
     ],
 )
 
