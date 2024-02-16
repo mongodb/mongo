@@ -289,7 +289,9 @@ __compact_worker(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
     u_int i, loop;
-    bool another_pass;
+    bool another_pass, background_compaction;
+
+    background_compaction = session == S2C(session)->background_compact.session;
 
     /*
      * Reset the handles' compaction skip flag (we don't bother setting or resetting it when we
@@ -302,7 +304,7 @@ __compact_worker(WT_SESSION_IMPL *session)
      * Perform an initial checkpoint unless this is background compaction. See this file's leading
      * comment for details.
      */
-    if (session != S2C(session)->background_compact.session)
+    if (!background_compaction)
         WT_ERR(__compact_checkpoint(session));
 
     /*
@@ -352,13 +354,19 @@ __compact_worker(WT_SESSION_IMPL *session)
                       "Compaction halted at data handle %s by eviction pressure. Returning EBUSY.",
                       session->op_handle[i]->name);
                 }
-                ret = 0;
-                another_pass = true;
 
                 __wt_verbose_info(session, WT_VERB_COMPACT,
                   "The compaction of the data handle %s returned EBUSY due to an in-progress "
-                  "conflicting checkpoint. Compaction of this data handle will be retried.",
-                  session->op_handle[i]->name);
+                  "conflicting checkpoint.%s",
+                  session->op_handle[i]->name,
+                  background_compaction ? "" : " Compaction of this data handle will be retried.");
+
+                ret = 0;
+
+                /* Don't retry in the case of background compaction, move on. */
+                if (!background_compaction)
+                    another_pass = true;
+
             }
 
             /* Compaction was interrupted internally. */
@@ -366,6 +374,7 @@ __compact_worker(WT_SESSION_IMPL *session)
                 ret = 0;
             WT_ERR(ret);
         }
+
         if (!another_pass)
             break;
 
