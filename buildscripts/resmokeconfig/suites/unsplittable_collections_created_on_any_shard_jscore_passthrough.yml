@@ -59,6 +59,10 @@ selector:
   # TODO: SERVER-83582 Enable after fix
   - jstests/core/write/insert/insert_id_undefined.js
 
+  # TODO: SERVER-85382 re-enable this test with tracked collection once create collection coordinator
+  # support all timeseries/bucket namespace cases.
+  - jstests/core/timeseries/timeseries_user_system_buckets.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos
