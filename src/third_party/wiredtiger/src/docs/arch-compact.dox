@@ -21,24 +21,23 @@ that there are as many blocks as possible on the file's "available for reuse" li
 starts. The compaction logic then starts examining the files that need to be compacted. Compaction
 does not proceed if any of the following conditions are met:
 
-    - The file is smaller than 1MB.
-    - Less than the configured \c free_space_target (see \c WT_SESSION::compact) worth of space
+- The file is smaller than 1MB.
+- Less than the configured \c free_space_target (see \c WT_SESSION::compact) worth of space
 can be theoretically recovered.
 
-Once enough free space is available, one of the two following conditions has to be met for compaction to proceed:
+Once enough free space is available, one of the two following hard-coded conditions must be met for compaction to proceed:
 
-    - At least 20% of the available space lies within the first 80% of the file (compaction will
+- At least 20% of the available space lies within the first 80% of the file (compaction will
 then try to rewrite the last 20% of the file).
-    - At least 10% of the total file is available in the first 90% of the file (compaction will then
+- At least 10% of the total file is available in the first 90% of the file (compaction will then
 attempt to work on the last 10% of the file).
 
-Depending on the scenario, compaction the object is done 20% or 10% at a time, that is, compaction tries to move blocks from the last 20% or 10% of the
-file into the beginning of the file. This incremental step is hard-coded in the block manager. The reason for
-this is because compaction walks the file in a logical order, not block offset order, and compaction
-of a file can fail if the block from the end of the file is not written first. Note that the block manager
-uses a first-fit block selection algorithm during compaction to maximize block movement. The process
-is repeated multiple times until the block manager detects that there are no blocks from the last 10% of the file
-that can be moved.
+Depending on the scenario, compaction tries to move blocks from the last 20% or 10% of the
+file into the beginning of the file. The reason for this is because compaction walks the file in a
+logical order, not block offset order, and compaction of a file can fail if the block from the end
+of the file is not written first. Note that the block manager uses a first-fit block selection
+algorithm during compaction to maximize block movement. The process is repeated multiple times until
+the block manager detects that there are no blocks from the last 10% of the file that can be moved.
 
 Diving deep into the compaction process, the btree layer walks the internal pages for a given table to
 identify leaf pages that can be rewritten. For each leaf page referenced by the internal page, we use
@@ -75,16 +74,17 @@ with the compaction process.
 Background compaction is a WiredTiger service that runs compaction autonomously on all the eligible files
 present in the database while being the least disruptive as possible. Every file is eligible unless:
 
-    - it belongs to a tiered table or,
-    - it is a part of the exclude list that can be configured when enabling background compaction.
+- it belongs to a tiered table or,
+- it is a part of the exclude list that can be configured when enabling background compaction.
 
-To limit disruption, background compaction reduces the number of checkpoints by skipping the first one
-described in the section above. Furthermore, background compaction gathers statistics over time to
-keep track of tables where compaction is successful. Using those statistics, the service focuses on
-tables where compaction is likely to reclaim space and avoids unnecessary attempts.
+Background compaction retrieves the files to compact by walking the metadata file. To limit disruption,
+background compaction reduces the number of checkpoints by skipping the first one described in the
+section above. Furthermore, background compaction gathers statistics over time to keep track of tables
+where compaction is successful. Using those statistics, the service focuses on tables where compaction
+is likely to reclaim space and avoids unnecessary attempts.
 
 Background compaction can be enabled, configured, and disabled through the same API \c WT_SESSION::compact.
-When disabled, background compaction goes off as soon as possible and when re-enabled, it starts
+When disabled, background compaction turns off as soon as possible and when re-enabled, it starts
 from the last processed table.
 
 */
