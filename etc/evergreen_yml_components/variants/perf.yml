@@ -451,14 +451,26 @@ buildvariants:
   tasks:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
-    - name: ycsb.2023-09
-      cron: *high-value-workload-cron
     - name: ycsb_single_thread
     - name: ycsb_60GB.2023-09
     - name: tpcc
-    - name: tpcc_majority
     - name: linkbench
+    - name: array_traversal_high_value
+    - name: change_streams_listen_throughput
+    - name: expressive_queries_high_value
+    - name: filter_with_complex_logical_expression_high_value
+    - name: large_indexed_ins_high_value
+    - name: load_test_high_value
     - name: linkbench2
+    - name: majority_reads10_k_threads_high_value
+    - name: mixed_workloads_genny_rate_limited_high_value
+    - name: time_series_sort_high_value
+    - name: tpcc_majority
+    - name: tsbs_load
+    - name: tsbs_query
+    - name: ycsb.2023-09
+      cron: *high-value-workload-cron
+    - name: ycsb_60GB.long.2023-09
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-atlas-M60-shard-real-multi-client.arm.aws.2023-11
@@ -504,13 +516,25 @@ buildvariants:
   tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
-    - name: ycsb.2023-09
     - name: ycsb_single_thread
     - name: ycsb_60GB.2023-09
     - name: tpcc
-    - name: tpcc_majority
     - name: linkbench
+    - name: array_traversal_high_value
+    - name: change_streams_listen_throughput
+    - name: expressive_queries_high_value
+    - name: filter_with_complex_logical_expression_high_value
+    - name: large_indexed_ins_high_value
+    - name: load_test_high_value
     - name: linkbench2
+    - name: majority_reads10_k_threads_high_value
+    - name: mixed_workloads_genny_rate_limited_high_value
+    - name: time_series_sort_high_value
+    - name: tpcc_majority
+    - name: tsbs_load
+    - name: tsbs_query
+    - name: ycsb.2023-09
+    - name: ycsb_60GB.long.2023-09
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-standalone.arm.aws.2023-11
