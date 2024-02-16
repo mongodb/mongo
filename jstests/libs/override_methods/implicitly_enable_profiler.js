@@ -36,6 +36,11 @@ function runCommandAfterEnablingProfiler(
         });
         enabledDbNames.add(dbName);
     }
+    if (commandName == "dropDatabase") {
+        // Remove the name for this database from the set so profiling is re-enabled when the
+        // database gets recreated.
+        enabledDbNames.delete(dbName);
+    }
     if (commandName == "listCollections") {
         // Hide the system.profile collection from the listCollections result since its presence
         // can cause the assertions in some tests to fail.
