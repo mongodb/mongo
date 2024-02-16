@@ -133,7 +133,7 @@ bool DocumentStorageIterator::shouldSkipDeleted() {
 
         // If we strip the metadata see if a field name matches the known list. All metadata fields
         // start with '$' so optimize for a quick bailout.
-        if (_storage->bsonHasMetadata() && fieldName[0] == '$' &&
+        if (_storage->bsonHasMetadata() && !fieldName.empty() && fieldName[0] == '$' &&
             Document::allMetadataFieldNames.contains(fieldName)) {
             return true;
         }
@@ -443,7 +443,7 @@ void DocumentStorage::loadLazyMetadata() const {
     while (it.more()) {
         BSONElement elem(it.next());
         auto fieldName = elem.fieldNameStringData();
-        if (fieldName[0] == '$') {
+        if (!fieldName.empty() && fieldName[0] == '$') {
             if (fieldName == Document::metaFieldTextScore) {
                 _metadataFields.setTextScore(elem.Double());
             } else if (fieldName == Document::metaFieldSearchScore) {
