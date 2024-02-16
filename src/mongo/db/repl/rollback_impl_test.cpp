@@ -1995,196 +1995,234 @@ protected:
     OpObserver::RollbackObserverInfo _rbInfo;
 };
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfInsertOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfInsertOplogEntry) {
     auto insertNss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto uuid = UUID::gen();
     auto ts = Timestamp(2, 2);
-    auto insertOp = makeCRUDOp(OpTypeEnum::kInsert,
-                               ts,
-                               UUID::gen(),
-                               insertNss.ns_forTest(),
-                               BSON("_id" << 1),
-                               boost::none,
-                               2);
+    auto insertOp = makeCRUDOp(
+        OpTypeEnum::kInsert, ts, uuid, insertNss.ns_forTest(), BSON("_id" << 1), boost::none, 2);
 
     std::set<NamespaceString> expectedNamespaces = {insertNss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(insertOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] = unittest::assertGet(
+        _rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(insertOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfUpdateOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfUpdateOplogEntry) {
     auto updateNss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto uuid = UUID::gen();
     auto ts = Timestamp(2, 2);
     auto o = BSON("$set" << BSON("x" << 2));
-    auto updateOp = makeCRUDOp(
-        OpTypeEnum::kUpdate, ts, UUID::gen(), updateNss.ns_forTest(), o, BSON("_id" << 1), 2);
+    auto updateOp =
+        makeCRUDOp(OpTypeEnum::kUpdate, ts, uuid, updateNss.ns_forTest(), o, BSON("_id" << 1), 2);
 
     std::set<NamespaceString> expectedNamespaces = {updateNss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(updateOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] = unittest::assertGet(
+        _rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(updateOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDeleteOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfDeleteOplogEntry) {
     auto deleteNss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto uuid = UUID::gen();
     auto ts = Timestamp(2, 2);
-    auto deleteOp = makeCRUDOp(OpTypeEnum::kDelete,
-                               ts,
-                               UUID::gen(),
-                               deleteNss.ns_forTest(),
-                               BSON("_id" << 1),
-                               boost::none,
-                               2);
+    auto deleteOp = makeCRUDOp(
+        OpTypeEnum::kDelete, ts, uuid, deleteNss.ns_forTest(), BSON("_id" << 1), boost::none, 2);
 
     std::set<NamespaceString> expectedNamespaces = {deleteNss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(deleteOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] = unittest::assertGet(
+        _rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(deleteOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsIgnoresNamespaceOfNoopOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsIgnoresNamespaceAndUUIDOfNoopOplogEntry) {
     auto noopNss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto ts = Timestamp(2, 2);
     auto noop = makeCRUDOp(
         OpTypeEnum::kNoop, ts, UUID::gen(), noopNss.ns_forTest(), BSONObj(), boost::none, 2);
 
     std::set<NamespaceString> expectedNamespaces = {};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(noop.first)));
+    std::set<UUID> expectedUUIDs = {};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(noop.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
 TEST_F(RollbackImplObserverInfoTest,
-       NamespacesForOpsExtractsNamespaceOfCreateCollectionOplogEntry) {
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfCreateCollectionOplogEntry) {
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    auto cmdOp = makeCommandOp(
-        Timestamp(2, 2), UUID::gen(), nss.getCommandNS(), BSON("create" << nss.coll()), 2);
+    auto uuid = UUID::gen();
+    auto cmdOp =
+        makeCommandOp(Timestamp(2, 2), uuid, nss.getCommandNS(), BSON("create" << nss.coll()), 2);
     std::set<NamespaceString> expectedNamespaces = {nss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropCollectionOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfDropCollectionOplogEntry) {
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
-    auto cmdOp = makeCommandOp(
-        Timestamp(2, 2), UUID::gen(), nss.getCommandNS(), BSON("drop" << nss.coll()), 2);
+    auto uuid = UUID::gen();
+    auto cmdOp =
+        makeCommandOp(Timestamp(2, 2), uuid, nss.getCommandNS(), BSON("drop" << nss.coll()), 2);
 
     std::set<NamespaceString> expectedNamespaces = {nss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfCreateIndexOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfCreateIndexOplogEntry) {
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto uuid = UUID::gen();
     auto indexObj =
         BSON("createIndexes" << nss.coll() << "v"
                              << static_cast<int>(IndexDescriptor::IndexVersion::kV2) << "key"
                              << "x"
                              << "name"
                              << "x_1");
-    auto cmdOp = makeCommandOp(Timestamp(2, 2), UUID::gen(), nss.getCommandNS(), indexObj, 2);
+    auto cmdOp = makeCommandOp(Timestamp(2, 2), uuid, nss.getCommandNS(), indexObj, 2);
 
     std::set<NamespaceString> expectedNamespaces = {nss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespaceOfDropIndexOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespaceAndUUIDOfDropIndexOplogEntry) {
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto uuid = UUID::gen();
     auto cmdOp = makeCommandOp(Timestamp(2, 2),
-                               UUID::gen(),
+                               uuid,
                                nss.getCommandNS(),
                                BSON("dropIndexes" << nss.coll() << "index"
                                                   << "x_1"),
                                2);
     std::set<NamespaceString> expectedNamespaces = {nss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
 TEST_F(RollbackImplObserverInfoTest,
-       NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntry) {
+       NamespacesAndUUIDsForOpsExtractsNamespacesAndUUIDOfRenameCollectionOplogEntry) {
     auto fromNss = NamespaceString::createNamespaceString_forTest("test", "source");
     auto toNss = NamespaceString::createNamespaceString_forTest("test", "dest");
+    auto uuid = UUID::gen();
 
     auto cmdObj = BSON("renameCollection" << fromNss.ns_forTest() << "to" << toNss.ns_forTest());
-    auto cmdOp = makeCommandOp(Timestamp(2, 2), UUID::gen(), fromNss.getCommandNS(), cmdObj, 2);
+    auto cmdOp = makeCommandOp(Timestamp(2, 2), uuid, fromNss.getCommandNS(), cmdObj, 2);
 
     std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest,
-       NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntryWithMultitenancy) {
+TEST_F(
+    RollbackImplObserverInfoTest,
+    NamespacesAndUUIDsForOpsExtractsNamespacesAndUUIDOfRenameCollectionOplogEntryWithMultitenancy) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     boost::optional<TenantId> tid(OID::gen());
     auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");
     auto toNss = NamespaceString::createNamespaceString_forTest(tid, "test", "dest");
+    auto uuid = UUID::gen();
 
     auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(
                                                  fromNss, SerializationContext::stateDefault())
                                           << "to"
                                           << NamespaceStringUtil::serialize(
                                                  toNss, SerializationContext::stateDefault()));
-    auto cmdOp = makeCommandOp(Timestamp(2, 2), UUID::gen(), fromNss, cmdObj, 2);
+    auto cmdOp = makeCommandOp(Timestamp(2, 2), uuid, fromNss, cmdObj, 2);
 
 
     std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest,
-       NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntryRequiresTenantId) {
+TEST_F(
+    RollbackImplObserverInfoTest,
+    NamespacesAndUUIDsForOpsExtractsNamespacesAndUUIDOfRenameCollectionOplogEntryRequiresTenantId) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
     boost::optional<TenantId> tid(OID::gen());
     auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");
     auto toNss = NamespaceString::createNamespaceString_forTest(tid, "test", "dest");
+    auto uuid = UUID::gen();
 
     auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(
                                                  fromNss, SerializationContext::stateDefault())
                                           << "to"
                                           << NamespaceStringUtil::serialize(
                                                  toNss, SerializationContext::stateDefault()));
-    auto cmdOp = makeCommandOp(Timestamp(2, 2), UUID::gen(), fromNss, cmdObj, 2, boost::none, tid);
+    auto cmdOp = makeCommandOp(Timestamp(2, 2), uuid, fromNss, cmdObj, 2, boost::none, tid);
 
     std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsIgnoresNamespaceOfDropDatabaseOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDForOpsIgnoresNamespaceAndUUIDOfDropDatabaseOplogEntry) {
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     auto cmdObj = BSON("dropDatabase" << 1);
     auto cmdOp = makeCommandOp(Timestamp(2, 2), boost::none, nss.getCommandNS(), cmdObj, 2);
 
     std::set<NamespaceString> expectedNamespaces = {};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
-TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsExtractsNamespacesOfCollModOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesAndUUIDsForOpsExtractsNamespacesAndUUIDOfCollModOplogEntry) {
     auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    auto uuid = UUID::gen();
     auto cmdObj = BSON("collMod" << nss.coll() << "validationLevel"
                                  << "off");
-    auto cmdOp = makeCommandOp(Timestamp(2, 2), UUID::gen(), nss.getCommandNS(), cmdObj, 2);
+    auto cmdOp = makeCommandOp(Timestamp(2, 2), uuid, nss.getCommandNS(), cmdObj, 2);
 
     std::set<NamespaceString> expectedNamespaces = {nss};
-    auto namespaces =
-        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    std::set<UUID> expectedUUIDs = {uuid};
+    auto [namespaces, uuids] =
+        unittest::assertGet(_rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(cmdOp.first)));
     ASSERT(expectedNamespaces == namespaces);
+    ASSERT(expectedUUIDs == uuids);
 }
 
 TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsFailsOnUnsupportedOplogEntry) {
@@ -2196,13 +2234,14 @@ TEST_F(RollbackImplObserverInfoTest, NamespacesForOpsFailsOnUnsupportedOplogEntr
                       BSON("emptycapped" << 1),
                       2);
 
-    auto status = _rollback->_namespacesForOp_forTest(OplogEntry(emptycappedOp.first)).getStatus();
+    auto status =
+        _rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(emptycappedOp.first)).getStatus();
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status);
 }
 
 DEATH_TEST_F(RollbackImplObserverInfoTest,
              NamespacesForOpsInvariantsOnApplyOpsOplogEntry,
-             "_namespacesForOp does not handle 'applyOps' oplog entries.") {
+             "_namespacesAndUUIDsForOp does not handle 'applyOps' oplog entries.") {
     // Add one sub-op.
     auto createNss = NamespaceString::createNamespaceString_forTest("test", "createColl");
     auto createOp = makeCommandOp(Timestamp(2, 2),
@@ -2221,41 +2260,59 @@ DEATH_TEST_F(RollbackImplObserverInfoTest,
                       BSON("applyOps" << subops.arr()),
                       2);
 
-    auto status = _rollback->_namespacesForOp_forTest(OplogEntry(applyOpsCmdOp.first));
+    auto status = _rollback->_namespacesAndUUIDsForOp_forTest(OplogEntry(applyOpsCmdOp.first));
     LOGV2(21654,
           "Mongod did not crash. Status: {status_getStatus}",
           "status_getStatus"_attr = status.getStatus());
     MONGO_UNREACHABLE;
 }
 
-TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesOfApplyOpsOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesAndUUIDsOfApplyOpsOplogEntry) {
 
     // Add a few different sub-ops from different namespaces to make sure they all get recorded.
     auto createNss = NamespaceString::createNamespaceString_forTest("test", "createColl");
-    auto createOp = makeCommandOpForApplyOps(UUID::gen(),
+    auto createUUID = UUID::gen();
+    auto createOp = makeCommandOpForApplyOps(createUUID,
                                              createNss.getCommandNS().toString_forTest(),
                                              BSON("create" << createNss.coll()),
                                              2);
 
     auto dropNss = NamespaceString::createNamespaceString_forTest("test", "dropColl");
-    auto dropUuid = UUID::gen();
+    auto dropUUID = UUID::gen();
     auto dropOp = makeCommandOpForApplyOps(
-        dropUuid, dropNss.getCommandNS().toString_forTest(), BSON("drop" << dropNss.coll()), 2);
-    _initializeCollection(_opCtx.get(), dropUuid, dropNss);
+        dropUUID, dropNss.getCommandNS().toString_forTest(), BSON("drop" << dropNss.coll()), 2);
+    _initializeCollection(_opCtx.get(), dropUUID, dropNss);
 
     auto collModNss = NamespaceString::createNamespaceString_forTest("test", "collModColl");
+    auto collModUUID = UUID::gen();
     auto collModOp =
-        makeCommandOpForApplyOps(UUID::gen(),
+        makeCommandOpForApplyOps(collModUUID,
                                  collModNss.getCommandNS().ns_forTest(),
                                  BSON("collMod" << collModNss.coll() << "validationLevel"
                                                 << "off"),
                                  2);
+
+    auto renameFromNss = NamespaceString::createNamespaceString_forTest("test", "fromColl");
+    auto renameToNss = NamespaceString::createNamespaceString_forTest("test", "toColl");
+    auto renameFromUUID = UUID::gen();
+    auto dropTargetUUID = UUID::gen();
+    const auto collBeforeRename =
+        _initializeCollection(_opCtx.get(), renameFromUUID, renameFromNss);
+    const auto collToDrop = _initializeCollection(_opCtx.get(), dropTargetUUID, renameToNss);
+    auto renameOp = makeCommandOpForApplyOps(
+        renameFromUUID,
+        renameFromNss.getCommandNS().ns_forTest(),
+        BSON("renameCollection" << renameFromNss.ns_forTest() << "to" << renameToNss.ns_forTest()
+                                << "dropTarget" << dropTargetUUID << "validationLevel"
+                                << "off"),
+        2);
 
     // Create the applyOps command object.
     BSONArrayBuilder subops;
     subops.append(createOp.first);
     subops.append(dropOp.first);
     subops.append(collModOp.first);
+    subops.append(renameOp.first);
     auto applyOpsCmdOp =
         makeCommandOp(Timestamp(2, 2),
                       boost::none,
@@ -2264,8 +2321,12 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespacesOfApplyOpsOplogEnt
                       2);
 
     ASSERT_OK(rollbackOps({applyOpsCmdOp}));
-    std::set<NamespaceString> expectedNamespaces = {createNss, dropNss, collModNss};
-    ASSERT(expectedNamespaces == _rbInfo.rollbackNamespaces);
+    std::set<NamespaceString> expectedNamespaces = {
+        createNss, dropNss, collModNss, renameFromNss, renameToNss};
+    std::set<UUID> expectedUUIDs = {
+        createUUID, dropUUID, collModUUID, renameFromUUID, dropTargetUUID};
+    invariant(expectedNamespaces == _rbInfo.rollbackNamespaces);
+    invariant(expectedUUIDs == _rbInfo.rollbackUUIDs);
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnMalformedApplyOpsOplogEntry) {
@@ -2283,7 +2344,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnMalformedApplyOpsOplogEntry)
     ASSERT_NOT_OK(status);
 }
 
-TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespaceOfSingleOplogEntry) {
+TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespaceAndUUIDsOfSingleOplogEntry) {
     const auto nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     const auto uuid = UUID::gen();
     const auto coll = _initializeCollection(_opCtx.get(), uuid, nss);
@@ -2291,10 +2352,12 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsNamespaceOfSingleOplogEntry)
 
     ASSERT_OK(rollbackOps({insertOp}));
     std::set<NamespaceString> expectedNamespaces = {nss};
+    std::set<UUID> expectedUUIDs = {uuid};
     ASSERT(expectedNamespaces == _rbInfo.rollbackNamespaces);
+    ASSERT(expectedUUIDs == _rbInfo.rollbackUUIDs);
 }
 
-TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleNamespacesOfOplogEntries) {
+TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleNamespacesAndUUIDsOfOplogEntries) {
     const auto makeInsertOp = [&](UUID uuid, NamespaceString nss, Timestamp ts, int recordId) {
         return _insertDocAndReturnOplogEntry(BSON("_id" << 1), uuid, nss, recordId);
     };
@@ -2317,7 +2380,9 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleNamespacesOfOplogEnt
 
     ASSERT_OK(rollbackOps({insertOp3, insertOp2, insertOp1}));
     std::set<NamespaceString> expectedNamespaces = {nss1, nss2, nss3};
+    std::set<UUID> expectedUUIDs = {uuid1, uuid2, uuid3};
     ASSERT(expectedNamespaces == _rbInfo.rollbackNamespaces);
+    ASSERT(expectedUUIDs == _rbInfo.rollbackUUIDs);
 }
 
 TEST_F(RollbackImplObserverInfoTest, RollbackFailsOnUnknownOplogEntryCommandType) {

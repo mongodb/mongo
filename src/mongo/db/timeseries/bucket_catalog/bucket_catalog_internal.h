@@ -117,7 +117,7 @@ StripeNumber getStripeNumber(const BucketKey& key, size_t numberOfStripes);
  * Extracts the information from the input 'doc' that is used to map the document to a bucket.
  */
 StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
-    const NamespaceString& ns,
+    const UUID& collectionUUID,
     const StringDataComparator* comparator,
     const TimeseriesOptions& options,
     const BSONObj& doc);
@@ -157,6 +157,7 @@ Bucket* useBucket(OperationContext* opCtx,
                   BucketCatalog& catalog,
                   Stripe& stripe,
                   WithLock stripeLock,
+                  const NamespaceString& nss,
                   const CreationInfo& info,
                   AllowBucketCreation mode);
 
@@ -167,6 +168,7 @@ Bucket* useBucket(OperationContext* opCtx,
 Bucket* useAlternateBucket(BucketCatalog& catalog,
                            Stripe& stripe,
                            WithLock stripeLock,
+                           const NamespaceString& nss,
                            const CreationInfo& info);
 
 /**
@@ -178,7 +180,7 @@ Bucket* useAlternateBucket(BucketCatalog& catalog,
 StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                                                        BucketCatalog& catalog,
                                                        ExecutionStatsController& stats,
-                                                       const NamespaceString& ns,
+                                                       const UUID& collectionUUID,
                                                        const StringDataComparator* comparator,
                                                        const TimeseriesOptions& options,
                                                        const BucketToReopen& bucketToReopen,
@@ -208,6 +210,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
 StatusWith<std::reference_wrapper<Bucket>> reuseExistingBucket(BucketCatalog& catalog,
                                                                Stripe& stripe,
                                                                WithLock stripeLock,
+                                                               const NamespaceString& nss,
                                                                ExecutionStatsController& stats,
                                                                const BucketKey& key,
                                                                Bucket& existingBucket,
@@ -377,19 +380,19 @@ std::pair<RolloverAction, RolloverReason> determineRolloverAction(
  * Retrieves or initializes the execution stats for the given namespace, for writing.
  */
 ExecutionStatsController getOrInitializeExecutionStats(BucketCatalog& catalog,
-                                                       const NamespaceString& ns);
+                                                       const UUID& collectionUUID);
 
 /**
  * Retrieves the execution stats for the given namespace, if they have already been initialized.
  */
 shared_tracked_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
-                                                     const NamespaceString& ns);
+                                                     const UUID& collectionUUID);
 
 /**
  * Retrieves the execution stats from the side bucket catalog.
  * Assumes the side bucket catalog has the stats of one collection.
  */
-std::pair<NamespaceString, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
+std::pair<UUID, shared_tracked_ptr<ExecutionStats>> getSideBucketCatalogCollectionStats(
     BucketCatalog& sideBucketCatalog);
 
 /**
@@ -397,12 +400,12 @@ std::pair<NamespaceString, shared_tracked_ptr<ExecutionStats>> getSideBucketCata
  */
 void mergeExecutionStatsToBucketCatalog(BucketCatalog& catalog,
                                         shared_tracked_ptr<ExecutionStats> collStats,
-                                        const NamespaceString& viewNs);
+                                        const UUID& collectionUUID);
 
 /**
  * Generates a status with code TimeseriesBucketCleared and an appropriate error message.
  */
-Status getTimeseriesBucketClearedError(const NamespaceString& ns, const OID& oid);
+Status getTimeseriesBucketClearedError(const NamespaceString& nss, const OID& oid);
 
 /**
  * Close an open bucket, setting the state appropriately and removing it from the catalog.
@@ -437,6 +440,7 @@ void closeArchivedBucket(BucketCatalog& catalog,
  *  - Measurement count on-disk matches in-memory state. (Helpful for detecting race conditions.)
  */
 void runPostCommitDebugChecks(OperationContext* opCtx,
+                              const NamespaceString& nss,
                               const Bucket& bucket,
                               const WriteBatch& batch);
 

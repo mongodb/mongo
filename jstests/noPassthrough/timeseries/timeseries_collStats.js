@@ -42,35 +42,32 @@ const clearCollection = function() {
     assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     expectedStats.bucketCount = 0;
-    if (!initialized) {
-        if (!alwaysUseCompressedBuckets) {
-            expectedStats.numCompressedBuckets = 0;
-            expectedStats.numSubObjCompressionRestart = 0;
-        }
-        expectedStats.numBucketInserts = 0;
-        expectedStats.numBucketUpdates = 0;
-        expectedStats.numBucketsOpenedDueToMetadata = 0;
-        expectedStats.numBucketsClosedDueToCount = 0;
-        expectedStats.numBucketsClosedDueToSize = 0;
-        expectedStats.numBucketsClosedDueToTimeForward = 0;
-        expectedStats.numBucketsClosedDueToTimeBackward = 0;
-        expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
-        expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
-        expectedStats.numBucketsArchivedDueToTimeBackward = 0;
-        expectedStats.numBucketsReopened = 0;
-        expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
-        expectedStats.numBucketsClosedDueToCachePressure = 0;
-        expectedStats.numBucketsFetched = 0;
-        expectedStats.numBucketsQueried = 0;
-        expectedStats.numBucketFetchesFailed = 0;
-        expectedStats.numBucketQueriesFailed = 0;
-        expectedStats.numBucketReopeningsFailed = 0;
-        expectedStats.numDuplicateBucketsReopened = 0;
-        expectedStats.numCommits = 0;
-        expectedStats.numWaits = 0;
-        expectedStats.numMeasurementsCommitted = 0;
-        initialized = true;
+    if (!alwaysUseCompressedBuckets) {
+        expectedStats.numCompressedBuckets = 0;
+        expectedStats.numSubObjCompressionRestart = 0;
     }
+    expectedStats.numBucketInserts = 0;
+    expectedStats.numBucketUpdates = 0;
+    expectedStats.numBucketsOpenedDueToMetadata = 0;
+    expectedStats.numBucketsClosedDueToCount = 0;
+    expectedStats.numBucketsClosedDueToSize = 0;
+    expectedStats.numBucketsClosedDueToTimeForward = 0;
+    expectedStats.numBucketsClosedDueToTimeBackward = 0;
+    expectedStats.numBucketsClosedDueToMemoryThreshold = 0;
+    expectedStats.numBucketsArchivedDueToMemoryThreshold = 0;
+    expectedStats.numBucketsArchivedDueToTimeBackward = 0;
+    expectedStats.numBucketsReopened = 0;
+    expectedStats.numBucketsKeptOpenDueToLargeMeasurements = 0;
+    expectedStats.numBucketsClosedDueToCachePressure = 0;
+    expectedStats.numBucketsFetched = 0;
+    expectedStats.numBucketsQueried = 0;
+    expectedStats.numBucketFetchesFailed = 0;
+    expectedStats.numBucketQueriesFailed = 0;
+    expectedStats.numBucketReopeningsFailed = 0;
+    expectedStats.numDuplicateBucketsReopened = 0;
+    expectedStats.numCommits = 0;
+    expectedStats.numWaits = 0;
+    expectedStats.numMeasurementsCommitted = 0;
 };
 clearCollection();
 

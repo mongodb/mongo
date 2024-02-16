@@ -33,8 +33,8 @@
 #include <cstdint>
 
 #include "mongo/bson/oid.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -45,14 +45,14 @@ struct BucketId {
     using Hash = std::size_t;
 
     BucketId() = delete;
-    BucketId(const NamespaceString& nss, const OID& oid);
+    BucketId(const UUID& collectionUUID, const OID& oid);
 
-    NamespaceString ns;
+    UUID collectionUUID;
     OID oid;
     Hash hash;
 
     bool operator==(const BucketId& other) const {
-        return oid == other.oid && ns == other.ns;
+        return oid == other.oid && collectionUUID == other.collectionUUID;
     }
     bool operator!=(const BucketId& other) const {
         return !(*this == other);
@@ -60,7 +60,7 @@ struct BucketId {
 
     template <typename H>
     friend H AbslHashValue(H h, const BucketId& bucketId) {
-        return H::combine(std::move(h), bucketId.oid, bucketId.ns);
+        return H::combine(std::move(h), bucketId.oid, bucketId.collectionUUID);
     }
 };
 
@@ -71,14 +71,14 @@ struct BucketKey {
     using Hash = std::size_t;
 
     BucketKey() = delete;
-    BucketKey(const NamespaceString& nss, const BucketMetadata& meta);
+    BucketKey(const UUID& collectionUUID, const BucketMetadata& meta);
 
-    NamespaceString ns;
+    UUID collectionUUID;
     BucketMetadata metadata;
     Hash hash;
 
     bool operator==(const BucketKey& other) const {
-        return ns == other.ns && metadata == other.metadata;
+        return collectionUUID == other.collectionUUID && metadata == other.metadata;
     }
     bool operator!=(const BucketKey& other) const {
         return !(*this == other);
@@ -86,7 +86,7 @@ struct BucketKey {
 
     template <typename H>
     friend H AbslHashValue(H h, const BucketKey& key) {
-        return H::combine(std::move(h), key.ns, key.metadata);
+        return H::combine(std::move(h), key.collectionUUID, key.metadata);
     }
 };
 

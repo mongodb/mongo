@@ -70,9 +70,9 @@ class BucketStateRegistryTest : public BucketCatalog, public CatalogTestFixture 
 public:
     BucketStateRegistryTest() {}
 
-    void clearById(const NamespaceString& ns, const OID& oid) {
-        directWriteStart(bucketStateRegistry, ns, oid);
-        directWriteFinish(bucketStateRegistry, ns, oid);
+    void clearById(const UUID& uuid, const OID& oid) {
+        directWriteStart(bucketStateRegistry, uuid, oid);
+        directWriteFinish(bucketStateRegistry, uuid, oid);
     }
 
     bool hasBeenCleared(Bucket& bucket) {
@@ -155,17 +155,17 @@ public:
     }
 
     WithLock withLock = WithLock::withoutLock();
-    NamespaceString ns1 = NamespaceString::createNamespaceString_forTest("db.test1");
-    NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("db.test2");
-    NamespaceString ns3 = NamespaceString::createNamespaceString_forTest("db.test3");
+    UUID uuid1 = UUID::gen();
+    UUID uuid2 = UUID::gen();
+    UUID uuid3 = UUID::gen();
     BSONElement elem;
     BucketMetadata bucketMetadata{elem, nullptr, boost::none};
-    BucketKey bucketKey1{ns1, bucketMetadata};
-    BucketKey bucketKey2{ns2, bucketMetadata};
-    BucketKey bucketKey3{ns3, bucketMetadata};
+    BucketKey bucketKey1{uuid1, bucketMetadata};
+    BucketKey bucketKey2{uuid2, bucketMetadata};
+    BucketKey bucketKey3{uuid3, bucketMetadata};
     Date_t date = Date_t::now();
     TimeseriesOptions options;
-    ExecutionStatsController stats = internal::getOrInitializeExecutionStats(*this, ns1);
+    ExecutionStatsController stats = internal::getOrInitializeExecutionStats(*this, uuid1);
     ClosedBuckets closedBuckets;
     internal::CreationInfo info1{bucketKey1,
                                  internal::getStripeNumber(bucketKey1, numberOfStripes),
@@ -533,7 +533,7 @@ TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
 
     // When clearing buckets, we expect the BucketCatalog's era value to increase while the cleared
     // bucket era values should remain unchanged.
-    clear(*this, ns1);
+    clear(*this, uuid1);
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 1);
     ASSERT_EQ(bucket1.lastChecked, 0);
 
@@ -544,14 +544,14 @@ TEST_F(BucketStateRegistryTest, EraAdvancesAsExpected) {
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 1);
     ASSERT_EQ(bucket2.lastChecked, 1);
     ASSERT_EQ(bucket3.lastChecked, 1);
-    clear(*this, ns1);
+    clear(*this, uuid1);
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 2);
     ASSERT_EQ(bucket3.lastChecked, 1);
     ASSERT_EQ(bucket1.lastChecked, 0);
     ASSERT_EQ(bucket2.lastChecked, 1);
 
     // Era also advances when clearing by OID
-    clearById(ns1, OID());
+    clearById(uuid1, OID());
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 4);
 }
 
@@ -560,7 +560,7 @@ TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
     auto& bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1.lastChecked, 0);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 1);
-    clear(*this, ns1);
+    clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket1);
 
     // When the last bucket in an era is destructed, the counter in the map should be removed.
@@ -573,7 +573,7 @@ TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
     ASSERT_EQ(bucket2.lastChecked, 1);
     ASSERT_EQ(bucket3.lastChecked, 1);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 2);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket3);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
 
@@ -582,7 +582,7 @@ TEST_F(BucketStateRegistryTest, EraCountMapUpdatedCorrectly) {
     auto& bucket4 = createBucket(info2);
     ASSERT_EQ(bucket4.lastChecked, 2);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 2), 1);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket4);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 2), 0);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 1), 1);
@@ -599,7 +599,7 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
     ASSERT_FALSE(cannotAccessBucket(bucket1));
     ASSERT_FALSE(cannotAccessBucket(bucket2));
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 2);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     ASSERT_FALSE(cannotAccessBucket(bucket1));
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 0), 1);
     ASSERT_EQ(bucket1.lastChecked, 1);
@@ -610,12 +610,12 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
     auto& bucket4 = createBucket(info2);
     ASSERT_EQ(bucket3.lastChecked, 1);
     ASSERT_EQ(bucket4.lastChecked, 1);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     ASSERT(cannotAccessBucket(bucket3));
     ASSERT(cannotAccessBucket(bucket4));
     auto& bucket5 = createBucket(info2);
     ASSERT_EQ(bucket5.lastChecked, 2);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     ASSERT(cannotAccessBucket(bucket5));
     // _isMemberOfClearedSet should be able to advance a bucket by multiple eras.
     ASSERT_EQ(bucket1.lastChecked, 1);
@@ -627,10 +627,10 @@ TEST_F(BucketStateRegistryTest, HasBeenClearedFunctionReturnsAsExpected) {
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 1);
 
     // _isMemberOfClearedSet works even if the bucket wasn't cleared in the most recent clear.
-    clear(*this, ns1);
+    clear(*this, uuid1);
     auto& bucket6 = createBucket(info2);
     ASSERT_EQ(bucket6.lastChecked, 4);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 3), 1);
     ASSERT_EQ(getBucketCountForEra(bucketStateRegistry, 4), 1);
     ASSERT(cannotAccessBucket(bucket1));
@@ -645,11 +645,11 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     ASSERT_EQ(bucket1.lastChecked, 0);
     ASSERT_EQ(bucket2.lastChecked, 0);
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
-    clear(*this, ns1);
+    clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket1);
     // Era 0 still has non-zero count after this clear because bucket2 is still in era 0.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket2);
     // Bucket2 gets deleted, which makes era 0's count decrease to 0, then clear registry gets
     // cleaned.
@@ -659,7 +659,7 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     auto& bucket4 = createBucket(info2);
     ASSERT_EQ(bucket3.lastChecked, 2);
     ASSERT_EQ(bucket4.lastChecked, 2);
-    clear(*this, ns1);
+    clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket3);
     // Era 2 still has bucket4 in it, so its count remains non-zero.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
@@ -667,12 +667,12 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     auto& bucket6 = createBucket(info2);
     ASSERT_EQ(bucket5.lastChecked, 3);
     ASSERT_EQ(bucket6.lastChecked, 3);
-    clear(*this, ns1);
+    clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket5);
     // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
     // non-zero.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket4);
     checkAndRemoveClearedBucket(bucket6);
     // Eras 2 and 3 have their counts become 0 because bucket4 and bucket6 are cleared. The clear
@@ -683,25 +683,25 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
     auto& bucket8 = createBucket(info3);
     ASSERT_EQ(bucket7.lastChecked, 5);
     ASSERT_EQ(bucket8.lastChecked, 5);
-    clear(*this, ns3);
+    clear(*this, uuid3);
     checkAndRemoveClearedBucket(bucket8);
     // Era 5 still has bucket7 in it so its count remains non-zero.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 1);
     auto& bucket9 = createBucket(info2);
     ASSERT_EQ(bucket9.lastChecked, 6);
-    clear(*this, ns2);
+    clear(*this, uuid2);
     checkAndRemoveClearedBucket(bucket9);
     // Era 6's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 2);
     auto& bucket10 = createBucket(info3);
     ASSERT_EQ(bucket10.lastChecked, 7);
-    clear(*this, ns3);
+    clear(*this, uuid3);
     checkAndRemoveClearedBucket(bucket10);
     // Era 7's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 3);
-    clear(*this, ns1);
+    clear(*this, uuid1);
     checkAndRemoveClearedBucket(bucket7);
     // Era 5's count becomes 0. No eras with non-zero counts remain, so all clear ops are removed.
     ASSERT_EQUALS(getClearedSetsCount(bucketStateRegistry), 0);
@@ -710,21 +710,21 @@ TEST_F(BucketStateRegistryTest, ClearRegistryGarbageCollection) {
 TEST_F(BucketStateRegistryTest, HasBeenClearedToleratesGapsInRegistry) {
     auto& bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1.lastChecked, 0);
-    clearById(ns1, OID());
+    clearById(uuid1, OID());
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 2);
-    clear(*this, ns1);
+    clear(*this, uuid1);
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 3);
     ASSERT_TRUE(hasBeenCleared(bucket1));
 
     auto& bucket2 = createBucket(info2);
     ASSERT_EQ(bucket2.lastChecked, 3);
-    clearById(ns1, OID());
-    clearById(ns1, OID());
-    clearById(ns1, OID());
+    clearById(uuid1, OID());
+    clearById(uuid1, OID());
+    clearById(uuid1, OID());
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 9);
     ASSERT_TRUE(hasBeenCleared(bucket1));
     ASSERT_FALSE(hasBeenCleared(bucket2));
-    clear(*this, ns2);
+    clear(*this, uuid2);
     ASSERT_EQ(getCurrentEra(bucketStateRegistry), 10);
     ASSERT_TRUE(hasBeenCleared(bucket1));
     ASSERT_TRUE(hasBeenCleared(bucket2));
@@ -749,7 +749,7 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;
 
-    auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.ns);
+    auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
     auto batch = std::make_shared<WriteBatch>(
         BucketHandle{bucketId, info1.stripe}, info1.key, 0, stats, bucket.timeField);
 
@@ -758,16 +758,17 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
 }
 
 TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState) {
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.foo");
     auto& bucket = createBucket(info1);
     auto bucketId = bucket.bucketId;
 
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kNormal));
 
-    auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.ns);
+    auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
     auto batch = std::make_shared<WriteBatch>(
         BucketHandle{bucketId, info1.stripe}, info1.key, 0, stats, bucket.timeField);
     ASSERT(claimWriteBatchCommitRights(*batch));
-    ASSERT_OK(prepareCommit(*this, batch));
+    ASSERT_OK(prepareCommit(*this, ns, batch));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));
 
     {
@@ -775,7 +776,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
         // this and closes the bucket.
         bucket.rolloverAction = RolloverAction::kHardClose;
         CommitInfo commitInfo{};
-        auto closedBucket = finish(operationContext(), *this, batch, commitInfo);
+        auto closedBucket = finish(operationContext(), *this, ns, batch, commitInfo);
         ASSERT(closedBucket.has_value());
         ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 
@@ -789,17 +790,17 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteStartInitializesBucketState) {
-    auto bucketId = BucketId{ns1, OID()};
-    directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
+    auto bucketId = BucketId{uuid1, OID()};
+    directWriteStart(bucketStateRegistry, uuid1, bucketId.oid);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 }
 
 TEST_F(BucketStateRegistryTest, DirectWriteFinishRemovesBucketState) {
-    auto bucketId = BucketId{ns1, OID()};
-    directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
+    auto bucketId = BucketId{uuid1, OID()};
+    directWriteStart(bucketStateRegistry, uuid1, bucketId.oid);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
-    directWriteFinish(bucketStateRegistry, ns1, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, uuid1, bucketId.oid);
     ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
@@ -817,19 +818,19 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
 
     // Start a direct write and ensure the counter is incremented correctly.
     while (dwCounter < 4) {
-        directWriteStart(bucketStateRegistry, ns1, bucketId.oid);
+        directWriteStart(bucketStateRegistry, uuid1, bucketId.oid);
         dwCounter++;
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     while (dwCounter > 1) {
-        directWriteFinish(bucketStateRegistry, ns1, bucketId.oid);
+        directWriteFinish(bucketStateRegistry, uuid1, bucketId.oid);
         dwCounter--;
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     // When the number of direct writes reaches 0, we should clear the bucket.
-    directWriteFinish(bucketStateRegistry, ns1, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, uuid1, bucketId.oid);
     ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kCleared));
 }
@@ -837,42 +838,42 @@ TEST_F(BucketStateRegistryTest, TestDirectWriteStartCounter) {
 TEST_F(BucketStateRegistryTest, ConflictingDirectWrites) {
     // While two direct writes (e.g. two racing updates) should correctly conflict at the storage
     // engine layer, we expect the directWriteStart/Finish pairs to work successfully.
-    BucketId bucketId{ns1, OID()};
+    BucketId bucketId{uuid1, OID()};
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_FALSE(state.has_value());
 
     // First direct write initializes state as untracked.
-    directWriteStart(bucketStateRegistry, bucketId.ns, bucketId.oid);
+    directWriteStart(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
-    directWriteStart(bucketStateRegistry, bucketId.ns, bucketId.oid);
+    directWriteStart(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
 
     // First finish does not remove the state from the registry.
-    directWriteFinish(bucketStateRegistry, bucketId.ns, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
     ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
 
     // Second one removes it.
-    directWriteFinish(bucketStateRegistry, bucketId.ns, bucketId.oid);
+    directWriteFinish(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
     ASSERT_TRUE(doesBucketStateMatch(bucketId, boost::none));
 }
 
 TEST_F(BucketStateRegistryTest, LargeNumberOfDirectWritesInTransaction) {
     // If a single transaction contains many direct writes to the same bucket, we should handle
     // it gracefully.
-    BucketId bucketId{ns1, OID()};
+    BucketId bucketId{uuid1, OID()};
     auto state = getBucketState(bucketStateRegistry, bucketId);
     ASSERT_FALSE(state.has_value());
 
     int numDirectWrites = 100'000;
 
     for (int i = 0; i < numDirectWrites; ++i) {
-        directWriteStart(bucketStateRegistry, bucketId.ns, bucketId.oid);
+        directWriteStart(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
     }
 
     for (int i = 0; i < numDirectWrites; ++i) {
         ASSERT_TRUE(doesBucketHaveDirectWrite(bucketId));
-        directWriteFinish(bucketStateRegistry, bucketId.ns, bucketId.oid);
+        directWriteFinish(bucketStateRegistry, bucketId.collectionUUID, bucketId.oid);
     }
 
     ASSERT_FALSE(doesBucketHaveDirectWrite(bucketId));

@@ -652,6 +652,9 @@ public:
         // Set of all namespaces from ops being rolled back.
         std::set<NamespaceString> rollbackNamespaces = {};
 
+        // Set of all collection UUIDs from ops being rolled back.
+        std::set<UUID> rollbackUUIDs = {};
+
         // Set of all session ids from ops being rolled back.
         std::set<UUID> rollbackSessionIds = {};
 

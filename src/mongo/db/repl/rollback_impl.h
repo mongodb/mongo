@@ -287,8 +287,9 @@ public:
     /**
      * Wrappers to expose private methods for testing.
      */
-    StatusWith<std::set<NamespaceString>> _namespacesForOp_forTest(const OplogEntry& oplogEntry) {
-        return _namespacesForOp(oplogEntry);
+    StatusWith<std::pair<std::set<NamespaceString>, std::set<UUID>>>
+    _namespacesAndUUIDsForOp_forTest(const OplogEntry& oplogEntry) {
+        return _namespacesAndUUIDsForOp(oplogEntry);
     }
 
     /**
@@ -455,7 +456,8 @@ private:
      * handle 'applyOps' oplog entries, since it assumes their sub operations have already been
      * extracted at a higher layer.
      */
-    StatusWith<std::set<NamespaceString>> _namespacesForOp(const OplogEntry& oplogEntry);
+    StatusWith<std::pair<std::set<NamespaceString>, std::set<UUID>>> _namespacesAndUUIDsForOp(
+        const OplogEntry& oplogEntry);
 
     /**
      * Persists rollback files to disk for each namespace that contains documents inserted or

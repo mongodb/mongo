@@ -807,8 +807,12 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingReplacementUpdate) {
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
-        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
+    auto [doc, _] =
+        write_without_shard_key::generateUpsertDocument(getOpCtx(),
+                                                        updateRequest,
+                                                        UUID::gen(),
+                                                        /*timeseriesOptions=*/boost::none,
+                                                        /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 3, x: 2 }"));
 }
 
@@ -828,8 +832,12 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingLetConstantAndPipeli
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
-        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
+    auto [doc, _] =
+        write_without_shard_key::generateUpsertDocument(getOpCtx(),
+                                                        updateRequest,
+                                                        UUID::gen(),
+                                                        /*timeseriesOptions=*/boost::none,
+                                                        /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: 'foo', y: 3 }"));
 }
 
@@ -848,8 +856,12 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingArrayFilterAndModifi
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
-        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
+    auto [doc, _] =
+        write_without_shard_key::generateUpsertDocument(getOpCtx(),
+                                                        updateRequest,
+                                                        UUID::gen(),
+                                                        /*timeseriesOptions=*/boost::none,
+                                                        /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: [ { a: 93 } ] }"));
 }
 
@@ -874,8 +886,12 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingCollation) {
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
-        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
+    auto [doc, _] =
+        write_without_shard_key::generateUpsertDocument(getOpCtx(),
+                                                        updateRequest,
+                                                        UUID::gen(),
+                                                        /*timeseriesOptions=*/boost::none,
+                                                        /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: [ { a: 'FOO' }, { a: 'FOO' }, { a: 'foo' } ] }"));
 }
 

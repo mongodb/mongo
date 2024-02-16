@@ -33,9 +33,7 @@ const checkBucketSize = (() => {
     assert.eq(numMeasurements / 10, timeseriesStats.bucketCount);
 
     assert(timeseriesStats.hasOwnProperty("numBucketsKeptOpenDueToLargeMeasurements"));
-    expectedNumBucketsKeptOpenDueToLargeMeasurements += numMeasurements / 10;
-    assert.eq(expectedNumBucketsKeptOpenDueToLargeMeasurements,
-              timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
+    assert.eq(numMeasurements / 10, timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
 });
 
 jsTestLog("Testing single inserts");

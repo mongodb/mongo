@@ -24,8 +24,6 @@ const resetCollection = (() => {
 });
 
 const numMeasurements = 4;
-let expectedNumBucketsClosedDueToSize = 0;
-let expectedNumBucketsKeptOpenDueToLargeMeasurements = 0;
 const checkBucketSize = (() => {
     const timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
 
@@ -43,9 +41,8 @@ const checkBucketSize = (() => {
     assert.eq(numMeasurements - 1, bucketDocs[1].control.min._id);
     assert.eq(numMeasurements - 1, bucketDocs[1].control.max._id);
 
-    assert.eq(++expectedNumBucketsClosedDueToSize, timeseriesStats.numBucketsClosedDueToSize);
-    assert.eq(++expectedNumBucketsKeptOpenDueToLargeMeasurements,
-              timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
+    assert.eq(1, timeseriesStats.numBucketsClosedDueToSize);
+    assert.eq(1, timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
 });
 
 const measurementValueLength = 2 * 1024 * 1024;

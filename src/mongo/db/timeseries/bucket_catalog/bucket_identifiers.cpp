@@ -33,11 +33,11 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-BucketId::BucketId(const NamespaceString& n, const OID& o)
-    : ns{n}, oid{o}, hash{absl::Hash<BucketId>{}(*this)} {}
+BucketId::BucketId(const UUID& u, const OID& o)
+    : collectionUUID{u}, oid{o}, hash{absl::Hash<BucketId>{}(*this)} {}
 
-BucketKey::BucketKey(const NamespaceString& n, const BucketMetadata& m)
-    : ns(n), metadata(m), hash(absl::Hash<BucketKey>{}(*this)) {}
+BucketKey::BucketKey(const UUID& u, const BucketMetadata& m)
+    : collectionUUID(u), metadata(m), hash(absl::Hash<BucketKey>{}(*this)) {}
 
 std::size_t BucketHasher::operator()(const BucketKey& key) const {
     return key.hash;
