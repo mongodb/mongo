@@ -76,6 +76,9 @@ protected:
         : ShardingMongoDTestFixture(Options{}.useMockClock(true), false /* setUpMajorityReads */) {}
 
     void setUp() override {
+        // Ensure that this node is neither "config server" nor "shard server".
+        serverGlobalParams.clusterRole = ClusterRole::None;
+
         ShardingMongoDTestFixture::setUp();
 
         auto keysCollectionClient = std::make_unique<KeysCollectionClientDirect>(
@@ -89,9 +92,6 @@ protected:
         auto validator = std::make_unique<LogicalTimeValidator>(_keyManager);
         validator->init(getServiceContext());
         LogicalTimeValidator::set(getServiceContext(), std::move(validator));
-
-        // Ensure that this node is neither "config server" nor "shard server".
-        serverGlobalParams.clusterRole = ClusterRole::None;
     }
 
     void tearDown() override {
