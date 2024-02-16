@@ -949,6 +949,8 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
     return Status::OK();
 }
 
+void CollectionImpl::unsetRecordIdsReplicated(OperationContext* opCtx) {}
+
 bool CollectionImpl::isChangeStreamPreAndPostImagesEnabled() const {
     return _metadata->options.changeStreamPreAndPostImagesOptions.getEnabled();
 }

@@ -246,6 +246,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void unsetRecordIdsReplicated(OperationContext* opCtx) final {
+        MONGO_UNREACHABLE;
+    }
+
     bool isChangeStreamPreAndPostImagesEnabled() const {
         MONGO_UNREACHABLE;
     }

@@ -268,6 +268,8 @@ public:
                             boost::optional<long long> newCappedSize,
                             boost::optional<long long> newCappedMax) final;
 
+    void unsetRecordIdsReplicated(OperationContext* opCtx) final;
+
     //
     // Stats
     //

@@ -355,6 +355,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    void unsetRecordIdsReplicated(OperationContext* opCtx) override {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<int> checkMetaDataForIndex(const std::string& indexName,
                                           const BSONObj& spec) const override {
         return _coll->checkMetaDataForIndex(indexName, spec);

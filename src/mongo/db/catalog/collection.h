@@ -455,6 +455,13 @@ public:
                                     boost::optional<long long> newCappedSize,
                                     boost::optional<long long> newCappedMax) = 0;
 
+    /**
+     * Updates the 'recordIdsReplicated' setting to false.
+     * The collection will no longer guarantee the same recordId for a given document across all
+     * nodes in the a replica set.
+     */
+    virtual void unsetRecordIdsReplicated(OperationContext* opCtx) = 0;
+
     //
     // Index
     //

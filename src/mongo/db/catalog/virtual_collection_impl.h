@@ -326,6 +326,10 @@ public:
         return Status(ErrorCodes::UnknownError, "unknown");
     }
 
+    void unsetRecordIdsReplicated(OperationContext* opCtx) final {
+        unimplementedTasserted();
+    }
+
     StatusWith<int> checkMetaDataForIndex(const std::string& indexName,
                                           const BSONObj& spec) const final {
         unimplementedTasserted();
