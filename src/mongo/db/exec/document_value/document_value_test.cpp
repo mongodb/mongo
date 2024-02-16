@@ -954,6 +954,15 @@ TEST(MetaFields, FromBsonWithMetadataAcceptsIndexKeyMetadata) {
     ASSERT_BSONOBJ_EQ(bsonWithoutMetadata, BSON("a" << 1));
 }
 
+TEST(MetaFields, FromBsonWithMetadataHandlesEmptyFieldName) {
+    auto bson = BSON("" << 1 << "$indexKey" << BSON("b" << 1));
+    auto doc = Document::fromBsonWithMetaData(bson);
+    ASSERT_TRUE(doc.metadata().hasIndexKey());
+    ASSERT_BSONOBJ_EQ(doc.metadata().getIndexKey(), BSON("b" << 1));
+    auto bsonWithoutMetadata = doc.toBson();
+    ASSERT_BSONOBJ_EQ(bsonWithoutMetadata, BSON("" << 1));
+}
+
 TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
     Document source = Document::fromBsonWithMetaData(
         BSON("a" << 1 << "$textScore" << 9.9 << "b" << 1 << "$randVal" << 42.0 << "c" << 1
