@@ -960,11 +960,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildGroup(const Query
 
     const auto& childNode = groupNode->children[0].get();
 
-    // Builds the child and gets the child result slot. If we don't need the full result object, we
-    // can process block values.
-    auto [childStage, childOutputs] = build(
-        childNode,
-        computeChildReqsForGroup(reqs, *groupNode).setCanProcessBlockValues(!reqs.hasResultObj()));
+    // Builds the child and gets the child result slot. We can process block values.
+    auto [childStage, childOutputs] =
+        build(childNode, computeChildReqsForGroup(reqs, *groupNode).setCanProcessBlockValues(true));
     auto stage = std::move(childStage);
 
     // Build the group stage in a separate helper method, so that the variables that are not needed
@@ -1059,37 +1057,33 @@ SlotBasedStageBuilder::buildGroupImpl(SbStage stage,
     bool vectorizedGroupByExprs = false;
 
     if (childOutputs.hasBlockOutput()) {
-        // If we have a single expression, try to vectorize it.
-        if (idIsSingleKey) {
-            SbExpr groupByBlockExpr =
-                buildVectorizedExpr(_state, groupByExprs[0].clone(), childOutputs, false);
-
-            auto typeSig = groupByBlockExpr.getTypeSignature();
-            bool isBlockType = typeSig && TypeSignature::kBlockType.isSubset(*typeSig);
-
-            if (groupByBlockExpr && (groupByBlockExpr.isConstantExpr() || isBlockType)) {
-                // If vectorization succeed, store the vectorized expression into 'groupByExprs'.
-                groupByExprs[0] = std::move(groupByBlockExpr);
-                vectorizedGroupByExprs = true;
-            }
+        // Try to vectorize all the group keys.
+        for (auto& sbExpr : groupByExprs) {
+            sbExpr = buildVectorizedExpr(_state, std::move(sbExpr), childOutputs, false);
         }
 
-        // If this expression wasn't eligible for vectorization or if vectorization didn't succeed,
-        // then we need to stop block processing now.
-        if (!vectorizedGroupByExprs) {
+        // If some expressions could not be vectorized, rebuild everything after transitioning to
+        // scalar.
+        if (std::any_of(groupByExprs.begin(), groupByExprs.end(), [](const SbExpr& expr) {
+                return expr.isNull();
+            })) {
             stage = buildBlockToRow(std::move(stage), _state, childOutputs);
 
             // buildBlockToRow() just made a bunch of changes to 'childOutputs', so we need
             // to re-generate 'groupByExprs'.
             groupByExprs = generateGroupByKeyExprs(_state, idExpr.get(), childOutputs);
+        } else {
+            vectorizedGroupByExprs = true;
         }
     }
 
-    // If 'idIsSingleKey' is true and we didn't vectorize the sole groupBy expression, then we
-    // call optimize() on the groupBy expression so that the call to "isConstantExpr()" below
-    // can recognize more cases where the groupBy expr is constant.
-    if (!vectorizedGroupByExprs && idIsSingleKey) {
-        groupByExprs[0].optimize(_state, buildVariableTypes(childOutputs));
+    if (!vectorizedGroupByExprs) {
+        // If we didn't vectorize the groupBy expressions call optimize() on them so that the call
+        // to "isConstantExpr()" below can recognize more cases where the groupBy expr is constant.
+        auto varTypes = buildVariableTypes(childOutputs);
+        for (auto& sbExpr : groupByExprs) {
+            sbExpr.optimize(_state, varTypes);
+        }
     }
 
     // Generate all the input arg expressions for all of the accumulators.

@@ -82,6 +82,16 @@ TimeseriesTest.run((insert) => {
 
         const testcases = [
             {
+                name: "GroupByNull",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: null}},
+                    {$project: {_id: 1}}
+                ],
+                expectedResults: [{_id: null}],
+                usesBlockProcessing: false
+            },
+            {
                 name: "Min_GroupByNull",
                 pipeline: [
                     {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
@@ -202,6 +212,104 @@ TimeseriesTest.run((insert) => {
                 usesBlockProcessing: sbeFullEnabled && !allowDiskUse
             },
             {
+                name: "MaxMinusMinWithId_GroupByDateTrunc",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {
+                        $group: {
+                            _id: {$dateTrunc: {date: "$time", unit: "hour"}},
+                            a: {$min: '$y'},
+                            b: {$max: '$y'}
+                        }
+                    },
+                    {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
+                ],
+                expectedResults: [{_id: ISODate("1970-01-20T10:00:00Z"), a: 88}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "MaxMinusMinWithId_GroupByDateAdd",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {
+                        $group: {
+                            _id: {
+                                $dateAdd: {
+                                    startDate: ISODate("2024-01-01T00:00:00"),
+                                    unit: "millisecond",
+                                    amount: {
+                                        $dateDiff: {
+                                            startDate: new Date(datePrefix),
+                                            endDate: "$time",
+                                            unit: "millisecond"
+                                        }
+                                    }
+                                }
+                            },
+                            a: {$min: '$y'}
+                        }
+                    },
+                    {$project: {_id: 1, a: '$a'}}
+                ],
+                expectedResults: [
+                    {_id: ISODate("2024-01-01T00:00:00.100Z"), a: 73},
+                    {_id: ISODate("2024-01-01T00:00:00.200Z"), a: 42},
+                    {_id: ISODate("2024-01-01T00:00:00.300Z"), a: 11},
+                    {_id: ISODate("2024-01-01T00:00:00.400Z"), a: 99}
+                ],
+                usesBlockProcessing: false
+            },
+            {
+                name: "MaxPlusMinWithId_GroupByDateDiff",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lte: dateUpperBound}}},
+                    {
+                        $group: {
+                            _id: {
+                                $dateDiff: {
+                                    startDate: new Date(datePrefix),
+                                    endDate: "$time",
+                                    unit: "millisecond"
+                                }
+                            },
+                            a: {$min: '$y'},
+                            b: {$max: '$y'}
+                        }
+                    },
+                    {$project: {_id: 1, a: {$add: ['$b', '$a']}}}
+                ],
+                expectedResults: [
+                    {_id: 100, a: 73 + 73},
+                    {_id: 200, a: 42 + 42},
+                    {_id: 300, a: 11 + 11},
+                    {_id: 400, a: 99 + 99},
+                    {_id: 500, a: null}
+                ],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "MaxPlusMinWithId_GroupByFilteredComputedDateDiff",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$lte: new Date(datePrefix + 300)}}},
+                    {
+                        $addFields: {
+                            msDiff: {
+                                $dateDiff: {
+                                    startDate: new Date(datePrefix),
+                                    endDate: "$time",
+                                    unit: "millisecond"
+                                }
+                            }
+                        }
+                    },
+                    {$match: {msDiff: {$gte: 300}}},
+                    {$group: {_id: "$msDiff", a: {$min: '$y'}, b: {$max: '$y'}}},
+                    {$project: {_id: 1, a: {$add: ['$b', '$a']}}}
+                ],
+                expectedResults: [{_id: 300, a: 11 + 11}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
                 name: "Min_GroupByX_NoFilter",
                 pipeline: [{$group: {_id: '$x', a: {$min: '$y'}}}, {$project: {_id: 0, a: 1}}],
                 expectedResults: [{a: 11}, {a: 42}, {a: null}],
@@ -242,6 +350,81 @@ TimeseriesTest.run((insert) => {
                 ],
                 expectedResults: [{_id: 123, a: 31}, {_id: 456, a: 88}, {_id: null, a: null}],
                 usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "MaxMinusMinWithId_GroupByDateTrunc_NoFilter",
+                pipeline: [
+                    {
+                        $group: {
+                            _id: {"$dateTrunc": {date: "$time", unit: "minute", binSize: 1}},
+                            a: {$min: '$y'},
+                            b: {$max: '$y'}
+                        }
+                    },
+                    {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
+                ],
+                expectedResults: [{_id: ISODate("1970-01-20T10:55:00Z"), a: 88}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "MaxMinusMinWithId_GroupByDateTruncAndDateDiff_NoFilter",
+                pipeline: [
+                    {
+                        $group: {
+                            _id: {
+                                date: {
+                                    $dateTrunc: {date: "$time", unit: "millisecond", binSize: 200}
+                                },
+                                delta: {
+                                    $dateDiff: {
+                                        startDate: new Date(datePrefix),
+                                        endDate: "$time",
+                                        unit: "millisecond"
+                                    }
+                                }
+                            },
+                            a: {$min: '$y'},
+                            b: {$max: '$y'}
+                        }
+                    },
+                    {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
+                ],
+                expectedResults: [
+                    {_id: {date: ISODate("1970-01-20T10:55:12.400Z"), delta: 100}, a: 0},
+                    {_id: {date: ISODate("1970-01-20T10:55:12.600Z"), delta: 200}, a: 0},
+                    {_id: {date: ISODate("1970-01-20T10:55:12.600Z"), delta: 300}, a: 0},
+                    {_id: {date: ISODate("1970-01-20T10:55:12.800Z"), delta: 400}, a: 0},
+                    {_id: {date: ISODate("1970-01-20T10:55:12.800Z"), delta: 500}, a: null}
+                ],
+                usesBlockProcessing: false
+            },
+            {
+                name: "MaxMinusMinWithId_GroupByDateTruncAndMeta_NoFilter",
+                pipeline: [
+                    {
+                        $group: {
+                            _id: {
+                                date: {$dateTrunc: {date: "$time", unit: "minute", binSize: 1}},
+                                symbol: "$measurement"
+                            },
+                            a: {$min: '$y'},
+                            b: {$max: '$y'}
+                        }
+                    },
+                    {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
+                ],
+                expectedResults:
+                    [{_id: {date: ISODate("1970-01-20T10:55:00Z"), symbol: "foo"}, a: 88}],
+                usesBlockProcessing: false
+            },
+            {
+                name: "MaxMinusMinWithId_GroupByMeta_NoFilter",
+                pipeline: [
+                    {$group: {_id: "$measurement", a: {$min: '$y'}, b: {$max: '$y'}}},
+                    {$project: {_id: 1, a: {$subtract: ['$b', '$a']}}}
+                ],
+                expectedResults: [{_id: "foo", a: 88}],
+                usesBlockProcessing: false
             },
             {
                 name: "Avg_GroupByX",
