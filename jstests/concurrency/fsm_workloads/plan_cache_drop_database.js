@@ -22,10 +22,12 @@ export const $config = (function() {
             // cached by the query planner because we query on a single value
             // of 'a' and a range of 'b' values.
             assert.commandWorkedOrFailedWithCode(coll.createIndex({a: 1}), [
+                ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ]);
             assert.commandWorkedOrFailedWithCode(coll.createIndex({b: 1}), [
+                ErrorCodes.DatabaseDropPending,
                 ErrorCodes.IndexBuildAborted,
                 ErrorCodes.NoMatchingDocument,
             ]);
