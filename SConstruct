@@ -2219,6 +2219,13 @@ if env.TargetOSIs('windows') and not visibility_annotations_enabled:
         env.FatalError(
             "Windows builds must use the 'object', 'dynamic-sdk', or 'static' link models")
 
+# TODO(SERVER-85904): remove check when object mode & LTO are supported in bazel
+if link_model == "object" and env.get("BAZEL_BUILD_ENABLED"):
+    env.FatalError(
+        "Bazel-enabled builds currently do not support the \"object\" link model. "
+        "Please add BAZEL_BUILD_ENABLED=0 to the end of your command line argument if you need to build with the \"object\" link model."
+    )
+
 # The 'object' mode for libdeps is enabled by setting _LIBDEPS to $_LIBDEPS_OBJS. The other two
 # modes operate in library mode, enabled by setting _LIBDEPS to $_LIBDEPS_LIBS.
 env['_LIBDEPS'] = '$_LIBDEPS_OBJS' if link_model == "object" else '$_LIBDEPS_LIBS'
