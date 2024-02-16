@@ -426,7 +426,7 @@ __wt_rec_cell_build_val(WT_SESSION_IMPL *session, WT_RECONCILE *r, const void *d
 
         /* Create an overflow object if the data won't fit. */
         if (val->buf.size > btree->maxleafvalue) {
-            WT_STAT_DATA_INCR(session, rec_overflow_value);
+            WT_STAT_CONN_DATA_INCR(session, rec_overflow_value);
 
             return (__wt_rec_cell_build_ovfl(session, r, val, WT_CELL_VALUE_OVFL, tw, rle));
         }

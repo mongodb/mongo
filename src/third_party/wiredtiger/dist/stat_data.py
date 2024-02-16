@@ -634,7 +634,6 @@ conn_stats = [
     RecStat('rec_maximum_hs_wrapup_milliseconds', 'maximum milliseconds spent in moving updates to the history store in a reconciliation', 'no_clear,no_scale,size'),
     RecStat('rec_maximum_image_build_milliseconds', 'maximum milliseconds spent in building a disk image in a reconciliation', 'no_clear,no_scale,size'),
     RecStat('rec_maximum_milliseconds', 'maximum milliseconds spent in a reconciliation call', 'no_clear,no_scale,size'),
-    RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
     RecStat('rec_pages_with_prepare', 'page reconciliation calls that resulted in values with prepared transaction metadata'),
     RecStat('rec_pages_with_ts', 'page reconciliation calls that resulted in values with timestamps'),
     RecStat('rec_pages_with_txn', 'page reconciliation calls that resulted in values with transaction ids'),
@@ -913,8 +912,6 @@ dsrc_stats = [
     RecStat('rec_multiblock_internal', 'internal page multi-block writes'),
     RecStat('rec_multiblock_leaf', 'leaf page multi-block writes'),
     RecStat('rec_multiblock_max', 'maximum blocks required for a page', 'max_aggregate,no_scale'),
-    RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
-    RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_prefix_compression', 'leaf page key bytes discarded using prefix compression', 'size'),
     RecStat('rec_suffix_compression', 'internal page key bytes discarded using suffix compression', 'size'),
     RecStat('rec_time_window_pages_prepared', 'pages written including at least one prepare'),
@@ -1085,6 +1082,8 @@ conn_dsrc_stats = [
     ##########################################
     # Reconciliation statistics
     ##########################################
+    RecStat('rec_overflow_key_leaf', 'leaf-page overflow keys'),
+    RecStat('rec_overflow_value', 'overflow values written'),
     RecStat('rec_page_delete', 'pages deleted'),
     RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_pages', 'page reconciliation calls'),
