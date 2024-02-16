@@ -223,6 +223,41 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
     // Generic case.
     return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
 }
+
+CreateCommand makeCreateCommand(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ShardsvrCreateCollectionRequest& request) {
+    // TODO SERVER-81447: build CreateCommand by simply extracting CreateCollectionRequest
+    // from ShardsvrCreateCollectionRequest
+    CreateCommand cmd(nss);
+    CreateCollectionRequest createRequest;
+    createRequest.setCapped(request.getCapped());
+    createRequest.setTimeseries(request.getTimeseries());
+    createRequest.setSize(request.getSize());
+    createRequest.setAutoIndexId(request.getAutoIndexId());
+    createRequest.setClusteredIndex(request.getClusteredIndex());
+    if (request.getCollation() && !request.getCollation()->isEmpty()) {
+        auto collation = Collation::parse(IDLParserContext("collation"), *request.getCollation());
+        createRequest.setCollation(collation);
+    }
+    createRequest.setEncryptedFields(request.getEncryptedFields());
+    createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
+    createRequest.setMax(request.getMax());
+    createRequest.setFlags(request.getFlags());
+    createRequest.setTemp(request.getTemp());
+    createRequest.setIdIndex(request.getIdIndex());
+    createRequest.setViewOn(request.getViewOn());
+    createRequest.setIndexOptionDefaults(request.getIndexOptionDefaults());
+    createRequest.setExpireAfterSeconds(request.getExpireAfterSeconds());
+    createRequest.setValidationAction(request.getValidationAction());
+    createRequest.setValidationLevel(request.getValidationLevel());
+    createRequest.setValidator(request.getValidator());
+    createRequest.setPipeline(request.getPipeline());
+    createRequest.setStorageEngine(request.getStorageEngine());
+
+    cmd.setCreateCollectionRequest(createRequest);
+    return cmd;
+}
 }  // namespace create_collection_util
 
 namespace {
@@ -349,35 +384,7 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
 Status createCollectionLocally(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const ShardsvrCreateCollectionRequest& request) {
-    // TODO SERVER - 81447 : build CreateCommand by simply extracting CreateCollectionRequest
-    // from ShardsvrCreateCollectionRequest
-    CreateCommand cmd(nss);
-    CreateCollectionRequest createRequest;
-    createRequest.setCapped(request.getCapped());
-    createRequest.setTimeseries(request.getTimeseries());
-    createRequest.setSize(request.getSize());
-    createRequest.setAutoIndexId(request.getAutoIndexId());
-    createRequest.setClusteredIndex(request.getClusteredIndex());
-    if (request.getCollation() && !request.getCollation()->isEmpty()) {
-        auto collation = Collation::parse(IDLParserContext("collation"), *request.getCollation());
-        createRequest.setCollation(collation);
-    }
-    createRequest.setEncryptedFields(request.getEncryptedFields());
-    createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
-    createRequest.setMax(request.getMax());
-    createRequest.setFlags(request.getFlags());
-    createRequest.setTemp(request.getTemp());
-    createRequest.setIdIndex(request.getIdIndex());
-    createRequest.setViewOn(request.getViewOn());
-    createRequest.setIndexOptionDefaults(request.getIndexOptionDefaults());
-    createRequest.setExpireAfterSeconds(request.getExpireAfterSeconds());
-    createRequest.setValidationAction(request.getValidationAction());
-    createRequest.setValidationLevel(request.getValidationLevel());
-    createRequest.setValidator(request.getValidator());
-    createRequest.setPipeline(request.getPipeline());
-    createRequest.setStorageEngine(request.getStorageEngine());
-
-    cmd.setCreateCollectionRequest(createRequest);
+    auto cmd = create_collection_util::makeCreateCommand(opCtx, nss, request);
 
     BSONObj createRes;
     DBDirectClient localClient(opCtx);

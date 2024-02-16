@@ -78,6 +78,19 @@ std::unique_ptr<InitialSplitPolicy> createPolicy(
     bool isUnsplittable,
     boost::optional<ShardId> dataShard,
     boost::optional<std::vector<ShardId>> availableShardIds = boost::none);
+
+/**
+ * Generates, using a ShardsvrCreateCollectionRequest as source, a CreateCommand that
+ * can be used with the command execution framework to create a collection on this
+ * shard server.
+ *
+ * TODO(SERVER-81447): build CreateCommand by simply extracting CreateCollectionRequest
+ * from ShardsvrCreateCollectionRequest. Also, see SERVER-65865.
+ */
+CreateCommand makeCreateCommand(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ShardsvrCreateCollectionRequest& request);
+
 }  // namespace create_collection_util
 
 // This interface allows the retrieval of the outcome of a shardCollection request (which may be

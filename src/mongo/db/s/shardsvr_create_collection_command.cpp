@@ -72,42 +72,6 @@
 namespace mongo {
 namespace {
 
-CreateCommand makeCreateCommand(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const ShardsvrCreateCollectionRequest& request) {
-    // TODO SERVER-81447: build CreateCommand by simply extracting CreateCollectionRequest
-    // from ShardsvrCreateCollectionRequest
-    CreateCommand cmd(nss);
-    CreateCollectionRequest createRequest;
-    createRequest.setCapped(request.getCapped());
-    createRequest.setTimeseries(request.getTimeseries());
-    createRequest.setSize(request.getSize());
-    createRequest.setAutoIndexId(request.getAutoIndexId());
-    createRequest.setClusteredIndex(request.getClusteredIndex());
-    if (request.getCollation()) {
-        auto collation =
-            Collation::parse(IDLParserContext("shardsvrCreateCollection"), *request.getCollation());
-        createRequest.setCollation(collation);
-    }
-    createRequest.setEncryptedFields(request.getEncryptedFields());
-    createRequest.setChangeStreamPreAndPostImages(request.getChangeStreamPreAndPostImages());
-    createRequest.setMax(request.getMax());
-    createRequest.setFlags(request.getFlags());
-    createRequest.setTemp(request.getTemp());
-    createRequest.setIdIndex(request.getIdIndex());
-    createRequest.setViewOn(request.getViewOn());
-    createRequest.setIndexOptionDefaults(request.getIndexOptionDefaults());
-    createRequest.setExpireAfterSeconds(request.getExpireAfterSeconds());
-    createRequest.setValidationAction(request.getValidationAction());
-    createRequest.setValidationLevel(request.getValidationLevel());
-    createRequest.setValidator(request.getValidator());
-    createRequest.setPipeline(request.getPipeline());
-    createRequest.setStorageEngine(request.getStorageEngine());
-
-    cmd.setCreateCollectionRequest(createRequest);
-    return cmd;
-}
-
 void runCreateCommandDirectClient(OperationContext* opCtx,
                                   NamespaceString ns,
                                   const CreateCommand& cmd) {
@@ -179,8 +143,8 @@ public:
                         "cannot shard a collection in a transaction",
                         isUnsplittable);
 
-                auto cmd =
-                    makeCreateCommand(opCtx, ns(), request().getShardsvrCreateCollectionRequest());
+                auto cmd = create_collection_util::makeCreateCommand(
+                    opCtx, ns(), request().getShardsvrCreateCollectionRequest());
                 runCreateCommandDirectClient(opCtx, ns(), cmd);
                 return CreateCollectionResponse{ShardVersion::UNSHARDED()};
             }
@@ -210,7 +174,7 @@ public:
                         !feature_flags::gTrackUnshardedCollectionsOnShardingCatalog.isEnabled(
                             (*optFixedFcvRegion)->acquireFCVSnapshot());
                     if (isTrackUnshardedDisabled) {
-                        auto cmd = makeCreateCommand(
+                        auto cmd = create_collection_util::makeCreateCommand(
                             opCtx, ns(), request().getShardsvrCreateCollectionRequest());
                         runCreateCommandDirectClient(opCtx, ns(), cmd);
                         return CreateCollectionResponse{ShardVersion::UNSHARDED()};
@@ -223,7 +187,7 @@ public:
                         static constexpr StringData lockReason{"CreateCollectionUntracked"_sd};
                         const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
                             opCtx, ns(), lockReason, MODE_X};
-                        auto cmd = makeCreateCommand(
+                        auto cmd = create_collection_util::makeCreateCommand(
                             opCtx, ns(), request().getShardsvrCreateCollectionRequest());
                         runCreateCommandDirectClient(opCtx, ns(), cmd);
                         return CreateCollectionResponse{ShardVersion::UNSHARDED()};
