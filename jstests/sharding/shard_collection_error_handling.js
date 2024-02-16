@@ -50,6 +50,7 @@ function testNonRetriableErrorInsideCommitPhase(createAsUnsharded) {
     // persisted variables, i.e. chunk distribution.
     const primaryNode = st.rs0.getPrimary();
     st.rs0.freeze(primaryNode);
+    st.rs0.waitForPrimary();
 
     awaitShardCollection();
     fp.off();
@@ -128,6 +129,7 @@ function testRetriableErrorWithoutInvolvingDBPrimaryShardAtSecondExecution(creat
     // persisted variables, i.e. chunk distribution.
     const primaryNode = st.rs0.getPrimary();
     st.rs0.freeze(primaryNode);
+    st.rs0.waitForPrimary();
 
     awaitShardCollection();
     fp.off();
@@ -196,6 +198,7 @@ function testRetriableErrorWithoutInvolvingParticipantShardAtSecondExecution(cre
     // persisted variables, i.e. chunk distribution.
     const primaryNode = st.rs0.getPrimary();
     st.rs0.freeze(primaryNode);
+    st.rs0.waitForPrimary();
 
     awaitShardCollection();
     fp.off();
