@@ -71,6 +71,7 @@ class DependsReportTypes(Enum):
     SYMBOL_DEPENDS = auto()
     EFFICIENCY = auto()
     BAZEL_CONV_CANDIDATES = auto()
+    BAZEL_ORDER = auto()
 
 
 class LinterTypes(Enum):
