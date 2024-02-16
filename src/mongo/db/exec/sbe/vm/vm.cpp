@@ -1782,6 +1782,33 @@ std::pair<value::TypeTags, value::Value> initializeDoubleDoubleSumState() {
     return {accTag, accValue};
 }
 
+FastTuple<bool, value::TypeTags, value::Value>
+ByteCode::builtinConvertPartialCountSumToDoubleDoubleSum(ArityType arity) {
+    auto [_, partialCountSumTag, partialCountSumValue] = getFromStack(1);
+    // Move the incoming accumulator state from the stack. Given that we are now the owner of the
+    // state we are free to do any in-place update as we see fit.
+    auto [accTag, accValue] = moveOwnedFromStack(0);
+
+    // Initialize a DoubleDoubleSum array, if necessary (that is, if on the first call to this
+    // function, we are merging two simple sums).
+    if (accTag == value::TypeTags::Nothing) {
+        std::tie(accTag, accValue) = initializeDoubleDoubleSumState();
+    } else if (value::isNumber(accTag)) {
+        auto [newArrTag, newArrValue] = initializeDoubleDoubleSumState();
+        value::ValueGuard guard{newArrTag, newArrValue};
+        aggDoubleDoubleSumImpl(value::getArrayView(newArrValue), accTag, accValue);
+        std::tie(accTag, accValue) = std::tie(newArrTag, newArrValue);
+        guard.reset();
+    }
+
+    value::ValueGuard guard{accTag, accValue};
+    tassert(7720308, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
+    tassert(7720309, "The input value must be numeric", value::isNumber(partialCountSumTag));
+    aggDoubleDoubleSumImpl(value::getArrayView(accValue), partialCountSumTag, partialCountSumValue);
+    guard.reset();
+    return {true, accTag, accValue};
+}
+
 template <bool merging>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDoubleDoubleSum(
     ArityType arity) {
@@ -9130,6 +9157,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinCollAddToSetCapped(arity);
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity);
+        case Builtin::convertSimpleSumToDoubleDoubleSum:
+            return builtinConvertPartialCountSumToDoubleDoubleSum(arity);
         case Builtin::aggDoubleDoubleSum:
             return builtinAggDoubleDoubleSum<false /*merging*/>(arity);
         case Builtin::doubleDoubleSumFinalize:
@@ -9642,6 +9671,8 @@ std::string builtinToString(Builtin b) {
             return "collAddToSetCapped";
         case Builtin::doubleDoubleSum:
             return "doubleDoubleSum";
+        case Builtin::convertSimpleSumToDoubleDoubleSum:
+            return "convertSimpleSumToDoubleDoubleSum";
         case Builtin::aggDoubleDoubleSum:
             return "aggDoubleDoubleSum";
         case Builtin::doubleDoubleSumFinalize:

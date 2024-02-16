@@ -506,6 +506,8 @@ enum class Builtin : uint16_t {
 
     // Special double summation.
     doubleDoubleSum,
+    // Accumulator to merge simple sums into a double double summation.
+    convertSimpleSumToDoubleDoubleSum,
     // A variant of the standard sum aggregate function which maintains a DoubleDouble as the
     // accumulator's underlying state.
     aggDoubleDoubleSum,
@@ -1732,6 +1734,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSetToArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinConvertPartialCountSumToDoubleDoubleSum(
+        ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
     // The template parameter is false for a regular DoubleDouble summation and true if merging
     // partially computed DoubleDouble sums.

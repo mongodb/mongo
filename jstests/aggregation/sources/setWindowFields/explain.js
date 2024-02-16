@@ -90,7 +90,7 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     // each function. For the default [unbounded, unbounded] window type, each function uses memory
     // usage comparable to it's $group counterpart.
     let expectedFunctionMemUsages = {
-        count: 60,
+        count: 72,
         push: nDocs * 1024,
         set: 1024,
     };

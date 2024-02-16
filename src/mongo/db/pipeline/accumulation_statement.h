@@ -217,10 +217,33 @@ inline AccumulationExpression parseCountAccumulator(ExpressionContext* const exp
             "$count takes no arguments, i.e. $count:{}",
             elem.type() == BSONType::Object && elem.Obj().isEmpty());
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
-    auto argument = ExpressionConstant::create(expCtx, Value(1));
+    const Value constantAddend = Value(1);
+    auto argument = ExpressionConstant::create(expCtx, constantAddend);
     return {initializer,
             argument,
-            [expCtx]() { return AccumulatorSum::create(expCtx); },
+            [expCtx, constantAddend]() {
+                return AccumulatorSum::create(expCtx, boost::make_optional(constantAddend));
+            },
+            AccumulatorSum::kName};
+}
+
+/**
+ * A $sum accumulation statement parser that handles the case of a constant sum argument such as
+ * {$sum: 1}.
+ */
+template <class AccName>
+AccumulationExpression parseSumAccumulator(ExpressionContext* const expCtx,
+                                           BSONElement elem,
+                                           VariablesParseState vps) {
+    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
+    auto argument = Expression::parseOperand(expCtx, elem, vps);
+
+    return {initializer,
+            argument,
+            [expCtx, argument]() {
+                return AccumulatorSum::create(expCtx,
+                                              AccumulatorSum::getConstantArgument(argument));
+            },
             AccumulatorSum::kName};
 }
 

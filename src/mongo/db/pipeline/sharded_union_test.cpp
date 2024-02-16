@@ -350,13 +350,15 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
 
     // That error should be retried, this time two shards.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return CursorResponse(
-                   kTestAggregateNss, CursorId{0}, {BSON("_id" << BSONNULL << "count" << 1)})
+        return CursorResponse(kTestAggregateNss,
+                              CursorId{0},
+                              {BSON("_id" << BSONNULL << "count" << BSON_ARRAY(16 << 1.0 << 0.0))})
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return CursorResponse(
-                   kTestAggregateNss, CursorId{0}, {BSON("_id" << BSONNULL << "count" << 0)})
+        return CursorResponse(kTestAggregateNss,
+                              CursorId{0},
+                              {BSON("_id" << BSONNULL << "count" << BSON_ARRAY(16 << 0.0 << 0.0))})
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
@@ -590,7 +592,9 @@ TEST_F(ShardedUnionTest, ForwardsReadConcernToRemotes) {
             ASSERT(request.cmdObj.hasField("readConcern")) << request;
             ASSERT_BSONOBJ_EQ(request.cmdObj["readConcern"].Obj(), readConcernArgs.toBSONInner());
             return CursorResponse(
-                       kTestAggregateNss, CursorId{0}, {BSON("_id" << BSONNULL << "count" << 1)})
+                       kTestAggregateNss,
+                       CursorId{0},
+                       {BSON("_id" << BSONNULL << "count" << BSON_ARRAY(16 << 1.0 << 0.0))})
                 .toBSON(CursorResponse::ResponseType::InitialResponse);
         };
 
