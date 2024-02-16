@@ -205,6 +205,7 @@ public:
 
     void report(BSONObjBuilder* builder) const;
     void reset();
+    int64_t getCumulativeWaitTimeMicros() const;
 
 private:
     // Necessary for the append call, which accepts argument of type different than our
@@ -224,6 +225,7 @@ private:
                  const char* resourceTypeName,
                  const PerModeLockStatCounters& stat) const;
 
+    int64_t _getWaitTime(const PerModeLockStatCounters& stat) const;
 
     // For the global resource, split the lock stats per ID since each one should be reported
     // separately. For the remaining resources, split the lock stats per resource type. Special-case

@@ -565,6 +565,10 @@ public:
         return getLockMode(resourceIdReplicationStateTransitionLock) == MODE_X;
     }
 
+    void setTicketQueueTime(Milliseconds queueTime) {
+        _timeQueuedForTicketMicros = duration_cast<Microseconds>(queueTime);
+    }
+
     //
     // Below functions are for unit-testing only
     //

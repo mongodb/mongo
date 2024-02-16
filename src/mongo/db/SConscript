@@ -2770,6 +2770,7 @@ if wiredtiger:
             'collection_index_usage_tracker_test.cpp',
             'commands_test.cpp',
             'curop_test.cpp',
+            'curop_stats_test.cpp',
             'cursor_manager_test.cpp',
             'd_concurrency_test.cpp',
             'database_name_test.cpp',

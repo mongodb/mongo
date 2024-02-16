@@ -136,6 +136,31 @@ void LockStats<CounterType>::reset() {
     }
 }
 
+template <typename CounterType>
+int64_t LockStats<CounterType>::getCumulativeWaitTimeMicros() const {
+    int64_t totalWaitTime = 0;
+    for (uint8_t i = 0; i < static_cast<uint8_t>(ResourceGlobalId::kNumIds); ++i) {
+        totalWaitTime += _getWaitTime(_resourceGlobalStats[i]);
+    }
+
+    // Index starting from offset 2 because position 0 is a sentinel value for invalid resource/no
+    // lock, and position 1 is the global resource which was already accounted for above.
+    for (int i = RESOURCE_GLOBAL + 1; i < ResourceTypesCount; i++) {
+        totalWaitTime += _getWaitTime(_stats[i]);
+    }
+
+    totalWaitTime += _getWaitTime(_oplogStats);
+    return totalWaitTime;
+}
+
+template <typename CounterType>
+int64_t LockStats<CounterType>::_getWaitTime(const PerModeLockStatCounters& stat) const {
+    int64_t timeAcquiringLocks = 0;
+    for (int mode = 1; mode < LockModesCount; mode++) {
+        timeAcquiringLocks += CounterOps::get(stat.modeStats[mode].combinedWaitTimeMicros);
+    }
+    return timeAcquiringLocks;
+}
 
 // Ensures that there are instances compiled for LockStats for AtomicWord<long long> and int64_t
 template class LockStats<int64_t>;

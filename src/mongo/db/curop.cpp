@@ -460,6 +460,16 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
     return _tickSource->ticksTo<Microseconds>(endTime - startTime);
 }
 
+Milliseconds CurOp::_sumBlockedTimeTotal() {
+    auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(_lockStatsBase);
+    auto waitForLocks = duration_cast<Milliseconds>(
+        Microseconds(lockerInfo ? lockerInfo->stats.getCumulativeWaitTimeMicros() : 0));
+    auto waitForTickets = _debug.waitForTicketDurationMillis;
+    auto waitForWriteConcern = _debug.waitForWriteConcernDurationMillis;
+
+    return waitForLocks + waitForTickets + waitForWriteConcern;
+}
+
 void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
     ensureStarted();
     _nss = std::move(nss);
@@ -519,6 +529,10 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
 
     _debug.waitForTicketDurationMillis = duration_cast<Milliseconds>(
         shard_role_details::getLocker(opCtx)->getTimeQueuedForTicketMicros());
+
+    auto totalBlockedTime = _sumBlockedTimeTotal();
+    // TODO SERVER-86572: Identify paused durations that are being double counted as blocked
+    _debug.workingTimeMillis = Milliseconds(executionTimeMillis) - totalBlockedTime;
 
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
@@ -1199,6 +1213,12 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (remoteOpWaitTime) {
         pAttrs->add("remoteOpWaitMillis", durationCount<Milliseconds>(*remoteOpWaitTime));
+    }
+
+    if (gFeatureFlagLogSlowOpsBasedOnTimeWorking.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        // workingMillis should always be present for any operation
+        pAttrs->add("workingMillis", workingTimeMillis.count());
     }
 
     // durationMillis should always be present for any operation

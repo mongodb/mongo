@@ -392,7 +392,7 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
     }
 }
 
-TEST(CurOpTest, getCursorMetricsProducesValidObject) {
+TEST(CurOpTest, GetCursorMetricsProducesValidObject) {
     // This test just checks that the cursor metrics object produced by getCursorMetrics
     // is a valid, serializable object. In particular, it must have all required fields.
     QueryTestServiceContext serviceContext;

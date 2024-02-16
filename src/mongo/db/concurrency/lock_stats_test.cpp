@@ -263,5 +263,48 @@ TEST_F(LockStatsTest, ServerStatus) {
                       .getIntField("w"));
 }
 
+TEST_F(LockStatsTest, CumulativeWaitTime) {
+    const ResourceId resId1(
+        RESOURCE_COLLECTION,
+        NamespaceString::createNamespaceString_forTest(boost::none, "LockStats.Wait1"));
+    const ResourceId resId2(
+        RESOURCE_DATABASE,
+        NamespaceString::createNamespaceString_forTest(boost::none, "LockStats.Wait2"));
+
+    auto opCtx = makeOperationContext();
+    Locker locker(getServiceContext());
+
+    resetGlobalLockStats();
+    locker.lockGlobal(opCtx.get(), MODE_IX);
+    ON_BLOCK_EXIT([&] { locker.unlockGlobal(); });
+    locker.lock(opCtx.get(), resId1, MODE_X);
+    locker.lock(opCtx.get(), resId2, MODE_X);
+
+    {
+        Locker lockerConflict(getServiceContext());
+        lockerConflict.lockGlobal(opCtx.get(), MODE_IX);
+        ON_BLOCK_EXIT([&] { lockerConflict.unlockGlobal(); });
+
+        ASSERT_THROWS_CODE(
+            lockerConflict.lock(opCtx.get(), resId1, MODE_S, Date_t::now() + Milliseconds(5)),
+            AssertionException,
+            ErrorCodes::LockTimeout);
+
+        ASSERT_THROWS_CODE(
+            lockerConflict.lock(opCtx.get(), resId2, MODE_S, Date_t::now() + Milliseconds(5)),
+            AssertionException,
+            ErrorCodes::LockTimeout);
+    }
+
+    SingleThreadedLockStats stats;
+    reportGlobalLockingStats(&stats);
+
+    auto wait1 = stats.get(resId1, MODE_S).combinedWaitTimeMicros;
+    auto wait2 = stats.get(resId2, MODE_S).combinedWaitTimeMicros;
+    ASSERT_GREATER_THAN(wait1, 0);
+    ASSERT_GREATER_THAN(wait2, 0);
+    ASSERT_EQ(stats.getCumulativeWaitTimeMicros(), wait1 + wait2);
+}
+
 }  // namespace
 }  // namespace mongo
