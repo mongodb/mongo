@@ -240,10 +240,14 @@ SbExpr generateTraverseF(SbExpr inputExpr,
     // will be false.
     const bool childIsLeafWithEmptyName =
         (level == fp.numParts() - 2u) && fp.isPathComponentEmpty(level + 1);
-    const bool isNumericField =
-        (level < fp.FieldRef::numParts()) && fp.isNumericPathComponentStrict(level);
-    const bool isNumericFieldNext =
-        (level + 1 < fp.FieldRef::numParts()) && fp.isNumericPathComponentStrict(level + 1);
+    int arrayIndex = 0;
+    const bool isNumericField = (level < fp.FieldRef::numParts()) &&
+        fp.isNumericPathComponentStrict(level) &&
+        NumberParser{}(fp.getPart(level), &arrayIndex).isOK();
+    int arrayIndexNext = 0;
+    const bool isNumericFieldNext = (level + 1 < fp.FieldRef::numParts()) &&
+        fp.isNumericPathComponentStrict(level + 1) &&
+        NumberParser{}(fp.getPart(level + 1), &arrayIndexNext).isOK();
     const bool isLeafField = (level == fp.numParts() - 1u) || childIsLeafWithEmptyName;
     const bool needsArrayCheck = (isLeafField && mode == LeafTraversalMode::kArrayAndItsElements);
     const bool needsNothingCheck = !isLeafField && matchesNothing;
@@ -307,11 +311,6 @@ SbExpr generateTraverseF(SbExpr inputExpr,
         fieldExpr = SbVar(*frameId, 0);
     }
 
-    int arrayIndex = 0;
-    if (isNumericField) {
-        auto status = NumberParser{}(fp.getPart(level), &arrayIndex);
-        tassert(7097203, "Cannot parse array index", status.isOK());
-    }
     // traverseF() can return Nothing only when the lambda returns Nothing. All expressions that we
     // generate return Boolean, so there is no need for explicit fillEmpty here.
     auto traverseFExpr = isNumericField

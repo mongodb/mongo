@@ -445,3 +445,25 @@ assert.commandWorked(coll.insert({_id: 3, f0: 'zz', f1: [[[0], [3, 5]], [[0], [5
     const res2 = coll.find({'0.1': {$elemMatch: {$eq: 5}}}).toArray();
     assert.sameMembers([{'0': {'0': [42], '1': [5]}, _id: 2}], res2);
 }
+{
+    assert(coll.drop());
+    // Unreasonably large numerical components are treated as string field names.
+    assert.commandWorked(coll.insert({_id: 1, 'a': {'9223372036854776000': 42}}));
+    assert.commandWorked(coll.insert({_id: 2, 'a': {'9223372036854776000': [42]}}));
+    assert.commandWorked(coll.insert({_id: 3, 'a': {'9223372036854776000': [0, 42]}}));
+    assert.commandWorked(
+        coll.insert({_id: 4, 'a': {'9223372036854776000': [{'9223372036854776000': 42}]}}));
+    const res1 = coll.find({'a.9223372036854776000': 42}).toArray();
+    const expected1 = [
+        {_id: 1, 'a': {'9223372036854776000': 42}},
+        {_id: 2, 'a': {'9223372036854776000': [42]}},
+        {_id: 3, 'a': {'9223372036854776000': [0, 42]}}
+    ];
+    assert.sameMembers(expected1, res1);
+    const res2 = coll.find({'a.9223372036854776000.1': 42}).toArray();
+    const expected2 = [{_id: 3, 'a': {'9223372036854776000': [0, 42]}}];
+    assert.sameMembers(expected2, res2);
+    const res3 = coll.find({'a.9223372036854776000.9223372036854776000': 42}).toArray();
+    const expected3 = [{_id: 4, 'a': {'9223372036854776000': [{'9223372036854776000': 42}]}}];
+    assert.sameMembers(expected3, res3);
+}
