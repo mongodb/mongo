@@ -222,6 +222,11 @@ struct __wt_cache {
                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     wt_shared uint16_t pool_flags_atomic; /* Cache pool flags */
 
+#ifdef HAVE_DIAGNOSTIC
+    uint64_t not_enough_page_queued_aggressive; /* The start time that eviction walk not queuing
+                                           enough pages in aggressive mode. */
+#endif
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CACHE_EVICT_CLEAN 0x001u        /* Evict clean pages */
 #define WT_CACHE_EVICT_CLEAN_HARD 0x002u   /* Clean % blocking app threads */

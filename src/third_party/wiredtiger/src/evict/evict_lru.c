@@ -1440,6 +1440,9 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
     u_int loop_count, max_entries, retries, slot, start_slot;
     u_int total_candidates;
     bool dhandle_locked, incr;
+#ifdef HAVE_DIAGNOSTIC
+    uint64_t not_enough_page_queued_aggressive;
+#endif
 
     WT_TRACK_OP_INIT(session);
 
@@ -1622,6 +1625,22 @@ retry:
         ++retries;
         goto retry;
     }
+
+#ifdef HAVE_DIAGNOSTIC
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && cache->evict_aggressive_score == WT_EVICT_SCORE_MAX &&
+      slot < max_entries) {
+        if (cache->not_enough_page_queued_aggressive == 0)
+            cache->not_enough_page_queued_aggressive = __wt_clock(session);
+        else {
+            not_enough_page_queued_aggressive = __wt_clock(session);
+            WT_ASSERT_ALWAYS(session,
+              WT_CLOCKDIFF_SEC(
+                not_enough_page_queued_aggressive, cache->not_enough_page_queued_aggressive) < 60,
+              "eviction walk not queuing enough pages during aggressive mode for 60 seconds");
+        }
+    } else
+        cache->not_enough_page_queued_aggressive = 0;
+#endif
 
 err:
     if (dhandle_locked)
