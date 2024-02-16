@@ -87,7 +87,7 @@ var $config = extendWorkload($config, function($config, $super) {
         }
         assertWhenOwnDB.commandFailedWithCode(
             db.runCommand({convertToCapped: this.outputCollName, size: 100000}),
-            ErrorCodes.CommandNotSupportedOnView);
+            [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.NamespaceNotFound]);
     };
 
     $config.teardown = function teardown(db) {
