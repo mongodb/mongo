@@ -252,6 +252,13 @@ public:
      */
     void assertInternalStateIdentical_forTest(const BSONColumnBuilder& other) const;
 
+    /**
+     * Returns the last non-skipped appended scalar element into this BSONColumnBuilder.
+     *
+     * If the builder is not in scalar mode internally, EOO is returned.
+     */
+    BSONElement last() const;
+
 private:
     /**
      * Internal mode this BSONColumnBuilder is in.

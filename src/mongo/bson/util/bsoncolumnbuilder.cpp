@@ -1138,6 +1138,17 @@ int BSONColumnBuilder::numInterleavedStartWritten() const {
     return _numInterleavedStartWritten;
 }
 
+BSONElement BSONColumnBuilder::last() const {
+    if (_is.mode != Mode::kRegular) {
+        return {};
+    }
+
+    return BSONElement(_is.regular._prev.buffer.get(),
+                       /*field name size including null terminator*/ 1,
+                       /*total size*/ _is.regular._prev.size,
+                       BSONElement::TrustedInitTag{});
+}
+
 namespace bsoncolumn {
 bool Element::operator==(const Element& rhs) const {
     if (type != rhs.type || size != rhs.size)
@@ -1468,7 +1479,6 @@ Element EncodingState::_previous() const {
     return {
         BSONType(*_prev.buffer.get()), BSONElementValue(_prev.buffer.get() + 2), _prev.size - 2};
 }
-
 
 void EncodingState::_storePrevious(Element elem) {
     // Add space for type byte and field name null terminator

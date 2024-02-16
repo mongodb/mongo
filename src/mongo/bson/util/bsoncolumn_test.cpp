@@ -564,6 +564,34 @@ public:
         }
         ASSERT_EQ(memcmp(columnBinary.data, buf, columnBinary.length), 0);
 
+        // Verify BSONColumnBuilder::last
+        {
+            BSONColumnBuilder cb;
+            // Initial state returns eoo
+            ASSERT_TRUE(cb.last().eoo());
+
+            BSONColumn column(columnBinary);
+            BSONElement last;
+            for (auto&& elem : column) {
+                cb.append(elem);
+                // Last does not consider skip
+                if (!elem.eoo()) {
+                    last = elem;
+                }
+
+                if (last.eoo()) {
+                    // Only skips have been encountered, last() should continue to return EOO
+                    ASSERT_TRUE(cb.last().eoo());
+                } else if (last.type() != Object && last.type() != Array) {
+                    // Empty objects and arrays _may_ be encoded as scalar depending on what else
+                    // has been added to the builder. This makes this case difficult to test and we
+                    // just test the scalar types instead.
+                    ASSERT_FALSE(cb.last().eoo());
+                    ASSERT_TRUE(last.binaryEqualValues(cb.last()));
+                }
+            }
+        }
+
         // Verify BSONColumnBuilder::intermediate
         {
             BufBuilder buffer;

@@ -100,7 +100,7 @@ public:
     const Date_t minTime;
 
     // Maximum timestamp of committed measurements.
-    // TODO(SERVER-86434): remove this member once BSONColumnBuilder::last() is implemented.
+    // TODO(SERVER-86756): remove this member once BSONColumnBuilder::last() is implemented.
     Timestamp maxCommittedTime;
 
     // A reference so we can clean up some linked state from the destructor.
