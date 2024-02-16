@@ -8,9 +8,10 @@ assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a 
 const conn = db.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(conn);
 
-if (topology.type !== Topology.kShardedCluster) {
-    throw new Error(
-        'Routing table consistency check must be run against a sharded cluster, but got: ' +
-        tojson(topology));
-}
+assert(topology.type == Topology.kShardedCluster ||
+           (topology.type == Topology.kReplicaSet && topology.configsvr &&
+            TestData.testingReplicaSetEndpoint),
+       "Routing table consistency check must be run against a sharded cluster, but got: " +
+           tojson(topology));
+
 RoutingTableConsistencyChecker.run(db.getMongo());

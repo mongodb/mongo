@@ -10,7 +10,9 @@ const result = db.adminCommand({
     defaultWriteConcern: defaultWriteConcern,
     writeConcern: {w: 1}
 });
-assert.commandWorkedOrFailedWithCode(result, [51300, 51301, 40415]);
+assert.commandWorkedOrFailedWithCode(
+    result,
+    TestData.testingReplicaSetEndpoint ? [ErrorCodes.NotWritablePrimary] : [51300, 51301, 40415]);
 if (result.ok) {
     jsTestLog("Resetting the global cluster wide write concern to " + tojson(defaultWriteConcern));
 }

@@ -624,6 +624,18 @@ tasks:
       suite: jstestfuzz_replication_session
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
 
+## jstestfuzz replica set endpoint ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_with_replica_set_endpoint_gen
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "jstestfuzz", "common", "sharding", "require_npm", "random_name", "feature_flag_guarded"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      suite: jstestfuzz_replication_with_replica_set_endpoint
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+
 # jstestfuzz write conflict #
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_write_conflicts_gen

@@ -58,6 +58,7 @@ const StringDataSet kTargetedCmdNames = {
     "logout",
     "ping",
     "profile",
+    "reapLogicalSessionCacheNow",
     "refreshLogicalSessionCacheNow",
     "replSetGetStatus",
     "saslStart",
