@@ -129,6 +129,33 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         boost::none)};                 // needsRetryImage
 }
 
+repl::OplogEntry makeApplyOpsOplogEntry(repl::OpTime opTime,
+                                        repl::OpTypeEnum opType,
+                                        std::vector<repl::ReplOperation> ops,
+                                        OperationSessionInfo sessionInfo,
+                                        Date_t wallClockTime,
+                                        const std::vector<StmtId>& stmtIds,
+                                        boost::optional<repl::OpTime> prevWriteOpTimeInTransaction,
+                                        boost::optional<repl::MultiOplogEntryType> multiOpType) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpTime(opTime);
+    oplogEntry.setOpType(opType);
+    oplogEntry.setNss(NamespaceString::kAdminCommandNamespace);
+    oplogEntry.setOperationSessionInfo(sessionInfo);
+    oplogEntry.setWallClockTime(wallClockTime);
+    oplogEntry.setStatementIds(stmtIds);
+    oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
+    oplogEntry.setMultiOpType(multiOpType);
+    BSONObjBuilder oField;
+    BSONArrayBuilder applyOpsBuilder = oField.subarrayStart("applyOps");
+    for (const auto& op : ops) {
+        applyOpsBuilder.append(op.toBSON());
+    }
+    applyOpsBuilder.doneFast();
+    oplogEntry.setObject(oField.obj());
+    return uassertStatusOK(repl::OplogEntry::parse(oplogEntry.toBSON()));
+}
+
 class OpObserverMock : public OpObserverNoop {
 public:
     void onTransactionPrepare(
@@ -1090,6 +1117,209 @@ TEST_F(TransactionParticipantRetryableWritesTest, ErrorOnlyWhenStmtIdBeingChecke
     }
 
     ASSERT_THROWS(txnParticipant.checkStatementExecuted(opCtx(), 2), AssertionException);
+}
+
+TEST_F(TransactionParticipantRetryableWritesTest, SingleRetryableApplyOps) {
+    const auto sessionId = *opCtx()->getLogicalSessionId();
+    const TxnNumber txnNum = 2;
+
+    {
+        OperationSessionInfo osi;
+        osi.setSessionId(sessionId);
+        osi.setTxnNumber(txnNum);
+        UUID collUUID = UUID::gen();
+
+        auto insert0 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+        auto insert1 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 1 << "x" << 11), BSON("_id" << 1));
+        auto insert2 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 2 << "x" << 12), BSON("_id" << 2));
+        auto entry0 = makeApplyOpsOplogEntry(
+            repl::OpTime(Timestamp(100, 0), 0),  // optime
+            repl::OpTypeEnum::kCommand,          // op type
+            {insert0, insert1, insert2},         // operations
+            osi,                                 // session info
+            Date_t::now(),                       // wall clock time
+            {0, 1, 2},                           // statement ids
+            repl::OpTime(),  // optime of previous write within same retryable write
+            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+        insertOplogEntry(entry0);
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+            SessionTxnRecord sessionRecord;
+            sessionRecord.setSessionId(sessionId);
+            sessionRecord.setTxnNum(txnNum);
+            sessionRecord.setLastWriteOpTime(entry0.getOpTime());
+            sessionRecord.setLastWriteDate(entry0.getWallClockTime());
+            return sessionRecord.toBSON();
+        }());
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.invalidate(opCtx());
+    txnParticipant.refreshFromStorageIfNeeded(opCtx());
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 0));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
+    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 3));
+}
+
+TEST_F(TransactionParticipantRetryableWritesTest, MultipleRetryableApplyOps) {
+    const auto sessionId = *opCtx()->getLogicalSessionId();
+    const TxnNumber txnNum = 2;
+
+    {
+        OperationSessionInfo osi;
+        osi.setSessionId(sessionId);
+        osi.setTxnNumber(txnNum);
+        UUID collUUID = UUID::gen();
+
+        auto insert0 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+        auto insert1 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 1 << "x" << 11), BSON("_id" << 1));
+        auto insert2 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 2 << "x" << 12), BSON("_id" << 2));
+        auto insert3 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 3 << "x" << 13), BSON("_id" << 3));
+        auto insert4 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 4 << "x" << 14), BSON("_id" << 4));
+        auto insert5 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 5 << "x" << 15), BSON("_id" << 5));
+        const repl::OpTime firstOpTime(Timestamp(100, 1), 1);
+        const repl::OpTime lastOpTime(Timestamp(100, 2), 1);
+        auto entry0 = makeApplyOpsOplogEntry(
+            firstOpTime,                  // optime
+            repl::OpTypeEnum::kCommand,   // op type
+            {insert0, insert1, insert2},  // operations
+            osi,                          // session info
+            Date_t::now(),                // wall clock time
+            {0, 1, 2},                    // statement ids
+            repl::OpTime(),               // optime of previous write within same retryable write
+            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+        auto entry1 = makeApplyOpsOplogEntry(
+            lastOpTime,                   // optime
+            repl::OpTypeEnum::kCommand,   // op type
+            {insert3, insert4, insert5},  // operations
+            osi,                          // session info
+            Date_t::now(),                // wall clock time
+            {4, 5, 6},                    // statement ids
+            firstOpTime,                  // optime of previous write within same retryable write
+            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+        insertOplogEntry(entry0);
+        insertOplogEntry(entry1);
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+            SessionTxnRecord sessionRecord;
+            sessionRecord.setSessionId(sessionId);
+            sessionRecord.setTxnNum(txnNum);
+            sessionRecord.setLastWriteOpTime(entry1.getOpTime());
+            sessionRecord.setLastWriteDate(entry1.getWallClockTime());
+            return sessionRecord.toBSON();
+        }());
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.invalidate(opCtx());
+    txnParticipant.refreshFromStorageIfNeeded(opCtx());
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 0));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
+    // We skipped 3 above.
+    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 3));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 4));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 5));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 6));
+    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 7));
+}
+
+TEST_F(TransactionParticipantRetryableWritesTest, MixedInsertAndApplyOps) {
+    const auto sessionId = *opCtx()->getLogicalSessionId();
+    const TxnNumber txnNum = 2;
+
+    {
+        OperationSessionInfo osi;
+        osi.setSessionId(sessionId);
+        osi.setTxnNumber(txnNum);
+        UUID collUUID = UUID::gen();
+
+        auto insert0 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 0 << "x" << 10), BSON("_id" << 0));
+        auto insert1 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 1 << "x" << 11), BSON("_id" << 1));
+        auto insert2 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 2 << "x" << 12), BSON("_id" << 2));
+        auto insert3 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 3 << "x" << 13), BSON("_id" << 3));
+        auto insert4 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 4 << "x" << 14), BSON("_id" << 4));
+        auto insert5 = repl::MutableOplogEntry::makeInsertOperation(
+            kNss, collUUID, BSON("_id" << 5 << "x" << 15), BSON("_id" << 5));
+        const repl::OpTime firstOpTime(Timestamp(100, 1), 1);
+        const repl::OpTime secondOpTime(Timestamp(100, 2), 1);
+        const repl::OpTime lastOpTime(Timestamp(100, 3), 1);
+        auto entry0 = makeApplyOpsOplogEntry(
+            firstOpTime,                  // optime
+            repl::OpTypeEnum::kCommand,   // op type
+            {insert0, insert1, insert2},  // operations
+            osi,                          // session info
+            Date_t::now(),                // wall clock time
+            {0, 1, 2},                    // statement ids
+            repl::OpTime(),               // optime of previous write within same retryable write
+            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+        auto entry1 = makeApplyOpsOplogEntry(
+            secondOpTime,                 // optime
+            repl::OpTypeEnum::kCommand,   // op type
+            {insert3, insert4, insert5},  // operations
+            osi,                          // session info
+            Date_t::now(),                // wall clock time
+            {4, 5, 6},                    // statement ids
+            firstOpTime,                  // optime of previous write within same retryable write
+            repl::MultiOplogEntryType::kApplyOpsAppliedSeparately);
+
+        auto entry2 =
+            makeOplogEntry(lastOpTime,                     // optime
+                           repl::OpTypeEnum::kInsert,      // op type
+                           BSON("_id" << 6 << "x" << 16),  // o
+                           osi,                            // session info
+                           Date_t::now(),                  // wall clock time
+                           {7},                            // statement ids
+                           secondOpTime);  // optime of previous write within same retryable write
+        insertOplogEntry(entry0);
+        insertOplogEntry(entry1);
+        insertOplogEntry(entry2);
+
+        DBDirectClient client(opCtx());
+        client.insert(NamespaceString::kSessionTransactionsTableNamespace, [&] {
+            SessionTxnRecord sessionRecord;
+            sessionRecord.setSessionId(sessionId);
+            sessionRecord.setTxnNum(txnNum);
+            sessionRecord.setLastWriteOpTime(entry2.getOpTime());
+            sessionRecord.setLastWriteDate(entry2.getWallClockTime());
+            return sessionRecord.toBSON();
+        }());
+    }
+
+    auto txnParticipant = TransactionParticipant::get(opCtx());
+    txnParticipant.invalidate(opCtx());
+    txnParticipant.refreshFromStorageIfNeeded(opCtx());
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 0));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 1));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 2));
+    // We skipped 3 above.
+    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 3));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 4));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 5));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 6));
+    ASSERT(txnParticipant.checkStatementExecuted(opCtx(), 7));
+    ASSERT_FALSE(txnParticipant.checkStatementExecuted(opCtx(), 8));
 }
 
 TEST_F(TransactionParticipantRetryableWritesTest, RefreshFromStorageAsSecondary) {

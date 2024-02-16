@@ -214,6 +214,12 @@ void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
 }
 
 void validateTransactionHistoryApplyOpsOplogEntry(const repl::OplogEntry& oplogEntry) {
+    // A multiOpType of MultiOplogEntryType::kApplyOpsAppliedSeparately
+    // indicates this applyOps is not expected to be part of an internal transaction.
+    if (oplogEntry.getMultiOpType().value_or(repl::MultiOplogEntryType::kLegacyMultiOpType) ==
+        repl::MultiOplogEntryType::kApplyOpsAppliedSeparately)
+        return;
+
     uassert(5875601,
             "Found an applyOps oplog entry for retryable writes that were executed without "
             "using a retryable internal transaction",

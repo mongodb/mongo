@@ -62,6 +62,19 @@ enums:
         values:
             kPreImage: "preImage"
             kPostImage: "postImage"
+    MultiOplogEntryType:
+        description: >-
+            Describes this oplog entry's role in a chain of oplog entries.
+            kLegacyMultiOpType: Role must be determined by consulting session/txn, prevOpTime
+                                and partialTxn fields
+            kApplyOpsAppliedSeparately: This oplog entry is an applyOps which should be applied
+                                        independently of other applyOps entries in the chain.
+                                        Used for vectored inserts which require more than one
+                                        storage transaction.
+        type: int
+        values:
+            kLegacyMultiOpType: 0
+            kApplyOpsAppliedSeparately: 1
 
 types:
     zeroOneManyStmtId:
@@ -209,3 +222,8 @@ structs:
                 type: optime
                 optional: true # Only for writes that are part of a transaction
                 description: "The opTime of the previous write with the same transaction."
+            multiOpType:
+                cpp_name: multiOpType
+                type: MultiOplogEntryType
+                optional: true
+                description: "This oplog entry's role in an oplog entry chain."

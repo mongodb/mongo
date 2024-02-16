@@ -2014,7 +2014,7 @@ protected:
                        const repl::OpTime& expectedOpTime,
                        Date_t expectedWallClock,
                        boost::optional<repl::OpTime> expectedStartOpTime,
-                       DurableTxnStateEnum expectedState) {
+                       boost::optional<DurableTxnStateEnum> expectedState) {
         repl::checkTxnTable(_opCtx.get(),
                             lsid,
                             txnNum,
@@ -2213,6 +2213,11 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionTwoBa
     ASSERT_BSONOBJ_EQ(insertDocs[3], *(nss1It++));
 }
 
+OplogEntry addMultiOpType(OplogEntry op, MultiOplogEntryType multiOpType) {
+    return unittest::assertGet(OplogEntry::parse(op.getEntry().toBSON().addField(
+        BSON(OplogEntry::kMultiOpTypeFieldName << multiOpType).firstElement())));
+}
+
 TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
     // Tests that two transactions on the same session ID in the same batch both
     // apply correctly.
@@ -2322,6 +2327,182 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), *(nss1It++));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 3), *(nss1It++));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 4), *(nss1It++));
+}
+
+TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyNontransactionalRetryableWriteLastInsert) {
+    // Tests a retryable write with two oplog entries, where the first is an applyOps and the
+    // second is an actual insert.  These should be applied nontransactionally.  The applyOps
+    // writes one document to nss1 and one to nss2, the insert writes one document to nss1.
+    std::vector<OplogEntry> insertOps;
+    std::vector<BSONObj> insertDocs;
+
+    const NamespaceString cmdNss = NamespaceString::createNamespaceString_forTest("admin", "$cmd");
+    insertDocs.push_back(BSON("_id" << 0));
+    insertDocs.push_back(BSON("_id" << 1));
+    insertDocs.push_back(BSON("_id" << 2));
+    auto applyOpsBson = BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                           << "i"
+                                                           << "ns" << _nss1.ns_forTest() << "ui"
+                                                           << *_uuid1 << "o" << insertDocs[0])
+                                                      << BSON("op"
+                                                              << "i"
+                                                              << "ns" << _nss2.ns_forTest() << "ui"
+                                                              << *_uuid2 << "o" << insertDocs[1])));
+    auto applyOpsOp = addMultiOpType(
+        makeCommandOplogEntryWithSessionInfoAndStmtIds({Timestamp(Seconds(1), 1), 1LL},
+                                                       cmdNss,
+                                                       applyOpsBson,
+                                                       _lsid,
+                                                       _txnNum,
+                                                       {StmtId(0), StmtId(1)},
+                                                       OpTime()),
+        MultiOplogEntryType::kApplyOpsAppliedSeparately);
+    auto singleInsertOp =
+        makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds({Timestamp(Seconds(1), 2), 1LL},
+                                                              _nss1,
+                                                              *_uuid1,
+                                                              insertDocs[2],
+                                                              _lsid,
+                                                              _txnNum,
+                                                              {StmtId(2)},
+                                                              applyOpsOp.getOpTime());
+    insertOps.push_back(singleInsertOp);
+
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        _writerPool.get());
+
+    // Insert the applyops entry in its own batch.  This should result in the oplog entry being
+    // written and the operations being applied.
+    const auto expectedStartOpTime = boost::none;  // Retryable writes don't have a startOpTime
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {applyOpsOp}));
+    ASSERT_EQ(1U, oplogDocs().size());
+    ASSERT_EQ(1U, _insertedDocs[_nss1].size());
+    ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  applyOpsOp.getOpTime(),
+                  applyOpsOp.getWallClockTime(),
+                  expectedStartOpTime,
+                  boost::none);
+
+    // Insert the insert entry in its own batch.  This should result in the insert entry being
+    // written and the operations being applied.
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {singleInsertOp}));
+    ASSERT_EQ(2U, oplogDocs().size());
+    ASSERT_EQ(2U, _insertedDocs[_nss1].size());
+    ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  singleInsertOp.getOpTime(),
+                  singleInsertOp.getWallClockTime(),
+                  expectedStartOpTime,
+                  boost::none);
+
+    auto nss1It = _insertedDocs[_nss1].begin();
+    auto nss2It = _insertedDocs[_nss2].begin();
+    ASSERT_BSONOBJ_EQ(insertDocs[0], *(nss1It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[1], *(nss2It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[2], *(nss1It++));
+}
+
+TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyNontransactionalRetryableWriteThreeEntries) {
+    // Tests a retryable write with three oplog entries. These should be applied nontransactionally.
+    // Populate oplog entries with 6 inserts, three in nss1 and three in nss2.
+    std::vector<OplogEntry> insertOps;
+    std::vector<BSONObj> insertDocs;
+
+    const NamespaceString cmdNss = NamespaceString::createNamespaceString_forTest("admin", "$cmd");
+    for (int i = 0; i < 6; i += 2) {
+        insertDocs.push_back(BSON("_id" << i));
+        insertDocs.push_back(BSON("_id" << (i + 1)));
+        auto applyOpsBson =
+            BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                               << "i"
+                                               << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1
+                                               << "o" << insertDocs[i])
+                                          << BSON("op"
+                                                  << "i"
+                                                  << "ns" << _nss2.ns_forTest() << "ui" << *_uuid2
+                                                  << "o" << insertDocs[i + 1])));
+        insertOps.push_back(addMultiOpType(makeCommandOplogEntryWithSessionInfoAndStmtIds(
+                                               {Timestamp(Seconds(1), i + 1), 1LL},
+                                               cmdNss,
+                                               applyOpsBson,
+                                               _lsid,
+                                               _txnNum,
+                                               {StmtId(i), StmtId(i + 1)},
+                                               i == 0 ? OpTime() : insertOps.back().getOpTime()),
+                                           MultiOplogEntryType::kApplyOpsAppliedSeparately));
+    }
+
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        _writerPool.get());
+
+    // Insert the first entry in its own batch.  This should result in the oplog entry being written
+    // and the operations being applied.
+    const auto expectedStartOpTime = boost::none;  // Retryable writes don't have a startOpTime
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOps[0]}));
+    ASSERT_EQ(1U, oplogDocs().size());
+    ASSERT_EQ(1U, _insertedDocs[_nss1].size());
+    ASSERT_EQ(1U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  insertOps[0].getOpTime(),
+                  insertOps[0].getWallClockTime(),
+                  expectedStartOpTime,
+                  boost::none);
+
+    // Insert the second entry in its own batch.  This should result in the oplog entry being
+    // written and the operations being applied.
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOps[1]}));
+    ASSERT_EQ(2U, oplogDocs().size());
+    ASSERT_EQ(2U, _insertedDocs[_nss1].size());
+    ASSERT_EQ(2U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  insertOps[1].getOpTime(),
+                  insertOps[1].getWallClockTime(),
+                  expectedStartOpTime,
+                  boost::none);
+
+    // Insert the last entry. This should result in the oplog entry being
+    // written and the operations being applied.
+    ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {insertOps[2]}));
+    ASSERT_EQ(3U, oplogDocs().size());
+    ASSERT_EQ(3U, _insertedDocs[_nss1].size());
+    ASSERT_EQ(3U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  insertOps[2].getOpTime(),
+                  insertOps[2].getWallClockTime(),
+                  expectedStartOpTime,
+                  boost::none);
+
+    // Check that we inserted the expected documents
+    auto nss1It = _insertedDocs[_nss1].begin();
+    auto nss2It = _insertedDocs[_nss2].begin();
+    ASSERT_BSONOBJ_EQ(insertDocs[0], *(nss1It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[1], *(nss2It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[2], *(nss1It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[3], *(nss2It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[4], *(nss1It++));
+    ASSERT_BSONOBJ_EQ(insertDocs[5], *(nss2It++));
 }
 
 class MultiOplogEntryOplogApplierImplTestMultitenant : public OplogApplierImplTest {

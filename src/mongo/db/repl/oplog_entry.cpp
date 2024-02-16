@@ -530,13 +530,34 @@ bool DurableOplogEntry::shouldPrepare() const {
         getObject()[ApplyOpsCommandInfoBase::kPrepareFieldName].booleanSafe();
 }
 
+bool DurableOplogEntry::applyOpsIsLinkedTransactionally() const {
+    // An applyOps with a prevWriteOpTime is part of a transaction, unless multiOpType is
+    // kApplyOpsAppliedSeparately.
+    return bool(getPrevWriteOpTimeInTransaction()) &&
+        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) !=
+        MultiOplogEntryType::kApplyOpsAppliedSeparately;
+}
+
+bool DurableOplogEntry::isInTransaction() const {
+    if (getCommandType() == CommandType::kAbortTransaction ||
+        getCommandType() == CommandType::kCommitTransaction)
+        return true;
+    if (!getTxnNumber() || !getSessionId())
+        return false;
+    if (getCommandType() != CommandType::kApplyOps)
+        return false;
+    return applyOpsIsLinkedTransactionally();
+}
+
 bool DurableOplogEntry::isSingleOplogEntryTransaction() const {
     if (getCommandType() != CommandType::kApplyOps || !getTxnNumber() || !getSessionId() ||
         getObject()[ApplyOpsCommandInfoBase::kPartialTxnFieldName].booleanSafe()) {
         return false;
     }
     auto prevOptimeOpt = getPrevWriteOpTimeInTransaction();
-    if (!prevOptimeOpt) {
+    if (!prevOptimeOpt ||
+        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) ==
+            MultiOplogEntryType::kApplyOpsAppliedSeparately) {
         // If there is no prevWriteOptime, then this oplog entry is not a part of a transaction.
         return false;
     }
@@ -546,19 +567,21 @@ bool DurableOplogEntry::isSingleOplogEntryTransaction() const {
 bool DurableOplogEntry::isEndOfLargeTransaction() const {
     if (getCommandType() != CommandType::kApplyOps) {
         // If the oplog entry is neither commit nor abort, then it must be an applyOps. Otherwise,
-        // it cannot be a termainal oplog entry of a large transaction.
+        // it cannot be a terminal oplog entry of a large transaction.
         return false;
     }
     auto prevOptimeOpt = getPrevWriteOpTimeInTransaction();
     if (!prevOptimeOpt) {
-        // If the oplog entry is neither commit nor abort, then it must be an applyOps. Otherwise,
-        // it cannot be a terminal oplog entry of a large transaction.
+        // If there is no prevWriteOptime, then this oplog entry is not a part of a transaction.
         return false;
     }
     // There should be a previous oplog entry in a multiple oplog entry transaction if this is
     // supposed to be the last one. The first oplog entry in a large transaction will have a null
-    // ts.
-    return !prevOptimeOpt->isNull() && !isPartialTransaction();
+    // ts.  The end of a large transaction should not have a partialTxn field, nor should
+    // multiOpType be set to kApplyOpsAppliedSeparately
+    return !prevOptimeOpt->isNull() && !isPartialTransaction() &&
+        getMultiOpType().value_or(MultiOplogEntryType::kLegacyMultiOpType) !=
+        MultiOplogEntryType::kApplyOpsAppliedSeparately;
 }
 
 bool DurableOplogEntry::isSingleOplogEntryTransactionWithCommand() const {
@@ -801,6 +824,10 @@ const boost::optional<mongo::repl::OpTime>& OplogEntry::getPostImageOpTime() con
     return _entry.getPostImageOpTime();
 }
 
+boost::optional<mongo::repl::MultiOplogEntryType> OplogEntry::getMultiOpType() const& {
+    return _entry.getMultiOpType();
+}
+
 boost::optional<RetryImageEnum> OplogEntry::getNeedsRetryImage() const {
     return _needsRetryImage;
 }
@@ -815,6 +842,14 @@ OpTime OplogEntry::getOpTime() const {
 
 bool OplogEntry::isCommand() const {
     return _entry.isCommand();
+}
+
+bool OplogEntry::applyOpsIsLinkedTransactionally() const {
+    return _entry.applyOpsIsLinkedTransactionally();
+}
+
+bool OplogEntry::isInTransaction() const {
+    return _entry.isInTransaction();
 }
 
 bool OplogEntry::isPartialTransaction() const {

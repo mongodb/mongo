@@ -171,15 +171,7 @@ bool SessionUpdateTracker::isTransactionEntry(const OplogEntry& entry) {
         return true;
     }
 
-    auto sessionInfo = entry.getOperationSessionInfo();
-    if (!sessionInfo.getTxnNumber()) {
-        return false;
-    }
-
-    return entry.isPartialTransaction() ||
-        entry.getCommandType() == repl::OplogEntry::CommandType::kAbortTransaction ||
-        entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
-        entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps;
+    return entry.isInTransaction();
 }
 
 boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateOrFlush(

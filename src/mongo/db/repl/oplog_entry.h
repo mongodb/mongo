@@ -446,6 +446,7 @@ public:
     using MutableOplogEntry::kDurableReplOperationFieldName;
     using MutableOplogEntry::kFromMigrateFieldName;
     using MutableOplogEntry::kFromTenantMigrationFieldName;
+    using MutableOplogEntry::kMultiOpTypeFieldName;
     using MutableOplogEntry::kNssFieldName;
     using MutableOplogEntry::kObject2FieldName;
     using MutableOplogEntry::kObjectFieldName;
@@ -475,6 +476,7 @@ public:
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
     using MutableOplogEntry::getFromTenantMigration;
+    using MutableOplogEntry::getMultiOpType;
     using MutableOplogEntry::getNeedsRetryImage;
     using MutableOplogEntry::getNss;
     using MutableOplogEntry::getObject;
@@ -562,6 +564,19 @@ public:
      * Returns if the oplog entry is for a command operation.
      */
     bool isCommand() const;
+
+    /**
+     * Returns if the applyOps oplog entry is linked through its prevOpTime field as part of a
+     * transaction, rather than as a retryable write or stand-alone applyOps.  Valid only for
+     * applyOps entries.
+     */
+    bool applyOpsIsLinkedTransactionally() const;
+
+    /**
+     * Returns if the oplog entry is part of a transaction, whether an applyOps, a prepare, or
+     * a commit.
+     */
+    bool isInTransaction() const;
 
     /**
      * Returns if the oplog entry is part of a transaction that has not yet been prepared or
@@ -738,6 +753,7 @@ public:
         DurableOplogEntry::kCheckExistenceForDiffInsertFieldName;
     static constexpr auto kFromTenantMigrationFieldName =
         DurableOplogEntry::kFromTenantMigrationFieldName;
+    static constexpr auto kMultiOpTypeFieldName = DurableOplogEntry::kMultiOpTypeFieldName;
     static constexpr auto kDonorOpTimeFieldName = DurableOplogEntry::kDonorOpTimeFieldName;
     static constexpr auto kDonorApplyOpsIndexFieldName =
         DurableOplogEntry::kDonorApplyOpsIndexFieldName;
@@ -815,9 +831,12 @@ public:
     boost::optional<std::int64_t> getDonorApplyOpsIndex() const&;
     const boost::optional<mongo::repl::OpTime>& getPrevWriteOpTimeInTransaction() const&;
     const boost::optional<mongo::repl::OpTime>& getPostImageOpTime() const&;
+    boost::optional<MultiOplogEntryType> getMultiOpType() const&;
 
     OpTime getOpTime() const;
     bool isCommand() const;
+    bool applyOpsIsLinkedTransactionally() const;
+    bool isInTransaction() const;
     bool isPartialTransaction() const;
     bool isEndOfLargeTransaction() const;
     bool isPreparedCommit() const;

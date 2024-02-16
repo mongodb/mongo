@@ -140,6 +140,182 @@ TEST(OplogEntryTest, Create) {
     ASSERT(!entry.getTid());
 }
 
+TEST(OplogEntryTest, ApplyOpsNotInSession) {
+    UUID uuid(UUID::gen());
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 1)))));
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    ASSERT_TRUE(applyOpsEntry.isCommand());
+    ASSERT_FALSE(applyOpsEntry.isInTransaction());
+    ASSERT_TRUE(applyOpsEntry.isTerminalApplyOps());
+    ASSERT_FALSE(applyOpsEntry.isSingleOplogEntryTransaction());
+    ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
+    ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
+    ASSERT_FALSE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
+TEST(OplogEntryTest, ApplyOpsSingleEntryTransaction) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 1))))
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime());
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    ASSERT_TRUE(applyOpsEntry.isCommand());
+    ASSERT_TRUE(applyOpsEntry.isInTransaction());
+    ASSERT_TRUE(applyOpsEntry.isTerminalApplyOps());
+    ASSERT_TRUE(applyOpsEntry.isSingleOplogEntryTransaction());
+    ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
+    ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
+    ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
+TEST(OplogEntryTest, ApplyOpsStartMultiEntryTransaction) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 1)))
+                                     << "partialTxn" << true)
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime());
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    ASSERT_TRUE(applyOpsEntry.isCommand());
+    ASSERT_TRUE(applyOpsEntry.isInTransaction());
+    ASSERT_FALSE(applyOpsEntry.isTerminalApplyOps());
+    ASSERT_FALSE(applyOpsEntry.isSingleOplogEntryTransaction());
+    ASSERT_TRUE(applyOpsEntry.isPartialTransaction());
+    ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
+    ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
+TEST(OplogEntryTest, ApplyOpsMiddleMultiEntryTransaction) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 2) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 1)))
+                                     << "partialTxn" << true)
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1));
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    ASSERT_TRUE(applyOpsEntry.isCommand());
+    ASSERT_TRUE(applyOpsEntry.isInTransaction());
+    ASSERT_FALSE(applyOpsEntry.isTerminalApplyOps());
+    ASSERT_FALSE(applyOpsEntry.isSingleOplogEntryTransaction());
+    ASSERT_TRUE(applyOpsEntry.isPartialTransaction());
+    ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
+    ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
+TEST(OplogEntryTest, ApplyOpsEndMultiEntryTransaction) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 2) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 1))))
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1));
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    ASSERT_TRUE(applyOpsEntry.isInTransaction());
+    ASSERT_TRUE(applyOpsEntry.isCommand());
+    ASSERT_TRUE(applyOpsEntry.isTerminalApplyOps());
+    ASSERT_FALSE(applyOpsEntry.isSingleOplogEntryTransaction());
+    ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
+    ASSERT_TRUE(applyOpsEntry.isEndOfLargeTransaction());
+    ASSERT_TRUE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
+TEST(OplogEntryTest, ApplyOpsFirstOrOnlyRetryableWrite) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 1))))
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime() << "multiOpType" << 1);
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    ASSERT_FALSE(applyOpsEntry.isInTransaction());
+    ASSERT_TRUE(applyOpsEntry.isCommand());
+    ASSERT_TRUE(applyOpsEntry.isTerminalApplyOps());
+    ASSERT_FALSE(applyOpsEntry.isSingleOplogEntryTransaction());
+    ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
+    ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
+    ASSERT_FALSE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
+TEST(OplogEntryTest, ApplyOpsSubsequentRetryableWrite) {
+    UUID uuid(UUID::gen());
+    auto sessionId = makeLogicalSessionIdForTest();
+    const auto applyOpsBson =
+        BSON("ts" << Timestamp(1, 2) << "t" << 1LL << "op"
+                  << "c"
+                  << "ns"
+                  << "admin.$cmd"
+                  << "wall" << Date_t() << "o"
+                  << BSON("applyOps" << BSON_ARRAY(BSON("op"
+                                                        << "i"
+                                                        << "ns" << nss.ns_forTest() << "ui" << uuid
+                                                        << "o" << BSON("_id" << 1))))
+                  << "lsid" << sessionId.toBSON() << "txnNumber" << TxnNumber(5) << "stmtId"
+                  << StmtId(0) << "prevOpTime" << OpTime(Timestamp(1, 1), 1) << "multiOpType" << 1);
+    auto applyOpsEntry = unittest::assertGet(OplogEntry::parse(applyOpsBson));
+    ASSERT_TRUE(applyOpsEntry.isCommand());
+    ASSERT_FALSE(applyOpsEntry.isInTransaction());
+    // All retryable-write applyOps are "terminal", because that just means they can be applied
+    // when we get them; we don't have to wait for a later oplog entry.
+    ASSERT_TRUE(applyOpsEntry.isTerminalApplyOps());
+    ASSERT_FALSE(applyOpsEntry.isSingleOplogEntryTransaction());
+    ASSERT_FALSE(applyOpsEntry.isPartialTransaction());
+    ASSERT_FALSE(applyOpsEntry.isEndOfLargeTransaction());
+    ASSERT_FALSE(applyOpsEntry.applyOpsIsLinkedTransactionally());
+}
+
 TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     const BSONObj oplogEntryExtraField = BSON("ts" << Timestamp(0, 0) << "t" << 0LL << "op"
                                                    << "c"
