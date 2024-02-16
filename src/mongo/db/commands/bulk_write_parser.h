@@ -72,11 +72,7 @@ public:
     BSONObj toBSON() const;
 
     /**
-     * Factory function that parses a BulkWriteReplyItem from a BSONObj. A BulkWriteReplyItem parsed
-     * this way is strictly a view onto that BSONObj; the BSONObj must be kept valid to
-     * ensure the validity any members of this struct that point-into the BSONObj (i.e.
-     * unowned
-     * objects).
+     * Factory function that parses a BulkWriteReplyItem from a BSONObj.
      */
     static BulkWriteReplyItem parse(const BSONObj& bsonObject);
 

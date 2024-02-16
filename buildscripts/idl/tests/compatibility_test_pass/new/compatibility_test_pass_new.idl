@@ -801,6 +801,20 @@ commands:
                 optional: true
                 stability: stable
 
+    addedCommandParameterDefault:
+        description: "new command parameter with a default is added and should pass"
+        command_name: addedCommandParameterDefault
+        namespace: ignored
+        cpp_name: addedCommandParameterDefault
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newStableParameter:
+                type: string
+                default: ""
+                stability: stable
+
     addedCommandParameterStable:
         description: "new command has an optional stable parameter that is unstable
                       in the corresponding old command and still passes"
@@ -814,6 +828,20 @@ commands:
             newOptionalStableParam:
                 type: string
                 optional: true
+                stability: stable
+
+    addedCommandParameterStableRequired:
+        description: "new command has a stable parameter that is unstable and required
+                      in the corresponding old command and still passes"
+        command_name: addedCommandParameterStableRequired
+        namespace: ignored
+        cpp_name: addedCommandParameterStableRequired
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newStableParam:
+                type: string
                 stability: stable
 
     addedCommandParameterStableWithDefault:

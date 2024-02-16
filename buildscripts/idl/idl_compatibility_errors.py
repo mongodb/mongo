@@ -431,20 +431,20 @@ class IDLCompatibilityContext(object):
 
         Add an error about an added required command parameter or command type field that did not
         exist in the old command.
-        The added parameter or command type field should be optional.
+        The added parameter or command type field should be optional or have a default.
         """
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER, command_name,
                 "New definition of field or sub-field '%s' for command '%s' is required when it should "
-                "be optional." % (field_name, command_name), file)
+                "be optional or have a default value." % (field_name, command_name), file)
         else:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_REQUIRED, command_name,
                 "The new definition of command '%s' or its sub-struct has type '%s' with an added and "
                 "required type field '%s' that did not exist "
-                "in the old definition of struct type." % (command_name, type_name, field_name),
-                file)
+                "in the old definition of struct type. The field should be optional or have a default value."
+                % (command_name, type_name, field_name), file)
 
     def add_new_param_or_command_type_field_missing_error(self, command_name: str, field_name: str,
                                                           file: str, type_name: str,
@@ -497,7 +497,7 @@ class IDLCompatibilityContext(object):
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED_NO_DEFAULT, struct_name,
-                "'%s' has a stable required field '%s' with no default that was unstable in the"
+                "'%s' has a stable required field '%s' with no default that was unstable and not required in the"
                 " old definition of the struct."
                 "The new definition of the field should be optional or have a default value" %
                 (struct_name, field_name), file)
@@ -505,7 +505,7 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED_NO_DEFAULT, struct_name,
                 ("'%s' has type '%s' with a stable and required type field '%s' with no default "
-                 "that was unstable in the old definition of the struct type."
+                 "that was unstable and not required in the old definition of the struct type."
                  "The new definition of the field should be optional or have a default value") %
                 (struct_name, type_name, field_name), file)
 

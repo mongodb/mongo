@@ -2023,6 +2023,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'api_parameters',
         'commands',
     ],

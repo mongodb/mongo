@@ -92,6 +92,19 @@ void validateAPIParameters(const BSONObj& requestBody,
             !(command->getReadWriteType() == BasicCommand::ReadWriteType::kWrite &&
               requestBody.firstElementType() == BSONType::String &&
               requestBody.firstElement().String() == "system.js");
+
+        // Need to handle bulkWrite case.
+        if (requestBody.hasField("nsInfo")) {
+            auto namespaces = requestBody.getField("nsInfo").Array();
+            for (auto& ns : namespaces) {
+                auto nss = NamespaceStringUtil::deserialize(boost::none,
+                                                            ns.Obj().getField("ns").String(),
+                                                            SerializationContext::stateDefault());
+                if (nss.coll() == "system.js") {
+                    strictDoesntWriteToSystemJS = false;
+                }
+            }
+        }
         uassert(ErrorCodes::APIStrictError,
                 fmt::format(
                     "Provided apiStrict:true, but the command {} attempts to write to system.js.",

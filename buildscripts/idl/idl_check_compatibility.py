@@ -246,7 +246,9 @@ ALLOWED_STABLE_FIELDS_LIST: List[str] = [
     'commandCppTypeNotEqualUnstable-param-cppTypeNotEqualStructUnstableField',
     'newlyAddedTypeFieldBsonAnyNotAllowed-param-newlyAddedBsonSerializationTypeAnyStructField',
     'typeWithIncompatibleChainedStruct-param-newBsonSerializationTypeAnyUnstableStructField',
+    'addedCommandParameterDefault-param-newStableParameter',
     'addedCommandParameterStable-param-newOptionalStableParam',
+    'addedCommandParameterStableRequired-param-newStableParam',
     'addedCommandParameterStableWithDefault-param-newStableParamWithDefault',
     'newCommandParameterTypeStructRecursiveOne-param-unstableToStableOptionalField',
     'oldUnstableParamTypeChanges-param-oldUnstableTypeChangesParam',
@@ -303,6 +305,43 @@ ALLOWED_STABLE_FIELDS_LIST: List[str] = [
     'hello-reply-serviceId',
     'hello-reply-isImplicitDefaultMajorityWC',
     'hello-reply-cwwc',
+
+    # BulkWrite fields
+    'bulkWrite-param-ops',
+    'bulkWrite-param-insert',
+    'bulkWrite-param-document',
+    'bulkWrite-param-update',
+    'bulkWrite-param-filter',
+    'bulkWrite-param-multi',
+    'bulkWrite-param-updateMods',
+    'bulkWrite-param-upsert',
+    'bulkWrite-param-arrayFilters',
+    'bulkWrite-param-hint',
+    'bulkWrite-param-collation',
+    'bulkWrite-param-delete',
+    'bulkWrite-param-collation',
+    'bulkWrite-param-nsInfo',
+    'bulkWrite-param-ns',
+    'bulkWrite-param-cursor',
+    'bulkWrite-param-bypassDocumentValidation',
+    'bulkWrite-param-constants',
+    'bulkWrite-param-ordered',
+    'bulkWrite-param-stmtId',
+    'bulkWrite-param-stmtIds',
+    'bulkWrite-param-let',
+    'bulkWrite-param-errorsOnly',
+    'bulkWrite-reply-cursor',
+    'bulkWrite-reply-id',
+    'bulkWrite-reply-firstBatch',
+    'bulkWrite-reply-ns',
+    'bulkWrite-reply-electionId',
+    'bulkWrite-reply-opTime',
+    'bulkWrite-reply-nErrors',
+    'bulkWrite-reply-nInserted',
+    'bulkWrite-reply-nMatched',
+    'bulkWrite-reply-nModified',
+    'bulkWrite-reply-nUpserted',
+    'bulkWrite-reply-nDeleted',
 ]
 
 SKIPPED_FILES = [
@@ -1166,7 +1205,8 @@ def check_command_params_or_type_struct_fields(
             new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
             new_field_optional = new_field.optional or (new_field_type
                                                         and new_field_type.name == 'optionalBool')
-            if not new_field_optional and not is_unstable(new_field.stability):
+            if not new_field_optional and new_field.default is None and not is_unstable(
+                    new_field.stability):
                 ctxt.add_new_param_or_command_type_field_added_required_error(
                     cmd_name, new_field.name, new_idl_file_path, new_struct.name,
                     is_command_parameter)
@@ -1205,7 +1245,7 @@ def check_command_param_or_type_struct_field(
             cmd_name, old_field.name, old_idl_file_path, is_command_parameter)
 
     # If old field is unstable and new field is stable, the new field should either be optional or
-    # have a default value.
+    # have a default value, unless the old field was a required field.
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
     old_field_optional = old_field.optional or (old_field_type
@@ -1214,8 +1254,10 @@ def check_command_param_or_type_struct_field(
                                                 and new_field_type.name == "optionalBool")
     if is_unstable(old_field.stability) and not is_unstable(
             new_field.stability) and not new_field_optional and new_field.default is None:
-        ctxt.add_new_param_or_command_type_field_stable_required_no_default_error(
-            cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
+        # Only error if the old field was not a required field already.
+        if old_field_optional or old_field.default is not None:
+            ctxt.add_new_param_or_command_type_field_stable_required_no_default_error(
+                cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
 
     if not is_unstable(
             old_field.stability

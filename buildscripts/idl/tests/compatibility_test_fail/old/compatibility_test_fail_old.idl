@@ -722,10 +722,11 @@ structs:
 
     StableRequiredNoDefaultTypeFieldStruct:
         description: "This struct contains a field that is stable and required with no default value
-                      in the new version that was unstable in the old version"
+                      in the new version that was unstable and optional in the old version"
         fields:
             stableRequiredNoDefaultTypeField:
                 type: string
+                optional: true
                 stability: unstable
 
     StructCommandParameterTypeRecursive:
@@ -994,7 +995,7 @@ commands:
 
     commandParameterStableRequiredNoDefault:
         description: "new required stable command parameter with no default value fails
-                      because it is unstable in the corresponding old command"
+                      because it is unstable and optional in the corresponding old command"
         command_name: commandParameterStableRequiredNoDefault
         namespace: ignored
         cpp_name: commandParameterStableRequiredNoDefault
@@ -1004,6 +1005,7 @@ commands:
         fields:
             newRequiredStableParam:
                 type: string
+                optional: true
                 stability: unstable
 
     commandParameterRequired:
@@ -2308,7 +2310,7 @@ commands:
         reply_type: VariantStructRecursiveReplyWithArray
 
     unstableToStableParamField:
-        description: "new command fails because contains a stable parameter that is unstable in the
+        description: "new command fails because contains a stable parameter that is unstable and optional in the
                       corresponding old command"
         command_name: unstableToStableParamField
         namespace: ignored
@@ -2320,6 +2322,7 @@ commands:
             stableNewParam:
                 type: string
                 unstable: true
+                optional: true
 
     newParamVariantNotSuperset:
         description: "new command fails because its parameter type is a variant type that is not

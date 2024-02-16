@@ -65,11 +65,11 @@ structs:
                 description: "Insert command which references the namespace index in 'nsInfo'."
                 type: safeInt
                 validator: { gte: 0 }
-                stability: unstable
+                stability: stable
             document:
                 description: "The document to insert into the given collection"
                 type: object
-                stability: unstable
+                stability: stable
 
     BulkWriteUpdateOp:
         description: "A struct representing updates in the 'bulkWrite' command."
@@ -79,29 +79,29 @@ structs:
                 description: "Update command which references the namespace index in 'nsInfo'."
                 type: safeInt
                 validator: { gte: 0 }
-                stability: unstable
+                stability: stable
             filter:
                 description: "The query that matches documents to update. Uses the same query
                               selectors as used in the 'find' operation."
                 type: object
-                stability: unstable
+                stability: stable
             multi:
                 description: "If true, updates all documents that meet the query criteria. If false,
                               limits the update to one document which meets the query criteria." 
                 type: bool
                 default: false
-                stability: unstable
+                stability: stable
             updateMods:
                 description:  "Set of modifications to apply."
                 type: update_modification
-                stability: unstable
+                stability: stable
             upsert:
                 description: "If true, perform an insert if no documents match the query. If both
                               upsert and multi are true and no documents match the query, the update
                               operation inserts only a single document."
                 type: bool
                 default: false
-                stability: unstable
+                stability: stable
             upsertSupplied:
                 description: "Only applicable when upsert is true. If set, and if no documents match
                               the query, the update subsystem will insert the document supplied as
@@ -112,23 +112,23 @@ structs:
                 description: "Specifies which array elements an update modifier should apply to"
                 type: array<object>
                 optional: true
-                stability: unstable
+                stability: stable
             hint:
                 description: "Specifies the hint to use for the operation."
                 type: indexHint
                 default: mongo::BSONObj()
-                stability: unstable
+                stability: stable
             constants:
                 description: "Specifies constant values that can be referred to in the pipeline
                               performing a custom update."
                 type: object
                 optional: true
-                stability: unstable
+                stability: stable
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object
                 optional: true
-                stability: unstable
+                stability: stable
             sampleId:
                 description: "The unique sample id for the operation if it has been chosen for sampling."
                 type: uuid
@@ -150,28 +150,28 @@ structs:
                 cpp_name: deleteCommand # `delete` is a C++ keyword.
                 type: safeInt
                 validator: { gte: 0 }
-                stability: unstable
+                stability: stable
             filter:
                 description: "The query that matches documents to delete. Uses the same query
                               selectors as used in the 'find' operation."
                 type: object
-                stability: unstable
+                stability: stable
             multi:
                 description: "If true, deletes all documents that meet the query criteria. If false,
                               limits the delete to one document which meets the query criteria." 
                 type: bool
                 default: false
-                stability: unstable
+                stability: stable
             hint:
                 description: "Specifies the hint to use for the operation."
                 type: indexHint
                 default: mongo::BSONObj()
-                stability: unstable
+                stability: stable
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object
                 optional: true
-                stability: unstable
+                stability: stable
             sampleId:
                 description: "The unique sample id for the operation if it has been chosen for sampling."
                 type: uuid
@@ -205,7 +205,7 @@ structs:
             ns:
                 description: "The namespace for the entry"
                 type: namespacestring
-                stability: unstable
+                stability: stable
             collectionUUID:
                 description: "The expected UUID of the collection."
                 type: uuid
@@ -240,14 +240,14 @@ structs:
         fields:
             id:
                 type: long
-                stability: unstable
+                stability: stable
             firstBatch:
                 type: array<BulkWriteReplyItem>
-                stability: unstable
+                stability: stable
             ns:
                 description: "The namespace of the cursor."
                 type: namespacestring
-                stability: unstable
+                stability: stable
 
     BulkWriteCommandReply:
         description: "Holds reply information for the 'bulkWrite' command."
@@ -256,34 +256,34 @@ structs:
         fields:
             cursor:
                 type: BulkWriteCommandResponseCursor
-                stability: unstable
+                stability: stable
             nErrors:
                 type: int
-                stability: unstable
+                stability: stable
             nInserted:
                 type: int
-                stability: unstable
+                stability: stable
             nMatched:
                 type: int
-                stability: unstable
+                stability: stable
             nModified:
                 type: int
-                stability: unstable
+                stability: stable
             nUpserted:
                 type: int
-                stability: unstable
+                stability: stable
             nDeleted:
                 type: int
-                stability: unstable
+                stability: stable
             electionId:
                 type: objectid
                 optional: true
-                stability: unstable
+                stability: stable
             opTime:
                 description: "Operation time for the 'bulkWrite' command."
                 type: optime
                 optional: true
-                stability: unstable
+                stability: stable
             retriedStmtIds:
                 description: "The statement numbers for the write statements that had already been
                               executed, thus were not executed by this command."
@@ -317,23 +317,23 @@ commands:
                 description: "An array of CRUD ops in the bulk write."
                 type: array<variant<BulkWriteInsertOp, BulkWriteUpdateOp, BulkWriteDeleteOp>>
                 supports_doc_sequence: true
-                stability: unstable
+                stability: stable
             nsInfo:
                 description: "An array of namespaces this bulk write operates on."
                 type: array<NamespaceInfoEntry>
                 supports_doc_sequence: true
-                stability: unstable
+                stability: stable
             cursor:
                 description: "Cursor info struct that holds batch size setting."
                 type: SimpleCursorOptions
                 optional: true
-                stability: unstable
+                stability: stable
             bypassDocumentValidation:
                 description: "Enables the operation to bypass document validation. This lets you
                               write documents that do not meet the validation requirements."
                 type: safeBool
                 default: false
-                stability: unstable
+                stability: stable
             ordered:
                 description: "If true, then when a write statement fails, the bulkWrite command returns
                               without executing the remaining statements. If false, then statements
@@ -341,27 +341,27 @@ commands:
                               continue with the remaining statements, if any."
                 type: bool
                 default: true
-                stability: unstable
+                stability: stable
             stmtId:
                 description: "A statement number relative to the transaction."
                 type: int
                 optional: true
-                stability: unstable
+                stability: stable
             stmtIds:
                 description: "An array of statement numbers relative to the transaction."
                 type: array<int>
                 optional: true
-                stability: unstable
+                stability: stable
             let:
                 description: "Specifies constant values."
                 type: object
                 optional: true
-                stability: unstable
+                stability: stable
             errorsOnly:
                 description: "Only return error responses and not all detailed results."
                 type: bool
                 default: false
-                stability: unstable
+                stability: stable
             $_originalQuery:
                 description: "The original write query. This is used for updateOne/deleteOne
                               without shard key during the write phase of the two phase protocol in

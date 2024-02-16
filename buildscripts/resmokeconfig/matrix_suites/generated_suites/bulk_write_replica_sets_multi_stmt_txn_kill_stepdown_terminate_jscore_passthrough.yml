@@ -227,7 +227,6 @@ selector:
   - jstests/core/write/update/batch_write_command_update.js
   - jstests/core/write/delete/batch_write_command_delete.js
   - jstests/core/failcommand_failpoint.js
-  - jstests/core/version_api_v1_command_coverage.js
   - jstests/core/write/write_commands_reject_unknown_fields.js
   - jstests/core/query/explain/explain_uuid.js
   - jstests/core/query/explain/explain_includes_command.js
