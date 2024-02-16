@@ -72,7 +72,7 @@ feature_flags:
     featureFlagOCSF:
         description: "Provide an OCSF compatible output for audit logs"
         cpp_varname: gFeatureFlagOCSF
-        default: false
+        default: true
         shouldBeFCVGated: false
     featureFlagStreams:
         description: "Enable support for streams"
