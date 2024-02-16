@@ -7,7 +7,6 @@ set -o errexit
 
 # Only run this script for the external_auth_oidc_gcp task.
 if [ "${task_name}" != "external_auth_oidc_gcp" ]; then
-  echo "skipping teardown"
   exit 0
 fi
 
@@ -17,6 +16,8 @@ if [ ! -z "${GOOGLE_APPLICATION_CREDENTIALS}" ] \
   && [ -f "${GOOGLE_APPLICATION_CREDENTIALS}" ] \
   && [ -f "${HOME}/gce_vm_config.json" ] \
   && [ -f "${HOME}/gce_vm_info.json" ]; then
+  # Install google-cloud-compute so that the script can run.
+  $python -m pip install google-cloud-compute
   $python src/mongo/db/modules/enterprise/jstests/external_auth_oidc_gcp/lib/gce_vm_manager.py delete --config_file $HOME/gce_vm_config.json --service_account_key_file ${GOOGLE_APPLICATION_CREDENTIALS} --output_file $HOME/gce_vm_info.json
 fi
 

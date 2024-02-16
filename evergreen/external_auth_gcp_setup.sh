@@ -38,6 +38,9 @@ echo ${oidc_gcp_service_account_key} | sed "s/[[:space:]]//g" | base64 --decode 
 chmod 600 ${GOOGLE_APPLICATION_CREDENTIALS}
 ls -al ${GOOGLE_APPLICATION_CREDENTIALS}
 
+# Install google-cloud-compute so that the script can run.
+$python -m pip install google-cloud-compute
+
 # This script creates a Google Compute Engine VM instance that we will later use to obtain our managed identity token.
 # It also outputs the external IP and name of the new VM into a local file so that the test knows where to SSH into
 # and the teardown script knows which VM instance to delete.
