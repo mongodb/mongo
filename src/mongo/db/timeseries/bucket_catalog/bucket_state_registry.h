@@ -139,11 +139,9 @@ struct BucketStateRegistry {
     tracked_unordered_map<BucketId, std::variant<BucketState, DirectWriteCounter>, BucketHasher>
         bucketStates;
 
-    // Registry storing 'clearSetOfBuckets' operations. Maps from era to a lambda function which
-    // takes in information about a Bucket and returns whether the Bucket belongs to the cleared
-    // set.
-    // TODO SERVER-85565: use tracked type for ShouldClearFn.
-    tracked_map<Era, ShouldClearFn> clearedSets;
+    // Registry storing 'clearSetOfBuckets' operations. Maps from era to a list of cleared
+    // collection UUIDS.
+    tracked_map<Era, tracked_vector<UUID>> clearedSets;
 
     BucketStateRegistry(TrackingContext& trackingContext);
 };
@@ -155,11 +153,9 @@ BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
                                               BucketStateRegistry::Era value);
 
 /**
- * Asynchronously clears all buckets belonging to namespaces satisfying the 'shouldClear'
- * predicate.
+ * Asynchronously clears all buckets belonging to cleared collection UUIDs.
  */
-void clearSetOfBuckets(BucketStateRegistry& registry,
-                       std::function<bool(const UUID&)>&& shouldClear);
+void clearSetOfBuckets(BucketStateRegistry& registry, tracked_vector<UUID> clearedCollectionUUIDs);
 
 /**
  * Returns the number of clear operations currently stored in the clear registry.

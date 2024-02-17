@@ -46,6 +46,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
+#include "mongo/db/timeseries/timeseries_tracked_types.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
@@ -167,9 +168,9 @@ void TimeSeriesOpObserver::onReplicationRollback(OperationContext* opCtx,
     }
 
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-    timeseries::bucket_catalog::clear(
-        bucketCatalog,
-        [uuids = rbInfo.rollbackUUIDs](const UUID& uuid) { return uuids.contains(uuid); });
+    timeseries::tracked_vector<UUID> clearedCollectionUUIDs = timeseries::make_tracked_vector<UUID>(
+        bucketCatalog.trackingContext, rbInfo.rollbackUUIDs.begin(), rbInfo.rollbackUUIDs.end());
+    timeseries::bucket_catalog::clear(bucketCatalog, std::move(clearedCollectionUUIDs));
 }
 
 }  // namespace mongo

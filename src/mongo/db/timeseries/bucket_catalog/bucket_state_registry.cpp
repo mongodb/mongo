@@ -88,7 +88,8 @@ bool isMemberOfClearedSet(BucketStateRegistry& registry, WithLock lock, Bucket* 
     for (auto it = registry.clearedSets.lower_bound(bucket->lastChecked + 1);
          it != registry.clearedSets.end();
          ++it) {
-        if (it->second(bucket->bucketId.collectionUUID)) {
+        if (std::find(it->second.begin(), it->second.end(), bucket->bucketId.collectionUUID) !=
+            it->second.end()) {
             return true;
         }
     }
@@ -119,7 +120,7 @@ BucketStateRegistry::BucketStateRegistry(TrackingContext& trackingContext)
       bucketStates(make_tracked_unordered_map<BucketId,
                                               std::variant<BucketState, DirectWriteCounter>,
                                               BucketHasher>(trackingContext)),
-      clearedSets(make_tracked_map<Era, ShouldClearFn>(trackingContext)) {}
+      clearedSets(make_tracked_map<Era, tracked_vector<UUID>>(trackingContext)) {}
 
 BucketStateRegistry::Era getCurrentEra(const BucketStateRegistry& registry) {
     stdx::lock_guard lk{registry.mutex};
@@ -148,10 +149,9 @@ BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
     }
 }
 
-void clearSetOfBuckets(BucketStateRegistry& registry,
-                       BucketStateRegistry::ShouldClearFn&& shouldClear) {
+void clearSetOfBuckets(BucketStateRegistry& registry, tracked_vector<UUID> clearedCollectionUUIDs) {
     stdx::lock_guard lk{registry.mutex};
-    registry.clearedSets[++registry.currentEra] = std::move(shouldClear);
+    registry.clearedSets[++registry.currentEra] = std::move(clearedCollectionUUIDs);
 }
 
 std::uint64_t getClearedSetsCount(const BucketStateRegistry& registry) {

@@ -705,13 +705,15 @@ void directWriteFinish(BucketStateRegistry& registry, const UUID& collectionUUID
     removeDirectWrite(registry, BucketId{collectionUUID, oid});
 }
 
-void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear) {
-    clearSetOfBuckets(catalog.bucketStateRegistry, std::move(shouldClear));
+void clear(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs) {
+    clearSetOfBuckets(catalog.bucketStateRegistry, std::move(clearedCollectionUUIDs));
 }
 
 void clear(BucketCatalog& catalog, const UUID& collectionUUID) {
-    clear(catalog,
-          [collectionUUID](const UUID& bucketUuid) { return bucketUuid == collectionUUID; });
+    tracked_vector<UUID> clearedCollectionUUIDs =
+        make_tracked_vector<UUID>(catalog.trackingContext);
+    clearedCollectionUUIDs.push_back(collectionUUID);
+    clear(catalog, std::move(clearedCollectionUUIDs));
 }
 
 void freeze(BucketCatalog& catalog, const UUID& collectionUUID, const OID& oid) {

@@ -348,14 +348,14 @@ void directWriteStart(BucketStateRegistry& registry, const UUID& collectionUUID,
 void directWriteFinish(BucketStateRegistry& registry, const UUID& collectionUUID, const OID& oid);
 
 /**
- * Clears any bucket whose namespace satisfies the predicate by removing the bucket from the catalog
+ * Clears any bucket whose collection UUID has been cleared by removing the bucket from the catalog
  * asynchronously through the BucketStateRegistry.
  */
-void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear);
+void clear(BucketCatalog& catalog, tracked_vector<UUID> clearedCollectionUUIDs);
 
 /**
- * Clears the buckets for the given namespace by removing the bucket from the catalog asynchronously
- * through the BucketStateRegistry.
+ * Clears the buckets for the given collection UUID by removing the bucket from the catalog
+ * asynchronously through the BucketStateRegistry.
  */
 void clear(BucketCatalog& catalog, const UUID& collectionUUID);
 
