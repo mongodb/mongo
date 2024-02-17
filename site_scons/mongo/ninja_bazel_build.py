@@ -30,10 +30,18 @@ try:
     ninja_last_cmd_file = '.ninja_last_command_line_targets.txt'
     with open(ninja_last_cmd_file) as f:
         ninja_command_line_targets = [target.strip() for target in f.readlines() if target.strip()]
+    os.unlink(ninja_last_cmd_file)
 except OSError as exc:
-    print(
-        f"Failed to open {ninja_last_cmd_file}, this is expected to be generated on ninja execution by the mongo-ninja-python module."
-    )
+    print(f"""
+Failed to open {ninja_last_cmd_file}, this is expected to be generated on ninja execution by the mongo-ninja-python module.
+          
+Make sure you are in the recommended virtualenv: 
+https://github.com/10gen/mongo/blob/master/docs/building.md#python-prerequisites
+          
+The command `hash -r && which ninja` should reference a ninja file located within the virtualenv. 
+If this is not the case, the virtualenv may have become corrupted and you will need to delete it
+and create a new one from scratch based on the commands in the doc link above.
+""")
     raise exc
 print_debug(f"NINJA COMMAND LINE TARGETS:{os.linesep}{os.linesep.join(ninja_command_line_targets)}")
 
@@ -62,6 +70,7 @@ print_debug(f"NINJA GET INPUTS CMD: {' '.join(ninja_inputs_cmd)}")
 ninja_proc = subprocess.run(ninja_inputs_cmd, capture_output=True, text=True, check=True)
 deps = [os.path.abspath(dep).replace("\\", '/') for dep in ninja_proc.stdout.split("\n") if dep]
 print_debug(f"COMMAND LINE DEPS:{os.linesep}{os.linesep.join(deps)}")
+os.unlink(ninja_last_cmd_file)
 
 # isolate just the raw output files for the list intersection
 bazel_outputs = [bazel_t['bazel_output'] for bazel_t in ninja_build_info['targets'].values()]
