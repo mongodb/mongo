@@ -118,6 +118,7 @@ void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
     batch.intermediateBuilders = std::move(bucket.intermediateBuilders);
     batch.uncompressedBucketDoc = std::move(bucket.uncompressedBucketDoc);
     batch.maxCommittedTime = bucket.maxCommittedTime;
+    batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
     bucket.uncompressedBucketDoc = {};
     bucket.memoryUsage -= batch.uncompressedBucketDoc.objsize();
     bucket.memoryUsage -= batch.intermediateBuilders.getMemoryUsage();
@@ -585,6 +586,7 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         // Move BSONColumnBuilders from WriteBatch to Bucket.
         // See corollary in prepareWriteBatchForCommit().
         bucket->maxCommittedTime = batch->maxCommittedTime;
+        bucket->bucketIsSortedByTime = batch->bucketIsSortedByTime;
         bucket->intermediateBuilders = std::move(batch->intermediateBuilders);
         bucket->preparedBatch.reset();
 

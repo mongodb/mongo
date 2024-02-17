@@ -155,12 +155,6 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
     };
 
     $config.setup = function setup(db, collName, cluster) {
-        // TODO(SERVER-86317): re-enable this test
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-            jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
-            quit();
-        }
-
         db[collName].drop();
         db[this.nonShardCollName].drop();
 

@@ -389,6 +389,8 @@ std::size_t BucketUnpackerV2::numberOfFields() {
     // and possibly the meta field.
     return kFixedFieldNumber + _fieldColumns.size();
 }
+
+using BucketUnpackerV3 = BucketUnpackerV2;
 }  // namespace
 
 BucketUnpacker::BucketUnpacker() = default;
@@ -569,19 +571,35 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
     uassert(5857903,
             "The $_internalUnpackBucket stage requires 'control.version' field to be present",
             versionField && isNumericBSONType(versionField.type()));
-    auto version = versionField.Number();
+    auto version = versionField.safeNumberInt();
 
-    if (version == 1) {
-        _unpackingImpl = std::make_unique<BucketUnpackerV1>(timeFieldElem);
-    } else if (version == 2) {
-        auto countField = controlField.Obj()[kBucketControlCountFieldName];
-        _unpackingImpl =
-            std::make_unique<BucketUnpackerV2>(timeFieldElem,
-                                               countField && isNumericBSONType(countField.type())
-                                                   ? static_cast<int>(countField.Number())
-                                                   : -1);
-    } else {
-        uasserted(5857900, "Invalid bucket version");
+    switch (version) {
+        case kTimeseriesControlUncompressedVersion: {
+            _unpackingImpl = std::make_unique<BucketUnpackerV1>(timeFieldElem);
+            break;
+        }
+        case kTimeseriesControlCompressedSortedVersion: {
+            auto countField = controlField.Obj()[kBucketControlCountFieldName];
+            _unpackingImpl = std::make_unique<BucketUnpackerV2>(
+                timeFieldElem,
+                countField && isNumericBSONType(countField.type())
+                    ? static_cast<int>(countField.Number())
+                    : -1);
+            break;
+        }
+        case kTimeseriesControlCompressedUnsortedVersion: {
+            auto countField = controlField.Obj()[kBucketControlCountFieldName];
+            _unpackingImpl = std::make_unique<BucketUnpackerV3>(
+                timeFieldElem,
+                countField && isNumericBSONType(countField.type())
+                    ? static_cast<int>(countField.Number())
+                    : -1);
+            break;
+        }
+        default: {
+            uasserted(5857900, "Invalid bucket version");
+            break;
+        }
     }
 
     // Walk the data region of the bucket, and decide if an iterator should be set up based on the

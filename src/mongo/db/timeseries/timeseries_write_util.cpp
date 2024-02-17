@@ -229,15 +229,21 @@ write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const BSONObj& bucketDocBefore,
     const BSONObj& bucketDocAfter,
-    const StringMap<int>& offsets) {
+    const StringMap<int>& offsets,
+    bool changedToUnsorted) {
     BSONObjBuilder updateBuilder;
     {
         // Control builder.
         BSONObjBuilder controlBuilder(updateBuilder.subobjStart(kControlFieldNameDocDiff));
-        BSONObj countObj =
-            BSON(kBucketControlCountFieldName << static_cast<int>(
-                     (batch->numPreviouslyCommittedMeasurements + batch->measurements.size())));
-        controlBuilder.append(doc_diff::kUpdateSectionFieldName, countObj);
+        BSONObjBuilder countAndVersionBuilder;
+        countAndVersionBuilder.append(kBucketControlCountFieldName,
+                                      static_cast<int>((batch->numPreviouslyCommittedMeasurements +
+                                                        batch->measurements.size())));
+        if (changedToUnsorted) {
+            countAndVersionBuilder.append(kBucketControlVersionFieldName,
+                                          kTimeseriesControlCompressedUnsortedVersion);
+        }
+        controlBuilder.append(doc_diff::kUpdateSectionFieldName, countAndVersionBuilder.obj());
 
         if (!batch->min.isEmpty() || !batch->max.isEmpty()) {
             if (!batch->min.isEmpty()) {
@@ -882,11 +888,12 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
 
     auto& batchBuilders = batch->intermediateBuilders;
 
+    bool changedToUnsorted = false;
     std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
-    if (sortedMeasurements.begin()->timeField.timestamp() < batch->maxCommittedTime) {
-        // TODO(SERVER-86317): Upgrade to v3 buckets instead of throwing here.
-        throwWriteConflictException(
-            "New measurement falls between committed timestamp range. Create a new bucket.");
+    if (batch->bucketIsSortedByTime &&
+        sortedMeasurements.begin()->timeField.timestamp() < batch->maxCommittedTime) {
+        batch->bucketIsSortedByTime = false;
+        changedToUnsorted = true;
     }
 
     // Insert new measurements, and appropriate skips, into all column builders.
@@ -903,12 +910,13 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
 
     // Generates a delta update request using the before and after compressed bucket documents' data
     // fields. The only other items that will be different are the min, max, and count fields in the
-    // control block.
+    // control block, and the version field if it was promoted to a v3 bucket.
     const auto updateEntry = makeTimeseriesCompressedDiffEntry(opCtx,
                                                                batch,
                                                                compressedBucketDataFieldDocBefore,
                                                                compressedBucketDataFieldDocAfter,
-                                                               offsets);
+                                                               offsets,
+                                                               changedToUnsorted);
     write_ops::UpdateCommandRequest op(bucketsNs, {updateEntry});
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;

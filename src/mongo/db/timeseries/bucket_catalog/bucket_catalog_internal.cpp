@@ -490,6 +490,10 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
     bucket->maxCommittedTime = controlField.getObjectField(kBucketControlMinFieldName)
                                    .getField(options.getTimeField())
                                    .timestamp();
+    bucket->bucketIsSortedByTime = controlField.getField(kBucketControlVersionFieldName).Number() ==
+            kTimeseriesControlCompressedSortedVersion
+        ? true
+        : false;
     bucket->numMeasurements = numMeasurements;
     bucket->numCommittedMeasurements = numMeasurements;
 

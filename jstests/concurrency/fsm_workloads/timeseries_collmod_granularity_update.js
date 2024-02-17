@@ -10,7 +10,6 @@
  */
 
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function() {
     const shardedCollName = i => `sharded_${i}`;
@@ -122,12 +121,6 @@ export const $config = (function() {
     };
 
     const setup = function(db, collName, cluster) {
-        // TODO(SERVER-86317): re-enable this test
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-            jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
-            quit();
-        }
-
         for (let i = 0; i < collCount; i++) {
             const timeseriesOptions = {
                 timeField: timeField,

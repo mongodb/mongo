@@ -15,8 +15,6 @@
  * ]
  */
 
-import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-
 export const $config = (function() {
     const data = {
         logColl: "deletes_and_inserts_log",
@@ -77,12 +75,6 @@ export const $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        // TODO(SERVER-86317): re-enable this test
-        if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
-            jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
-            quit();
-        }
-
         // Lower the following parameter to force more yields.
         cluster.executeOnMongodNodes(function lowerYieldParams(db) {
             assert.commandWorked(

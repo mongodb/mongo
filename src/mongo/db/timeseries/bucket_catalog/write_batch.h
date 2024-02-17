@@ -115,6 +115,11 @@ struct WriteBatch {
      */
     Timestamp maxCommittedTime;
 
+    // Whether the measurements in the bucket are sorted by timestamp or not.
+    // True by default, if a v2 buckets gets promoted to v3 this is set to false.
+    // It should not be used for v1 buckets.
+    bool bucketIsSortedByTime = true;
+
     bool openedDueToMetadata =
         false;  // If true, bucket has been opened due to the inserted measurement having different
                 // metadata than available buckets.

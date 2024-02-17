@@ -27,13 +27,6 @@ const primaryDB = primary.getDB(dbName);
 const otherShard = st.shard1;
 const otherShardDB = otherShard.getDB(dbName);
 
-// TODO(SERVER-86317): re-enable this test
-if (FeatureFlagUtil.isEnabled(primary, "TimeseriesAlwaysUseCompressedBuckets")) {
-    jsTestLog("This test is disabled for featureFlagTimeseriesAlwaysUseCompressedBuckets.");
-    st.stop();
-    quit();
-}
-
 let currentId = 0;
 function generateId() {
     return currentId++;
