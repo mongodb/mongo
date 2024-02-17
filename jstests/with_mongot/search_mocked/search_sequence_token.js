@@ -51,6 +51,7 @@ const history = [
                     {_id: 4, $searchSequenceToken: "ddddddd=="},
                 ]
             },
+            vars: {SEARCH_META: {value: 1}},
             ok: 1
         }
     },
@@ -101,6 +102,47 @@ assert.commandWorked(
 cursor = coll.aggregate(
     [{$search: searchQuery}, {$addFields: {"myToken": {$meta: "searchSequenceToken"}}}]);
 assert.eq(expected, cursor.toArray());
+
+const expected2 = [{
+    "meta": [{"value": 1}],
+    "docs": [
+        {"_id": 1, "paginationToken": "aaaaaaa=="},
+        {"_id": 2, "paginationToken": "bbbbbbb=="},
+        {"_id": 3, "paginationToken": "ccccccc=="},
+    ]
+}];
+assert.commandWorked(
+    mongotConn.adminCommand({setMockResponses: 1, cursorId: cursorId, history: history}));
+
+// Test $search + $facet with searchSequenceToken.
+cursor = coll.aggregate([
+    {$search: searchQuery},
+    {
+        $facet: {
+            meta: [
+                {
+                    $replaceWith: "$$SEARCH_META",
+                },
+                {
+                    $limit: 1,
+                },
+            ],
+            docs: [
+                {
+                    $limit: 3,
+                },
+                {
+                    $project: {
+                        paginationToken: {
+                            $meta: "searchSequenceToken",
+                        },
+                    },
+                },
+            ],
+        },
+    },
+]);
+assert.eq(expected2, cursor.toArray());
 
 MongoRunner.stopMongod(conn);
 mongotmock.stop();
