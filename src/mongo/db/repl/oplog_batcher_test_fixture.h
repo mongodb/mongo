@@ -65,7 +65,8 @@ public:
     void shutdown(OperationContext* opCtx) final;
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
-              Batch::const_iterator end) final;
+              Batch::const_iterator end,
+              std::size_t size = -1) final;
     void waitForSpace(OperationContext* opCtx, std::size_t size) final{};
     bool isEmpty() const final;
     std::size_t getMaxSize() const final {

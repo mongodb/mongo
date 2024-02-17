@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -48,6 +48,11 @@ public:
     OplogBatch(std::vector<T> entries, size_t byteSize)
         : _batch(std::move(entries)), _byteSize(byteSize) {}
 
+    OplogBatch(typename std::vector<T>::const_iterator begin,
+               typename std::vector<T>::const_iterator end,
+               size_t byteSize)
+        : _batch(begin, end), _byteSize(byteSize) {}
+
     bool empty() const {
         return _batch.empty();
     }
@@ -66,11 +71,11 @@ public:
         return _batch;
     }
 
-    size_t size() const {
+    size_t count() const {
         return _batch.size();
     }
 
-    std::size_t getByteSize() {
+    std::size_t byteSize() {
         return _byteSize;
     }
 
@@ -129,7 +134,7 @@ private:
     boost::optional<long long> _termWhenExhausted;
 };
 
-using OplogBatchBSONObj = OplogBatch<BSONObj>;
+using OplogWriterBatch = OplogBatch<BSONObj>;
 
 }  // namespace repl
 }  // namespace mongo

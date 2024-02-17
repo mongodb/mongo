@@ -69,7 +69,8 @@ public:
     }
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
-              Batch::const_iterator end) override {
+              Batch::const_iterator end,
+              std::size_t size = -1) override {
         for (auto i = begin; i != end; ++i) {
             values.push_back(*i);
         }

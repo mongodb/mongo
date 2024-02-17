@@ -230,7 +230,10 @@ public:
         return _peekOrPop(value, Mode::kPeek);
     }
 
-    void push(OperationContext*, Batch::const_iterator, Batch::const_iterator) final {
+    void push(OperationContext*,
+              Batch::const_iterator,
+              Batch::const_iterator,
+              std::size_t size = -1) final {
         MONGO_UNREACHABLE;
     }
     void waitForSpace(OperationContext*, std::size_t) final {

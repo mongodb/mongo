@@ -564,7 +564,7 @@ private:
 TEST_F(OplogApplierDelayTest, GetNextApplierBatchReturnsEmptyBatchImmediately) {
     auto batch =
         unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits, Milliseconds(10)));
-    ASSERT_EQ(0, batch.size());
+    ASSERT_EQ(0, batch.count());
 }
 
 TEST_F(OplogApplierDelayTest, GetNextApplierBatchReturnsFullBatchImmediately) {
@@ -579,7 +579,7 @@ TEST_F(OplogApplierDelayTest, GetNextApplierBatchReturnsFullBatchImmediately) {
 
     auto batch =
         unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits, Milliseconds(10)));
-    ASSERT_EQ(3, batch.size());
+    ASSERT_EQ(3, batch.count());
 }
 
 TEST_F(OplogApplierDelayTest, GetNextApplierBatchWaitsForBatchToFill) {
@@ -607,7 +607,7 @@ TEST_F(OplogApplierDelayTest, GetNextApplierBatchWaitsForBatchToFill) {
     });
     auto batch =
         unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits, Milliseconds(10)));
-    ASSERT_EQ(3, batch.size());
+    ASSERT_EQ(3, batch.count());
     killWaits();
     insertThread.join();
 }
@@ -634,7 +634,7 @@ TEST_F(OplogApplierDelayTest, GetNextApplierBatchWaitsForBatchToTimeout) {
     });
     auto batch =
         unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits, Milliseconds(10)));
-    ASSERT_EQ(2, batch.size());
+    ASSERT_EQ(2, batch.count());
     killWaits();
     insertThread.join();
 }
@@ -663,7 +663,7 @@ TEST_F(OplogApplierDelayTest, GetNextApplierBatchInterrupted) {
     });
     auto batch =
         unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits, Milliseconds(10)));
-    ASSERT_EQ(2, batch.size());
+    ASSERT_EQ(2, batch.count());
     ASSERT_EQ(ErrorCodes::InterruptedAtShutdown, opCtx()->checkForInterruptNoAssert());
     killWaits();
     insertThread.join();

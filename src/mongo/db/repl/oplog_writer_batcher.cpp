@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/repl/oplog_writer_batcher.h"
+
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/duration.h"
 
@@ -45,19 +46,19 @@ OplogWriterBatcher::OplogWriterBatcher(OplogBuffer* oplogBuffer) : _oplogBuffer(
 
 OplogWriterBatcher::~OplogWriterBatcher() {}
 
-OplogBatchBSONObj OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seconds maxWaitTime) {
-    std::vector<OplogBatchBSONObj> batches;
-    OplogBatchBSONObj batch;
+OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seconds maxWaitTime) {
+    std::vector<OplogWriterBatch> batches;
+    OplogWriterBatch batch;
     size_t totalBytes = 0;
     size_t totalOps = 0;
     auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp();
 
     while (true) {
         while (_pollFromBuffer(opCtx, &batch, delaySecsLatestTimestamp)) {
-            auto batchSize = batch.getByteSize();
+            auto batchSize = batch.byteSize();
             invariant(batchSize <= kMinWriterBatchSize);
             totalBytes += batchSize;
-            totalOps += batch.size();
+            totalOps += batch.count();
             batches.push_back(std::move(batch));
             // Once the total bytes is between 16MB and 32MB, we return it as a writer batch. This
             // may not be optimistic on size but we can avoid waiting the next batch coming before
@@ -75,14 +76,17 @@ OplogBatchBSONObj OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Seco
 
     // We can't wait for any data from the buffer, return an empty batch.
     if (batches.empty()) {
-        return OplogBatchBSONObj();
+        return OplogWriterBatch();
+    }
+    if (batches.size() == 1) {
+        return std::move(batches.front());
     }
 
     return _mergeBatches(batches, totalBytes, totalOps);
 }
 
 bool OplogWriterBatcher::_pollFromBuffer(OperationContext* opCtx,
-                                         OplogBatchBSONObj* batch,
+                                         OplogWriterBatch* batch,
                                          boost::optional<Date_t>& delaySecsLatestTimestamp) {
     if (_stashedBatch) {
         *batch = std::move(*_stashedBatch);
@@ -109,18 +113,21 @@ bool OplogWriterBatcher::_pollFromBuffer(OperationContext* opCtx,
 }
 
 
-OplogBatchBSONObj OplogWriterBatcher::_mergeBatches(std::vector<OplogBatchBSONObj>& batches,
-                                                    size_t totalBytes,
-                                                    size_t totalOps) {
-    invariant(!batches.empty());
-    // Merge all oplog entries
+OplogWriterBatch OplogWriterBatcher::_mergeBatches(std::vector<OplogWriterBatch>& batches,
+                                                   size_t totalBytes,
+                                                   size_t totalOps) {
+    // Merge all batches into one.
+    invariant(batches.size() > 1);
+
     std::vector<BSONObj> ops;
     ops.reserve(totalOps);
+
     for (auto& batch : batches) {
         auto& objs = batch.getBatch();
         std::move(objs.begin(), objs.end(), std::back_inserter(ops));
     }
-    return OplogBatchBSONObj(std::move(ops), totalBytes);
+
+    return OplogWriterBatch(std::move(ops), totalBytes);
 }
 
 bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Seconds maxWaitTime) {
@@ -141,6 +148,7 @@ bool OplogWriterBatcher::_waitForData(OperationContext* opCtx, Seconds maxWaitTi
               "Interrupted when waiting for data, return what we have now",
               "error"_attr = e);
     }
+
     return false;
 }
 

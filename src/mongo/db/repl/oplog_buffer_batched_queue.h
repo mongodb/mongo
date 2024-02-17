@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,29 +29,25 @@
 
 #pragma once
 
-#include <cstddef>
-
-#include <boost/optional/optional.hpp>
-
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/util/duration.h"
-#include "mongo/util/interruptible.h"
-#include "mongo/util/queue.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
 
 /**
- * Oplog buffer backed by in memory blocking queue of BSONObj.
+ * Oplog buffer backed by a bounded, in-memory queue that supports batched operations
+ * like tryPopBatch() but does not supporting point operations like peek(), tryPop().
+ *
+ * Values of this buffer are stored in batches and popped out in batches, in the same
+ * way as they were pushed in. An important assumption is that each batch pushed into
+ * the buffer is not too large in byte size, normally less than 16MB.
  */
-class OplogBufferBlockingQueue final : public OplogBuffer {
+class OplogBufferBatchedQueue final : public OplogBuffer {
 public:
-    OplogBufferBlockingQueue();
-    explicit OplogBufferBlockingQueue(Counters* counters);
+    explicit OplogBufferBatchedQueue(size_t maxSize);
+    OplogBufferBatchedQueue(size_t maxSize, Counters* counters);
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
@@ -65,11 +61,18 @@ public:
     std::size_t getSize() const override;
     std::size_t getCount() const override;
     void clear(OperationContext* opCtx) override;
-    bool tryPop(OperationContext* opCtx, Value* value) override;
+    bool tryPop(OperationContext* opCtx, Value* value) {
+        MONGO_UNIMPLEMENTED;
+    }
+    bool tryPopBatch(OperationContext* opCtx, OplogBatch<Value>* batch) override;
     bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) override;
     bool waitForDataUntil(Date_t deadline, Interruptible* interruptible) override;
-    bool peek(OperationContext* opCtx, Value* value) override;
-    boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const override;
+    bool peek(OperationContext* opCtx, Value* value) {
+        MONGO_UNIMPLEMENTED;
+    }
+    boost::optional<Value> lastObjectPushed(OperationContext* opCtx) const {
+        MONGO_UNIMPLEMENTED;
+    };
 
     // In drain mode, the queue does not block. It is the responsibility of the caller to ensure
     // that no items are added to the queue while in drain mode; this is enforced by invariant().
@@ -77,11 +80,19 @@ public:
     void exitDrainMode() final;
 
 private:
-    Mutex _notEmptyMutex = MONGO_MAKE_LATCH("OplogBufferBlockingQueue::mutex");
-    stdx::condition_variable _notEmptyCv;
+    void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size);
+    void _clear_inlock(WithLock lk);
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferBatchedQueue::_mutex");
+    stdx::condition_variable _notEmptyCV;
+    stdx::condition_variable _notFullCV;
+    const size_t _maxSize;
+    size_t _curSize = 0;
+    size_t _curCount = 0;
     bool _drainMode = false;
+    bool _isShutdown = false;
     Counters* const _counters;
-    BlockingQueue<BSONObj> _queue;
+    std::list<OplogBatch<Value>> _queue;
 };
 
 }  // namespace repl

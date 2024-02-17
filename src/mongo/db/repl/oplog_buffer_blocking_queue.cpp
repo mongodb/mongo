@@ -67,7 +67,8 @@ void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
 
 void OplogBufferBlockingQueue::push(OperationContext*,
                                     Batch::const_iterator begin,
-                                    Batch::const_iterator end) {
+                                    Batch::const_iterator end,
+                                    std::size_t size) {
     invariant(!_drainMode);
     _queue.pushAllBlocking(begin, end);
     _notEmptyCv.notify_one();

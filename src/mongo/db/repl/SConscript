@@ -391,6 +391,16 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_buffer_batched_queue',
+    source=[
+        'oplog_buffer_batched_queue.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='oplog_buffer_blocking_queue',
     source=[
         'oplog_buffer_blocking_queue.cpp',
@@ -1825,6 +1835,7 @@ if wiredtiger:
             'oplog_applier_impl_test.cpp',
             'oplog_applier_test.cpp',
             'oplog_batcher_test_fixture.cpp',
+            'oplog_buffer_batched_queue_test.cpp',
             'oplog_buffer_collection_test.cpp',
             'oplog_buffer_proxy_test.cpp',
             'oplog_entry_test.cpp',
@@ -1931,6 +1942,7 @@ if wiredtiger:
             'oplog',
             'oplog_application_interface',
             'oplog_applier_impl_test_fixture',
+            'oplog_buffer_batched_queue',
             'oplog_buffer_collection',
             'oplog_buffer_proxy',
             'oplog_entry',

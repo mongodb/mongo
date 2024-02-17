@@ -1540,7 +1540,7 @@ void InitialSyncer::_getNextApplierBatchCallback(
 
     std::string logMsg = str::stream()
         << "Initial Syncer is about to apply the next oplog batch of size: "
-        << batchResult.getValue().size();
+        << batchResult.getValue().count();
     pauseAtInitialSyncFuzzerSyncronizationPoints(logMsg);
 
     if (MONGO_unlikely(failInitialSyncBeforeApplyingBatch.shouldFail())) {
