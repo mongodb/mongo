@@ -55,7 +55,7 @@ requests = "^2.26.0"
 typing-extensions = "^4.7.1"
 
 [tool.poetry.group.export.dependencies]
-pipx = "1.2.0"
+pipx = "1.4.3"
 # TODO: Add in pex as we move forward with this
 # pex = "^2.1.137"
 poetry = "1.5.1"
