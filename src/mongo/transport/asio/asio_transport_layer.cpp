@@ -1215,18 +1215,17 @@ Status AsioTransportLayer::start() {
         return ShutdownStatus;
     }
 
-    if (_sessionManager) {
-        uassertStatusOK(_sessionManager->start());
+    if (_listenerOptions.isIngress()) {
+        // Only start the listener thread if the TL wasn't shut down before start() was invoked.
+        if (_listener.state == Listener::State::kNew) {
+            invariant(_sessionManager);
+            _listener.thread = stdx::thread([this] { _runListener(); });
+            _listener.cv.wait(lk, [&] { return _listener.state != Listener::State::kNew; });
+        }
+    } else {
+        invariant(_acceptorRecords.empty());
     }
 
-    if (_listenerOptions.isIngress() && _listener.state == Listener::State::kNew) {
-        invariant(_sessionManager);
-        _listener.thread = stdx::thread([this] { _runListener(); });
-        _listener.cv.wait(lk, [&] { return _listener.state != Listener::State::kNew; });
-        return Status::OK();
-    }
-
-    invariant(_acceptorRecords.empty());
     return Status::OK();
 }
 

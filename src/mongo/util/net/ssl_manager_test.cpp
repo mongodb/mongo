@@ -77,10 +77,6 @@ public:
         old_sessions.clear();
     }
 
-    Status start() override {
-        return Status::OK();
-    }
-
     bool shutdown(Milliseconds timeout) override {
         return true;
     }

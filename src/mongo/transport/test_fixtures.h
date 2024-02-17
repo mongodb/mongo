@@ -176,10 +176,6 @@ public:
         _join();
     }
 
-    Status start() override {
-        return Status::OK();
-    }
-
     void startSession(std::shared_ptr<transport::Session> session) override {
         LOGV2(6109510, "Accepted connection", "remote"_attr = session->remote());
         auto& newSession = [&]() -> SessionThread& {

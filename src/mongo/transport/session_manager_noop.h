@@ -41,9 +41,6 @@ public:
     void startSession(std::shared_ptr<transport::Session> session) override {}
     void endAllSessions(Client::TagMask tags) override {}
     void endSessionByClient(Client* client) override {}
-    Status start() override {
-        return Status::OK();
-    }
     bool shutdown(Milliseconds timeout) override {
         return true;
     }

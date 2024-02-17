@@ -192,10 +192,6 @@ Status GRPCTransportLayerImpl::start() {
                 "tlsFIPSMode is not supported when gRPC mode is enabled",
                 !sslGlobalParams.sslFIPSMode);
 
-        if (_sessionManager) {
-            uassertStatusOK(_sessionManager->start());
-        }
-
         if (_server) {
             invariant(_sessionManager);
             _server->start();
