@@ -25,4 +25,25 @@ else
   LOCAL_ARG="--config=local"
 fi
 
-./bazelisk run --verbose_failures $LOCAL_ARG ${args} ${target}
+ARCH=$(uname -m)
+if [[ "$ARCH" == "arm64" || "$ARCH" == "aarch64" ]]; then
+  ARCH="arm64"
+elif [[ "$ARCH" == "ppc64le" || "$ARCH" == "ppc64" || "$ARCH" == "ppc" || "$ARCH" == "ppcle" ]]; then
+  ARCH="ppc64le"
+else
+  ARCH="amd64"
+fi
+
+# TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
+if [[ $ARCH == "ppc64le" ]]; then
+  BAZEL_BINARY=$TMPDIR/bazel
+else
+  BAZEL_BINARY=$TMPDIR/bazelisk
+fi
+
+# Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
+if [[ $ARCH == "ppc64le" ]]; then
+  export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
+fi
+
+$BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target}

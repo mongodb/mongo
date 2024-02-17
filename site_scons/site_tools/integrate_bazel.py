@@ -1,6 +1,7 @@
 import atexit
 import functools
 import getpass
+import hashlib
 import json
 import os
 import platform
@@ -27,6 +28,8 @@ _SUPPORTED_PLATFORM_MATRIX = [
     "linux:arm64:clang",
     "linux:amd64:gcc",
     "linux:amd64:clang",
+    "linux:ppc64le:gcc",
+    "linux:ppc64le:clang",
     "windows:amd64:msvc",
     "macos:amd64:clang",
     "macos:arm64:clang",
@@ -39,6 +42,11 @@ _SANITIZER_MAP = {
     "leak": "lsan",
     "thread": "tsan",
     "undefined": "ubsan",
+}
+
+_S3_HASH_MAPPING = {
+    "https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-ppc64le":
+        "dd21c75817533ff601bf797e64f0eb2f7f6b813af26c829f0bda30e328caef46",
 }
 
 
@@ -61,6 +69,9 @@ class Globals:
 
     # bazel command line with options, but not targets
     bazel_base_build_command: List[str] = None
+
+    # environment variables to set when invoking bazel
+    bazel_env_variables: Dict[str, str] = {}
 
     # Flag to signal that the bazel build thread should die and/or is not running
     kill_bazel_thread_flag: bool = False
@@ -276,7 +287,8 @@ def bazel_batch_build_thread(log_dir: str) -> None:
                 start_time = time.time()
                 bazel_proc = subprocess.run(
                     Globals.bazel_base_build_command + list(targets_to_build),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                    env={**os.environ.copy(), **Globals.bazel_env_variables})
                 bazel_debug(
                     f"Bazel build completed in {'{0:.2f}'.format(time.time() - start_time)} seconds and built {targets_to_build}."
                 )
@@ -473,6 +485,25 @@ def generate_bazel_info_for_ninja(env: SCons.Environment.Environment) -> None:
     env["NINJA_BAZEL_INPUTS"] = ninja_bazel_ins
 
 
+def sha256_file(filename: str) -> str:
+    sha256_hash = hashlib.sha256()
+    with open(filename, "rb") as f:
+        for block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(block)
+        return sha256_hash.hexdigest()
+
+
+def verify_s3_hash(s3_path: str, local_path: str) -> None:
+    if s3_path not in _S3_HASH_MAPPING:
+        raise Exception(
+            f"S3 path not found in hash mapping, unable to verify downloaded for s3 path: s3_path")
+
+    hash = sha256_file(local_path)
+    if hash != _S3_HASH_MAPPING[s3_path]:
+        raise Exception(
+            f"Hash mismatch for {s3_path}, expected {_S3_HASH_MAPPING[s3_path]} but got {hash}")
+
+
 # Establishes logic for BazelLibrary build rule
 def generate(env: SCons.Environment.Environment) -> None:
 
@@ -502,15 +533,34 @@ def generate(env: SCons.Environment.Environment) -> None:
             )
 
         # === Bazelisk ===
+        bazel_bin_dir = env.GetOption("evergreen-tmp-dir") if env.GetOption(
+            "evergreen-tmp-dir") else "build"
+        if not os.path.exists(bazel_bin_dir):
+            os.makedirs(bazel_bin_dir)
+
+        # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
+        bazel_executable = os.path.join(
+            bazel_bin_dir, "bazel") if normalized_arch in ["ppc64le"] else os.path.join(
+                bazel_bin_dir, "bazelisk")
 
         # TODO(SERVER-81038): remove once bazel/bazelisk is self-hosted.
-        if not os.path.exists("bazelisk"):
-            ext = ".exe" if normalized_os == "windows" else ""
-            os_str = normalized_os.replace("macos", "darwin")
-            urllib.request.urlretrieve(
-                f"https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-{os_str}-{normalized_arch}{ext}",
-                "bazelisk")
-            os.chmod("bazelisk", stat.S_IXUSR)
+        if not os.path.exists(bazel_executable):
+            print(f"Downloading {bazel_executable}...")
+            # TODO(SERVER-86050): remove the branch once bazelisk is built on s390x & ppc64le
+            if normalized_arch in ["ppc64le"]:
+                s3_path = f"https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-{normalized_arch}"
+                urllib.request.urlretrieve(s3_path, bazel_executable)
+                verify_s3_hash(s3_path, bazel_executable)
+            else:
+                ext = ".exe" if normalized_os == "windows" else ""
+                os_str = normalized_os.replace("macos", "darwin")
+                urllib.request.urlretrieve(
+                    f"https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-{os_str}-{normalized_arch}{ext}",
+                    bazel_executable)
+            print(f"Downloaded {bazel_executable}")
+            os.chmod(bazel_executable, stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        else:
+            print("Skipped downloading bazelisk", bazel_executable)
 
         # === Build settings ===
 
@@ -598,9 +648,14 @@ def generate(env: SCons.Environment.Environment) -> None:
             bazel_internal_flags.append(f"--sandbox_writable_path={evergreen_tmp_dir}")
 
         Globals.bazel_base_build_command = [
-            os.path.abspath("bazelisk"),
+            os.path.abspath(bazel_executable),
             'build',
         ] + bazel_internal_flags + shlex.split(env.get("BAZEL_FLAGS", ""))
+
+        # Set the JAVA_HOME directories for ppc64le and s390x since their bazel binaries are not compiled with a built-in JDK.
+        if normalized_arch == "ppc64le":
+            Globals.bazel_env_variables[
+                "JAVA_HOME"] = "/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
 
         # Store the bazel command line flags so scons can check if it should rerun the bazel targets
         # if the bazel command line changes.
@@ -623,6 +678,8 @@ def generate(env: SCons.Environment.Environment) -> None:
             # For c++ toolchains, bazel has some wierd behaviour where it thinks the default
             # cpu is "k8" which is another name for x86_64 cpus, so its not wrong, but abnormal
             out_dir_platform = "k8"
+        elif normalized_arch == "ppc64le":
+            out_dir_platform = "ppc"
 
         env["BAZEL_OUT_DIR"] = env.Dir(f"#/bazel-out/{out_dir_platform}-dbg/bin/")
 

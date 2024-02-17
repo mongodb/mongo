@@ -34,6 +34,7 @@ buildvariants:
     compile_variant: *ubuntu2204-arm64-bazel-compile
   tasks:
     - name: compile_bazel_TG
+    - name: compile_bazel_ninja_TG
 
 - name: &ubuntu2204-x86-64-bazel-compile ubuntu2204-x86-64-bazel-compile
   display_name: "Ubuntu 22.04 x86_64 Bazel Compile"
@@ -46,6 +47,7 @@ buildvariants:
     compile_variant: *ubuntu2204-x86-64-bazel-compile
   tasks:
     - name: compile_bazel_TG
+    - name: compile_bazel_ninja_TG
 
 - <<: *enterprise-ubuntu2204-64-libvoidstar-template
   name: &enterprise-ubuntu2204-64-libvoidstar enterprise-ubuntu2204-64-libvoidstar

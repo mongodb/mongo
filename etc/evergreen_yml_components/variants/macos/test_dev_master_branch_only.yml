@@ -26,6 +26,7 @@ buildvariants:
     compile_variant: *macos-amd64-bazel-compile
   tasks:
   - name: compile_bazel_macos_TG
+  - name: compile_bazel_ninja_TG
 
 # Note that this task is currently optional;
 # This will eventually become suggested, then required.
@@ -51,6 +52,7 @@ buildvariants:
     compile_variant: *macos-arm64-bazel-compile
   tasks:
   - name: compile_bazel_macos_TG
+  - name: compile_bazel_ninja_TG
 
 - name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"

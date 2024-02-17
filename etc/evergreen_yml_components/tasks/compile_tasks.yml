@@ -215,7 +215,7 @@ tasks:
 ## task ensures we can build with bazel.
 # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
 - name: compile_bazel_dist_test
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -248,7 +248,7 @@ tasks:
       compiler: clang
 
 - name: compile_bazel_dist_test_windows
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -273,7 +273,7 @@ tasks:
       output: build/fast/mongo/db/commands/fsync_locked.lib
 
 - name: compile_bazel_dist_test_macos
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -304,7 +304,7 @@ tasks:
 # contain C and asssembly source code files.
 # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
 - name: compile_bazel_c_and_asm_targets
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -320,7 +320,7 @@ tasks:
 # and that the bazel compilation correctly injects the libunwind dependency into other targets.
 # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
 - name: compile_bazel_libunwind
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -345,7 +345,7 @@ tasks:
       output: build/fast/third_party/unwind/libunwind.a
 
 - name: compile_bazel_program
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -371,7 +371,7 @@ tasks:
       output: build/fast/mongo/platform/visibility_test1
 
 - name: run_bazel_program
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -384,7 +384,7 @@ tasks:
         //src/mongo/platform:visibility_test1
 
 - name: run_bazel_program_windows
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
@@ -2296,21 +2296,23 @@ task_groups:
   - compile_bazel_c_and_asm_targets
   - compile_bazel_libunwind
   - compile_bazel_program
-  - compile_ninja_bazel
   - run_bazel_program
+
+- <<: *compile_bazel_task_group_template
+  name: compile_bazel_ninja_TG
+  tasks:
+  - compile_ninja_bazel
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_windows_TG
   tasks:
   - compile_bazel_dist_test_windows
-  - compile_ninja_bazel
   - run_bazel_program_windows
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_macos_TG
   tasks:
   - compile_bazel_dist_test_macos
-  - compile_ninja_bazel
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG

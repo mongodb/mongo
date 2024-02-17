@@ -67,3 +67,21 @@ platform(
         "@bazel_tools//tools/cpp:clang",
     ],
 )
+
+platform(
+    name = "linux_ppc64le_clang",
+    constraint_values = [
+        "@platforms//cpu:ppc64le",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+)
+
+platform(
+    name = "linux_ppc64le_gcc",
+    constraint_values = [
+        "@platforms//cpu:ppc64le",
+        "@platforms//os:linux",
+        "@bazel_tools//tools/cpp:gcc",
+    ],
+)
