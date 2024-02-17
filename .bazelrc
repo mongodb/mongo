@@ -32,6 +32,7 @@ build --bes_results_url=https://sodalite.cluster.engflow.com/invocation/
 build --experimental_remote_cache_compression=true 
 build --grpc_keepalive_time=30s
 build --nolegacy_important_outputs
+build --bes_keywords=repo:mongo
 
 # if you don't have access to the remote execution cluster above, use the local config
 # described below.
