@@ -159,6 +159,7 @@ struct ParsedCollModRequest {
     boost::optional<long long> cappedSize;
     boost::optional<long long> cappedMax;
     boost::optional<bool> timeseriesBucketsMayHaveMixedSchemaData;
+    boost::optional<bool> recordIdsReplicated;
 };
 
 Status getNotSupportedOnViewError(StringData fieldName) {
@@ -655,6 +656,15 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                                  *mixedSchema);
     }
 
+    if (auto recordIdsReplicated = cmr.getRecordIdsReplicated()) {
+        if (*recordIdsReplicated) {
+            return {ErrorCodes::InvalidOptions, "Cannot set recordIdsReplicated to true"};
+        }
+
+        parsed.recordIdsReplicated = recordIdsReplicated;
+        oplogEntryBuilder.append(CollMod::kRecordIdsReplicatedFieldName, false);
+    }
+
     if (const auto& dryRun = cmr.getDryRun()) {
         parsed.dryRun = *dryRun;
         // The dry run option should never be included in a collMod oplog entry.
@@ -979,6 +989,18 @@ Status _collModInternal(OperationContext* opCtx,
         if (auto mixedSchema = cmrNew.timeseriesBucketsMayHaveMixedSchemaData) {
             coll.getWritableCollection(opCtx)->setTimeseriesBucketsMayHaveMixedSchemaData(
                 opCtx, mixedSchema);
+        }
+
+        if (auto recordIdsReplicated = cmrNew.recordIdsReplicated) {
+            // Must be false if present.
+            invariant(
+                !(*recordIdsReplicated),
+                fmt::format(
+                    "Unexpected true value for 'recordIdsReplicated' in collMod options for {}: {}",
+                    nss.toStringForErrorMsg(),
+                    cmd.toBSON({}).toString()));
+
+            coll.getWritableCollection(opCtx)->unsetRecordIdsReplicated(opCtx);
         }
 
         // Handle index modifications.

@@ -204,6 +204,16 @@ structs:
                 validator:
                     lt: 2147483648  # 2^31
                 stability: stable
+            recordIdsReplicated:
+                description: >-
+                    Unsets and removes the 'recordIdsReplicated' option for the collection.
+                    Once this modification is applied, the collection will no longer guarantee the
+                    same recordId for a given document across all nodes in the a replica set.
+                    This collMod option must be set to 'false' (or equivalent according to
+                    BSONElement::booleanSafe()) if provided.
+                optional: true
+                type: safeBool
+                stability: unstable
 
 commands:
     collMod:

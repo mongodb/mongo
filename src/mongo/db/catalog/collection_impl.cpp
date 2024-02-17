@@ -948,7 +948,21 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
     return Status::OK();
 }
 
-void CollectionImpl::unsetRecordIdsReplicated(OperationContext* opCtx) {}
+void CollectionImpl::unsetRecordIdsReplicated(OperationContext* opCtx) {
+    uassert(8650600,
+            "This collection does not replicate record IDs",
+            _metadata->options.recordIdsReplicated);
+
+    LOGV2_DEBUG(8650601,
+                1,
+                "Unsetting 'recordIdsReplicated' catalog entry flag",
+                logAttrs(ns()),
+                logAttrs(uuid()));
+
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.options.recordIdsReplicated = false;
+    });
+}
 
 bool CollectionImpl::isChangeStreamPreAndPostImagesEnabled() const {
     return _metadata->options.changeStreamPreAndPostImagesOptions.getEnabled();
