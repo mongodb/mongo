@@ -481,7 +481,7 @@ def mongo_cc_library(
         "//bazel/config:macos_aarch64": macos_rpath_flags,
     })
 
-    # Create a cc_library entry to generate a shared archive of the target.
+    # Create a cc_library entry to generate a shared archive of the target (linux).
     native.cc_library(
         name = name + ".so",
         srcs = srcs,
@@ -498,13 +498,36 @@ def mongo_cc_library(
         includes = [],
         features = ["supports_pic", "pic"],
         target_compatible_with = select({
-            "//bazel/config:shared_archive_enabled": [],
+            "//bazel/config:shared_archive_enabled_linux": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+    )
+
+    # Create a cc_library entry to generate a shared archive of the target (windows).
+    native.cc_library(
+        name = name + ".dll",
+        srcs = srcs,
+        hdrs = hdrs + fincludes_hdr,
+        deps = deps,
+        visibility = visibility,
+        testonly = testonly,
+        copts = MONGO_GLOBAL_COPTS + copts + fincludes_copt,
+        data = data,
+        tags = tags,
+        linkopts = MONGO_GLOBAL_LINKFLAGS + linkopts,
+        linkstatic = True,
+        local_defines = MONGO_GLOBAL_DEFINES + visibility_support_defines + local_defines,
+        includes = [],
+        features = ["supports_pic", "pic"],
+        target_compatible_with = select({
+            "//bazel/config:shared_archive_enabled_windows": [],
             "//conditions:default": ["@platforms//:incompatible"],
         }),
     )
 
     deps_with_shared_archive = deps + select({
-        "//bazel/config:shared_archive_enabled": [":" + name + ".so"],
+        "//bazel/config:shared_archive_enabled_linux": [":" + name + ".so"],
+        "//bazel/config:shared_archive_enabled_windows": [":" + name + ".dll"],
         "//conditions:default": [],
     })
 

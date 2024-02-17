@@ -107,6 +107,9 @@ def bazel_target_emitter(
     """This emitter will map any scons outputs to bazel outputs so copy can be done later."""
 
     for t in target:
+        # Bug in Windows shared library emitter returns a string rather than a node
+        if type(t) == str:
+            t = env.arg2nodes(t)[0]
 
         # normally scons emitters conveniently build-ify the target paths so it will
         # reference the output location, but we actually want the node path
