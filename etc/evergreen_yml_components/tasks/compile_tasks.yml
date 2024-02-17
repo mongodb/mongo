@@ -1479,7 +1479,20 @@ tasks:
       permissions: public-read
       content_type: application/tar
       display_name: Packages
-
+  # We perform package task generally in the middle of larger task groups running
+  # on the same host serially. In order to reduce peak required disk space, we can delete
+  # these generated files since we have already uploaded them to aws at this point.
+  - func: "remove files"
+    vars:
+      files: >-
+        packages.tgz
+        src/mongodb-cryptd-debugsymbols.${ext|tgz}
+        src/mongodb-cryptd.${ext|tgz}
+        src/mongodb-jstestshell-debugsymbols.${ext|tgz}
+        src/mongodb-jstestshell.${ext|tgz}
+        src/mongodb-dist-debugsymbols.${ext|tgz}
+        src/mongodb-dist.${ext|tgz}
+        src/distsrc.${ext|tgz}
 
 - name: publish_packages
   run_on: rhel8.7-small
@@ -2432,10 +2445,12 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
+  # package task here to reduce peak diskspace SERVER-86662
+  - package
   - compile_dbtest
   - run_dbtest
   - archive_dbtest
-  - package
+
 
 # The *no_unittests_TG taskgroups are useful for static builds,
 # were the static binaries of the unittests can take up to
@@ -2457,11 +2472,12 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
+  # package task here to reduce peak diskspace SERVER-86662
+  - package
   - compile_dbtest
   - run_dbtest
   - archive_dbtest
   - compile_all_but_not_unittests
-  - package
 
 # TODO: SERVER-79886 Fix commented out tasks
 - <<: *compile_task_group_template
@@ -2470,11 +2486,13 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
+  # package task here to reduce peak diskspace SERVER-86662
+  - package
   - compile_dbtest
   # - run_dbtest
   # - archive_dbtest
   # - compile_all_but_not_unittests
-  # - package
+
 
 - <<: *compile_task_group_template
   name: compile_and_package_serial_no_unittests_TG
@@ -2503,12 +2521,13 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
+  # package task here to reduce peak diskspace SERVER-86662
+  - package
   - compile_dbtest
   - run_dbtest
   - archive_dbtest
   - compile_upload_benchmarks
   - compile_all_but_not_unittests
-  - package
 
 - <<: *compile_task_group_template
   name: compile_test_parallel_unittest_stream_TG

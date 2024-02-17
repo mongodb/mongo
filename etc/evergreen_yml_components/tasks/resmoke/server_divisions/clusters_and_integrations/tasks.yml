@@ -1836,6 +1836,7 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
+  - package
   - compile_integration_test
   - integration_tests_standalone
   - integration_tests_standalone_audit
@@ -1846,7 +1847,7 @@ task_groups:
   - run_dbtest
   - archive_dbtest
   - compile_all_but_not_unittests
-  - package
+
 
 - <<: *compile_task_group_template
   name: server_discovery_and_monitoring_json_test_TG
