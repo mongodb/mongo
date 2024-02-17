@@ -56,6 +56,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -796,6 +797,8 @@ public:
                 origCmd.getIsTimeseriesNamespace() && *origCmd.getIsTimeseriesNamespace();
             if (auto options = timeseries::getTimeseriesOptions(
                     opCtx, origCmd.getNamespace(), !isCommandOnTimeseriesBucketNamespace)) {
+                checkCollectionUUIDMismatch(
+                    opCtx, origCmd.getNamespace(), nullptr, origCmd.getCollectionUUID());
                 timeseriesCmdOwnership =
                     timeseries::makeTimeseriesCreateIndexesCommand(opCtx, origCmd, *options);
                 cmd = &timeseriesCmdOwnership.value();

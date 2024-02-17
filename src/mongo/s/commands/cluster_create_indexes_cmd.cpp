@@ -46,6 +46,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/database_name.h"
@@ -64,6 +65,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_ddl.h"
 #include "mongo/s/collection_routing_info_targeter.h"
+#include "mongo/s/collection_uuid_mismatch.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/string_map.h"
 
@@ -117,7 +119,7 @@ public:
     bool runWithRequestParser(OperationContext* opCtx,
                               const DatabaseName& dbName,
                               const BSONObj& cmdObj,
-                              const RequestParser&,
+                              const RequestParser& requestParser,
                               BSONObjBuilder& output) final {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22750, 1, "CMD: createIndexes", logAttrs(nss), "command"_attr = redact(cmdObj));
@@ -128,6 +130,16 @@ public:
         auto routingInfo = targeter.getRoutingInfo();
         auto cmdToBeSent = cmdObj;
         if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {
+            const auto& request = requestParser.request();
+            if (auto uuid = request.getCollectionUUID()) {
+                auto status = Status(CollectionUUIDMismatchInfo(
+                                         nss.dbName(), *uuid, nss.coll().toString(), boost::none),
+                                     "'collectionUUID' is specified for a time-series view "
+                                     "namespace; views do not have UUIDs");
+                uassertStatusOK(populateCollectionUUIDMismatch(opCtx, status));
+                MONGO_UNREACHABLE_TASSERT(8549600);
+            }
+
             cmdToBeSent = timeseries::makeTimeseriesCommand(
                 cmdToBeSent, nss, getName(), CreateIndexesCommand::kIsTimeseriesNamespaceFieldName);
         }

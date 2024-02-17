@@ -18,6 +18,15 @@ testDB.dropDatabase();
 assert.commandWorked(
     testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
 
+assert.commandWorked(testDB.runCommand({
+    createIndexes: collName,
+    indexes: [{name: "a1", key: {"a": 1}}, {name: "m1", key: {"m": 1}}],
+}));
+testDB.dropDatabase();
+
+assert.commandWorked(
+    testDB.createCollection(collName, {timeseries: {timeField: "t", metaField: "m"}}));
+
 const nonexistentUUID = UUID();
 const bucketsCollUUID = testDB.getCollectionInfos({name: bucketsCollName})[0].info.uuid;
 
@@ -66,6 +75,15 @@ const testUpdate = function(uuid, field) {
                 uuid);
 };
 
+const testCreateIndex = function(uuid, field) {
+    checkResult(testDB.runCommand({
+        createIndexes: collName,
+        indexes: [{name: "indexFieldName", key: {[field]: 1}}],
+        collectionUUID: uuid,
+    }),
+                uuid);
+};
+
 const testDelete = function(uuid, field) {
     assert.commandWorked(testDB[collName].insert({t: ISODate(), m: 1, a: 1}));
     checkResult(testDB.runCommand({
@@ -84,6 +102,9 @@ for (const uuid of [nonexistentUUID, bucketsCollUUID]) {
     testInsert(uuid, false);
 
     testCollMod(uuid);
+
+    testCreateIndex(uuid, "m");
+    testCreateIndex(uuid, "a");
 
     if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
         testUpdate(uuid, "m");
