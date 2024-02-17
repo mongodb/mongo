@@ -100,7 +100,6 @@ TEST_F(HashJoinStageTest, HashJoinCollationTest) {
                                      makeSV(innerCondSlot),
                                      makeSV(),
                                      boost::optional<value::SlotId>{useCollator, collatorSlot},
-                                     nullptr /* yieldPolicy */,
                                      kEmptyPlanNodeId);
 
             return std::make_pair(makeSV(innerCondSlot, outerCondSlot), std::move(hashJoinStage));

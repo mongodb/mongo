@@ -571,6 +571,9 @@ public:
         : CanTrackStats{stageType, nodeId, participateInTrialRunTracking},
           CanInterrupt{yieldPolicy} {}
 
+    PlanStage(StringData stageType, PlanNodeId nodeId, bool participateInTrialRunTracking)
+        : PlanStage(stageType, nullptr, nodeId, participateInTrialRunTracking) {}
+
     virtual ~PlanStage() = default;
 
     /**

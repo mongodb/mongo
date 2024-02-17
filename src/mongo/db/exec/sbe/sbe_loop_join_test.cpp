@@ -188,11 +188,8 @@ TEST_F(LoopJoinStageTest, LoopJoinInnerBlockingStage) {
     // Build a scan for the inner loop.
     auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(3 << 4 << 5));
 
-    auto spoolStage = makeS<SpoolEagerProducerStage>(std::move(innerScanStage),
-                                                     generateSpoolId(),
-                                                     makeSV(innerScanSlot),
-                                                     nullptr /* yieldPolicy */,
-                                                     kEmptyPlanNodeId);
+    auto spoolStage = makeS<SpoolEagerProducerStage>(
+        std::move(innerScanStage), generateSpoolId(), makeSV(innerScanSlot), kEmptyPlanNodeId);
 
     // Build and prepare for execution loop join of the two scan stages.
     auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),

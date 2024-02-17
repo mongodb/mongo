@@ -73,8 +73,7 @@ HashLookupStage::HashLookupStage(std::unique_ptr<PlanStage> outer,
                                  boost::optional<value::SlotId> collatorSlot,
                                  PlanNodeId planNodeId,
                                  bool participateInTrialRunTracking)
-    : PlanStage(
-          "hash_lookup"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("hash_lookup"_sd, planNodeId, participateInTrialRunTracking),
       _outerCond(outerCond),
       _innerCond(innerCond),
       _innerProjects(innerProjects),

@@ -71,10 +71,9 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      std::unique_ptr<EExpression> limit,
                      size_t memoryLimit,
                      bool allowDiskUse,
-                     PlanYieldPolicy* yieldPolicy,
                      PlanNodeId planNodeId,
                      bool participateInTrialRunTracking)
-    : PlanStage("sort"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage("sort"_sd, planNodeId, participateInTrialRunTracking),
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),
@@ -118,7 +117,6 @@ std::unique_ptr<PlanStage> SortStage::clone() const {
                                        _limitExpr ? _limitExpr->clone() : nullptr,
                                        _specificStats.maxMemoryUsageBytes,
                                        _allowDiskUse,
-                                       _yieldPolicy,
                                        _commonStats.nodeId,
                                        _participateInTrialRunTracking);
 }
@@ -420,7 +418,6 @@ void SortStage::SortImpl<KeyRow, ValueRow>::open(bool reOpen) {
 template <typename KeyRow, typename ValueRow>
 PlanState SortStage::SortImpl<KeyRow, ValueRow>::getNext() {
     auto optTimer(_stage.getOptTimer(_stage._opCtx));
-    _stage.checkForInterruptAndYield(_stage._opCtx);
 
     // When the sort spilled data to disk then read back the sorted runs.
     if (_mergeIt && _mergeIt->more()) {

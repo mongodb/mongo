@@ -114,7 +114,6 @@ public:
                  boost::optional<value::SlotId> collatorSlot,
                  bool allowDiskUse,
                  SlotExprPairVector mergingExprs,
-                 PlanYieldPolicy* yieldPolicy,
                  PlanNodeId planNodeId,
                  bool participateInTrialRunTracking = true,
                  bool forceIncreasedSpilling = false);

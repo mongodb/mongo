@@ -55,10 +55,7 @@ TsBucketToCellBlockStage::TsBucketToCellBlockStage(
     const std::string& timeField,
     PlanNodeId nodeId,
     bool participateInTrialRunTracking)
-    : PlanStage("ts_bucket_to_cellblock"_sd,
-                nullptr /* yieldPolicy */,
-                nodeId,
-                participateInTrialRunTracking),
+    : PlanStage("ts_bucket_to_cellblock"_sd, nodeId, participateInTrialRunTracking),
       _bucketSlotId(bucketSlot),
       _pathReqs(pathReqs),
       _blocksOutSlotId(std::move(blocksOut)),

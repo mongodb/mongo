@@ -68,11 +68,10 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            boost::optional<value::SlotId> collatorSlot,
                            bool allowDiskUse,
                            SlotExprPairVector mergingExprs,
-                           PlanYieldPolicy* yieldPolicy,
                            PlanNodeId planNodeId,
                            bool participateInTrialRunTracking,
                            bool forceIncreasedSpilling)
-    : PlanStage("group"_sd, yieldPolicy, planNodeId, participateInTrialRunTracking),
+    : PlanStage("group"_sd, planNodeId, participateInTrialRunTracking),
       _gbs(std::move(gbs)),
       _aggs(std::move(aggs)),
       _collatorSlot(collatorSlot),
@@ -123,7 +122,6 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
                                           _collatorSlot,
                                           _allowDiskUse,
                                           std::move(mergingExprsClone),
-                                          _yieldPolicy,
                                           _commonStats.nodeId,
                                           _participateInTrialRunTracking,
                                           _forceIncreasedSpilling);
@@ -659,7 +657,6 @@ PlanState HashAggStage::getNextSpilled() {
 
 PlanState HashAggStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
-    checkForInterruptAndYield(_opCtx);
 
     // If we've spilled, then we need to produce the output by merging the spilled segments from the
     // spill file.

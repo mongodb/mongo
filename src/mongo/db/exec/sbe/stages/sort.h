@@ -85,7 +85,6 @@ public:
               std::unique_ptr<EExpression> limit,
               size_t memoryLimit,
               bool allowDiskUse,
-              PlanYieldPolicy* yieldPolicy,
               PlanNodeId planNodeId,
               bool participateInTrialRunTracking = true);
 

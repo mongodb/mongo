@@ -53,8 +53,7 @@ TraverseStage::TraverseStage(std::unique_ptr<PlanStage> outer,
                              PlanNodeId planNodeId,
                              boost::optional<size_t> nestedArraysDepth,
                              bool participateInTrialRunTracking)
-    : PlanStage(
-          "traverse"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+    : PlanStage("traverse"_sd, planNodeId, participateInTrialRunTracking),
       _inField(inField),
       _outField(outField),
       _outFieldInner(outFieldInner),
