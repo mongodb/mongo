@@ -1,5 +1,7 @@
 """Repository rules for rules_py_simple"""
 
+load("//bazel:utils.bzl", "retry_download_and_extract")
+
 _OS_MAP = {
     "macos": "@platforms//os:osx",
     "linux": "@platforms//os:linux",
@@ -73,7 +75,9 @@ def _py_download(ctx):
         interpreter_path = platform_info["interpreter_path"]
 
     ctx.report_progress("downloading python")
-    ctx.download_and_extract(
+    retry_download_and_extract(
+        ctx = ctx,
+        tries = 5,
         url = urls,
         sha256 = sha,
         stripPrefix = "python",

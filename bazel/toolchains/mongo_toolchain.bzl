@@ -1,3 +1,5 @@
+load("//bazel:utils.bzl", "retry_download_and_extract")
+
 _OS_MAP = {
     "macos": "@platforms//os:osx",
     "linux": "@platforms//os:linux",
@@ -61,7 +63,9 @@ def _toolchain_download(ctx):
         sha = platform_info["sha"]
 
         ctx.report_progress("downloading mongo toolchain")
-        ctx.download_and_extract(
+        retry_download_and_extract(
+            ctx = ctx,
+            tries = 5,
             url = urls,
             sha256 = sha,
         )
