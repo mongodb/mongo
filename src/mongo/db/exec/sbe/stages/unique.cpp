@@ -44,7 +44,8 @@ UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector keys,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("unique"_sd, planNodeId, participateInTrialRunTracking), _keySlots(keys) {
+    : PlanStage("unique"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
+      _keySlots(keys) {
     _children.emplace_back(std::move(input));
 }
 

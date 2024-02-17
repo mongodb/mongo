@@ -76,6 +76,7 @@ public:
     SpoolEagerProducerStage(std::unique_ptr<PlanStage> input,
                             SpoolId spoolId,
                             value::SlotVector vals,
+                            PlanYieldPolicy* yieldPolicy,
                             PlanNodeId planNodeId,
                             bool participateInTrialRunTracking = true);
 
@@ -192,15 +193,19 @@ class SpoolConsumerStage final : public PlanStage {
 public:
     SpoolConsumerStage(SpoolId spoolId,
                        value::SlotVector vals,
+                       PlanYieldPolicy* yieldPolicy,
                        PlanNodeId planNodeId,
                        bool participateInTrialRunTracking = true)
-        : PlanStage{IsStack ? "sspool"_sd : "cspool"_sd, planNodeId, participateInTrialRunTracking},
+        : PlanStage{IsStack ? "sspool"_sd : "cspool"_sd,
+                    yieldPolicy,
+                    planNodeId,
+                    participateInTrialRunTracking},
           _spoolId{spoolId},
           _vals{std::move(vals)} {}
 
     std::unique_ptr<PlanStage> clone() const {
         return std::make_unique<SpoolConsumerStage<IsStack>>(
-            _spoolId, _vals, _commonStats.nodeId, _participateInTrialRunTracking);
+            _spoolId, _vals, _yieldPolicy, _commonStats.nodeId, _participateInTrialRunTracking);
     }
 
     void prepare(CompileCtx& ctx) {
@@ -237,6 +242,7 @@ public:
 
     PlanState getNext() {
         auto optTimer(getOptTimer(_opCtx));
+        checkForInterruptAndYield(_opCtx);
 
         if constexpr (IsStack) {
             if (_bufferIt != _buffer->size()) {

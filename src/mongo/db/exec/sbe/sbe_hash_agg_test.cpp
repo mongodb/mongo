@@ -136,6 +136,7 @@ void HashAggStageTest::performHashAggWithSpillChecking(
             makeSlotExprPairVec(
                 spillSlot,
                 stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+            nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));
@@ -240,6 +241,7 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
             boost::none,
             false /* allowDiskUse */,
             makeSlotExprPairVec() /* mergingExprs */,
+            nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 
         auto outSlot = generateSlotId();
@@ -299,6 +301,7 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
             boost::none,
             false /* allowDiskUse */,
             makeSlotExprPairVec() /* mergingExprs */,
+            nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 
         return std::make_pair(hashAggSlot, std::move(hashAggStage));
@@ -400,6 +403,7 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
             boost::none,
             false /* allowDiskUse */,
             makeSlotExprPairVec() /* mergingExprs */,
+            nullptr /* yieldPolicy */,
             kEmptyPlanNodeId);
 
         return std::make_pair(countsSlot, std::move(hashAggStage));
@@ -468,6 +472,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
         true /* allowDiskUse */,
         makeSlotExprPairVec(
             spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -532,6 +537,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
         true /* allowDiskUse */,
         makeSlotExprPairVec(
             spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -611,6 +617,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
         true /* allowDiskUse */,
         makeSlotExprPairVec(
             spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -675,6 +682,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
         true /* allowDiskUse */,
         makeSlotExprPairVec(
             spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -742,6 +750,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
         true /* allowDiskUse */,
         makeSlotExprPairVec(
             spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -812,6 +821,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
             stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot1)),
             spillSlot2,
             stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot2))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -892,6 +902,7 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
             stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot1)),
             spillSlot2,
             stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot2))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -972,6 +983,7 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
         true,  // allowDiskUse=true
         makeSlotExprPairVec(
             spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.
@@ -1021,6 +1033,7 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
         true,  // allowDiskUse=true
         makeSlotExprPairVec(
             spillSlot, stage_builder::makeFunction("sum", stage_builder::makeVariable(spillSlot))),
+        nullptr /* yieldPolicy */,
         kEmptyPlanNodeId);
 
     // Prepare the tree and get the 'SlotAccessor' for the output slot.

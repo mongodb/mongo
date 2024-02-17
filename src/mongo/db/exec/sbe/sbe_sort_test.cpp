@@ -72,6 +72,7 @@ TEST_F(SortStageTest, SortNumbersTest) {
                                               value::bitcastFrom<int64_t>(4)) /*limit*/,
                              204857600,
                              false,
+                             nullptr /* yieldPolicy */,
                              kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));

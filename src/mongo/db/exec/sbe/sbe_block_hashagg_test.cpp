@@ -219,6 +219,7 @@ public:
                                                      accumulatorBitset,
                                                      accDataSlots,
                                                      std::move(aggs),
+                                                     nullptr /* yieldPolicy */,
                                                      kEmptyPlanNodeId,
                                                      true);
             return std::make_pair(outputSlots, std::move(outStage));

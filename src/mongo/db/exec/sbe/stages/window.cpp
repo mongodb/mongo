@@ -50,7 +50,7 @@ WindowStage::WindowStage(std::unique_ptr<PlanStage> input,
                          bool allowDiskUse,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("window"_sd, planNodeId, participateInTrialRunTracking),
+    : PlanStage("window"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _currSlots(std::move(currSlots)),
       _boundTestingSlots(std::move(boundTestingSlots)),
       _partitionSlotCount(partitionSlotCount),

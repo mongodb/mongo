@@ -66,6 +66,7 @@ public:
                       value::SlotId accumulatorBitsetSlotId,
                       value::SlotVector accumulatorDataSlotIds,
                       BlockAndRowAggs aggs,
+                      PlanYieldPolicy* yieldPolicy,
                       PlanNodeId planNodeId,
                       bool participateInTrialRunTracking = true);
 

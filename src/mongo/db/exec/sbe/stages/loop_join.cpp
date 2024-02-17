@@ -70,7 +70,7 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              JoinType joinType,
                              PlanNodeId nodeId,
                              bool participateInTrialRunTracking)
-    : PlanStage("nlj"_sd, nodeId, participateInTrialRunTracking),
+    : PlanStage("nlj"_sd, nullptr /* yieldPolicy */, nodeId, participateInTrialRunTracking),
       _outerProjects(std::move(outerProjects)),
       _outerCorrelated(std::move(outerCorrelated)),
       _innerProjects(std::move(innerProjects)),

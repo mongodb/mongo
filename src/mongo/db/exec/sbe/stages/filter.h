@@ -66,6 +66,7 @@ public:
                 PlanNodeId planNodeId,
                 bool participateInTrialRunTracking = true)
         : PlanStage(IsConst ? "cfilter"_sd : (IsEof ? "efilter" : "filter"_sd),
+                    nullptr /* yieldPolicy */,
                     planNodeId,
                     participateInTrialRunTracking),
           _filter(std::move(filter)) {

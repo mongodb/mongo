@@ -330,11 +330,11 @@ bool SearchCursorStage::shouldReturnEOF() {
 
 PlanState SearchCursorStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+    checkForInterruptAndYield(_opCtx);
+
     if (shouldReturnEOF()) {
         return trackPlanState(PlanState::IS_EOF);
     }
-
-    _opCtx->checkForInterrupt();
 
     auto state = doGetNext();
 

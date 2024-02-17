@@ -78,6 +78,7 @@ public:
                   value::SlotVector innerCond,
                   value::SlotVector innerProjects,
                   boost::optional<value::SlotId> collatorSlot,
+                  PlanYieldPolicy* yieldPolicy,
                   PlanNodeId planNodeId,
                   bool participateInTrialRunTracking = true);
 

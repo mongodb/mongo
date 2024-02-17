@@ -60,6 +60,7 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
                                       PlanNodeId planNodeId,
                                       bool participateInTrialRunTracking)
     : PlanStage(O == MakeObjOutputType::object ? "mkobj"_sd : "mkbson"_sd,
+                nullptr /* yieldPolicy */,
                 planNodeId,
                 participateInTrialRunTracking),
       _objSlot(objSlot),

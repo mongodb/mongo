@@ -56,7 +56,7 @@ BranchStage::BranchStage(std::unique_ptr<PlanStage> inputThen,
                          value::SlotVector outputVals,
                          PlanNodeId planNodeId,
                          bool participateInTrialRunTracking)
-    : PlanStage("branch"_sd, planNodeId, participateInTrialRunTracking),
+    : PlanStage("branch"_sd, nullptr /* yieldPolicy */, planNodeId, participateInTrialRunTracking),
       _filter(std::move(filter)),
       _inputThenVals(std::move(inputThenVals)),
       _inputElseVals(std::move(inputElseVals)),
