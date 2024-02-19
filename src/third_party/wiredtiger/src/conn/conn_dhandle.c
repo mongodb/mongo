@@ -723,11 +723,18 @@ done:
             time_stop = __wt_clock(session);
             time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
             WT_STAT_CONN_SET(session, checkpoint_handle_applied, conn->ckpt_apply);
-            WT_STAT_CONN_SET(session, checkpoint_handle_skipped, conn->ckpt_skip);
-            WT_STAT_CONN_SET(session, checkpoint_handle_walked, conn->dhandle_count);
+            WT_STAT_CONN_SET(session, checkpoint_handle_apply_duration, conn->ckpt_apply_time);
+            WT_STAT_CONN_SET(session, checkpoint_handle_dropped, conn->ckpt_drop);
+            WT_STAT_CONN_SET(session, checkpoint_handle_drop_duration, conn->ckpt_drop_time);
             WT_STAT_CONN_SET(session, checkpoint_handle_duration, time_diff);
-            WT_STAT_CONN_SET(session, checkpoint_handle_duration_apply, conn->ckpt_apply_time);
-            WT_STAT_CONN_SET(session, checkpoint_handle_duration_skip, conn->ckpt_skip_time);
+            WT_STAT_CONN_SET(session, checkpoint_handle_locked, conn->ckpt_lock);
+            WT_STAT_CONN_SET(session, checkpoint_handle_lock_duration, conn->ckpt_lock_time);
+            WT_STAT_CONN_SET(session, checkpoint_handle_meta_checked, conn->ckpt_meta_check);
+            WT_STAT_CONN_SET(
+              session, checkpoint_handle_meta_check_duration, conn->ckpt_meta_check_time);
+            WT_STAT_CONN_SET(session, checkpoint_handle_skipped, conn->ckpt_skip);
+            WT_STAT_CONN_SET(session, checkpoint_handle_skip_duration, conn->ckpt_skip_time);
+            WT_STAT_CONN_SET(session, checkpoint_handle_walked, conn->dhandle_count);
         }
         return (0);
     }

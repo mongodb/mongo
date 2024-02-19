@@ -11,6 +11,7 @@
 static void __checkpoint_timing_stress(WT_SESSION_IMPL *, uint64_t, struct timespec *);
 static int __checkpoint_lock_dirty_tree(WT_SESSION_IMPL *, bool, bool, bool, const char *[]);
 static int __checkpoint_mark_skip(WT_SESSION_IMPL *, WT_CKPT *, bool);
+static void __checkpoint_prepare_progress(WT_SESSION_IMPL *session, bool final);
 static int __checkpoint_presync(WT_SESSION_IMPL *, const char *[]);
 static int __checkpoint_tree_helper(WT_SESSION_IMPL *, const char *[]);
 static int __drop_list_execute(WT_SESSION_IMPL *session, WT_ITEM *drop_list);
@@ -421,8 +422,12 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
     WT_BTREE *btree;
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
+    uint64_t time_diff, time_start, time_stop;
     const char *name;
     bool force;
+
+    /* Periodically log checkpoint prepare progress. */
+    __checkpoint_prepare_progress(session, false);
 
     /* Find out if we have to force a checkpoint. */
     WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
@@ -457,7 +462,12 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
         WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_ERROR));
         WT_RET(__wt_metadata_cursor(session, &meta_cursor));
         meta_cursor->set_key(meta_cursor, session->dhandle->name);
+        time_start = __wt_clock(session);
         ret = __wt_curfile_insert_check(meta_cursor);
+        time_stop = __wt_clock(session);
+        time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
+        ++S2C(session)->ckpt_meta_check;
+        S2C(session)->ckpt_meta_check_time += time_diff;
         if (ret == WT_ROLLBACK) {
             /*
              * If create or drop or any schema operation of a table is with in an user transaction
@@ -478,7 +488,12 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
      * Decide whether the tree needs to be included in the checkpoint and if so, acquire the
      * necessary locks.
      */
+    time_start = __wt_clock(session);
     WT_SAVE_DHANDLE(session, ret = __checkpoint_lock_dirty_tree(session, true, force, true, cfg));
+    time_stop = __wt_clock(session);
+    time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
+    ++S2C(session)->ckpt_lock;
+    S2C(session)->ckpt_lock_time += time_diff;
     WT_RET(ret);
     if (F_ISSET(btree, WT_BTREE_SKIP_CKPT)) {
         __checkpoint_update_generation(session);
@@ -573,6 +588,32 @@ __checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
         bytes_written_total = cache->bytes_written - bytes_written_start;
         if (bytes_written_total > max_write)
             break;
+    }
+}
+
+/*
+ * __checkpoint_prepare_progress --
+ *     Output a checkpoint prepare progress message.
+ */
+static void
+__checkpoint_prepare_progress(WT_SESSION_IMPL *session, bool final)
+{
+    struct timespec cur_time;
+    WT_CONNECTION_IMPL *conn;
+    uint64_t time_diff;
+
+    conn = S2C(session);
+    __wt_epoch(session, &cur_time);
+
+    /* Time since the full database checkpoint started */
+    time_diff = WT_TIMEDIFF_SEC(cur_time, conn->ckpt_timer_start);
+
+    if (final || (time_diff / WT_PROGRESS_MSG_PERIOD) > conn->ckpt_progress_msg_count) {
+        __wt_verbose(session, WT_VERB_CHECKPOINT_PROGRESS,
+          "Checkpoint prepare %s for %" PRIu64 " seconds and it has gathered %" PRIu64
+          " dhandles and skipped %" PRIu64 " dhandles",
+          final ? "ran" : "has been running", time_diff, conn->ckpt_apply, conn->ckpt_skip);
+        conn->ckpt_progress_msg_count++;
     }
 }
 
@@ -1177,6 +1218,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      */
     WT_WITH_SCHEMA_LOCK(session, ret = __checkpoint_prepare(session, &tracking, cfg));
     WT_ERR(ret);
+
+    /* Log the final checkpoint prepare progress message if needed. */
+    if (conn->ckpt_progress_msg_count > 0)
+        __checkpoint_prepare_progress(session, true);
 
     /*
      * Save the checkpoint timestamp in a temporary variable, when we release our snapshot it'll be
@@ -1881,6 +1926,7 @@ __checkpoint_lock_dirty_tree(
     WT_ITEM *drop_list;
     size_t ckpt_bytes_allocated;
     uint64_t now;
+    uint64_t time_diff, time_start, time_stop;
     char *name_alloc;
     const char *name;
     bool is_drop, is_wt_ckpt, seen_ckpt_add, skip_ckpt;
@@ -1968,6 +2014,7 @@ __checkpoint_lock_dirty_tree(
     WT_BTREE_CLEAN_CKPT(session, btree, 0);
     F_CLR(btree, WT_BTREE_OBSOLETE_PAGES);
 
+    time_start = __wt_clock(session);
     WT_ERR(__wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase, &ckpt_bytes_allocated));
 
     /* We may be dropping specific checkpoints, check the configuration. */
@@ -2013,6 +2060,11 @@ __checkpoint_lock_dirty_tree(
      * checkpoint.
      */
     WT_ERR(__drop(session, NULL, ckptbase, name, strlen(name)));
+
+    time_stop = __wt_clock(session);
+    ++S2C(session)->ckpt_drop;
+    time_diff = WT_CLOCKDIFF_US(time_stop, time_start);
+    S2C(session)->ckpt_drop_time += time_diff;
 
     /* Set the name of the new entry at the end of the list. */
     WT_CKPT_FOREACH (ckptbase, ckpt)
