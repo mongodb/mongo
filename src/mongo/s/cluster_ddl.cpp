@@ -189,7 +189,6 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
         }
     }
 
-    auto cmdObj = request.toBSON({});
     BSONObjBuilder builder;
     request.serialize({}, &builder);
 
