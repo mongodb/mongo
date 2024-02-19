@@ -5148,18 +5148,24 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                     std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
                                         {sbe::value::TypeTags::Nothing, 0},
                                     boost::optional<TimeUnit> unit = boost::none) {
+            // Use three way comparison to compare special values like NaN.
             return makeBinaryOp(sbe::EPrimBinary::greaterEq,
-                                makeVariable(boundTestingSlot),
-                                makeOffsetBoundExpr(boundSlot, offset, unit));
+                                makeBinaryOp(sbe::EPrimBinary::cmp3w,
+                                             makeVariable(boundTestingSlot),
+                                             makeOffsetBoundExpr(boundSlot, offset, unit)),
+                                makeConstant(sbe::value::TypeTags::NumberInt32, 0));
         };
         auto makeHighBoundExpr = [&](sbe::value::SlotId boundSlot,
                                      sbe::value::SlotId boundTestingSlot,
                                      std::pair<sbe::value::TypeTags, sbe::value::Value> offset =
                                          {sbe::value::TypeTags::Nothing, 0},
                                      boost::optional<TimeUnit> unit = boost::none) {
+            // Use three way comparison to compare special values like NaN.
             return makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                makeVariable(boundTestingSlot),
-                                makeOffsetBoundExpr(boundSlot, offset, unit));
+                                makeBinaryOp(sbe::EPrimBinary::cmp3w,
+                                             makeVariable(boundTestingSlot),
+                                             makeOffsetBoundExpr(boundSlot, offset, unit)),
+                                makeConstant(sbe::value::TypeTags::NumberInt32, 0));
         };
         auto makeLowUnboundedExpr = [&](const WindowBounds::Unbounded&) {
             window.lowBoundExpr = nullptr;

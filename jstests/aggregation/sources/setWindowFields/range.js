@@ -271,3 +271,25 @@ const pipeline = [{
     }
 }];
 assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
+
+// Test the behavior with regards NaN as the sort value.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {x: NaN},
+    {x: 0},
+]));
+assert.sameMembers(run([
+                       {
+                           $setWindowFields: {
+                               sortBy: {x: 1},
+                               output: {
+                                   y: {$push: "$x", window: {range: [0, 1]}},
+                               }
+                           }
+                       },
+                       {$unset: '_id'}
+                   ]),
+                   [
+                       {x: NaN, y: [NaN]},
+                       {x: 0, y: [0]},
+                   ]);
