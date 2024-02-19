@@ -2574,6 +2574,7 @@ task_groups:
   - ninja_dev_compile_smoke_test
 
 - name: clang_tidy_TG
+  tags: ["development_and_release_critical", "run_on_single_variant"]
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load

@@ -196,7 +196,7 @@ tasks:
 
 - <<: *task_template
   name: resmoke_validation_tests
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant"]
   depends_on:
   - name: archive_dist_test
   commands:

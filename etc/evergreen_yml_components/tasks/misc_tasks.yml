@@ -540,7 +540,7 @@ tasks:
       jepsen_test_name: set
 
 - name: lint_clang_format
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -560,7 +560,7 @@ tasks:
       targets: lint-clang-format
 
 - name: lint_cpplint
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -580,7 +580,7 @@ tasks:
       targets: lint-lint.py
 
 - name: lint_errorcodes
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -595,7 +595,7 @@ tasks:
       targets: lint-errorcodes
 
 - name: lint_eslint
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -642,7 +642,7 @@ tasks:
   - func: "lint fuzzer sanity patch"
 
 - name: lint_large_files_check
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant"]
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -665,7 +665,7 @@ tasks:
 
 # Confirm that the poetry.lock file is up to date with pyproject.toml
 - name: lint_poetry_lock
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -683,7 +683,7 @@ tasks:
       - "evergreen/functions/poetry_lock_check.py"
 
 - name: lint_bazel
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -716,7 +716,7 @@ tasks:
       - "lint-all"
 
 - name: lint_pylinters
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -736,7 +736,7 @@ tasks:
       targets: lint-pylinters
 
 - name: lint_sconslinters
-  tags: ["assigned_to_jira_team_devprod_build", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -756,7 +756,7 @@ tasks:
       targets: lint-sconslinters
 
 - name: lint_shellscripts
-  tags: ["assigned_to_jira_team_devprod_correctness", "lint"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant", "lint"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -773,7 +773,7 @@ tasks:
       - "src/evergreen/lint_shellscripts.sh"
 
 - name: lint_yaml
-  tags: ["assigned_to_jira_team_devprod_correctness", "lint"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant", "lint"]
   depends_on: []
   commands:
   - command: manifest.load
@@ -1074,7 +1074,7 @@ tasks:
   - func: "sync repo with copybara"
 
 - name: test_api_version_compatibility
-  tags: ["assigned_to_jira_team_server_repl"]
+  tags: ["assigned_to_jira_team_server_repl", "development_and_release_critical", "run_on_single_variant"]
   depends_on:
   - name: archive_dist_test
   commands:
@@ -1128,7 +1128,7 @@ tasks:
       docker_password: ${dockerhub_password}
 
 - name: validate_commit_message
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant"]
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -1196,7 +1196,7 @@ tasks:
   - func: "generate version"
 
 - name: version_gen_validation
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant"]
   commands:
   - command: manifest.load
   - func: "git get project"

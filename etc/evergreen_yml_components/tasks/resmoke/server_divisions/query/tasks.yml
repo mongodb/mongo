@@ -492,7 +492,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore
-  tags: ["assigned_to_jira_team_server_query_execution", "jscore", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "development_and_release_critical", "jscore", "common"]
   commands:
   - func: "do setup"
   - func: "run tests"
