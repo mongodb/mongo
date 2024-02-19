@@ -118,14 +118,14 @@ tasks:
 
 - <<: *task_template
   name: aggregation
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggregation", "common"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: aggregation_auth
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "auth", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggregation", "auth", "common"]
   depends_on:
   - name: aggregation
   commands:
@@ -456,7 +456,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "concurrency", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "concurrency", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -514,7 +514,7 @@ tasks:
 
 - <<: *gen_task_template
   name: parallel_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "misc_js", "parallel"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "misc_js", "parallel"]
   commands:
   - func: "generate resmoke tasks"
     vars:

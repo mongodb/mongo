@@ -2097,7 +2097,7 @@ tasks:
 
 - name: crypt_push
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_server_security", "publish_crypt"]
+  tags: ["assigned_to_jira_team_server_security", "release_critical", "publish_crypt"]
   patchable: false
   stepback: false
   depends_on:
@@ -2634,19 +2634,20 @@ task_groups:
 
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_archive
-  tags: ["stitch"]
+  tags: ["release_critical", "stitch"]
   tasks:
   - "stitch_support_create_lib"
 
 - <<: *stitch_support_task_group_template
   name: stitch_support_lib_build_and_test
-  tags: ["stitch"]
+  tags: ["release_critical", "stitch"]
   max_hosts: 1
   tasks:
   - "stitch_support_install_tests"
   - "stitch_support_run_tests"
 
 - name: crypt_build
+  tags: ["release_critical", "crypt"]
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"
@@ -2671,7 +2672,6 @@ task_groups:
   - func: "generate compile expansions"
   teardown_group:
   - func: "umount shared scons directory"
-  tags: ["crypt"]
   max_hosts: 1
   tasks:
   - "crypt_create_lib"

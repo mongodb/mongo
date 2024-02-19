@@ -234,7 +234,7 @@ tasks:
 
 - <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
-  tags: ["assigned_to_jira_team_server_repl", "causally_consistent"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "causally_consistent"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -247,7 +247,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_causal_consistency_gen
-  tags: ["assigned_to_jira_team_server_repl", "concurrency", "repl", "large", "non_live_record"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "concurrency", "repl", "large", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -256,7 +256,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_gen
-  tags: ["assigned_to_jira_team_server_repl", "concurrency", "common", "repl"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "concurrency", "common", "repl"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -264,7 +264,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_multi_stmt_txn_gen
-  tags: ["assigned_to_jira_team_server_repl", "concurrency", "common", "repl", "txn", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "concurrency", "common", "repl", "txn", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -343,7 +343,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_replication_gen
-  tags: ["assigned_to_jira_team_server_repl", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -387,7 +387,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_replication_with_balancer_gen
-  tags: ["assigned_to_jira_team_server_repl", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -405,7 +405,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_simultaneous_replication_gen
-  tags: ["assigned_to_jira_team_server_repl", "concurrency", "common", "large", "repl", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "concurrency", "common", "large", "repl", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -461,7 +461,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore_txns
-  tags: ["assigned_to_jira_team_server_repl", "jscore", "common", "txns"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "jscore", "common", "txns"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -658,7 +658,7 @@ tasks:
 
 - <<: *gen_task_template
   name: multiversion_gen
-  tags: ["assigned_to_jira_team_server_repl", "multiversion", "no_multiversion_generate_tasks", "future_git_tag_incompatible"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "multiversion", "no_multiversion_generate_tasks", "future_git_tag_incompatible"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -698,7 +698,7 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_auth_gen
-  tags: ["assigned_to_jira_team_server_repl", "replica_sets", "common", "san", "auth", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "replica_sets", "common", "san", "auth", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -714,7 +714,7 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_gen
-  tags: ["assigned_to_jira_team_server_repl", "replica_sets", "san", "large"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "replica_sets", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
 
@@ -750,7 +750,7 @@ tasks:
 
 - <<: *gen_task_template
   name: replica_sets_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "replica_sets", "common", "san", "large"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "replica_sets", "common", "san", "large"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -955,7 +955,7 @@ tasks:
 
 - <<: *task_template
   name: serial_run
-  tags: ["assigned_to_jira_team_server_repl", "misc_js", "non_win_dbg"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "misc_js", "non_win_dbg"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -970,7 +970,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_collections_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -978,7 +978,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharded_collections_txns_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -986,7 +986,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_api_version_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "sharding", "jscore"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -994,7 +994,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1002,7 +1002,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_txns_uninitialized_fcv_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_repl", "sharding", "jscore", "initsync", "uninitialized_fcv"]
+  tags: ["assigned_to_jira_team_server_repl", "release_critical", "sharding", "jscore", "initsync", "uninitialized_fcv"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1070,7 +1070,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_simultaneous_gen
-  tags: ["assigned_to_jira_team_server_execution", "concurrency", "common", "random_name"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical", "concurrency", "common", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1215,7 +1215,7 @@ tasks:
 
 - <<: *task_template
   name: disk_wiredtiger
-  tags: ["assigned_to_jira_team_server_execution"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1224,7 +1224,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore_decimal
-  tags: ["assigned_to_jira_team_server_execution", "jscore", "common", "decimal"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical", "jscore", "common", "decimal"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1285,7 +1285,7 @@ tasks:
 
 - <<: *gen_task_template
   name: noPassthroughWithMongod_gen
-  tags: ["assigned_to_jira_team_server_execution", "misc_js"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical", "misc_js"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1294,7 +1294,7 @@ tasks:
 
 - <<: *gen_task_template
   name: noPassthrough_gen
-  tags: ["assigned_to_jira_team_server_execution", "misc_js", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical", "misc_js", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1325,7 +1325,7 @@ tasks:
 
 - <<: *gen_task_template
   name: slow1_gen
-  tags: ["assigned_to_jira_team_server_execution", "misc_js", "non_win_dbg"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical", "misc_js", "non_win_dbg"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1334,7 +1334,7 @@ tasks:
 
 - <<: *gen_task_template
   name: timeseries_crud_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_execution", "timeseries_crud"]
+  tags: ["assigned_to_jira_team_server_execution", "release_critical", "timeseries_crud"]
   commands:
   - func: "generate resmoke tasks"
     vars:

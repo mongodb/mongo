@@ -163,7 +163,7 @@ tasks:
 
 - <<: *task_template
   name: mongosTest
-  tags: ["assigned_to_jira_team_devprod_correctness", "misc_js", "non_read_maj", "non_live_record"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "release_critical", "misc_js", "non_read_maj", "non_live_record"]
   commands:
   - func: "do setup"
   - func: "run tests"
