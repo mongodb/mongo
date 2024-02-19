@@ -103,7 +103,7 @@ def get_compare_cursor(conn, timestamp, uri, arg):
 def show_kv(kv):
     s = str(kv)
     if len(s) > 100:
-        s = s[0:100] + '...'
+        s = s[:25] + '[...]' + s[-25:]
     return s
 
 # Walk through both cursors, comparing them.  Generally, it's very easy, when the
