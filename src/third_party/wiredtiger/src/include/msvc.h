@@ -119,12 +119,12 @@ WT_ACQUIRE_BARRIER(void)
 }
 
 /*
- * WT_WRITE_BARRIER --
- *	MSVC implementation of WT_WRITE_BARRIER. As we're running on x86 TSO we only issue a
+ * WT_RELEASE_BARRIER --
+ *	MSVC implementation of WT_RELEASE_BARRIER. As we're running on x86 TSO we only issue a
  *compiler barrier.
  */
 static inline void
-WT_WRITE_BARRIER(void)
+WT_RELEASE_BARRIER(void)
 {
     WT_COMPILER_BARRIER();
 }

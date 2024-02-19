@@ -494,12 +494,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
             WT_RET(__wt_split_multi(session, ref, closing));
         break;
     case WT_PM_REC_REPLACE:
-        /*
-         * 1-for-1 page swap: Update the parent to reference the replacement page.
-         *
-         * Publish: a barrier to ensure the structure fields are set before the state change makes
-         * the page available to readers.
-         */
+        /* 1-for-1 page swap: Update the parent to reference the replacement page. */
         WT_ASSERT(session, mod->mod_replace.addr != NULL);
         WT_RET(__wt_calloc_one(session, &addr));
         *addr = mod->mod_replace;

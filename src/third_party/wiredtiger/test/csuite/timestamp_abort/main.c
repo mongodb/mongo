@@ -915,7 +915,7 @@ rollback:
 
         /* We're done with the timestamps, allow oldest and stable to move forward. */
         if (use_ts)
-            WT_PUBLISH(active_timestamps[td->threadnum], active_ts);
+            WT_RELEASE_WRITE_WITH_BARRIER(active_timestamps[td->threadnum], active_ts);
     }
     /* NOTREACHED */
 }

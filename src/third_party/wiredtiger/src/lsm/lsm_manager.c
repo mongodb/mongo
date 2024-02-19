@@ -231,7 +231,7 @@ err:
         /*
          * Reset the workers count (otherwise, LSM destroy will hang waiting for threads to exit.
          */
-        WT_PUBLISH(manager->lsm_workers, 0);
+        WT_RELEASE_WRITE_WITH_BARRIER(manager->lsm_workers, 0);
     }
     return (ret);
 }

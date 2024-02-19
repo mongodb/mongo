@@ -709,8 +709,8 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
         last_running = S2C(session)->txn_global.last_running;
 
     /*
-     * We depend on the atomic operation being a write barrier, that is, a barrier to ensure all
-     * changes to the page are flushed before updating the page state and/or marking the tree dirty,
+     * We depend on the atomic operation being a release barrier, that is, a barrier to ensure all
+     * changes to the page are written before updating the page state and/or marking the tree dirty,
      * otherwise checkpoints and/or page reconciliation might be looking at a clean page/tree.
      *
      * Every time the page transitions from clean to dirty, update the cache and transactional
@@ -811,7 +811,7 @@ __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
          * reconciliation thread.
          *
          * Since clearing of the page state is not going to be happening during reconciliation on a
-         * separate thread, there's no write barrier needed here.
+         * separate thread, there's no release barrier needed here.
          */
         page->modify->page_state = WT_PAGE_CLEAN;
         page->modify->flags = 0;

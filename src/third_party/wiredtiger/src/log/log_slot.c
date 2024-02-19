@@ -80,7 +80,7 @@ __wt_log_slot_activate(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
      * Set the slot state last. Other threads may have a stale pointer to this slot and could try to
      * alter the state and other fields once they see the state cleared.
      */
-    WT_PUBLISH(slot->slot_state, 0);
+    WT_RELEASE_WRITE_WITH_BARRIER(slot->slot_state, 0);
 }
 
 /*

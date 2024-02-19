@@ -84,7 +84,7 @@ __txn_remove_from_global_table(WT_SESSION_IMPL *session)
 
     txn_shared = WT_SESSION_TXN_SHARED(session);
 #endif
-    WT_PUBLISH(txn_shared->id, WT_TXN_NONE);
+    WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->id, WT_TXN_NONE);
 }
 
 /*
@@ -194,7 +194,7 @@ done:
  *     Allocate a snapshot, optionally update our shared txn ids.
  */
 static void
-__txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
+__txn_get_snapshot_int(WT_SESSION_IMPL *session, bool update_shared_state)
 {
     WT_CONNECTION_IMPL *conn;
     WT_TXN *txn;
@@ -239,7 +239,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
     if ((id = txn_global->checkpoint_txn_shared.id) != WT_TXN_NONE) {
         if (txn->id != id)
             txn->snapshot_data.snapshot[n++] = id;
-        if (publish)
+        if (update_shared_state)
             txn_shared->metadata_pinned = id;
     }
 
@@ -302,7 +302,7 @@ __txn_get_snapshot_int(WT_SESSION_IMPL *session, bool publish)
     WT_ASSERT(session, WT_TXNID_LE(prev_oldest_id, pinned_id));
     WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 done:
-    if (publish)
+    if (update_shared_state)
         txn_shared->pinned_id = pinned_id;
     __wt_readunlock(session, &txn_global->rwlock);
     __txn_sort_snapshot(session, n, current_id);
@@ -904,7 +904,7 @@ __txn_prepare_rollback_restore_hs_update(
     }
 
     /* Append the update to the end of the chain. */
-    WT_PUBLISH(upd_chain->next, upd);
+    WT_RELEASE_WRITE_WITH_BARRIER(upd_chain->next, upd);
 
     __wt_cache_page_inmem_incr(session, page, total_size);
 

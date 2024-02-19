@@ -41,10 +41,10 @@ __wt_session_array_walk(WT_SESSION_IMPL *session,
 
     for (i = 0, array_session = WT_CONN_SESSIONS_GET(conn); i < session_cnt; i++, array_session++) {
         /*
-         * This acquire read is paired with a WT_PUBLISH from the session create logic, and
-         * guarantees that by the time this thread sees active == 1 all other fields in the session
-         * have been initialized properly. Any other ordering constraints, such as ensuring this
-         * loop occurs in-order, are not intentional.
+         * This acquire read is paired with a WT_RELEASE_WRITE_WITH_BARRIER from the session create
+         * logic, and guarantees that by the time this thread sees active == 1 all other fields in
+         * the session have been initialized properly. Any other ordering constraints, such as
+         * ensuring this loop occurs in-order, are not intentional.
          */
         WT_ACQUIRE_READ_WITH_BARRIER(active, array_session->active);
 

@@ -18,13 +18,13 @@
 #define wt_shared
 
 /*
- * Publish a value to a shared location. All previous stores must complete before the value is made
- * public.
+ * Release write a value to a shared location. All previous stores must complete before the value is
+ * made public.
  */
-#define WT_PUBLISH(v, val)  \
-    do {                    \
-        WT_WRITE_BARRIER(); \
-        (v) = (val);        \
+#define WT_RELEASE_WRITE_WITH_BARRIER(v, val) \
+    do {                                      \
+        WT_RELEASE_BARRIER();                 \
+        (v) = (val);                          \
     } while (0)
 
 /*
@@ -70,7 +70,7 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define WT_WRITE_ONCE(v, val) ((*(volatile __typeof__(v) *)&(v)) = (val))
 #else
-#define WT_WRITE_ONCE(v, val) WT_PUBLISH(v, val)
+#define WT_WRITE_ONCE(v, val) WT_RELEASE_WRITE_WITH_BARRIER(v, val)
 #endif
 
 /*

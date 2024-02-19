@@ -493,7 +493,7 @@ real_worker(THREAD_DATA *td)
                                 goto err;
                             }
                             if (g.predictable_replay)
-                                WT_PUBLISH(td->ts, base_ts);
+                                WT_RELEASE_WRITE_WITH_BARRIER(td->ts, base_ts);
                         } else {
                             if ((ret = session->rollback_transaction(session, NULL)) != 0) {
                                 if (!g.predictable_replay)

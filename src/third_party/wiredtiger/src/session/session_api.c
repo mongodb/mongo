@@ -405,8 +405,8 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
      * exclude the hazard array from review by the eviction thread. Because some session fields are
      * accessed by other threads, the structure must be cleared carefully.
      *
-     * We don't need to publish here, because regardless of the active field being non-zero, the
-     * hazard pointer is always valid.
+     * We don't need to release write here, because regardless of the active field being non-zero,
+     * the hazard pointer is always valid.
      */
     __session_clear(session);
     session = conn->default_session;
@@ -2664,11 +2664,10 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         WT_ERR(__session_reconfigure((WT_SESSION *)session_ret, config));
 
     /*
-     * Publish: make the entry visible to server threads. There must be a barrier for two reasons,
-     * to ensure structure fields are set before any other thread will consider the session, and to
-     * push the session count to ensure the eviction thread can't review too few slots.
+     * Release write to ensure structure fields are set before any other thread will consider the
+     * session.
      */
-    WT_PUBLISH(session_ret->active, 1);
+    WT_RELEASE_WRITE_WITH_BARRIER(session_ret->active, 1);
 
     *sessionp = session_ret;
 

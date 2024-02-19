@@ -148,10 +148,10 @@ __txn_apply_prepare_state_update(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool 
          * As updating timestamp might not be an atomic operation, we will manage using state.
          */
         upd->prepare_state = WT_PREPARE_LOCKED;
-        WT_WRITE_BARRIER();
+        WT_RELEASE_BARRIER();
         upd->start_ts = txn->commit_timestamp;
         upd->durable_ts = txn->durable_timestamp;
-        WT_PUBLISH(upd->prepare_state, WT_PREPARE_RESOLVED);
+        WT_RELEASE_WRITE_WITH_BARRIER(upd->prepare_state, WT_PREPARE_RESOLVED);
     } else {
         /* Set prepare timestamp. */
         upd->start_ts = txn->prepare_timestamp;
@@ -162,7 +162,7 @@ __txn_apply_prepare_state_update(WT_SESSION_IMPL *session, WT_UPDATE *upd, bool 
          * problem.
          */
         upd->durable_ts = WT_TS_NONE;
-        WT_PUBLISH(upd->prepare_state, WT_PREPARE_INPROGRESS);
+        WT_RELEASE_WRITE_WITH_BARRIER(upd->prepare_state, WT_PREPARE_INPROGRESS);
     }
 }
 
@@ -184,7 +184,7 @@ __txn_apply_prepare_state_page_del(WT_SESSION_IMPL *session, WT_PAGE_DELETED *pa
          */
         page_del->timestamp = txn->commit_timestamp;
         page_del->durable_timestamp = txn->durable_timestamp;
-        WT_PUBLISH(page_del->prepare_state, WT_PREPARE_RESOLVED);
+        WT_RELEASE_WRITE_WITH_BARRIER(page_del->prepare_state, WT_PREPARE_RESOLVED);
     } else {
         /* Set prepare timestamp. */
         page_del->timestamp = txn->prepare_timestamp;
@@ -195,7 +195,7 @@ __txn_apply_prepare_state_page_del(WT_SESSION_IMPL *session, WT_PAGE_DELETED *pa
          * problem.
          */
         page_del->durable_timestamp = WT_TS_NONE;
-        WT_PUBLISH(page_del->prepare_state, WT_PREPARE_INPROGRESS);
+        WT_RELEASE_WRITE_WITH_BARRIER(page_del->prepare_state, WT_PREPARE_INPROGRESS);
     }
 }
 
@@ -1449,7 +1449,7 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
      * to get their own snapshot for this transaction ID to retry.
      *
      * Then we do an atomic increment to allocate a unique ID. This will give the valid ID to this
-     * transaction that we publish to the global transaction table.
+     * transaction that we release to the global transaction table.
      *
      * We want the global value to lead the allocated values, so that any allocated transaction ID
      * eventually becomes globally visible. When there are no transactions running, the oldest_id
@@ -1460,12 +1460,12 @@ __wt_txn_id_alloc(WT_SESSION_IMPL *session, bool publish)
      * well defined, we must use an atomic increment here.
      */
     if (publish) {
-        WT_PUBLISH(txn_shared->is_allocating, true);
-        WT_PUBLISH(txn_shared->id, txn_global->current);
+        WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->is_allocating, true);
+        WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->id, txn_global->current);
         id = __wt_atomic_addv64(&txn_global->current, 1) - 1;
         session->txn->id = id;
-        WT_PUBLISH(txn_shared->id, id);
-        WT_PUBLISH(txn_shared->is_allocating, false);
+        WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->id, id);
+        WT_RELEASE_WRITE_WITH_BARRIER(txn_shared->is_allocating, false);
     } else
         id = __wt_atomic_addv64(&txn_global->current, 1) - 1;
 

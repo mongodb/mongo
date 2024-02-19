@@ -101,12 +101,12 @@ replay_end_timed_run(void)
 {
     /*
      * We'll post a stop timestamp that all worker threads should abide by. There's a potential race
-     * between when we read the current timestamp and before we publish the stop timestamp. During
+     * between when we read the current timestamp and before we write the stop timestamp. During
      * that time, other threads could do work and advance the current timestamp, potentially beyond
      * the intended stop timestamp. We pick a stop timestamp far enough in the future that it's
      * rather unlikely to happen.
      */
-    WT_PUBLISH(g.stop_timestamp, g.timestamp + 0x10000);
+    WT_RELEASE_WRITE_WITH_BARRIER(g.stop_timestamp, g.timestamp + 0x10000);
 }
 
 /*
@@ -261,7 +261,7 @@ replay_pick_timestamp(TINFO *tinfo)
         } while (in_use);
 
         tinfo->replay_ts = ts;
-        WT_PUBLISH(g.lanes[lane].in_use, true);
+        WT_RELEASE_WRITE_WITH_BARRIER(g.lanes[lane].in_use, true);
         testutil_check(pthread_rwlock_unlock(&g.lane_lock));
         tinfo->lane = lane;
     }
@@ -460,9 +460,9 @@ replay_committed(TINFO *tinfo)
      * Updating the last commit timestamp for a lane in use allows read, oldest and stable
      * timestamps to advance.
      */
-    WT_PUBLISH(g.lanes[lane].last_commit_ts, tinfo->replay_ts);
+    WT_RELEASE_WRITE_WITH_BARRIER(g.lanes[lane].last_commit_ts, tinfo->replay_ts);
     if (g.timestamp <= tinfo->replay_ts + LANE_COUNT) {
-        WT_PUBLISH(g.lanes[lane].in_use, false);
+        WT_RELEASE_WRITE_WITH_BARRIER(g.lanes[lane].in_use, false);
         tinfo->lane = LANE_NONE;
         tinfo->replay_ts = 0;
     } else {

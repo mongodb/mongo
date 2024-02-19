@@ -1176,7 +1176,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
     else {
         WT_ASSIGN_LSN(&log->log_close_lsn, &log->alloc_lsn);
         /* Paired with an acquire read in the log file server path. */
-        WT_PUBLISH(log->log_close_fh, log->log_fh);
+        WT_RELEASE_WRITE_WITH_BARRIER(log->log_close_fh, log->log_fh);
     }
     log->fileid++;
 
@@ -1245,7 +1245,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
         WT_SET_LSN(&log->alloc_lsn, log->fileid, log->first_record);
     }
     WT_ASSIGN_LSN(&end_lsn, &log->alloc_lsn);
-    WT_PUBLISH(log->log_fh, log_fh);
+    WT_RELEASE_WRITE_WITH_BARRIER(log->log_fh, log_fh);
 
     /*
      * If we're called from connection creation code, we need to update the LSNs since we're the

@@ -1081,7 +1081,7 @@ __wt_txn_clear_durable_timestamp(WT_SESSION_IMPL *session)
     if (!F_ISSET(txn, WT_TXN_SHARED_TS_DURABLE))
         return;
 
-    WT_WRITE_BARRIER();
+    WT_RELEASE_BARRIER();
     F_CLR(txn, WT_TXN_SHARED_TS_DURABLE);
     txn_shared->pinned_durable_timestamp = WT_TS_NONE;
 }
@@ -1103,7 +1103,7 @@ __wt_txn_clear_read_timestamp(WT_SESSION_IMPL *session)
         /* Assert the read timestamp is greater than or equal to the pinned timestamp. */
         WT_ASSERT(session, txn_shared->read_timestamp >= S2C(session)->txn_global.pinned_timestamp);
 
-        WT_WRITE_BARRIER();
+        WT_RELEASE_BARRIER();
         F_CLR(txn, WT_TXN_SHARED_TS_READ);
     }
     txn_shared->read_timestamp = WT_TS_NONE;

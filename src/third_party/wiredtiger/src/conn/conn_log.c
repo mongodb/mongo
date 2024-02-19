@@ -40,7 +40,7 @@ __logmgr_sync_cfg(WT_SESSION_IMPL *session, const char **cfg)
         FLD_SET(txn_logsync, WT_LOG_FSYNC);
     else if (WT_STRING_MATCH("none", cval.str, cval.len))
         FLD_SET(txn_logsync, WT_LOG_FLUSH);
-    WT_PUBLISH(conn->txn_logsync, txn_logsync);
+    WT_RELEASE_WRITE_WITH_BARRIER(conn->txn_logsync, txn_logsync);
     return (0);
 }
 

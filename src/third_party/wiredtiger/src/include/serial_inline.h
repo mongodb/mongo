@@ -25,9 +25,9 @@ __insert_simple_func(
      * sufficient. Even though we don't get the benefit of the memory we allocated, we can't roll
      * back.
      *
-     * All structure setup must be flushed before the structure is entered into the list. We need a
-     * write barrier here, our callers depend on it. Don't pass complex arguments to the macro, some
-     * implementations read the old value multiple times.
+     * All structure setup must be written before the structure is entered into the list. We need a
+     * release barrier here, our callers depend on it. Don't pass complex arguments to the macro,
+     * some implementations read the old value multiple times.
      */
     for (i = 0; i < skipdepth; i++) {
         /*
@@ -68,9 +68,9 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_INSERT_HEAD *ins_head, WT_INSE
      * levels we updated are correct and sufficient. Even though we don't get the benefit of the
      * memory we allocated, we can't roll back.
      *
-     * All structure setup must be flushed before the structure is entered into the list. We need a
-     * write barrier here, our callers depend on it. Don't pass complex arguments to the macro, some
-     * implementations read the old value multiple times.
+     * All structure setup must be written before the structure is entered into the list. We need a
+     * release barrier here, our callers depend on it. Don't pass complex arguments to the macro,
+     * some implementations read the old value multiple times.
      */
     for (i = 0; i < skipdepth; i++) {
         /*
@@ -258,8 +258,8 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
     prev_upd_ts = upd->prev_durable_ts;
 
     /*
-     * All structure setup must be flushed before the structure is entered into the list. We need a
-     * write barrier here, our callers depend on it.
+     * All structure setup must be written before the structure is entered into the list. We need a
+     * release barrier here, our callers depend on it.
      *
      * Swap the update into place. If that fails, a new update was added after our search, we raced.
      * Check if our update is still permitted.

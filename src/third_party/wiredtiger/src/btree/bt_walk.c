@@ -319,7 +319,6 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
 
     /*
      * Tree walks are special: they look inside page structures that splits may want to free.
-     * Publish the tree is active during this window.
      */
     WT_ENTER_PAGE_INDEX(session);
 

@@ -426,7 +426,7 @@ __wt_configure_method(WT_SESSION_IMPL *session, const char *method, const char *
      * want to acquire locks every time we access configuration strings, since that's done on every
      * API call.
      */
-    WT_PUBLISH(*epp, entry);
+    WT_RELEASE_WRITE_WITH_BARRIER(*epp, entry);
 
     if (0) {
 err:

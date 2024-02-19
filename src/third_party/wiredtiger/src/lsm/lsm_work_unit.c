@@ -452,7 +452,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
     release_dhandle = false;
     WT_ERR(__wt_session_release_dhandle(session));
 
-    WT_PUBLISH(chunk->flushing, 0);
+    WT_RELEASE_WRITE_WITH_BARRIER(chunk->flushing, 0);
     flush_set = false;
 
     /* Make sure we aren't pinning a transaction ID. */
@@ -468,7 +468,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
 
 err:
     if (flush_set)
-        WT_PUBLISH(chunk->flushing, 0);
+        WT_RELEASE_WRITE_WITH_BARRIER(chunk->flushing, 0);
     if (release_dhandle)
         WT_TRET(__wt_session_release_dhandle(session));
 

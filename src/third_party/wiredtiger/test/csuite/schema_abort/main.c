@@ -569,7 +569,7 @@ thread_ts_run(void *arg)
               "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, oldest_ts, oldest_ts);
             testutil_check(td->conn->set_timestamp(td->conn, tscfg));
             last_ts = oldest_ts;
-            WT_PUBLISH(stable_timestamp, oldest_ts);
+            WT_RELEASE_WRITE_WITH_BARRIER(stable_timestamp, oldest_ts);
             if (!stable_set) {
                 stable_set = true;
                 printf("SET STABLE: %" PRIx64 " %" PRIu64 "\n", oldest_ts, oldest_ts);
@@ -779,7 +779,7 @@ thread_run(void *arg)
              * Set our timestamp to the stop timestamp to indicate we are done. Just stay in the
              * loop, waiting to be killed.
              */
-            WT_PUBLISH(th_ts[td->info].ts, stop_timestamp);
+            WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].ts, stop_timestamp);
             __wt_sleep(1, 0);
             continue;
         }
@@ -788,7 +788,7 @@ thread_run(void *arg)
          * Allow some threads to skip schema operations so that they are generating sufficient dirty
          * data.
          */
-        WT_PUBLISH(th_ts[td->info].op, NOOP);
+        WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, NOOP);
         if (td->info != 0 && td->info != 1)
             /*
              * Do a schema operation about 50% of the time by having a case for only about half the
@@ -796,35 +796,35 @@ thread_run(void *arg)
              */
             switch (__wt_random(&td->data_rnd) % 20) {
             case 0:
-                WT_PUBLISH(th_ts[td->info].op, BULK);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, BULK);
                 test_bulk(td);
                 break;
             case 1:
-                WT_PUBLISH(th_ts[td->info].op, BULK_UNQ);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, BULK_UNQ);
                 test_bulk_unique(td, reserved_ts, __wt_random(&td->data_rnd) & 1);
                 break;
             case 2:
-                WT_PUBLISH(th_ts[td->info].op, CREATE);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, CREATE);
                 test_create(td);
                 break;
             case 3:
-                WT_PUBLISH(th_ts[td->info].op, CREATE_UNQ);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, CREATE_UNQ);
                 test_create_unique(td, reserved_ts, __wt_random(&td->data_rnd) & 1);
                 break;
             case 4:
-                WT_PUBLISH(th_ts[td->info].op, CURSOR);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, CURSOR);
                 test_cursor(td);
                 break;
             case 5:
-                WT_PUBLISH(th_ts[td->info].op, DROP);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, DROP);
                 test_drop(td, __wt_random(&td->data_rnd) & 1);
                 break;
             case 6:
-                WT_PUBLISH(th_ts[td->info].op, UPGRADE);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, UPGRADE);
                 test_upgrade(td);
                 break;
             case 7:
-                WT_PUBLISH(th_ts[td->info].op, VERIFY);
+                WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].op, VERIFY);
                 test_verify(td);
                 break;
             }
@@ -891,7 +891,7 @@ thread_run(void *arg)
              * statement, if we were to race with the timestamp thread, it might see our thread
              * update before the commit.
              */
-            WT_PUBLISH(th_ts[td->info].ts, stable_ts);
+            WT_RELEASE_WRITE_WITH_BARRIER(th_ts[td->info].ts, stable_ts);
         } else {
             testutil_check(session->commit_transaction(session, NULL));
             if (use_prep)
