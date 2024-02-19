@@ -51,7 +51,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
+#include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session_manager_mongod.h"
@@ -137,8 +137,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
 
     ShardingState::create(_serviceContext);
     CollectionShardingStateFactory::set(
-        _serviceContext,
-        std::make_unique<CollectionShardingStateFactoryStandalone>(_serviceContext));
+        _serviceContext, std::make_unique<CollectionShardingStateFactoryShard>(_serviceContext));
     DatabaseHolder::set(_serviceContext, std::make_unique<DatabaseHolderImpl>());
     Collection::Factory::set(_serviceContext, std::make_unique<CollectionImpl::FactoryImpl>());
 

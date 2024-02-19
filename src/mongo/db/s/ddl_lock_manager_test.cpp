@@ -46,7 +46,7 @@ public:
         AutoGetDb autoDb(operationContext(), _dbName, MODE_X);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(operationContext(), _dbName);
-        scopedDss->setDbInfo(operationContext(), {_dbName, _myShardName, _dbVersion});
+        scopedDss->setDbInfo(operationContext(), {_dbName, kMyShardName, _dbVersion});
     }
 
 protected:

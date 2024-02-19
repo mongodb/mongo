@@ -66,11 +66,9 @@ const std::string kShardName("TestShard");
  * shardIdentity document specifically) will invoke the sharding initialization code.
  */
 class ShardingInitializationOpObserverTest : public ShardingMongoDTestFixture {
-public:
+protected:
     void setUp() override {
         ShardingMongoDTestFixture::setUp();
-
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
         // NOTE: this assumes that globalInit will always be called on the same thread as the main
         // test thread
@@ -87,6 +85,8 @@ public:
     }
 
 private:
+    service_context_test::ShardRoleOverride _shardRole;
+
     int _initCallCount = 0;
 };
 

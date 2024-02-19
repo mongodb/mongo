@@ -104,26 +104,23 @@ public:
         ServiceContextMongoDTest::setUp();
 
         auto serviceContext = getServiceContext();
-        {
-            auto opCtx = makeOperationContext();
-            auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
-            ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-            repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
-            repl::createOplog(opCtx.get());
+        auto opCtx = makeOperationContext();
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(serviceContext);
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
-            auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
-            repl::StorageInterface::set(serviceContext, std::move(storageImpl));
+        repl::createOplog(opCtx.get());
 
-            MongoDSessionCatalog::set(
-                serviceContext,
-                std::make_unique<MongoDSessionCatalog>(
-                    std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
-            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
-            mongoDSessionCatalog->onStepUp(opCtx.get());
-        }
+        auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
+        repl::StorageInterface::set(serviceContext, std::move(storageImpl));
 
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        MongoDSessionCatalog::set(
+            serviceContext,
+            std::make_unique<MongoDSessionCatalog>(
+                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
+        mongoDSessionCatalog->onStepUp(opCtx.get());
     }
 
     repl::OpTime insertSessionRecord(OperationContext* opCtx,
@@ -416,6 +413,8 @@ private:
     const ShardId _donorShardId{"donor-0"};
     const NamespaceString _oplogBufferNss = NamespaceString::createNamespaceString_forTest(
         NamespaceString::kReshardingLocalOplogBufferPrefix + _donorShardId.toString());
+
+    service_context_test::ShardRoleOverride _shardRole;
 };
 
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSession) {

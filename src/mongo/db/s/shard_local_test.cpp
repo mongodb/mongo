@@ -63,8 +63,40 @@ namespace {
 
 class ShardLocalTest : public ServiceContextMongoDTest {
 protected:
-    ServiceContext::UniqueOperationContext _opCtx;
-    std::unique_ptr<ShardLocal> _shardLocal;
+    ShardLocalTest() {
+        serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
+    }
+
+    ~ShardLocalTest() {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+    }
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+        _shardLocal = std::make_unique<ShardLocal>(ShardId::kConfigServerId);
+        const repl::ReplSettings replSettings = {};
+        repl::ReplicationCoordinator::set(
+            getGlobalServiceContext(),
+            std::unique_ptr<repl::ReplicationCoordinator>(
+                new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings)));
+        ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
+                      ->setFollowerMode(repl::MemberState::RS_PRIMARY));
+
+        repl::createOplog(_opCtx.get());
+
+        // Set a committed snapshot so that we can perform majority reads.
+        WriteUnitOfWork wuow{_opCtx.get()};
+        _opCtx->getServiceContext()->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+            repl::getNextOpTime(_opCtx.get()).getTimestamp());
+        wuow.commit();
+    }
+
+    void tearDown() override {
+        _opCtx.reset();
+        ServiceContextMongoDTest::tearDown();
+        repl::ReplicationCoordinator::set(getGlobalServiceContext(), nullptr);
+    }
 
     /**
      * Sets up and runs a FindAndModify command with ShardLocal's runCommand. Finds a document in
@@ -73,7 +105,24 @@ protected:
      */
     StatusWith<Shard::CommandResponse> runFindAndModifyRunCommand(NamespaceString nss,
                                                                   BSONObj find,
-                                                                  BSONObj set);
+                                                                  BSONObj set) {
+        auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest(nss);
+        findAndModifyRequest.setQuery(find);
+        findAndModifyRequest.setUpdate(write_ops::UpdateModification::parseFromClassicUpdate(set));
+        findAndModifyRequest.setUpsert(true);
+        findAndModifyRequest.setNew(true);
+        findAndModifyRequest.setWriteConcern(
+            WriteConcernOptions(
+                WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(15))
+                .toBSON());
+
+        return _shardLocal->runCommandWithFixedRetryAttempts(
+            _opCtx.get(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            nss.dbName(),
+            findAndModifyRequest.toBSON({}),
+            Shard::RetryPolicy::kNoRetry);
+    }
     /**
      * Facilitates running a find query by supplying the redundant parameters. Finds documents in
      * namespace "nss" that match "query" and returns "limit" (if there are that many) number of
@@ -87,82 +136,33 @@ protected:
     /**
      * Returns the index definitions that exist for the given collection.
      */
-    StatusWith<std::vector<BSONObj>> getIndexes(NamespaceString nss);
+    StatusWith<std::vector<BSONObj>> getIndexes(NamespaceString nss) {
+        auto response = _shardLocal->runCommandWithFixedRetryAttempts(
+            _opCtx.get(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            nss.dbName(),
+            BSON("listIndexes" << nss.coll().toString()),
+            Shard::RetryPolicy::kIdempotent);
+        if (!response.isOK()) {
+            return response.getStatus();
+        }
+        if (!response.getValue().commandStatus.isOK()) {
+            return response.getValue().commandStatus;
+        }
 
-private:
-    void setUp() override;
-    void tearDown() override;
+        auto cursorResponse = CursorResponse::parseFromBSON(response.getValue().response);
+        if (!cursorResponse.isOK()) {
+            return cursorResponse.getStatus();
+        }
+
+        return cursorResponse.getValue().getBatch();
+    }
+
+    service_context_test::ShardRouterRoleOverride _shardRole;
+
+    ServiceContext::UniqueOperationContext _opCtx;
+    std::unique_ptr<ShardLocal> _shardLocal;
 };
-
-void ShardLocalTest::setUp() {
-    ServiceContextMongoDTest::setUp();
-    _opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-    _shardLocal = std::make_unique<ShardLocal>(ShardId::kConfigServerId);
-    const repl::ReplSettings replSettings = {};
-    repl::ReplicationCoordinator::set(
-        getGlobalServiceContext(),
-        std::unique_ptr<repl::ReplicationCoordinator>(
-            new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings)));
-    ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
-                  ->setFollowerMode(repl::MemberState::RS_PRIMARY));
-
-    repl::createOplog(_opCtx.get());
-
-    // Set a committed snapshot so that we can perform majority reads.
-    WriteUnitOfWork wuow{_opCtx.get()};
-    _opCtx->getServiceContext()->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
-        repl::getNextOpTime(_opCtx.get()).getTimestamp());
-    wuow.commit();
-}
-
-void ShardLocalTest::tearDown() {
-    _opCtx.reset();
-    ServiceContextMongoDTest::tearDown();
-    repl::ReplicationCoordinator::set(getGlobalServiceContext(), nullptr);
-}
-
-StatusWith<Shard::CommandResponse> ShardLocalTest::runFindAndModifyRunCommand(NamespaceString nss,
-                                                                              BSONObj find,
-                                                                              BSONObj set) {
-    auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest(nss);
-    findAndModifyRequest.setQuery(find);
-    findAndModifyRequest.setUpdate(write_ops::UpdateModification::parseFromClassicUpdate(set));
-    findAndModifyRequest.setUpsert(true);
-    findAndModifyRequest.setNew(true);
-    findAndModifyRequest.setWriteConcern(WriteConcernOptions(WriteConcernOptions::kMajority,
-                                                             WriteConcernOptions::SyncMode::UNSET,
-                                                             Seconds(15))
-                                             .toBSON());
-
-    return _shardLocal->runCommandWithFixedRetryAttempts(
-        _opCtx.get(),
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        nss.dbName(),
-        findAndModifyRequest.toBSON({}),
-        Shard::RetryPolicy::kNoRetry);
-}
-
-StatusWith<std::vector<BSONObj>> ShardLocalTest::getIndexes(NamespaceString nss) {
-    auto response = _shardLocal->runCommandWithFixedRetryAttempts(
-        _opCtx.get(),
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        nss.dbName(),
-        BSON("listIndexes" << nss.coll().toString()),
-        Shard::RetryPolicy::kIdempotent);
-    if (!response.isOK()) {
-        return response.getStatus();
-    }
-    if (!response.getValue().commandStatus.isOK()) {
-        return response.getValue().commandStatus;
-    }
-
-    auto cursorResponse = CursorResponse::parseFromBSON(response.getValue().response);
-    if (!cursorResponse.isOK()) {
-        return cursorResponse.getStatus();
-    }
-    return cursorResponse.getValue().getBatch();
-}
 
 /**
  * Takes a FindAndModify command's BSON response and parses it for the returned "value" field.

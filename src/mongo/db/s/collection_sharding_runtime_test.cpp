@@ -367,7 +367,7 @@ public:
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const UUID kCollUUID = UUID::gen();
     const std::string kShardKey = "x";
-    const std::vector<ShardType> kShardList = {ShardType(_myShardName.toString(), "Host0:12345")};
+    const std::vector<ShardType> kShardList = {ShardType(kMyShardName.toString(), "Host0:12345")};
 
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();

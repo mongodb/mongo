@@ -172,7 +172,6 @@ public:
     void setUp() override {
         ShardingMongoDTestFixture::setUp();
 
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         ShardingState::get(getServiceContext())
             ->setRecoveryCompleted({OID::gen(),
                                     ClusterRole::ShardServer,
@@ -462,6 +461,7 @@ protected:
     }
 
     static constexpr int kWriterPoolSize = 4;
+
     const NamespaceString kOplogNs =
         NamespaceString::createNamespaceString_forTest("config.localReshardingOplogBuffer.xxx.yyy");
     const NamespaceString kCrudNs = NamespaceString::createNamespaceString_forTest("foo.bar");
@@ -477,10 +477,13 @@ protected:
     const ShardId kOtherShardId{"shard2"};
     const std::vector<ShardType> kShardList = {ShardType(kMyShardId.toString(), "Host0:12345"),
                                                ShardType(kOtherShardId.toString(), "Host1:12345")};
+    const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
+
+    service_context_test::ShardRoleOverride _shardRole;
+
     boost::optional<ChunkManager> _cm;
     CatalogCacheLoaderMock* _mockCatalogCacheLoader;
 
-    const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
     std::unique_ptr<ReshardingMetrics> _metrics;
     std::unique_ptr<ReshardingOplogApplierMetrics> _applierMetrics;
 

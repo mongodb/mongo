@@ -37,9 +37,9 @@
 
 namespace mongo {
 
-class CollectionShardingStateFactoryStandalone final : public CollectionShardingStateFactory {
+class CollectionShardingStateFactoryEmbedded final : public CollectionShardingStateFactory {
 public:
-    CollectionShardingStateFactoryStandalone(ServiceContext* serviceContext);
+    CollectionShardingStateFactoryEmbedded(ServiceContext* serviceContext);
 
     void join() override;
 

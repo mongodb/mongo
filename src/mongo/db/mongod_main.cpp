@@ -172,7 +172,6 @@
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
@@ -1531,14 +1530,8 @@ void setUpObservers(ServiceContext* serviceContext) {
 
 void setUpSharding(ServiceContext* service) {
     ShardingState::create(service);
-
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-        CollectionShardingStateFactory::set(
-            service, std::make_unique<CollectionShardingStateFactoryShard>(service));
-    } else {
-        CollectionShardingStateFactory::set(
-            service, std::make_unique<CollectionShardingStateFactoryStandalone>(service));
-    }
+    CollectionShardingStateFactory::set(
+        service, std::make_unique<CollectionShardingStateFactoryShard>(service));
 }
 
 namespace {

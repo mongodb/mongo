@@ -220,9 +220,9 @@ class ReshardingTxnClonerTest : public ShardServerTestFixtureWithCatalogCacheLoa
 
 protected:
     const UUID kDefaultReshardingId = UUID::gen();
-    const std::vector<ShardId> kTwoShardIdList{_myShardName, {"otherShardName"}};
+    const std::vector<ShardId> kTwoShardIdList{kMyShardName, {"otherShardName"}};
     const std::vector<ReshardingSourceId> kTwoSourceIdList = {
-        {kDefaultReshardingId, _myShardName}, {kDefaultReshardingId, ShardId("otherShardName")}};
+        {kDefaultReshardingId, kMyShardName}, {kDefaultReshardingId, ShardId("otherShardName")}};
 
     const std::vector<DurableTxnStateEnum> kDurableTxnStateEnumValues = {
         DurableTxnStateEnum::kPrepared,

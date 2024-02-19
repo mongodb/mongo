@@ -108,7 +108,7 @@ public:
                                                false,
                                                chunks);
 
-        return ChunkManager(_myShardName,
+        return ChunkManager(kMyShardName,
                             _sourceDbVersion,
                             makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none);

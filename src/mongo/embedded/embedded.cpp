@@ -33,7 +33,6 @@
 #include <cstdlib>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <ostream>
 #include <set>
 #include <string>
@@ -65,7 +64,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
@@ -75,7 +73,6 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -91,6 +88,7 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/embedded/collection_sharding_state_factory_embedded.h"
 #include "mongo/embedded/embedded_options_parser_init.h"
 #include "mongo/embedded/index_builds_coordinator_embedded.h"
 #include "mongo/embedded/operation_logger_embedded.h"
@@ -127,7 +125,6 @@ namespace {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {}
 
-namespace {
 ServiceContext::ConstructorActionRegisterer registerWireSpec{
     "RegisterWireSpec", [](ServiceContext* service) {
         // The featureCompatibilityVersion behavior defaults to the downgrade behavior while the
@@ -141,7 +138,6 @@ ServiceContext::ConstructorActionRegisterer registerWireSpec{
 
         WireSpec::getWireSpec(service).initialize(std::move(spec));
     }};
-}  // namespace
 
 void setUpCatalog(ServiceContext* serviceContext) {
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());
@@ -183,7 +179,7 @@ ServiceContext::ConstructorActionRegisterer shardingStateRegisterer{
     [](ServiceContext* service) {
         ShardingState::create(service);
         CollectionShardingStateFactory::set(
-            service, std::make_unique<CollectionShardingStateFactoryStandalone>(service));
+            service, std::make_unique<CollectionShardingStateFactoryEmbedded>(service));
     },
     [](ServiceContext* service) {
         CollectionShardingStateFactory::clear(service);

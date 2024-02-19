@@ -4128,7 +4128,7 @@ public:
         PipelineOptimizations::setUp();
         getCatalogCacheLoaderMock()->setDatabaseRefreshReturnValue(
             DatabaseType{DatabaseName::createDatabaseName_forTest(boost::none, "a"),
-                         _myShardName,
+                         kMyShardName,
                          DatabaseVersion{}});
     }
 
@@ -4162,11 +4162,11 @@ public:
             boost::none /* timeseriesFields */,
             boost::none /* reshardingFields */,
             true,
-            {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
+            {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), kMyShardName}});
 
         getCatalogCacheMock()->setCollectionReturnValue(
             NamespaceString::createNamespaceString_forTest("a.outColl"),
-            CollectionRoutingInfo{ChunkManager{_myShardName,
+            CollectionRoutingInfo{ChunkManager{kMyShardName,
                                                DatabaseVersion{UUID::gen(), timestamp},
                                                makeStandaloneRoutingTableHistory(std::move(rt)),
                                                timestamp},
@@ -4178,7 +4178,7 @@ public:
 
         std::string shardPipeJson = unsplittable ? "[]" : kSentPipeJson;
         std::string mergePipeJson = unsplittable ? kSentPipeJson : "[]";
-        boost::optional<ShardId> mergeShardId{unsplittable, _myShardName};
+        boost::optional<ShardId> mergeShardId{unsplittable, kMyShardName};
 
         doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
                std::move(shardPipeJson),
@@ -4195,13 +4195,13 @@ TEST_F(PipelineOptimizationsShardMerger, Out) {
     getCatalogCacheMock()->setCollectionReturnValue(
         nss,
         CatalogCacheMock::makeCollectionRoutingInfoUnsplittable(
-            nss, ShardId("dbPrimary"), DatabaseVersion{UUID::gen(), timestamp}, _myShardName));
+            nss, ShardId("dbPrimary"), DatabaseVersion{UUID::gen(), timestamp}, kMyShardName));
 
     doTest("[{$out: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
            "[{$out: {coll: 'outColl', db: 'a'}}]" /*mergePipeJson*/,
            false,
-           _myShardName /* mergeShardId */);
+           kMyShardName /* mergeShardId */);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
@@ -4209,7 +4209,7 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
     getCatalogCacheMock()->setCollectionReturnValue(
         NamespaceString::createNamespaceString_forTest("a.outColl"),
         CollectionRoutingInfo{
-            ChunkManager{_myShardName,
+            ChunkManager{kMyShardName,
                          DatabaseVersion{UUID::gen(), timestamp},
                          RoutingTableHistoryValueHandle{OptionalRoutingTableHistory{}},
                          timestamp},
@@ -4219,7 +4219,7 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
            "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
            "whenMatched: 'merge', whenNotMatched: 'insert'}}]" /*mergePipeJson*/,
            false /*needsPrimaryShardMerger*/,
-           _myShardName /*needsSpecificShardMerger*/);
+           kMyShardName /*needsSpecificShardMerger*/);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, MergeWithShardedCollection) {
@@ -4255,11 +4255,11 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
         boost::none /* timeseriesFields */,
         boost::none /* reshardingFields */,
         true /* allowMigrations */,
-        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
+        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), kMyShardName}});
 
     getCatalogCacheMock()->setCollectionReturnValue(
         fromCollNs,
-        CollectionRoutingInfo{ChunkManager{_myShardName,
+        CollectionRoutingInfo{ChunkManager{kMyShardName,
                                            DatabaseVersion{UUID::gen(), timestamp},
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
                                            timestamp},
@@ -4271,7 +4271,7 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
         ,
         false /* needsPrimaryShardMerger */,
-        _myShardName /* needsSpecificShardMerger */);
+        kMyShardName /* needsSpecificShardMerger */);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
@@ -4292,11 +4292,11 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
         boost::none /* timeseriesFields */,
         boost::none /* reshardingFields */,
         true /* allowMigrations */,
-        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), _myShardName}});
+        {ChunkType{uuid, range, ChunkVersion({epoch, timestamp}, {1, 0}), kMyShardName}});
 
     getCatalogCacheMock()->setCollectionReturnValue(
         fromCollNs,
-        CollectionRoutingInfo{ChunkManager{_myShardName,
+        CollectionRoutingInfo{ChunkManager{kMyShardName,
                                            DatabaseVersion{UUID::gen(), timestamp},
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
                                            timestamp},
@@ -4308,7 +4308,7 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
         ,
         false /* needsPrimaryShardMerger */,
-        _myShardName /* needsSpecificShardMerger */);
+        kMyShardName /* needsSpecificShardMerger */);
 };
 
 }  // namespace needsPrimaryShardMerger

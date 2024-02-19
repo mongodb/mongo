@@ -78,7 +78,7 @@ class DatabaseShardingStateTestWithMockedLoader
 public:
     const DatabaseName kDbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
 
-    const std::vector<ShardType> kShardList = {ShardType(_myShardName.toString(), "Host0:12345")};
+    const std::vector<ShardType> kShardList = {ShardType(kMyShardName.toString(), "Host0:12345")};
 
     void setUp() override {
         ShardServerTestFixtureWithCatalogCacheLoaderMock::setUp();

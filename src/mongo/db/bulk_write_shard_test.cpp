@@ -233,8 +233,8 @@ void BulkWriteShardTest::setUp() {
         {ChunkType(uuidShardedCollection1,
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection1.placementVersion(),
-                   _myShardName)},
-        _myShardName);
+                   kMyShardName)},
+        kMyShardName);
 
     // Create nssShardedCollection2
     createTestCollection(opCtx(), nssShardedCollection2);
@@ -246,8 +246,8 @@ void BulkWriteShardTest::setUp() {
         {ChunkType(uuidShardedCollection2,
                    ChunkRange{BSON("skey" << MINKEY), BSON("skey" << MAXKEY)},
                    shardVersionShardedCollection2.placementVersion(),
-                   _myShardName)},
-        _myShardName);
+                   kMyShardName)},
+        kMyShardName);
 }
 
 NamespaceInfoEntry nsInfoWithShardDatabaseVersions(NamespaceString nss,

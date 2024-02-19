@@ -41,7 +41,7 @@ class CollectionShardingStateFactoryShard final : public CollectionShardingState
 public:
     CollectionShardingStateFactoryShard(ServiceContext* serviceContext);
 
-    void join() override{};
+    void join() override {}
 
     std::unique_ptr<CollectionShardingState> make(const NamespaceString& nss) override;
 };

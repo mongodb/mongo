@@ -262,7 +262,7 @@ protected:
     const NamespaceString tempNss =
         resharding::constructTemporaryReshardingNss(_sourceNss.db_forTest(), _sourceUUID);
     const UUID _reshardingUUID = UUID::gen();
-    const ReshardingSourceId _sourceId{UUID::gen(), _myShardName};
+    const ReshardingSourceId _sourceId{UUID::gen(), kMyShardName};
     const DatabaseVersion _sourceDbVersion{UUID::gen(), Timestamp(1, 1)};
 
     std::unique_ptr<ReshardingMetrics> _metrics;
@@ -298,7 +298,7 @@ TEST_F(ReshardingCollectionClonerTest, MinKeyChunk) {
     };
 
     runPipelineTest(std::move(sk),
-                    _myShardName,
+                    kMyShardName,
                     std::move(collectionData),
                     std::move(configData),
                     kExpectedCopiedCount,

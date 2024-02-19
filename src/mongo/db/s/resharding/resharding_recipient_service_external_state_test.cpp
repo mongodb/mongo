@@ -64,7 +64,6 @@
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -87,26 +86,7 @@ namespace {
 
 class RecipientServiceExternalStateTest : public ShardCatalogCacheTestFixture,
                                           public ServiceContextMongoDTest {
-public:
-    const ShardKeyPattern kShardKey = ShardKeyPattern(BSON("_id" << 1));
-
-    const NamespaceString kOrigNss = NamespaceString::createNamespaceString_forTest("db.foo");
-    const OID kOrigEpoch = OID::gen();
-    const Timestamp kOrigTimestamp = Timestamp(1);
-    const UUID kOrigUUID = UUID::gen();
-
-    const NamespaceString kReshardingNss = NamespaceString::createNamespaceString_forTest(
-        str::stream() << "db." << NamespaceString::kTemporaryReshardingCollectionPrefix
-                      << kOrigUUID);
-    const ShardKeyPattern kReshardingKey = ShardKeyPattern(BSON("newKey" << 1));
-    const OID kReshardingEpoch = OID::gen();
-    const Timestamp kReshardingTimestamp = Timestamp(2);
-    const UUID kReshardingUUID = UUID::gen();
-
-    const CommonReshardingMetadata kMetadata{
-        kReshardingUUID, kOrigNss, kOrigUUID, kReshardingNss, kReshardingKey.getKeyPattern()};
-    const Timestamp kDefaultFetchTimestamp = Timestamp(200, 1);
-
+protected:
     void setUp() override {
         ShardCatalogCacheTestFixture::setUp();
 
@@ -297,9 +277,31 @@ public:
         RecipientStateMachineExternalStateImpl externalState;
         externalState.ensureTempReshardingCollectionExistsWithIndexes(
             operationContext(), kMetadata, kDefaultFetchTimestamp);
-        CollectionShardingRuntime csr(getServiceContext(), kOrigNss);
-        ASSERT(csr.getCurrentMetadataIfKnown() == boost::none);
+
+        AutoGetCollection autoColl(operationContext(), kReshardingNss, MODE_IX);
+        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+            operationContext(), kReshardingNss);
+        ASSERT(scopedCsr->getCurrentMetadataIfKnown() == boost::none);
     }
+
+    const ShardKeyPattern kShardKey = ShardKeyPattern(BSON("_id" << 1));
+
+    const NamespaceString kOrigNss = NamespaceString::createNamespaceString_forTest("db.foo");
+    const OID kOrigEpoch = OID::gen();
+    const Timestamp kOrigTimestamp = Timestamp(1);
+    const UUID kOrigUUID = UUID::gen();
+
+    const NamespaceString kReshardingNss = NamespaceString::createNamespaceString_forTest(
+        str::stream() << "db." << NamespaceString::kTemporaryReshardingCollectionPrefix
+                      << kOrigUUID);
+    const ShardKeyPattern kReshardingKey = ShardKeyPattern(BSON("newKey" << 1));
+    const OID kReshardingEpoch = OID::gen();
+    const Timestamp kReshardingTimestamp = Timestamp(2);
+    const UUID kReshardingUUID = UUID::gen();
+
+    const CommonReshardingMetadata kMetadata{
+        kReshardingUUID, kOrigNss, kOrigUUID, kReshardingNss, kReshardingKey.getKeyPattern()};
+    const Timestamp kDefaultFetchTimestamp = Timestamp(200, 1);
 };
 
 TEST_F(RecipientServiceExternalStateTest, ReshardingConfigServerUpdatesHaveNoTimeout) {

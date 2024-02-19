@@ -57,7 +57,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/server_options.h"

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
+#include "mongo/embedded/collection_sharding_state_factory_embedded.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
@@ -110,13 +110,13 @@ private:
 
 }  // namespace
 
-CollectionShardingStateFactoryStandalone::CollectionShardingStateFactoryStandalone(
+CollectionShardingStateFactoryEmbedded::CollectionShardingStateFactoryEmbedded(
     ServiceContext* serviceContext)
     : CollectionShardingStateFactory(serviceContext) {}
 
-void CollectionShardingStateFactoryStandalone::join() {}
+void CollectionShardingStateFactoryEmbedded::join() {}
 
-std::unique_ptr<CollectionShardingState> CollectionShardingStateFactoryStandalone::make(
+std::unique_ptr<CollectionShardingState> CollectionShardingStateFactoryEmbedded::make(
     const NamespaceString& nss) {
     return std::make_unique<CollectionShardingStateStandalone>(nss);
 }

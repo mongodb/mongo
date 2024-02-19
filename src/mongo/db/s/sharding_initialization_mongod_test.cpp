@@ -47,9 +47,6 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/operation_logger_mock.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/migration_chunk_cloner_source_op_observer.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_op_observer.h"
@@ -79,18 +76,9 @@ namespace {
  * proper state transitions.
  */
 class ShardingInitializationMongoDTest : public ShardingMongoDTestFixture {
-public:
-    const std::string kShardName{"TestShard"};
-    const ShardIdentity kShardIdentityDoc{
-        kShardName, OID::gen(), ConnectionString::forReplicaSet(kShardName, {HostAndPort("a:1")})};
-
 protected:
     void setUp() override {
-        serverGlobalParams.clusterRole = ClusterRole::None;
         ShardingMongoDTestFixture::setUp();
-
-        // When sharding initialization is triggered, initialize sharding state as a shard server.
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
 
         CatalogCacheLoader::set(getServiceContext(),
                                 std::make_unique<ShardServerCatalogCacheLoader>(
@@ -140,6 +128,12 @@ protected:
         return ShardingState::get(getServiceContext());
     }
 
+    const std::string kShardName{"TestShard"};
+    const ShardIdentity kShardIdentityDoc{
+        kShardName, OID::gen(), ConnectionString::forReplicaSet(kShardName, {HostAndPort("a:1")})};
+
+    service_context_test::ShardRoleOverride _shardRole;
+
     // Used to write to set up local collections before exercising server logic.
     std::unique_ptr<DBDirectClient> _dbDirectClient;
 };
@@ -151,23 +145,11 @@ protected:
 class ScopedSetStandaloneMode {
 public:
     ScopedSetStandaloneMode(ServiceContext* serviceContext) : _serviceContext(serviceContext) {
-        CollectionShardingStateFactory::clear(serviceContext);
-
-        CollectionShardingStateFactory::set(
-            serviceContext,
-            std::make_unique<CollectionShardingStateFactoryStandalone>(serviceContext));
-
         serverGlobalParams.clusterRole = ClusterRole::None;
         _serviceContext->setOpObserver(std::make_unique<OpObserverRegistry>());
     }
 
     ~ScopedSetStandaloneMode() {
-        CollectionShardingStateFactory::clear(_serviceContext);
-
-        CollectionShardingStateFactory::set(
-            _serviceContext,
-            std::make_unique<CollectionShardingStateFactoryShard>(_serviceContext));
-
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         _serviceContext->setOpObserver([&] {
             auto opObserver = std::make_unique<OpObserverRegistry>();

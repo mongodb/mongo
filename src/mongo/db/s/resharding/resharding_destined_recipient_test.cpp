@@ -146,7 +146,7 @@ class DestinedRecipientTest : public ShardServerTestFixtureWithCatalogCacheLoade
 public:
     const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("test.foo");
     const std::string kShardKey = "x";
-    const std::vector<ShardType> kShardList = {ShardType(_myShardName.toString(), "Host0:12345"),
+    const std::vector<ShardType> kShardList = {ShardType(kMyShardName.toString(), "Host0:12345"),
                                                ShardType("shard1", "Host1:12345")};
 
     void setUp() override {

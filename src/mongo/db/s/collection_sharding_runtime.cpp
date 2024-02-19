@@ -57,7 +57,6 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deleter_service.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -157,18 +156,13 @@ void checkShardingMetadataWasValidAtTxnClusterTime(
 
 }  // namespace
 
-CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime::
-    ScopedSharedCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss)
-    : _scopedCss(std::move(scopedCss)) {}
-CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime::
-    ScopedExclusiveCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss)
-    : _scopedCss(std::move(scopedCss)) {}
-
 CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* service, NamespaceString nss)
     : _serviceContext(service),
       _nss(std::move(nss)),
-      _metadataType(_nss.isNamespaceAlwaysUntracked() ? MetadataType::kUntracked
-                                                      : MetadataType::kUnknown) {}
+      _metadataType(_nss.isNamespaceAlwaysUntracked() ||
+                            !ShardingState::get(_serviceContext)->enabled()
+                        ? MetadataType::kUntracked
+                        : MetadataType::kUnknown) {}
 
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime
 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(OperationContext* opCtx,
@@ -234,11 +228,6 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     OperationContext* opCtx, bool operationIsVersioned) const {
-    // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
-    // consider all collections as untracked
-    if (!ShardingState::get(opCtx)->enabled())
-        return {kUntrackedCollection};
-
     // Present the collection as unsharded to internal or direct commands against shards
     if (!operationIsVersioned)
         return {kUntrackedCollection};
@@ -467,7 +456,6 @@ SharedSemiFuture<void> CollectionShardingRuntime::getOngoingQueriesCompletionFut
     return _metadataManager->getOngoingQueriesCompletionFuture(range);
 }
 
-
 std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getCurrentMetadataIfKnown(
     const boost::optional<LogicalTime>& atClusterTime, bool preserveRange) const {
@@ -496,11 +484,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const boost::optional<ShardVersion>& optReceivedShardVersion,
     bool preserveRange,
     bool supportNonVersionedOperations) const {
-    // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
-    // consider all collections as unsharded
-    if (!ShardingState::get(opCtx)->enabled())
-        return kUntrackedCollection;
-
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kAvailableReadConcern)
         return kUntrackedCollection;
@@ -806,9 +789,6 @@ void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
 }
 
 void CollectionShardingRuntime::_checkCritSecForIndexMetadata(OperationContext* opCtx) const {
-    if (!ShardingState::get(opCtx)->enabled())
-        return;
-
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kAvailableReadConcern)
         return;
@@ -837,5 +817,12 @@ void CollectionShardingRuntime::_checkCritSecForIndexMetadata(OperationContext* 
                           << " is acquired with reason: " << reason,
             !criticalSectionSignal);
 }
+
+CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime::
+    ScopedSharedCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss)
+    : _scopedCss(std::move(scopedCss)) {}
+CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime::
+    ScopedExclusiveCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss)
+    : _scopedCss(std::move(scopedCss)) {}
 
 }  // namespace mongo

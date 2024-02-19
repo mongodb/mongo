@@ -54,6 +54,7 @@ yamlEnv.InjectThirdParty(libraries=['yaml'])
 env.Library(
     target='embedded',
     source=[
+        'collection_sharding_state_factory_embedded.cpp',
         'embedded.cpp',
         'embedded_auth_manager.cpp',
         'embedded_auth_session.cpp',
