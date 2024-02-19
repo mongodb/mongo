@@ -110,8 +110,6 @@ public:
 
     ~TsBlock() override;
 
-    boost::optional<DeblockedHomogeneousVals> extractHomogeneous() override;
-
     std::unique_ptr<ValueBlock> clone() const override;
     std::unique_ptr<TsBlock> cloneStrongTyped() const;
 

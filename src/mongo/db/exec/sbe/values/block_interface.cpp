@@ -81,17 +81,21 @@ std::unique_ptr<ValueBlock> ValueBlock::map(const ColumnOp& op) {
 std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op) {
     // If the ColumnOp function is monotonic and the block is dense, we can try to map the whole
     // bucket to a MonoBlock instead of mapping each value iteratively.
-    if (tryDense().get_value_or(false) && tryCount() &&
-        (op.opType.flags & ColumnOpType::kMonotonic)) {
+    if ((op.opType.flags & ColumnOpType::kMonotonic) && tryDense().get_value_or(false) &&
+        tryCount()) {
         auto [minTag, minVal] = tryMin();
         auto [maxTag, maxVal] = tryMax();
 
         if (minTag == maxTag && minTag != value::TypeTags::Nothing) {
             auto [minResTag, minResVal] = op.processSingle(minTag, minVal);
+            ValueGuard minGuard(minResTag, minResVal);
             auto [maxResTag, maxResVal] = op.processSingle(maxTag, maxVal);
-            if (minResTag == maxResTag && minResVal == maxResVal) {
-                auto [cpyTag, cpyVal] = copyValue(minResTag, minResVal);
-                return std::make_unique<MonoBlock>(*tryCount(), cpyTag, cpyVal);
+            ValueGuard maxGuard(maxResTag, maxResVal);
+
+            auto [cmpTag, cmpVal] = value::compareValue(minResTag, minResVal, maxResTag, maxResVal);
+            if (cmpTag == value::TypeTags::NumberInt32 && cmpVal == 0) {
+                minGuard.reset();
+                return std::make_unique<MonoBlock>(*tryCount(), minResTag, minResVal);
             }
         }
     }
@@ -114,8 +118,45 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
     std::vector<TypeTags> tags(extracted.count(), TypeTags::Nothing);
     std::vector<Value> vals(extracted.count(), Value{0u});
 
+    ValueVectorGuard blockGuard(tags, vals);
     op.processBatch(
         extracted.tags(), extracted.vals(), tags.data(), vals.data(), extracted.count());
+    blockGuard.reset();
+
+    return buildBlockFromStorage(std::move(tags), std::move(vals));
+}
+
+std::unique_ptr<ValueBlock> ValueBlock::buildBlockFromStorage(std::vector<value::TypeTags> tags,
+                                                              std::vector<value::Value> vals) {
+    if (vals.empty()) {
+        return std::make_unique<HeterogeneousBlock>();
+    }
+
+    if ((validHomogeneousType(tags[0]) || tags[0] == TypeTags::Nothing) &&
+        std::all_of(tags.begin(), tags.end(), [&](TypeTags tag) { return tag == tags[0]; })) {
+        switch (tags[0]) {
+            case value::TypeTags::Nothing: {
+                return std::make_unique<MonoBlock>(vals.size(), value::TypeTags::Nothing, 0);
+            }
+            case value::TypeTags::Boolean: {
+                return std::make_unique<value::BoolBlock>(std::move(vals));
+            }
+            case value::TypeTags::NumberInt32: {
+                return std::make_unique<value::Int32Block>(std::move(vals));
+            }
+            case value::TypeTags::NumberInt64: {
+                return std::make_unique<value::Int64Block>(std::move(vals));
+            }
+            case value::TypeTags::NumberDouble: {
+                return std::make_unique<value::DoubleBlock>(std::move(vals));
+            }
+            case value::TypeTags::Date: {
+                return std::make_unique<value::DateBlock>(std::move(vals));
+            }
+            default:
+                break;
+        }
+    }
 
     bool isDense = std::all_of(
         tags.begin(), tags.end(), [](TypeTags tag) { return tag != TypeTags::Nothing; });
@@ -124,24 +165,23 @@ std::unique_ptr<ValueBlock> ValueBlock::defaultMapImpl(const ColumnOp& op) {
 }
 
 std::unique_ptr<ValueBlock> HeterogeneousBlock::map(const ColumnOp& op) {
-    auto outBlock = std::make_unique<HeterogeneousBlock>();
-
-    size_t numElems = _vals.size();
-
-    if (numElems > 0) {
-        const TypeTags* inTags = _tags.data();
-        const Value* inVals = _vals.data();
-
-        outBlock->_tags.resize(numElems, TypeTags::Nothing);
-        outBlock->_vals.resize(numElems, Value{0u});
-
-        TypeTags* outTags = outBlock->_tags.data();
-        Value* outVals = outBlock->_vals.data();
-
-        op.processBatch(inTags, inVals, outTags, outVals, numElems);
+    if (auto fastPathResult = this->mapMonotonicFastPath(op); fastPathResult) {
+        return fastPathResult;
     }
 
-    return outBlock;
+    size_t numElems = _vals.size();
+    if (numElems == 0) {
+        return std::make_unique<HeterogeneousBlock>();
+    }
+
+    std::vector<TypeTags> tags(numElems, TypeTags::Nothing);
+    std::vector<Value> vals(numElems, Value{0u});
+
+    ValueVectorGuard blockGuard(tags, vals);
+    op.processBatch(_tags.data(), _vals.data(), tags.data(), vals.data(), numElems);
+    blockGuard.reset();
+
+    return buildBlockFromStorage(std::move(tags), std::move(vals));
 }
 
 TokenizedBlock ValueBlock::tokenize() {
@@ -192,6 +232,59 @@ struct IntValueEq {
     }
 };
 }  // namespace
+
+template <typename T, value::TypeTags TypeTag>
+std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::map(const ColumnOp& op) {
+    if (auto fastPathResult = this->mapMonotonicFastPath(op); fastPathResult) {
+        return fastPathResult;
+    }
+
+    size_t numElems = _vals.size();
+    if (numElems == 0) {
+        return std::make_unique<HeterogeneousBlock>();
+    }
+
+    std::vector<TypeTags> tags(numElems, TypeTags::Nothing);
+    std::vector<Value> vals(numElems, Value{0u});
+
+    ValueVectorGuard blockGuard(tags, vals);
+    // Fast path for dense case, everything can be processed in one chunk.
+    op.processBatch(TypeTag, _vals.data(), tags.data(), vals.data(), numElems);
+
+    if (_presentBitset.all()) {
+        blockGuard.reset();
+        return buildBlockFromStorage(std::move(tags), std::move(vals));
+    }
+
+    // If the block is not dense, we have to get the result for Nothing input(s).
+    auto [nullTag, nullVal] = op.processSingle(value::TypeTags::Nothing, 0);
+    ValueGuard nullGuard(nullTag, nullVal);
+
+    // Then, insert it in the proper places.
+    size_t blockSize = size();
+    std::vector<TypeTags> mergedTags(blockSize, TypeTags::Nothing);
+    std::vector<Value> mergedVals(blockSize, Value{0u});
+
+    size_t valIdx = 0;
+    for (size_t i = 0; i < _presentBitset.size(); ++i) {
+        if (_presentBitset[i]) {
+            mergedTags[i] = tags[valIdx];
+            mergedVals[i] = vals[valIdx];
+            valIdx++;
+        } else {
+            std::tie(mergedTags[i], mergedVals[i]) = sbe::value::copyValue(nullTag, nullVal);
+        }
+    }
+    blockGuard.reset();
+    return buildBlockFromStorage(std::move(mergedTags), std::move(mergedVals));
+}
+
+template std::unique_ptr<ValueBlock> BoolBlock::map(const ColumnOp& op);
+template std::unique_ptr<ValueBlock> Int32Block::map(const ColumnOp& op);
+template std::unique_ptr<ValueBlock> Int64Block::map(const ColumnOp& op);
+template std::unique_ptr<ValueBlock> DateBlock::map(const ColumnOp& op);
+template std::unique_ptr<ValueBlock> DoubleBlock::map(const ColumnOp& op);
+
 
 // Should not be used for DoubleBlocks since hashValue has special handling of NaN's that differs
 // from naively using absl::Hash<double>.

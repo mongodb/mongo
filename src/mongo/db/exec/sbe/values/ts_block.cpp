@@ -300,66 +300,6 @@ void TsBlock::deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
     }
 }
 
-/**
- * This is implicitly optimized for dense blocks but we may want to revisit this in the future.
- */
-boost::optional<DeblockedHomogeneousVals> TsBlock::extractHomogeneous() {
-    // Check if we have already called extractHomogeneous on this block.
-    if (_decompressedBlock) {
-        return _decompressedBlock->extractHomogeneous();
-    }
-
-    ensureDeblocked();
-    invariant(_decompressedBlock);
-    auto deblocked = _decompressedBlock->extract();
-
-    bool foundNonNothing = false;
-    TypeTags acc = TypeTags::Nothing;
-    HomogeneousBlockBitset bitset;
-    bitset.resize(deblocked.count(), true);
-    std::vector<Value> vals;
-    vals.resize(deblocked.count());
-    size_t valsIdx = 0;
-    for (size_t i = 0; i < deblocked.count(); ++i) {
-        if (deblocked.tags()[i] == TypeTags::Nothing) {
-            bitset[i] = false;
-            continue;
-        } else if (!foundNonNothing) {
-            // TODO SERVER-83799 Remove check for Boolean
-            if (!DeblockedHomogeneousVals::validHomogeneousType(deblocked.tags()[i]) ||
-                deblocked.tags()[i] == TypeTags::Boolean) {
-                return boost::none;
-            }
-            foundNonNothing = true;
-            acc = deblocked.tags()[i];
-        } else if (foundNonNothing && deblocked.tags()[i] != acc) {
-            return boost::none;
-        }
-        vals[valsIdx++] = deblocked.vals()[i];
-    }
-    // Resize vals in case there were Nothings present in the block.
-    vals.resize(valsIdx);
-
-    switch (acc) {
-        case TypeTags::NumberInt32:
-            _decompressedBlock = std::make_unique<Int32Block>(std::move(vals), std::move(bitset));
-            break;
-        case TypeTags::NumberInt64:
-            _decompressedBlock = std::make_unique<Int64Block>(std::move(vals), std::move(bitset));
-            break;
-        case TypeTags::NumberDouble:
-            _decompressedBlock = std::make_unique<DoubleBlock>(std::move(vals), std::move(bitset));
-            break;
-        case TypeTags::Date:
-            _decompressedBlock = std::make_unique<DateBlock>(std::move(vals), std::move(bitset));
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-
-    return _decompressedBlock->extractHomogeneous();
-}
-
 std::unique_ptr<TsBlock> TsBlock::cloneStrongTyped() const {
     // TODO: If we've already decoded the output, there's no need to re-copy the entire bson
     // column. We could instead just copy the decoded values and metadata.
@@ -426,7 +366,7 @@ void TsBlock::ensureDeblocked() {
             deblockFromBsonColumn(tags, vals);
         }
 
-        _decompressedBlock = std::make_unique<HeterogeneousBlock>(std::move(tags), std::move(vals));
+        _decompressedBlock = buildBlockFromStorage(std::move(tags), std::move(vals));
     }
 }
 

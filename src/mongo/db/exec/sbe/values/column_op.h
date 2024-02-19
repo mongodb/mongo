@@ -158,8 +158,8 @@ public:
         using ProcessSingleFn = std::pair<TypeTags, Value> (*)(const ColumnOpFunctorData*,
                                                                TypeTags,
                                                                Value);
-        using ProcessBatchFn = void (*)(
-            const ColumnOpFunctorData*, const TypeTags*, const Value*, TypeTags*, Value*, size_t);
+        using ProcessBatchFn =
+            void (*)(const ColumnOpFunctorData*, TypeTags, const Value*, TypeTags*, Value*, size_t);
 
         constexpr MethodTable(ProcessSingleFn processSingleFn,
                               ProcessBatchFn processBatchFn) noexcept
@@ -200,8 +200,8 @@ public:
         (OpType.flags & ColumnOpType::kOutputNothingOnMissingInput) != ColumnOpType::kNoFlags;
 
     // Check if 'BatchFn' provides a general batch callback that uses a variable-size batch.
-    static constexpr bool hasGeneralBatchFn = std::
-        is_invocable_v<const BatchFn&, const TypeTags*, const Value*, TypeTags*, Value*, size_t>;
+    static constexpr bool hasGeneralBatchFn =
+        std::is_invocable_v<const BatchFn&, TypeTags, const Value*, TypeTags*, Value*, size_t>;
 
     // If 2 functors were provided to makeColumnOp(), the second functor must provide a batch
     // callback.
@@ -216,7 +216,7 @@ public:
     }
 
     static void processBatchFn(const ColumnOpFunctorData* cofd,
-                               const TypeTags* inTags,
+                               TypeTags inTag,
                                const Value* inVals,
                                TypeTags* outTags,
                                Value* outVals,
@@ -224,12 +224,10 @@ public:
         const ColumnOpFunctor& cof = *static_cast<const ColumnOpFunctor*>(cofd);
 
         if constexpr (hasGeneralBatchFn) {
-            cof.getBatchFn()(inTags, inVals, outTags, outVals, count);
+            cof.getBatchFn()(inTag, inVals, outTags, outVals, count);
         } else {
             for (size_t i = 0; i < count; ++i) {
-                auto [tag, val] = processSingleFn(cofd, inTags[i], inVals[i]);
-                outTags[i] = tag;
-                outVals[i] = val;
+                std::tie(outTags[i], outVals[i]) = processSingleFn(cofd, inTag, inVals[i]);
             }
         }
     }
@@ -304,12 +302,36 @@ struct ColumnOp {
         return methodTable.processSingleFn(cofd, tag, val);
     }
 
+    void processBatch(TypeTags inTag,
+                      const Value* inVals,
+                      TypeTags* outTags,
+                      Value* outVals,
+                      size_t count) const {
+        methodTable.processBatchFn(cofd, inTag, inVals, outTags, outVals, count);
+    }
+
+    // Helper method that takes care of extracting contiguous chunks of homogeneous values
+    // so that they can be invoked by the batch function.
     void processBatch(const TypeTags* inTags,
                       const Value* inVals,
                       TypeTags* outTags,
                       Value* outVals,
                       size_t count) const {
-        methodTable.processBatchFn(cofd, inTags, inVals, outTags, outVals, count);
+        for (size_t index = 0; index < count;) {
+            // Compute the length of the chunk having the same type.
+            size_t chunkSize = 1;
+            while ((index + chunkSize) < count && inTags[index] == inTags[index + chunkSize]) {
+                chunkSize++;
+            }
+            if (chunkSize == 1) {
+                std::tie(outTags[index], outVals[index]) =
+                    processSingle(inTags[index], inVals[index]);
+            } else {
+                processBatch(
+                    inTags[index], &inVals[index], &outTags[index], &outVals[index], chunkSize);
+            }
+            index += chunkSize;
+        }
     }
 
     const ColumnOpType opType;

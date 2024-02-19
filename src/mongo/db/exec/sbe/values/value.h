@@ -448,6 +448,36 @@ private:
     Value _value;
 };
 
+class ValueVectorGuard {
+public:
+    MONGO_COMPILER_ALWAYS_INLINE ValueVectorGuard(std::vector<TypeTags>& tags,
+                                                  std::vector<Value>& values)
+        : _owned(true), _tags(tags), _values(values) {}
+    ValueVectorGuard() = delete;
+    ValueVectorGuard(const ValueVectorGuard&) = delete;
+    ValueVectorGuard(ValueVectorGuard&& other) = delete;
+    MONGO_COMPILER_ALWAYS_INLINE ~ValueVectorGuard() {
+        if (_owned) {
+            invariant(_tags.size() == _values.size());
+            for (size_t i = 0; i < _tags.size(); i++) {
+                releaseValue(_tags[i], _values[i]);
+            }
+        }
+    }
+
+    ValueVectorGuard& operator=(const ValueVectorGuard&) = delete;
+    ValueVectorGuard& operator=(ValueVectorGuard&& other) = delete;
+
+    void reset() {
+        _owned = false;
+    }
+
+private:
+    bool _owned;
+    std::vector<TypeTags>& _tags;
+    std::vector<Value>& _values;
+};
+
 inline char* getRawPointerView(Value val) noexcept {
     return reinterpret_cast<char*>(val);
 }

@@ -505,10 +505,10 @@ static const auto testOp3 = value::makeColumnOp<testOp3Type>(
     [](TypeTags tag, Value val) {
         return std::pair(TypeTags::Boolean, value::bitcastFrom<bool>(tag != TypeTags::Nothing));
     },
-    [](const TypeTags* tags, const Value* vals, TypeTags* outTags, Value* outVals, size_t count) {
+    [](TypeTags tag, const Value* vals, TypeTags* outTags, Value* outVals, size_t count) {
         for (size_t i = 0; i < count; ++i) {
             outTags[i] = TypeTags::Boolean;
-            outVals[i] = value::bitcastFrom<bool>(tags[i] != TypeTags::Nothing);
+            outVals[i] = value::bitcastFrom<bool>(tag != TypeTags::Nothing);
         }
     });
 
@@ -525,9 +525,9 @@ static const auto testOp4 = value::makeColumnOp<testOp4Type>(
             return std::pair(TypeTags::Nothing, Value{0u});
         }
     },
-    [](const TypeTags* tags, const Value* vals, TypeTags* outTags, Value* outVals, size_t count) {
+    [](TypeTags tag, const Value* vals, TypeTags* outTags, Value* outVals, size_t count) {
         for (size_t i = 0; i < count; ++i) {
-            if (tags[i] == TypeTags::NumberDouble) {
+            if (tag == TypeTags::NumberDouble) {
                 double d = value::bitcastTo<double>(vals[i]);
                 outTags[i] = TypeTags::NumberDouble;
                 outVals[i] = value::bitcastFrom<double>(d * 2.0 + 1.0);
@@ -565,6 +565,32 @@ TEST_F(ValueBlockTest, HeterogeneousBlockMap) {
     auto outBlock4 = block->map(testOp4);
     auto output4 = blockToBsonArr(*outBlock4);
     ASSERT_BSONOBJ_EQ(output4, fromjson("{result: [null, null, 7.0, 21.0, null]}"));
+}
+
+// Test HomogeneousBlock::map().
+TEST_F(ValueBlockTest, HomogeneousBlockMap) {
+    auto block = std::make_unique<value::DoubleBlock>();
+
+    block->pushNothing();
+    block->push_back(3.0);
+    block->push_back(10.0);
+    block->pushNothing();
+
+    auto outBlock1 = block->map(testOp1);
+    auto output1 = blockToBsonArr(*outBlock1);
+    ASSERT_BSONOBJ_EQ(output1, fromjson("{result: [false, false, false, false]}"));
+
+    auto outBlock2 = block->map(testOp2);
+    auto output2 = blockToBsonArr(*outBlock2);
+    ASSERT_BSONOBJ_EQ(output2, fromjson("{result: [null, false, true, null]}"));
+
+    auto outBlock3 = block->map(testOp3);
+    auto output3 = blockToBsonArr(*outBlock3);
+    ASSERT_BSONOBJ_EQ(output3, fromjson("{result: [false, true, true, false]}"));
+
+    auto outBlock4 = block->map(testOp4);
+    auto output4 = blockToBsonArr(*outBlock4);
+    ASSERT_BSONOBJ_EQ(output4, fromjson("{result: [null, 7.0, 21.0, null]}"));
 }
 
 // Test MonoBlock::map().
@@ -692,9 +718,30 @@ public:
         return std::make_unique<TestBlock>(*this);
     }
 
+    std::pair<value::TypeTags, value::Value> tryMin() const override {
+        if (_minVal) {
+            return *_minVal;
+        }
+        return value::ValueBlock::tryMin();
+    }
+    std::pair<value::TypeTags, value::Value> tryMax() const override {
+        if (_maxVal) {
+            return *_maxVal;
+        }
+        return value::ValueBlock::tryMax();
+    }
+
+    void setMin(value::TypeTags tag, value::Value val) {
+        _minVal.emplace(tag, val);
+    }
+    void setMax(value::TypeTags tag, value::Value val) {
+        _maxVal.emplace(tag, val);
+    }
+
 private:
     std::vector<Value> _vals;
     std::vector<TypeTags> _tags;
+    boost::optional<std::pair<value::TypeTags, value::Value>> _minVal, _maxVal;
 };
 
 // Test ValueBlock::defaultMapImpl().
@@ -724,6 +771,32 @@ TEST_F(ValueBlockTest, TestBlockMap) {
     auto outBlock4 = block->map(testOp4);
     auto output4 = blockToBsonArr(*outBlock4);
     ASSERT_BSONOBJ_EQ(output4, fromjson("{result: [null, null, 7.0, 21.0, null]}"));
+}
+
+// Test monotonic shortcut in ValueBlock::defaultMapImpl().
+static constexpr auto testOp5Type =
+    ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput | ColumnOpType::kMonotonic,
+                 TypeTags::bsonString,
+                 TypeTags::bsonString,
+                 ColumnOpType::ReturnNothingOnMissing{}};
+static const auto testOp5 = value::makeColumnOp<testOp5Type>(
+    [](TypeTags tag, Value val) { return value::makeBigString("fake result from map"); });
+
+TEST_F(ValueBlockTest, TestBlockMapFast) {
+    auto block = std::make_unique<TestBlock>();
+
+    auto [strTag1, strVal1] = value::makeNewString("not a small string");
+    block->push_back(strTag1, strVal1);
+    auto [strTag2, strVal2] = value::makeNewString("a slightly longer string");
+    block->push_back(strTag2, strVal2);
+
+    block->setMin(strTag2, strVal2);
+    block->setMax(strTag1, strVal1);
+
+    auto outBlock1 = block->map(testOp5);
+    auto output1 = blockToBsonArr(*outBlock1);
+    ASSERT_BSONOBJ_EQ(output1,
+                      fromjson("{result: ['fake result from map', 'fake result from map']}"));
 }
 
 // Test ValueBlock::tokenize().

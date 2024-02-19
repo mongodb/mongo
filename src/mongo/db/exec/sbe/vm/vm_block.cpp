@@ -865,47 +865,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockRound(
 }
 
 namespace {
-template <class Cmp>
-FastTuple<bool, value::TypeTags, value::Value> homogeneousCmpScalar(
-    value::DeblockedHomogeneousVals deblocked, value::Value val, Cmp op = {}) {
-    std::vector<value::Value> res(deblocked.vals.size());
-    switch (deblocked.tag) {
-        case value::TypeTags::NumberInt32: {
-            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
-                res[i] = value::bitcastFrom<bool>(op(value::bitcastTo<int32_t>(deblocked.vals[i]),
-                                                     value::bitcastTo<int32_t>(val)));
-            }
-            break;
-        }
-        case value::TypeTags::NumberInt64:
-        case value::TypeTags::Date: {
-            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
-                res[i] = value::bitcastFrom<bool>(op(value::bitcastTo<int64_t>(deblocked.vals[i]),
-                                                     value::bitcastTo<int64_t>(val)));
-            }
-            break;
-        }
-        case value::TypeTags::NumberDouble:
-            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
-                res[i] = value::bitcastFrom<bool>(
-                    op(value::bitcastTo<double>(deblocked.vals[i]), value::bitcastTo<double>(val)));
-            }
-            break;
-        case value::TypeTags::Boolean: {
-            for (size_t i = 0; i < deblocked.vals.size(); ++i) {
-                res[i] = value::bitcastFrom<bool>(
-                    op(value::bitcastTo<bool>(deblocked.vals[i]), value::bitcastTo<bool>(val)));
-            }
-            break;
-        }
-        default:
-            MONGO_UNREACHABLE;
+template <class Cmp, typename T>
+void compareNativeCppType(size_t count,
+                          const value::Value* inVals,
+                          T rhsVal,
+                          value::TypeTags* outTags,
+                          value::Value* outVals,
+                          Cmp op = {}) {
+    std::fill_n(outTags, count, value::TypeTags::Boolean);
+    for (size_t index = 0; index < count; index++) {
+        outVals[index] = value::bitcastFrom<bool>(op(value::bitcastTo<T>(inVals[index]), rhsVal));
     }
-
-    // TODO SERVER-83799 Change to BitsetBlock
-    auto out = std::make_unique<value::BoolBlock>(std::move(res), std::move(deblocked.bitset));
-    return {
-        true, value::TypeTags::valueBlock, value::bitcastFrom<value::ValueBlock*>(out.release())};
 }
 
 template <class Cmp, ColumnOpType::Flags AddFlags = ColumnOpType::kNoFlags>
@@ -918,28 +888,73 @@ FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueB
                      value::TypeTags::Nothing,
                      ColumnOpType::ReturnNothingOnMissing{}};
 
-    const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
-        return value::genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
-    });
+    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+        [&](value::TypeTags tag, value::Value val) {
+            return value::genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
+        },
+        [&](value::TypeTags inTag,
+            const value::Value* inVals,
+            value::TypeTags* outTags,
+            value::Value* outVals,
+            size_t count) {
+            // We can natively process the comparison of numeric values, if both values are of the
+            // same type or if we can make them match by improving the precision of the constant
+            // value.
+            switch (inTag) {
+                case value::TypeTags::NumberDouble: {
+                    if (isNumber(rhsTag) &&
+                        getWidestNumericalType(inTag, rhsTag) == value::TypeTags::NumberDouble &&
+                        rhsTag != value::TypeTags::NumberInt64) {
+                        compareNativeCppType<Cmp, double>(
+                            count, inVals, numericCast<double>(rhsTag, rhsVal), outTags, outVals);
+                        return;
+                    }
+                } break;
+                case value::TypeTags::NumberInt32: {
+                    if (isNumber(rhsTag) &&
+                        getWidestNumericalType(inTag, rhsTag) == value::TypeTags::NumberInt32) {
+                        compareNativeCppType<Cmp, int32_t>(
+                            count, inVals, numericCast<int32_t>(rhsTag, rhsVal), outTags, outVals);
+                        return;
+                    }
+                } break;
+                case value::TypeTags::NumberInt64: {
+                    if (isNumber(rhsTag) &&
+                        getWidestNumericalType(inTag, rhsTag) == value::TypeTags::NumberInt64) {
+                        compareNativeCppType<Cmp, int64_t>(
+                            count, inVals, numericCast<int64_t>(rhsTag, rhsVal), outTags, outVals);
+                        return;
+                    }
+                } break;
+                case value::TypeTags::NumberDecimal: {
+                    if (isNumber(rhsTag) &&
+                        getWidestNumericalType(inTag, rhsTag) == value::TypeTags::NumberDecimal &&
+                        rhsTag != value::TypeTags::NumberDouble) {
+                        compareNativeCppType<Cmp, Decimal128>(
+                            count,
+                            inVals,
+                            numericCast<Decimal128>(rhsTag, rhsVal),
+                            outTags,
+                            outVals);
+                        return;
+                    }
+                } break;
+                case value::TypeTags::Date: {
+                    if (rhsTag == value::TypeTags::Date) {
+                        compareNativeCppType<Cmp, int64_t>(
+                            count, inVals, value::bitcastTo<int64_t>(rhsVal), outTags, outVals);
+                        return;
+                    }
+                } break;
+                default:
+                    break;
+            }
+            for (size_t index = 0; index < count; index++) {
+                std::tie(outTags[index], outVals[index]) =
+                    value::genericCompare<Cmp>(inTag, inVals[index], rhsTag, rhsVal);
+            }
+        });
 
-    // Attempt to take advantage of the fact that the comparison could be monotonic. If this doesn't
-    // work, we'll have to extract the contents of the block and compare them one by one.
-    if (auto fastPathRes = blockView->mapMonotonicFastPath(cmpOp); fastPathRes) {
-        return {true,
-                value::TypeTags::valueBlock,
-                value::bitcastFrom<value::ValueBlock*>(fastPathRes.release())};
-    }
-
-    // Second best case, we can get a view of the data in homogeneous form and apply the comparison
-    // in a typed way.
-    auto deblocked = blockView->extractHomogeneous();
-    // Compare fast path for when the input block is strongly typed, and has the same tag as the
-    // value it's being compared to.
-    if (deblocked && deblocked->tag == rhsTag) {
-        return homogeneousCmpScalar<Cmp>(*deblocked, rhsVal);
-    }
-
-    // Generic case: apply the operation one at a time using the generic map() api.
     auto res = blockView->map(cmpOp);
 
     return {
@@ -1027,10 +1042,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmp3wS
 
     auto blockView = value::getValueBlock(blockVal);
 
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Nothing,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
+    static constexpr auto cmpOpType =
+        ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput | ColumnOpType::kMonotonic,
+                     value::TypeTags::Nothing,
+                     value::TypeTags::Nothing,
+                     ColumnOpType::ReturnNothingOnMissing{}};
 
     const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
         return value::compare3way(tag, val, value.b, value.c);
