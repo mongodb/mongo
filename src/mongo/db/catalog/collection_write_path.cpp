@@ -114,6 +114,9 @@ MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
 // This fail point introduces corruption to documents during insert.
 MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
 
+// This fail point manually forces the RecordId to be of a given value during insert.
+MONGO_FAIL_POINT_DEFINE(explicitlySetRecordIdOnInsert);
+
 bool compareSafeContentElem(const BSONObj& oldDoc, const BSONObj& newDoc) {
     if (newDoc.hasField(kSafeContent) != oldDoc.hasField(kSafeContent)) {
         return false;
@@ -278,6 +281,16 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             timestamps.emplace_back(it->oplogSlot.getTimestamp());
             continue;
         }
+
+        explicitlySetRecordIdOnInsert.execute([&](const BSONObj& data) {
+            const auto docToMatch = data["doc"].Obj();
+            if (doc.woCompare(docToMatch) == 0) {
+                {
+                    auto ridValue = data["rid"].safeNumberInt();
+                    recordId = RecordId(ridValue);
+                }
+            }
+        });
 
         records.emplace_back(Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize())});
         timestamps.emplace_back(it->oplogSlot.getTimestamp());
