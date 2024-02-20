@@ -43,8 +43,10 @@ BuildRoot: %{_tmppath}/%{_name}-%{version}-%{release}-root
 %if 0%{?suse_version}
 %define timezone_pkg timezone
 %define python_pkg python
+%define shadow_pkg shadow
 %else
 %define timezone_pkg tzdata
+%define shadow_pkg shadow-utils
 %endif
 
 %description
@@ -93,14 +95,14 @@ This metapackage will install the mongo shell, import/export tools, other client
 %package -n mongodb-org-server
 Summary: MongoDB database server
 Group: Applications/Databases
-Requires: shadow-utils, openssl, %{timezone_pkg}
+Requires: %{shadow_pkg}, openssl, %{timezone_pkg}
 Conflicts: mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools
 Obsoletes: mongo-10gen-server
 Provides: mongo-10gen-server
 
 %if 0%{?suse_version} >= 1210 || 0%{?rhel} >= 700 || 0%{?fedora} >= 15
 BuildRequires: systemd-rpm-macros
-Requires: shadow-utils
+Requires: %{shadow_pkg}
 %else
 BuildRequires: systemd
 %{?systemd_requires}
