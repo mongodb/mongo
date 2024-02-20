@@ -1196,7 +1196,12 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
     // The database primary must always be a recipient to ensure it ends up with consistent
     // collection metadata.
-    recipientShardIds.emplace(cm.dbPrimary());
+    const auto dbPrimaryShard =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(
+                            opCtx, coordinatorDoc.getSourceNss().dbName()))
+            ->getPrimary();
+
+    recipientShardIds.emplace(dbPrimaryShard);
 
     if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
         auto version = calculateChunkVersionForInitialChunks(opCtx);
@@ -2549,11 +2554,12 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
     ShardsvrNotifyShardingEventRequest request(notify_sharding_event::kCollectionResharded,
                                                eventNotification.toBSON());
 
-    const auto cm = uassertStatusOK(Grid::get(opCtx.get())
-                                        ->catalogCache()
-                                        ->getTrackedCollectionRoutingInfoWithPlacementRefresh(
-                                            opCtx.get(), _coordinatorDoc.getSourceNss()))
-                        .cm;
+    const auto dbPrimaryShard =
+        uassertStatusOK(
+            Grid::get(opCtx.get())
+                ->catalogCache()
+                ->getDatabaseWithRefresh(opCtx.get(), _coordinatorDoc.getSourceNss().dbName()))
+            ->getPrimary();
 
     // In case the recipient is running a legacy binary, swallow the error.
     try {
@@ -2564,7 +2570,7 @@ void ReshardingCoordinator::_generateOpEventOnCoordinatingShard(
                 **executor, _ctHolder->getStepdownToken(), request, args);
         opts->cmd.setDbName(DatabaseName::kAdmin);
         _reshardingCoordinatorExternalState->sendCommandToShards(
-            opCtx.get(), opts, {cm.dbPrimary()});
+            opCtx.get(), opts, {dbPrimaryShard});
     } catch (const ExceptionFor<ErrorCodes::UnsupportedShardingEventNotification>& e) {
         LOGV2_WARNING(7403100,
                       "Unable to generate op entry on reshardCollection commit",

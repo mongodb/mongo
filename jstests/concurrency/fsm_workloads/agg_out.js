@@ -11,7 +11,7 @@
  * the server doesn't deadlock or crash.
  *
  * @tags: [
- *   # TODO SERVER-86622: Disabled due to problems with moving unsplittable collections
+ *   # TODO SERVER-86802: Disabled due to problems with moving unsplittable collections
  *   assumes_balancer_off,
  *   requires_capped,
  * ]
