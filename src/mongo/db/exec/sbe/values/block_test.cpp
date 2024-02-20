@@ -476,32 +476,22 @@ public:
     ValueBlockTest() = default;
 };
 
-static constexpr auto testOp1Type = ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput,
-                                                 TypeTags::Nothing,
-                                                 TypeTags::Boolean,
-                                                 ColumnOpType::ReturnBoolOnMissing{}};
-static const auto testOp1 = value::makeColumnOp<testOp1Type>([](TypeTags tag, Value val) {
-    return std::pair(TypeTags::Boolean, value::bitcastFrom<bool>(value::isString(tag)));
-});
+static const auto testOp1 =
+    value::makeColumnOp<ColumnOpType::kNoFlags>([](TypeTags tag, Value val) {
+        return std::pair(TypeTags::Boolean, value::bitcastFrom<bool>(value::isString(tag)));
+    });
 
-static constexpr auto testOp2Type = ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput,
-                                                 TypeTags::NumberDouble,
-                                                 TypeTags::Boolean,
-                                                 ColumnOpType::ReturnNothingOnMissing{}};
-static const auto testOp2 = value::makeColumnOp<testOp2Type>([](TypeTags tag, Value val) {
-    if (tag == TypeTags::NumberDouble) {
-        double d = value::bitcastTo<double>(val);
-        return std::pair(TypeTags::Boolean, value::bitcastFrom<bool>(d >= 5.0));
-    } else {
-        return std::pair(TypeTags::Nothing, Value{0u});
-    }
-});
+static const auto testOp2 =
+    value::makeColumnOp<ColumnOpType::kNoFlags>([](TypeTags tag, Value val) {
+        if (tag == TypeTags::NumberDouble) {
+            double d = value::bitcastTo<double>(val);
+            return std::pair(TypeTags::Boolean, value::bitcastFrom<bool>(d >= 5.0));
+        } else {
+            return std::pair(TypeTags::Nothing, Value{0u});
+        }
+    });
 
-static constexpr auto testOp3Type = ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput,
-                                                 TypeTags::Nothing,
-                                                 TypeTags::Boolean,
-                                                 ColumnOpType::ReturnBoolOnMissing{}};
-static const auto testOp3 = value::makeColumnOp<testOp3Type>(
+static const auto testOp3 = value::makeColumnOp<ColumnOpType::kNoFlags>(
     [](TypeTags tag, Value val) {
         return std::pair(TypeTags::Boolean, value::bitcastFrom<bool>(tag != TypeTags::Nothing));
     },
@@ -512,11 +502,7 @@ static const auto testOp3 = value::makeColumnOp<testOp3Type>(
         }
     });
 
-static constexpr auto testOp4Type = ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput,
-                                                 TypeTags::NumberDouble,
-                                                 TypeTags::NumberDouble,
-                                                 ColumnOpType::ReturnNothingOnMissing{}};
-static const auto testOp4 = value::makeColumnOp<testOp4Type>(
+static const auto testOp4 = value::makeColumnOp<ColumnOpType::kNoFlags>(
     [](TypeTags tag, Value val) {
         if (tag == TypeTags::NumberDouble) {
             double d = value::bitcastTo<double>(val);
@@ -774,12 +760,7 @@ TEST_F(ValueBlockTest, TestBlockMap) {
 }
 
 // Test monotonic shortcut in ValueBlock::defaultMapImpl().
-static constexpr auto testOp5Type =
-    ColumnOpType{ColumnOpType::kOutputNonNothingOnExpectedInput | ColumnOpType::kMonotonic,
-                 TypeTags::bsonString,
-                 TypeTags::bsonString,
-                 ColumnOpType::ReturnNothingOnMissing{}};
-static const auto testOp5 = value::makeColumnOp<testOp5Type>(
+static const auto testOp5 = value::makeColumnOp<ColumnOpType::kMonotonic>(
     [](TypeTags tag, Value val) { return value::makeBigString("fake result from map"); });
 
 TEST_F(ValueBlockTest, TestBlockMapFast) {

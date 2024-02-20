@@ -838,13 +838,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::blockRoundTrunc(
         place = convertNumericToInt32(placeTag, placeVal);
     }
 
-    // What should this be?
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Nothing,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
-
-    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+    const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
             auto [_, resTag, resVal] = genericRoundTrunc(funcName, roundingMode, place, tag, val);
             return {resTag, resVal};
@@ -882,13 +876,7 @@ template <class Cmp, ColumnOpType::Flags AddFlags = ColumnOpType::kNoFlags>
 FastTuple<bool, value::TypeTags, value::Value> blockCompareGeneric(value::ValueBlock* blockView,
                                                                    value::TypeTags rhsTag,
                                                                    value::Value rhsVal) {
-    static constexpr auto cmpOpType =
-        ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput | AddFlags,
-                     value::TypeTags::Nothing,
-                     value::TypeTags::Nothing,
-                     ColumnOpType::ReturnNothingOnMissing{}};
-
-    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+    const auto cmpOp = value::makeColumnOp<AddFlags>(
         [&](value::TypeTags tag, value::Value val) {
             return value::genericCompare<Cmp>(tag, val, rhsTag, rhsVal);
         },
@@ -1004,12 +992,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockNeqSca
 
     // For neq we apply equal_to and then use genericNot() to negate it, just like the scalar
     // variation in the VM.
-    static constexpr auto notOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Nothing,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
-
-    const auto notOp = value::makeColumnOp<notOpType>(
+    const auto notOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) { return genericNot(tag, val); });
 
     tassert(8625710,
@@ -1042,15 +1025,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCmp3wS
 
     auto blockView = value::getValueBlock(blockVal);
 
-    static constexpr auto cmpOpType =
-        ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput | ColumnOpType::kMonotonic,
-                     value::TypeTags::Nothing,
-                     value::TypeTags::Nothing,
-                     ColumnOpType::ReturnNothingOnMissing{}};
-
-    const auto cmpOp = value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
-        return value::compare3way(tag, val, value.b, value.c);
-    });
+    const auto cmpOp =
+        value::makeColumnOp<ColumnOpType::kMonotonic>([&](value::TypeTags tag, value::Value val) {
+            return value::compare3way(tag, val, value.b, value.c);
+        });
 
     auto res = blockView->map(cmpOp);
 
@@ -1140,13 +1118,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCombin
             value::bitcastFrom<value::ValueBlock*>(blockOut.release())};
 }
 
-static constexpr auto invokeLambdaOpType = ColumnOpType{ColumnOpType::kNoFlags,
-                                                        value::TypeTags::Nothing,
-                                                        value::TypeTags::Nothing,
-                                                        ColumnOpType::OnMissingInput{}};
-
 static const auto invokeLambdaOp =
-    value::makeColumnOpWithParams<invokeLambdaOpType, ByteCode::InvokeLambdaFunctor>();
+    value::makeColumnOpWithParams<ColumnOpType::kNoFlags, ByteCode::InvokeLambdaFunctor>();
 
 /**
  * Implementation of the valueBlockApplyLambda instruction. This instruction takes a mask, a block
@@ -1440,12 +1413,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockLogica
 
     auto bitmapView = value::getValueBlock(bitmapVal);
 
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Nothing,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
-
-    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+    const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) { return genericNot(tag, val); });
 
     auto res = bitmapView->map(cmpOp);
@@ -1593,37 +1561,25 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockIsMemb
     auto arrTag = arrTag_;
     auto arrVal = arrVal_;
 
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNonNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Boolean,
-                                                   ColumnOpType::ReturnBoolOnMissing{}};
-
-    auto isInList = [](value::TypeTags inputTag, value::Value inputVal, InListData* inListData) {
-        return inputTag != value::TypeTags::Nothing && inListData->contains(inputTag, inputVal);
-    };
-
-    auto isMemberOfSet =
-        [](value::TypeTags inputTag, value::Value inputVal, value::ValueSetType& valueSet) {
-            return valueSet.find({inputTag, inputVal}) != valueSet.end();
-        };
-
     auto res = [&]() {
         if (arrTag == value::TypeTags::inListData) {
             auto inListData = value::getInListDataView(arrVal);
 
-            return valueBlockView->map(
-                value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
+            return valueBlockView->map(value::makeColumnOp<ColumnOpType::kNoFlags>(
+                [&](value::TypeTags tag, value::Value val) {
                     return std::pair{value::TypeTags::Boolean,
-                                     value::bitcastFrom<bool>(isInList(tag, val, inListData))};
+                                     value::bitcastFrom<bool>(tag != value::TypeTags::Nothing &&
+                                                              inListData->contains(tag, val))};
                 }));
         } else if (arrTag == value::TypeTags::ArraySet) {
             auto arrSet = value::getArraySetView(arrVal);
             auto& values = arrSet->values();
 
-            return valueBlockView->map(
-                value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
-                    return std::pair{value::TypeTags::Boolean,
-                                     value::bitcastFrom<bool>(isMemberOfSet(tag, val, values))};
+            return valueBlockView->map(value::makeColumnOp<ColumnOpType::kNoFlags>(
+                [&](value::TypeTags tag, value::Value val) {
+                    return std::pair{
+                        value::TypeTags::Boolean,
+                        value::bitcastFrom<bool>(values.find({tag, val}) != values.end())};
                 }));
         } else {
             value::ValueSetType values(0, value::ValueHash(nullptr), value::ValueEq(nullptr));
@@ -1631,10 +1587,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockIsMemb
                 values.insert({elemTag, elemVal});
             });
 
-            return valueBlockView->map(
-                value::makeColumnOp<cmpOpType>([&](value::TypeTags tag, value::Value val) {
-                    return std::pair{value::TypeTags::Boolean,
-                                     value::bitcastFrom<bool>(isMemberOfSet(tag, val, values))};
+            return valueBlockView->map(value::makeColumnOp<ColumnOpType::kNoFlags>(
+                [&](value::TypeTags tag, value::Value val) {
+                    return std::pair{
+                        value::TypeTags::Boolean,
+                        value::bitcastFrom<bool>(values.find({tag, val}) != values.end())};
                 }));
         }
     }();
@@ -1652,12 +1609,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockCoerce
             valBlockTag == value::TypeTags::valueBlock);
     auto valueBlockView = value::getValueBlock(valBlockVal);
 
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Boolean,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
-
-    auto res = valueBlockView->map(value::makeColumnOp<cmpOpType>(
+    auto res = valueBlockView->map(value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) { return value::coerceToBool(tag, val); }));
 
     return {
@@ -1684,12 +1636,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockMod(Ar
                 value::bitcastFrom<value::ValueBlock*>(nothingBlock.release())};
     }
 
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Nothing,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
-
-    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+    const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
             auto [_, resTag, resVal] = genericMod(tag, val, mod.b, mod.c);
             return {resTag, resVal};
@@ -1714,12 +1661,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockConver
     // Numeric convert expects always a numeric type as target. However, it does not check for it
     // and throws if the value is not numeric. We let genericNumConvert do this check and we do not
     // make any checks here.
-    static constexpr auto cmpOpType = ColumnOpType{ColumnOpType::kOutputNothingOnMissingInput,
-                                                   value::TypeTags::Nothing,
-                                                   value::TypeTags::Nothing,
-                                                   ColumnOpType::ReturnNothingOnMissing{}};
-
-    const auto cmpOp = value::makeColumnOp<cmpOpType>(
+    const auto cmpOp = value::makeColumnOp<ColumnOpType::kNoFlags>(
         [&](value::TypeTags tag, value::Value val) -> std::pair<value::TypeTags, value::Value> {
             auto [_, resTag, resVal] = value::genericNumConvert(tag, val, target.b);
             return {resTag, resVal};
