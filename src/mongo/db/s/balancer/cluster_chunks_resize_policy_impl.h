@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/s/balancer/cluster_chunks_resize_policy.h"
 #include "mongo/s/catalog/type_collection.h"
 
@@ -122,7 +121,6 @@ private:
     Mutex _stateMutex = MONGO_MAKE_LATCH("ClusterChunksResizePolicyImpl::_stateMutex");
 
     boost::optional<SharedPromise<void>> _activeRequestPromise{boost::none};
-    std::unique_ptr<mongo::DBClientCursor> _unprocessedCollections;
     stdx::unordered_map<UUID, CollectionState, UUID::Hash> _collectionsBeingProcessed;
     int64_t _defaultMaxChunksSizeBytes{-1};
 

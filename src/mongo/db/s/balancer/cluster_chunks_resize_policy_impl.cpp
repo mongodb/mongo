@@ -212,19 +212,9 @@ SharedSemiFuture<void> ClusterChunksResizePolicyImpl::activate(OperationContext*
 
     stdx::lock_guard<Latch> lk(_stateMutex);
     if (!_activeRequestPromise.is_initialized()) {
-        invariant(!_unprocessedCollections && _collectionsBeingProcessed.empty());
+        invariant(_collectionsBeingProcessed.empty());
         _defaultMaxChunksSizeBytes = defaultMaxChunksSizeBytes;
         invariant(_defaultMaxChunksSizeBytes > 0);
-
-        DBDirectClient dbClient(opCtx);
-        FindCommandRequest findCollectionsRequest{CollectionType::ConfigNS};
-        findCollectionsRequest.setFilter(
-            BSON(CollectionTypeBase::kChunksAlreadySplitForDowngradeFieldName
-                 << BSON("$not" << BSON("$eq" << true))));
-        _unprocessedCollections = dbClient.find(std::move(findCollectionsRequest));
-        uassert(ErrorCodes::OperationFailed,
-                "Failed to establish a cursor for accessing config.collections",
-                _unprocessedCollections);
 
         _activeRequestPromise.emplace();
     }
@@ -242,7 +232,6 @@ void ClusterChunksResizePolicyImpl::stop() {
         stdx::lock_guard<Latch> lk(_stateMutex);
         if (_activeRequestPromise.is_initialized()) {
             _collectionsBeingProcessed.clear();
-            _unprocessedCollections = nullptr;
             _activeRequestPromise->setFrom(
                 Status(ErrorCodes::Interrupted, "Chunk resizing task has been interrupted"));
             _activeRequestPromise = boost::none;
@@ -264,6 +253,17 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
     }
 
     bool stateInspectionCompleted = false;
+
+    DBDirectClient dbClient(opCtx);
+    FindCommandRequest findCollectionsRequest{CollectionType::ConfigNS};
+    findCollectionsRequest.setFilter(
+        BSON(CollectionTypeBase::kChunksAlreadySplitForDowngradeFieldName
+             << BSON("$not" << BSON("$eq" << true))));
+    auto unprocessedCollections = dbClient.find(std::move(findCollectionsRequest));
+    uassert(ErrorCodes::OperationFailed,
+            "Failed to establish a cursor for accessing config.collections",
+            unprocessedCollections);
+
     while (!stateInspectionCompleted) {
         // Try to get the next action from the current subset of collections being processed.
         for (auto it = _collectionsBeingProcessed.begin();
@@ -307,9 +307,9 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
         }
 
         if (_collectionsBeingProcessed.size() < kMaxCollectionsBeingProcessed &&
-            _unprocessedCollections->more()) {
+            unprocessedCollections->more()) {
             // Start processing a new collection
-            auto nextDoc = _unprocessedCollections->next();
+            auto nextDoc = unprocessedCollections->next();
             CollectionType coll(nextDoc);
             auto initialCollState = _buildInitialStateFor(opCtx, coll);
             if (initialCollState) {
@@ -322,7 +322,7 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
         }
     }
 
-    if (_collectionsBeingProcessed.empty() && !_unprocessedCollections->more()) {
+    if (_collectionsBeingProcessed.empty() && !unprocessedCollections->more()) {
         LOGV2(6417104, "Cluster chunks resize process completed. Clearing up internal state");
         PersistentTaskStore<CollectionType> store(CollectionType::ConfigNS);
         try {
@@ -340,7 +340,7 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
                 "Failed to clear persisted state while ending cluster chunks resize process",
                 "err"_attr = redact(e));
         }
-        _unprocessedCollections = nullptr;
+
         _activeRequestPromise->setFrom(Status::OK());
         _activeRequestPromise = boost::none;
     }
