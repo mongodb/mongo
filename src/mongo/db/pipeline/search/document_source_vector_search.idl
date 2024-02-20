@@ -70,6 +70,6 @@ structs:
       filter:
         description: Pre-filter to apply before performing search.
         optional: true
-        type: object
+        type: object_owned
         query_shape: parameter
 

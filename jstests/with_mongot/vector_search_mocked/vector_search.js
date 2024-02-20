@@ -90,6 +90,32 @@ const responseOk = 1;
     assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
 })();
 
+// $vectorSearch succeeds if a filter is present. Note that the filter will not be applied in
+// this test, as the mock can't interpret MatchExpressions.
+(function testVectorSearchWorksWithFilter() {
+    const filter = {"$or": [{"color": {"$gt": "C"}}, {"color": {"$lt": "C"}}]};
+    const pipeline = [{$vectorSearch: {queryVector, path, limit: 1, filter: filter}}];
+
+    const mongotResponseBatch = [{_id: 0}, {_id: 1}];
+    const expectedDocs = [{_id: 0}];
+
+    const history = [{
+        expectedCommand: mongotCommandForVectorSearchQuery({
+            queryVector,
+            path,
+            limit: 1,
+            index: null,
+            filter: filter,
+            collName,
+            dbName,
+            collectionUUID
+        }),
+        response: mongotResponseForBatch(mongotResponseBatch, NumberLong(0), collNS, responseOk),
+    }];
+    mongotMock.setMockResponses(history, cursorId);
+    assert.eq(testDB[collName].aggregate(pipeline).toArray(), expectedDocs);
+})();
+
 // $vectorSearch populates {$meta: score}.
 (function testVectorSearchPopulatesScoreeMetaField() {
     const pipeline = [

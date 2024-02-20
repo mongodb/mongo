@@ -47,10 +47,12 @@ st.shardColl(testColl, {_id: 1}, {_id: 10}, {_id: 10 + 1});
 const collectionUUID = getUUIDFromListCollections(st.rs0.getPrimary().getDB(dbName), collName);
 
 const vectorSearchQuery = {
-    queryVector: [1.0, 2.0, 3.0],
-    path: "x",
-    numCandidates: 10,
-    limit: 100
+    "index": "default",
+    "path": "x",
+    "numCandidates": 10,
+    "limit": 100,
+    "filter": {"$or": [{"color": {"$gt": "C"}}, {"color": {"$lt": "C"}}]},
+    "queryVector": [2.0, 2.0]
 };
 const expectedMongotCommand =
     mongotCommandForVectorSearchQuery({...vectorSearchQuery, collName, dbName, collectionUUID});
