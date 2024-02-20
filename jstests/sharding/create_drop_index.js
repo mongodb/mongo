@@ -2,7 +2,7 @@
  * Tests create/drop index for all combinations of sharded/unsplittable collections initially
  * created on a db's primary/non-primary shard.
  *
- * @tags [
+ * @tags: [
  *   featureFlagTrackUnshardedCollectionsOnShardingCatalog,
  * ]
  *
