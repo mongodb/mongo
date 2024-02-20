@@ -27,6 +27,7 @@ selector:
 
   # TODO SERVER-86727 Reenable.
   - jstests/core/txns/create_collection_not_blocked_by_txn.js
+  - jstests/core/txns/indexing_not_blocked_by_txn.js
 
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
