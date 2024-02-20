@@ -85,6 +85,12 @@ structs:
                               selectors as used in the 'find' operation."
                 type: object
                 stability: stable
+            sort:
+                description: "Determines which document the operation modifies if the query selects
+                              multiple documents."
+                type: object
+                optional: true
+                stability: unstable
             multi:
                 description: "If true, updates all documents that meet the query criteria. If false,
                               limits the update to one document which meets the query criteria." 

@@ -383,6 +383,7 @@ int BatchItemRef::getSizeForBatchWriteBytes() const {
                 update.getUpsertSupplied().has_value(),
                 update.getCollation(),
                 update.getArrayFilters(),
+                update.getSort(),
                 update.getHint(),
                 update.getSampleId(),
                 update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value());
@@ -430,6 +431,7 @@ int BatchItemRef::getSizeForBulkWriteBytes() const {
                                                           updateOp.getUpsertSupplied().has_value(),
                                                           updateOp.getCollation(),
                                                           updateOp.getArrayFilters(),
+                                                          updateOp.getSort(),
                                                           updateOp.getHint(),
                                                           updateOp.getSampleId());
             // When running a debug build, verify that estSize is at least the BSON serialization

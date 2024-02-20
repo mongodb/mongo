@@ -255,6 +255,12 @@ structs:
                 type: object
                 optional: true
                 stability: stable
+            sort:
+                description: "Determines which document the operation modifies if the query selects
+                              multiple documents."
+                type: object
+                optional: true
+                stability: unstable
             arrayFilters:
                 description: "Specifies which array elements an update modifier should apply to."
                 type: array<object>

@@ -373,11 +373,12 @@ export const BulkWriteUtils = (function() {
             "upsert": update.upsert ? update.upsert : false
         };
 
-        ["arrayFilters", "collation", "hint", "sampleId", "upsertSupplied"].forEach(property => {
-            if (update.hasOwnProperty(property)) {
-                op[property] = update[property];
-            }
-        });
+        ["arrayFilters", "collation", "hint", "sampleId", "sort", "upsertSupplied"].forEach(
+            property => {
+                if (update.hasOwnProperty(property)) {
+                    op[property] = update[property];
+                }
+            });
 
         if (update.hasOwnProperty("c")) {
             op["constants"] = update.c;

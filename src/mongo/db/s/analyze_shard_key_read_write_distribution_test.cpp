@@ -267,6 +267,7 @@ protected:
             op.setConstants(updateOp.getC());
             op.setUpdateMods(updateOp.getU());
             op.setHint(updateOp.getHint());
+            op.setSort(updateOp.getSort());
             op.setCollation(updateOp.getCollation());
             op.setArrayFilters(updateOp.getArrayFilters());
             op.setUpsert(updateOp.getUpsert());

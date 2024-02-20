@@ -326,7 +326,7 @@ TEST_F(BulkWriteTest, SingleQueryInUpdateOp) {
     ASSERT_FALSE(mirroredObj.hasField("databaseVersion"));
 }
 
-TEST_F(BulkWriteTest, SingleQueryInUpdateOpWithHintAndCollation) {
+TEST_F(BulkWriteTest, SingleQueryInUpdateOpWithHintCollationSort) {
     auto bulkWriteArgs = {
         BSON("ops" << BSON_ARRAY(BSON("insert" << 0 << "document" << BSON("_id" << 1))
                                  << BSON("update"
@@ -334,7 +334,8 @@ TEST_F(BulkWriteTest, SingleQueryInUpdateOpWithHintAndCollation) {
                                          << "updateMods" << BSON("$inc" << BSON("price" << 1))
                                          << "hint" << BSON("price" << 1) << "collation"
                                          << BSON("locale"
-                                                 << "fr")))),
+                                                 << "fr")
+                                         << "sort" << BSON("price" << 1)))),
         BSON("nsInfo" << BSON_ARRAY(BSON("ns" << kNss)))};
 
     auto mirroredObj = createCommandAndGetMirrored("1", bulkWriteArgs);
@@ -343,6 +344,7 @@ TEST_F(BulkWriteTest, SingleQueryInUpdateOpWithHintAndCollation) {
     ASSERT_EQ(mirroredObj["filter"].Obj().toString(), "{ price: { $gt: 100 } }");
     ASSERT_EQ(mirroredObj["hint"].Obj().toString(), "{ price: 1 }");
     ASSERT_EQ(mirroredObj["collation"].Obj().toString(), "{ locale: \"fr\" }");
+    ASSERT_EQ(mirroredObj["sort"].Obj().toString(), "{ price: 1 }");
     ASSERT_TRUE(mirroredObj["singleBatch"].Bool());
     ASSERT_EQ(mirroredObj["batchSize"].Int(), 1);
     ASSERT_FALSE(mirroredObj.hasField("shardVersion"));

@@ -1216,6 +1216,62 @@ WriteResult performInserts(OperationContext* opCtx,
     return out;
 }
 
+/**
+ * Performs a single update without retries.
+ */
+static SingleWriteResult performSingleUpdateOpNoRetry(OperationContext* opCtx,
+                                                      OperationSource source,
+                                                      bool* containsDotsAndDollarsField,
+                                                      CurOp& curOp,
+                                                      CollectionAcquisition collection,
+                                                      ParsedUpdate& parsedUpdate) {
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(&curOp.debug(), collection, &parsedUpdate, boost::none /* verbosity */));
+
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+    }
+
+    auto updateResult = exec->executeUpdate();
+
+    PlanSummaryStats summary;
+    auto&& explainer = exec->getPlanExplainer();
+    explainer.getSummaryStats(&summary);
+    if (const auto& coll = collection.getCollectionPtr()) {
+        CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
+    }
+
+    if (curOp.shouldDBProfile()) {
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        curOp.debug().execStats = std::move(stats);
+    }
+
+    if (source != OperationSource::kTimeseriesInsert) {
+        recordUpdateResultInOpDebug(updateResult, &curOp.debug());
+    }
+    curOp.debug().setPlanSummaryMetrics(summary);
+
+    const bool didInsert = !updateResult.upsertedId.isEmpty();
+    const long long nMatchedOrInserted = didInsert ? 1 : updateResult.numMatched;
+    SingleWriteResult result;
+    result.setN(nMatchedOrInserted);
+    result.setNModified(updateResult.numDocsModified);
+    result.setUpsertedId(updateResult.upsertedId);
+
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangAfterBatchUpdate, opCtx, "hangAfterBatchUpdate");
+
+    if (containsDotsAndDollarsField && updateResult.containsDotsAndDollarsField) {
+        *containsDotsAndDollarsField = true;
+    }
+
+    return result;
+}
+
+/**
+ * Performs a single update, sometimes retrying failure due to WriteConflictException.
+ */
 static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                                                const NamespaceString& ns,
                                                const boost::optional<mongo::UUID>& opCollectionUUID,
@@ -1305,48 +1361,15 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, ns);
 
-    auto exec = uassertStatusOK(
-        getExecutorUpdate(&curOp.debug(), collection, &parsedUpdate, boost::none /* verbosity */));
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+    if (updateRequest->getSort().isEmpty()) {
+        return performSingleUpdateOpNoRetry(
+            opCtx, source, containsDotsAndDollarsField, curOp, collection, parsedUpdate);
+    } else {
+        return writeConflictRetry(opCtx, "update", ns, [&]() -> SingleWriteResult {
+            return performSingleUpdateOpNoRetry(
+                opCtx, source, containsDotsAndDollarsField, curOp, collection, parsedUpdate);
+        });
     }
-
-    auto updateResult = exec->executeUpdate();
-
-    PlanSummaryStats summary;
-    auto&& explainer = exec->getPlanExplainer();
-    explainer.getSummaryStats(&summary);
-    if (const auto& coll = collection.getCollectionPtr()) {
-        CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
-    }
-
-    if (curOp.shouldDBProfile()) {
-        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-        curOp.debug().execStats = std::move(stats);
-    }
-
-    if (source != OperationSource::kTimeseriesInsert) {
-        recordUpdateResultInOpDebug(updateResult, &curOp.debug());
-    }
-    curOp.debug().setPlanSummaryMetrics(summary);
-
-    const bool didInsert = !updateResult.upsertedId.isEmpty();
-    const long long nMatchedOrInserted = didInsert ? 1 : updateResult.numMatched;
-    SingleWriteResult result;
-    result.setN(nMatchedOrInserted);
-    result.setNModified(updateResult.numDocsModified);
-    result.setUpsertedId(updateResult.upsertedId);
-
-    CurOpFailpointHelpers::waitWhileFailPointEnabled(
-        &hangAfterBatchUpdate, opCtx, "hangAfterBatchUpdate");
-
-    if (containsDotsAndDollarsField && updateResult.containsDotsAndDollarsField) {
-        *containsDotsAndDollarsField = true;
-    }
-
-    return result;
 }
 
 /**
@@ -1553,6 +1576,11 @@ WriteResult performUpdates(OperationContext* opCtx,
                     !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti() ||
                         opCtx->isRetryableWrite());
         }
+
+        uassert(ErrorCodes::FailedToParse,
+                "Cannot specify sort with multi=true",
+                !singleOp.getSort() || !singleOp.getMulti());
+
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         if (opCtx->isRetryableWrite()) {

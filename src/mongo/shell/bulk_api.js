@@ -702,6 +702,11 @@ var _bulk_api_module = (function() {
                 var document =
                     {q: currentOp.selector, u: updateDocument, multi: false, upsert: upsert};
 
+                // Copy over the sort, if we have one.
+                if (currentOp.hasOwnProperty('sort')) {
+                    document.sort = currentOp.sort;
+                }
+
                 // Copy over the hint, if we have one.
                 if (currentOp.hasOwnProperty('hint')) {
                     document.hint = currentOp.hint;
@@ -734,6 +739,11 @@ var _bulk_api_module = (function() {
             upsert: function() {
                 currentOp.upsert = true;
                 // Return the findOperations
+                return findOperations;
+            },
+
+            sort: function(sort) {
+                currentOp.sort = sort;
                 return findOperations;
             },
 

@@ -105,6 +105,11 @@ TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
     updateOpEntry.setHint(hint);
     ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
 
+    // Add a sort.
+    BSONObj sort = fromjson("{a: 1}");
+    updateOpEntry.setSort(sort);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
     // Add arrayFilters.
     auto arrayFilter = std::vector<BSONObj>{fromjson("{'x.a': {$gt: 85}}")};
     updateOpEntry.setArrayFilters(arrayFilter);

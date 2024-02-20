@@ -106,11 +106,11 @@ const FieldRef idFieldRef(idFieldName);
  * case of a conflict. Returns false if we should skip the document and keep going.
  */
 bool shouldRestartUpdateIfNoLongerMatches(const UpdateStageParams& params) {
-    // When we're doing a findAndModify with a sort, the sort will have a limit of 1, so it will not
-    // produce any more results even if there is another matching document. Throw a WCE here so that
-    // these operations get another chance to find a matching document. The findAndModify command
-    // should automatically retry if it gets a WCE.
-    return params.request->shouldReturnAnyDocs() && !params.request->getSort().isEmpty();
+    // When we're doing an updateOne or findAndModify with a sort, the sort will have a limit of 1,
+    // so it will not produce any more results even if there is another matching document. Throw a
+    // WCE here so that these operations get another chance to find a matching document. The
+    // updateOne and findAndModify commands should automatically retry if they get a WCE.
+    return !params.request->getSort().isEmpty();
 };
 
 CollectionUpdateArgs::StoreDocOption getStoreDocMode(const UpdateRequest& updateRequest) {

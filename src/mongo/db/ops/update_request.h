@@ -43,6 +43,7 @@ namespace mongo {
 namespace {
 const std::vector<BSONObj> emptyArrayFilters{};
 const BSONObj emptyCollation{};
+const BSONObj emptySort{};
 
 template <typename T>
 void appendArrayToString(const T& arr, StringBuilder* builder) {
@@ -110,11 +111,11 @@ public:
     }
 
     void setSort(const BSONObj& sort) {
-        _sort = sort;
+        _updateOp.setSort(sort);
     }
 
     const BSONObj& getSort() const {
-        return _sort;
+        return _updateOp.getSort().get_value_or(emptySort);
     }
 
     void setCollation(const BSONObj& collation) {

@@ -454,6 +454,10 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
         arrayFilters = opts.arrayFilters;
         hint = opts.hint;
         letParams = opts.let;
+        if (opts.sort) {
+            throw new Error(
+                "This sort will not do anything. Please call update without a sort or defer to calling updateOne with a sort.");
+        }
     }
 
     // Normalize 'upsert' and 'multi' to booleans.

@@ -133,6 +133,7 @@ public:
                      bool upsert,
                      bool multi,
                      const boost::optional<std::vector<BSONObj>>& arrayFilters,
+                     const boost::optional<BSONObj>& sort,
                      const boost::optional<BSONObj>& collation,
                      const boost::optional<BSONObj>& hint);
 

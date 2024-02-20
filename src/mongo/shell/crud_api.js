@@ -111,6 +111,10 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
 
             // Translate operation to bulk operation
             var operation = bulkOp.find(op.updateOne.filter);
+            if (op.updateOne.sort) {
+                operation.sort(op.updateOne.sort);
+            }
+
             if (op.updateOne.upsert) {
                 operation = operation.upsert();
             }
@@ -135,6 +139,11 @@ DBCollection.prototype.bulkWrite = function(operations, options) {
 
             if (!op.updateMany.update) {
                 throw new Error('updateMany bulkWrite operation expects the update field');
+            }
+
+            if (op.updateMany.sort) {
+                throw new Error(
+                    "This sort will not do anything. Please call update without a sort or defer to calling updateOne with a sort.");
             }
 
             // Translate operation to bulk operation
@@ -577,6 +586,9 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
 
     // Add the updateOne operation
     var op = bulk.find(filter);
+    if (opts.sort) {
+        op.sort(opts.sort);
+    }
     if (opts.upsert) {
         op = op.upsert();
     }
@@ -667,6 +679,12 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
 
     // Add the updateMany operation
     var op = bulk.find(filter);
+
+    if (opts.sort) {
+        throw new Error(
+            "This sort will not do anything. Please call update without a sort or defer to calling updateOne with a sort.");
+    }
+
     if (opts.upsert) {
         op = op.upsert();
     }

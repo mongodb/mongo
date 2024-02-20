@@ -127,6 +127,7 @@ public:
                        type != UpsertType::kNone /* includeUpsertSupplied */,
                        boost::none /* collation */,
                        boost::none /* arrayFilters */,
+                       boost::none /* sort */,
                        BSONObj() /* hint*/,
                        boost::none /* sampleId */,
                        false /* $_allowShardKeyUpdatesWithoutFullShardKeyInQuery */) +

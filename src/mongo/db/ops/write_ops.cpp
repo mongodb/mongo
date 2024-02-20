@@ -282,6 +282,7 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const bool includeUpsertSupplied,
                           const boost::optional<mongo::BSONObj>& collation,
                           const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+                          const boost::optional<mongo::BSONObj>& sort,
                           const mongo::BSONObj& hint,
                           const boost::optional<UUID>& sampleId,
                           const bool includeAllowShardKeyUpdatesWithoutFullShardKeyInQuery) {
@@ -316,6 +317,11 @@ int getUpdateSizeEstimate(const BSONObj& q,
     if (arrayFilters) {
         estSize +=
             getArrayFiltersFieldSize(arrayFilters.get(), UpdateOpEntry::kArrayFiltersFieldName);
+    }
+
+    // Add the size of the 'sort' field, if present.
+    if (sort) {
+        estSize += UpdateOpEntry::kSortFieldName.size() + sort->objsize() + kPerElementOverhead;
     }
 
     // Add the size of the 'hint' field, if present.
@@ -355,6 +361,7 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
                                    const bool includeUpsertSupplied,
                                    const boost::optional<mongo::BSONObj>& collation,
                                    const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+                                   const boost::optional<mongo::BSONObj>& sort,
                                    const BSONObj& hint,
                                    const boost::optional<UUID>& sampleId) {
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
@@ -393,6 +400,11 @@ int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
     if (arrayFilters) {
         estSize +=
             getArrayFiltersFieldSize(arrayFilters.get(), BulkWriteUpdateOp::kArrayFiltersFieldName);
+    }
+
+    // Add the size of the 'sort' field, if present.
+    if (sort) {
+        estSize += BulkWriteUpdateOp::kSortFieldName.size() + sort->objsize() + kPerElementOverhead;
     }
 
     // Add the size of the 'hint' field, if present.
@@ -493,6 +505,7 @@ bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
                update.getUpsertSupplied().has_value(),
                update.getCollation(),
                update.getArrayFilters(),
+               update.getSort(),
                update.getHint(),
                update.getSampleId(),
                update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) >=
@@ -526,6 +539,7 @@ bool verifySizeEstimate(const UpdateCommandRequest& updateReq,
                     update.getUpsertSupplied().has_value(),
                     update.getCollation(),
                     update.getArrayFilters(),
+                    update.getSort(),
                     update.getHint(),
                     update.getSampleId(),
                     update.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value()) +

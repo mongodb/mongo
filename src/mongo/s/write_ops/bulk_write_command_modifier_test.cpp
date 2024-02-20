@@ -162,11 +162,12 @@ TEST(BulkWriteCommandModifier, AddUpdate) {
     const BSONObj collation = BSON("locale"
                                    << "en_US");
     const BSONObj arrayFilter = BSON("i" << 0);
+    const BSONObj sort = BSON("a" << 1);
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
-            auto rawUpdate =
-                BSON("q" << query << "u" << update << "arrayFilters" << BSON_ARRAY(arrayFilter)
-                         << "multi" << multi << "upsert" << upsert << "collation" << collation);
+            auto rawUpdate = BSON("q" << query << "u" << update << "arrayFilters"
+                                      << BSON_ARRAY(arrayFilter) << "multi" << multi << "upsert"
+                                      << upsert << "collation" << collation << "sort" << sort);
             auto cmd = BSON("update" << nss.coll() << "updates" << BSON_ARRAY(rawUpdate));
             for (bool seq : {false, true}) {
                 auto opMsgRequest = toOpMsg(nss.db_forTest(), cmd, seq);
@@ -189,6 +190,7 @@ TEST(BulkWriteCommandModifier, AddUpdate) {
                 ASSERT_BSONOBJ_EQ(query, op.getUpdate()->getFilter());
                 ASSERT_BSONOBJ_EQ(update, op.getUpdate()->getUpdateMods().getUpdateModifier());
                 ASSERT_BSONOBJ_EQ(collation, op.getUpdate()->getCollation().value_or(BSONObj()));
+                ASSERT_BSONOBJ_EQ(sort, op.getUpdate()->getSort().value_or(BSONObj()));
                 ASSERT(op.getUpdate()->getArrayFilters());
                 auto filter = (*op.getUpdate()->getArrayFilters())[0];
                 ASSERT_BSONOBJ_EQ(arrayFilter, filter);
@@ -204,12 +206,14 @@ TEST(BulkWriteCommandModifier, AddOpUpdate) {
     const BSONObj collation = BSON("locale"
                                    << "en_US");
     const BSONObj arrayFilter = BSON("i" << 0);
+    const BSONObj sort = BSON("a" << 1);
 
     auto updateOp = write_ops::UpdateOpEntry();
     updateOp.setQ(query);
     updateOp.setU(update);
     updateOp.setCollation(collation);
     updateOp.setArrayFilters({{arrayFilter}});
+    updateOp.setSort(sort);
 
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
@@ -236,6 +240,7 @@ TEST(BulkWriteCommandModifier, AddOpUpdate) {
             ASSERT_BSONOBJ_EQ(query, op.getUpdate()->getFilter());
             ASSERT_BSONOBJ_EQ(update, op.getUpdate()->getUpdateMods().getUpdateModifier());
             ASSERT_BSONOBJ_EQ(collation, op.getUpdate()->getCollation().value_or(BSONObj()));
+            ASSERT_BSONOBJ_EQ(sort, op.getUpdate()->getSort().value_or(BSONObj()));
             ASSERT(op.getUpdate()->getArrayFilters());
             auto filter = (*op.getUpdate()->getArrayFilters())[0];
             ASSERT_BSONOBJ_EQ(arrayFilter, filter);
@@ -250,13 +255,14 @@ TEST(BulkWriteCommandModifier, AddUpdateOps) {
     const BSONObj collation = BSON("locale"
                                    << "en_US");
     const BSONObj arrayFilter = BSON("i" << 0);
+    const BSONObj sort = BSON("a" << 1);
 
     for (bool upsert : {false, true}) {
         for (bool multi : {false, true}) {
             BulkWriteCommandRequest request;
             BulkWriteCommandModifier builder(&request);
             builder.addUpdateOp(
-                nss, query, update, upsert, multi, {{arrayFilter}}, collation, boost::none);
+                nss, query, update, upsert, multi, {{arrayFilter}}, sort, collation, boost::none);
             builder.finishBuild();
 
             auto nsInfo = request.getNsInfo();
@@ -272,6 +278,7 @@ TEST(BulkWriteCommandModifier, AddUpdateOps) {
             ASSERT_BSONOBJ_EQ(query, op.getUpdate()->getFilter());
             ASSERT_BSONOBJ_EQ(update, op.getUpdate()->getUpdateMods().getUpdateModifier());
             ASSERT_BSONOBJ_EQ(collation, op.getUpdate()->getCollation().value_or(BSONObj()));
+            ASSERT_BSONOBJ_EQ(sort, op.getUpdate()->getSort().value_or(BSONObj()));
             ASSERT(op.getUpdate()->getArrayFilters());
             auto filter = (*op.getUpdate()->getArrayFilters())[0];
             ASSERT_BSONOBJ_EQ(arrayFilter, filter);

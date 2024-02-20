@@ -1581,6 +1581,7 @@ BulkWriteOpVariant makeTestUpdateOp(BSONObj filter,
                                     mongo::OptionalBool upsertSupplied,
                                     mongo::BSONObj hint,
                                     boost::optional<std::vector<mongo::BSONObj>> arrayFilters,
+                                    boost::optional<mongo::BSONObj> sort,
                                     boost::optional<mongo::BSONObj> constants,
                                     boost::optional<mongo::BSONObj> collation) {
     BulkWriteUpdateOp op;
@@ -1595,6 +1596,7 @@ BulkWriteOpVariant makeTestUpdateOp(BSONObj filter,
     op.setHint(hint);
     op.setConstants(constants);
     op.setCollation(collation);
+    op.setSort(sort);
     return op;
 }
 
@@ -1641,6 +1643,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                                         BSONObj() /* hint */,
                                         boost::none,
                                         boost::none,
+                                        boost::none,
                                         boost::none);
     ASSERT_GTE(getSizeEstimate(basicUpdate), getActualSize(basicUpdate));
 
@@ -1650,6 +1653,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                          mongo::OptionalBool(true) /* upsertSupplied */,
                          fromjson("{a: 1}") /* hint */,
                          boost::none,
+                         fromjson("{a: 1}") /* sort */,
                          fromjson("{z: 1}") /* constants */,
                          fromjson("{locale: 'simple'}") /* collation */);
     ASSERT_GTE(getSizeEstimate(updateAllFieldsSetBesidesArrayFilters),
@@ -1662,6 +1666,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                          mongo::OptionalBool(true) /* upsertSupplied */,
                          fromjson("{a: 1}") /* hint */,
                          arrayFilters,
+                         fromjson("{a: 1}") /* sort */,
                          fromjson("{z: 1}") /* constants */,
                          fromjson("{locale: 'simple'}") /* collation */);
     // We can't make an exact assertion when arrayFilters is set, because the way we estimate BSON
@@ -1673,6 +1678,7 @@ TEST_F(BulkWriteOpTest, TestBulkWriteUpdateSizeEstimation) {
                                                write_ops::UpdateModification(pipeline),
                                                mongo::OptionalBool() /* upsertSupplied */,
                                                BSONObj() /* hint */,
+                                               boost::none,
                                                boost::none,
                                                boost::none,
                                                boost::none);

@@ -130,7 +130,8 @@ void ParsedUpdateBase::maybeTranslateTimeseriesUpdate() {
     // that in findAndModify code path, the parsed update constructor should be called with
     // isRequestToTimeseries = true for a time-series collection.
     uassert(ErrorCodes::InvalidOptions,
-            "Cannot perform a findAndModify with a query and sort on a time-series collection.",
+            "Cannot perform an updateOne or a findAndModify with a query and sort on a time-series "
+            "collection.",
             _request->isMulti() || _request->getSort().isEmpty());
 
     // If we're updating documents in a time-series collection, splits the match expression into a

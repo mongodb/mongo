@@ -186,11 +186,16 @@ write_ops::InsertCommandRequest makeInsertCommandRequestForFLE(
 }
 
 write_ops::UpdateOpEntry makeUpdateOpEntryFromUpdateOp(const BulkWriteUpdateOp* op) {
+    uassert(ErrorCodes::FailedToParse,
+            "Cannot specify sort with multi=true",
+            !op->getSort() || !op->getMulti());
+
     write_ops::UpdateOpEntry update;
     update.setQ(op->getFilter());
     update.setMulti(op->getMulti());
     update.setC(op->getConstants());
     update.setU(op->getUpdateMods());
+    update.setSort(op->getSort());
     update.setHint(op->getHint());
     update.setCollation(op->getCollation());
     update.setArrayFilters(op->getArrayFilters());

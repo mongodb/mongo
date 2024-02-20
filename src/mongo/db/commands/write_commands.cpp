@@ -445,7 +445,7 @@ public:
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
             auto extractQueryDetails = [](const BSONObj& update, BSONObjBuilder* bob) -> void {
-                // "filter", "hint", and "collation" fields are optional.
+                // "filter", "sort", "hint", and "collation" fields are optional.
                 if (update.isEmpty())
                     return;
 
@@ -454,6 +454,8 @@ public:
 
                 if (update.hasField("q"))
                     bob->append("filter", update["q"].Obj());
+                if (update.hasField("sort") && !update["sort"].Obj().isEmpty())
+                    bob->append("sort", update["sort"].Obj());
                 if (update.hasField("hint") && !update["hint"].Obj().isEmpty())
                     bob->append("hint", update["hint"].Obj());
                 if (update.hasField("collation") && !update["collation"].Obj().isEmpty())

@@ -48,6 +48,8 @@ selector:
   - jstests/core/write/find_and_modify/find_and_modify_empty_update.js
   - jstests/core/write/find_and_modify/find_and_modify_invalid_query_params.js
   - jstests/core/write/find_and_modify/find_and_modify_server7660.js
+  # updateOne sort.
+  - jstests/core/write/update/updateOne_sort.js
   # Incompatible find command option.
   - jstests/core/min_max_hashed_index.js # min
   - jstests/core/query/expr/expr.js # divide

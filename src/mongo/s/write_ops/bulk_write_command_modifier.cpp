@@ -107,6 +107,7 @@ void BulkWriteCommandModifier::addOp(write_ops::UpdateCommandRequest updateOp) {
         auto op = BulkWriteUpdateOp(idx, update.getQ(), update.getU());
 
         op.setArrayFilters(update.getArrayFilters());
+        op.setSort(update.getSort());
         op.setMulti(update.getMulti());
         op.setCollation(update.getCollation());
         op.setUpsert(update.getUpsert());
@@ -181,6 +182,7 @@ void BulkWriteCommandModifier::addUpdateOp(
     bool upsert,
     bool multi,
     const boost::optional<std::vector<BSONObj>>& arrayFilters,
+    const boost::optional<BSONObj>& sort,
     const boost::optional<BSONObj>& collation,
     const boost::optional<BSONObj>& hint) {
     auto [nsInfoEntry, idx] = getNsInfoEntry(nss);
@@ -190,6 +192,7 @@ void BulkWriteCommandModifier::addUpdateOp(
     op.setUpsert(upsert);
     op.setMulti(multi);
     op.setCollation(collation);
+    op.setSort(sort);
     op.setHint(hint.value_or(BSONObj()));
     op.setArrayFilters(arrayFilters);
 
