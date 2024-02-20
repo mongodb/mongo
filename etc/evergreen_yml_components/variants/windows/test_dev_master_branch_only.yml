@@ -233,7 +233,7 @@ buildvariants:
   display_name: "* Enterprise Windows (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - windows-vsCurrent-small
+  - windows-vsCurrent-large # To accommodate OOD issues noted in BF-31698
   modules:
   - enterprise
   expansions:
