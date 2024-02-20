@@ -41,7 +41,11 @@ class MigrationBlockingOperationCoordinator
 public:
     using Phase = MigrationBlockingOperationCoordinatorPhaseEnum;
     using UUIDSet = stdx::unordered_set<UUID, UUID::Hash>;
+    using StateDoc = MigrationBlockingOperationCoordinatorDocument;
+    using ShardingDDLCoordinator::getOrCreate;
 
+    static std::shared_ptr<MigrationBlockingOperationCoordinator> getOrCreate(
+        OperationContext* opCtx, const NamespaceString& nss);
     MigrationBlockingOperationCoordinator(ShardingDDLCoordinatorService* service,
                                           const BSONObj& initialState);
 
@@ -49,6 +53,13 @@ public:
 
     void beginOperation(OperationContext* opCtx, const UUID& operationUUID);
     void endOperation(OperationContext* opCtx, const UUID& operationUUID);
+
+    static void beginOperation(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const UUID& operationUUID);
+    static void endOperation(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             const UUID& operationUUID);
 
 private:
     virtual StringData serializePhase(const Phase& phase) const override;
@@ -60,10 +71,9 @@ private:
     void _throwIfCleaningUp(WithLock lk);
     void _recoverIfNecessary(WithLock lk, OperationContext* opCtx, bool isBeginOperation);
 
-    void _insertOrUpdateStateDocument(
-        WithLock lk,
-        OperationContext* opCtx,
-        MigrationBlockingOperationCoordinatorDocument newStateDocument);
+    void _insertOrUpdateStateDocument(WithLock lk,
+                                      OperationContext* opCtx,
+                                      StateDoc newStateDocument);
 
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH("MigrationBlockingOperationCoordinatorInstance::_mutex");

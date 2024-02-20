@@ -112,11 +112,13 @@ public:
         return Future<DbResponse>::makeReady(dbResponse);
     }
 
-    void startBlockingMigrations() const override {
+    void startBlockingMigrations(OperationContext* opCtx,
+                                 const MultiUpdateCoordinatorMetadata& metadata) const override {
         _counters->onStartBlockingMigrations();
     }
 
-    void stopBlockingMigrations() const override {
+    void stopBlockingMigrations(OperationContext* opCtx,
+                                const MultiUpdateCoordinatorMetadata& metadata) const override {
         _counters->onStopBlockingMigrations();
     }
 

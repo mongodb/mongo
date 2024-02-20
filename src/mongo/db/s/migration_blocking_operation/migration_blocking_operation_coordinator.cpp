@@ -38,6 +38,8 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingDiskState);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBlockingMigrations);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAllowingMigrations);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFulfillingPromise);
+MONGO_FAIL_POINT_DEFINE(hangAfterFetchingMigrationBlockingOperationCoordinator);
+MONGO_FAIL_POINT_DEFINE(hangAfterCatchingCleanupError);
 
 MigrationBlockingOperationCoordinator::UUIDSet populateOperations(
     MigrationBlockingOperationCoordinatorDocument doc) {
@@ -62,6 +64,21 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp) {
     if (!sp.getFuture().isReady()) {
         sp.emplaceValue();
     }
+}
+
+std::shared_ptr<MigrationBlockingOperationCoordinator>
+MigrationBlockingOperationCoordinator::getOrCreate(OperationContext* opCtx,
+                                                   const NamespaceString& nss) {
+    auto coordinatorDoc = [&] {
+        StateDoc doc;
+        doc.setShardingDDLCoordinatorMetadata(
+            {{nss, DDLCoordinatorTypeEnum::kMigrationBlockingOperation}});
+        return doc.toBSON();
+    }();
+
+    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+    return checked_pointer_cast<MigrationBlockingOperationCoordinator>(
+        service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
 }
 
 MigrationBlockingOperationCoordinator::MigrationBlockingOperationCoordinator(
@@ -201,14 +218,36 @@ void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx
 }
 
 void MigrationBlockingOperationCoordinator::_insertOrUpdateStateDocument(
-    WithLock lk,
-    OperationContext* opCtx,
-    MigrationBlockingOperationCoordinatorDocument newStateDocument) {
+    WithLock lk, OperationContext* opCtx, StateDoc newStateDocument) {
     if (_isFirstOperation(lk)) {
         _insertStateDocument(opCtx, std::move(newStateDocument));
     } else {
         _updateStateDocument(opCtx, std::move(newStateDocument));
     }
+}
+
+void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const UUID& operationUUID) {
+    auto migrationBlockingOperationCoordinator = getOrCreate(opCtx, nss);
+    hangAfterFetchingMigrationBlockingOperationCoordinator.pauseWhileSet();
+
+    try {
+        migrationBlockingOperationCoordinator->beginOperation(opCtx, operationUUID);
+    } catch (const ExceptionFor<ErrorCodes::MigrationBlockingOperationCoordinatorCleaningUp>&) {
+        hangAfterCatchingCleanupError.pauseWhileSet();
+        migrationBlockingOperationCoordinator->getCompletionFuture().wait(opCtx);
+
+        migrationBlockingOperationCoordinator = getOrCreate(opCtx, nss);
+        migrationBlockingOperationCoordinator->beginOperation(opCtx, operationUUID);
+    }
+}
+
+void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx,
+                                                         const NamespaceString& nss,
+                                                         const UUID& operationUUID) {
+    auto migrationBlockingOperationCoordinator = getOrCreate(opCtx, nss);
+    migrationBlockingOperationCoordinator->endOperation(opCtx, operationUUID);
 }
 
 }  // namespace mongo

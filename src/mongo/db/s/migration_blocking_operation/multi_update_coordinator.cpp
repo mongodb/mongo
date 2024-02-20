@@ -28,8 +28,10 @@
  */
 
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/cluster_command_translations.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/migration_blocking_operation/migration_blocking_operation_coordinator.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_server_parameters_gen.h"
 #include "mongo/db/s/primary_only_service_helpers/pause_during_state_transition_fail_point.h"
 #include "mongo/rpc/factory.h"
@@ -57,6 +59,13 @@ primary_only_service_helpers::PauseDuringStateTransitionFailPoint<MultiUpdateCoo
                 "pauseDuringMultiUpdateCoordinatorStateTransition::readStateArgument");
             return MultiUpdateCoordinatorState_parse(ectx, state);
         }};
+
+void attachCachedDbVersion(OperationContext* opCtx, const NamespaceString& nss) {
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
+    const auto scopedDss =
+        DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
+    OperationShardingState::setShardRole(opCtx, nss, boost::none, scopedDss->getDbVersion(opCtx));
+}
 }  // namespace
 
 Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCommandToShards(
@@ -64,12 +73,17 @@ Future<DbResponse> MultiUpdateCoordinatorExternalStateImpl::sendClusterUpdateCom
     return ServiceEntryPointMongos::handleRequestImpl(opCtx, message);
 }
 
-void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations() const {
-    // TODO(SERVER-81265): call MigrationBlockingOperationCoordinator::beginOperation().
+void MultiUpdateCoordinatorExternalStateImpl::startBlockingMigrations(
+    OperationContext* opCtx, const MultiUpdateCoordinatorMetadata& metadata) const {
+    attachCachedDbVersion(opCtx, metadata.getNss());
+    MigrationBlockingOperationCoordinator::beginOperation(
+        opCtx, metadata.getNss(), metadata.getId());
 }
 
-void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations() const {
-    // TODO(SERVER-81265): call MigrationBlockingOperationCoordinator::endOperation().
+void MultiUpdateCoordinatorExternalStateImpl::stopBlockingMigrations(
+    OperationContext* opCtx, const MultiUpdateCoordinatorMetadata& metadata) const {
+    attachCachedDbVersion(opCtx, metadata.getNss());
+    MigrationBlockingOperationCoordinator::endOperation(opCtx, metadata.getNss(), metadata.getId());
 }
 
 MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(
@@ -164,7 +178,9 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_startBlockingMigrations() 
     }
 
     return ExecutorFuture<void>(**_taskExecutor).then([this] {
-        _externalState->startBlockingMigrations();
+        auto opCtxHolder = cc().makeOperationContext();
+        auto opCtx = opCtxHolder.get();
+        _externalState->startBlockingMigrations(opCtx, _metadata);
     });
 }
 
@@ -225,7 +241,9 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_cleanup() {
 }
 
 void MultiUpdateCoordinatorInstance::_stopBlockingMigrations() {
-    return _externalState->stopBlockingMigrations();
+    auto opCtxHolder = cc().makeOperationContext();
+    auto opCtx = opCtxHolder.get();
+    return _externalState->stopBlockingMigrations(opCtx, _metadata);
 }
 
 void MultiUpdateCoordinatorInstance::interrupt(Status status) {}
