@@ -75,8 +75,10 @@ struct CanonicalQueryParams {
     bool isSearchQuery = false;
 };
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
-                                                              FindCommandRequest& findCommand);
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
+    OperationContext* opCtx,
+    FindCommandRequest& findCommand,
+    boost::optional<ExplainOptions::Verbosity> verbosity = boost::none);
 
 class CanonicalQuery {
 public:

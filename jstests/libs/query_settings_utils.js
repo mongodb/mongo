@@ -129,7 +129,7 @@ export class QuerySettingsUtils {
     assertExplainQuerySettings(query, expectedQuerySettings) {
         // Pass query without the $db field to explain command, because it injects the $db field
         // inside the query before processing.
-        const {$db: _, ...queryWithoutDollarDb} = query;
+        const queryWithoutDollarDb = this.withoutDollarDB(query);
         const explain = (() => {
             if (query.find || query.distinct) {
                 return assert.commandWorked(this.db.runCommand({explain: queryWithoutDollarDb}));

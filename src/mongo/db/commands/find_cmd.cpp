@@ -221,10 +221,12 @@ query_settings::QuerySettings lookupQuerySettingsForFind(
     }
 
     const auto& serializationContext = parsedFind.findCommandRequest->getSerializationContext();
-    return query_settings::lookupQuerySettings(expCtx, nss, serializationContext, [&]() {
+    auto settings = query_settings::lookupQuerySettings(expCtx, nss, serializationContext, [&]() {
         query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
         return findCmdShape.sha256Hash(expCtx->opCtx, serializationContext);
     });
+    query_settings::failIfRejectedBySettings(expCtx, settings);
+    return settings;
 }
 
 /**

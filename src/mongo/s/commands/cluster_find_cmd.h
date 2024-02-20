@@ -149,7 +149,7 @@ public:
             Impl::checkCanExplainHere(opCtx);
 
             auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
-            auto expCtx = makeExpressionContext(opCtx, *findCommand);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
             auto parsedFind = uassertStatusOK(parsed_find_command::parse(
                 expCtx,
                 {.findCommand = std::move(findCommand),
@@ -352,10 +352,13 @@ public:
 
             auto opCtx = expCtx->opCtx;
             auto serializationContext = parsedFind.findCommandRequest->getSerializationContext();
-            return query_settings::lookupQuerySettings(expCtx, ns(), serializationContext, [&]() {
-                query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
-                return findCmdShape.sha256Hash(opCtx, serializationContext);
-            });
+            auto settings =
+                query_settings::lookupQuerySettings(expCtx, ns(), serializationContext, [&]() {
+                    query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
+                    return findCmdShape.sha256Hash(opCtx, serializationContext);
+                });
+            query_settings::failIfRejectedBySettings(expCtx, settings);
+            return settings;
         }
 
         void retryOnViewError(

@@ -90,6 +90,9 @@ QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>&
         .first;
 }
 
+void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              const QuerySettings& settings);
+
 namespace utils {
 
 /**

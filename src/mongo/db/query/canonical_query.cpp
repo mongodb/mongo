@@ -77,8 +77,10 @@ boost::optional<size_t> loadMaxMatchExpressionParams() {
 
 }  // namespace
 
-boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx,
-                                                              FindCommandRequest& findCommand) {
+boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
+    OperationContext* opCtx,
+    FindCommandRequest& findCommand,
+    boost::optional<ExplainOptions::Verbosity> verbosity) {
     auto collator = [&]() -> std::unique_ptr<mongo::CollatorInterface> {
         if (findCommand.getCollation().isEmpty()) {
             return nullptr;
@@ -88,7 +90,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
                                           "unable to parse collation");
     }();
     return make_intrusive<ExpressionContext>(
-        opCtx, findCommand, std::move(collator), true /* mayDbProfile */);
+        opCtx, findCommand, std::move(collator), true /* mayDbProfile */, std::move(verbosity));
 }
 
 // static

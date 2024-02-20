@@ -141,7 +141,10 @@ query_settings::QuerySettings lookupQuerySettingsForDistinct(
         return shape.sha256Hash(expCtx->opCtx, serializationContext);
     };
 
-    return query_settings::lookupQuerySettings(expCtx, nss, serializationContext, queryShapeHashFn);
+    auto settings =
+        query_settings::lookupQuerySettings(expCtx, nss, serializationContext, queryShapeHashFn);
+    query_settings::failIfRejectedBySettings(expCtx, settings);
+    return settings;
 }
 
 CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,

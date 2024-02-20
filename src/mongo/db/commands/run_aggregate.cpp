@@ -1136,13 +1136,16 @@ query_settings::QuerySettings lookupQuerySettingsForAgg(
     const bool isInternalClient = opCtx->getClient()->session() &&
         (opCtx->getClient()->isInternalClient() || opCtx->getClient()->isInDirectClient());
     auto serializationContext = aggregateCommandRequest.getSerializationContext();
-    return isInternalClient
+    auto settings = isInternalClient
         ? aggregateCommandRequest.getQuerySettings().get_value_or({})
         : query_settings::lookupQuerySettings(expCtx, nss, serializationContext, [&]() {
               query_shape::AggCmdShape shape(
                   aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx);
               return shape.sha256Hash(opCtx, serializationContext);
           });
+
+    query_settings::failIfRejectedBySettings(expCtx, settings);
+    return settings;
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(

@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_shape/distinct_cmd_shape.h"
 #include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_utils.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {
@@ -227,11 +228,22 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }
 
+void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              const QuerySettings& settings) {
+    if (expCtx->explain) {
+        // Explaining queries which _would_ be rejected if executed is still useful;
+        // do not fail here.
+        return;
+    }
+    uassert(ErrorCodes::QueryRejectedBySettings,
+            "Query rejected by admin query settings",
+            !settings.getReject());
+}
+
 namespace utils {
 
 bool isEmpty(const QuerySettings& settings) {
     // The `serialization_context` field is not significant.
-    // TODO: SERVER-86499 Consider having this generated from IDL.
     static_assert(
         QuerySettings::fieldNames.size() == 4,
         "A new field has been added to QuerySettings, isEmpty should be updated appropriately.");
