@@ -731,24 +731,41 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
     }
     foldIfNecessary(test);
 
-    auto blockify = [](Tree& tree, optimizer::ProjectionName bitmapVar) {
+    auto blockify = [](Tree& tree, const std::list<optimizer::ProjectionName>& bitmapVars) {
         if (!TypeSignature::kBlockType.isSubset(tree.typeSignature)) {
-            tree.expr =
-                makeABTFunction("valueBlockNewFill"_sd,
-                                makeIf(makeABTFunction("valueBlockNone"_sd,
-                                                       makeVariable(bitmapVar),
-                                                       optimizer::Constant::boolean(true)),
-                                       optimizer::Constant::nothing(),
-                                       std::move(*tree.expr)),
-                                makeABTFunction("valueBlockSize"_sd, makeVariable(bitmapVar)));
+            boost::optional<optimizer::ABT> bitmapExpr;
+            for (const auto& var : bitmapVars) {
+                if (!bitmapExpr.has_value()) {
+                    bitmapExpr = makeVariable(var);
+                } else {
+                    bitmapExpr = makeABTFunction(
+                        "valueBlockLogicalAnd"_sd, std::move(*bitmapExpr), makeVariable(var));
+                }
+            }
+
+            if (!tree.expr->cast<optimizer::Constant>()) {
+                tree.expr = makeIf(makeABTFunction("valueBlockNone"_sd,
+                                                   std::move(*bitmapExpr),
+                                                   optimizer::Constant::boolean(true)),
+                                   optimizer::Constant::nothing(),
+                                   std::move(*tree.expr));
+            }
+
+            tree.expr = makeABTFunction(
+                "valueBlockNewFill"_sd,
+                std::move(*tree.expr),
+                makeABTFunction("valueBlockSize"_sd, makeVariable(bitmapVars.back())));
             tree.typeSignature = TypeSignature::kBlockType.include(tree.typeSignature);
             tree.sourceCell = boost::none;
         }
     };
 
     if (TypeSignature::kBlockType.isSubset(test.typeSignature)) {
-        // Treat the result of the condition as the mask to be applied on the 'then' side, and its
-        // flipped representation as the mask for the 'else' branch.
+        // The bitmap result of the conditions in the path so far.
+        auto previousConditionBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
+        auto previousBitmapExpr = generateMaskArg();
+
+        // The `then` side will use all the bitmaps seen so far AND the current bitmap.
         auto thenBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
         _activeMasks.push_back(thenBranchBitmapVar);
         auto thenBranch = op.getThenChild().visit(*this);
@@ -757,8 +774,14 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             return thenBranch;
         }
         // If the branch produces a scalar value, blockify it.
-        blockify(thenBranch, thenBranchBitmapVar);
+        if (_activeMasks.empty()) {
+            blockify(thenBranch, {thenBranchBitmapVar});
+        } else {
+            blockify(thenBranch, {previousConditionBitmapVar, thenBranchBitmapVar});
+        }
 
+        // The `else` side will use all the bitmaps seen so far AND the negation of the current
+        // bitmap.
         auto elseBranchBitmapVar = getABTLocalVariableName(_frameGenerator->generate(), 0);
         _activeMasks.push_back(elseBranchBitmapVar);
         auto elseBranch = op.getElseChild().visit(*this);
@@ -766,9 +789,12 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
         if (!elseBranch.expr.has_value()) {
             return elseBranch;
         }
-
         // If the branch produces a scalar value, blockify it.
-        blockify(elseBranch, elseBranchBitmapVar);
+        if (_activeMasks.empty()) {
+            blockify(elseBranch, {elseBranchBitmapVar});
+        } else {
+            blockify(elseBranch, {previousConditionBitmapVar, elseBranchBitmapVar});
+        }
 
         boost::optional<optimizer::ProjectionName> sameCell = thenBranch.sourceCell.has_value() &&
                 elseBranch.sourceCell.has_value() &&
@@ -780,18 +806,23 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             foldIfNecessary(thenBranch);
             foldIfNecessary(elseBranch);
         }
-        return {makeLet(thenBranchBitmapVar,
-                        std::move(*test.expr),
-                        makeABTFunction("valueBlockCombine"_sd,
-                                        std::move(*thenBranch.expr),
-                                        makeLet(elseBranchBitmapVar,
-                                                makeABTFunction("valueBlockLogicalNot"_sd,
-                                                                makeVariable(thenBranchBitmapVar)),
-                                                std::move(*elseBranch.expr)),
-                                        makeVariable(thenBranchBitmapVar))),
+
+        // previousConditionBitmapVar is not used when there are no previous bitmaps and the
+        // optimiser removes it from the plan.
+        return {makeLet(previousConditionBitmapVar,
+                        std::move(previousBitmapExpr),
+                        makeLet(thenBranchBitmapVar,
+                                std::move(*test.expr),
+                                makeABTFunction(
+                                    "valueBlockCombine"_sd,
+                                    std::move(*thenBranch.expr),
+                                    makeLet(elseBranchBitmapVar,
+                                            makeABTFunction("valueBlockLogicalNot"_sd,
+                                                            makeVariable(thenBranchBitmapVar)),
+                                            std::move(*elseBranch.expr)),
+                                    makeVariable(thenBranchBitmapVar)))),
                 thenBranch.typeSignature.include(elseBranch.typeSignature),
                 sameCell};
-
     } else {
         // Scalar test, keep it as it is.
         auto thenBranch = op.getThenChild().visit(*this);
@@ -840,7 +871,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             if (!_activeMasks.empty()) {
                 // The scalarBranch variable is a reference, so we are actually modifying either
                 // thenBranch.expr or elseBranch.expr in place.
-                blockify(scalarBranch, _activeMasks.back());
+                blockify(scalarBranch, _activeMasks);
                 return {makeIf(std::move(*test.expr),
                                std::move(*thenBranch.expr),
                                std::move(*elseBranch.expr)),
@@ -869,6 +900,7 @@ Vectorizer::Tree Vectorizer::operator()(const optimizer::ABT& n, const optimizer
             // scalar pipeline.
             return {{}, TypeSignature::kAnyScalarType, {}};
         }
+
         boost::optional<optimizer::ProjectionName> sameCell;
         if (TypeSignature::kBlockType.isSubset(thenBranch.typeSignature)) {
             sameCell = thenBranch.sourceCell.has_value() && elseBranch.sourceCell.has_value() &&
