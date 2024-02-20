@@ -847,7 +847,12 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
 
     // The database primary must always be a recipient to ensure it ends up with consistent
     // collection metadata.
-    recipientShardIds.emplace(cm.dbPrimary());
+    const auto dbPrimaryShard =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(
+                            opCtx, coordinatorDoc.getSourceNss().db()))
+            .primaryId();
+
+    recipientShardIds.emplace(dbPrimaryShard);
 
     if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
         auto version = calculateChunkVersionForInitialChunks(opCtx);
