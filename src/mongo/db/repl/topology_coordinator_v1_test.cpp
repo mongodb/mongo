@@ -359,6 +359,26 @@ protected:
                                        HostAndPort());
     }
 
+    HeartbeatResponseAction heartbeatFromMemberWithMultiOptime(
+        const HostAndPort& member,
+        const std::string& setName,
+        MemberState memberState,
+        const OpTime& lastDurableOpTimeSender,
+        const OpTime& lastAppliedOpTimeSender,
+        const OpTime& lastWrittenOpTimeSender,
+        Milliseconds roundTripTime = Milliseconds(1)) {
+        return _receiveHeartbeatHelperWithMultiOptime(Status::OK(),
+                                                      member,
+                                                      setName,
+                                                      memberState,
+                                                      Timestamp(),
+                                                      lastDurableOpTimeSender,
+                                                      lastAppliedOpTimeSender,
+                                                      lastWrittenOpTimeSender,
+                                                      roundTripTime,
+                                                      HostAndPort());
+    }
+
 private:
     HeartbeatResponseAction _receiveHeartbeatHelper(Status responseStatus,
                                                     const HostAndPort& member,
@@ -367,25 +387,48 @@ private:
                                                     Timestamp electionTime,
                                                     const OpTime& lastOpTimeSender,
                                                     Milliseconds roundTripTime,
-                                                    const HostAndPort& syncingTo,
-                                                    Date_t lastDurableWallTime = Date_t(),
-                                                    Date_t lastAppliedWallTime = Date_t(),
-                                                    Date_t lastWrittenWallTime = Date_t()) {
+                                                    const HostAndPort& syncingTo) {
+        return _receiveHeartbeatHelperWithMultiOptime(responseStatus,
+                                                      member,
+                                                      setName,
+                                                      memberState,
+                                                      electionTime,
+                                                      lastOpTimeSender,
+                                                      lastOpTimeSender,
+                                                      lastOpTimeSender,
+                                                      roundTripTime,
+                                                      syncingTo);
+    }
+
+    HeartbeatResponseAction _receiveHeartbeatHelperWithMultiOptime(
+        Status responseStatus,
+        const HostAndPort& member,
+        const std::string& setName,
+        MemberState memberState,
+        Timestamp electionTime,
+        const OpTime& lastDurableOpTimeSender,
+        const OpTime& lastAppliedOpTimeSender,
+        const OpTime& lastWrittenOpTimeSender,
+        Milliseconds roundTripTime,
+        const HostAndPort& syncingTo,
+        Date_t lastDurableWallTime = Date_t(),
+        Date_t lastAppliedWallTime = Date_t(),
+        Date_t lastWrittenWallTime = Date_t()) {
         if (lastDurableWallTime == Date_t()) {
-            lastDurableWallTime = Date_t() + Seconds(lastOpTimeSender.getSecs());
+            lastDurableWallTime = Date_t() + Seconds(lastDurableOpTimeSender.getSecs());
         }
         if (lastAppliedWallTime == Date_t()) {
-            lastAppliedWallTime = Date_t() + Seconds(lastOpTimeSender.getSecs());
+            lastAppliedWallTime = Date_t() + Seconds(lastAppliedOpTimeSender.getSecs());
         }
         if (lastWrittenWallTime == Date_t()) {
-            lastWrittenWallTime = Date_t() + Seconds(lastOpTimeSender.getSecs());
+            lastWrittenWallTime = Date_t() + Seconds(lastWrittenOpTimeSender.getSecs());
         }
         ReplSetHeartbeatResponse hb;
         hb.setConfigVersion(1);
         hb.setState(memberState);
-        hb.setDurableOpTimeAndWallTime({lastOpTimeSender, lastDurableWallTime});
-        hb.setAppliedOpTimeAndWallTime({lastOpTimeSender, lastAppliedWallTime});
-        hb.setWrittenOpTimeAndWallTime({lastOpTimeSender, lastWrittenWallTime});
+        hb.setDurableOpTimeAndWallTime({lastDurableOpTimeSender, lastDurableWallTime});
+        hb.setAppliedOpTimeAndWallTime({lastAppliedOpTimeSender, lastAppliedWallTime});
+        hb.setWrittenOpTimeAndWallTime({lastWrittenOpTimeSender, lastWrittenWallTime});
         hb.setElectionTime(electionTime);
         hb.setTerm(getTopoCoord().getTerm());
         hb.setSyncingTo(syncingTo);
@@ -6757,6 +6800,59 @@ TEST_F(TopoCoordTest, OnlyDataBearingVoterIncludedInInternalMajorityWriteConcern
     ASSERT_TRUE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
 }
 
+TEST_F(TopoCoordTest, HaveTaggedNodesReachedOpTime) {
+    // The config has 3 voting members, so the majority number is 2.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", true);
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 2 << "term" << 0 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+
+    auto caughtUpOpTime = OpTime(Timestamp(100, 0), term);
+    auto laggedOpTime = OpTime(Timestamp(50, 0), term);
+
+    auto tagPatternStatus =
+        getCurrentConfig().findCustomWriteMode(ReplSetConfig::kMajorityWriteConcernModeName);
+    ASSERT_TRUE(tagPatternStatus.isOK());
+    auto tagPattern = tagPatternStatus.getValue();
+    auto durable = true;
+
+    topoCoordSetMyLastAppliedOpTime(caughtUpOpTime, Date_t(), false);
+    topoCoordSetMyLastDurableOpTime(caughtUpOpTime, Date_t(), false);
+
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+    // One secondary is not caught up.
+    heartbeatFromMemberWithMultiOptime(HostAndPort("host1"),
+                                       "rs0",
+                                       MemberState::RS_SECONDARY,
+                                       laggedOpTime,
+                                       laggedOpTime,
+                                       laggedOpTime);
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+
+    // The other one's lastAppliedOpTime is lagging
+    heartbeatFromMemberWithMultiOptime(HostAndPort("host2"),
+                                       "rs0",
+                                       MemberState::RS_SECONDARY,
+                                       caughtUpOpTime,
+                                       laggedOpTime,
+                                       laggedOpTime);
+
+    // Since host2's lastAppliedOpTime is lagging, and we check the
+    // min(lastDurableOpTime, lastAppliedOpTime), it should not be counted.
+    ASSERT_FALSE(getTopoCoord().haveTaggedNodesReachedOpTime(caughtUpOpTime, tagPattern, durable));
+}
+
 TEST_F(TopoCoordTest, ArbiterNotIncludedInW3WriteInPSSAReplSet) {
     // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy it.
     updateConfig(BSON("_id"
@@ -6830,12 +6926,58 @@ TEST_F(TopoCoordTest, ArbitersNotIncludedInW2WriteInPSSAAReplSet) {
     heartbeatFromMember(HostAndPort("host1"), "rs0", MemberState::RS_SECONDARY, laggedOpTime);
     heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, laggedOpTime);
 
-    // Both arbiters arae caught up, but neither should count towards the w:2.
+    // Both arbiters are caught up, but neither should count towards the w:2.
     heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_ARBITER, caughtUpOpTime);
     heartbeatFromMember(HostAndPort("host4"), "rs0", MemberState::RS_ARBITER, caughtUpOpTime);
 
     ASSERT_FALSE(getTopoCoord().haveNumNodesReachedOpTime(
         caughtUpOpTime, 2 /* numNodes */, false /* durablyWritten */));
+}
+
+TEST_F(TopoCoordTest, HaveNumNodesReachedOpTime) {
+    // In a PSSA set, a w:3 write should only be acknowledged if both secondaries can satisfy it.
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagReduceMajorityWriteLatency", true);
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 2 << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host0:27017")
+                                    << BSON("_id" << 1 << "host"
+                                                  << "host1:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"))),
+                 0);
+
+    const auto term = getTopoCoord().getTerm();
+    makeSelfPrimary();
+
+    auto caughtUpOpTime = OpTime(Timestamp(100, 0), term);
+    auto laggedOpTime = OpTime(Timestamp(50, 0), term);
+
+    topoCoordSetMyLastAppliedOpTime(caughtUpOpTime, Date_t(), false);
+    topoCoordSetMyLastDurableOpTime(caughtUpOpTime, Date_t(), false);
+
+    // One secondary is caught up.
+    heartbeatFromMemberWithMultiOptime(HostAndPort("host1"),
+                                       "rs0",
+                                       MemberState::RS_SECONDARY,
+                                       caughtUpOpTime,
+                                       caughtUpOpTime,
+                                       caughtUpOpTime);
+
+    // The other one's lastAppliedOpTime is lagging
+    heartbeatFromMemberWithMultiOptime(HostAndPort("host2"),
+                                       "rs0",
+                                       MemberState::RS_SECONDARY,
+                                       caughtUpOpTime,
+                                       laggedOpTime,
+                                       laggedOpTime);
+
+    // Since host2's lastAppliedOpTime is lagging, and we check the
+    // min(lastDurableOpTime, lastAppliedOpTime), it should not be counted.
+    ASSERT_FALSE(getTopoCoord().haveNumNodesReachedOpTime(
+        caughtUpOpTime, 3 /* numNodes */, true /* durablyWritten */));
 }
 
 TEST_F(TopoCoordTest, CheckIfCommitQuorumCanBeSatisfied) {
