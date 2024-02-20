@@ -842,8 +842,8 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
         return container->end();
     }
 
-    // If the following stage is $sort and there is no internal $unwind, consider pushing it ahead
-    // of $lookup.
+    // If the following stage is $sort and this $lookup has not absorbed a following $unwind, try to
+    // move the $sort ahead of the $lookup.
     if (!_unwindSrc) {
         itr = tryReorderingWithSort(itr, container);
         if (*itr != this) {
@@ -853,13 +853,24 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
 
     auto nextUnwind = dynamic_cast<DocumentSourceUnwind*>((*std::next(itr)).get());
 
-    // If we are not already handling an $unwind stage internally, we can combine with the
-    // following $unwind stage.
+    // If we are not already handling an $unwind stage internally and the following stage is an
+    // $unwind of the $lookup "as" output array, subsume the $unwind into the current $lookup as an
+    // $lu ($lookup + $unwind) macro stage. The combined stage acts like a SQL join (one result
+    // record per LHS x RHS match instead of one result per LHS with an array of its RHS matches).
+    //
+    // Ideally for simplicity in the stage builder we would not absorb the downstream $unwind if the
+    // lookup strategy is kNonExistentForeignCollection, but that is not determined until later and
+    // would be hard to do so here as it requires several inputs we do not have. It is also hard to
+    // move that determination earlier as it occurs in the deep stack under createLegacyExecutor().
     if (nextUnwind && !_unwindSrc && nextUnwind->getUnwindPath() == _as.fullPath()) {
+        if (nextUnwind->preserveNullAndEmptyArrays() || nextUnwind->indexPath()) {
+            downgradeSbeCompatibility(SbeCompatibility::notCompatible);
+        } else {
+            // TODO SERVER-80226: Remove this downgrade when $LU pushdown is enabled. Until then $LU
+            // (combined $lookup + $unwind) stages are only lowered to SBE with featureFlagSbeFull.
+            downgradeSbeCompatibility(SbeCompatibility::requiresSbeFull);
+        }
         _unwindSrc = std::move(nextUnwind);
-
-        // We cannot push absorbed $unwind stages into SBE.
-        _sbeCompatibility = SbeCompatibility::notCompatible;
         container->erase(std::next(itr));
         return itr;
     }
@@ -944,12 +955,8 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
         return std::next(itr);
     }
 
-    // We can internalize the $match. This $lookup should already be marked as SBE incompatible
-    // because a $match can only be internalized if an $unwind, which is SBE incompatible, was
-    // absorbed as well.
-    tassert(5843701,
-            "This $lookup cannot be compatible with SBE",
-            _sbeCompatibility == SbeCompatibility::notCompatible);
+    // We cannot yet lower $LUM (combined $lookup + $unwind + $match) stages to SBE.
+    _sbeCompatibility = SbeCompatibility::notCompatible;
     if (!_matchSrc) {
         _matchSrc = nextMatch;
     } else {
@@ -978,7 +985,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
     // There may be further optimization between this $lookup and the new neighbor, so we return an
     // iterator pointing to ourself.
     return itr;
-}
+}  // doOptimizeAt
 
 bool DocumentSourceLookUp::usedDisk() {
     if (_pipeline)

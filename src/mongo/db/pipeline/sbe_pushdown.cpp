@@ -231,7 +231,7 @@ bool pushDownPipelineStageIfCompatible(
     }
 
     return false;
-}
+}  // pushDownPipelineStageIfCompatible
 
 /**
  * Prunes $addFields from 'stagesForPushdown' if it is the last stage, subject to additional
@@ -331,7 +331,9 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  * {'internalQueryFrameworkControl': 'forceClassicEngine'}, a stage can be extracted from the
  * pipeline if and only if all the stages before it are extracted and it meets the criteria for its
  * stage type. When 'internalQueryFrameworkControl' is set to 'trySbeRestricted', only '$group',
- * '$lookup', and '$_internalUnpackBucket' can be extracted. Criteria by stage type:
+ * '$lookup', and '$_internalUnpackBucket' can be extracted.
+ *
+ * Additional criteria by stage type:
  *
  * $group via 'DocumentSourceGroup':
  *   - The 'internalQuerySlotBasedExecutionDisableGroupPushdown' knob is false and
@@ -340,8 +342,11 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  *
  * $lookup via 'DocumentSourceLookUp':
  *   - The 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is false,
- *   - the $lookup uses only the 'localField'/'foreignField' syntax (no pipelines), and
- *   - the foreign collection is fully local to this node and is not a view.
+ *   - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines), and
+ *   - The foreign collection is fully local to this node and is not a view.
+ *   - There is no absorbed $unwind stage ('_unwindSrc') or 'featureFlagSbeFull' is enabled.
+ *     TODO SERVER-80226 $unwind Pushdown: remove above restriction when $LU pushdown is supported.
+ *   - There is no absorbed $match stage ('_matchSrc').
  *
  * $project via 'DocumentSourceInternalProjection':
  *   - No additional criteria.
@@ -366,16 +371,19 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  * $skip via 'DocumentSourceSkip':
  *   - No additional criteria.
  *
- * 'DocumentSourceUnpackBucket':
+ * $search and $searchMeta via 'DocumentSourceSearch':
+ *   - The 'featureFlagSearchInSbe' flag is enabled.
  *   - The 'featureFlagSbeFull' flag is enabled.
  *
- * 'DocumentSourceSearch':
- *   - The 'featureFlagSearchInSbe' flag is enabled.
- *   - the 'featureFlagSbeFull' flag is enabled.
+ * 'DocumentSourceUnpackBucket':
+ *   - The 'featureFlagSbeFull' flag is enabled.
  *
  * $_internalUnpackBucket via 'DocumentSourceInternalUnpackBucket':
  *   - The 'featureFlagTimeSeriesInSbe' flag is enabled and
  *   - the 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown', is _not_ enabled,
+ *
+ * $unwind stages ('DocumentSourceUnwind'):
+ *    - 'featureFlagSbeFull' is enabled. (TODO SERVER-80226 $unwind Pushdown: change to "none")
  */
 bool findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
@@ -425,7 +433,7 @@ bool findSbeCompatibleStagesForPushdown(
 
         .match = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
-        // TODO (SERVER-80226): SBE execution of 'unwind' stages requires 'featureFlagSbeFull' to be
+        // TODO SERVER-80226: Change to SbeCompatibility::requiresTrySbe when $unwind pushdown
         // enabled.
         .unwind = meetsRequirements(SbeCompatibility::requiresSbeFull),
 

@@ -160,6 +160,6 @@ private:
 
     // TODO SERVER-80226: Change to SbeCompatibility::requiresTrySbe when $unwind pushdown enabled.
     SbeCompatibility _sbeCompatibility{SbeCompatibility::requiresSbeFull};
-};
+};  // class DocumentSourceUnwind
 
 }  // namespace mongo

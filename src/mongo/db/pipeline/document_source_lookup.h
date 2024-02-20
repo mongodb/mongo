@@ -308,6 +308,14 @@ public:
         return _additionalFilter;
     }
 
+    /*
+     * Indicates whether this $lookup stage has absorbed an immediately following $unwind stage that
+     * unwinds the lookup result array.
+     */
+    bool hasUnwindSrc() const {
+        return _unwindSrc ? true : false;
+    }
+
     /**
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
      * cursor and/or cache source as appropriate.
@@ -323,8 +331,10 @@ protected:
     void doDispose() final;
 
     /**
-     * Attempts to combine with a subsequent $unwind stage, setting the internal '_unwindSrc'
-     * field.
+     * Attempts to combine with an immediately following $unwind stage that unwinds the $lookup's
+     * "as" field, setting the '_unwindSrc' member to the absorbed $unwind stage. If this is done
+     * it may also absorb one or more $match stages that immediately followed the $unwind, setting
+     * the resulting combined $match in the '_matchSrc' member.
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
@@ -370,6 +380,10 @@ private:
         MONGO_UNREACHABLE_TASSERT(7484304);
     }
 
+    /**
+     * Delegate of doGetNext() in the case where an $unwind stage has been absorbed into _unwindSrc.
+     * This returns the next record resulting from unwinding the lookup's "as" field.
+     */
     GetNextResult unwindResult();
 
     /**
@@ -421,16 +435,28 @@ private:
     bool foreignShardedLookupAllowed() const;
 
     /**
-     * Checks conditions necessary for SBE compatibility and sets '_sbeCompatibility' flag. Note:
+     * Checks conditions necessary for SBE compatibility and sets '_sbeCompatibility' enum. Note:
      * when optimizing the pipeline the flag might be modified.
      */
     void determineSbeCompatibility();
+
+    /**
+     * Sets '_sbeCompatibility' enum to 'maxCompatibility' iff that *reduces* the compatibility.
+     */
+    inline void downgradeSbeCompatibility(SbeCompatibility maxCompatibility) {
+        if (maxCompatibility < _sbeCompatibility) {
+            _sbeCompatibility = maxCompatibility;
+        }
+    }
 
     DocumentSourceLookupStats _stats;
 
     NamespaceString _fromNs;
     NamespaceString _resolvedNs;
+
+    // Path to the "as" field of the $lookup where the matches output array will be created.
     FieldPath _as;
+
     boost::optional<BSONObj> _additionalFilter;
 
     // For use when $lookup is specified with localField/foreignField syntax.
@@ -485,6 +511,6 @@ private:
     PipelinePtr _pipeline;
     boost::optional<Document> _input;
     boost::optional<Document> _nextValue;
-};
+};  // class DocumentSourceLookUp
 
 }  // namespace mongo

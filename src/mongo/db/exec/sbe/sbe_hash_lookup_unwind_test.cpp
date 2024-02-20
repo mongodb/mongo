@@ -28,15 +28,16 @@
  */
 
 /**
- * This file contains tests for sbe::HashLookupStage.
+ * This file contains tests for sbe::HashLookupUnwindStage.
  */
 
 #include "mongo/db/exec/sbe/sbe_hash_lookup_shared_test.h"
-#include "mongo/db/exec/sbe/stages/hash_lookup.h"
+#include "mongo/db/exec/sbe/stages/hash_lookup_unwind.h"
+
 
 namespace mongo::sbe {
 
-class HashLookupStageTest : public HashLookupSharedTest {
+class HashLookupUnwindStageTest : public HashLookupSharedTest {
 public:
     void runVariation(unittest::GoldenTestContext& gctx,
                       const std::string& name,
@@ -89,17 +90,14 @@ public:
 
         // Build and prepare for execution loop join of the two scan stages.
         value::SlotId lookupStageOutputSlot = generateSlotId();
-        SlotExprPair agg = std::make_pair(
-            lookupStageOutputSlot,
-            stage_builder::makeFunction("addToArray", makeE<EVariable>(innerScanSlots[0])));
-        auto lookupStage = makeS<HashLookupStage>(std::move(outerScanStage),
-                                                  std::move(innerScanStage),
-                                                  outerScanSlots[1],
-                                                  innerScanSlots[1],
-                                                  innerScanSlots[0],
-                                                  std::move(agg),
-                                                  collatorSlot,
-                                                  kEmptyPlanNodeId);
+        auto lookupStage = makeS<HashLookupUnwindStage>(std::move(outerScanStage),
+                                                        std::move(innerScanStage),
+                                                        outerScanSlots[1],
+                                                        innerScanSlots[1],
+                                                        innerScanSlots[0],
+                                                        lookupStageOutputSlot,
+                                                        collatorSlot,
+                                                        kEmptyPlanNodeId);
 
         StageResultsPrinters::SlotNames slotNames;
         if (outerKeyOnly) {
@@ -111,9 +109,9 @@ public:
 
         prepareAndEvalStageWithReopen(ctx.get(), stream, slotNames, lookupStage.get());
     }  // runVariation
-};     // class HashLookupStageTest
+};     // HashLookupUnwindStageTest
 
-TEST_F(HashLookupStageTest, BasicTests) {
+TEST_F(HashLookupUnwindStageTest, BasicTests) {
     unittest::GoldenTestContext gctx(&goldenTestConfigSbe);
 
     runVariation(gctx,

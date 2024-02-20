@@ -42,9 +42,13 @@ Array.from({length: 10}, (_, i) => ({x: i, y: 0})).forEach(doc => bulk_other.ins
 Array.from({length: 10}, (_, i) => ({x: i, y: 1})).forEach(doc => bulk_other.insert(doc));
 assert.commandWorked(bulk_other.execute());
 
-// Check that lookup->limit is reordered to limit->lookup, with the limit stage pushed down to query
-// system.
-var pipeline = [
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// TESTS
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TEST_01: Check that lookup->limit is reordered to limit->lookup, with the limit stage pushed down
+// to query system.
+let pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$limit: 5}
 ];
@@ -59,8 +63,8 @@ if (isSbeEnabled) {
     checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "$lookup"]);
 }
 
-// Check that lookup->addFields->lookup->limit is reordered to limit->lookup->addFields->lookup,
-// with the limit stage pushed down to query system.
+// TEST_02: Check that lookup->addFields->lookup->limit is reordered to
+// limit->lookup->addFields->lookup, with the limit stage pushed down to query system.
 pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$addFields: {z: 0}},
@@ -80,38 +84,87 @@ if (isSbeEnabled) {
     checkResults(pipeline, true, ["COLLSCAN", "LIMIT", "$lookup", "$addFields", "$lookup"]);
 }
 
-// Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage being
-// absorbed into the lookup stage and preventing the limit from swapping before it.
+// TEST_03: Check that lookup->unwind->limit is reordered to lookup->limit, with the unwind stage
+// being absorbed into the lookup stage and preventing the limit from swapping before it.
 pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-
 if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
 } else {
     checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$unwind", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
 }
-checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$limit"]);
 
-// Check that lookup->unwind->sort->limit is reordered to lookup->sort, with the unwind stage being
-// absorbed into the lookup stage and preventing the limit from swapping before it, and the limit
-// stage being absorbed into the sort stage.
+// TEST_04: Same as TEST_03 except intervening $unset prevents the $unwind from being absorbed into
+// the $lookup.
+pipeline = [
+    {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
+    {$unset: "nonexistent_field"},
+    {$unwind: "$from_other"},
+    {$limit: 5}
+];
+if (isSbeEnabled) {
+    checkResults(
+        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
+    checkResults(
+        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "LIMIT"]);
+} else if (isSbeGroupLookupOnly) {
+    checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$limit"]);
+} else {
+    checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$project", "$unwind", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$project", "$unwind", "$limit"]);
+}
+
+// TEST_05: Check that lookup->unwind->sort->limit is reordered to lookup->sort, with the unwind
+// stage being absorbed into the lookup stage and preventing the limit from swapping before it, and
+// the limit stage being absorbed into the sort stage.
 pipeline = [
     {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
     {$unwind: "$from_other"},
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-
 if (isSbeEnabled) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "UNWIND", "SORT", "LIMIT"]);
+    checkResults(pipeline, true, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"]);
 } else if (isSbeGroupLookupOnly) {
     checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
 } else {
     checkResults(pipeline, false, ["COLLSCAN", "$lookup", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
 }
-checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
+
+// TEST_06: Same as TEST_05 except intervening $unset prevents the $unwind from being absorbed into
+// the $lookup. The $sort is still moved before the $unwind in the optimized case.
+pipeline = [
+    {$lookup: {from: other.getName(), localField: "x", foreignField: "x", as: "from_other"}},
+    {$unset: "nonexistent_field"},
+    {$unwind: "$from_other"},
+    {$sort: {x: 1}},
+    {$limit: 5}
+];
+if (isSbeEnabled) {
+    checkResults(pipeline,
+                 false,
+                 ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "UNWIND", "SORT", "LIMIT"]);
+    checkResults(
+        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "PROJECTION_DEFAULT", "SORT", "UNWIND", "LIMIT"]);
+} else if (isSbeGroupLookupOnly) {
+    checkResults(
+        pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$project", "$unwind", "$sort", "$limit"]);
+    checkResults(
+        pipeline, true, ["COLLSCAN", "EQ_LOOKUP", "$project", "$sort", "$unwind", "$limit"]);
+} else {
+    checkResults(
+        pipeline, false, ["COLLSCAN", "$lookup", "$project", "$unwind", "$sort", "$limit"]);
+    checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$project", "$sort", "$unwind", "$limit"]);
+}

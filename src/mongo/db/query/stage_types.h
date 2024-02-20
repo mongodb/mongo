@@ -142,6 +142,7 @@ enum StageType {
     // Stages for DocumentSources.
     STAGE_GROUP,
     STAGE_EQ_LOOKUP,
+    STAGE_EQ_LOOKUP_UNWIND,
     STAGE_SEARCH,
     STAGE_WINDOW,
     STAGE_SENTINEL,

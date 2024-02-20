@@ -96,6 +96,7 @@ public:
         }
     }
 
+    // 'idx' is the index of the column to reset.
     void reset(size_t idx, bool own, value::TypeTags tag, value::Value val) {
         RowType& self = *static_cast<RowType*>(this);
         if (self.owned()[idx]) {

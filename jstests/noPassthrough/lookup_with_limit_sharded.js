@@ -90,7 +90,7 @@ const unwindPipeline = [
     {$unwind: "$from_other"},
     {$limit: 5}
 ];
-checkUnshardedResults(unwindPipeline, ["COLLSCAN"], ["$lookup", "$limit"]);
+checkUnshardedResults(unwindPipeline, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "LIMIT"], []);
 
 // Check that lookup->unwind->sort->limit is reordered to lookup->sort, with the unwind stage being
 // absorbed into the lookup stage and preventing the limit from swapping before it, and the limit
@@ -101,7 +101,7 @@ const sortPipeline = [
     {$sort: {x: 1}},
     {$limit: 5}
 ];
-checkUnshardedResults(sortPipeline, "COLLSCAN", ["$lookup", "$sort"]);
+checkUnshardedResults(sortPipeline, ["COLLSCAN", "EQ_LOOKUP_UNWIND", "SORT"], []);
 
 // Check that sort->lookup->limit is reordered to sort->lookup, with the limit stage being absorbed
 // into the sort stage and creating a top-k sort, which is pushed down to query system.

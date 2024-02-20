@@ -1499,18 +1499,19 @@ Status _runAggregate(OperationContext* opCtx,
         invariant(collatorToUse);
 
 
-        auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
-                                                           origNss,
-                                                           request,
-                                                           ctx,
-                                                           std::move(*collatorToUse),
-                                                           uuid,
-                                                           collatorToUseMatchesDefault,
-                                                           collections,
-                                                           liteParsedPipeline,
-                                                           nss.isCollectionlessAggregateNS(),
-                                                           resolvedView,
-                                                           origRequest);
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline =
+            parsePipelineAndRegisterQueryStats(opCtx,
+                                               origNss,
+                                               request,
+                                               ctx,
+                                               std::move(*collatorToUse),
+                                               uuid,
+                                               collatorToUseMatchesDefault,
+                                               collections,
+                                               liteParsedPipeline,
+                                               nss.isCollectionlessAggregateNS(),
+                                               resolvedView,
+                                               origRequest);
         expCtx = pipeline->getContext();
 
         CurOp::get(opCtx)->beginQueryPlanningTimer();

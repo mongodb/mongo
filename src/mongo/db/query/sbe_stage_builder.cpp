@@ -2430,8 +2430,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 /**
- * This builds the execution stage for an $unwind aggregation stage that has been pushed down to
- * SBE. This also builds a child project stage to get the field to be unwound, and ancestor project
+ * Builds the execution stage for an $unwind aggregation stage that has been pushed down to SBE.
+ * This also builds a child project stage to get the field to be unwound, and ancestor project
  * stage(s) to add the $unwind outputs (value and optionally array index) to the result document.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildUnwind(
@@ -2447,9 +2447,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // node needs to produce the result slot.
     PlanStageReqs childReqs = reqs.copyForChild().setResultObj();
     auto [stage, outputs] = build(un->children[0].get(), childReqs);
+
     // Clear the root of the original field being unwound so later plan stages do not reference it.
     outputs.clearField(fp.getSubpath(0));
-    const TypedSlot childResultSlot = outputs.getResultObj();
+    const sbe::value::SlotId childResultSlot = outputs.getResultObj().slotId;
 
     //
     // Build a project execution child node to get the field to be unwound. This gets the value of
@@ -2468,6 +2469,26 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                      &outputs);
     stage = std::move(outStage);
     sbe::value::SlotId getFieldSlot = outSlots[0].getId();
+
+    // Continue building the unwind and projection to results.
+    return buildOnlyUnwind(un, reqs, stage, outputs, childResultSlot, getFieldSlot);
+}  // buildUnwind
+
+/**
+ * Builds only the unwind and project results part of an $unwind stage, allowing an $LU stage to
+ * invoke just these parts of building its absorbed $unwind. For stand-alone $unwind this method is
+ * conceptually just the "bottom two thirds" of buildUnwind(). Used for the special case of a
+ * nonexistent foreign collection, where the $lookup result array is empty and thus its
+ * materialization is not a performance or memory problem.
+ */
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildOnlyUnwind(
+    const UnwindNode* un,
+    const PlanStageReqs& reqs,
+    std::unique_ptr<sbe::PlanStage>& stage,
+    PlanStageSlots& outputs,
+    const sbe::value::SlotId childResultSlot,
+    const sbe::value::SlotId getFieldSlot) {
+    const FieldPath& fp = un->fieldPath;
 
     //
     // Build the unwind execution node itself. This will unwind the value in 'getFieldSlot' into
@@ -2644,7 +2665,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     outputs.setResultObj(resultSlot);
     return {std::move(stage), std::move(outputs)};
-}  // buildUnwind
+}  // buildOnlyUnwind
 
 /**
  * Create a ProjectStage that evalutes the "newRoot" expression from a $replaceRoot pipeline stage
@@ -5797,7 +5818,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         {STAGE_AND_SORTED, &SlotBasedStageBuilder::buildAndSorted},
         {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
         {STAGE_GROUP, &SlotBasedStageBuilder::buildGroup},
-        {STAGE_EQ_LOOKUP, &SlotBasedStageBuilder::buildLookup},
+        {STAGE_EQ_LOOKUP, &SlotBasedStageBuilder::buildEqLookup},
+        {STAGE_EQ_LOOKUP_UNWIND, &SlotBasedStageBuilder::buildEqLookupUnwind},
         {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter},
         {STAGE_SEARCH, &SlotBasedStageBuilder::buildSearch},
         {STAGE_WINDOW, &SlotBasedStageBuilder::buildWindow},

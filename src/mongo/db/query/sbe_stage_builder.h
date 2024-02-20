@@ -1024,8 +1024,27 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildMatch(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    /**
+     * Builds a complete $unwind stage, including extraction of the field to be unwound from the
+     * source document, performing the unwind, and projecting the results to the output document.
+     */
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildUnwind(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
+    /**
+     * Enables an $LU stage to build the absorbed $unwind's unwinding and results projection only,
+     * as the $lookup, which is conceptually the child of the $unwind, is built directly via a call
+     * to buildEqLookupUnwind() with no parent call to buildUnwind() since the $unwind was erased
+     * from the pipeline before the plan was finalized. Used for the special case of a nonexistent
+     * foreign collection, where the $lookup result array is empty and thus its materialization is
+     * not a performance or memory problem.
+     */
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildOnlyUnwind(
+        const UnwindNode* un,
+        const PlanStageReqs& reqs,
+        std::unique_ptr<sbe::PlanStage>& stage,
+        PlanStageSlots& outputs,
+        sbe::value::SlotId childResultSlot,
+        sbe::value::SlotId getFieldSlot);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildReplaceRoot(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
@@ -1082,7 +1101,10 @@ private:
         PlanStageSlots childOutputs,
         const GroupNode* groupNode);
 
-    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLookup(
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildEqLookup(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildEqLookupUnwind(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildUnpackTsBucket(

@@ -924,7 +924,7 @@ QueryPlannerAnalysis::determineLookupStrategy(
     bool allowDiskUse,
     const CollatorInterface* collator) {
     auto foreignCollItr = collectionsInfo.find(foreignCollName);
-    if (foreignCollItr == collectionsInfo.end()) {
+    if (foreignCollItr == collectionsInfo.end() || !foreignCollItr->second.exists) {
         return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
     }
 
@@ -958,9 +958,7 @@ QueryPlannerAnalysis::determineLookupStrategy(
     }();
 
     // TODO: SERVER-85242: Ensure the robustness of the 'QuerySettings' fallback mechanism.
-    if (!foreignCollItr->second.exists) {
-        return {EqLookupNode::LookupStrategy::kNonExistentForeignCollection, boost::none};
-    } else if (foreignIndex) {
+    if (foreignIndex) {
         return {EqLookupNode::LookupStrategy::kIndexedLoopJoin, std::move(foreignIndex)};
     } else if (allowDiskUse && isEligibleForHashJoin(foreignCollItr->second)) {
         return {EqLookupNode::LookupStrategy::kHashJoin, boost::none};

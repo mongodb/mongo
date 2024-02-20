@@ -49,6 +49,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_DISTINCT_SCAN, "DISTINCT_SCAN"_sd},
         {STAGE_EOF, "EOF"_sd},
         {STAGE_EQ_LOOKUP, "EQ_LOOKUP"_sd},
+        {STAGE_EQ_LOOKUP_UNWIND, "EQ_LOOKUP_UNWIND"_sd},
         {STAGE_FETCH, "FETCH"_sd},
         {STAGE_GEO_NEAR_2D, "GEO_NEAR_2D"_sd},
         {STAGE_GEO_NEAR_2DSPHERE, "GEO_NEAR_2DSPHERE"_sd},

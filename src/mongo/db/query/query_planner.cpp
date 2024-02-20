@@ -1831,16 +1831,35 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                 secondaryCollInfos,
                 query.getExpCtx()->allowDiskUse,
                 query.getCollator());
-            auto eqLookupNode =
-                std::make_unique<EqLookupNode>(std::move(solnForAgg),
-                                               lookupStage->getFromNs(),
-                                               lookupStage->getLocalField()->fullPath(),
-                                               lookupStage->getForeignField()->fullPath(),
-                                               lookupStage->getAsField().fullPath(),
-                                               strategy,
-                                               std::move(idxEntry),
-                                               isLastSource /* shouldProduceBson */);
-            solnForAgg = std::move(eqLookupNode);
+
+            if (!lookupStage->hasUnwindSrc()) {
+                solnForAgg =
+                    std::make_unique<EqLookupNode>(std::move(solnForAgg),
+                                                   lookupStage->getFromNs(),
+                                                   lookupStage->getLocalField()->fullPath(),
+                                                   lookupStage->getForeignField()->fullPath(),
+                                                   lookupStage->getAsField().fullPath(),
+                                                   strategy,
+                                                   std::move(idxEntry),
+                                                   isLastSource /* shouldProduceBson */);
+            } else {
+                const boost::intrusive_ptr<DocumentSourceUnwind>& unwindSrc =
+                    lookupStage->getUnwindSource();
+                solnForAgg =
+                    std::make_unique<EqLookupUnwindNode>(std::move(solnForAgg),
+                                                         // Shared data members.
+                                                         lookupStage->getAsField().fullPath(),
+                                                         // $lookup-specific data members.
+                                                         lookupStage->getFromNs(),
+                                                         lookupStage->getLocalField()->fullPath(),
+                                                         lookupStage->getForeignField()->fullPath(),
+                                                         strategy,
+                                                         std::move(idxEntry),
+                                                         isLastSource /* shouldProduceBson */,
+                                                         // $unwind-specific data members.
+                                                         unwindSrc->preserveNullAndEmptyArrays(),
+                                                         unwindSrc->indexPath());
+            }
             continue;
         }
 

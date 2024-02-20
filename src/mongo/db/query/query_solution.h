@@ -1891,7 +1891,120 @@ struct EqLookupNode : public QuerySolutionNode {
      * 'sbe::Object' is produced instead.
      */
     bool shouldProduceBson;
-};
+};  // struct EqLookupNode
+
+/**
+ * EqLookupUnwindNode is used for $LU ($lookup + $unwind) macro aggregation stages that are pushed
+ * down to SBE, where the $unwind always unwinds the "as" output array of the $lookup. These act
+ * like SQL join stages. They are more like $lookup than $unwind.
+ */
+struct EqLookupUnwindNode : public QuerySolutionNode {
+    EqLookupUnwindNode(std::unique_ptr<QuerySolutionNode> child,
+                       // Shared data members.
+                       const FieldPath& joinField,
+                       // $lookup-specific data members.
+                       const NamespaceString& foreignCollection,
+                       const FieldPath& joinFieldLocal,
+                       const FieldPath& joinFieldForeign,
+                       EqLookupNode::LookupStrategy lookupStrategy,
+                       boost::optional<IndexEntry> idxEntry,
+                       bool shouldProduceBson,
+                       // $unwind-specific data members.
+                       bool preserveNullAndEmptyArrays,
+                       const boost::optional<FieldPath>& indexPath)
+        : QuerySolutionNode(std::move(child)),
+          // Shared data members.
+          joinField{joinField},
+          // $lookup-specific data members.
+          foreignCollection(foreignCollection),
+          joinFieldLocal(joinFieldLocal),
+          joinFieldForeign(joinFieldForeign),
+          lookupStrategy(lookupStrategy),
+          idxEntry(std::move(idxEntry)),
+          shouldProduceBson(shouldProduceBson),
+          // $unwind-specific data members.
+          unwindNode{nullptr /* child */,
+                     joinField /* fieldPath */,
+                     preserveNullAndEmptyArrays,
+                     indexPath} {}
+
+    virtual StageType getType() const {
+        return STAGE_EQ_LOOKUP_UNWIND;
+    }
+
+    void appendToString(str::stream* ss, int indent) const final;
+    std::unique_ptr<QuerySolutionNode> clone() const final;
+
+    /**
+     * Data from the LU node is considered fetched iff the child provides fetched data.
+     */
+    bool fetched() const {
+        return children[0]->fetched();
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        if (field == joinField) {
+            // This field is available, but isn't mapped to the original document.
+            return FieldAvailability::kNotProvided;
+        } else {
+            return children[0]->getFieldAvailability(field);
+        }
+    }
+
+    bool sortedByDiskLoc() const {
+        return children[0]->sortedByDiskLoc();
+    }
+
+    const ProvidedSortSet& providedSorts() const final {
+        // Right now, we conservatively return kEmptySet. A future optimization could theoretically
+        // take the "joinField" into account when deciding whether this provides a sort or not.
+        return kEmptySet;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // $lookup and $unwind shared data members
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // The "as" field for the $lookup output field that would be added to local (outer) document
+    // containing the array of all matched foreign (inner) documents, except that this stage will
+    // unwind it instead. Same as $unwind's field to unwind. If the field already exists in the
+    // local (outer) document, the field will be overwritten.
+    FieldPath joinField;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // $lookup-specific data members
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // The foreign (inner) collection namespace string.
+    NamespaceString foreignCollection;
+
+    // The local (outer) join field.
+    FieldPath joinFieldLocal;
+
+    // The foreign (inner) join field.
+    FieldPath joinFieldForeign;
+
+    // The algorithm that will be used to execute this 'EqLookupUnwindNode'. Defaults to nested loop
+    // join as it's applicable independent of collection sizes or the availability of indexes.
+    EqLookupNode::LookupStrategy lookupStrategy = EqLookupNode::LookupStrategy::kNestedLoopJoin;
+
+    // The index to be used if we can answer the join predicate with an index on the foreign
+    // collection. Set to 'boost::none' by default and if a non-indexed strategy is chosen.
+    boost::optional<IndexEntry> idxEntry = boost::none;
+
+    // If set to true, generated SBE plan will produce result as BSON object. If false,
+    // 'sbe::Object' is produced instead.
+    bool shouldProduceBson;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // $unwind-specific data members
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Represents the absorbed $unwind stage, which may be used in the stage builder for this $LU
+    // node. Its 'child' member is set to nullptr to avoid an unwanted recursion to the current $LU,
+    // which is conceptually the $unwind's parent.
+    struct UnwindNode unwindNode;
+};  // struct EqLookupUnwindNode
 
 struct SentinelNode : public QuerySolutionNode {
     SentinelNode() {}

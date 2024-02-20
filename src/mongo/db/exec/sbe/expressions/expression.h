@@ -135,7 +135,8 @@ protected:
     }
 };
 
-using SlotExprPairVector = std::vector<std::pair<value::SlotId, std::unique_ptr<EExpression>>>;
+using SlotExprPair = std::pair<value::SlotId, std::unique_ptr<EExpression>>;
+using SlotExprPairVector = std::vector<SlotExprPair>;
 
 struct AggExprPair {
     std::unique_ptr<EExpression> init;

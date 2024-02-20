@@ -265,6 +265,22 @@ void statsToBSON(const QuerySolutionNode* node,
             }
             break;
         }
+        case STAGE_EQ_LOOKUP_UNWIND: {
+            auto eln = static_cast<const EqLookupUnwindNode*>(node);
+
+            bob->append("foreignCollection",
+                        NamespaceStringUtil::serialize(eln->foreignCollection,
+                                                       SerializationContext::stateDefault()));
+            bob->append("localField", eln->joinFieldLocal.fullPath());
+            bob->append("foreignField", eln->joinFieldForeign.fullPath());
+            bob->append("asField", eln->joinField.fullPath());
+            bob->append("strategy", EqLookupNode::serializeLookupStrategy(eln->lookupStrategy));
+            if (eln->idxEntry) {
+                bob->append("indexName", eln->idxEntry->identifier.catalogName);
+                bob->append("indexKeyPattern", eln->idxEntry->keyPattern);
+            }
+            break;
+        }
         case STAGE_COLUMN_SCAN: {
             auto cisn = static_cast<const ColumnIndexScanNode*>(node);
 
