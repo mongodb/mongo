@@ -723,13 +723,16 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
         }
     }
 
-    WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
     hs_btree = __wt_curhs_get_btree(hs_cursor);
     max_hs_size = hs_btree->file_max;
-    if (max_hs_size != 0 && (uint64_t)hs_size > max_hs_size)
-        WT_ERR_PANIC(session, WT_PANIC,
-          "WiredTigerHS: file size of %" PRIu64 " exceeds maximum size %" PRIu64, (uint64_t)hs_size,
-          max_hs_size);
+    /* Check the history store size if a limit is enforced. */
+    if (max_hs_size != 0) {
+        WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
+        if ((uint64_t)hs_size > max_hs_size)
+            WT_ERR_PANIC(session, WT_PANIC,
+              "WiredTigerHS: file size of %" PRIu64 " exceeds maximum size %" PRIu64,
+              (uint64_t)hs_size, max_hs_size);
+    }
 
 err:
     if (ret == 0 && insert_cnt > 0)
