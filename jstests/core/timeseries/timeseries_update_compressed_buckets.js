@@ -1,5 +1,4 @@
 /**
- * TODO SERVER-78946: Check if we can remove this test.
  * Tests running the updateOne and updateMany command on a time-series collection with compressed
  * buckets.
  *
