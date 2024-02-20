@@ -65,7 +65,13 @@ public:
         kFailedUnitOfWork   // in a unit of work that has failed and must be aborted
     };
 
-    WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries = false);
+    enum OplogEntryGroupType {
+        kDontGroup,
+        kGroupForTransaction,
+        kGroupForPossiblyRetryableOperations
+    };
+
+    WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupType = kDontGroup);
 
     ~WriteUnitOfWork();
 
@@ -104,10 +110,17 @@ public:
 private:
     WriteUnitOfWork() = default;  // for createForSnapshotResume
 
+    /**
+     * Whether this WUOW is grouping oplog entries, regardless of the grouping type.
+     */
+    bool _isGroupingOplogEntries() {
+        return _groupOplogEntries != kDontGroup;
+    }
+
     OperationContext* _opCtx;
 
     bool _toplevel;
-    bool _groupOplogEntries;
+    OplogEntryGroupType _groupOplogEntries;
 
     bool _committed = false;
     bool _prepared = false;

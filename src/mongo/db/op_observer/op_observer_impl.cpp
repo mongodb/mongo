@@ -1754,7 +1754,8 @@ void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
     batchedWriteContext.setWritesAreBatched(true);
 }
 
-void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
+void OpObserverImpl::onBatchedWriteCommit(
+    OperationContext* opCtx, WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) {
     if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().isReplSet() ||
         !opCtx->writesAreReplicated()) {
         return;

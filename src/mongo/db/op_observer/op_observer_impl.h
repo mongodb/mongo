@@ -229,7 +229,8 @@ public:
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         OpStateAccumulator* opAccumulator = nullptr) final;
     void onBatchedWriteStart(OperationContext* opCtx) final;
-    void onBatchedWriteCommit(OperationContext* opCtx) final;
+    void onBatchedWriteCommit(OperationContext* opCtx,
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) final;
     void onBatchedWriteAbort(OperationContext* opCtx) final;
     void onPreparedTransactionCommit(
         OperationContext* opCtx,

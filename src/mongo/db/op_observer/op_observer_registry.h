@@ -596,10 +596,11 @@ public:
         }
     }
 
-    void onBatchedWriteCommit(OperationContext* opCtx) override {
+    void onBatchedWriteCommit(OperationContext* opCtx,
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
-            o->onBatchedWriteCommit(opCtx);
+            o->onBatchedWriteCommit(opCtx, oplogGroupingFormat);
         }
     }
 

@@ -539,7 +539,8 @@ public:
      * are gathered in a single applyOps oplog entry, similar to multi-doc transactions, and written
      * to the oplog.
      */
-    virtual void onBatchedWriteCommit(OperationContext* opCtx) = 0;
+    virtual void onBatchedWriteCommit(OperationContext* opCtx,
+                                      WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) = 0;
 
     /**
      * Clears the accumulated write operations. No further writes is allowed in this storage

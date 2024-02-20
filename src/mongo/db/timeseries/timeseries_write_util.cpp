@@ -1049,7 +1049,9 @@ void performAtomicWrites(
     // Groups all operations in one or several chained oplog entries to ensure the writes are
     // replicated atomically.
     auto groupOplogEntries =
-        !opCtx->getTxnNumber() && (!insertOps.empty() || !updateOps.empty()) && modificationOp;
+        !opCtx->getTxnNumber() && (!insertOps.empty() || !updateOps.empty()) && modificationOp
+        ? WriteUnitOfWork::kGroupForTransaction
+        : WriteUnitOfWork::kDontGroup;
     WriteUnitOfWork wuow{opCtx, groupOplogEntries};
 
     if (modificationOp) {

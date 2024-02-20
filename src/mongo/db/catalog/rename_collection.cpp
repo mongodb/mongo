@@ -754,7 +754,9 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                     canBeBatched);
 
                 bool isGroupedOplogEntries = stmts.size() > 1U;
-                WriteUnitOfWork wunit(opCtx, isGroupedOplogEntries);
+                WriteUnitOfWork wunit(opCtx,
+                                      isGroupedOplogEntries ? WriteUnitOfWork::kGroupForTransaction
+                                                            : WriteUnitOfWork::kDontGroup);
 
                 if (!isOplogDisabledForTmpColl && !isGroupedOplogEntries) {
                     auto oplogInfo = LocalOplogInfo::get(opCtx);

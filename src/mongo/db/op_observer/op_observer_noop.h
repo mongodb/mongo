@@ -225,7 +225,8 @@ public:
 
     void onBatchedWriteStart(OperationContext* opCtx) override {}
 
-    void onBatchedWriteCommit(OperationContext* opCtx) override {}
+    void onBatchedWriteCommit(OperationContext* opCtx,
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat) override {}
 
     void onBatchedWriteAbort(OperationContext* opCtx) override {}
 

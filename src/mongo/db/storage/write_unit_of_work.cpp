@@ -51,14 +51,14 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(sleepBeforeCommit);
 
-WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, bool groupOplogEntries)
+WriteUnitOfWork::WriteUnitOfWork(OperationContext* opCtx, OplogEntryGroupType groupOplogEntries)
     : _opCtx(opCtx),
       _toplevel(opCtx->_ruState == RecoveryUnitState::kNotInUnitOfWork),
       _groupOplogEntries(groupOplogEntries) {  // Grouping oplog entries doesn't support WUOW
                                                // nesting (e.g. multi-doc transactions).
-    invariant(_toplevel || !_groupOplogEntries);
+    invariant(_toplevel || !_isGroupingOplogEntries());
 
-    if (_groupOplogEntries) {
+    if (_isGroupingOplogEntries()) {
         const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
         opObserver->onBatchedWriteStart(_opCtx);
@@ -93,7 +93,7 @@ WriteUnitOfWork::~WriteUnitOfWork() {
         shard_role_details::getLocker(_opCtx)->endWriteUnitOfWork();
     }
 
-    if (_groupOplogEntries) {
+    if (_isGroupingOplogEntries()) {
         const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
         opObserver->onBatchedWriteAbort(_opCtx);
@@ -136,10 +136,10 @@ void WriteUnitOfWork::commit() {
     invariant(!_released);
     invariant(_opCtx->_ruState == RecoveryUnitState::kActiveUnitOfWork);
 
-    if (_groupOplogEntries) {
+    if (_isGroupingOplogEntries()) {
         const auto opObserver = _opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
-        opObserver->onBatchedWriteCommit(_opCtx);
+        opObserver->onBatchedWriteCommit(_opCtx, _groupOplogEntries);
     }
     if (_toplevel) {
         if (MONGO_unlikely(sleepBeforeCommit.shouldFail())) {

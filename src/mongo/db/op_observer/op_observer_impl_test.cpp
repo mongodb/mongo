@@ -2989,8 +2989,8 @@ protected:
         NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), "test", "coll");
 };
 
-// Verifies that a WriteUnitOfWork with groupOplogEntries=true replicates its writes as a single
-// applyOps. Tests WUOWs batching a range of 1 to 5 deletes (inclusive).
+// Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction replicates its writes
+// as a single applyOps. Tests WUOWs batching a range of 1 to 5 deletes (inclusive).
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     const auto nDocsToDelete = 5;
     const BSONObj docsToDelete[nDocsToDelete] = {
@@ -3010,11 +3010,11 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     // Run the test with WUOW's grouping 1 to 5 deletions.
     for (size_t docsToBeBatched = 1; docsToBeBatched <= nDocsToDelete; docsToBeBatched++) {
 
-        // Start a WUOW with groupOplogEntries=true. Verify that initialises the
+        // Start a WUOW with groupOplogEntries=kGroupForTransaction. Verify that initialises the
         // BatchedWriteContext.
         auto& bwc = BatchedWriteContext::get(opCtx);
         ASSERT(!bwc.writesAreBatched());
-        WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+        WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
         ASSERT(bwc.writesAreBatched());
 
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
@@ -3057,8 +3057,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
     }
 }
 
-// Verifies that a WriteUnitOfWork with groupOplogEntries=true constisting of an insert, an
-// update and a delete replicates as a single applyOps.
+// Verifies that a WriteUnitOfWork with groupOplogEntries=kGroupForTransaction constisting of an
+// insert, an update and a delete replicates as a single applyOps.
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     // Setup.
     auto opCtxRaii = cc().makeOperationContext();
@@ -3066,11 +3066,11 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
     reset(opCtx, _nss);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
-    // Start a WUOW with groupOplogEntries=true. Verify that initialises the
+    // Start a WUOW with groupOplogEntries=kGroupForTransaction. Verify that initialises the
     // BatchedWriteContext.
     auto& bwc = BatchedWriteContext::get(opCtx);
     ASSERT(!bwc.writesAreBatched());
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
     ASSERT(bwc.writesAreBatched());
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
@@ -3162,11 +3162,11 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     reset(opCtx, _nssWithTid);
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
-    // Start a WUOW with groupOplogEntries=true. Verify that initialises the
+    // Start a WUOW with groupOplogEntries=kGroupForTransaction. Verify that initialises the
     // BatchedWriteContext.
     auto& bwc = BatchedWriteContext::get(opCtx);
     ASSERT(!bwc.writesAreBatched());
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
     ASSERT(bwc.writesAreBatched());
 
     AutoGetCollection autoColl(opCtx, _nssWithTid, MODE_IX);
@@ -3270,7 +3270,7 @@ TEST_F(BatchedWriteOutputsTest, testEmptyWUOW) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
     // Start and commit an empty WUOW.
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
     wuow.commit();
 
     // The getNOplogEntries call below asserts that the oplog is empty.
@@ -3286,7 +3286,7 @@ TEST_F(BatchedWriteOutputsTest, testWUOWLarge) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
 
     // Delete BatchedWriteOutputsTest::maxDeleteOpsInBatch documents in a single batch, which is the
     // maximum number of docs that can be batched while staying within 16MB of applyOps.
@@ -3337,7 +3337,7 @@ TEST_F(BatchedWriteOutputsTest, testWUOWTooLarge) {
     reset(opCtx, NamespaceString::kRsOplogNamespace);
 
     AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
+    WriteUnitOfWork wuow(opCtx, WriteUnitOfWork::kGroupForTransaction);
 
     // Attempt to delete more documents than allowed in a single applyOps batch because it
     // the generated entry exceeds the limit of 16MB for an applyOps entry.
