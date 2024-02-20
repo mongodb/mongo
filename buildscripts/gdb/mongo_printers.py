@@ -518,23 +518,30 @@ class WtTxnPrinter(object):
                 yield (field.name, field_val)
 
 
+def absl_container_size(val):
+    return val["settings_"]["value"]["compressed_tuple_"]["value"]
+
+
 def absl_get_nodes(val):
     """Return a generator of every node in absl::container_internal::raw_hash_set and derived classes."""
-    size = val["size_"]
+    size = absl_container_size(val)
 
     if size == 0:
         return
 
     table = val
-    capacity = int(table["capacity_"])
-    ctrl = table["ctrl_"]
+    capacity = int(table["settings_"]["value"]["capacity_"])
+    ctrl = table["settings_"]["value"]["control_"]
+
+    # Derive the underlying type stored in the container.
+    slot_type = lookup_type(str(val.type.strip_typedefs()) + "::slot_type").strip_typedefs()
 
     # Using the array of ctrl bytes, search for in-use slots and return them
-    # https://github.com/abseil/abseil-cpp/blob/7ffbe09f3d85504bd018783bbe1e2c12992fe47c/absl/container/internal/raw_hash_set.h#L787-L788
+    # https://github.com/abseil/abseil-cpp/blob/8a3caf7dea955b513a6c1b572a2423c6b4213402/absl/container/internal/raw_hash_set.h#L2108-L2113
     for item in range(capacity):
         ctrl_t = int(ctrl[item])
         if ctrl_t >= 0:
-            yield table["slots_"][item]
+            yield table["settings_"]["value"]["slots_"].cast(slot_type.pointer())[item]
 
 
 class AbslHashSetPrinterBase(object):
@@ -553,7 +560,7 @@ class AbslHashSetPrinterBase(object):
     def to_string(self):
         """Return absl::[node/flat]_hash_set for printing."""
         return "absl::%s_hash_set<%s> with %s elems " % (
-            self.to_str, self.val.type.template_argument(0), self.val["size_"])
+            self.to_str, self.val.type.template_argument(0), absl_container_size(self.val))
 
 
 class AbslNodeHashSetPrinter(AbslHashSetPrinterBase):
@@ -603,7 +610,7 @@ class AbslHashMapPrinterBase(object):
         """Return absl::[node/flat]_hash_map for printing."""
         return "absl::%s_hash_map<%s, %s> with %s elems " % (
             self.to_str, self.val.type.template_argument(0), self.val.type.template_argument(1),
-            self.val["size_"])
+            absl_container_size(self.val))
 
 
 class AbslNodeHashMapPrinter(AbslHashMapPrinterBase):
@@ -631,7 +638,7 @@ class AbslFlatHashMapPrinter(AbslHashMapPrinterBase):
         """Children."""
         for kvp in absl_get_nodes(self.val):
             yield ('key', kvp['key'])
-            yield ('value', kvp['value'])
+            yield ('value', kvp['value']["second"])
 
 
 class ImmutableMapIter(ImmerListIter):
@@ -1002,10 +1009,10 @@ def build_pretty_printer():
     pp.add('Status', 'mongo::Status', False, StatusPrinter)
     pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)
     pp.add('StringData', 'mongo::StringData', False, StringDataPrinter)
-    pp.add('node_hash_map', 'absl::lts_20211102::node_hash_map', True, AbslNodeHashMapPrinter)
-    pp.add('node_hash_set', 'absl::lts_20211102::node_hash_set', True, AbslNodeHashSetPrinter)
-    pp.add('flat_hash_map', 'absl::lts_20211102::flat_hash_map', True, AbslFlatHashMapPrinter)
-    pp.add('flat_hash_set', 'absl::lts_20211102::flat_hash_set', True, AbslFlatHashSetPrinter)
+    pp.add('node_hash_map', 'absl::lts_20230802::node_hash_map', True, AbslNodeHashMapPrinter)
+    pp.add('node_hash_set', 'absl::lts_20230802::node_hash_set', True, AbslNodeHashSetPrinter)
+    pp.add('flat_hash_map', 'absl::lts_20230802::flat_hash_map', True, AbslFlatHashMapPrinter)
+    pp.add('flat_hash_set', 'absl::lts_20230802::flat_hash_set', True, AbslFlatHashSetPrinter)
     pp.add('RecordId', 'mongo::RecordId', False, RecordIdPrinter)
     pp.add('UUID', 'mongo::UUID', False, UUIDPrinter)
     pp.add('OID', 'mongo::OID', False, OIDPrinter)

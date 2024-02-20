@@ -271,7 +271,7 @@ def get_decorations(obj):
 def get_object_decoration(decorable, start, index):
     decoration_data = get_unique_ptr_bytes(decorable["_decorations"]["_data"])
     entry = start[index]
-    deco_type_info = str(entry["_typeInfo"])
+    deco_type_info = str(entry["typeInfo"])
     deco_type_name = re.sub(r'.* <typeinfo for (.*)>', r'\1', deco_type_info)
     offset = int(entry["offset"])
     obj = decoration_data[offset]

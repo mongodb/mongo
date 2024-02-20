@@ -44,6 +44,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/string_map.h"
 
 #if defined(__clang__)
 #define clang_optnone __attribute__((optnone))
@@ -87,6 +88,20 @@ int clang_optnone main(int argc, char** argv) {
         mongo::NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
     mongo::NamespaceString nssWithTenantId =
         mongo::NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
+
+    // Tests for various abseil containers.
+    mongo::StringMap<int> emptyMap;
+
+    mongo::StringMap<int> intMap;
+    intMap["a"] = 1;
+    intMap["b"] = 1;
+
+    mongo::StringMap<std::string> strMap;
+    strMap["a"] = "a_value";
+
+    mongo::StringSet strSet;
+    strSet.insert("a");
+
     mongo::breakpoint();
 
     return 0;
