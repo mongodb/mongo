@@ -380,6 +380,8 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
 
     monitorThread.start();
 
+    sleepmillis(100);
+
     deathEvent.wait();
 
     monitorThread.shutdown();
@@ -413,6 +415,8 @@ TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
     ASSERT_EQ(monitor.getMonitorGeneration(), 0);
 
     monitor.start();
+
+    sleepmillis(100);
 
     deathEvent.wait();
 
@@ -492,7 +496,7 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
 
     counterCheckPtr->waitForCount();
     // Sleep to ensure the monitor runs at least once.
-    sleepmillis(1007);
+    sleepmillis(3000);
 
     monitor.shutdown();
 
