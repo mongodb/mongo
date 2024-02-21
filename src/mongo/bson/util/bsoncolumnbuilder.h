@@ -33,7 +33,6 @@
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -329,12 +328,12 @@ private:
             class InterleavedControlBlockWriter {
             public:
                 InterleavedControlBlockWriter(
-                    std::deque<std::pair<ptrdiff_t, size_t>>& controlBlocks);
+                    std::vector<std::pair<ptrdiff_t, size_t>>& controlBlocks);
 
                 void operator()(ptrdiff_t, size_t);
 
             private:
-                std::deque<std::pair<ptrdiff_t, size_t>>& _controlBlocks;
+                std::vector<std::pair<ptrdiff_t, size_t>>& _controlBlocks;
             };
 
             SubObjState();
@@ -346,14 +345,14 @@ private:
 
             bsoncolumn::EncodingState state;
             BufBuilder buffer;
-            std::deque<std::pair<ptrdiff_t, size_t>> controlBlocks;
+            std::vector<std::pair<ptrdiff_t, size_t>> controlBlocks;
 
             InterleavedControlBlockWriter controlBlockWriter();
         };
 
         // Encoding states when in sub-object compression mode. There should be one encoding state
         // per scalar field in '_referenceSubObj'.
-        std::deque<SubObjState> subobjStates;
+        std::vector<SubObjState> subobjStates;
 
         // Reference object that is used to match object hierarchy to encoding states. Appending
         // objects for sub-object compression need to check their hierarchy against this object.

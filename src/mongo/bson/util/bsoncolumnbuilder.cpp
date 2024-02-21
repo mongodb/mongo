@@ -1769,7 +1769,7 @@ BSONColumnBuilder::InternalState::SubObjState::operator=(SubObjState&& rhs) {
 }
 
 BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter::
-    InterleavedControlBlockWriter(std::deque<std::pair<ptrdiff_t, size_t>>& controlBlocks)
+    InterleavedControlBlockWriter(std::vector<std::pair<ptrdiff_t, size_t>>& controlBlocks)
     : _controlBlocks(controlBlocks) {}
 
 void BSONColumnBuilder::InternalState::SubObjState::InterleavedControlBlockWriter::operator()(
@@ -1885,28 +1885,42 @@ void BSONColumnBuilder::_flushSubObjMode() {
     // in the decoder's perspective where a DecodingState that exhausts its elements will read the
     // next control byte. We can use a min-heap to see which encoding states have written the fewest
     // elements so far. In case of tie we use the smallest encoder/decoder index.
-    std::vector<std::pair<uint32_t /* num elements written */, uint32_t /* encoder index */>> heap;
+    struct HeapElement {
+        HeapElement(uint32_t index) : encoderIndex(index) {}
+
+        uint32_t numElementsWritten = 0;
+        uint32_t encoderIndex;
+        uint32_t controlBlockIndex = 0;
+
+        bool operator>(const HeapElement& rhs) const {
+            // Implement operator using std::pair
+            return std::tie(numElementsWritten, encoderIndex) >
+                std::tie(rhs.numElementsWritten, rhs.encoderIndex);
+        }
+    };
+    std::vector<HeapElement> heap;
     for (uint32_t i = 0; i < _is.subobjStates.size(); ++i) {
-        heap.emplace_back(0, i);
+        heap.emplace_back(i);
     }
 
     // Initialize as min-heap
-    using MinHeap = std::greater<std::pair<uint32_t, uint32_t>>;
-    std::make_heap(heap.begin(), heap.end(), MinHeap());
+    std::make_heap(heap.begin(), heap.end(), std::greater<>{});
 
     // Append all control blocks
     while (!heap.empty()) {
         // Take out encoding state with fewest elements written from heap
-        std::pop_heap(heap.begin(), heap.end(), MinHeap());
+        std::pop_heap(heap.begin(), heap.end(), std::greater<>{});
         // And we take out control blocks in FIFO order from this encoding state
-        auto& slot = _is.subobjStates[heap.back().second];
-        const char* controlBlock = slot.buffer.buf() + slot.controlBlocks.front().first;
-        size_t size = slot.controlBlocks.front().second;
+        auto& top = heap.back();
+        auto& slot = _is.subobjStates[top.encoderIndex];
+        const char* controlBlock =
+            slot.buffer.buf() + slot.controlBlocks.at(top.controlBlockIndex).first;
+        size_t size = slot.controlBlocks.at(top.controlBlockIndex).second;
 
         // Write it to the buffer
         _bufBuilder.appendBuf(controlBlock, size);
-        slot.controlBlocks.pop_front();
-        if (slot.controlBlocks.empty()) {
+        ++top.controlBlockIndex;
+        if (top.controlBlockIndex == slot.controlBlocks.size()) {
             // No more control blocks for this encoding state so remove it from the heap
             heap.pop_back();
             continue;
@@ -1933,8 +1947,8 @@ void BSONColumnBuilder::_flushSubObjMode() {
         }();
 
         // Append num elements and put this encoding state back into the heap.
-        heap.back().first += elems;
-        std::push_heap(heap.begin(), heap.end(), MinHeap());
+        top.numElementsWritten += elems;
+        std::push_heap(heap.begin(), heap.end(), std::greater<>{});
     }
     // All control blocks written, write EOO to end the interleaving and cleanup.
     _bufBuilder.appendChar(EOO);

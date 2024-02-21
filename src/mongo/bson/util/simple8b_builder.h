@@ -35,7 +35,6 @@
 #include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <iterator>
 #include <type_traits>
@@ -126,13 +125,13 @@ public:
         bool operator!=(const PendingIterator& rhs) const;
 
     private:
-        PendingIterator(typename std::deque<PendingValue>::const_iterator beginning,
-                        typename std::deque<PendingValue>::const_iterator it,
+        PendingIterator(typename std::vector<PendingValue>::const_iterator beginning,
+                        typename std::vector<PendingValue>::const_iterator it,
                         reference rleValue,
                         uint32_t rleCount);
 
-        typename std::deque<PendingValue>::const_iterator _begin;
-        typename std::deque<PendingValue>::const_iterator _it;
+        typename std::vector<PendingValue>::const_iterator _begin;
+        typename std::vector<PendingValue>::const_iterator _it;
 
         const boost::optional<T>& _rleValue;
         uint32_t _rleCount;
@@ -317,7 +316,7 @@ private:
 
     // These variables hold the max amount of bits for each value in _pendingValues. They are
     // updated whenever values are added or removed from _pendingValues to always reflect the max
-    // value in the deque.
+    // value in the pending queue.
     std::array<uint8_t, kNumOfSelectorTypes> _currMaxBitLen = kMinDataBits;
     std::array<uint8_t, kNumOfSelectorTypes> _currTrailingZerosCount = {0, 0, 0, 0};
 
@@ -333,7 +332,7 @@ private:
 
     // This holds values that have not be encoded to the simple8b buffer, but are waiting for a full
     // simple8b word to be filled before writing to buffer.
-    std::deque<PendingValue> _pendingValues;
+    std::vector<PendingValue> _pendingValues;
 };
 
 }  // namespace mongo

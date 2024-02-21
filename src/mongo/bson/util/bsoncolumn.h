@@ -38,7 +38,6 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <iterator>
 #include <memory>
 #include <span>

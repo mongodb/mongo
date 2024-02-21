@@ -116,8 +116,8 @@ Simple8bBuilder<T>::PendingValue::PendingValue(
 
 template <typename T>
 Simple8bBuilder<T>::PendingIterator::PendingIterator(
-    typename std::deque<PendingValue>::const_iterator beginning,
-    typename std::deque<PendingValue>::const_iterator it,
+    typename std::vector<PendingValue>::const_iterator beginning,
+    typename std::vector<PendingValue>::const_iterator it,
     reference rleValue,
     uint32_t rleCount)
     : _begin(beginning), _it(it), _rleValue(rleValue), _rleCount(rleCount) {}
@@ -513,6 +513,9 @@ int64_t Simple8bBuilder<T>::_encodeLargestPossibleWord(uint8_t extensionType) {
             encodedWord = _encode(BaseSelectorEncodeFunctor(), selector, extensionType);
     }
 
+    // While we erase from the front of a vector the number of remaining elements is normally small.
+    // Vector is a less complex data structure than a deque and normally has better performance when
+    // the number of elements in it is low.
     _pendingValues.erase(_pendingValues.begin(), _pendingValues.begin() + integersCoded);
     _currMaxBitLen = kMinDataBits;
     for (const auto& val : _pendingValues) {
