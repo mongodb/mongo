@@ -511,6 +511,9 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
         aggExprsMap.emplace(sbSlot.getId(), std::move(exprPair));
     }
 
+    sbe::value::SlotVector groupBySlots;
+    groupBySlots.push_back(groupBySlot.getId());
+
     sbe::value::SlotVector blockAccArgSlots;
     sbe::value::SlotVector blockAccInternalArgSlots;
 
@@ -522,7 +525,7 @@ std::tuple<SbStage, SbSlotVector, SbSlotVector> SbBuilder::makeBlockHashAgg(
     }
 
     stage = sbe::makeS<sbe::BlockHashAggStage>(std::move(stage),
-                                               groupBySlot.getId(),
+                                               groupBySlots,
                                                selectivityBitmapSlotId,
                                                std::move(blockAccArgSlots),
                                                accInternalSlot.getId(),
