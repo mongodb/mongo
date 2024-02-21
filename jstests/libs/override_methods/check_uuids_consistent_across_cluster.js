@@ -69,8 +69,10 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
         // Read from config.collections, config.shards, and config.chunks to construct a picture
         // of which shards own data for which collections, and what the UUIDs for those collections
         // are.
+        // Create a new connection in case the router was restarted during the test.
+        let mongos = new Mongo(this.s.host);
         let authoritativeCollMetadataArr =
-            this.s.getDB("config")
+            mongos.getDB("config")
                 .chunks
                 .aggregate([
                     {

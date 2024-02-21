@@ -1081,9 +1081,15 @@ MongoRunner.runMongod = function(opts, isMixedVersionCluster = false) {
     }
 
     mongod.commandLine = MongoRunner.arrToOpts(opts);
-    mongod.name = (useHostName ? getHostName() : "localhost") + ":" + mongod.commandLine.port;
+    mongod.hostNoPort = useHostName ? getHostName() : "localhost";
+    mongod.name = mongod.hostNoPort + ":" + mongod.commandLine.port;
     mongod.host = mongod.name;
     mongod.port = parseInt(mongod.commandLine.port);
+    mongod.routerPort =
+        mongod.commandLine.routerPort ? parseInt(mongod.commandLine.routerPort) : undefined;
+    // Connect to the router port of this mongod, if open, with `new Mongo(conn.routerHost)`;
+    mongod.routerHost =
+        (mongod.routerPort) ? mongod.hostNoPort + ":" + mongod.routerPort : undefined;
     mongod.runId = runId || ObjectId();
     mongod.dbpath = fullOptions.dbpath;
     mongod.savedOptions = MongoRunner.savedOptions[mongod.runId];

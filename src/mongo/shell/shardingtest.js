@@ -90,6 +90,10 @@
  *       useAutoBootstrapProcedure {boolean}: Use the auto-bootstrapping procedure on every shard
  *          and config server if set to true.
  *       alwaysUseTestNameForShardName {boolean}: Always use the testname as the name of the shard.
+ *       embeddedRouter {boolean}: Use mongod's embedding routing functionality instead of mongos.
+ *          Each st.s, s0, s1,.... points to the router port of a mongod instead of a dedicated
+ * mongos. Ignores mongosOptions. Chooses `numMongos` mongod nodes from the shards to act as
+ * routers, at random. Incompatible with useBridge.
  *     }
  *   }
  *
@@ -887,8 +891,9 @@ var ShardingTest = function ShardingTest(params) {
                     (tlsOptions.includes(currNode.fullOptions.tlsMode) ||
                      sslOptions.includes(currNode.fullOptions.sslMode));
 
-                const x509AuthRequired = (conn.fullOptions && conn.fullOptions.clusterAuthMode &&
-                                          conn.fullOptions.clusterAuthMode === "x509");
+                const x509AuthRequired =
+                    (this.s.fullOptions && this.s.fullOptions.clusterAuthMode &&
+                     this.s.fullOptions.clusterAuthMode === "x509");
 
                 if (keyFileUsed) {
                     authutil.asCluster(currNode, keyFileUsed, () => {
@@ -934,7 +939,12 @@ var ShardingTest = function ShardingTest(params) {
             MongoRunner.stopMongos(this._unbridgedMongos[n], undefined, opts, waitpid);
             this["s" + n].stop();
         } else {
-            MongoRunner.stopMongos(this["s" + n], undefined, opts, waitpid);
+            let mongos = this["s" + n];
+            // this isn't a real mongos, it's the embedded router of a mongod. Don't do anything.
+            if (mongos.isEmbeddedRouter) {
+                return;
+            }
+            MongoRunner.stopMongos(mongos, undefined, opts, waitpid);
         }
     };
 
@@ -1217,11 +1227,9 @@ var ShardingTest = function ShardingTest(params) {
     let isEmbeddedRouterMode =
         otherParams.hasOwnProperty('embeddedRouter') ? otherParams.embeddedRouter : false;
     isEmbeddedRouterMode = isEmbeddedRouterMode || jsTestOptions().embeddedRouter;
+
     if (isEmbeddedRouterMode) {
-        // TODO (SERVER-84239): Make ShardingTest and ReplSetTest fully support embedded routers.
-        assert(numShards == 1 && isConfigShardMode,
-               "The embedded router mode is currently only supported on a single-shard " +
-                   "cluster in the config shard mode");
+        assert(!otherParams.useBridge, "Embedded router mode is not compatible with mongobridge");
     }
 
     if ("shardAsReplicaSet" in otherParams) {
@@ -1369,10 +1377,56 @@ var ShardingTest = function ShardingTest(params) {
     try {
         const clusterVersionInfo = this.getClusterVersionInfo();
 
+        let startTime = new Date();  // Measure the execution time of startup and initiate.
+        if (!isConfigShardMode) {
+            //
+            // Start up the config server replica set.
+            //
+
+            var rstOptions = {
+                useHostName: otherParams.useHostname,
+                host: hostName,
+                useBridge: otherParams.useBridge,
+                bridgeOptions: otherParams.bridgeOptions,
+                keyFile: this.keyFile,
+                waitForKeys: false,
+                name: testName + "-configRS",
+                seedRandomNumberGenerator: !randomSeedAlreadySet,
+                isConfigServer: true,
+            };
+
+            // always use wiredTiger as the storage engine for CSRS
+            var startOptions = {
+                pathOpts: pathOpts,
+                // Ensure that journaling is always enabled for config servers.
+                configsvr: "",
+                storageEngine: "wiredTiger",
+            };
+
+            if (otherParams.configOptions && otherParams.configOptions.binVersion) {
+                otherParams.configOptions.binVersion =
+                    MongoRunner.versionIterator(otherParams.configOptions.binVersion);
+            }
+
+            startOptions = Object.merge(startOptions, otherParams.configOptions);
+            rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
+
+            var nodeOptions = [];
+            for (var i = 0; i < numConfigs; ++i) {
+                nodeOptions.push(otherParams["c" + i] || {});
+            }
+
+            rstOptions.nodes = nodeOptions;
+
+            // Start the config server's replica set without waiting for it to complete. This allows
+            // it to proceed in parallel with the startup of each shard.
+            this.configRS = new ReplSetTest(rstOptions);
+            this.configRS.startSetAsync(startOptions, false, clusterVersionInfo.isMixedVersion);
+        }
+
         //
         // Start each shard replica set.
         //
-        let startTime = new Date();  // Measure the execution time of startup and initiate.
         for (var i = 0; i < numShards; i++) {
             var setName = testName + "-rs" + i;
 
@@ -1486,6 +1540,11 @@ var ShardingTest = function ShardingTest(params) {
                 seedRandomNumberGenerator: !randomSeedAlreadySet,
                 isConfigServer: setIsConfigSvr,
                 isRouterServer: isEmbeddedRouterMode,
+                // We can have undefined configRS even in embedded router mode if we're the
+                // config-shard and are still starting up. That's OK because the configdb
+                // argument to embedded router isn't needed for mongods in a config shard.
+                configdb: (this.configRS && isEmbeddedRouterMode) ? this.configRS.getURL()
+                                                                  : undefined,
                 useAutoBootstrapProcedure: useAutoBootstrapProcedure,
             });
 
@@ -1499,54 +1558,9 @@ var ShardingTest = function ShardingTest(params) {
                 nodes: rs.startSetAsync(rsDefaults, false, clusterVersionInfo.isMixedVersion),
                 url: rs.getURL()
             };
-        }
-
-        if (isConfigShardMode) {
-            this.configRS = this._rs[0].test;
-        } else {
-            //
-            // Start up the config server replica set.
-            //
-
-            var rstOptions = {
-                useHostName: otherParams.useHostname,
-                host: hostName,
-                useBridge: otherParams.useBridge,
-                bridgeOptions: otherParams.bridgeOptions,
-                keyFile: this.keyFile,
-                waitForKeys: false,
-                name: testName + "-configRS",
-                seedRandomNumberGenerator: !randomSeedAlreadySet,
-                isConfigServer: true,
-            };
-
-            // always use wiredTiger as the storage engine for CSRS
-            var startOptions = {
-                pathOpts: pathOpts,
-                // Ensure that journaling is always enabled for config servers.
-                configsvr: "",
-                storageEngine: "wiredTiger",
-            };
-
-            if (otherParams.configOptions && otherParams.configOptions.binVersion) {
-                otherParams.configOptions.binVersion =
-                    MongoRunner.versionIterator(otherParams.configOptions.binVersion);
+            if (i == 0 && isConfigShardMode) {
+                this.configRS = this._rs[0].test;
             }
-
-            startOptions = Object.merge(startOptions, otherParams.configOptions);
-            rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
-
-            var nodeOptions = [];
-            for (var i = 0; i < numConfigs; ++i) {
-                nodeOptions.push(otherParams["c" + i] || {});
-            }
-
-            rstOptions.nodes = nodeOptions;
-
-            // Start the config server's replica set without waiting for it to complete. This allows
-            // it to proceed in parallel with the startup of each shard.
-            this.configRS = new ReplSetTest(rstOptions);
-            this.configRS.startSetAsync(startOptions, false, clusterVersionInfo.isMixedVersion);
         }
 
         //
@@ -1821,49 +1835,81 @@ var ShardingTest = function ShardingTest(params) {
 
         this._mongos = [];
 
-        // Start the MongoS servers
-        for (var i = 0; i < numMongos; i++) {
-            const options = mongosOptions[i];
-            options.configdb = this._configDB;
+        // Start and connect to the MongoS servers if needed; create connections to the embedded
+        // router ports if not.
+        if (isEmbeddedRouterMode) {
+            print("Connecting to embedded routers...");
+            let allShardNodes = this._rs.map(r => r.test.nodes).flat();
+            const numNodes = allShardNodes.length;
+            assert(numNodes >= numMongos,
+                   'Need at least numMongos total mongod nodes in the cluster');
 
-            if (otherParams.useBridge) {
-                var bridgeOptions =
-                    Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
-                bridgeOptions = Object.merge(bridgeOptions, {
-                    hostName: otherParams.useHostname ? hostName : "localhost",
-                    port: _allocatePortForBridgeForMongos(),
-                    // The mongos processes identify themselves to mongobridge as host:port, where
-                    // the host is the actual hostname of the machine and not localhost.
-                    dest: hostName + ":" + options.port,
-                });
-
-                var bridge = new MongoBridge(bridgeOptions);
+            if (!randomSeedAlreadySet) {
+                Random.setRandomFixtureSeed();
             }
+            let shuffledNodes = Array.shuffle(allShardNodes);
+            let routerNodes = shuffledNodes.slice(0, numMongos);
+            let i = 0;
 
-            var conn = MongoRunner.runMongos(options, clusterVersionInfo.isMixedVersion);
-            if (!conn) {
-                throw new Error("Failed to start mongos " + i);
-            }
-
-            if (otherParams.causallyConsistent) {
-                conn.setCausalConsistency(true);
-            }
-
-            if (otherParams.useBridge) {
-                bridge.connectToBridge();
-                this._mongos.push(bridge);
-                this._unbridgedMongos.push(conn);
-            } else {
+            print("Chose the following nodes to act as embedded routers: " + routerNodes);
+            for (const node of routerNodes) {
+                const conn = MongoRunner.awaitConnection({pid: node.pid, port: node.routerPort});
+                conn.isEmbeddedRouter = true;
+                conn.port = node.routerPort;
                 this._mongos.push(conn);
+                this["s" + i++] = conn;
+                print("Connected to embedded router - this.s" + i + " == mongod with pid " +
+                      node.pid + " listening on routerPort " + node.routerPort);
             }
-
-            if (i === 0) {
-                this.s = this._mongos[i];
-                this.admin = this._mongos[i].getDB('admin');
-                this.config = this._mongos[i].getDB('config');
+            if (i > 0) {
+                this.s = this._mongos[0];
+                this.admin = this._mongos[0].getDB('admin');
+                this.config = this._mongos[0].getDB('config');
             }
+        } else {
+            for (var i = 0; i < numMongos; i++) {
+                const options = mongosOptions[i];
+                options.configdb = this._configDB;
 
-            this["s" + i] = this._mongos[i];
+                if (otherParams.useBridge) {
+                    var bridgeOptions =
+                        Object.merge(otherParams.bridgeOptions, options.bridgeOptions || {});
+                    bridgeOptions = Object.merge(bridgeOptions, {
+                        hostName: otherParams.useHostname ? hostName : "localhost",
+                        port: _allocatePortForBridgeForMongos(),
+                        // The mongos processes identify themselves to mongobridge as host:port,
+                        // where the host is the actual hostname of the machine and not localhost.
+                        dest: hostName + ":" + options.port,
+                    });
+
+                    var bridge = new MongoBridge(bridgeOptions);
+                }
+
+                var conn = MongoRunner.runMongos(options, clusterVersionInfo.isMixedVersion);
+                if (!conn) {
+                    throw new Error("Failed to start mongos " + i);
+                }
+
+                if (otherParams.causallyConsistent) {
+                    conn.setCausalConsistency(true);
+                }
+
+                if (otherParams.useBridge) {
+                    bridge.connectToBridge();
+                    this._mongos.push(bridge);
+                    this._unbridgedMongos.push(conn);
+                } else {
+                    this._mongos.push(conn);
+                }
+
+                if (i === 0) {
+                    this.s = this._mongos[i];
+                    this.admin = this._mongos[i].getDB('admin');
+                    this.config = this._mongos[i].getDB('config');
+                }
+
+                this["s" + i] = this._mongos[i];
+            }
         }
 
         _extendWithShMethods(this);
