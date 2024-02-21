@@ -39,8 +39,11 @@ st.awaitBalancerRound();
 // During balancing, the balancer should catch the IndexNotFound and turn off the balancer for the
 // collection by setting {noBalance : true}.
 assert.soon(() => {
-    return configDB.getCollection('collections').findOne({_id: nss}).noBalance === true;
+    return configDB.getCollection('collections')
+               .findOne({_id: nss}, {}, {readConcern: "majority"})
+               .noBalance === true;
 });
+st.awaitBalancerRound();
 
 // Confirm all chunks remain on shard0.
 assert.eq(0, findChunksUtil.findChunksByNs(configDB, nss, {shard: st.shard1.shardName}).itcount());
