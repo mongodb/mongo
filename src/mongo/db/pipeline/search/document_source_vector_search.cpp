@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 
 #include "mongo/base/string_data.h"
@@ -40,6 +38,8 @@
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/vector_search/filter_validator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 

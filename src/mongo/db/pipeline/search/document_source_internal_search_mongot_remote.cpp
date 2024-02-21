@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 #include "mongo/db/pipeline/search/document_source_internal_search_mongot_remote.h"
 
 #include "mongo/db/curop.h"
@@ -50,6 +48,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/transport_layer.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(failClassicSearch);

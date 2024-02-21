@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 #include "mongo/db/dump_lock_manager_impl.h"
 
 #include "mongo/base/shim.h"
@@ -39,6 +37,8 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
