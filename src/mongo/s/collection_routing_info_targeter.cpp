@@ -560,8 +560,9 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // target an upsert without the full shard key. Else, the query must contain an exact match
     // on the shard key. If we were to target based on the replacement doc, it could result in an
     // insertion even if a document matching the query exists on another shard.
-    if ((!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
+    if ((!feature_flags::gFeatureFlagUpdateOneWithoutShardKey
+              .isEnabledUseLatestFCVWhenUninitialized(
+                  serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
          updateOp.getMulti()) &&
         isUpsert) {
         return targetByShardKey(extractShardKeyFromQuery(shardKeyPattern, *cq),
