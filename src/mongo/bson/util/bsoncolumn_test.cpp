@@ -65,6 +65,12 @@ using namespace mongo::bsoncolumn;
 namespace mongo {
 namespace {
 
+void assertBinaryEqual(BSONBinData finalizedColumn, const BufBuilder& buffer) {
+    ASSERT_EQ(finalizedColumn.type, BinDataType::Column);
+    ASSERT_EQ(finalizedColumn.length, buffer.len());
+    ASSERT_EQ(memcmp(finalizedColumn.data, buffer.buf(), finalizedColumn.length), 0);
+}
+
 class BSONColumnTest : public unittest::Test {
 public:
     BSONElement createBSONColumn(const char* buffer, int size) {
@@ -546,6 +552,7 @@ public:
         }
 
         BSONColumnBuilder reopen(buffer, size);
+        [[maybe_unused]] auto diff = reference.intermediate();
 
         // Verify that the internal state is identical to the reference builder
         reopen.assertInternalStateIdentical_forTest(reference);
@@ -594,64 +601,116 @@ public:
 
         // Verify BSONColumnBuilder::intermediate
         {
-            BufBuilder buffer;
+            // Test intermediate when called between every append to ensure we get the same binary
+            // compared to when no intermediate was used.
+            {
+                BufBuilder buffer;
+                BSONColumnBuilder cb;
+                BSONColumnBuilder reference;
+
+                BSONColumn c(columnBinary);
+                bool empty = true;
+                for (auto&& elem : c) {
+                    cb.append(elem);
+                    reference.append(elem);
+
+                    auto diff = cb.intermediate();
+
+                    ASSERT_GTE(buffer.len(), diff.offset());
+                    buffer.setlen(diff.offset());
+                    buffer.appendBuf(diff.data(), diff.size());
+                    empty = false;
+                }
+
+                // If there was nothing in the column, we need to make sure at least one
+                // intermediate was called
+                if (empty) {
+                    auto diff = cb.intermediate();
+                    ASSERT_EQ(diff.offset(), 0);
+                    buffer.appendBuf(diff.data(), diff.size());
+                }
+
+                // Compare the binary with one obtained using finalize
+                assertBinaryEqual(reference.finalize(), buffer);
+            }
+
+            // Test intermediate when called between every other append to ensure we get the same
+            // binary compared to when no intermediate was used.
+            {
+                BufBuilder buffer;
+                BSONColumnBuilder cb;
+                BSONColumnBuilder reference;
+
+                BSONColumn c(columnBinary);
+
+                int num = 0;
+                for (auto it = c.begin(); it != c.end(); ++it, ++num) {
+                    cb.append(*it);
+                    reference.append(*it);
+
+                    if (num % 2 == 1)
+                        continue;
+
+                    auto diff = cb.intermediate();
+
+                    ASSERT_GTE(buffer.len(), diff.offset());
+                    buffer.setlen(diff.offset());
+                    buffer.appendBuf(diff.data(), diff.size());
+                }
+
+                // One last intermediate to ensure all data is put into binary
+                auto diff = cb.intermediate();
+                ASSERT_GTE(buffer.len(), diff.offset());
+                buffer.setlen(diff.offset());
+                buffer.appendBuf(diff.data(), diff.size());
+
+                // Compare the binary with one obtained using finalize
+                assertBinaryEqual(reference.finalize(), buffer);
+            }
+
+            // Divide the range into two blocks where intermediate is called in between. We do all
+            // combinations of dividing the ranges so this test has quadratic complexity. Limit it
+            // to binaries with a limited number of elements.
             size_t num = BSONColumn(columnBinary).size();
-            // This test has quadratic complexity, limit it to binaries with a limited number of
-            // elements.
             if (num > 0 && num < 100) {
                 // Iterate over all elements and validate intermediate in all combinations
                 for (size_t i = 1; i < num; ++i) {
+                    BufBuilder buffer;
                     BSONColumnBuilder cb;
+                    BSONColumnBuilder reference;
 
                     // Append initial data to our builder
                     BSONColumn c(columnBinary);
                     auto it = c.begin();
                     for (size_t j = 0; j < i; ++j, ++it) {
                         cb.append(*it);
+                        reference.append(*it);
                     }
 
-                    // Call intermediate and obtain our anchor points
-                    auto [anchor1, anchor2] = cb.intermediate(buffer);
-                    ASSERT_GTE(anchor1, 0);
-                    ASSERT_LTE(anchor1, buffer.len());
-                    ASSERT_GTE(anchor2, 0);
-                    ASSERT_LTE(anchor2, buffer.len());
-                    ASSERT_LTE(anchor1, anchor2);
+                    // Call intermediate to obtain the initial binary
+                    auto diff = cb.intermediate();
+                    ASSERT_EQ(diff.offset(), 0);
+                    buffer.appendBuf(diff.data(), diff.size());
 
-                    // Append the rest of the data and verify that the anchor points from before.
+                    // Append the rest of the data
                     BufBuilder buffer2;
                     for (size_t j = i; j < num; ++j, ++it) {
                         cb.append(*it);
-
-                        // Validate anchor points when we've appended more data.
-                        cb.intermediate(buffer2);
-                        ASSERT(memcmp(buffer.buf(), buffer2.buf(), anchor1) == 0);
-                        if (*(buffer.buf() + anchor1) == *(buffer2.buf() + anchor1)) {
-                            ASSERT(memcmp(buffer.buf(), buffer2.buf(), anchor2) == 0);
-                        }
+                        reference.append(*it);
                     }
+
+                    // Call intermediate to obtain rest of the binary
+                    diff = cb.intermediate();
+                    // Start writing at the provided offset
+                    ASSERT_GTE(buffer.len(), diff.offset());
+                    buffer.setlen(diff.offset());
+                    buffer.appendBuf(diff.data(), diff.size());
 
                     // We should now have added all our data.
                     ASSERT(it == c.end());
 
-                    // Finalize the binary, we are now done. Perform one last validation of the
-                    // anchor points
-                    BSONBinData binary = cb.finalize();
-                    ASSERT_GTE(binary.length, anchor1);
-                    auto data = buffer.buf();
-                    auto res = memcmp(binary.data, data, anchor1);
-                    ASSERT(res == 0);
-
-                    if (*(data + anchor1) == *((const char*)binary.data + anchor1)) {
-                        auto res = memcmp(binary.data, data, anchor2);
-                        ASSERT(res == 0);
-                    }
-
-                    // Last verify that the final binary is exactly the same as-if intermediate was
-                    // never called.
-                    ASSERT_EQ(binary.length, columnBinary.length);
-                    res = memcmp(binary.data, columnBinary.data, binary.length);
-                    ASSERT(res == 0);
+                    // Compare the binary with one obtained using finalize
+                    assertBinaryEqual(reference.finalize(), buffer);
                 }
             }
         }
@@ -1206,6 +1265,29 @@ TEST_F(BSONColumnTest, ValueAfterSkip) {
     verifyDecompression(binData, {BSONElement(), elem}, true);
 }
 
+TEST_F(BSONColumnTest, MultipleSimple8bBlocksAfterControl) {
+    BSONColumnBuilder cb;
+
+    std::vector<BSONElement> elems;
+    for (int i = 0; i < 100; ++i) {
+        elems.push_back(createElementInt64(i % 2));
+    }
+
+    for (auto&& elem : elems) {
+        cb.append(elem);
+    }
+
+
+    BufBuilder expected;
+    appendLiteral(expected, elems.front());
+    appendSimple8bControl(expected, 0b1000, 0b0100);
+    appendSimple8bBlocks64(expected, deltaInt64(elems.begin() + 1, elems.end(), elems.front()), 5);
+    appendEOO(expected);
+
+    auto binData = cb.finalize();
+    verifyBinary(binData, expected);
+    verifyDecompression(binData, elems, true);
+}
 
 TEST_F(BSONColumnTest, LargeDeltaIsLiteral) {
     BSONColumnBuilder cb;
@@ -6969,62 +7051,104 @@ TEST_F(BSONColumnTest, AppendArrayDirectly) {
 TEST_F(BSONColumnTest, Intermediate) {
     // Verify that the intermediate function works as expected
     BSONColumnBuilder cb;
-    BSONColumnBuilder cb2;
+    BSONColumnBuilder reference;
 
     // Various elements
-    std::vector<BSONElement> elems = {
-        createElementInt32(1),
-        createElementInt32(1),
-        createElementInt32(5),
-        createElementDouble(5),
-        createElementInt32(2),
-        createElementObj(BSON("x" << 1 << "y" << 2)),
-        createElementObj(BSON("x" << 4)),
-        createElementObj(BSON("x" << 4 << "y" << 1)),
-        createElementInt32(2),
-        createElementObj(BSON("x" << 1 << "y" << 1)),
-        createElementObj(BSON("x" << 1)),
-        createElementObj(BSON("x" << 1)),
-    };
+    std::vector<BSONElement> elems = {createElementDouble(1.0),
+                                      createElementDouble(2.0),
+                                      BSONElement(),
+                                      createElementDouble(2.1),
+                                      createElementDouble(2.2),
+                                      createElementDouble(1.1),
+                                      createElementDouble(2.1),
+                                      BSONElement(),
+                                      createElementDouble(2.2),
+                                      createElementDouble(2.3),
+                                      createElementDouble(3.12345678),
+                                      createElementDouble(1.12345671),
+                                      createElementDouble(1.12345672),
+                                      createElementDouble(2),
+                                      createElementDouble(3),
+                                      createElementDouble(94.8),
+                                      createElementDouble(107.9),
+                                      createElementDouble(111.9),
+                                      createElementDouble(113.4),
+                                      createElementDouble(89.0),
+                                      createElementDouble(126.7),
+                                      createElementDouble(119.0),
+                                      createElementDouble(105.0),
+                                      createElementDouble(120.0),
+                                      createElementDouble(1.12345671),
+                                      createElementDouble(2),
+                                      BSONElement(),
+                                      BSONElement(),
+                                      createElementDouble(3),
+                                      createElementDouble(1.12345671),
+                                      createElementDouble(1.12345672),
+                                      createElementDouble(2),
+                                      createElementDouble(3),
+                                      createElementDouble(1.12345672),
+                                      createElementDouble(1.12345671),
+                                      createElementDouble(2),
+                                      BSONElement(),
+                                      BSONElement(),
+                                      createElementDouble(1.12345671),
+                                      createElementDouble(116.0),
+                                      createElementDouble(95.0),
+                                      createElementDouble(80.0),
+                                      createElementDouble(87.0),
+                                      createElementDouble(113.0),
+                                      createElementDouble(90.0),
+                                      createElementDouble(113.0),
+                                      createElementDouble(93.0),
+                                      createElementDouble(99.0),
+                                      createElementDouble(123.0),
+                                      createElementDouble(89.0),
+                                      createElementDouble(92.0)};
 
-    std::vector<BufBuilder> anchors;
 
-    int prevAnchor = 0;
     {
-        int a;
-        BufBuilder buffer;
-        std::tie(prevAnchor, a) = cb.intermediate(buffer);
-        ASSERT_EQ(buffer.len(), 1);
-        ASSERT_EQ(*buffer.buf(), '\0');
-        ASSERT_EQ(prevAnchor, 0);
+        auto diff = cb.intermediate();
+        ASSERT_EQ(diff.size(), 1);
+        ASSERT_EQ(*diff.data(), '\0');
+        ASSERT_EQ(diff.offset(), 0);
     }
 
-
+    BufBuilder buffer;
+    // Vector of reopen builders, we will reopen all intermediate binaries and continue appending to
+    // make sure they all produce the same binaries in the end.
+    std::vector<std::pair<BSONColumnBuilder, BufBuilder>> reopenBuilders;
     for (auto&& elem : elems) {
+        // Append element to all builders, inclusive our reopenBuilders
         cb.append(elem);
-        cb2.append(elem);
+        reference.append(elem);
 
-        BufBuilder buffer;
-        auto [anchor, anchor2] = cb.intermediate(buffer);
-        anchors.emplace_back();
-        anchors.back().appendBuf(buffer.buf(), anchor);
-        // Anchor is always less than the final buffer because of the EOO at the end
-        ASSERT_LT(anchor, buffer.len());
-        // Anchor should increase or stay the same when appending
-        ASSERT_GTE(anchor, prevAnchor);
-        prevAnchor = anchor;
+        auto diff = cb.intermediate();
+        ASSERT_GTE(buffer.len(), diff.offset());
+        buffer.setlen(diff.offset());
+        buffer.appendBuf(diff.data(), diff.size());
+
+        // Perform the same intermediate on the builders that was reopened
+        for (auto&& reopen : reopenBuilders) {
+            reopen.first.append(elem);
+            auto d = reopen.first.intermediate();
+            reopen.second.setlen(d.offset());
+            reopen.second.appendBuf(d.data(), d.size());
+        }
+
+        // Reopen this binary
+        BufBuilder reopenBuf;
+        reopenBuf.appendBuf(buffer.buf(), buffer.len());
+        reopenBuilders.push_back(
+            std::make_pair(BSONColumnBuilder(buffer.buf(), buffer.len()), std::move(reopenBuf)));
     }
-    ASSERT_GT(prevAnchor, 0);
 
-    // Verify that the binaries are exactly the same even if intermediate is called
-    auto binData = cb.finalize();
-    auto binData2 = cb2.finalize();
-    ASSERT_EQ(binData.length, binData2.length);
-    ASSERT_EQ(memcmp(binData.data, binData2.data, binData.length), 0);
+    // Verify that the binaries are exactly compared to a builder using finalize
+    auto binData = reference.finalize();
 
-    // Validate that no data changed before the returned anchor
-    for (auto&& anchor : anchors) {
-        ASSERT_EQ(memcmp(binData.data, anchor.buf(), anchor.len()), 0);
+    assertBinaryEqual(binData, buffer);
+    for (auto&& reopen : reopenBuilders) {
+        assertBinaryEqual(binData, reopen.second);
     }
 }
 

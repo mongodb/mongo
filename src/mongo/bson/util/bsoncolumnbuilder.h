@@ -171,8 +171,11 @@ public:
 
     /**
      * Initializes this BSONColumnBuilder from a BSONColumn binary. Leaves the BSONColumnBuilder in
-     * a state as-if the contents of the BSONColumn have been appended to it without calling
-     * finalize(). This allows for efficient appending of new data to this BSONColumn.
+     * a state as-if the contents of the BSONColumn have been appended to it and intermediate() has
+     * been called. This allows for efficient appending of new data to this BSONColumn and
+     * calculating binary diffs using intermediate() of this data.
+     *
+     * finalize() may not be used after this constructor.
      */
     BSONColumnBuilder(const char* binary, int size);
 
@@ -209,29 +212,63 @@ public:
     BSONColumnBuilder& skip();
 
     /**
-     * Returns a BSON Column binary and leaves the BSONColumnBuilder in a state where it is allowed
-     * to continue append data to it. Less efficient than 'finalize'.
+     * Returns a BSON Column binary diff relative to previous intermediate() call(s). Leaves the
+     * BSONColumnBuilder in a state where it is allowed to continue append data to it. Less
+     * efficient than producing than 'finalize' when used to produce full binaries.
      *
-     * Two anchor points are returned. These are relevant to comparing the buffer returned from this
-     * call with the buffer returned from a subsequent call to intermediate()/finalize(). The first
-     * anchor is the stable anchor point where there is a guarantee that no bytes prior to that
-     * index change in the buffer.
-     *
-     * The second anchor point is potentially stable, but the second caller of
-     * intermediate()/finalize() needs to determine this by comparing that the byte at the first
-     * (stable) is unchanged in the second output buffer compared to the first.
-     *
-     * Bytes after the anchor point(s) may remain unchanged depending on what data is appended
-     * afterwards.
-     *
-     * Overwrites data into the provided buffer.
+     * May not be called after finalize() has been called.
      */
-    std::pair<int, int> intermediate(BufBuilder& buffer);
+    class [[nodiscard]] BinaryDiff {
+    public:
+        BinaryDiff(SharedBuffer buffer, int bufferSize, int readOffset, int writeOffset)
+            : _buffer(std::move(buffer)),
+              _bufferSize(bufferSize),
+              _readOffset(readOffset),
+              _writeOffset(writeOffset) {}
+
+        /**
+         * Binary data in this diff to be changed after the offset point.
+         *
+         * This BinaryDiff must remain in scope for this pointer to be valid.
+         */
+        const char* data() const {
+            return _buffer.get() + _readOffset;
+        }
+
+        /**
+         * Size of binary data in this diff
+         */
+        int size() const {
+            return _bufferSize - _readOffset;
+        }
+
+        /**
+         * Absolute location in binaries obtained from previous intermediate() calls where this diff
+         * should be applied.
+         *
+         * Returns 0 the first time intermediate() has been called.
+         */
+        int offset() const {
+            return _writeOffset;
+        }
+
+    private:
+        SharedBuffer _buffer;
+        int _bufferSize;
+        int _readOffset;
+        int _writeOffset;
+    };
+
+    BinaryDiff intermediate();
 
     /**
-     * Finalizes the BSON Column and returns the BinData binary. Further data append is not allowed.
+     * Finalizes the BSON Column and returns the full BSONColumn binary. Further data append is not
+     * allowed.
      *
-     * The BSONColumnBuilder must remain in scope for the pointer to be valid.
+     * The BSONColumnBuilder must remain in scope for the data to be valid.
+     *
+     * May not be called after intermediate() or the constructor that initializes the builder from a
+     * previous binary.
      */
     BSONBinData finalize();
 
@@ -279,6 +316,8 @@ private:
      * finalize.
      */
     struct InternalState {
+        InternalState();
+
         Mode mode = Mode::kRegular;
 
         // Encoding state for kRegular mode
@@ -327,6 +366,12 @@ private:
 
         // Helper to flatten Object to compress to match _subobjStates
         std::vector<BSONElement> flattenedAppendedObj;
+
+        // Current offset of the binary relative to previous intermediate() calls.
+        int offset = 0;
+
+        // Finalized state of last control byte written out by the previous intermediate() call.
+        uint8_t lastControl;
     };
 
     // Internal helper to perform reopen/initialization of this class from a BSONColumn binary.
@@ -353,8 +398,6 @@ private:
     BufBuilder _bufBuilder;
 
     int _numInterleavedStartWritten = 0;
-
-    bool _finalized = false;
 };
 
 }  // namespace mongo

@@ -50,6 +50,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_operation_source.h"
@@ -855,11 +856,25 @@ BSONObj buildCompressedBucketDataFieldDocEfficiently(
     BSONObjBuilder dataBuilder = bucketBuilder.subobjStart(kBucketDataFieldName);
     for (boost::optional<std::string> key = batchBuilders.begin(); key != boost::none;
          key = batchBuilders.next()) {
+        // TODO SERVER-79416: This is a naive implementation that simulates the old behavior
+        // when intermediate produced full binaries. Finalize is used to produce the binary and then
+        // the data is re-appended using a new BSONColumnBuilder so it is left in an appendable
+        // state.
         BSONColumnBuilder& dataFieldColumnBuilder = batchBuilders.getBuilder(*key);
-        BufBuilder buf;
-        std::pair<int, int> anchors = dataFieldColumnBuilder.intermediate(buf);
-        offsets[*key] = anchors.first;
-        dataBuilder.append(*key, BSONBinData(buf.buf(), buf.len(), BinDataType::Column));
+        // Swap out the builders so the finalize data remain valid while we iterate over it and
+        // re-append.
+        BSONColumnBuilder oldBuilder;
+        std::swap(oldBuilder, dataFieldColumnBuilder);
+
+        BSONBinData columnBinary = oldBuilder.finalize();
+        dataBuilder.append(*key, columnBinary);
+
+        BSONColumn c(columnBinary);
+        for (auto&& elem : c) {
+            dataFieldColumnBuilder.append(elem);
+        }
+
+        offsets[*key] = 0;
     }
     dataBuilder.done();
 

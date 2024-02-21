@@ -38,8 +38,16 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
         int binLength = 0;
         const char* binData = columnValue.binData(binLength);
         // TODO(SERVER-84234): Handle BSONColumnConstructor throwing.
-        _builders.emplace(key,
-                          std::make_pair(numMeasurements, BSONColumnBuilder(binData, binLength)));
+        // TODO SERVER-79416: Use BSONColumnBuilder reopen constructor. It leaves the builder in a
+        // diff-producing state so this needs to be integrated together with the intermediate()
+        // call.
+        auto [it, inserted] =
+            _builders.emplace(key, std::make_pair(numMeasurements, BSONColumnBuilder()));
+        BSONColumn c(binData, binLength);
+        for (auto&& elem : c) {
+            it->second.second.append(elem);
+        }
+
         _insertionOrder.emplace_back(key);
         _insertionOrderSize += key.size();
     }
