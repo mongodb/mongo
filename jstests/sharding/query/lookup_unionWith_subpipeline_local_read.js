@@ -131,7 +131,8 @@ function assertProfilerEntriesMatch(expected, comment, pipeline) {
                     {"command.aggregate": {$eq: foreignNs}},
                     {"command.aggregate": {$eq: foreign.getName()}}
                 ],
-                "command.comment": comment
+                "command.comment": comment,
+                "errName": {$ne: "StaleConfig"}
             };
             if (expected.subPipelineRemote[i]) {
                 profilerHasAtLeastOneMatchingEntryOrThrow({

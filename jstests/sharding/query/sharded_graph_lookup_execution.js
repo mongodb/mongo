@@ -20,10 +20,6 @@ import {profilerHasNumMatchingEntriesOrThrow} from "jstests/libs/profiler.js";
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
-// TODO SERVER-77915 remove feature flag
-const isTrackUnshardedEnabled = FeatureFlagUtil.isPresentAndEnabled(
-    st.s.getDB('admin'), "TrackUnshardedCollectionsOnShardingCatalog");
-
 const testName = "sharded_graph_lookup";
 
 const mongosDB = st.s0.getDB(testName);
@@ -101,6 +97,7 @@ function assertGraphLookupExecution(pipeline, opts, expectedResults, executionLi
                         "command.comment": opts.comment,
                         "command.pipeline.$graphLookup": {$exists: !isLookup},
                         "command.pipeline.$lookup": {$exists: isLookup},
+                        "errName": {$ne: "StaleConfig"}
                     },
                     numExpectedMatches: exec.toplevelExec[shard]
                 });
@@ -118,7 +115,8 @@ function assertGraphLookupExecution(pipeline, opts, expectedResults, executionLi
                                         .find({
                                             "command.aggregate": fromCollName,
                                             "command.comment": opts.comment,
-                                            "command.fromMongos": exec.mongosMerger === true
+                                            "command.fromMongos": exec.mongosMerger === true,
+                                            "errName": {$ne: "StaleConfig"}
                                         })
                                         .itcount();
             assert.eq(localReadCount + remoteReadCount,
@@ -331,7 +329,7 @@ assertGraphLookupExecution(pipeline, {comment: "sharded_to_sharded_to_unsharded"
         // the rest can be done via a local read. The $graphLookups cannot share a cache because
         // they run indepedently.
         toplevelExec: [0, 0],
-        recursiveMatchExec: [isTrackUnshardedEnabled ? 7 : 6, 0]
+        recursiveMatchExec: [6, 0]
     }
 ]);
 

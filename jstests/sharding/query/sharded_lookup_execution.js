@@ -120,7 +120,8 @@ function assertLookupExecution(pipeline, opts, expected) {
                 filter: {
                     "command.aggregate": reviewsColl.getName(),
                     "command.comment": opts.comment,
-                    "command.fromMongos": expected.mongosMerger === true
+                    "command.fromMongos": expected.mongosMerger === true,
+                    "errName": {$ne: "StaleConfig"}
                 },
                 numExpectedMatches: expected.subpipelineExec[i]
             });
@@ -141,7 +142,8 @@ function assertLookupExecution(pipeline, opts, expected) {
                     filter: {
                         "command.aggregate": reviewsColl.getName(),
                         "command.comment": opts.comment,
-                        "command.fromMongos": expected.mongosMerger === true
+                        "command.fromMongos": expected.mongosMerger === true,
+                        "errName": {$ne: "StaleConfig"}
                     },
                     numExpectedMatches: expected.subpipelineExec[i]
                 });
@@ -168,8 +170,11 @@ function assertLookupExecution(pipeline, opts, expected) {
             // Confirm that the nested $lookup subpipeline execution is as expected.
             profilerHasNumMatchingEntriesOrThrow({
                 profileDB: shardList[i],
-                filter:
-                    {"command.aggregate": updatesColl.getName(), "command.comment": opts.comment},
+                filter: {
+                    "command.aggregate": updatesColl.getName(),
+                    "command.comment": opts.comment,
+                    "errName": {$ne: "StaleConfig"}
+                },
                 numExpectedMatches: expected.nestedExec[i]
             });
         }
