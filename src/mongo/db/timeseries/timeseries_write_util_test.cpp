@@ -78,9 +78,8 @@ protected:
         bucket_catalog::BucketId bucketId(uuid, oid);
         std::uint8_t stripe = 0;
         auto opId = 0;
-        bucket_catalog::ExecutionStats globalStats;
         auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
-        bucket_catalog::ExecutionStatsController stats(collectionStats, globalStats);
+        bucket_catalog::ExecutionStatsController stats(collectionStats, _globalStats);
         return std::make_shared<bucket_catalog::WriteBatch>(
             bucket_catalog::BucketHandle{bucketId, stripe},
             bucket_catalog::BucketKey{uuid, bucketMetadata},
@@ -88,6 +87,9 @@ protected:
             stats,
             kTimeseriesOptions.getTimeField());
     }
+
+private:
+    bucket_catalog::ExecutionStats _globalStats;
 };
 
 TEST_F(TimeseriesWriteUtilTest, MakeNewBucketFromWriteBatch) {
