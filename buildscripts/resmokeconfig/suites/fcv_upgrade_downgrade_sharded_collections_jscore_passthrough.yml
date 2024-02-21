@@ -189,6 +189,8 @@ selector:
   - featureFlagQuerySettings
   # TODO: SERVER-66393 Remove Feature Flag for PM-2919.
   - featureFlagTimeseriesUpdatesSupport
+  # TODO: SERVER-78068 Remove Feature Flag for PM-2983
+  - featureFlagRecordIdsReplicated
   # Transactions are aborted upon fcv upgrade or downgrade.
   - uses_transactions
   # Exclude tests that require a specific fcv.
