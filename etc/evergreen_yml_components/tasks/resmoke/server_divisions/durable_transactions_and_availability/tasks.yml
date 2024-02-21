@@ -1119,7 +1119,7 @@ tasks:
         --fuzzMongodConfigs=normal
         --fuzzMongosConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
-      use_large_distro: "true"
+      use_xlarge_distro: "true"
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template

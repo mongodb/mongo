@@ -643,6 +643,7 @@ buildvariants:
     scons_cache_scope: shared
     separate_debug: off
     large_distro_name: rhel80-xlarge
+    xlarge_distro_name: rhel80-xxlarge
     core_analyzer_distro_name: rhel80-xlarge
     multiversion_platform: rhel80
     multiversion_edition: enterprise
