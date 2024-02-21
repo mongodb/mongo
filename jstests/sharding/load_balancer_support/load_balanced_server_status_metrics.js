@@ -7,8 +7,8 @@
  * ]
  */
 
-const kProxyIngressPort = 22064;
-const kProxyEgressPort = 22065;
+const kProxyIngressPort = allocatePort();
+const kProxyEgressPort = allocatePort();
 const kProxyVersion = 2;
 
 if (_isWindows()) {

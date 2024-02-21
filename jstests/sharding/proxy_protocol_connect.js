@@ -42,8 +42,8 @@ function testProxyProtocolConnectFailure(lbPort, sendLoadBalanced) {
     st.stop();
 }
 
-const ingressPort = 21234;
-const egressPort = 21235;
+const ingressPort = allocatePort();
+const egressPort = allocatePort();
 
 testProxyProtocolConnect(ingressPort, egressPort, 1);
 testProxyProtocolConnect(ingressPort, egressPort, 2);
