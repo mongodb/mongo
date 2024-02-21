@@ -1168,33 +1168,12 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     return nextAction;
 }
 
-OpTime TopologyCoordinator::_getMemberOpTimeForRecencyCheck(const MemberData& memberData,
-                                                            bool durablyWritten) {
-    OpTime memberOpTime;
-
-    // For j: true case use min(lastDurable, lastApplied) because oplog entries being
-    // durable no longer implies being applied, but we'd like to have numbered and
-    // tagged write concerns support the read-your-write semantics.
-    if (feature_flags::gReduceMajorityWriteLatency.isEnabled(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        memberOpTime = durablyWritten
-            ? std::min(memberData.getLastDurableOpTime(), memberData.getLastAppliedOpTime())
-            : memberData.getLastAppliedOpTime();
-    } else {
-        memberOpTime =
-            durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
-    }
-
-    return memberOpTime;
-}
-
 bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
                                                     int numNodes,
                                                     bool durablyWritten) {
     // Replication progress that is for some reason ahead of us should not allow us to
     // satisfy a write concern if we aren't caught up ourselves.
-    OpTime myOpTime = _getMemberOpTimeForRecencyCheck(_selfMemberData(), durablyWritten);
-
+    OpTime myOpTime = durablyWritten ? getMyLastDurableOpTime() : getMyLastAppliedOpTime();
     if (myOpTime < targetOpTime) {
         return false;
     }
@@ -1213,7 +1192,8 @@ bool TopologyCoordinator::haveNumNodesReachedOpTime(const OpTime& targetOpTime,
             continue;
         }
 
-        OpTime memberOpTime = _getMemberOpTimeForRecencyCheck(memberData, durablyWritten);
+        const OpTime& memberOpTime =
+            durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
 
         // In addition to checking if a member has a greater/equal timestamp field we also need to
         // make sure that the memberOpTime is in the same term as the OpTime we wait for. If a
@@ -1248,8 +1228,9 @@ TopologyCoordinator::MemberPredicate TopologyCoordinator::makeOpTimePredicate(co
     // OpTime has been replicated.
     invariant(opTime.getTerm() == getMyLastAppliedOpTime().getTerm());
 
-    return [this, opTime, durablyWritten](const MemberData& memberData) {
-        OpTime memberOpTime = _getMemberOpTimeForRecencyCheck(memberData, durablyWritten);
+    return [=](const MemberData& memberData) {
+        auto memberOpTime =
+            durablyWritten ? memberData.getLastDurableOpTime() : memberData.getLastAppliedOpTime();
 
         // In addition to checking if a member has a greater/equal timestamp field we also need to
         // make sure that the memberOpTime is in the same term as the OpTime we wait for. If a
