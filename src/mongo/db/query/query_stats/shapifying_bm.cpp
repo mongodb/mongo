@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
@@ -99,6 +100,7 @@ void BM_ShapfiyIDHack(benchmark::State& state) {
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("query_test");
 
+    serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     auto opCtx = client->makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
     auto fcr = std::make_unique<FindCommandRequest>(expCtx->ns);
@@ -117,6 +119,7 @@ void BM_ShapfiyMildlyComplex(benchmark::State& state) {
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("query_test");
 
+    serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     auto opCtx = client->makeOperationContext();
     auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get());
     auto fcr = std::make_unique<FindCommandRequest>(expCtx->ns);
