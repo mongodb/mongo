@@ -614,7 +614,7 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
     OperationContext* opCtx, ShardFactory* shardFactory) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    auto readConcern = repl::ReadConcernLevel::kMajorityReadConcern;
+    auto readConcern = repl::ReadConcernLevel::kSnapshotReadConcern;
 
     // ShardRemote requires a majority read. We can only allow a non-majority read if we are a
     // config server.
