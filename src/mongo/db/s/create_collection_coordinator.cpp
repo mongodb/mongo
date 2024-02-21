@@ -51,6 +51,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -468,6 +469,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             false /* throwIfReasonDiffers */);
 
                     _result = createCollectionResponseOpt;
+
+                    // Checkpoint configTime in order to preserve causality of operations in case of
+                    // a stepdown.
+                    VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
+
                     return;
                 }
 
@@ -878,6 +884,9 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
         throw;
     }
+
+    // Checkpoint configTime in order to preserve causality of operations in case of a stepdown.
+    VectorClockMutable::get(opCtx)->waitForDurable().get(opCtx);
 
     // Best effort refresh to warm up cache of all involved shards so we can have a cluster ready to
     // receive operations.
