@@ -76,7 +76,7 @@ public:
      */
     void initBuilders(BSONObj bucketDataDocWithCompressedBuilders, size_t numMeasurements);
 
-    BSONColumnBuilder& getBuilder(std::string key) {
+    BSONColumnBuilder& getBuilder(const std::string& key) {
         return _builders[key].second;
     }
 
