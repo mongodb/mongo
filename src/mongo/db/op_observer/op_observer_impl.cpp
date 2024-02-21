@@ -617,7 +617,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
     const size_t count = end - begin;
     // Either no recordIds were passed in, or the number passed in is equal to the number
     // of inserts that happened.
-    invariant(!recordIds.size() || recordIds.size() == count,
+    invariant(recordIds.empty() || recordIds.size() == count,
               str::stream() << "recordIds' size: " << recordIds.size()
                             << ", is non-empty but not equal to count: " << count);
 
@@ -640,7 +640,7 @@ std::vector<repl::OpTime> _logInsertOps(OperationContext* opCtx,
             insertStatementOplogSlot = operationLogger->getNextOpTimes(opCtx, 1U)[0];
         }
         const auto docKey = getDocumentKey(collectionPtr, begin[i].doc).getShardKeyAndId();
-        if (recordIds.size()) {
+        if (!recordIds.empty()) {
             oplogEntry.setRecordId(recordIds[i]);
         }
         oplogEntry.setObject(begin[i].doc);
@@ -753,6 +753,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     if (inBatchedWrite) {
         invariant(!defaultFromMigrate);
 
+        size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
@@ -760,6 +761,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 shardingWriteRouter->getReshardingDestinedRecipient(iter->doc));
 
             operation.setFromMigrateIfTrue(fromMigrate[std::distance(first, iter)]);
+            if (!recordIds.empty()) {
+                operation.setRecordId(recordIds[i++]);
+            }
 
             batchedWriteContext.addBatchedOperation(opCtx, operation);
         }
@@ -777,9 +781,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
+        size_t i = 0;
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = getDocumentKey(coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
+            if (!recordIds.empty()) {
+                operation.setRecordId(recordIds[i++]);
+            }
             if (inRetryableInternalTransaction) {
                 operation.setInitializedStatementIds(iter->stmtIds);
             }
