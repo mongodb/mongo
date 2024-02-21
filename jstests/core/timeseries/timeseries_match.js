@@ -201,6 +201,36 @@ TimeseriesTest.run((insert) => {
             usesBlockProcessing: false
         },
         {pred: {$expr: {$lt: [101, "$topLevelScalar"]}}, ids: [0, 1], usesBlockProcessing: false},
+        {
+            pred: {$expr: {$lt: [new Date(datePrefix + 300), "$time"]}},
+            ids: [3, 4],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {$expr: {$lte: [new Date(datePrefix + 300), "$time"]}},
+            ids: [2, 3, 4],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {$expr: {$gt: [new Date(datePrefix + 300), "$time"]}},
+            ids: [0, 1],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {$expr: {$gte: [new Date(datePrefix + 300), "$time"]}},
+            ids: [0, 1, 2],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {$expr: {$eq: [new Date(datePrefix + 300), "$time"]}},
+            ids: [2],
+            usesBlockProcessing: true
+        },
+        {
+            pred: {$expr: {$ne: [new Date(datePrefix + 300), "$time"]}},
+            ids: [0, 1, 3, 4],
+            usesBlockProcessing: true
+        },
 
         {
             pred: {

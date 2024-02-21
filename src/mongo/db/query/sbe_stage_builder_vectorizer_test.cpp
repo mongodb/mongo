@@ -229,8 +229,6 @@ TEST(VectorizerTest, ConvertDateDiff) {
 }
 
 TEST(VectorizerTest, ConvertGt) {
-    auto tree1 = make<BinaryOp>(Operations::Gt, make<Variable>("inputVar"), Constant::int32(9));
-
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;
     bindings.emplace(
@@ -238,75 +236,278 @@ TEST(VectorizerTest, ConvertGt) {
         std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
                        boost::none));
 
-    auto processed =
-        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+    {
+        auto tree1 = make<BinaryOp>(Operations::Gt, make<Variable>("inputVar"), Constant::int32(9));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
 
-    ASSERT_TRUE(processed.expr.has_value());
-    ASSERT_EXPLAIN_BSON_AUTO(
-        "{\n"
-        "    nodeType: \"FunctionCall\", \n"
-        "    name: \"valueBlockGtScalar\", \n"
-        "    arguments: [\n"
-        "        {\n"
-        "            nodeType: \"Variable\", \n"
-        "            name: \"inputVar\"\n"
-        "        }, \n"
-        "        {\n"
-        "            nodeType: \"Const\", \n"
-        "            tag: \"NumberInt32\", \n"
-        "            value: 9\n"
-        "        }\n"
-        "    ]\n"
-        "}\n",
-        *processed.expr);
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockGtScalar\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+    {
+        auto tree1 = make<BinaryOp>(Operations::Gt, Constant::int32(9), make<Variable>("inputVar"));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockLtScalar\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
 }
 
 TEST(VectorizerTest, ConvertGtOnCell) {
-    auto tree1 = make<BinaryOp>(Operations::Gt, make<Variable>("inputVar"), Constant::int32(9));
-
     sbe::value::FrameIdGenerator generator;
     Vectorizer::VariableTypes bindings;
     bindings.emplace("inputVar"_sd,
                      std::make_pair(TypeSignature::kCellType.include(TypeSignature::kAnyScalarType),
                                     boost::none));
 
-    auto processed =
-        Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(tree1, bindings, boost::none);
+    {
+        auto tree1 = make<BinaryOp>(Operations::Gt, make<Variable>("inputVar"), Constant::int32(9));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
 
-    ASSERT_TRUE(processed.expr.has_value());
-    ASSERT_EXPLAIN_BSON_AUTO(
-        "{\n"
-        "    nodeType: \"FunctionCall\", \n"
-        "    name: \"cellFoldValues_F\", \n"
-        "    arguments: [\n"
-        "        {\n"
-        "            nodeType: \"FunctionCall\", \n"
-        "            name: \"valueBlockGtScalar\", \n"
-        "            arguments: [\n"
-        "                {\n"
-        "                    nodeType: \"FunctionCall\", \n"
-        "                    name: \"cellBlockGetFlatValuesBlock\", \n"
-        "                    arguments: [\n"
-        "                        {\n"
-        "                            nodeType: \"Variable\", \n"
-        "                            name: \"inputVar\"\n"
-        "                        }\n"
-        "                    ]\n"
-        "                }, \n"
-        "                {\n"
-        "                    nodeType: \"Const\", \n"
-        "                    tag: \"NumberInt32\", \n"
-        "                    value: 9\n"
-        "                }\n"
-        "            ]\n"
-        "        }, \n"
-        "        {\n"
-        "            nodeType: \"Variable\", \n"
-        "            name: \"inputVar\"\n"
-        "        }\n"
-        "    ]\n"
-        "}\n",
-        *processed.expr);
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"valueBlockGtScalar\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"FunctionCall\", \n"
+            "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                    arguments: [\n"
+            "                        {\n"
+            "                            nodeType: \"Variable\", \n"
+            "                            name: \"inputVar\"\n"
+            "                        }\n"
+            "                    ]\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 9\n"
+            "                }\n"
+            "            ]\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+    {
+        auto tree1 = make<BinaryOp>(Operations::Gt, Constant::int32(9), make<Variable>("inputVar"));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"cellFoldValues_F\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"valueBlockLtScalar\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"FunctionCall\", \n"
+            "                    name: \"cellBlockGetFlatValuesBlock\", \n"
+            "                    arguments: [\n"
+            "                        {\n"
+            "                            nodeType: \"Variable\", \n"
+            "                            name: \"inputVar\"\n"
+            "                        }\n"
+            "                    ]\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 9\n"
+            "                }\n"
+            "            ]\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+}
+
+TEST(VectorizerTest, ConvertLte) {
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "inputVar"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    {
+        auto tree1 =
+            make<BinaryOp>(Operations::Lte, make<Variable>("inputVar"), Constant::int32(9));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockLteScalar\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+    {
+        auto tree1 =
+            make<BinaryOp>(Operations::Lte, Constant::int32(9), make<Variable>("inputVar"));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockGteScalar\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+}
+
+TEST(VectorizerTest, ConvertCmp3w) {
+    sbe::value::FrameIdGenerator generator;
+    Vectorizer::VariableTypes bindings;
+    bindings.emplace(
+        "inputVar"_sd,
+        std::make_pair(TypeSignature::kBlockType.include(TypeSignature::kAnyScalarType),
+                       boost::none));
+
+    {
+        auto tree1 =
+            make<BinaryOp>(Operations::Cmp3w, make<Variable>("inputVar"), Constant::int32(9));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockCmp3wScalar\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Variable\", \n"
+            "            name: \"inputVar\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 9\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
+    {
+        auto tree1 =
+            make<BinaryOp>(Operations::Cmp3w, Constant::int32(9), make<Variable>("inputVar"));
+        auto processed = Vectorizer{&generator, Vectorizer::Purpose::Filter}.vectorize(
+            tree1, bindings, boost::none);
+
+        ASSERT_TRUE(processed.expr.has_value());
+        ASSERT_EXPLAIN_BSON_AUTO(
+            "{\n"
+            "    nodeType: \"FunctionCall\", \n"
+            "    name: \"valueBlockSub\", \n"
+            "    arguments: [\n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"Nothing\"\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"Const\", \n"
+            "            tag: \"NumberInt32\", \n"
+            "            value: 0\n"
+            "        }, \n"
+            "        {\n"
+            "            nodeType: \"FunctionCall\", \n"
+            "            name: \"valueBlockCmp3wScalar\", \n"
+            "            arguments: [\n"
+            "                {\n"
+            "                    nodeType: \"Variable\", \n"
+            "                    name: \"inputVar\"\n"
+            "                }, \n"
+            "                {\n"
+            "                    nodeType: \"Const\", \n"
+            "                    tag: \"NumberInt32\", \n"
+            "                    value: 9\n"
+            "                }\n"
+            "            ]\n"
+            "        }\n"
+            "    ]\n"
+            "}\n",
+            *processed.expr);
+    }
 }
 
 TEST(VectorizerTest, ConvertBooleanAndOnCell) {
