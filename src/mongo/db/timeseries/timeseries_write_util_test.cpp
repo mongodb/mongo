@@ -356,7 +356,6 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
 
     batch->uncompressedBucketDoc = uncompressedPreImage;
     batch->compressedBucketDoc = *preImageCompressionResult.compressedBucket;
-    batch->maxCommittedTime = batch->max.getObjectField("u").getField("time").timestamp();
 
     batch->numPreviouslyCommittedMeasurements = 3;
     BSONObj bucketDataDoc =
@@ -429,7 +428,6 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
 
     batch->uncompressedBucketDoc = uncompressedPreImage;
     batch->compressedBucketDoc = *preImageCompressionResult.compressedBucket;
-    batch->maxCommittedTime = batch->max.getObjectField("u").getField("time").timestamp();
 
     batch->numPreviouslyCommittedMeasurements = 3;
     BSONObj bucketDataDoc =

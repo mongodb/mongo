@@ -487,9 +487,6 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
                 "Bucket data field is malformed (missing a valid time column)"};
     }
 
-    bucket->maxCommittedTime = controlField.getObjectField(kBucketControlMinFieldName)
-                                   .getField(options.getTimeField())
-                                   .timestamp();
     bucket->bucketIsSortedByTime = controlField.getField(kBucketControlVersionFieldName).Number() ==
             kTimeseriesControlCompressedSortedVersion
         ? true

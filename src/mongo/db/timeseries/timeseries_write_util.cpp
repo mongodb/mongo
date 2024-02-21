@@ -730,7 +730,6 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
         bucketToInsert = *bucketDoc.compressedBucket;
     }
 
-    batch->maxCommittedTime = batch->measurements.back().getField(batch->timeField).timestamp();
     write_ops::InsertCommandRequest op{bucketsNs, {bucketToInsert}};
     op.setWriteCommandRequestBase(makeTimeseriesWriteOpBase(std::move(stmtIds)));
     return op;
@@ -889,9 +888,11 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     auto& batchBuilders = batch->intermediateBuilders;
 
     bool changedToUnsorted = false;
+    Timestamp maxCommittedTime =
+        batch->intermediateBuilders.getBuilder(batch->timeField.toString()).last().timestamp();
     std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
     if (batch->bucketIsSortedByTime &&
-        sortedMeasurements.begin()->timeField.timestamp() < batch->maxCommittedTime) {
+        sortedMeasurements.begin()->timeField.timestamp() < maxCommittedTime) {
         batch->bucketIsSortedByTime = false;
         changedToUnsorted = true;
         batch->stats.incNumBucketsPromoted();
@@ -905,7 +906,6 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     StringMap<int> unused;
     BSONObj compressedBucketDataFieldDocAfter =
         buildCompressedBucketDataFieldDocEfficiently(batch, unused);
-    batch->maxCommittedTime = batch->measurements.back().getField(batch->timeField).timestamp();
     batch->compressedBucketDoc = compressedBucketDataFieldDocAfter;
     batch->uncompressedBucketDoc = {};
 

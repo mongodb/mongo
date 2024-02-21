@@ -99,10 +99,6 @@ public:
     // Minimum timestamp over contained measurements.
     const Date_t minTime;
 
-    // Maximum timestamp of committed measurements.
-    // TODO(SERVER-86756): remove this member once BSONColumnBuilder::last() is implemented.
-    Timestamp maxCommittedTime;
-
     // Whether the measurements in the bucket are sorted by timestamp or not.
     // True by default, if a v2 buckets gets promoted to v3 this is set to false.
     // It should not be used for v1 buckets.
