@@ -289,6 +289,8 @@ DepsTracker::State DocumentSourceFacet::getDependencies(DepsTracker* deps) const
         deps->vars.insert(subDepsTracker.vars.begin(), subDepsTracker.vars.end());
 
         deps->needWholeDocument = deps->needWholeDocument || subDepsTracker.needWholeDocument;
+        // If the subpipeline needs any metadata, the top level pipeline must know to generate it.
+        deps->metadataDeps() |= subDepsTracker.metadataDeps();
 
         // The text score is the only type of metadata that could be needed by $facet.
         deps->setNeedsMetadata(
