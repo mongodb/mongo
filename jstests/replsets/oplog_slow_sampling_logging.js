@@ -39,6 +39,9 @@ replSet.initiate();
 
 let coll = replSet.getPrimary().getDB(testDB).getCollection("testcoll");
 
+// Make sure each insert is an oplog entry.
+assert.commandWorked(
+    replSet.getPrimary().adminCommand({setParameter: 1, internalInsertMaxBatchSize: 1}));
 // Insert enough documents to force kNumOplogSamples to be taken on the following start up.
 let docsRemaining = kOplogDocs;
 let docsDone = 0;

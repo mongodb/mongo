@@ -18,9 +18,12 @@ const oplogColl = localDb[oplogCollName];
 
 coll.drop();
 
-// Insert several document so that we can use a cursor to fetch them in multiple batches.
+// Insert several documents individually so that we can use a cursor to fetch them in multiple
+// batches.
 const testData = [{_id: 0, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}];
-assert.commandWorked(coll.insert(testData));
+testData.forEach(doc => {
+    assert.commandWorked(coll.insert([doc]));
+});
 
 // Run the initial query and request to return a resume token. We will also request to return a
 // recordId for the document as it will

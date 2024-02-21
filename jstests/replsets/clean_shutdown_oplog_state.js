@@ -81,8 +81,10 @@ assert.neq(null, conn, "secondary failed to start");
 // Additionally, the begin field must not be in the minValid document, the ts must match the
 // top of the oplog (SERVER-25353), and the oplogTruncateAfterPoint must be null (SERVER-7200
 // and SERVER-25071).
-var oplogDoc =
-    conn.getCollection('local.oplog.rs').find({ns: 'test.coll'}).sort({$natural: -1}).limit(1)[0];
+const filter = {
+    $or: [{ns: 'test.coll'}, {"o.applyOps.ns": "test.coll"}]
+};
+var oplogDoc = conn.getCollection('local.oplog.rs').find(filter).sort({$natural: -1}).limit(1)[0];
 var collDoc = conn.getCollection('test.coll').find().sort({_id: -1}).limit(1)[0];
 var minValidDoc =
     conn.getCollection('local.replset.minvalid').find().sort({$natural: -1}).limit(1)[0];
@@ -95,7 +97,16 @@ printjson({
     oplogTruncateAfterPointDoc: oplogTruncateAfterPointDoc
 });
 
-assert.eq(collDoc._id, oplogDoc.o._id);
+// The oplog doc could be an insert or an applyOps with an internal insert.
+let oplogDocId;
+if (oplogDoc.ns == 'test.coll') {
+    oplogDocId = oplogDoc.o._id;
+} else {
+    const opArray = oplogDoc.o.applyOps
+    oplogDocId = opArray[opArray.length - 1].o._id;
+}
+
+assert.eq(collDoc._id, oplogDocId);
 assert(!('begin' in minValidDoc), 'begin in minValidDoc');
 if (storageEngine !== "wiredTiger") {
     assert.eq(minValidDoc.ts, oplogDoc.ts);

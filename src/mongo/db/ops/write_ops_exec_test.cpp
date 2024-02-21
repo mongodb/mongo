@@ -50,6 +50,9 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
@@ -58,6 +61,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/timeseries/bucket_compression.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/time_support.h"
@@ -398,6 +402,196 @@ TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
         UnorderedFieldsBSONObjComparator comparator;
         ASSERT_EQ(0, comparator.compare(retrievedBucket.value(), bucketDoc));
     }
+}
+
+class OpObserverMock : public OpObserverNoop {
+public:
+    virtual ~OpObserverMock() {
+        ASSERT_FALSE(inBatch);
+    }
+
+    void onBatchedWriteStart(OperationContext* opCtx) override {
+        ASSERT_FALSE(inBatch);
+        inBatch = true;
+    }
+
+    void onBatchedWriteCommit(OperationContext* opCtx,
+                              WriteUnitOfWork::OplogEntryGroupType oplogGroupingFormat,
+                              OpStateAccumulator* opStateAccumulator = nullptr) override {
+        ASSERT(inBatch);
+        inBatch = false;
+        batches.push_back(std::move(current_batch_docs));
+    }
+
+    void onBatchedWriteAbort(OperationContext* opCtx) override {
+        current_batch_docs.clear();
+        inBatch = false;
+    }
+
+    void onInserts(OperationContext* opCtx,
+                   const CollectionPtr& coll,
+                   std::vector<InsertStatement>::const_iterator begin,
+                   std::vector<InsertStatement>::const_iterator end,
+                   const std::vector<RecordId>& recordIds,
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate,
+                   OpStateAccumulator* opAccumulator) override {
+        auto& dest = inBatch ? current_batch_docs : unbatched_docs;
+        std::for_each(begin, end, [&](const auto& insert) { dest.push_back(insert.doc); });
+    }
+
+    bool inBatch = false;
+    std::vector<BSONObj> current_batch_docs;
+    std::vector<BSONObj> unbatched_docs;
+    std::vector<std::vector<BSONObj>> batches;
+};
+
+class WriteOpsExecOplogTest : public CatalogTestFixture {
+public:
+    explicit WriteOpsExecOplogTest(Options options = {})
+        : CatalogTestFixture(options.useReplSettings(true)),
+          _replicateVectoredInsertsTransactionally(
+              "featureFlagReplicateVectoredInsertsTransactionally", true) {}
+
+protected:
+    void setUp() override {
+        CatalogTestFixture::setUp();
+        auto opObserverRegistry =
+            checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
+        auto opObserverMock = std::make_unique<OpObserverMock>();
+        _opObserverMock = opObserverMock.get();
+        opObserverRegistry->addObserver(std::move(opObserverMock));
+    }
+
+    OpObserverMock* _opObserverMock;
+    RAIIServerParameterControllerForTest _replicateVectoredInsertsTransactionally;
+};
+
+
+TEST_F(WriteOpsExecOplogTest, VerifySingleInsertOplogDoesntBatch) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    BSONObj docToInsert(fromjson("{_id: 0, foo: 1}"));
+    insertCmdReq.setDocuments({docToInsert});
+    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    ASSERT_EQ(1, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+
+    // We should have generated an unbatched insert.
+    ASSERT(_opObserverMock->batches.empty());
+    ASSERT_EQ(1, _opObserverMock->unbatched_docs.size());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[0], docToInsert);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertOplogDoesBatch) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{
+        fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+
+    // We should have generated batched inserts.
+    ASSERT_EQ(1, _opObserverMock->batches.size());
+    ASSERT_EQ(3, _opObserverMock->batches[0].size());
+    ASSERT(_opObserverMock->unbatched_docs.empty());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][2], docsToInsert[2]);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertCappedOplogDoesntBatch) {
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx,
+                               ns.dbName(),
+                               BSON("create" << ns.coll() << "capped"
+                                             << "true"
+                                             << "size" << 10'000'000)));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{
+        fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+
+    // We should have generated unbatched inserts.
+    ASSERT(_opObserverMock->batches.empty());
+    ASSERT_EQ(3, _opObserverMock->unbatched_docs.size());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[2], docsToInsert[2]);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertMultipleBatches) {
+    RAIIServerParameterControllerForTest batchSizeController("internalInsertMaxBatchSize", 2);
+
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{fromjson("{_id: 0, foo: 1}"),
+                                      fromjson("{_id: 1, bar: 1}"),
+                                      fromjson("{_id: 2, baz: 1}"),
+                                      fromjson("{_id: 3, bif: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    ASSERT_EQ(4, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[3]).getN());
+
+    // We should have generated batched inserts in two batches.
+    ASSERT_EQ(2, _opObserverMock->batches.size());
+    ASSERT_EQ(2, _opObserverMock->batches[0].size());
+    ASSERT_EQ(2, _opObserverMock->batches[1].size());
+    ASSERT(_opObserverMock->unbatched_docs.empty());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[1][0], docsToInsert[2]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[1][1], docsToInsert[3]);
+}
+
+TEST_F(WriteOpsExecOplogTest, VerifyMultiInsertBatchedAndUnbatched) {
+    RAIIServerParameterControllerForTest batchSizeController("internalInsertMaxBatchSize", 2);
+
+    NamespaceString ns =
+        NamespaceString::createNamespaceString_forTest("db_write_ops_exec_test", "insertColl");
+    auto opCtx = operationContext();
+    ASSERT_OK(createCollection(opCtx, ns.dbName(), BSON("create" << ns.coll())));
+    write_ops::InsertCommandRequest insertCmdReq(ns);
+    std::vector<BSONObj> docsToInsert{
+        fromjson("{_id: 0, foo: 1}"), fromjson("{_id: 1, bar: 1}"), fromjson("{_id: 2, baz: 1}")};
+    insertCmdReq.setDocuments(docsToInsert);
+    auto result = write_ops_exec::performInserts(opCtx, insertCmdReq, OperationSource::kStandard);
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_EQ(1, unittest::assertGet(result.results[0]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[1]).getN());
+    ASSERT_EQ(1, unittest::assertGet(result.results[2]).getN());
+
+    // We should have generated one batch with two inserts, with a single insert unbatched.
+    ASSERT_EQ(1, _opObserverMock->batches.size());
+    ASSERT_EQ(2, _opObserverMock->batches[0].size());
+    ASSERT_EQ(1, _opObserverMock->unbatched_docs.size());
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][0], docsToInsert[0]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->batches[0][1], docsToInsert[1]);
+    ASSERT_BSONOBJ_EQ(_opObserverMock->unbatched_docs[0], docsToInsert[2]);
 }
 
 }  // namespace

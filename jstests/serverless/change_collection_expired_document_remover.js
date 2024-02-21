@@ -37,14 +37,25 @@ const replSet = new ChangeStreamMultitenantReplicaSetTest({
 const primary = replSet.getPrimary();
 const secondary = replSet.getSecondary();
 
+if (FeatureFlagUtil.isPresentAndEnabled(primary, "ReplicateVectoredInsertsTransactionally")) {
+    // Reduce the batch size so we're testing multiple oplog entries while still testing batched
+    // inserts.
+    assert.commandWorked(primary.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
+}
+
 // Assert that the change collection contains all documents in 'expectedRetainedDocs' and no
 // document in 'expectedDeletedDocs' for the collection 'stocksColl'.
 function assertChangeCollectionDocuments(
     changeColl, stocksColl, expectedDeletedDocs, expectedRetainedDocs) {
     const collNss = `${stocksTestDb.getName()}.${stocksColl.getName()}`;
-    const pipeline = (collectionEntries) => [{$match: {op: "i", ns: collNss}},
-                                             {$replaceRoot: {"newRoot": "$o"}},
-                                             {$match: {$or: collectionEntries}}];
+    const pipeline =
+        (collectionEntries) => [{
+            $match:
+                {$or: [{op: "i", ns: collNss}, {"o.applyOps.op": "i", "o.applyOps.ns": collNss}]}
+        },
+                                {$unwind: {path: "$o.applyOps", preserveNullAndEmptyArrays: true}},
+                                {$replaceRoot: {"newRoot": {$ifNull: ["$o.applyOps.o", "$o"]}}},
+                                {$match: {$or: collectionEntries}}];
 
     // Assert that querying for 'expectedRetainedDocs' yields documents that are exactly the same as
     // 'expectedRetainedDocs'.
@@ -68,7 +79,8 @@ function assertChangeCollectionDocuments(
 
 // Returns the operation time for the provided document 'doc'.
 function getDocumentOperationTime(doc) {
-    const oplogEntry = primary.getDB("local").oplog.rs.findOne({o: doc});
+    const oplogEntry =
+        primary.getDB("local").oplog.rs.findOne({$or: [{o: doc}, {"o.applyOps.o": doc}]});
     assert(oplogEntry);
     return oplogEntry.wall.getTime();
 }

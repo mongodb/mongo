@@ -3707,6 +3707,143 @@ TEST_F(BatchedWriteOutputsTest, TestRetryableVectoredInsertMultiApplyOpsGrouping
     }
 }
 
+// Test to make sure vectored inserts work if the vectored inserts don't fit into an applyOps.  This
+// should never happen except in tests which specifically set the batching parameters, but it makes
+// the code simpler to assume it does happen, and testing that it works is simpler and more reliable
+// than testing that it can't happen.  This tests the non-retryable case, in which case the oplog
+// entries should not be linked at all.
+TEST_F(BatchedWriteOutputsTest, TestNonRetryableVectoredInsertMultiApplyOpsGrouping) {
+    constexpr int kMaxDocsInBatch = 2;
+    // This test expects the docsToInsert0 to be two batches long, and docsToInsert1 to fit in one
+    // batch.
+    RAIIServerParameterControllerForTest batchReducer(
+        "maxNumberOfBatchedOperationsInSingleOplogEntry", kMaxDocsInBatch);
+    const BSONObj docsToInsert0[] = {
+        BSON("_id" << 0 << "a" << 10),
+        BSON("_id" << 1 << "a" << 11),
+        BSON("_id" << 2 << "a" << 12),
+    };
+    constexpr size_t nDocsToInsert0 = sizeof(docsToInsert0) / sizeof(docsToInsert0[0]);
+
+    const BSONObj docsToInsert1[] = {
+        BSON("_id" << 3 << "a" << 13),
+        BSON("_id" << 4 << "a" << 14),
+    };
+    constexpr size_t nDocsToInsert1 = sizeof(docsToInsert1) / sizeof(docsToInsert1[0]);
+
+    // Setup.
+    auto opCtxRaii = cc().makeOperationContext();
+    OperationContext* opCtx = opCtxRaii.get();
+    reset(opCtx, _nss);
+    reset(opCtx, NamespaceString::kRsOplogNamespace);
+
+    {
+        AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
+        WriteUnitOfWork wuow0(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        std::vector<InsertStatement> inserts0;
+
+        for (size_t i = 0; i < nDocsToInsert0; i++) {
+            inserts0.emplace_back(docsToInsert0[i]);
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts0.begin(),
+            inserts0.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts0.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow0.commit();
+
+        WriteUnitOfWork wuow1(opCtx, WriteUnitOfWork::kGroupForPossiblyRetryableOperations);
+        std::vector<InsertStatement> inserts1;
+
+        for (size_t i = 0; i < nDocsToInsert1; i++) {
+            inserts1.emplace_back(docsToInsert1[i]);
+        }
+        opCtx->getServiceContext()->getOpObserver()->onInserts(
+            opCtx,
+            *autoColl,
+            inserts1.begin(),
+            inserts1.end(),
+            /*recordIds=*/{},
+            /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
+            /*defaultFromMigrate=*/false);
+        wuow1.commit();
+    }
+
+    // Retrieve the oplog entries.  We did two batched WriteUnitsOfWork, but the first was too big,
+    // so we expect 3.
+    std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, 3);
+    auto firstOplogEntry = oplogs.front();
+    auto firstOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.front()));
+    auto middleOplogEntry = oplogs[1];
+    auto middleOplogEntryParsed = assertGet(OplogEntry::parse(oplogs[1]));
+    auto lastOplogEntry = oplogs.back();
+    auto lastOplogEntryParsed = assertGet(OplogEntry::parse(oplogs.back()));
+
+    // Each batch consists of an applyOps, whose array contains all inserts issued within the
+    // WUOW.
+    ASSERT(firstOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    ASSERT(middleOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    ASSERT(lastOplogEntryParsed.getCommandType() == OplogEntry::CommandType::kApplyOps);
+    // The prevOpTime field should be absent for all three entries.
+    ASSERT_FALSE(firstOplogEntryParsed.getPrevWriteOpTimeInTransaction());
+    ASSERT_FALSE(middleOplogEntryParsed.getPrevWriteOpTimeInTransaction());
+    ASSERT_FALSE(lastOplogEntryParsed.getPrevWriteOpTimeInTransaction());
+    // The multiOpType field should be absent for all entries.
+    ASSERT_FALSE(firstOplogEntryParsed.getMultiOpType());
+    // The multiOpType field should be present for the second applyOps.
+    ASSERT_FALSE(middleOplogEntryParsed.getMultiOpType());
+    // The multiOpType field should be present for the third applyOps.
+    ASSERT_FALSE(lastOplogEntryParsed.getMultiOpType());
+    // Partial transaction fields should not be present
+    ASSERT_FALSE(firstOplogEntryParsed.isPartialTransaction());
+    ASSERT_FALSE(middleOplogEntryParsed.isPartialTransaction());
+    ASSERT_FALSE(lastOplogEntryParsed.isPartialTransaction());
+    // There should be no statement IDs on the applyOps, only the operations.
+    ASSERT(firstOplogEntryParsed.getStatementIds().empty());
+    ASSERT(middleOplogEntryParsed.getStatementIds().empty());
+    ASSERT(lastOplogEntryParsed.getStatementIds().empty());
+    // Operations should contain the inserts we did.
+    std::vector<repl::OplogEntry> innerEntries;
+    repl::ApplyOps::extractOperationsTo(
+        firstOplogEntryParsed, firstOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), kMaxDocsInBatch);
+    for (size_t opIdx = 0; opIdx < kMaxDocsInBatch; opIdx++) {
+        const auto innerEntry = innerEntries[opIdx];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
+        ASSERT(innerEntry.getNss() == _nss);
+        ASSERT_BSONOBJ_EQ(innerEntry.getObject(), docsToInsert0[opIdx]);
+    }
+
+    innerEntries.clear();
+    repl::ApplyOps::extractOperationsTo(
+        middleOplogEntryParsed, middleOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    ASSERT_EQ(innerEntries.size(), nDocsToInsert0 - kMaxDocsInBatch);
+    for (size_t opIdx = 0; opIdx < nDocsToInsert0 - kMaxDocsInBatch; opIdx++) {
+        const auto innerEntry = innerEntries[opIdx];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
+        ASSERT(innerEntry.getNss() == _nss);
+        ASSERT(innerEntry.getStatementIds().empty());
+        ASSERT_BSONOBJ_EQ(innerEntry.getObject(), docsToInsert0[kMaxDocsInBatch + opIdx]);
+    }
+
+    innerEntries.clear();
+    repl::ApplyOps::extractOperationsTo(
+        lastOplogEntryParsed, lastOplogEntryParsed.getEntry().toBSON(), &innerEntries);
+    for (size_t opIdx = 0; opIdx < nDocsToInsert1; opIdx++) {
+        const auto innerEntry = innerEntries[opIdx];
+        ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
+        ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
+        ASSERT(innerEntry.getNss() == _nss);
+        ASSERT(innerEntry.getStatementIds().empty());
+        ASSERT_BSONOBJ_EQ(innerEntry.getObject(), docsToInsert1[opIdx]);
+    }
+}
+
 class OnDeleteOutputsTest : public OpObserverTest {
 
 protected:

@@ -192,8 +192,7 @@ testCreateCollection();
 // TODO(SERVER-84271):
 // Remove this call and testInsert() and associated code.  With this feature flag enabled,
 // insert does not create a long-lived oplog hole and so we do not need to test this case.
-if (!FeatureFlagUtil.isPresentAndEnabled(testDB,
-                                         "featureFlagReplicateVectoredInsertsTransactionally")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(testDB, "ReplicateVectoredInsertsTransactionally")) {
     testInsert();
 }
 testUnpreparedTransactionCommit();

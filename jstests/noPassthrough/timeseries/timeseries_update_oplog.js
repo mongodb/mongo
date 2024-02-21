@@ -32,6 +32,9 @@ const runTest = function({cmdBuilderFn, validateFn, retryableWrite = false}) {
     assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     assert.commandWorked(coll.insertMany(initialMeasurement));
+    // The above insert may generate an applyOps, so we use startTime to avoid examining it
+    // in the validateFn.
+    let startTime = testDB.getSession().getOperationTime();
 
     let cmdObj = cmdBuilderFn(coll);
     if (retryableWrite) {
@@ -43,7 +46,7 @@ const runTest = function({cmdBuilderFn, validateFn, retryableWrite = false}) {
         assert.commandWorked(testDB.runCommand(cmdObj));
     }
 
-    validateFn(testDB, coll, retryableWrite);
+    validateFn(testDB, coll, retryableWrite, startTime);
 };
 
 function partialBucketMultiUpdateBuilderFn(coll) {
@@ -80,11 +83,14 @@ function upsertBuilderFn(coll) {
 }
 
 // Full bucket update's oplog entry is an ApplyOps[delete, insert].
-function fullBucketValidateFn(testDB, coll, retryableWrite) {
+function fullBucketValidateFn(testDB, coll, retryableWrite, startTime) {
     const opEntries =
         testDB.getSiblingDB("local")
             .oplog.rs
-            .find({"o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName()})
+            .find({
+                "o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName(),
+                ts: {$gt: startTime}
+            })
             .toArray();
     assert.eq(opEntries.length, 1);
     const opEntry = opEntries[0];
@@ -93,11 +99,14 @@ function fullBucketValidateFn(testDB, coll, retryableWrite) {
     assert(opEntry["o"]["applyOps"][1]["op"] == "i");
 }
 // Partial bucket update's oplog entry is an ApplyOps[update, insert].
-function partialBucketValidateFn(testDB, coll, retryableWrite) {
+function partialBucketValidateFn(testDB, coll, retryableWrite, startTime) {
     const opEntries =
         testDB.getSiblingDB("local")
             .oplog.rs
-            .find({"o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName()})
+            .find({
+                "o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName(),
+                ts: {$gt: startTime}
+            })
             .toArray();
     assert.eq(opEntries.length, 1);
     const opEntry = opEntries[0];
@@ -107,11 +116,14 @@ function partialBucketValidateFn(testDB, coll, retryableWrite) {
 }
 // When inserting a new measurement, an Upsert's oplog entry is an ApplyOps[insert] if it's a
 // retryable write. Otherwise, it generates a regular insert oplog entry.
-function upsertValidateFn(testDB, coll, retryableWrite) {
+function upsertValidateFn(testDB, coll, retryableWrite, startTime) {
     const opEntries =
         testDB.getSiblingDB("local")
             .oplog.rs
-            .find({"o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName()})
+            .find({
+                "o.applyOps.ns": testDB.getName() + '.system.buckets.' + coll.getName(),
+                ts: {$gt: startTime}
+            })
             .toArray();
     if (retryableWrite) {
         assert.eq(opEntries.length, 1);

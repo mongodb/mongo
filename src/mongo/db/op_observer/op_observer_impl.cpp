@@ -1603,6 +1603,9 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
             oplogLink.multiOpType = repl::MultiOplogEntryType::kApplyOpsAppliedSeparately;
             operationLogger->appendOplogEntryChainInfo(
                 opCtx, oplogEntry, &oplogLink, stmtIdsWritten);
+        } else {
+            // No statement IDs; don't set prevWriteOpTimeInTransaction.
+            oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
         }
     } else {
         if (!stmtIdsWritten.empty()) {

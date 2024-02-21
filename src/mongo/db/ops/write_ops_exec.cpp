@@ -316,33 +316,27 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     });
 }
 
-void insertDocumentsAtomically(OperationContext* opCtx,
-                               const CollectionAcquisition& collection,
-                               std::vector<InsertStatement>::iterator begin,
-                               std::vector<InsertStatement>::iterator end,
-                               bool fromMigrate) {
-    // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
-    // oversized batches.
-    WriteUnitOfWork wuow(opCtx);
+namespace {
+// Acquire optimes and fill them in for each item in the batch.  This must only be done for
+// doc-locking storage engines, which are allowed to insert oplog documents
+// out-of-timestamp-order.  For other storage engines, the oplog entries must be physically
+// written in timestamp order, so we defer optime assignment until the oplog is about to be
+// written. Multidocument transactions should not generate opTimes because they are
+// generated at the time of commit.
+void acquireOplogSlotsForInserts(OperationContext* opCtx,
+                                 const CollectionAcquisition& collection,
+                                 std::vector<InsertStatement>::iterator begin,
+                                 std::vector<InsertStatement>::iterator end) {
+    dassert(!opCtx->inMultiDocumentTransaction());
+    dassert(!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, collection.nss()));
 
-    // Acquire optimes and fill them in for each item in the batch.
-    // This must only be done for doc-locking storage engines, which are allowed to insert oplog
-    // documents out-of-timestamp-order.  For other storage engines, the oplog entries must be
-    // physically written in timestamp order, so we defer optime assignment until the oplog is about
-    // to be written. Multidocument transactions should not generate opTimes because they are
-    // generated at the time of commit.
+    // Populate 'slots' with new optimes for each insert.
+    // This also notifies the storage engine of each new timestamp.
     auto batchSize = std::distance(begin, end);
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    auto inTransaction = opCtx->inMultiDocumentTransaction();
-
-    if (!inTransaction && !replCoord->isOplogDisabledFor(opCtx, collection.nss())) {
-        // Populate 'slots' with new optimes for each insert.
-        // This also notifies the storage engine of each new timestamp.
-        auto oplogSlots = repl::getNextOpTimes(opCtx, batchSize);
-        auto slot = oplogSlots.begin();
-        for (auto it = begin; it != end; it++) {
-            it->oplogSlot = *slot++;
-        }
+    auto oplogSlots = repl::getNextOpTimes(opCtx, batchSize);
+    auto slot = oplogSlots.begin();
+    for (auto it = begin; it != end; it++) {
+        it->oplogSlot = *slot++;
     }
 
     hangAndFailAfterDocumentInsertsReserveOpTimes.executeIf(
@@ -359,6 +353,43 @@ void insertDocumentsAtomically(OperationContext* opCtx,
             const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
             return fpNss.isEmpty() || collection.nss() == fpNss;
         });
+}
+}  // namespace
+
+void insertDocumentsAtomically(OperationContext* opCtx,
+                               const CollectionAcquisition& collection,
+                               std::vector<InsertStatement>::iterator begin,
+                               std::vector<InsertStatement>::iterator end,
+                               bool fromMigrate) {
+    auto batchSize = std::distance(begin, end);
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    const bool inTransaction = opCtx->inMultiDocumentTransaction();
+    const bool oplogDisabled = replCoord->isOplogDisabledFor(opCtx, collection.nss());
+    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
+
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool replicateVectoredInsertsTransactionally = fcvSnapshot.isVersionInitialized() &&
+        repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabled(fcvSnapshot);
+    // For multiple inserts not part of a multi-document transaction, the inserts will be
+    // batched into a single applyOps oplog entry.
+    if (replicateVectoredInsertsTransactionally && !inTransaction && batchSize > 1 &&
+        !oplogDisabled) {
+        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+    }
+
+    // Intentionally not using writeConflictRetry. That is handled by the caller so it can react to
+    // oversized batches.
+    WriteUnitOfWork wuow(opCtx, oplogEntryGroupType);
+
+    // Capped collections may implicitly generate a delete in the same unit of work as an
+    // insert. In order to avoid that delete generating a second timestamp in a WUOW which
+    // has un-timestamped writes (which is a violation of multi-timestamp constraints),
+    // we must reserve the timestamp for the insert in advance.
+    if (oplogEntryGroupType != WriteUnitOfWork::kGroupForPossiblyRetryableOperations &&
+        !inTransaction && !oplogDisabled &&
+        (!replicateVectoredInsertsTransactionally || collection.getCollectionPtr()->isCapped())) {
+        acquireOplogSlotsForInserts(opCtx, collection, begin, end);
+    }
 
     uassertStatusOK(collection_internal::insertDocuments(opCtx,
                                                          collection.getCollectionPtr(),
@@ -1949,13 +1980,24 @@ Status performAtomicTimeseriesWrites(
 
     assertCanWrite_inlock(opCtx, ns);
 
-    WriteUnitOfWork wuow{opCtx};
+    const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+    const bool replicateVectoredInsertsTransactionally = fcvSnapshot.isVersionInitialized() &&
+        repl::feature_flags::gReplicateVectoredInsertsTransactionally.isEnabled(fcvSnapshot);
+
+    WriteUnitOfWork::OplogEntryGroupType oplogEntryGroupType = WriteUnitOfWork::kDontGroup;
+    if (replicateVectoredInsertsTransactionally && insertOps.size() > 1 && updateOps.empty() &&
+        !repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
+        oplogEntryGroupType = WriteUnitOfWork::kGroupForPossiblyRetryableOperations;
+    }
+    WriteUnitOfWork wuow{opCtx, oplogEntryGroupType};
 
     std::vector<repl::OpTime> oplogSlots;
     boost::optional<std::vector<repl::OpTime>::iterator> slot;
-    if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
-        oplogSlots = repl::getNextOpTimes(opCtx, insertOps.size() + updateOps.size());
-        slot = oplogSlots.begin();
+    if (!replicateVectoredInsertsTransactionally || !updateOps.empty()) {
+        if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, ns)) {
+            oplogSlots = repl::getNextOpTimes(opCtx, insertOps.size() + updateOps.size());
+            slot = oplogSlots.begin();
+        }
     }
 
     auto participant = TransactionParticipant::get(opCtx);

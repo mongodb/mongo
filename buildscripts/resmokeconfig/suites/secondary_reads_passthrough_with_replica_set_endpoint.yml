@@ -91,6 +91,9 @@ selector:
     - jstests/core/catalog/list_collections_no_views.js
     # The following test requires query settings / cluster parameter modification.
     - jstests/core/query/query_settings/query_settings_size_limits.js
+    # TODO(SERVER-87308): This tests times out when replicateVectoredInsertsTransactionally is
+    # enabled because we have to do a write for every causal secondary read.
+    - jstests/core/timeseries/timeseries_predicates.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

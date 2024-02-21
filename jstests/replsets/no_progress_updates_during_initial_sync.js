@@ -59,7 +59,9 @@ assert.commandWorked(secondary.adminCommand({
 
 jsTestLog("Inserting some docs on the primary to advance its lastApplied");
 
-assert.commandWorked(primaryDb.test.insert([{a: 1}, {b: 2}, {c: 3}, {d: 4}, {e: 5}]));
+// We insert these one at a time to avoid batching of inserts.
+[{a: 1}, {b: 2}, {c: 3}, {d: 4}, {e: 5}].forEach(
+    doc => assert.commandWorked(primaryDb.test.insert([doc])));
 
 jsTestLog("Resuming initial sync");
 

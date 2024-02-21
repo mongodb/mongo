@@ -163,6 +163,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',

@@ -110,6 +110,9 @@ var ss = secondary.getDB("test").serverStatus();
 var secondaryBaseOplogOpsApplied = ss.metrics.repl.apply.ops;
 var secondaryBaseOplogOpsReceived = ss.metrics.repl.apply.batchSize;
 
+// Disable batching of inserts so each one creates an oplog entry.
+assert.commandWorked(testDB.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 1}));
+
 // add test docs
 var bulk = testDB.a.initializeUnorderedBulkOp();
 for (let x = 0; x < 1000; x++) {
