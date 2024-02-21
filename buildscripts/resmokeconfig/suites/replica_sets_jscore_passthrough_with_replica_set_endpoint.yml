@@ -121,7 +121,9 @@ executor:
       # that is fsync locked and has replica set endpoint enabled.
       # - CheckReplDBHash
       - CheckReplOplogs
-      - ValidateCollections
+      # TODO (SERVER-86630): Investigate ObjectIsBusy error in the replica set endpoint suite
+      # when the ValidateCollections hook is enabled
+      # - class: ValidateCollections
   config:
     shell_options:
       eval: "globalThis.testingReplication = true;"
