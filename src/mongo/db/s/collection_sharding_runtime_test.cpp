@@ -303,6 +303,64 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
     setGlobalReplSettings(originalRs);
 }
 
+TEST_F(CollectionShardingRuntimeTest, ShardVersionCheckDetectsClusterTimeConflicts) {
+    OperationContext* opCtx = operationContext();
+    CollectionShardingRuntime csr(getServiceContext(), kTestNss);
+    const auto metadata = makeShardedMetadata(opCtx);
+    csr.setFilteringMetadata(opCtx, metadata);
+
+    const auto collectionTimestamp = metadata.getShardPlacementVersion().getTimestamp();
+
+    auto receivedShardVersion =
+        ShardVersionFactory::make(metadata, boost::optional<CollectionIndexes>(boost::none));
+
+    // Test that conflict is thrown when transaction 'atClusterTime' is not valid the current shard
+    // version.
+    {
+        const auto previousReadConcern = repl::ReadConcernArgs::get(operationContext());
+        repl::ReadConcernArgs::get(operationContext()) =
+            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
+
+        // Valid atClusterTime (equal or later than collection timestamp).
+        {
+            repl::ReadConcernArgs::get(operationContext())
+                .setArgsAtClusterTimeForSnapshot(collectionTimestamp + 1);
+            ScopedSetShardRole scopedSetShardRole{
+                opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+            ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+        }
+
+        // Conflicting atClusterTime (earlier than collection timestamp).
+        repl::ReadConcernArgs::get(operationContext())
+            .setArgsAtClusterTimeForSnapshot(collectionTimestamp - 1);
+        ScopedSetShardRole scopedSetShardRole{
+            opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+        ASSERT_THROWS_CODE(
+            csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::SnapshotUnavailable);
+
+        repl::ReadConcernArgs::get(operationContext()) = previousReadConcern;
+    }
+
+    // Test that conflict is thrown when transaction 'placementConflictTime' is not valid the
+    // current shard version.
+    {
+        // Valid placementConflictTime (equal or later than collection timestamp).
+        {
+            receivedShardVersion.setPlacementConflictTime(LogicalTime(collectionTimestamp + 1));
+            ScopedSetShardRole scopedSetShardRole{
+                opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+            ASSERT_DOES_NOT_THROW(csr.checkShardVersionOrThrow(opCtx));
+        }
+
+        // Conflicting placementConflictTime (earlier than collection timestamp).
+        receivedShardVersion.setPlacementConflictTime(LogicalTime(collectionTimestamp - 1));
+        ScopedSetShardRole scopedSetShardRole{
+            opCtx, kTestNss, receivedShardVersion, boost::none /* databaseVersion */};
+        ASSERT_THROWS_CODE(
+            csr.checkShardVersionOrThrow(opCtx), DBException, ErrorCodes::SnapshotUnavailable);
+    }
+}
+
 class CollectionShardingRuntimeTestWithMockedLoader
     : public ShardServerTestFixtureWithCatalogCacheLoaderMock {
 public:
