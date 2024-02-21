@@ -115,7 +115,11 @@ void Grid::setAllowLocalHost(bool allow) {
 
 repl::ReadConcernArgs Grid::readConcernWithConfigTime(
     repl::ReadConcernLevel readConcernLevel) const {
-    return ReadConcernArgs(configOpTime(), readConcernLevel);
+    auto opTime = configOpTime();
+    if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
+        return ReadConcernArgs(LogicalTime(opTime.getTimestamp()), readConcernLevel);
+    }
+    return ReadConcernArgs(opTime, readConcernLevel);
 }
 
 ReadPreferenceSetting Grid::readPreferenceWithConfigTime(

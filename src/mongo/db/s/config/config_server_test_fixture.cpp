@@ -152,6 +152,8 @@ void ConfigServerTestFixture::_setUp(std::function<void()> onPreInitGlobalStateF
     onPreInitGlobalStateFn();
 
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
+
+    shardRegistry()->useMajorityReadConcern_forTest();
 }
 
 void ConfigServerTestFixture::tearDown() {

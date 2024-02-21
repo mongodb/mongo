@@ -62,7 +62,7 @@ public:
      * Reads shards docs from the catalog client and fills in maps.
      */
     static std::pair<ShardRegistryData, Timestamp> createFromCatalogClient(
-        OperationContext* opCtx, ShardFactory* shardFactory);
+        OperationContext* opCtx, ShardFactory* shardFactory, bool useMajorityReadConcernForTest);
 
     /**
      * Merges alreadyCachedData and configServerData into a new ShardRegistryData.
@@ -324,6 +324,11 @@ public:
 
     int getNumShardsNoReload() const;
 
+    // Test methods. These methods exist only to satisfy unit tests.
+    void useMajorityReadConcern_forTest() {
+        _useMajorityReadConcernForTest = true;
+    }
+
 private:
     /**
      * The ShardRegistry uses the ReadThroughCache to handle refreshing itself.  The cache stores
@@ -494,6 +499,13 @@ private:
     AtomicWord<bool> _isShutdown{false};
 
     ServiceContext* _service{nullptr};
+
+    // Test members
+
+    // This disables snapshot readConcern for shard registry refreshes. It is only used in unit
+    // tests so that we can use ephemeralForTest and not worry about advancing committed snapshot
+    // timestamps.
+    bool _useMajorityReadConcernForTest = false;
 };
 
 }  // namespace mongo

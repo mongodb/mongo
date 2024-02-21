@@ -101,23 +101,33 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
     const boost::optional<BSONObj>& hint) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-    if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern) {
+    if (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+        readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
         // Set up operation context with majority read snapshot so correct optime can be retrieved.
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
         Status status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
+        if (!status.isOK()) {
+            return status;
+        }
 
-        // Wait for any writes performed by this ShardLocal instance to be committed and visible.
+        // Waits for any writes performed by this ShardLocal instance to be committed and visible.
         Status readConcernStatus = replCoord->waitUntilOpTimeForRead(
             opCtx, repl::ReadConcernArgs{_getLastOpTime(), readConcernLevel});
         if (!readConcernStatus.isOK()) {
             return readConcernStatus;
         }
 
-        // Inform the storage engine to read from the committed snapshot for the rest of this
-        // operation.
         status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
         if (!status.isOK()) {
             return status;
+        }
+
+        if (readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            // Snapshot readConcern starts a snapshot at the majority timestamp, acquire the
+            // timestamp now and overwrite the majority readConcern used above.
+            auto opTime = replCoord->getCurrentCommittedSnapshotOpTime();
+            opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                          opTime.getTimestamp());
         }
     } else {
         invariant(readConcernLevel == repl::ReadConcernLevel::kLocalReadConcern);

@@ -370,7 +370,8 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
 
     BSONObj readConcernObj;
     {
-        invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern);
+        invariant(readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+                  readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
         const auto readConcern = grid->readConcernWithConfigTime(readConcernLevel);
         BSONObjBuilder bob;
         readConcern.appendInfo(&bob);

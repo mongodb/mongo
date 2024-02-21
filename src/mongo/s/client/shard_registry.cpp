@@ -143,8 +143,8 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
         [&]() -> std::tuple<ShardRegistryData, Timestamp, Increment, ShardRegistryData::ShardMap> {
         if (timeInStore.topologyTime > cachedData.getTime().topologyTime ||
             timeInStore.forceReloadIncrement > cachedData.getTime().forceReloadIncrement) {
-            auto [reloadedData, maxTopologyTime] =
-                ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
+            auto [reloadedData, maxTopologyTime] = ShardRegistryData::createFromCatalogClient(
+                opCtx, _shardFactory.get(), _useMajorityReadConcernForTest);
             if (!useActualTopologyTime()) {
                 // If not using the actual topology time, then just use the topologyTime currently
                 // in the cache, instead of the maximum topologyTime value from config.shards.  This
@@ -629,10 +629,11 @@ ShardRegistryData ShardRegistryData::createWithConfigShardOnly(std::shared_ptr<S
 }
 
 std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClient(
-    OperationContext* opCtx, ShardFactory* shardFactory) {
+    OperationContext* opCtx, ShardFactory* shardFactory, bool useMajorityReadConcernForTest) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    auto readConcern = repl::ReadConcernLevel::kMajorityReadConcern;
+    auto readConcern = useMajorityReadConcernForTest ? repl::ReadConcernLevel::kMajorityReadConcern
+                                                     : repl::ReadConcernLevel::kSnapshotReadConcern;
 
     // ShardRemote requires a majority read. We can only allow a non-majority read if we are a
     // config server.
