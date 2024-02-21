@@ -317,8 +317,9 @@ export var EncryptedClient = class {
     }
 
     assertWriteCommandReplyFields(response) {
-        if (isMongod(this._edb)) {
-            // These fields are replica set specific
+        if (isMongod(this._edb) && !TestData.testingReplicaSetEndpoint) {
+            // These fields are replica set specific. The replica set endpoint forces write commands
+            // to go through the router which does not return these fields.
             assert(response.hasOwnProperty("electionId"));
             assert(response.hasOwnProperty("opTime"));
         }
