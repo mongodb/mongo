@@ -54,7 +54,7 @@ const runTest = (failpoint, mode) => {
 
     rst.awaitReplication();
     dbcheckFp.off();
-    awaitDbCheckCompletion(rst, testDB, true /*withClearedHealthLog*/);
+    awaitDbCheckCompletion(rst, testDB, true /*waitForHealthLogDbCheckStop*/);
 
     // dbcheck shouldn't find any errors and log one warning that the collection doesn't exist.
     let warnings = [];
