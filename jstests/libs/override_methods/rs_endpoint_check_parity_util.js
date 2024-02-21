@@ -1,5 +1,3 @@
-import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
-
 const readCommandNames = new Set([
     "aggregate",
     "collStats",
@@ -32,7 +30,8 @@ function checkCanRun(dbName, commandName, commandObj) {
         throw Error("Cannot set 'internalQueryTopNAccumulatorBytes' to too low since it could " +
                     "cause the CheckRoutingTableConsistency hook to fail");
     }
-    if (commandName === "getClusterParameter" || commandName == "auditConfigure") {
+    if (commandName === "getClusterParameter" || commandName == "auditConfigure" ||
+        commandName == "getAuditConfig") {
         // TODO (SERVER-83421): Support cluster getClusterParameter command in embedded router.
         throw Error("Cannot run getClusterParameter command since it is currently not supported " +
                     "on embedded routers");
@@ -55,12 +54,37 @@ function checkCanRun(dbName, commandName, commandObj) {
     }
 }
 
-function runCommand(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+export function runCommandBase(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
     print("Running command with dbName: " + dbName + ", cmdObj: " + JSON.stringify(commandObj));
     checkCanRun(dbName, commandName, commandObj);
     return func.apply(conn, makeFuncArgs(commandObj));
 }
 
-OverrideHelpers.prependOverrideInParallelShell("jstests/libs/override_methods/rs_endpoint.js");
+/**
+ * Runs the given command against both connections and compare the responses.
+ */
+export function runCommandCompareResponsesBase(
+    conn0, conn1, dbName, commandName, commandObj, func, makeFuncArgs) {
+    print("Comparing responses for command with dbName: " + dbName +
+          ", cmdObj: " + JSON.stringify(commandObj));
+    checkCanRun(dbName, commandName, commandObj);
 
-OverrideHelpers.overrideRunCommand(runCommand);
+    let resObj0, err0;
+    try {
+        resObj0 = func.apply(conn0, makeFuncArgs(commandObj));
+    } catch (err) {
+        err0 = err;
+    }
+    let resObj1, err1;
+    try {
+        resObj1 = func.apply(conn1, makeFuncArgs(commandObj));
+    } catch (err) {
+        err1 = err;
+    }
+
+    if (err0) {
+        throw err0;
+    }
+    // TODO (SERVER-86834): Add response comparison to replica set endpoint jstestfuzz suites.
+    return resObj0;
+}

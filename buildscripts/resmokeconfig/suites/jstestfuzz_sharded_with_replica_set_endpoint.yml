@@ -15,7 +15,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        await import('jstests/libs/override_methods/rs_endpoint.js');
+        await import('jstests/libs/override_methods/rs_endpoint_check_parity_sharded_cluster.js');
       global_vars:
         TestData: &TestData
           testingReplicaSetEndpoint: true
