@@ -14,5 +14,4 @@
 - featureFlagAllMongodsAreSharded
 - featureFlagGRPC
 - featureFlagReplicaSetEndpoint
-- featureFlagClassicRuntimePlanningForSbe
 - featureFlagCreateCollectionInPreparedTransactions

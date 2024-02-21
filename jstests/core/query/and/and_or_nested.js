@@ -2,6 +2,8 @@
  * Some more tests $and/$or being nested in various ways.
  */
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.jstests_and_or_nested;
 coll.drop();
@@ -35,20 +37,10 @@ assert.commandWorked(coll.insert([
 runWithDifferentIndexes([[], [{a: 1}], [{b: 1}], [{a: 1}, {b: 1}], [{a: 1}, {c: 1}]], () => {
     assert(arrayEq(coll.find({$and: [{a: {$gt: 5}}, {c: {$gt: 4}}]}, {_id: 1}).toArray(),
                    [{_id: 5}, {_id: 9}, {_id: 12}]));
-
-    assert(arrayEq(coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}, {_id: 1}).toArray(),
-                   [{_id: 1}, {_id: 5}, {_id: 9}, {_id: 10}, {_id: 11}, {_id: 12}, {_id: 13}]));
-
     assert(
         arrayEq(coll.find({$and: [{$or: [{a: {$gt: 5}}, {b: {$lt: 5}}]}, {c: {$lt: 6}}]}, {_id: 1})
                     .toArray(),
                 [{_id: 1}, {_id: 3}, {_id: 5}, {_id: 10}, {_id: 12}]));
-
-    assert(arrayEq(
-        coll.find({$or: [{$and: [{a: {$gt: 5}}, {c: {$gt: 2}}]}, {$and: [{b: {$lt: 5}}, {d: 1}]}]},
-                  {_id: 1})
-            .toArray(),
-        [{_id: 1}, {_id: 5}, {_id: 9}, {_id: 12}, {_id: 13}]));
 
     assert(arrayEq(coll.find({$or: [{b: {$gte: 7}}]}, {_id: 1}).toArray(),
                    [{_id: 3}, {_id: 4}, {_id: 8}]));
@@ -56,9 +48,28 @@ runWithDifferentIndexes([[], [{a: 1}], [{b: 1}], [{a: 1}, {b: 1}], [{a: 1}, {c: 
     assert(arrayEq(coll.find({$or: [{$and: [{b: {$gte: 7}}]}]}, {_id: 1}).toArray(),
                    [{_id: 3}, {_id: 4}, {_id: 8}]));
 
-    assert(arrayEq(
-        coll.find({$or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}]},
-                  {_id: 1})
-            .toArray(),
-        [{_id: 1}, {_id: 5}, {_id: 9}, {_id: 10}, {_id: 12}, {_id: 13}]));
+    // TODO SERVER-86816: Remove this constraint.
+    // When running in any CSI passthrough suite with all feature flags enabled, this test will run
+    // with featureFlagClassicRuntimePlanningForSbe. This fails when we sub-plan a query and try to
+    // build a classic executable tree since CSI is not supported in the classic engine.
+    if (!setUpServerForColumnStoreIndexTest(db) &&
+        !FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
+        assert(arrayEq(coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}, {_id: 1}).toArray(),
+                       [{_id: 1}, {_id: 5}, {_id: 9}, {_id: 10}, {_id: 11}, {_id: 12}, {_id: 13}]));
+
+        assert(arrayEq(
+            coll.find({
+                    $or: [{$and: [{a: {$gt: 5}}, {c: {$gt: 2}}]}, {$and: [{b: {$lt: 5}}, {d: 1}]}]
+                },
+                      {_id: 1})
+                .toArray(),
+            [{_id: 1}, {_id: 5}, {_id: 9}, {_id: 12}, {_id: 13}]));
+
+        assert(arrayEq(
+            coll.find(
+                    {$or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}]},
+                    {_id: 1})
+                .toArray(),
+            [{_id: 1}, {_id: 5}, {_id: 9}, {_id: 10}, {_id: 12}, {_id: 13}]));
+    }
 });
