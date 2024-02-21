@@ -163,7 +163,7 @@ structs:
                 stability: stable
             recordIdsReplicated:
                 description: "Specifies whether this collection should utilize the same recordId for a given document
-                              across all nodes in the a replica set."
+                              across all nodes in a replica set."
                 type: safeBool
                 optional: true
                 stability: unstable
