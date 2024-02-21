@@ -54,12 +54,6 @@ function checkCanRun(dbName, commandName, commandObj) {
     }
 }
 
-export function runCommandBase(conn, dbName, commandName, commandObj, func, makeFuncArgs) {
-    print("Running command with dbName: " + dbName + ", cmdObj: " + JSON.stringify(commandObj));
-    checkCanRun(dbName, commandName, commandObj);
-    return func.apply(conn, makeFuncArgs(commandObj));
-}
-
 /**
  * Runs the given command against both connections and compare the responses.
  */

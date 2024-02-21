@@ -3,12 +3,12 @@
 import os.path
 
 from buildscripts.resmokelib import errors
-from buildscripts.resmokelib.testing.fixtures import shardedcluster
+from buildscripts.resmokelib.testing.fixtures import multi_sharded_cluster, shardedcluster
 from buildscripts.resmokelib.testing.hooks import jsfile
 from buildscripts.resmokelib.testing.hooks.background_job import _BackgroundJob, _ContinuousDynamicJSTestCase
 
 
-class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
+class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook):
     """Check the metadata consistency of a sharded cluster."""
 
     IS_BACKGROUND = True
@@ -23,9 +23,11 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckMetadataConsistencyInBackground."""
 
-        if not isinstance(fixture, shardedcluster.ShardedClusterFixture):
-            raise ValueError(f"'fixture' must be an instance of ShardedClusterFixture, but got " \
-                             f"{fixture.__class__.__name__}")
+        if not isinstance(fixture, shardedcluster.ShardedClusterFixture) and not isinstance(
+                fixture, multi_sharded_cluster.MultiShardedClusterFixture):
+            raise ValueError(
+                f"'fixture' must be an instance of ShardedClusterFixture or MultiShardedClusterFixture, but got"
+                f" {fixture.__class__.__name__}")
 
         description = "Perform consistency checks between the config database and metadata " \
                       "stored/cached in the shards"
