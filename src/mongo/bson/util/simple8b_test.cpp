@@ -1469,3 +1469,32 @@ TEST(Simple8b, ValueTooLargeBitCountUsedForExtendedSelectors) {
     Simple8bBuilder<uint64_t> builder;
     ASSERT_FALSE(builder.append(value, [](uint64_t) { ASSERT(false); }));
 }
+
+TEST(Simple8b, ResetRLEAfterLargeValue) {
+    // Large value that can be only be stored in the extended selectors that encodes a bit shift
+    uint64_t large = 0xC000000000000000;
+
+    std::vector<uint64_t> blocks;
+    auto writer = [&blocks](uint64_t block) {
+        blocks.push_back(block);
+    };
+    Simple8bBuilder<uint64_t> b;
+
+    // Write as many of these large values we need to ensure a non-RLE block is written followed by
+    // an RLE block.
+    for (int i = 0; i < simple8b_internal::kRleMultiplier + 7; ++i) {
+        ASSERT_TRUE(b.append(large, writer));
+    }
+
+    // Add a large value that can only fit in the base selector which can encode up to 60 meaningful
+    // bits. When terminating RLE we should completely reset to allow this value to be appended.
+    ASSERT_TRUE(b.append(0x07FFFFFFFFFFFFFF, writer));
+
+    b.flush(writer);
+
+    // In total 3 simple8b blocks should have been written
+    ASSERT_EQ(blocks.size(), 3);
+    // The second block should be an RLE block
+    ASSERT_TRUE((blocks[1] & simple8b_internal::kBaseSelectorMask) ==
+                simple8b_internal::kRleSelector);
+}

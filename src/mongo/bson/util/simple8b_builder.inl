@@ -414,6 +414,9 @@ void Simple8bBuilder<T>::_handleRleTermination(F&& writeFn) {
         }
         --_rleCount;
     }
+
+    // Reset which selectors are possible to use for next word
+    isSelectorPossible.fill(true);
 }
 
 template <typename T>
