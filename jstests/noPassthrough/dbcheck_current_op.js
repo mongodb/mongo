@@ -118,7 +118,7 @@ const runTest = (parameters) => {
         getExpectedCurOp(parameters, testDB.getCollectionInfos({name: collName})[0].info.uuid),
         testDB.currentOp().inprog.filter(x => x["desc"] === "dbCheck")[0]);
     dbcheckFp.off();
-    awaitDbCheckCompletion(rst, testDB, true /*withClearedHealthLog*/);
+    awaitDbCheckCompletion(rst, testDB, true /*waitForHealthLogDbCheckStop*/);
 };
 
 const dbCheckParameters = [

@@ -92,7 +92,7 @@ const runTest = (isPSASet) => {
             // Make sure that default wc is applied.
             assert.eq(defaultWC, dbcheckWC);
             dbcheckFp.off();
-            awaitDbCheckCompletion(rst, testDB, true /*withClearedHealthLog*/);
+            awaitDbCheckCompletion(rst, testDB, true /*waitForHealthLogDbCheckStop*/);
         });
     });
     rst.stopSet();

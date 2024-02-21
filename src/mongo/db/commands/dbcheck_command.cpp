@@ -114,6 +114,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangBeforeDbCheckLogOp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingDbCheckRun);
 MONGO_FAIL_POINT_DEFINE(hangBeforeProcessingFirstBatch);
+MONGO_FAIL_POINT_DEFINE(hangAndSetDBCheckReadTimestampToLastApplied);
 
 // The optional `tenantIdForStartStop` is used for dbCheckStart/dbCheckStop oplog entries so that
 // the namespace is still the admin command namespace but the tenantId will be set using the
@@ -1681,7 +1682,18 @@ std::unique_ptr<DbCheckAcquisition> DbChecker::_acquireDBCheckLocks(OperationCon
     // longer than the time it takes between starting and replicating a batch on the
     // primary. Otherwise, the readTimestamp will not be available on a secondary by the
     // time it processes the oplog entry.
-    const auto readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kNoOverlap};
+    auto readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kNoOverlap};
+
+    if (MONGO_unlikely(hangAndSetDBCheckReadTimestampToLastApplied.shouldFail())) {
+        auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
+        readSource = ReadSourceWithTimestamp{RecoveryUnit::ReadSource::kProvided,
+                                             lastAppliedOpTime.getTimestamp()};
+        LOGV2(8589000,
+              "Hanging dbCheck due to failpoint 'hangAndSetDBCheckReadTimestampToLastApplied' and "
+              "setting dbCheck's readTimestamp to lastAppliedOpTime.",
+              "lastAppliedOpTime"_attr = lastAppliedOpTime);
+        hangAndSetDBCheckReadTimestampToLastApplied.pauseWhileSet();
+    }
 
     // Acquires locks and sets appropriate state on the RecoveryUnit.
     auto acquisition = std::make_unique<DbCheckAcquisition>(
