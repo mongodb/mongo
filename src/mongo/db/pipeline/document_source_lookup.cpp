@@ -855,7 +855,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
 
     // If we are not already handling an $unwind stage internally and the following stage is an
     // $unwind of the $lookup "as" output array, subsume the $unwind into the current $lookup as an
-    // $lu ($lookup + $unwind) macro stage. The combined stage acts like a SQL join (one result
+    // $LU ($lookup + $unwind) macro stage. The combined stage acts like a SQL join (one result
     // record per LHS x RHS match instead of one result per LHS with an array of its RHS matches).
     //
     // Ideally for simplicity in the stage builder we would not absorb the downstream $unwind if the
@@ -866,9 +866,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
         if (nextUnwind->preserveNullAndEmptyArrays() || nextUnwind->indexPath()) {
             downgradeSbeCompatibility(SbeCompatibility::notCompatible);
         } else {
-            // TODO SERVER-80226: Remove this downgrade when $LU pushdown is enabled. Until then $LU
-            // (combined $lookup + $unwind) stages are only lowered to SBE with featureFlagSbeFull.
-            downgradeSbeCompatibility(SbeCompatibility::requiresSbeFull);
+            downgradeSbeCompatibility(SbeCompatibility::requiresTrySbe);
         }
         _unwindSrc = std::move(nextUnwind);
         container->erase(std::next(itr));

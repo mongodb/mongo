@@ -344,8 +344,7 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  *   - The 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is false,
  *   - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines), and
  *   - The foreign collection is fully local to this node and is not a view.
- *   - There is no absorbed $unwind stage ('_unwindSrc') or 'featureFlagSbeFull' is enabled.
- *     TODO SERVER-80226 $unwind Pushdown: remove above restriction when $LU pushdown is supported.
+ *   - There is no absorbed $unwind stage ('_unwindSrc') or 'trySbeEngine' is enabled.
  *   - There is no absorbed $match stage ('_matchSrc').
  *
  * $project via 'DocumentSourceInternalProjection':
@@ -383,7 +382,7 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  *   - the 'internalQuerySlotBasedExecutionDisableTimeSeriesPushdown', is _not_ enabled,
  *
  * $unwind stages ('DocumentSourceUnwind'):
- *    - 'featureFlagSbeFull' is enabled. (TODO SERVER-80226 $unwind Pushdown: change to "none")
+ *    - 'featureFlagSbeFull' is enabled.
  */
 bool findSbeCompatibleStagesForPushdown(
     const MultipleCollectionAccessor& collections,
@@ -433,8 +432,6 @@ bool findSbeCompatibleStagesForPushdown(
 
         .match = meetsRequirements(SbeCompatibility::requiresTrySbe),
 
-        // TODO SERVER-80226: Change to SbeCompatibility::requiresTrySbe when $unwind pushdown
-        // enabled.
         .unwind = meetsRequirements(SbeCompatibility::requiresSbeFull),
 
         // Note: even if its sort pattern is SBE compatible, we cannot push down a $sort stage when
