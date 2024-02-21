@@ -15,7 +15,6 @@ Import([
     'ssl_provider',
 ])
 
-snappySuffix = '-1.1.7'
 icuSuffix = '-57.1'
 tomcryptSuffix = '-1.18.2'
 
@@ -120,8 +119,19 @@ if not use_system_version_of_library('boost'):
     }
 
 if not use_system_version_of_library('snappy'):
+    platform_directory = "build_posix"
+
+    if env.TargetOSIs('linux'):
+        platform_directory = "build_linux_" + env['TARGET_ARCH']
+    elif env.TargetOSIs('windows'):
+        platform_directory = "build_windows"
+
     thirdPartyEnvironmentModifications['snappy'] = {
-        'CPPPATH': ['#/src/third_party/snappy' + snappySuffix],
+        'CPPPATH': [
+            '#/src/third_party/snappy/dist',
+            '#/src/third_party/snappy/platform/build_all',
+            '#/src/third_party/snappy/platform/' + platform_directory,
+        ],
     }
 
 # Valgrind is a header only include as valgrind.h includes everything we need
@@ -454,9 +464,9 @@ else:
     snappyEnv = snappyEnv.Clone()
     snappyEnv.InjectThirdParty(libraries=['snappy'])
     snappyEnv.InjectMongoIncludePaths()
-    snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={'env': snappyEnv})
+    snappyEnv.SConscript('snappy' + '/SConscript', exports={'env': snappyEnv})
     snappyEnv = snappyEnv.Clone(LIBDEPS_INTERFACE=[
-        'snappy' + snappySuffix + '/snappy',
+        'snappy/snappy',
     ])
 
 snappyEnv.ShimLibrary(name="snappy")

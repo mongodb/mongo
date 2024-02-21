@@ -1,5 +1,6 @@
 Snappy, a fast compressor/decompressor.
 
+[![Build Status](https://github.com/google/snappy/actions/workflows/build.yml/badge.svg)](https://github.com/google/snappy/actions/workflows/build.yml)
 
 Introduction
 ============
@@ -51,7 +52,7 @@ In particular:
 
  - Snappy uses 64-bit operations in several places to process more data at
    once than would otherwise be possible.
- - Snappy assumes unaligned 32- and 64-bit loads and stores are cheap.
+ - Snappy assumes unaligned 32 and 64-bit loads and stores are cheap.
    On some platforms, these must be emulated with single-byte loads
    and stores, which is much slower.
  - Snappy assumes little-endian throughout, and needs to byte-swap data in
@@ -65,32 +66,38 @@ are of course most welcome; see "Contact", below.
 Building
 ========
 
-CMake is supported and autotools will soon be deprecated.
-You need CMake 3.4 or above to build:
+You need the CMake version specified in [CMakeLists.txt](./CMakeLists.txt)
+or later to build:
 
-  mkdir build
-  cd build && cmake ../ && make
-
+```bash
+git submodule update --init
+mkdir build
+cd build && cmake ../ && make
+```
 
 Usage
 =====
 
 Note that Snappy, both the implementation and the main interface,
 is written in C++. However, several third-party bindings to other languages
-are available; see the home page at http://google.github.io/snappy/
-for more information. Also, if you want to use Snappy from C code, you can
-use the included C bindings in snappy-c.h.
+are available; see the [home page](docs/README.md) for more information.
+Also, if you want to use Snappy from C code, you can use the included C
+bindings in snappy-c.h.
 
 To use Snappy from your own C++ program, include the file "snappy.h" from
 your calling file, and link against the compiled library.
 
 There are many ways to call Snappy, but the simplest possible is
 
-  snappy::Compress(input.data(), input.size(), &output);
+```c++
+snappy::Compress(input.data(), input.size(), &output);
+```
 
 and similarly
 
-  snappy::Uncompress(input.data(), input.size(), &output);
+```c++
+snappy::Uncompress(input.data(), input.size(), &output);
+```
 
 where "input" and "output" are both instances of std::string.
 
@@ -102,48 +109,57 @@ information.
 Tests and benchmarks
 ====================
 
-When you compile Snappy, snappy_unittest is compiled in addition to the
-library itself. You do not need it to use the compressor from your own library,
-but it contains several useful components for Snappy development.
+When you compile Snappy, the following binaries are compiled in addition to the
+library itself. You do not need them to use the compressor from your own
+library, but they are useful for Snappy development.
 
-First of all, it contains unit tests, verifying correctness on your machine in
-various scenarios. If you want to change or optimize Snappy, please run the
-tests to verify you have not broken anything. Note that if you have the
-Google Test library installed, unit test behavior (especially failures) will be
-significantly more user-friendly. You can find Google Test at
+* `snappy_benchmark` contains microbenchmarks used to tune compression and
+  decompression performance.
+* `snappy_unittests` contains unit tests, verifying correctness on your machine
+  in various scenarios.
+* `snappy_test_tool` can benchmark Snappy against a few other compression
+  libraries (zlib, LZO, LZF, and QuickLZ), if they were detected at configure
+  time. To benchmark using a given file, give the compression algorithm you want
+  to test Snappy against (e.g. --zlib) and then a list of one or more file names
+  on the command line.
 
-  http://github.com/google/googletest
+If you want to change or optimize Snappy, please run the tests and benchmarks to
+verify you have not broken anything.
 
-You probably also want the gflags library for handling of command-line flags;
-you can find it at
+The testdata/ directory contains the files used by the microbenchmarks, which
+should provide a reasonably balanced starting point for benchmarking. (Note that
+baddata[1-3].snappy are not intended as benchmarks; they are used to verify
+correctness in the presence of corrupted data in the unit test.)
 
-  http://gflags.github.io/gflags/
+Contributing to the Snappy Project
+==================================
 
-In addition to the unit tests, snappy contains microbenchmarks used to
-tune compression and decompression performance. These are automatically run
-before the unit tests, but you can disable them using the flag
---run_microbenchmarks=false if you have gflags installed (otherwise you will
-need to edit the source).
+In addition to the aims listed at the top of the [README](README.md) Snappy
+explicitly supports the following:
 
-Finally, snappy can benchmark Snappy against a few other compression libraries
-(zlib, LZO, LZF, and QuickLZ), if they were detected at configure time.
-To benchmark using a given file, give the compression algorithm you want to test
-Snappy against (e.g. --zlib) and then a list of one or more file names on the
-command line. The testdata/ directory contains the files used by the
-microbenchmark, which should provide a reasonably balanced starting point for
-benchmarking. (Note that baddata[1-3].snappy are not intended as benchmarks; they
-are used to verify correctness in the presence of corrupted data in the unit
-test.)
+1. C++11
+2. Clang (gcc and MSVC are best-effort).
+3. Low level optimizations (e.g. assembly or equivalent intrinsics) for:
+  1. [x86](https://en.wikipedia.org/wiki/X86)
+  2. [x86-64](https://en.wikipedia.org/wiki/X86-64)
+  3. ARMv7 (32-bit)
+  4. ARMv8 (AArch64)
+4. Supports only the Snappy compression scheme as described in
+  [format_description.txt](format_description.txt).
+5. CMake for building
 
+Changes adding features or dependencies outside of the core area of focus listed
+above might not be accepted. If in doubt post a message to the
+[Snappy discussion mailing list](https://groups.google.com/g/snappy-compression).
+
+We are unlikely to accept contributions to the build configuration files, such
+as `CMakeLists.txt`. We are focused on maintaining a build configuration that
+allows us to test that the project works in a few supported configurations
+inside Google. We are not currently interested in supporting other requirements,
+such as different operating systems, compilers, or build systems.
 
 Contact
 =======
 
-Snappy is distributed through GitHub. For the latest version, a bug tracker,
-and other information, see
-
-  http://google.github.io/snappy/
-
-or the repository at
-
-  https://github.com/google/snappy
+Snappy is distributed through GitHub. For the latest version and other
+information, see https://github.com/google/snappy.

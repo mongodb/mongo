@@ -1,3 +1,23 @@
+Snappy v1.1.10, Mar 8th 2023:
+
+  * Performance improvements
+
+  * Compilation fixes for various environments
+
+Snappy v1.1.9, May 4th 2021:
+
+  * Performance improvements.
+
+  * Google Test and Google Benchmark are now bundled in third_party/.
+
+Snappy v1.1.8, January 15th 2020:
+
+  * Small performance improvements.
+
+  * Removed snappy::string alias for std::string.
+
+  * Improved CMake configuration.
+
 Snappy v1.1.7, August 24th 2017:
 
   * Improved CMake build support for 64-bit Linux distributions.

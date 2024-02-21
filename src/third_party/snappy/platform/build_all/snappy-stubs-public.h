@@ -1,5 +1,4 @@
 // Copyright 2011 Google Inc. All Rights Reserved.
-// Author: sesse@google.com (Steinar H. Gunderson)
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -36,56 +35,26 @@
 #ifndef THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_STUBS_PUBLIC_H_
 #define THIRD_PARTY_SNAPPY_OPENSOURCE_SNAPPY_STUBS_PUBLIC_H_
 
-#if HAVE_STDINT_H  // HAVE_STDINT_H
-#include <stdint.h>
-#endif  // HAVE_STDDEF_H
+#include <cstddef>
 
-#if HAVE_STDDEF_H  // HAVE_STDDEF_H
-#include <stddef.h>
-#endif  // HAVE_STDDEF_H
-
-#if HAVE_SYS_UIO_H  // HAVE_SYS_UIO_H
+#if HAVE_SYS_UIO_H
 #include <sys/uio.h>
 #endif  // HAVE_SYS_UIO_H
 
-#define SNAPPY_MAJOR 
-#define SNAPPY_MINOR 
-#define SNAPPY_PATCHLEVEL 
+#define SNAPPY_MAJOR 1
+#define SNAPPY_MINOR 1
+#define SNAPPY_PATCHLEVEL 10
 #define SNAPPY_VERSION \
     ((SNAPPY_MAJOR << 16) | (SNAPPY_MINOR << 8) | SNAPPY_PATCHLEVEL)
 
-#include <string>
-
 namespace snappy {
 
-#if HAVE_STDINT_H // HAVE_STDINT_H
-typedef int8_t int8;
-typedef uint8_t uint8;
-typedef int16_t int16;
-typedef uint16_t uint16;
-typedef int32_t int32;
-typedef uint32_t uint32;
-typedef int64_t int64;
-typedef uint64_t uint64;
-#else
-typedef signed char int8;
-typedef unsigned char uint8;
-typedef short int16;
-typedef unsigned short uint16;
-typedef int int32;
-typedef unsigned int uint32;
-typedef long long int64;
-typedef unsigned long long uint64;
-#endif  // HAVE_STDINT_H
-
-typedef std::string string;
-
-#if !HAVE_SYS_UIO_H  // !HAVE_SYS_UIO_H
+#if !HAVE_SYS_UIO_H
 // Windows does not have an iovec type, yet the concept is universally useful.
 // It is simple to define it ourselves, so we put it inside our own namespace.
 struct iovec {
-	void* iov_base;
-	size_t iov_len;
+  void* iov_base;
+  size_t iov_len;
 };
 #endif  // !HAVE_SYS_UIO_H
 

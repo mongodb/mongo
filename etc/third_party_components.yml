@@ -145,10 +145,8 @@ components:
     homepage_url: https://google.github.io/snappy/
     open_hub_url: N/A
     release_monitoring_id: 4844
-    local_directory_path: src/third_party/snappy-1.1.7
-    team_owner: "Storage Execution"
-    upgrade_suppression: TODO SERVER-47281
-    # TODO - bad version data
+    local_directory_path: src/third_party/snappy
+    team_owner: "Service Architecture"
 
   gperftools:
     homepage_url: https://github.com/gperftools/gperftools
