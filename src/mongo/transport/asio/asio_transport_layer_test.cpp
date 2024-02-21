@@ -342,6 +342,16 @@ TEST(AsioTransportLayer, TCPResetAfterConnectionIsSilentlySwallowed) {
     ASSERT_EQ(sessionsCreated.load(), 0);
 }
 
+TEST(AsioTransportLayer, StopAcceptingSessionsBeforeStart) {
+    auto sm = std::make_unique<test::MockSessionManager>();
+    auto tla = std::make_unique<AsioTransportLayer>(defaultTLAOptions(), std::move(sm));
+    ON_BLOCK_EXIT([&] { tla->shutdown(); });
+
+    ASSERT_OK(tla->setup());
+    tla->stopAcceptingSessions();
+    ASSERT_OK(tla->start());
+}
+
 #ifdef __linux__
 /**
  * Test that the server successfully captures the TCP socket queue depth, and places the value both
@@ -967,10 +977,6 @@ public:
 
         ~FirstSessionManager() override {
             _join();
-        }
-
-        Status start() override {
-            return Status::OK();
         }
 
         void startSession(std::shared_ptr<Session> session) override {

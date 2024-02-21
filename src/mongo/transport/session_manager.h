@@ -78,11 +78,6 @@ public:
     virtual void endAllSessions(Client::TagMask tags) = 0;
 
     /**
-     * Starts the session manager.
-     */
-    virtual Status start() = 0;
-
-    /**
      * Shuts down the session manager.
      */
     virtual bool shutdown(Milliseconds timeout) = 0;
