@@ -52,11 +52,21 @@ namespace mongo {
 
 class S2AccessMethod : public SortedDataIndexAccessMethod {
 public:
-    S2AccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
+    S2AccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree)
+        : S2AccessMethod(btreeState, std::move(btree), IndexNames::GEO_2DSPHERE) {}
+
+    /**
+     * Helper for 'fixSpec' which validates the index and returns a copy tweaked to conform to the
+     * expected format. If expectedVersion is specified, the index version must match.
+     *
+     * Returns a non-OK status if 'specObj' is invalid.
+     */
+    static StatusWith<BSONObj> _fixSpecHelper(
+        const BSONObj& specObj, boost::optional<long long> expectedVersion = boost::none);
 
     /**
      * Takes an index spec object for this index and returns a copy tweaked to conform to the
-     * expected format.  When an index build is initiated, this function is called on the spec
+     * expected format. When an index build is initiated, this function is called on the spec
      * object the user provides, and the return value of this function is the final spec object
      * that gets saved in the index catalog.
      *
@@ -64,10 +74,15 @@ public:
      */
     static StatusWith<BSONObj> fixSpec(const BSONObj& specObj);
 
+protected:
+    S2AccessMethod(IndexCatalogEntry* btreeState,
+                   std::unique_ptr<SortedDataInterface> btree,
+                   const std::string& indexName);
+
 private:
     void validateDocument(const CollectionPtr& collection,
                           const BSONObj& obj,
-                          const BSONObj& keyPattern) const override;
+                          const BSONObj& keyPattern) const override final;
 
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.

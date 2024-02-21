@@ -29,30 +29,21 @@
 
 #pragma once
 
-#include <boost/optional/optional.hpp>
-#include <memory>
-
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/record_id.h"
-#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 
-class S2BucketAccessMethod : public SortedDataIndexAccessMethod {
+class S2BucketAccessMethod : public S2AccessMethod {
 public:
-    S2BucketAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree);
+    S2BucketAccessMethod(IndexCatalogEntry* btreeState, std::unique_ptr<SortedDataInterface> btree)
+        : S2AccessMethod(btreeState, std::move(btree), IndexNames::GEO_2DSPHERE_BUCKET) {}
 
     /**
      * Takes an index spec object for this index and returns a copy tweaked to conform to the
@@ -62,40 +53,9 @@ public:
      *
      * Returns a non-OK status if 'specObj' is invalid.
      */
-    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj);
-
-private:
-    void validateDocument(const CollectionPtr& collection,
-                          const BSONObj& obj,
-                          const BSONObj& keyPattern) const override;
-
-    /**
-     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
-     *
-     * This function ignores the 'multikeyPaths' pointer because text indexes don't support tracking
-     * path-level multikey information.
-     *
-     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. This
-     * function resizes 'multikeyPaths' to have the same number of elements as the index key pattern
-     * and fills each element with the prefixes of the indexed field that would cause this index to
-     * be multikey as a result of inserting 'keys'.
-     */
-    void doGetKeys(OperationContext* opCtx,
-                   const CollectionPtr& collection,
-                   const IndexCatalogEntry* entry,
-                   SharedBufferFragmentBuilder& pooledBufferBuilder,
-                   const BSONObj& obj,
-                   GetKeysContext context,
-                   KeyStringSet* keys,
-                   KeyStringSet* multikeyMetadataKeys,
-                   MultikeyPaths* multikeyPaths,
-                   const boost::optional<RecordId>& id) const final;
-
-    S2IndexingParams _params;
-
-    // Null if this index orders strings according to the simple binary compare. If non-null,
-    // represents the collator used to generate index keys for indexed strings.
-    const CollatorInterface* _collator;
+    static StatusWith<BSONObj> fixSpec(const BSONObj& specObj) {
+        return S2AccessMethod::_fixSpecHelper(specObj, /*expectedVersion*/ S2_INDEX_VERSION_3);
+    }
 };
 
 }  // namespace mongo

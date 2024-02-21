@@ -61,7 +61,8 @@ namespace mongo {
 static const string kIndexVersionFieldName("2dsphereIndexVersion");
 
 S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
-                               std::unique_ptr<SortedDataInterface> btree)
+                               std::unique_ptr<SortedDataInterface> btree,
+                               const std::string& indexName)
     : SortedDataIndexAccessMethod(btreeState, std::move(btree)) {
     const IndexDescriptor* descriptor = btreeState->descriptor();
 
@@ -74,12 +75,12 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
     BSONObjIterator i(descriptor->keyPattern());
     while (i.more()) {
         BSONElement e = i.next();
-        if (e.type() == String && IndexNames::GEO_2DSPHERE == e.String()) {
+        if (e.type() == String && indexName == e.String()) {
             ++geoFields;
         } else {
             // We check for numeric in 2d, so that's the check here
             uassert(16823,
-                    (string) "Cannot use " + IndexNames::GEO_2DSPHERE +
+                    (string) "Cannot use " + indexName +
                         " index with other special index types: " + e.toString(),
                     e.isNumber());
         }
@@ -96,11 +97,22 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState,
     }
 }
 
-// static
-StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
-    // If the spec object has the field "2dsphereIndexVersion", validate it.  If it doesn't, add
-    // {2dsphereIndexVersion: 3}, which is the default for newly-built indexes.
+StatusWith<BSONObj> cannotCreateIndexStatus(BSONElement indexVersionElt,
+                                            const std::string& message,
+                                            const std::string& expectedVersions = str::stream()
+                                                << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2
+                                                << "," << S2_INDEX_VERSION_3,
+                                            const std::string& extraMessage = "") {
+    return {ErrorCodes::CannotCreateIndex,
+            str::stream() << message << " { " << kIndexVersionFieldName << " : " << indexVersionElt
+                          << " }, only versions: [" << expectedVersions << "] are supported"
+                          << extraMessage};
+}
 
+StatusWith<BSONObj> S2AccessMethod::_fixSpecHelper(const BSONObj& specObj,
+                                                   boost::optional<long long> expectedVersion) {
+    // If the spec object doesn't have field "2dsphereIndexVersion", add {2dsphereIndexVersion: 3},
+    // which is the default for newly-built indexes.
     BSONElement indexVersionElt = specObj[kIndexVersionFieldName];
     if (indexVersionElt.eoo()) {
         BSONObjBuilder bob;
@@ -109,34 +121,43 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
         return bob.obj();
     }
 
+    // Otherwise, validate the index version.
     if (!indexVersionElt.isNumber()) {
-        return {ErrorCodes::CannotCreateIndex,
-                str::stream() << "Invalid type for geo index version { " << kIndexVersionFieldName
-                              << " : " << indexVersionElt << " }, only versions: ["
-                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
-                              << S2_INDEX_VERSION_3 << "] are supported"};
+        return cannotCreateIndexStatus(indexVersionElt, "Invalid type for geo index version");
     }
 
     if (indexVersionElt.type() == BSONType::NumberDouble &&
         !std::isnormal(indexVersionElt.numberDouble())) {
-        return {ErrorCodes::CannotCreateIndex,
-                str::stream() << "Invalid value for geo index version { " << kIndexVersionFieldName
-                              << " : " << indexVersionElt << " }, only versions: ["
-                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
-                              << S2_INDEX_VERSION_3 << "] are supported"};
+        return cannotCreateIndexStatus(indexVersionElt, "Invalid value for geo index version");
     }
 
     const auto indexVersion = indexVersionElt.safeNumberLong();
-    if (indexVersion != S2_INDEX_VERSION_1 && indexVersion != S2_INDEX_VERSION_2 &&
-        indexVersion != S2_INDEX_VERSION_3) {
-        return {ErrorCodes::CannotCreateIndex,
-                str::stream() << "unsupported geo index version { " << kIndexVersionFieldName
-                              << " : " << indexVersionElt << " }, only versions: ["
-                              << S2_INDEX_VERSION_1 << "," << S2_INDEX_VERSION_2 << ","
-                              << S2_INDEX_VERSION_3 << "] are supported"};
-    }
 
+    if (expectedVersion) {
+        // If we have an expectedVersion, we must be in timeseries.
+        if (indexVersion != *expectedVersion) {
+            return cannotCreateIndexStatus(indexVersionElt,
+                                           "unsupported geo index version",
+                                           std::to_string(*expectedVersion),
+                                           " for timeseries");
+        }
+    } else {
+        // Index version must be either 1, 2 or 3.
+        switch (indexVersion) {
+            case S2_INDEX_VERSION_1:
+            case S2_INDEX_VERSION_2:
+            case S2_INDEX_VERSION_3:
+                break;
+            default:
+                return cannotCreateIndexStatus(indexVersionElt, "unsupported geo index version");
+        }
+    }
     return specObj;
+}
+
+// static
+StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
+    return S2AccessMethod::_fixSpecHelper(specObj);
 }
 
 void S2AccessMethod::validateDocument(const CollectionPtr& collection,

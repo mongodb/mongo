@@ -51,7 +51,6 @@ iamEnv.Library(
         'index_descriptor.cpp',
         'multikey_paths.cpp',
         's2_access_method.cpp',
-        's2_bucket_access_method.cpp',
         'skipped_record_tracker.cpp',
         'sort_key_generator.cpp',
         'wildcard_access_method.cpp',
