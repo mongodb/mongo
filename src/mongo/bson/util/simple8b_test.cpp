@@ -1407,3 +1407,36 @@ TEST(Simple8b, ValueTooLargeBitCountUsedForExtendedSelectors) {
     });
     ASSERT_FALSE(builder.append(value));
 }
+
+TEST(Simple8b, ResetRLEAfterLargeValue) {
+    uint8_t kRleMultiplier = 120;
+    uint8_t kBaseSelectorMask = 0x000000000000000F;
+    uint8_t kRleSelector = 15;
+    // Large value that can be only be stored in the extended selectors that encodes a bit shift
+    uint64_t large = 0xC000000000000000;
+
+    BufBuilder buf;
+    Simple8bBuilder<uint64_t> b([&buf](uint64_t simple8bBlock) {
+        buf.appendNum(simple8bBlock);
+        return true;
+    });
+
+    // Write as many of these large values we need to ensure a non-RLE block is written followed by
+    // an RLE block.
+    for (int i = 0; i < kRleMultiplier + 7; ++i) {
+        ASSERT_TRUE(b.append(large));
+    }
+
+    // Add a large value that can only fit in the base selector which can encode up to 60 meaningful
+    // bits. When terminating RLE we should completely reset to allow this value to be appended.
+    ASSERT_TRUE(b.append(0x07FFFFFFFFFFFFFF));
+
+    b.flush();
+    auto size = buf.len();
+    auto data = buf.release();
+
+    // The second block should be an RLE block
+    ASSERT_GT(size, 16);
+    uint64_t secondBlock = *((uint64_t*)(data.get() + sizeof(uint64_t)));
+    ASSERT_TRUE((secondBlock & kBaseSelectorMask) == kRleSelector);
+}
