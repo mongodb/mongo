@@ -188,6 +188,7 @@ server_parameters:
     cpp_varname: "internalQueryDisablePlanCache"
     cpp_vartype: AtomicWord<bool>
     default: false
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryCacheMaxEntriesPerCollection:
     description: "The maximum number of entries allowed in a given collection's plan cache. Applies
