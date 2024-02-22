@@ -670,6 +670,18 @@ private:
                                           const BSONElement& reference,
                                           const Materialize& materialize);
 
+    /* Like decompressAllDelta, but does not have branching to avoid re-materialization
+       of repeated values, intended to be used on primitive types where this does not
+       result in additional allocation */
+    template <typename T, typename Encoding, class Buffer, typename Materialize>
+    requires Appendable<Buffer>
+    static const char* decompressAllDeltaPrimitive(const char* ptr,
+                                                   const char* end,
+                                                   Buffer& buffer,
+                                                   Encoding last,
+                                                   const BSONElement& reference,
+                                                   const Materialize& materialize);
+
     template <typename T, class Buffer, typename Materialize, typename Decode>
     requires Appendable<Buffer>
     static const char* decompressAllDeltaOfDelta(const char* ptr,
