@@ -40,68 +40,130 @@
 namespace mongo {
 namespace {
 
-// mongod only metrics
-auto& deletedCounter = *MetricBuilder<Counter64>("document.deleted");
-auto& insertedCounter = *MetricBuilder<Counter64>("document.inserted");
-auto& returnedCounter = *MetricBuilder<Counter64>("document.returned");
-auto& updatedCounter = *MetricBuilder<Counter64>("document.updated");
+/** Build a `Counter64` metric with the given `name` and `role`. */
+Counter64* makeCounter(std::string name, ClusterRole role) {
+    return &*MetricBuilder<Counter64>(std::move(name)).setRole(role);
+}
 
-auto& scannedCounter = *MetricBuilder<Counter64>("queryExecutor.scanned");
-auto& scannedObjectCounter = *MetricBuilder<Counter64>("queryExecutor.scannedObjects");
+/** If `in` is nonzero, increment `stat` by it. */
+template <typename T>
+void incrCounter(Counter64* stat, const T& in) {
+    if (in)
+        stat->increment(in);
+}
 
-auto& scanAndOrderCounter = *MetricBuilder<Counter64>("operation.scanAndOrder");
-auto& writeConflictsCounter = *MetricBuilder<Counter64>("operation.writeConflicts");
+/** If `in` is an atomic, load it and increment by that value. */
+template <typename T>
+void incrCounter(Counter64* stat, const AtomicWord<T>& in) {
+    incrCounter(stat, in.load());
+}
 
-// mongos and mongod metrics
-auto& killedDueToClientDisconnectCounter =
-    *MetricBuilder<Counter64>("operation.killedDueToClientDisconnect");
-auto& killedDueToMaxTimeMSExpiredCounter =
-    *MetricBuilder<Counter64>("operation.killedDueToMaxTimeMSExpired");
+/** If `in` is an engaged optional, increment by its dereferenced value. */
+template <typename T>
+void incrCounter(Counter64* stat, const boost::optional<T>& in) {
+    if (in)
+        incrCounter(stat, *in);
+}
+
+/** Counters that are in both shard and router. */
+struct InBoth {
+    explicit InBoth(ClusterRole role)
+        : killedDueToClientDisconnect{makeCounter("operation.killedDueToClientDisconnect", role)},
+          killedDueToMaxTimeMSExpired{makeCounter("operation.killedDueToMaxTimeMSExpired", role)} {}
+
+    void record(OperationContext* opCtx) {
+        auto* curOp = CurOp::get(opCtx);
+        auto& debug = curOp->debug();
+        auto killStatus = opCtx->getKillStatus();
+        if (killStatus == ErrorCodes::ClientDisconnect) {
+            killedDueToClientDisconnect->increment();
+        }
+        if (killStatus == ErrorCodes::MaxTimeMSExpired ||
+            debug.errInfo == ErrorCodes::MaxTimeMSExpired) {
+            killedDueToMaxTimeMSExpired->increment();
+        }
+    }
+
+    Counter64* killedDueToClientDisconnect;
+    Counter64* killedDueToMaxTimeMSExpired;
+};
+
+/** Counters that are in shard service. */
+struct InShard : InBoth {
+    static constexpr auto role = ClusterRole::ShardServer;
+
+    InShard() : InBoth{role} {}
+
+    void recordWriteConflicts(OperationContext* opCtx) {
+        auto* curOp = CurOp::get(opCtx);
+        auto& debug = curOp->debug();
+        auto& am = debug.additiveMetrics;
+        incrCounter(writeConflicts, am.writeConflicts);
+    }
+
+    void record(OperationContext* opCtx) {
+        InBoth::record(opCtx);
+        auto* curOp = CurOp::get(opCtx);
+        auto& debug = curOp->debug();
+        auto& am = debug.additiveMetrics;
+        incrCounter(deleted, am.ndeleted);
+        incrCounter(inserted, am.ninserted);
+        incrCounter(returned, am.nreturned);
+        incrCounter(updated, am.nMatched);
+        incrCounter(scanned, am.keysExamined);
+        incrCounter(scannedObjects, am.docsExamined);
+        incrCounter(scanAndOrder, debug.hasSortStage);
+        incrCounter(writeConflicts, am.writeConflicts);
+
+        _updateExternalStats(opCtx);
+    }
+
+private:
+    /** A few nonmember variables also need to be updated. */
+    static void _updateExternalStats(const OperationContext* opCtx) {
+        auto* curOp = CurOp::get(opCtx);
+        auto& debug = curOp->debug();
+        lookupPushdownCounters.incrementLookupCounters(debug);
+        sortCounters.incrementSortCounters(debug);
+        queryFrameworkCounters.incrementQueryEngineCounters(curOp);
+    }
+
+public:
+    Counter64* deleted{makeCounter("document.deleted", role)};
+    Counter64* inserted{makeCounter("document.inserted", role)};
+    Counter64* returned{makeCounter("document.returned", role)};
+    Counter64* updated{makeCounter("document.updated", role)};
+    Counter64* scanned{makeCounter("queryExecutor.scanned", role)};
+    Counter64* scannedObjects{makeCounter("queryExecutor.scannedObjects", role)};
+    Counter64* scanAndOrder{makeCounter("operation.scanAndOrder", role)};
+    Counter64* writeConflicts{makeCounter("operation.writeConflicts", role)};
+};
+
+/** Counters that are in the router service (currently none). */
+struct InRouter : InBoth {
+    InRouter() : InBoth{ClusterRole::RouterServer} {}
+};
+
+static InShard shardStats{};
+static InRouter routerStats{};
 
 }  // namespace
 
 void recordCurOpMetrics(OperationContext* opCtx) {
-    const OpDebug& debug = CurOp::get(opCtx)->debug();
-    // TODO SERVER-78810 Use improved ClusterRole API here, and ensure we only add the non-router
-    // metrics if `opCtx` didn't execute under the router-role.
-    if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::RouterServer)) {
-        if (debug.additiveMetrics.nreturned)
-            returnedCounter.increment(*debug.additiveMetrics.nreturned);
-        if (debug.additiveMetrics.ninserted)
-            insertedCounter.increment(*debug.additiveMetrics.ninserted);
-        if (debug.additiveMetrics.nMatched)
-            updatedCounter.increment(*debug.additiveMetrics.nMatched);
-        if (debug.additiveMetrics.ndeleted)
-            deletedCounter.increment(*debug.additiveMetrics.ndeleted);
-        if (debug.additiveMetrics.keysExamined)
-            scannedCounter.increment(*debug.additiveMetrics.keysExamined);
-        if (debug.additiveMetrics.docsExamined)
-            scannedObjectCounter.increment(*debug.additiveMetrics.docsExamined);
-
-        if (debug.hasSortStage)
-            scanAndOrderCounter.increment();
-        if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
-            writeConflictsCounter.increment(n);
-        lookupPushdownCounters.incrementLookupCounters(CurOp::get(opCtx)->debug());
-        sortCounters.incrementSortCounters(debug);
-        queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
-    }
-
-    if (opCtx->getKillStatus() == ErrorCodes::ClientDisconnect) {
-        killedDueToClientDisconnectCounter.increment();
-    }
-
-    if (opCtx->getKillStatus() == ErrorCodes::MaxTimeMSExpired ||
-        debug.errInfo == ErrorCodes::MaxTimeMSExpired) {
-        killedDueToMaxTimeMSExpiredCounter.increment();
+    auto role = opCtx->getService()->role();
+    if (role.hasExclusively(ClusterRole::ShardServer)) {
+        shardStats.record(opCtx);
+    } else if (role.hasExclusively(ClusterRole::RouterServer)) {
+        routerStats.record(opCtx);
+    } else {
+        MONGO_UNREACHABLE;
     }
 }
 
 void recordCurOpMetricsOplogApplication(OperationContext* opCtx) {
-    const OpDebug& debug = CurOp::get(opCtx)->debug();
-    if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0) {
-        writeConflictsCounter.increment(n);
-    }
+    auto role = opCtx->getService()->role();
+    if (role.hasExclusively(ClusterRole::ShardServer))
+        shardStats.recordWriteConflicts(opCtx);
 }
 
 }  // namespace mongo
