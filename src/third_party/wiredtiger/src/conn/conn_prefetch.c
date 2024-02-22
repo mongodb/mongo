@@ -11,11 +11,6 @@
 /*
  * __wt_prefetch_create --
  *     Start the pre-fetch server.
- *
- * FIXME-WT-11691 The pre-fetch server currently starts up when pre-fetch is enabled on the
- *     connection level but this needs to be modified when we add the session level configuration.
- *     Perhaps we could delay starting the utility threads until the first session enables
- *     pre-fetching.
  */
 int
 __wt_prefetch_create(WT_SESSION_IMPL *session, const char *cfg[])
@@ -88,15 +83,10 @@ __wt_prefetch_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-    while (F_ISSET(conn, WT_CONN_PREFETCH_RUN)) {
-        /*
-         * Wait and cycle if there aren't any pages on the queue. It would be nice if this was
-         * interrupt driven, but for now just backoff and re-check.
-         */
-        if (conn->prefetch_queue_count == 0) {
-            __wt_sleep(0, 5000);
-            break;
-        }
+    if (F_ISSET(conn, WT_CONN_PREFETCH_RUN))
+        __wt_cond_wait(session, conn->prefetch_threads.wait_cond, 10 * WT_THOUSAND, NULL);
+
+    while (!TAILQ_EMPTY(&conn->pfqh)) {
         __wt_spin_lock(session, &conn->prefetch_lock);
         locked = true;
         pe = TAILQ_FIRST(&conn->pfqh);
@@ -168,6 +158,8 @@ __wt_conn_prefetch_queue_push(WT_SESSION_IMPL *session, WT_REF *ref)
     ++conn->prefetch_queue_count;
     __wt_spin_unlock(session, &conn->prefetch_lock);
 
+    __wt_cond_signal(session, conn->prefetch_threads.wait_cond);
+
     return (0);
 }
 
@@ -226,6 +218,9 @@ __wt_prefetch_destroy(WT_SESSION_IMPL *session)
 
     /* Ensure that the pre-fetch queue is drained. */
     WT_TRET(__wt_conn_prefetch_clear_tree(session, true));
+
+    /* Let any running threads finish up. */
+    __wt_cond_signal(session, conn->prefetch_threads.wait_cond);
 
     __wt_writelock(session, &conn->prefetch_threads.lock);
 
