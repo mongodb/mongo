@@ -44,7 +44,7 @@ ConfigShardWrapper::ConfigShardWrapper(std::shared_ptr<Shard> configShard)
     invariant(_configShard->isConfig());
 }
 
-ConnectionString ConfigShardWrapper::getConnString() const {
+const ConnectionString& ConfigShardWrapper::getConnString() const {
     return _configShard->getConnString();
 }
 

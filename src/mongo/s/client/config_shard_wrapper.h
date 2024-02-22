@@ -72,7 +72,7 @@ public:
 
     ~ConfigShardWrapper() = default;
 
-    ConnectionString getConnString() const override;
+    const ConnectionString& getConnString() const override;
 
     std::shared_ptr<RemoteCommandTargeter> getTargeter() const override;
 

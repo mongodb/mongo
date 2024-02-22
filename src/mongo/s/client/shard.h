@@ -128,7 +128,7 @@ public:
     /**
      * Returns the current connection string for the shard.
      */
-    virtual ConnectionString getConnString() const = 0;
+    virtual const ConnectionString& getConnString() const = 0;
 
     /**
      * Returns the RemoteCommandTargeter for the hosts in this shard.

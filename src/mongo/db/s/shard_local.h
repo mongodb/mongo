@@ -61,6 +61,10 @@ class ShardLocal : public Shard {
     ShardLocal& operator=(const ShardLocal&) = delete;
 
 public:
+    // ShardLocal doesn't have a "real" connection string since it's always a connection to the
+    // local process, so it uses the hardcoded local connection string. Only used in tests.
+    static const ConnectionString kLocalConnectionString;
+
     explicit ShardLocal(const ShardId& id);
 
     ~ShardLocal() = default;
@@ -69,7 +73,7 @@ public:
      * These functions are implemented for the Shard interface's sake. They should not be called on
      * ShardLocal because doing so triggers invariants.
      */
-    ConnectionString getConnString() const override;
+    const ConnectionString& getConnString() const override;
     std::shared_ptr<RemoteCommandTargeter> getTargeter() const override;
     void updateReplSetMonitor(const HostAndPort& remoteHost,
                               const Status& remoteCommandStatus) override;

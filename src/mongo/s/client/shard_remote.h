@@ -74,7 +74,7 @@ public:
 
     ~ShardRemote();
 
-    ConnectionString getConnString() const override {
+    const ConnectionString& getConnString() const override {
         return _connString;
     }
 

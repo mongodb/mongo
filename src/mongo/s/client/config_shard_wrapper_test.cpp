@@ -53,6 +53,9 @@
 namespace mongo {
 namespace {
 
+const HostAndPort kConfigHost{"configHost1"};
+ConnectionString kConfigCS{ConnectionString::forReplicaSet("configReplSet", {kConfigHost})};
+
 class MockShard : public Shard {
     MockShard(const MockShard&) = delete;
     MockShard& operator=(const MockShard&) = delete;
@@ -61,10 +64,8 @@ public:
     explicit MockShard(const ShardId& id) : Shard(id) {}
     ~MockShard() = default;
 
-    ConnectionString getConnString() const override {
-        const HostAndPort configHost{"configHost1"};
-        ConnectionString configCS{ConnectionString::forReplicaSet("configReplSet", {configHost})};
-        return configCS;
+    const ConnectionString& getConnString() const override {
+        return kConfigCS;
     }
 
     std::shared_ptr<RemoteCommandTargeter> getTargeter() const override {

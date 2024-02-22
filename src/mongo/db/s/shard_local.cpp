@@ -43,15 +43,16 @@
 
 namespace mongo {
 
+const ConnectionString ShardLocal::kLocalConnectionString = ConnectionString::forLocal();
+
 ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
     // Currently ShardLocal only works for config servers. If we ever start using ShardLocal on
     // shards we'll need to consider how to handle shards.
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 }
 
-ConnectionString ShardLocal::getConnString() const {
-    return repl::ReplicationCoordinator::get(getGlobalServiceContext())
-        ->getConfigConnectionString();
+const ConnectionString& ShardLocal::getConnString() const {
+    return kLocalConnectionString;
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {
