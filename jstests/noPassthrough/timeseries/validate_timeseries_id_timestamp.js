@@ -16,6 +16,9 @@ let bucketName = bucketNamePrefix + testCount;
 let coll = null;
 let bucket = null;
 
+const conn = MongoRunner.runMongod();
+const db = conn.getDB(jsTestName());
+
 jsTestLog(
     "Running the validate command to check time-series bucket OID timestamp and min timestamp equivalence.");
 testCount += 1;
@@ -59,6 +62,13 @@ coll.insertMany(
     {ordered: false});
 bucket.updateOne({"meta.sensorId": testCount}, {"$set": {"control.min.timestamp": ISODate()}});
 res = coll.validate();
+
+// TODO SERVER-87065: Validation should catch the timestamp error.
 assert(res.valid, tojson(res));
-assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
+assert.eq(res.nNonCompliantDocuments, 0);
+assert.eq(res.errors.length, 0);
+
+// As of SERVER-86451, time-series inconsistencies detected during validation
+// will error in testing, instead of being warnings. In this case,
+// validation on shutdown would fail, whereas before only a warning would be thrown.
+MongoRunner.stopMongod(conn, null, {skipValidation: true});

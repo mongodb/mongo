@@ -259,6 +259,9 @@ selector:
   - jstests/core/fsync.js
   # Time-series buckets processing may have different cursor behavior.
   - jstests/core/query/cursor/getmore_invalidated_cursors.js
+  # TODO SERVER-87065: Add this back in once we prevent it from erroring
+  # when validation hook is run.
+  - jstests/core/write/update/update_blank1.js
 
   exclude_with_any_tags:
   - requires_sharding

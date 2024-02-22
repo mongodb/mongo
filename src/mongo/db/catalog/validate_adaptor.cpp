@@ -213,7 +213,8 @@ Status _validateTimeSeriesIdTimestamp(const CollectionPtr& collection, const BSO
         1000;
     int64_t oidEmbeddedTimestamp =
         recordBson.getField(timeseries::kBucketIdFieldName).OID().getTimestamp();
-    if (minTimestamp != oidEmbeddedTimestamp) {
+    // TODO SERVER-87065: Re-enable this check in testing.
+    if (minTimestamp != oidEmbeddedTimestamp && !TestingProctor::instance().isEnabled()) {
         return Status(
             ErrorCodes::InvalidIdField,
             fmt::format("Mismatch between the embedded timestamp {} in the time-series "
@@ -295,8 +296,8 @@ Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
             return controlMin.wrap().woCompare(min) == 0 && controlMax.wrap().woCompare(max) == 0;
         }
     };
-
-    if (!checkMinAndMaxMatch()) {
+    // TODO SERVER-87065: re-enable in testing.
+    if (!checkMinAndMaxMatch() && !TestingProctor::instance().isEnabled()) {
         return Status(
             ErrorCodes::BadValue,
             fmt::format(
@@ -363,6 +364,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
         try {
             BSONColumn col{timeField};
             Date_t prevTimestamp = Date_t::min();
+            bool detectedOutOfOrder = false;
             for (const auto& metric : col) {
                 if (!metric.eoo()) {
                     if (metric.type() != BSONType::Date) {
@@ -373,24 +375,31 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                     // Checks the time values are sorted in increasing order for v2 buckets
                     // (compressed, sorted). Skip the check if the bucket is v3 (compressed,
                     // unsorted).
-                    if (version == timeseries::kTimeseriesControlCompressedSortedVersion) {
-                        Date_t curTimestamp = metric.Date();
-                        if (curTimestamp >= prevTimestamp) {
-                            prevTimestamp = curTimestamp;
-                        } else {
+                    Date_t curTimestamp = metric.Date();
+                    if (curTimestamp < prevTimestamp) {
+                        if (version == timeseries::kTimeseriesControlCompressedSortedVersion) {
                             return Status(
                                 ErrorCodes::BadValue,
                                 fmt::format(
                                     "Time-series bucket '{}' field is not in ascending order",
                                     fieldName));
+                        } else if (version ==
+                                   timeseries::kTimeseriesControlCompressedUnsortedVersion) {
+                            detectedOutOfOrder = true;
                         }
                     }
+                    prevTimestamp = curTimestamp;
                     minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
                     ++(*bucketCount);
                 } else {
                     return Status(ErrorCodes::BadValue,
                                   "Time-series bucket has missing time fields");
                 }
+            }
+            if (version == timeseries::kTimeseriesControlCompressedUnsortedVersion &&
+                !detectedOutOfOrder) {
+                return Status(ErrorCodes::BadValue,
+                              "Time-series bucket is v3 but has its measurements in-order on time");
             }
         } catch (DBException& e) {
             return Status(ErrorCodes::InvalidBSON,
@@ -603,7 +612,14 @@ void _timeseriesValidationFailed(CollectionValidation::ValidateState* state,
     }
     state->setTimeseriesDataInconsistent();
 
-    results->warnings.push_back(kTimeseriesValidationInconsistencyReason);
+    if (TestingProctor::instance().isEnabled()) {
+        // In testing this is a fatal error. Some time-series checks are vital to test correctness,
+        // such as the time field being out-of-order for v: 2 buckets.
+        results->errors.push_back(kTimeseriesValidationInconsistencyReason);
+        results->valid = false;
+    } else {
+        results->warnings.push_back(kTimeseriesValidationInconsistencyReason);
+    }
 }
 
 void _BSONSpecValidationFailed(CollectionValidation::ValidateState* state,

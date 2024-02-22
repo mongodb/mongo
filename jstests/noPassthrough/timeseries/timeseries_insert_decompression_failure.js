@@ -72,5 +72,8 @@ TimeseriesTest.run((insert) => {
     assert(TimeseriesTest.isBucketCompressed(buckets[1].control.version));
     assert.eq(buckets[1].control.count, 2);
 
-    MongoRunner.stopMongod(conn);
+    // Prevent validation from running on this collection and throwing an error. As of SERVER-86451
+    // timeseries validation inconsistencies error instead of returning warnings when testing, and
+    // this test would fail on shutdown validation because of the corrupt bucket we created.
+    MongoRunner.stopMongod(conn, null, {skipValidation: true});
 });

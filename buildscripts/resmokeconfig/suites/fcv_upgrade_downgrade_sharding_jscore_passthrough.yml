@@ -58,7 +58,6 @@ selector:
   # upgrade/downgrade
   # TODO SERVER-70605: remove this block.
   - jstests/core/timeseries/bucket_granularity.js
-  - jstests/core/timeseries/timeseries_bucket_spanning_epoch.js
   - jstests/core/timeseries/timeseries_id_range.js
   - jstests/core/timeseries/timeseries_insert_after_update.js
   - jstests/core/timeseries/timeseries_sparse.js

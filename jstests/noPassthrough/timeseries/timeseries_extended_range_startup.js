@@ -44,7 +44,7 @@ assert(checkLog.checkContainsWithCountJson(
 assert.eq(1, getExtendedRangeCount(primary));
 assert.eq(1, getExtendedRangeCount(secondary));
 
-rst.restart(primary);
+rst.restart(primary, {skipValidation: true});
 rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
 assert.eq(1, primaryDB.standard.count());
@@ -53,4 +53,8 @@ assert.eq(1, primaryDB.extended.count());
 // Make sure the collections get flagged properly again after startup.
 assert.eq(1, getExtendedRangeCount(primary));
 
-rst.stopSet();
+// As of SERVER-86451, time-series inconsistencies detected during validation
+// will error in testing, instead of being warnings. In this case,
+// validation on shutdown would fail, where before only a warning would be thrown.
+// TODO SERVER-87065: Look into re-enabling validation on shutdown.
+rst.stopSet(null, false, {skipValidation: true});

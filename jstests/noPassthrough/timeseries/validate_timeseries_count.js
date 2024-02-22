@@ -17,6 +17,9 @@ let bucketName = bucketNamePrefix + testCount;
 let coll = null;
 let bucket = null;
 
+const conn = MongoRunner.runMongod();
+const db = conn.getDB(jsTestName());
+
 jsTestLog(
     "Running the validate command to check that time-series bucket 'control.count' matches the number of measurements in version-2 buckets.");
 testCount += 1;
@@ -67,6 +70,11 @@ bucket.updateOne(
     {"meta.sensorId": 2, 'control.version': TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.count": 10}});
 res = bucket.validate({checkBSONConformance: true});
-assert(res.valid, tojson(res));
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
+assert.eq(res.errors.length, 1);
+
+// As of SERVER-86451, time-series inconsistencies detected during validation
+// will error in testing, instead of being warnings. In this case,
+// validation on shutdown would fail, whereas before only a warning would be thrown.
+MongoRunner.stopMongod(conn, null, {skipValidation: true});

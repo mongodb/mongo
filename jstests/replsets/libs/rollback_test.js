@@ -575,11 +575,11 @@ export function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         return curPrimary;
     };
 
-    this.stop = function(checkDataConsistencyOptions) {
+    this.stop = function(checkDataConsistencyOptions, skipDataConsistencyCheck = false) {
         const start = new Date();
         restartServerReplication(tiebreakerNode);
         rst.awaitReplication();
-        if (!doneConsistencyChecks) {
+        if (!doneConsistencyChecks && !skipDataConsistencyCheck) {
             this.checkDataConsistency(checkDataConsistencyOptions);
         }
         transitionIfAllowed(State.kStopped);

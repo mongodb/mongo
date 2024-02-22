@@ -19,6 +19,9 @@ let bucketName = bucketNamePrefix + testCount;
 let coll = null;
 let bucket = null;
 
+const conn = MongoRunner.runMongod();
+const db = conn.getDB(jsTestName());
+
 jsTestLog("Running the validate command to check time-series bucket versions");
 testCount += 1;
 collName = collNamePrefix + testCount;
@@ -79,9 +82,9 @@ if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
                      {"$set": {"control.version": TimeseriesTest.BucketVersion.kCompressedSorted}});
 }
 res = bucket.validate();
-assert(res.valid, tojson(res));
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
+assert.eq(res.errors.length, 1);
 
 // Inserts enough documents to close a bucket and then manually changes the version to 1.
 // Expects warnings from validation.
@@ -105,9 +108,9 @@ bucket.updateOne(
     {"meta.sensorId": 3, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.version": TimeseriesTest.BucketVersion.kUncompressed}});
 res = bucket.validate();
-assert(res.valid, tojson(res));
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
+assert.eq(res.errors.length, 1);
 
 // Returns warnings on a bucket with an unsupported version.
 jsTestLog("Changing 'control.version' to an unsupported version and checking for warnings.");
@@ -135,9 +138,9 @@ bucket.updateOne(
     {"meta.sensorId": 4, "control.version": TimeseriesTest.BucketVersion.kCompressedSorted},
     {"$set": {"control.version": 500}});
 res = bucket.validate();
-assert(res.valid, tojson(res));
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
+assert.eq(res.errors.length, 1);
 
 // Creates a type-version mismatch in the previous bucket and checks that multiple warnings are
 // reported from a single collection with multiple inconsistent documents.
@@ -153,6 +156,11 @@ if (TimeseriesTest.timeseriesAlwaysUseCompressedBucketsEnabled(db)) {
         {"$set": {"control.version": TimeseriesTest.BucketVersion.kCompressedSorted}});
 }
 res = bucket.validate();
-assert(res.valid, tojson(res));
+assert(!res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 2);
-assert.eq(res.warnings.length, 1);
+assert.eq(res.errors.length, 1);
+
+// As of SERVER-86451, time-series inconsistencies detected during validation
+// will error in testing, instead of being warnings. In this case,
+// validation on shutdown would fail, whereas before only a warning would be thrown.
+MongoRunner.stopMongod(conn, null, {skipValidation: true});
