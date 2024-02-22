@@ -561,7 +561,7 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     // on the shard key. If we were to target based on the replacement doc, it could result in an
     // insertion even if a document matching the query exists on another shard.
     if ((!feature_flags::gFeatureFlagUpdateOneWithoutShardKey
-              .isEnabledUseLatestFCVWhenUninitialized(
+              .isEnabledUseLastLTSFCVWhenUninitialized(
                   serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) ||
          updateOp.getMulti()) &&
         isUpsert) {
