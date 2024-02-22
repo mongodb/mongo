@@ -495,6 +495,8 @@ jsTestOptions = function() {
 
             useAutoBootstrapProcedure: TestData.useAutoBootstrapProcedure || false,
             nonClusteredConfigTransactions: TestData.nonClusteredConfigTransactions || false,
+
+            embeddedRouter: TestData.embeddedRouter || false,
         });
     }
     return _jsTestOptions;

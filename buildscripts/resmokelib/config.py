@@ -57,6 +57,7 @@ DEFAULTS = {
     "base_port": 20000,
     "backup_on_restart_dir": None,
     "buildlogger_url": "https://logkeeper2.build.10gen.cc",
+    "embedded_router": None,
     "config_shard": None,
     "continue_on_failure": False,
     "dbpath_prefix": None,
@@ -336,6 +337,9 @@ DRY_RUN = None
 
 # If set, specifies which node is the config shard. Can also be set to 'any'.
 CONFIG_SHARD = None
+
+# If set, use mongod's embedded router functionality for all sharding tests instead of mongos.
+EMBEDDED_ROUTER = None
 
 # if set, enables enterprise jstest to automatically be included
 ENABLE_ENTERPRISE_TESTS = None

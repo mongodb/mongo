@@ -349,6 +349,9 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     if "configShard" not in test_data and config.CONFIG_SHARD is not None:
         test_data["configShard"] = True
 
+    if "embeddedRouter" not in test_data and config.EMBEDDED_ROUTER is not None:
+        test_data["embeddedRouter"] = True
+
     # There's a periodic background thread that checks for and aborts expired transactions.
     # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring
     # and being aborted by the background thread. It defaults to 60 seconds, which is too short to

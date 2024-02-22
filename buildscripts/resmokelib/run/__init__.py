@@ -1206,6 +1206,10 @@ class RunPlugin(PluginInterface):
             "--configShard", dest="config_shard", metavar="CONFIG",
             help="If set, specifies which node is the config shard. Can also be set to 'any'.")
 
+        mongodb_server_options.add_argument(
+            "--embeddedRouter", dest="embedded_router", metavar="CONFIG",
+            help="If set, uses embedded routers instead of dedicated mongos.")
+
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
             description=("Internal options for advanced users and resmoke developers."

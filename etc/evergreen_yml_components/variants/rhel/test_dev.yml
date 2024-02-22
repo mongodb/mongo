@@ -316,6 +316,27 @@ buildvariants:
 #     - rhel80-medium
 #   - name: .multi_shard
 
+# This build variant is used to test suites that use sharded cluster fixture with embedded router mode.
+# Also supports ProgramRunner/ShardingTest driven suites that look for an embedded router flag in TestData.
+- &enterprise-rhel-80-64-bit-dynamic-embedded-router-all-feature-flags
+  <<: *linux_x86_dynamic_compile_variant_dependency
+  name: enterprise-rhel-80-64-bit-dynamic-embedded-router
+  display_name: "* Shared Library Enterprise RHEL 8.0 (Embedded Router all feature flags)"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  stepback: false
+  activate: false
+  expansions: &enterprise-rhel-80-64-bit-dynamic-embedded-router-expansions
+    <<: *enterprise-rhel-80-64-bit-dynamic-expansions
+    test_flags: >-
+      --embeddedRouter=true
+      --runAllFeatureFlagTests
+  tasks:
+  - name: sharding_gen
+
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
   name: enterprise-rhel-80-64-bit-dynamic-classic-engine

@@ -444,6 +444,7 @@ class ShardedClusterBuilder(FixtureBuilder):
         if "use_auto_bootstrap_procedure" in kwargs and kwargs[
                 "use_auto_bootstrap_procedure"] and not config_shard:
             config_shard = 0
+        kwargs["embedded_router"] = kwargs.pop("embedded_router", config.EMBEDDED_ROUTER)
         kwargs["config_shard"] = config_shard
 
     @staticmethod
