@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <absl/hash/hash.h>
-
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/block_interface.h"
@@ -61,7 +59,7 @@ public:
     typedef value::SlotMap<BlockRowAccumulators> BlockAndRowAggs;
 
     BlockHashAggStage(std::unique_ptr<PlanStage> input,
-                      value::SlotVector groupSlotIds,
+                      value::SlotId groupSlotId,
                       boost::optional<value::SlotId> blockBitsetInSlotId,
                       value::SlotVector blockDataInSlotIds,
                       value::SlotId rowAccSlotId,
@@ -112,30 +110,15 @@ private:
      */
     void executeAccumulatorCode(value::MaterializedRow key);
 
-    struct TokenizedKeys {
-        std::vector<value::MaterializedRow> keys;
-        std::vector<size_t> idxs;
-    };
-
-    /**
-     * Take a vector of TokenizedBlocks and combine them into the actual keys that will be used for
-     * the hash table. These combined keys will then be tokenized again, so that we can identify the
-     * unique compound keys. Returns TokenizedKeys containing the actual materialized keys and a
-     * vector of indices where keys[idxs[i]] represents the materialized key of the ith element in
-     * the input. If the number of unique keys encountered exceeds
-     * kMaxNumPartitionsForTokenizedPath, return boost::none and use the element wise path.
-     */
-    boost::optional<TokenizedKeys> tokenizeTokenInfos(
-        const std::vector<value::TokenizedBlock>& tokenInfos,
-        const std::vector<value::DeblockedTagVals>& deblockedTokens);
     /*
      * Finds the unique values in our input key blocks and processes them in together. For example
      * if half of the keys are 1 and the other half are 2, we can avoid many hash table lookups and
      * accumulator calls by processing the data with the same keys together. This is best if there
      * are only a few partitions.
      */
-    void runAccumulatorsTokenized(const TokenizedKeys& tokenizedKeys);
-
+    void runAccumulatorsTokenized(size_t nPartitions,
+                                  value::DeblockedTagVals deblockedTokens,
+                                  value::TokenizedBlock tokenInfo);
     /*
      * Runs the accumulators on each element of the inputs, one at a time. This is best if the
      * number of unique keys is high so the partitioning approach would be quadratic.
@@ -150,9 +133,9 @@ private:
     using HashKeyAccessor = value::MaterializedRowKeyAccessor<TableType::iterator>;
     using HashAggAccessor = value::MaterializedRowValueAccessor<TableType::iterator>;
 
-    // Groupby key slots.
-    const value::SlotVector _groupSlots;
-    std::vector<value::SlotAccessor*> _idInAccessors;
+    // Groupby key slot.
+    const value::SlotId _groupSlot;
+    value::SlotAccessor* _idAccessorIn = nullptr;
 
     // Input slot for bitset corresponding to data input.
     const boost::optional<value::SlotId> _blockBitsetInSlotId;
@@ -184,9 +167,6 @@ private:
 
     value::SlotAccessorMap _outAccessorsMap;
 
-    std::vector<value::OwnedValueAccessor> _outIdBlockAccessors;
-    std::vector<value::HeterogeneousBlock> _outIdBlocks;
-
     std::vector<value::OwnedValueAccessor> _outAggBlockAccessors;
     std::vector<value::HeterogeneousBlock> _outAggBlocks;
 
@@ -194,11 +174,14 @@ private:
     std::vector<std::unique_ptr<vm::CodeFragment>> _blockLevelAggCodes;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
 
+    value::OwnedValueAccessor _outIdBlockAccessor;
+    value::HeterogeneousBlock _outIdBlock;
+
     // Hash table where we'll map groupby key to the accumulators.
     TableType _ht;
     TableType::iterator _htIt;
     std::vector<std::unique_ptr<HashAggAccessor>> _rowAggHtAccessors;
-    std::vector<std::unique_ptr<HashKeyAccessor>> _idHtAccessors;
+    boost::optional<HashKeyAccessor> _idHtAccessor;
 
     HashAggStats _specificStats;
 
