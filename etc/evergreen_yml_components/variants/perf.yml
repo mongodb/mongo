@@ -147,6 +147,7 @@ buildvariants:
     - name: tpch_1_denormalized
     - name: tpch_10_normalized
     - name: tpch_10_denormalized
+    - name: genny_execution_ValidationFull
 
 - <<: *amazon2_x86_compile_variant_dependency
   name: perf-standalone-classic-query-engine.intel.aws.2023-11

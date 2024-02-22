@@ -953,6 +953,13 @@ tasks:
           test_control: auto_genny_workload
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/execution/UserAcquisition.yml
 
+  - name: genny_execution_ValidationFull
+    commands:
+      - func: f_dsi_run_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/src/workloads/execution/ValidateCmdFull.yml
+
   - name: genny_scale_InsertRemove
     commands:
       - func: f_dsi_run_workload
