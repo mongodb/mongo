@@ -52,6 +52,7 @@
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsoncolumn_helpers.h"
+#include "mongo/bson/util/bsoncolumn_interleaved.h"
 #include "mongo/bson/util/bsoncolumn_util.h"
 #include "mongo/bson/util/simple8b.h"
 #include "mongo/bson/util/simple8b_type_util.h"
@@ -710,10 +711,10 @@ void BSONColumnBlockBased::decompress(boost::intrusive_ptr<ElementStorage> alloc
     const char* control = _binary;
     const char* end = _binary + _size;
     while (*control != EOO) {
+        BlockBasedInterleavedDecompressor<CMaterializer> decompressor{*allocator, control, end};
         invariant(bsoncolumn::isInterleavedStartControlByte(*control),
                   "non-interleaved data is not yet handled via this API");
-        control = BlockBasedInterleavedDecompressor<CMaterializer>::decompress(
-            *allocator, control, end, pathCollectors);
+        control = decompressor.decompress(pathCollectors);
         invariant(control < end);
     }
 }

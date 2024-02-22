@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/simple8b.h"
 #include "mongo/platform/int128.h"
 
 namespace mongo::bsoncolumn {
@@ -50,6 +51,24 @@ inline bool isInterleavedStartControlByte(char control) {
 
 inline uint8_t numSimple8bBlocksForControlByte(uint8_t control) {
     return (control & 0x0F) + 1;
+}
+
+inline uint32_t numElemsForControlByte(const char* control) {
+    if (bsoncolumn::isUncompressedLiteralControlByte(*control)) {
+        return 1;
+    }
+
+    Simple8b<uint128_t> reader(
+        control + 1, sizeof(uint64_t) * bsoncolumn::numSimple8bBlocksForControlByte(*control));
+
+    uint32_t num = 0;
+    auto it = reader.begin();
+    auto end = reader.end();
+    while (it != end) {
+        num += it.blockSize();
+        it.advanceBlock();
+    }
+    return num;
 }
 
 inline uint8_t scaleIndexForControlByte(uint8_t control) {

@@ -1927,24 +1927,7 @@ void BSONColumnBuilder::_flushSubObjMode() {
         }
 
         // Calculate how many elements were in this control block
-        uint32_t elems = [&]() -> uint32_t {
-            if (bsoncolumn::isUncompressedLiteralControlByte(*controlBlock)) {
-                return 1;
-            }
-
-            Simple8b<uint128_t> reader(
-                controlBlock + 1,
-                sizeof(uint64_t) * bsoncolumn::numSimple8bBlocksForControlByte(*controlBlock));
-
-            uint32_t num = 0;
-            auto it = reader.begin();
-            auto end = reader.end();
-            while (it != end) {
-                num += it.blockSize();
-                it.advanceBlock();
-            }
-            return num;
-        }();
+        uint32_t elems = bsoncolumn::numElemsForControlByte(controlBlock);
 
         // Append num elements and put this encoding state back into the heap.
         top.numElementsWritten += elems;

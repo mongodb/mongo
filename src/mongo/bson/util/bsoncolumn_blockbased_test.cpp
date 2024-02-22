@@ -259,7 +259,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
         {TestPath{{"b", "c"}}, {}},
     };
 
-    // Decompress both scalar fields to vectors
+    // Decompress both scalar fields to vectors. Both paths can use the fast implementation to
+    // decompress the data.
     col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
     ASSERT_EQ(paths[0].second.size(), 4);
@@ -275,6 +276,38 @@ TEST_F(BSONColumnBlockBasedTest, DecompressScalars) {
     ASSERT_EQ(paths[1].second[3].Long(), 23);
 }
 
+TEST_F(BSONColumnBlockBasedTest, DecompressSomeScalars) {
+    // Create a BSONColumn that has different deltas in the object fields. This ensures that the
+    // number of deltas per simple8b block will be different for each field to encourage
+    // interleaved-ness of the data.
+    const int kN = 5000;
+    std::vector<BSONObj> objs;
+    for (int i = 0; i < kN; ++i) {
+        objs.push_back(BSON("a" << i << "b" << (i * 1000) << "c" << (i * 100000)));
+    }
+    auto col = bsonColumnFromObjs(std::move(objs));
+
+    // Select a and c, but omit b to show that we can skip over parts of the data as needed.
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{
+        {TestPath{{"a"}}, {}},
+        {TestPath{{"c"}}, {}},
+    };
+
+    // Decompress both scalar fields to vectors. The fast path will be used.
+    col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), kN);
+    for (size_t i = 0; i < kN; ++i) {
+        ASSERT_EQ(paths[0].second[i].Int(), i);
+    }
+
+    ASSERT_EQ(paths[1].second.size(), kN);
+    for (size_t i = 0; i < kN; ++i) {
+        ASSERT_EQ(paths[1].second[i].Int(), i * 100000);
+    }
+}
+
 TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     auto col = bsonColumnFromObjs({
         fromjson("{a: 10}"),
@@ -286,7 +319,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressObjects) {
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
     std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{}, {}}};
 
-    // Decompress complete objects to the vector.
+    // Decompress complete objects to the vector. The fast path won't be used here, since we are
+    // decompressing objects.
     col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
     ASSERT_EQ(paths[0].second.size(), 4);
@@ -337,6 +371,8 @@ TEST_F(BSONColumnBlockBasedTest, DecompressNestedObjects) {
         std::vector<std::pair<TestPath, std::vector<BSONElement>>> paths{{TestPath{{"a"}}, {}},
                                                                          {TestPath{{"b"}}, {}}};
 
+        // We will use the fast implementation to decompress "a" since it is scalar. We will fall
+        // back to the general implementation for "b".
         col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
 
         ASSERT_EQ(paths[0].second.size(), 4);
@@ -382,6 +418,89 @@ TEST_F(BSONColumnBlockBasedTest, DecompressSiblingObjects) {
     ASSERT_BSONOBJ_EQ(paths[1].second[1].Obj(), fromjson("{c: 31}"));
     ASSERT_BSONOBJ_EQ(paths[1].second[2].Obj(), fromjson("{c: 32}"));
     ASSERT_BSONOBJ_EQ(paths[1].second[3].Obj(), fromjson("{c: 33}"));
+}
+
+/**
+ * A path that is equivalent to
+ *     Get("a") / Traverse / Get("b") / Id
+ */
+struct TestArrayPath {
+    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+        auto a = refObj["a"];
+        if (a.type() == Array) {
+            std::vector<const char*> addrs;
+            for (auto&& elem : a.Array()) {
+                if (elem.type() == Object) {
+                    auto b = elem.Obj()["b"];
+                    if (!b.eoo()) {
+                        addrs.push_back(b.value());
+                    }
+                }
+            }
+
+            return addrs;
+        } else if (a.type() == Object) {
+            auto b = a.Obj()["b"];
+            if (!b.eoo()) {
+                return {b.value()};
+            }
+        }
+        return {};
+    }
+};
+
+TEST_F(BSONColumnBlockBasedTest, DecompressArrays) {
+    auto col = bsonColumnFromObjs({
+        fromjson("{a: [{b:  0}, {b: 10}]}"),
+        fromjson("{a: [{b: 20}, {b: 30}]}"),
+        fromjson("{a: [{b: 40}, {b: 50}]}"),
+        fromjson("{a: [{b: 60}, {b: 70}]}"),
+    });
+
+    // Create a path that will get the "b" fields of both array elements.
+    TestArrayPath path;
+    auto mockRefObj = fromjson("{a: [{b: 0}, {b: 10}]}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<TestArrayPath, std::vector<BSONElement>>> paths{{path, {}}};
+
+    // This is decompressing scalars, but since a single path is accessing two fields that need to
+    // be interleaved in the output, we still need to use the slow path.
+    col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), 8);
+    ASSERT_EQ(paths[0].second[0].type(), NumberInt);
+    for (int i = 0; i < 8; ++i) {
+        ASSERT_EQ(paths[0].second[i].Int(), i * 10);
+    }
+}
+
+TEST_F(BSONColumnBlockBasedTest, DecompressNothing) {
+    auto col = bsonColumnFromObjs({
+        fromjson("{a: [{b:  0}, {b: 10}]}"),
+    });
+
+    struct NoElemsPath {
+        std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+            return {};
+        }
+    };
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+
+    {
+        // Paths that don't map to any fields in the reference object just produce nothing.
+        // TODO(SERVER-86636): we should in fact be producing nulls here.
+        std::vector<std::pair<NoElemsPath, std::vector<BSONElement>>> paths{{NoElemsPath{}, {}}};
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+        ASSERT_EQ(paths[0].second.size(), 0);
+    }
+    {
+        // Make sure that decompressing zero paths doesn't segfault or anything like that.
+        std::vector<std::pair<NoElemsPath, std::vector<BSONElement>>> paths{{}};
+        col.decompress<BSONElementMaterializer>(allocator, std::span(paths));
+    }
 }
 
 }  // namespace
