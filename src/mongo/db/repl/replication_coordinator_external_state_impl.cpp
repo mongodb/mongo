@@ -244,7 +244,7 @@ bool ReplicationCoordinatorExternalStateImpl::isInitialSyncFlagSet(OperationCont
 void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     OperationContext* opCtx, ReplicationCoordinator* replCoord) {
 
-    stdx::lock_guard<Latch> lk(_threadMutex);
+    stdx::unique_lock<Latch> lk(_threadMutex);
 
     // We've shut down the external state, don't start again.
     if (_inShutdown)
@@ -294,6 +294,9 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _syncSourceFeedbackThread = std::make_unique<stdx::thread>([this, bgSyncPtr, replCoord] {
         _syncSourceFeedback.run(_taskExecutor.get(), bgSyncPtr, replCoord);
     });
+
+    // Release the thread mutex before notifying the storage engine to avoid deadlock.
+    lk.unlock();
 
     // Notify the storage engine that we have completed startup recovery and are transitioning to
     // steady state replication.

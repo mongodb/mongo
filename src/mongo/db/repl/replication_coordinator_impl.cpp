@@ -956,13 +956,15 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
                                                                                 recoverToTimestamp);
         }
 
-        stdx::lock_guard<Latch> lk(_mutex);
-        _setConfigState_inlock(kConfigReplicationDisabled);
-
-        // In standalone mode, inform the storage engine that startup recovery has completed.
+        // In standalone mode, inform the storage engine that startup recovery has completed. We
+        // should not be holding on to the replication coordinator mutex before calling this
+        // function to avoid deadlock.
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         invariant(storageEngine);
         storageEngine->notifyReplStartupRecoveryComplete(opCtx);
+
+        stdx::lock_guard<Latch> lk(_mutex);
+        _setConfigState_inlock(kConfigReplicationDisabled);
         return;
     }
 

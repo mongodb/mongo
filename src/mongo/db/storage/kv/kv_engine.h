@@ -73,6 +73,9 @@ public:
      * recovery and considers itself stable.
      *
      * This will be called during a node's transition to steady state replication.
+     *
+     * This function may race with shutdown. As a result, any steps within this function that should
+     * not race with shutdown should obtain the global lock.
      */
     virtual void notifyReplStartupRecoveryComplete(OperationContext* opCtx) {}
 
