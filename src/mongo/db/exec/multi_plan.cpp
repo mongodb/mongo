@@ -217,6 +217,10 @@ void MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 }
 
 Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
+    if (bestPlanChosen()) {
+        return Status::OK();
+    }
+
     // Adds the amount of time taken by pickBestPlan() to executionTime. There's lots of execution
     // work that happens here, so this is needed for the time accounting to make sense.
     auto optTimer = getOptTimer();

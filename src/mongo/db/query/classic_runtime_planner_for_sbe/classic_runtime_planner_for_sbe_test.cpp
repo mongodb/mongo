@@ -75,18 +75,22 @@ protected:
      *   {$addFields: 'addFieldsSpec'}}
      * ]
      * Defaults to kFindFilter and kAddFieldsSpec for 'findFilter' and 'addFieldsSpec' respectively
-     * if arguments are not supplied.
+     * if arguments are not supplied. If addFieldsSpec is empty, $addFields stage won't be added.
      */
     PlannerData createPlannerData(BSONObj findFilter = kFindFilter,
                                   BSONObj addFieldsSpec = kAddFieldsSpec) {
         auto findCommand = std::make_unique<FindCommandRequest>(kNss);
         findCommand->setFilter(findFilter);
 
+        std::vector<boost::intrusive_ptr<DocumentSource>> pipeline;
+        if (!addFieldsSpec.isEmpty()) {
+            pipeline.emplace_back(make_intrusive<DocumentSourceInternalProjection>(
+                expCtx, kAddFieldsSpec, InternalProjectionPolicyEnum::kAddFields));
+        }
         auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
             .expCtx = expCtx,
             .parsedFind = ParsedFindCommandParams{.findCommand = std::move(findCommand)},
-            .pipeline = {make_intrusive<DocumentSourceInternalProjection>(
-                expCtx, addFieldsSpec, InternalProjectionPolicyEnum::kAddFields)}});
+            .pipeline = std::move(pipeline)});
         cq->setSbeCompatible(true);
 
         auto opCtx = operationContext();
@@ -104,6 +108,20 @@ protected:
         };
     }
 
+    std::vector<BSONObj> getResultDocumentsAndAssertExecState(size_t expectedDocCount,
+                                                              PlanExecutor* exec) {
+        std::vector<BSONObj> result;
+        result.reserve(expectedDocCount);
+        for (size_t i = 0; i < expectedDocCount; ++i) {
+            BSONObj out;
+            auto state = exec->getNext(&out, nullptr);
+            ASSERT_EQ(PlanExecutor::ExecState::ADVANCED, state);
+            result.push_back(out.getOwned());
+        }
+        ASSERT_EQ(PlanExecutor::ExecState::IS_EOF, exec->getNextDocument(nullptr, nullptr));
+        return result;
+    }
+
     /**
      * For a given PlanExecutor, asserts the following:
      * 1. PlanExecutor returns EOF after exactly expectedSums.size() documents.
@@ -111,13 +129,11 @@ protected:
      *    element in expectedSums.
      */
     void assertPlanExecutorReturnsCorrectSums(std::vector<int> expectedSums, PlanExecutor* exec) {
-        for (int expectedSum : expectedSums) {
-            BSONObj out;
-            auto state = exec->getNext(&out, nullptr);
-            ASSERT_EQ(PlanExecutor::ExecState::ADVANCED, state);
-            ASSERT_EQ(expectedSum, out.getField("sum").Int());
+        size_t docCount = expectedSums.size();
+        auto result = getResultDocumentsAndAssertExecState(docCount, exec);
+        for (size_t i = 0; i < docCount; ++i) {
+            ASSERT_EQ(expectedSums[i], result[i].getField("sum").Int());
         }
-        ASSERT_EQ(PlanExecutor::ExecState::IS_EOF, exec->getNextDocument(nullptr, nullptr));
     }
 
     /**
@@ -196,6 +212,49 @@ protected:
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
 
+
+    std::pair<std::vector<std::unique_ptr<QuerySolution>>, std::vector<int>>
+    createVirtualScanQuerySolutionsForDefaultFilter(int resultDocCount, const CanonicalQuery* cq) {
+        std::vector<std::unique_ptr<QuerySolution>> solutions;
+        std::vector<int> expectedSums;
+        expectedSums.reserve(resultDocCount);
+
+        auto addVirtualScanSolution = [&](std::vector<BSONArray> docs) {
+            auto virtScan = std::make_unique<VirtualScanNode>(
+                std::move(docs), VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/);
+            virtScan->filter = cq->getPrimaryMatchExpression()->clone();
+            auto solution = std::make_unique<QuerySolution>();
+            solution->setRoot(std::move(virtScan));
+            solution->cacheData = std::make_unique<SolutionCacheData>();
+            solution->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
+            solution->cacheData->tree = std::make_unique<PlanCacheIndexTree>();
+            solutions.push_back(std::move(solution));
+        };
+
+        {  // Generate a plan with every second document matching the filter. We
+           // expect the multi-planner to choose this plan.
+            std::vector<BSONArray> docs;
+            docs.reserve(2 * resultDocCount);
+            for (int i = 1; i <= resultDocCount; ++i) {
+                docs.push_back(BSON_ARRAY(BSON("a" << i << "b" << 1)));
+                docs.push_back(BSON_ARRAY(BSON("a" << -i << "b" << 1)));
+                expectedSums.push_back(i + 1);
+            }
+            addVirtualScanSolution(std::move(docs));
+        }
+        {  // Generate a plan with every third document matching the filter.
+            std::vector<BSONArray> docs;
+            docs.reserve(3 * resultDocCount);
+            for (int i = 1; i <= resultDocCount; ++i) {
+                docs.push_back(BSON_ARRAY(BSON("a" << i << "b" << 2)));
+                docs.push_back(BSON_ARRAY(BSON("a" << -i << "b" << 2)));
+                docs.push_back(BSON_ARRAY(BSON("a" << -i << "b" << 2)));
+            }
+            addVirtualScanSolution(std::move(docs));
+        }
+        return {std::move(solutions), std::move(expectedSums)};
+    }
+
 private:
     std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
         return PlanYieldPolicySBE::make(
@@ -252,43 +311,8 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
     ON_BLOCK_EXIT([&] { internalQueryCacheDisableInactiveEntries.store(previousQueryKnobValue); });
 
     PlannerData plannerData = createPlannerData();
-    std::vector<std::unique_ptr<QuerySolution>> solutions;
-
-    auto addVirtualScanSolution = [&](std::vector<BSONArray> docs) {
-        auto virtScan = std::make_unique<VirtualScanNode>(
-            std::move(docs), VirtualScanNode::ScanType::kCollScan, false /*hasRecordId*/);
-        virtScan->filter = plannerData.cq->getPrimaryMatchExpression()->clone();
-        auto solution = std::make_unique<QuerySolution>();
-        solution->setRoot(std::move(virtScan));
-        solution->cacheData = std::make_unique<SolutionCacheData>();
-        solution->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
-        solution->cacheData->tree = std::make_unique<PlanCacheIndexTree>();
-        solutions.push_back(std::move(solution));
-    };
-
-    std::vector<int> expectedSums;
-    expectedSums.reserve(200);
-    {  // Generate a plan with 400 total documents and 200 documents matching the filter. We expect
-       // the multi-planner to choose this plan.
-        std::vector<BSONArray> docs;
-        docs.reserve(400);
-        for (int i = 1; i <= 200; ++i) {
-            docs.push_back(BSON_ARRAY(BSON("a" << i << "b" << 1)));
-            docs.push_back(BSON_ARRAY(BSON("a" << -i << "b" << 1)));
-            expectedSums.push_back(i + 1);
-        }
-        addVirtualScanSolution(std::move(docs));
-    }
-    {  // Generate a plan with 600 total documents and 200 documents matching the filter.
-        std::vector<BSONArray> docs;
-        docs.reserve(600);
-        for (int i = 1; i <= 200; ++i) {
-            docs.push_back(BSON_ARRAY(BSON("a" << i << "b" << 2)));
-            docs.push_back(BSON_ARRAY(BSON("a" << -i << "b" << 2)));
-            docs.push_back(BSON_ARRAY(BSON("a" << -i << "b" << 2)));
-        }
-        addVirtualScanSolution(std::move(docs));
-    }
+    auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
+        200 /*resultDocCount*/, plannerData.cq.get());
 
     MultiPlanner planner{operationContext(),
                          std::move(plannerData),
@@ -310,6 +334,81 @@ TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerPicksMoreEfficientPlan) {
             operationContext(), std::move(plannerData), std::move(cacheEntry)};
         auto cachedExec = cachedPlanner.plan();
         assertPlanExecutorReturnsCorrectSums(std::move(expectedSums), cachedExec.get());
+    }
+}
+
+TEST_F(ClassicRuntimePlannerForSbeTest, MultiPlannerUsesEofOptimization) {
+    if (kDebugBuild) {
+        // EOF optimization is not used in debug builds.
+        return;
+    }
+    {  // When the query has 200 result documents, no plan will reach EOF during multi-planner, so
+        // we should use SBE.
+        PlannerData plannerData = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+        auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
+            200 /*resultDocCount*/, plannerData.cq.get());
+        MultiPlanner planner{operationContext(),
+                             std::move(plannerData),
+                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                             std::move(solutions)};
+        auto exec = planner.plan();
+        ASSERT_EQ(exec->getPlanExplainer().getVersion(), "2");
+    }
+
+    {  // When the query has only 50 result documents, winning plan will reach EOF during
+        // multi-planner, so we should use the Classic Engine.
+        PlannerData plannerData = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+        auto [solutions, expectedSums] = createVirtualScanQuerySolutionsForDefaultFilter(
+            50 /*resultDocCount*/, plannerData.cq.get());
+        MultiPlanner planner{operationContext(),
+                             std::move(plannerData),
+                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                             std::move(solutions)};
+        auto exec = planner.plan();
+        ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
+    }
+}
+
+TEST_F(ClassicRuntimePlannerForSbeTest, SbePlanCacheIsUpdatedDuringEofOptimization) {
+    if (kDebugBuild) {
+        // EOF optimization is not used in debug builds.
+        return;
+    }
+    static const int kDocCount = 50;
+    // Run the query twice to ensure active cache entry.
+    std::vector<BSONObj> queryResult;
+    for (int i = 0; i < 2; ++i) {
+        PlannerData plannerData = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+        auto [solutions, expectedSums] =
+            createVirtualScanQuerySolutionsForDefaultFilter(kDocCount, plannerData.cq.get());
+        MultiPlanner planner{operationContext(),
+                             std::move(plannerData),
+                             PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                             std::move(solutions)};
+        auto exec = planner.plan();
+        ASSERT_EQ(exec->getPlanExplainer().getVersion(), "1");
+        queryResult = getResultDocumentsAndAssertExecState(kDocCount, exec.get());
+        for (int i = 1; i <= kDocCount; ++i) {
+            ASSERT_BSONOBJ_EQ(BSON("a" << i << "b" << 1), queryResult[i - 1]);
+        }
+    }
+    {  // Run CachedPlanner to execute the cached plan.
+        PlannerData plannerData = createPlannerData(kFindFilter, BSONObj{} /*addFieldsSpec*/);
+        auto planCacheKey =
+            plan_cache_key_factory::make(*plannerData.cq,
+                                         plannerData.collections,
+                                         canonical_query_encoder::Optimizer::kSbeStageBuilders);
+        auto&& planCache = sbe::getPlanCache(operationContext());
+        auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
+        ASSERT_TRUE(cacheEntry);
+        CachedPlanner cachedPlanner{
+            operationContext(), std::move(plannerData), std::move(cacheEntry)};
+        auto cachedExec = cachedPlanner.plan();
+        ASSERT_EQ(cachedExec->getPlanExplainer().getVersion(), "2");
+        auto cachedResult = getResultDocumentsAndAssertExecState(kDocCount, cachedExec.get());
+        for (size_t i = 0; i < kDocCount; ++i) {
+            ASSERT_BSONOBJ_EQ(cachedResult[i], queryResult[i]);
+        }
     }
 }
 

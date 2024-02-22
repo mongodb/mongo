@@ -223,7 +223,7 @@ void updateSbePlanCache(OperationContext* opCtx,
                         const MultipleCollectionAccessor& collections,
                         const CanonicalQuery& query,
                         const plan_ranker::PlanRankingDecision& ranking,
-                        QuerySolution* soln,
+                        const QuerySolution* soln,
                         std::unique_ptr<sbe::CachedSbePlan> cachedPlan) {
     auto buildDebugInfoFn = [soln]() -> plan_cache_debug_info::DebugInfoSBE {
         return buildDebugInfo(soln);
@@ -301,7 +301,7 @@ void updateSbePlanCacheFromClassicCandidates(
     const plan_ranker::PlanRankingDecision& ranking,
     const std::vector<plan_ranker::CandidatePlan>& candidates,
     const std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>& sbePlanAndData,
-    QuerySolution* winningSolution) {
+    const QuerySolution* winningSolution) {
     auto winnerIdx = ranking.candidateOrder[0];
     invariant(winnerIdx >= 0 && winnerIdx < candidates.size());
     auto& winningPlan = candidates[winnerIdx];

@@ -86,6 +86,10 @@ protected:
         return _plannerData.cq.get();
     }
 
+    const CanonicalQuery* cq() const {
+        return _plannerData.cq.get();
+    }
+
     std::unique_ptr<CanonicalQuery> extractCq() {
         return std::move(_plannerData.cq);
     }
@@ -181,6 +185,11 @@ public:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> plan() override;
 
 private:
+    using SbePlanAndData = std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>;
+    SbePlanAndData _buildSbePlanAndUpdatePlanCache(const QuerySolution* winningSolution);
+
+    bool _shouldUseEofOptimization() const;
+
     PlanYieldPolicy::YieldPolicy _yieldPolicy;
     std::unique_ptr<MultiPlanStage> _multiPlanStage;
 };

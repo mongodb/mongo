@@ -154,7 +154,7 @@ void updateSbePlanCacheFromClassicCandidates(
     const plan_ranker::PlanRankingDecision& ranking,
     const std::vector<plan_ranker::CandidatePlan>& candidates,
     const std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>& sbePlanAndData,
-    QuerySolution* winningSolution);
+    const QuerySolution* winningSolution);
 
 /**
  * Caches the plan 'root' along with its accompanying 'data' if the 'query' is of a type that can be

@@ -30,6 +30,7 @@
 #include "mongo/db/query/classic_runtime_planner_for_sbe/planner_interface.h"
 
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
@@ -68,6 +69,23 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
 
     uassertStatusOK(_multiPlanStage->pickBestPlan(trialPeriodYieldPolicy.get()));
 
+    if (_shouldUseEofOptimization()) {
+        // We don't need to extend the solution with the agg pipeline, because we don't do EOF
+        // optimization if the pipeline is present.
+        _buildSbePlanAndUpdatePlanCache(_multiPlanStage->bestSolution());
+        auto nss = cq()->nss();
+        return uassertStatusOK(
+            plan_executor_factory::make(extractCq(),
+                                        extractWs(),
+                                        std::move(_multiPlanStage),
+                                        collections().getMainCollectionPtrOrAcquisition(),
+                                        _yieldPolicy,
+                                        plannerOptions(),
+                                        std::move(nss),
+                                        nullptr /* querySolution */,
+                                        cachedPlanHash()));
+    }
+
     std::unique_ptr<QuerySolution> winningSolution = _multiPlanStage->extractBestSolution();
 
     // Extend the winning solution with the agg pipeline and build the execution tree.
@@ -80,9 +98,17 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
             *cq(), std::move(winningSolution), queryPlannerParams.secondaryCollectionsInfo);
     }
 
+    auto sbePlanAndData = _buildSbePlanAndUpdatePlanCache(winningSolution.get());
+    return prepareSbePlanExecutor(std::move(winningSolution),
+                                  std::move(sbePlanAndData),
+                                  false /*isFromPlanCache*/,
+                                  cachedPlanHash());
+}
+
+MultiPlanner::SbePlanAndData MultiPlanner::_buildSbePlanAndUpdatePlanCache(
+    const QuerySolution* winningSolution) {
     auto sbePlanAndData = stage_builder::buildSlotBasedExecutableTree(
         opCtx(), collections(), *cq(), *winningSolution, sbeYieldPolicy());
-
     plan_cache_util::updateSbePlanCacheFromClassicCandidates(opCtx(),
                                                              collections(),
                                                              PlanCachingMode::AlwaysCache,
@@ -90,11 +116,21 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> MultiPlanner::plan() {
                                                              _multiPlanStage->planRankingDecision(),
                                                              _multiPlanStage->candidates(),
                                                              sbePlanAndData,
-                                                             winningSolution.get());
-
-    return prepareSbePlanExecutor(std::move(winningSolution),
-                                  std::move(sbePlanAndData),
-                                  false /*isFromPlanCache*/,
-                                  cachedPlanHash());
+                                                             winningSolution);
+    return sbePlanAndData;
 }
+
+bool MultiPlanner::_shouldUseEofOptimization() const {
+    return _multiPlanStage->bestSolutionEof() &&
+        // We show SBE plan in explain.
+        !cq()->getExpCtxRaw()->explain &&
+        // We can't use EOF optimization if pipeline is present. Because we need to execute the
+        // pipeline part in SBE, we have to rebuild and rerun the whole query.
+        // TODO SERVER-86061 Avoid rerunning find part of the query if it reached EOF during
+        // planning.
+        cq()->cqPipeline().empty() &&
+        // We want more coverage for SBE in debug builds.
+        !kDebugBuild;
+}
+
 }  // namespace mongo::classic_runtime_planner_for_sbe

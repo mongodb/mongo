@@ -79,9 +79,6 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     assert.neq(sbe, null);
     assert.neq(classic, null);
-    assert.eq(sbe.queryFramework, "sbe", sbe);
-    assert.eq(classic.queryFramework, "classic", classic);
-
     assertQueryHashAndPlanCacheKey(sbe, classic);
 })();
 
@@ -149,9 +146,6 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     assert.neq(sbe, null);
     assert.neq(classic, null);
-    assert.eq(sbe.attr.queryFramework, "sbe", sbe);
-    assert.eq(classic.attr.queryFramework, "classic", classic);
-
     assertQueryHashAndPlanCacheKey(sbe.attr, classic.attr);
 })();
 
