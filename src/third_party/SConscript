@@ -125,6 +125,8 @@ if not use_system_version_of_library('snappy'):
         platform_directory = "build_linux_" + env['TARGET_ARCH']
     elif env.TargetOSIs('windows'):
         platform_directory = "build_windows"
+    elif env.TargetOSIs('darwin'):
+        platform_directory = "build_" + env["TARGET_OS"] + "_" + env["TARGET_ARCH"]
 
     thirdPartyEnvironmentModifications['snappy'] = {
         'CPPPATH': [
