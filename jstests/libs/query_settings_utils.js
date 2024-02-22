@@ -1,8 +1,13 @@
 /**
  * Utility class for testing query settings.
  */
-import {getQueryPlanners} from "jstests/libs/analyze_plan.js";
-import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {
+    getEngine,
+    getPlanStages,
+    getQueryPlanners,
+    getWinningPlan,
+    getWinningPlanFromExplain
+} from "jstests/libs/analyze_plan.js";
 import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 export class QuerySettingsUtils {
@@ -30,7 +35,7 @@ export class QuerySettingsUtils {
     }
 
     /**
-     * Makes an query instance of the aggregate command with an optional pipeline clause.
+     * Makes a query instance of the aggregate command with an optional pipeline clause.
      */
     makeAggregateQueryInstance(aggregateObj, collectionless = false) {
         return {
@@ -248,5 +253,44 @@ export class QuerySettingsUtils {
     withoutDollarDB(cmd) {
         const {$db: _, ...rest} = cmd;
         return rest;
+    }
+
+    /**
+     * Asserts that the expected engine is run on the input query and settings,
+     * including overriding a provided internalQueryFrameworkControl query knob.
+     */
+    testQueryFramework({query, settings, knob, expectedEngine}) {
+        // Ensure that query settings cluster parameter is empty.
+        this.assertQueryShapeConfiguration([]);
+
+        // Apply the provided settings for the query.
+        if (settings) {
+            assert.commandWorked(
+                this.db.adminCommand({setQuerySettings: query, settings: settings}));
+            // Wait until the settings have taken effect.
+            const expectedConfiguration = [this.makeQueryShapeConfiguration(settings, query)];
+            this.assertQueryShapeConfiguration(expectedConfiguration);
+        }
+
+        // Set framework control knob
+        if (knob) {
+            assert.commandWorked(
+                this.db.adminCommand({setParameter: 1, internalQueryFrameworkControl: knob}))
+        }
+        const withoutDollarDB = query.aggregate ? {...this.withoutDollarDB(query), cursor: {}}
+                                                : this.withoutDollarDB(query);
+        const explain = assert.commandWorked(this.db.runCommand({explain: withoutDollarDB}));
+        const engine = getEngine(explain);
+        assert.eq(
+            engine, expectedEngine, `Expected engine to be ${expectedEngine} but found ${engine}`);
+
+        // If a hinted index exists, assert it was used.
+        if (query.hint) {
+            const winningPlan = getWinningPlanFromExplain(explain);
+            const ixscanStage = getPlanStages(winningPlan, "IXSCAN")[0];
+            assert.eq(query.hint, ixscanStage.keyPattern, winningPlan);
+        }
+
+        this.removeAllQuerySettings();
     }
 }
