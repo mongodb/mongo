@@ -28,8 +28,11 @@ let makeUpgradedClusterFromOldReplSet = function() {
     replSet.startSet();
     replSet.initiate();
 
-    replSet.upgradeSet(
-        {binVersion: 'latest', setParameter: {featureFlagAllMongodsAreSharded: true}});
+    replSet.upgradeSet({
+        binVersion: 'latest',
+        setParameter:
+            {featureFlagAllMongodsAreSharded: true, featureFlagTransitionToCatalogShard: true}
+    });
 
     let primary = replSet.getPrimary();
     assert.commandWorked(
@@ -273,7 +276,8 @@ jsTest.log('Testing downgrade to sharded cluster from a cluster upgraded from re
 
 let replTest = makeUpgradedClusterFromOldReplSet();
 
-const mongos = MongoRunner.runMongos({configdb: replTest.getURL()});
+const mongos = MongoRunner.runMongos(
+    {configdb: replTest.getURL(), setParameter: "featureFlagTransitionToCatalogShard=true"});
 assert(mongos);
 assert.commandWorked(mongos.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(mongos.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
