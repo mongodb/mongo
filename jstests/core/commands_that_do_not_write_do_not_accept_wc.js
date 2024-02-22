@@ -15,7 +15,7 @@ var collName = 'leaves';
 
 var commands = [];
 
-commands.push({find: collName, query: {_id: 1}});
+commands.push({find: collName, filter: {_id: 1}});
 
 commands.push({distinct: collName, key: "_id"});
 
