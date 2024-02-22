@@ -337,11 +337,7 @@ TEST_F(OplogBufferCollectionTest, ShutdownWithDropCollectionAtShutdownFalseDoesN
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
 }
 
-DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
-                   StartupWithExistingCollectionFailsWhenEntryHasNoId,
-                   "Fatal assertion.*40348.*IndexNotFound: Index not found, "
-                   "ns:local.OplogBufferCollectionTest_"
-                   "StartupWithExistingCollectionFailsWhenEntryHasNoId, index: _id_") {
+TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionFailsWhenEntryHasNoId) {
     auto nss = makeNamespace(_agent);
     CollectionOptions collOpts;
     collOpts.setNoIdIndex();
@@ -354,7 +350,11 @@ DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
     OplogBufferCollection::Options opts;
     opts.dropCollectionAtStartup = false;
     OplogBufferCollection oplogBuffer(_storageInterface, nss, opts);
-    oplogBuffer.startup(_opCtx.get());
+    ASSERT_THROWS_CODE_AND_WHAT(oplogBuffer.startup(_opCtx.get()),
+                                DBException,
+                                ErrorCodes::IndexNotFound,
+                                "Index not found, ns:local.OplogBufferCollectionTest_"
+                                "StartupWithExistingCollectionFailsWhenEntryHasNoId, index: _id_");
 }
 
 DEATH_TEST_REGEX_F(OplogBufferCollectionTest,

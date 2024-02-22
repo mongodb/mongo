@@ -113,10 +113,20 @@ public:
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
+
+    // --- CAUTION: Push() and preload() are legal to be called only after startup() ---
+
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
               std::size_t size = -1) override;
+    /**
+     * Like push(), but allows the operations in the batch to be out of order with
+     * respect to themselves and to the buffer. Legal to be called only before reading anything,
+     * or immediately after a clear().
+     */
+    void preload(OperationContext* opCtx, Batch::const_iterator begin, Batch::const_iterator end);
+
     void waitForSpace(OperationContext* opCtx, std::size_t size) override;
     bool isEmpty() const override;
     std::size_t getMaxSize() const override;
@@ -138,13 +148,6 @@ public:
 
     // Only currently used by the TenantMigrationRecipientService, so not part of a parent API.
     Timestamp getLastPushedTimestamp() const;
-
-    /**
-     * Like push(), but allows the operations in the batch to be out of order with
-     * respect to themselves and to the buffer. Legal to be called only before reading anything,
-     * or immediately after a clear().
-     */
-    void preload(OperationContext* opCtx, Batch::const_iterator begin, Batch::const_iterator end);
 
     // ---- Testing API ----
     Timestamp getLastPoppedTimestamp_forTest() const;

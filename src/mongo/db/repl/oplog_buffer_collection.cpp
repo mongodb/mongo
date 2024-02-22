@@ -75,6 +75,7 @@ const StringData kIdFieldName = "_id"_sd;
 const StringData kTimestampFieldName = "ts"_sd;
 const StringData kIdIdxName = "_id_"_sd;
 
+const Timestamp kInvalidLastPushedTimestamp(0, 1);
 }  // namespace
 
 NamespaceString OplogBufferCollection::getDefaultNamespace() {
@@ -122,10 +123,10 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
     // If we are starting from an existing collection, we must populate the in memory state of the
     // buffer.
-    auto sizeResult = _storageInterface->getCollectionSize(opCtx, _nss);
-    fassert(40403, sizeResult);
-    _size = sizeResult.getValue();
+    _size = uassertStatusOK(_storageInterface->getCollectionSize(opCtx, _nss));
     _sizeIsValid = true;
+
+    _count = uassertStatusOK(_storageInterface->getCollectionCount(opCtx, _nss));
 
     // We always start from the beginning, with _lastPoppedKey being empty. This is safe because
     // it is always safe to replay old oplog entries in order. We explicitly reset all fields
@@ -139,15 +140,6 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
 
 void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock,
                                                                      OperationContext* opCtx) {
-    auto countResult = _storageInterface->getCollectionCount(opCtx, _nss);
-    fassert(40404, countResult);
-    _count = countResult.getValue();
-
-    if (_count == 0) {
-        _lastPushedTimestamp = {};
-        return;
-    }
-
     auto lastPushedObj = _lastDocumentPushed_inlock(opCtx);
     if (lastPushedObj) {
         auto lastPushedId = lastPushedObj->getObjectField(kIdFieldName);
@@ -200,10 +192,18 @@ void OplogBufferCollection::preload(OperationContext* opCtx,
     if (begin == end) {
         return;
     }
+
+    ScopeGuard failToPreloadGuard([this] {
+        stdx::unique_lock lk(_mutex);
+        _lastPushedTimestamp = kInvalidLastPushedTimestamp;
+    });
+
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_lastPoppedKey.isEmpty());
     _push(lk, opCtx, begin, end);
     _updateLastPushedTimestampFromCollection(lk, opCtx);
+
+    failToPreloadGuard.dismiss();
 }
 
 void OplogBufferCollection::_push(WithLock,
@@ -394,14 +394,13 @@ boost::optional<OplogBuffer::Value> OplogBufferCollection::_lastDocumentPushed_i
         return boost::none;
     }
     const auto docs =
-        fassert(40348,
-                _storageInterface->findDocuments(opCtx,
-                                                 _nss,
-                                                 kIdIdxName,
-                                                 StorageInterface::ScanDirection::kBackward,
-                                                 {},
-                                                 BoundInclusion::kIncludeStartKeyOnly,
-                                                 1U));
+        uassertStatusOK(_storageInterface->findDocuments(opCtx,
+                                                         _nss,
+                                                         kIdIdxName,
+                                                         StorageInterface::ScanDirection::kBackward,
+                                                         {},
+                                                         BoundInclusion::kIncludeStartKeyOnly,
+                                                         1U));
     invariant(1U == docs.size());
     return docs.front();
 }
@@ -443,15 +442,14 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode pe
     // when size of read ahead cache is greater than zero in the options.
     if (_peekCache.empty()) {
         std::size_t limit = isPeekCacheEnabled ? _options.peekCacheSize : 1U;
-        const auto docs =
-            fassert(40163,
-                    _storageInterface->findDocuments(opCtx,
-                                                     _nss,
-                                                     kIdIdxName,
-                                                     StorageInterface::ScanDirection::kForward,
-                                                     startKey,
-                                                     boundInclusion,
-                                                     limit));
+        const auto docs = uassertStatusOK(
+            _storageInterface->findDocuments(opCtx,
+                                             _nss,
+                                             kIdIdxName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             startKey,
+                                             boundInclusion,
+                                             limit));
         invariant(!docs.empty());
         for (const auto& doc : docs) {
             _peekCache.push(doc);
@@ -491,6 +489,10 @@ void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
 
 Timestamp OplogBufferCollection::getLastPushedTimestamp() const {
     stdx::lock_guard<Latch> lk(_mutex);
+    uassert(8359601,
+            "preload() might have failed. So clear() should be called before reading "
+            "'lastPushedTimestamp'",
+            _lastPushedTimestamp != kInvalidLastPushedTimestamp);
     return _lastPushedTimestamp;
 }
 
