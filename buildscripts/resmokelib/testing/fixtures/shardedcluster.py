@@ -33,7 +33,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             (2) Each shard-server in the cluster is started with the "--routerPort" CLI switch to enable routing.
             (3) An arbitrary subset of size `num_routers` of the shard-servers are chosen at fixture startup to serve as the routers,
                 and all routing requests are directed to the routing ports of those nodes.
-            TODO SERVER-81470: Support a mix of routing-enabled and routing-disabled shard servers in embedded router mode.
+            TODO SERVER-86554: Support a mix of shard servers with the routerPort opened and not.
         """
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
