@@ -38,15 +38,29 @@ export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
     // Checks that the number of docs examined matches the expected number. There are separate
     // expected args for Classic vs SBE because in Classic there is an extra cursor->next() call
     // beyond the end of the range if EOF has not been hit, but in SBE there is not. This function
-    // also handles that this stat is in different places for the two engines:
+    // also handles that this stat is in different places for the two engines and when using a
+    // sharded cluster:
     //   Classic: executionStats.executionStages.docsExamined
     //   SBE:     executionStats.totalDocsExamined
+    //   Sharded: executionStats.totalDocsExamined
     function assertDocsExamined(executionStats, expectedClassic, expectedSbe) {
         let sbe = false;
-        let docsExamined = executionStats.executionStages.docsExamined;
-        if (docsExamined == undefined) {
-            sbe = true;
+        let docsExamined = undefined;
+        const shards = executionStats.executionStages.shards;
+
+        if (shards == undefined) {
+            // single node case
+            docsExamined = executionStats.executionStages.docsExamined;
+            if (docsExamined == undefined) {
+                sbe = true;
+                docsExamined = executionStats.totalDocsExamined;
+            }
+        } else {
+            // sharded case
             docsExamined = executionStats.totalDocsExamined;
+            if (shards[0].executionStages.docsExamined == undefined) {
+                sbe = true;
+            }
         }
         if (sbe) {
             assert.eq(expectedSbe, docsExamined);
