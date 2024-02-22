@@ -1685,7 +1685,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=off
       --modules=
-    test_flags:  >-
+    test_flags: >-
       --excludeWithAnyTags=requires_external_data_source,requires_latch_analyzer
       --enableEnterpriseTests=off
     multiversion_platform: rhel90
