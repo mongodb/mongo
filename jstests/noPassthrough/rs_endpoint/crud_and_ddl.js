@@ -66,10 +66,19 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     assert.commandWorked(
         shard0Primary.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
-    const shard0URL = getReplicaSetURL(shard0Primary);
-    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
-    const mongos = MongoRunner.runMongos({configdb: shard0URL});
-    const mongosTestColl = mongos.getDB(dbName).getCollection(collName);
+    const {router, mongos} = (() => {
+        if (shard0Primary.routerHost) {
+            const router = new Mongo(shard0Primary.routerHost);
+            return {
+                router
+            }
+        }
+        const shard0URL = getReplicaSetURL(shard0Primary);
+        const mongos = MongoRunner.runMongos({configdb: shard0URL});
+        return {router: mongos, mongos};
+    })();
+    jsTest.log("Using " + tojsononeline({router, mongos}));
+    const mongosTestColl = router.getDB(dbName).getCollection(collName);
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains two shards (one config shard and one regular shard)");
@@ -80,10 +89,10 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     // shard1 doesn't have any documents for the collection.
     assert.eq(shard1TestColl.find().itcount(), 0);
 
-    assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {x: 1}}));
-    assert.commandWorked(mongos.adminCommand({split: ns, middle: {x: 0}}));
+    assert.commandWorked(router.adminCommand({shardCollection: ns, key: {x: 1}}));
+    assert.commandWorked(router.adminCommand({split: ns, middle: {x: 0}}));
     assert.commandWorked(
-        mongos.adminCommand({moveChunk: ns, find: {x: 0}, to: shard1Name, _waitForDelete: true}));
+        router.adminCommand({moveChunk: ns, find: {x: 0}, to: shard1Name, _waitForDelete: true}));
 
     assert.eq(mongosTestColl.find().itcount(), 2);
     // shard0 and shard1 each have one document for the collection.
@@ -98,9 +107,9 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 
     // Remove the second shard from the cluster.
     assert.commandWorked(
-        mongos.adminCommand({moveChunk: ns, find: {x: 0}, to: "config", _waitForDelete: true}));
+        router.adminCommand({moveChunk: ns, find: {x: 0}, to: "config", _waitForDelete: true}));
     assert.soon(() => {
-        const res = assert.commandWorked(mongos.adminCommand({removeShard: shard1Name}));
+        const res = assert.commandWorked(router.adminCommand({removeShard: shard1Name}));
         return res.state == "completed";
     });
     assert(shard1TestColl.drop());
@@ -113,16 +122,16 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     assert.eq(shard1TestColl.find().itcount(), 0);
 
     // Add the second shard back but convert the config shard to dedicated config server.
-    assert.commandWorked(mongos.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
-    moveDatabaseAndUnshardedColls(mongos.getDB(dbName), shard1Name);
-    assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.commandWorked(router.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
+    moveDatabaseAndUnshardedColls(router.getDB(dbName), shard1Name);
+    assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
 
     // Ensure the balancer is enabled so sharded data can be moved out by the transition to
     // dedicated command.
-    assert.commandWorked(mongos.adminCommand({balancerStart: 1}));
+    assert.commandWorked(router.adminCommand({balancerStart: 1}));
 
     assert.soon(() => {
-        let res = mongos.adminCommand({transitionToDedicatedConfigServer: 1});
+        let res = router.adminCommand({transitionToDedicatedConfigServer: 1});
         return res.state == "completed";
     });
 
@@ -135,7 +144,9 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 
     tearDownFunc();
     shard1Rst.stopSet();
-    MongoRunner.stopMongos(mongos);
+    if (mongos) {
+        MongoRunner.stopMongos(mongos);
+    }
 }
 
 {

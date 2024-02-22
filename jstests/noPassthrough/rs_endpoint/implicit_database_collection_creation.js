@@ -224,10 +224,19 @@ function runTests(getShard0PrimaryFunc,
     runTest(shard0Primary, execCtxTypes.kRetryableWrite, expectShardingMetadata3);
     runTest(shard0Primary, execCtxTypes.kTransaction, expectShardingMetadata3);
 
-    const shard0URL = getReplicaSetURL(shard0Primary);
-    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
-    const mongos = MongoRunner.runMongos({configdb: shard0URL});
-    assert.commandWorked(mongos.adminCommand({transitionToDedicatedConfigServer: 1}));
+    const {router, mongos} = (() => {
+        if (shard0Primary.routerHost) {
+            const router = new Mongo(shard0Primary.routerHost);
+            return {
+                router
+            }
+        }
+        const shard0URL = getReplicaSetURL(shard0Primary);
+        const mongos = MongoRunner.runMongos({configdb: shard0URL});
+        return {router: mongos, mongos};
+    })();
+    jsTest.log("Using " + tojsononeline({router, mongos}));
+    assert.commandWorked(router.adminCommand({transitionToDedicatedConfigServer: 1}));
 
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains one shard (regular shard)");
@@ -246,7 +255,9 @@ function runTests(getShard0PrimaryFunc,
 
     tearDownFunc();
     shard1Rst.stopSet();
-    MongoRunner.stopMongos(mongos);
+    if (mongos) {
+        MongoRunner.stopMongos(mongos);
+    }
 }
 
 function getStandaloneRestartOptions(maintenanceMode, port, setParameterOpts) {

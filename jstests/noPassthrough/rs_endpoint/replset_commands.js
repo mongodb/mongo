@@ -51,10 +51,19 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
     jsTest.log("Running tests for " + shard0Primary.host +
                " while the cluster contains two shards (one config shard and one regular shard)");
 
-    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
-    const shard0URL = getReplicaSetURL(shard0Primary);
-    const mongos = MongoRunner.runMongos({configdb: shard0URL});
-    assert.commandFailedWithCode(mongos.adminCommand({replSetStepDown: 1, force: true}),
+    const {router, mongos} = (() => {
+        if (shard0Primary.routerHost) {
+            const router = new Mongo(shard0Primary.routerHost);
+            return {
+                router
+            }
+        }
+        const shard0URL = getReplicaSetURL(shard0Primary);
+        const mongos = MongoRunner.runMongos({configdb: shard0URL});
+        return {router: mongos, mongos};
+    })();
+    jsTest.log("Using " + tojsononeline({router, mongos}));
+    assert.commandFailedWithCode(router.adminCommand({replSetStepDown: 1, force: true}),
                                  ErrorCodes.CommandNotFound);
 
     assert.commandWorked(shard0Primary.adminCommand({replSetStepDown: 1, force: true}));
@@ -66,7 +75,9 @@ function runTests(shard0Primary, tearDownFunc, isMultitenant) {
 
     tearDownFunc();
     shard1Rst.stopSet();
-    MongoRunner.stopMongos(mongos);
+    if (mongos) {
+        MongoRunner.stopMongos(mongos);
+    }
 }
 
 {

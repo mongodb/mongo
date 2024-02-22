@@ -81,9 +81,18 @@ function runTests(shard0Primary, tearDownFunc) {
     const shard1AuthDB = shard1Primary.getDB(authDbName);
     const shard1TestColl = shard1AuthDB.getSiblingDB(dbName).getCollection(collName);
 
-    // TODO (SERVER-83380): Connect to the router port on a shardsvr mongod instead.
-    const mongos = MongoRunner.runMongos({configdb: shard0URL, keyFile});
-    const mongosAuthDB = mongos.getDB(authDbName);
+    const {router, mongos} = (() => {
+        if (shard0Primary.routerHost) {
+            const router = new Mongo(shard0Primary.routerHost);
+            return {
+                router
+            }
+        }
+        const mongos = MongoRunner.runMongos({configdb: shard0URL, keyFile});
+        return {router: mongos, mongos};
+    })();
+    jsTest.log("Using " + tojsononeline({router, mongos}));
+    const mongosAuthDB = router.getDB(authDbName);
     const mongosTestColl = mongosAuthDB.getSiblingDB(dbName).getCollection(collName);
     assert(mongosAuthDB.auth(adminUser.userName, adminUser.password));
     // Insert documents now so shard0 is the primary shard for the test database.
@@ -188,7 +197,7 @@ function runTests(shard0Primary, tearDownFunc) {
     assert.commandWorked(
         mongosAuthDB.adminCommand({addShard: shard1Rst.getURL(), name: shard1Name}));
 
-    moveDatabaseAndUnshardedColls(mongos.getDB(dbName), shard1Name);
+    moveDatabaseAndUnshardedColls(router.getDB(dbName), shard1Name);
 
     assert.commandWorked(mongosAuthDB.adminCommand({transitionToDedicatedConfigServer: 1}));
     assert(mongosAuthDB.logout());
@@ -214,7 +223,9 @@ function runTests(shard0Primary, tearDownFunc) {
 
     tearDownFunc();
     shard1Rst.stopSet();
-    MongoRunner.stopMongos(mongos);
+    if (mongos) {
+        MongoRunner.stopMongos(mongos);
+    }
 }
 
 {
