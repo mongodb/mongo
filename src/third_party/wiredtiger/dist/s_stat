@@ -8,12 +8,16 @@ use_pygrep
 
 # List of files to search: skip stat.c, it lists all of the fields by
 # definition.
-l=`sed \
-    -e '/src\/support\/stat.c/d' \
-    -e '/^[a-z]/!d' \
-    -e 's/[	 ].*$//' \
-    -e 's,^,../,' filelist`
-l="$l `echo ../src/include/*_inline.h ../src/include/os.h`"
+l=$(
+    sed \
+        -e '/src\/support\/stat.c/d' \
+        -e '/^[a-z]/!d' \
+        -e 's/[	 ].*$//' \
+        -e 's,^,../,' filelist
+    ls -1 ../src/include/*_inline.h ../src/include/os.h
+)
+
+[[ -z "$( { echo ../src/include/stat.h; echo "$l"; } | filter_if_fast ../)" ]] && exit 0
 
 {
 # Get the list of statistics fields.

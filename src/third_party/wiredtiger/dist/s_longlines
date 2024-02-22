@@ -4,10 +4,12 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_top
+check_fast_mode_flag
 
 l=`(find bench/wtperf examples ext src test -name '*.[chsy]' &&
     find dist -name '*.py' &&
     find src -name '*.in') |
+    filter_if_fast |
     sed -e '/checksum\/power8/d' \
         -e '/checksum\/zseries/d' \
         -e '/config\/config_def\.c/d' \

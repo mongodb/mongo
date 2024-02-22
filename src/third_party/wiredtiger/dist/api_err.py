@@ -3,8 +3,17 @@
 # Output C #defines for errors into wiredtiger.in and the associated error
 # message code in strerror.c.
 
-import os, textwrap
+import os, sys, textwrap
 from dist import compare_srcfile, format_srcfile
+from common_functions import filter_if_fast
+
+if not [f for f in filter_if_fast([
+            "../src/conn/api_strerror.c",
+            "../src/docs/error-handling.dox",
+            "../src/include/wiredtiger.in",
+        ], prefix="../")]:
+    sys.exit(0)
+
 
 class Error:
     def __init__(self, name, value, desc, long_desc=None, **flags):

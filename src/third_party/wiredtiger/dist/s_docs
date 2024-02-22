@@ -2,6 +2,7 @@
 
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 cd_dist
+check_fast_mode_flag
 t2=__wt.$$.2
 trap 'rm -f $t $t2' 0 1 2 3 13 15
 
@@ -17,6 +18,12 @@ type doxygen > /dev/null 2>&1 || {
     echo "$0 skipped: doxygen not found"
     exit 0
 }
+
+[[ -z "$( {
+        echo ../bench/wtperf/wtperf_opt_inline.h
+        find ../src/docs/
+        [[ -d ../docs ]] && find ../docs/
+    } | filter_if_fast ../)" ]] && exit 0
 
 # Don't create Python bytecode files, we don't run this regularly and it gets flagged by git as an
 # untracked file.

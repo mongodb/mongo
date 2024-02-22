@@ -4,10 +4,16 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 cd_dist
 use_pygrep
+check_fast_mode_flag
 
 # List of files to search.
-l=`sed -e '/^[a-z]/!d' -e 's/[	 ].*$//' -e 's,^,../,' filelist`
-l="$l `echo ../src/*/*_inline.h ../src/utilities/*.c ../bench/wtperf/*.c ../bench/tiered/*.c`"
+l=$(
+    sed -e '/^[a-z]/!d' -e 's/[	 ].*$//' -e 's,^,../,' filelist
+    ls -1 ../src/*/*_inline.h ../src/utilities/*.c ../bench/wtperf/*.c ../bench/tiered/*.c
+)
+
+# If none of these files to search have changed relative to develop there's nothing to do. Early exit.
+[[ -z "$(echo "$l" | filter_if_fast ../)" ]] && exit 0
 
 {
     # Copy out the functions we don't use, but it's OK.

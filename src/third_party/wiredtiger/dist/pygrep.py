@@ -39,7 +39,7 @@ args.pattern = [line
                 for line in pat.splitlines() if line]
 if not args.pattern:
     argparser.print_help()
-    exit()
+    sys.exit(0)
 
 match = matchSearch if args.only_matching else matchLine
 if not args.is_regex:

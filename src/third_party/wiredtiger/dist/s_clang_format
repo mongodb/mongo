@@ -4,6 +4,7 @@ set -o pipefail
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_top
+check_fast_mode_flag
 
 download_clang_format() {
     version=$1
@@ -51,29 +52,12 @@ fi
 clang-format --version &> /dev/null || exit 1
 
 exclude=true
-case $# in
-0)
-    # Get all source files.
-    search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cpp'`
-    ;;
-1)
-    # If the -F option is not specified then find every source file.
-    if [ $1 == "-F" ]; then
-        # We are running in fast mode, get all the source files modified according to git.
-        check_fast_mode
-        search=`git diff --name-only $(last_commit_from_dev) | grep -E '\.(c|h|cpp)$'`
-    else
-        search="$1"
-        exclude=false
-    fi
-    ;;
-*)
-    echo "usage: $0 [-F] [file]"
-    echo "-F apply clang format to modified source files in the git index"
-    echo "Only a file or -F can be provided"
-    exit 1
-    ;;
-esac
+if [[ "$1" == "" || "$1" == "-F" ]]; then
+    search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cpp' | filter_if_fast`
+else
+    search="$1"
+    exclude=false
+fi
 
 if $exclude; then
     for f in `cat dist/s_clang_format.list`; do

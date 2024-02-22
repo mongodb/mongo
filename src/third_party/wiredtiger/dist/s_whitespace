@@ -5,6 +5,7 @@
 setup_trap
 cd_top
 use_pygrep
+check_fast_mode_flag
 
 # Clear lines that only contain whitespace, compress multiple empty lines
 # into a single line, discard trailing empty lines.
@@ -26,52 +27,26 @@ whitespace()
 }
 
 SUBDIRS="bench examples ext src test"
-{
-    if [[ "$1" = "-F" ]]; then
-        check_fast_mode
-        git diff --name-only "$(last_commit_from_dev)" $SUBDIRS | \
-            $EGREP \
-                -e '\.[ch]$' \
-                -e '\.cpp$' \
-                -e '\.dox$' \
-                -e '\.in$' \
-                -e '\.py$' \
-                -e '\.sh$' \
-                -e '\.yaml$' \
-                -e '\.yml$' \
-                -e '(^|/)s_' \
-                -e '(^|/)CONFIG\.' \
-                -e '(^|/)Makefile.am$' | \
-            $FGREP -v \
-                -e 'Makefile.in' \
-                -e 'checksum/power8' \
-                -e '3rdparty' \
-                -e 'docs/tools' \
-                -e 'log/log_auto' \
-                ;
-
-    else
-        find $SUBDIRS \
-            -name '*.[ch]' -o \
-            -name '*.cpp' -o \
-            -name '*.dox' -o \
-            -name '*.in' -o \
-            -name '*.py' -o \
-            -name '*.sh' -o \
-            -name '*.yaml' -o \
-            -name '*.yml' -o \
-            -name 's_*' -o \
-            -name 'CONFIG.*' -o \
-            -name 'Makefile.am' | \
-            $FGREP -v \
-                -e 'Makefile.in' \
-                -e 'checksum/power8' \
-                -e '3rdparty' \
-                -e 'docs/tools' \
-                -e 'log/log_auto' \
-                ;
-    fi
-} | while read f ; do
+find $SUBDIRS \
+    -name '*.[ch]' -o \
+    -name '*.cpp' -o \
+    -name '*.dox' -o \
+    -name '*.in' -o \
+    -name '*.py' -o \
+    -name '*.sh' -o \
+    -name '*.yaml' -o \
+    -name '*.yml' -o \
+    -name 's_*' -o \
+    -name 'CONFIG.*' -o \
+    -name 'Makefile.am' | \
+    $FGREP -v \
+        -e 'Makefile.in' \
+        -e 'checksum/power8' \
+        -e '3rdparty' \
+        -e 'docs/tools' \
+        -e 'log/log_auto' \
+| filter_if_fast |
+while read f ; do
     whitespace $f
 done
 

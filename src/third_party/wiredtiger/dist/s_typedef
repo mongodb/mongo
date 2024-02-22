@@ -3,6 +3,7 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_dist
+check_fast_mode_flag
 
 # Insulate against locale-specific sort order and IFS from the user's env
 LC_ALL=C
@@ -13,6 +14,13 @@ export IFS
 
 build() {
     set -o pipefail
+
+    [[ -z "$(
+        {
+            echo ../src/include/wt_internal.h
+            ls -1 ../src/include/*.h ../src/include/*.in
+        } | filter_if_fast ../
+    )" ]] && return
 
     # Build the standard typedefs.
     f=../src/include/wt_internal.h

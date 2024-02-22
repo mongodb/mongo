@@ -3,10 +3,11 @@
 # Check the style of WiredTiger C code.
 import os, re, sys
 from dist import all_c_files, compare_srcfile
+from common_functions import filter_if_fast
 
 # Complain if a function comment is missing.
 def missing_comment():
-    for f in all_c_files():
+    for f in filter_if_fast(all_c_files(), prefix="../"):
         skip_re = re.compile(r'DO NOT EDIT: automatically built')
         func_re = re.compile(
             r'(/\*(?:[^\*]|\*[^/])*\*/)?\n\w[\w \*]+\n(\w+)', re.DOTALL)
@@ -133,7 +134,7 @@ def function_args(name, line):
 # Put function arguments in correct sort order.
 def function_declaration():
     tmp_file = '__tmp_function' + str(os.getpid())
-    for name in all_c_files():
+    for name in filter_if_fast(all_c_files(), prefix="../"):
         skip_re = re.compile(r'DO NOT EDIT: automatically built')
         s = open(name, 'r').read()
         if skip_re.search(s):

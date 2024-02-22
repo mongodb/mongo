@@ -4,20 +4,7 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_top
-
-fast=1
-case "$1" in
-    -F) # Run fast.
-        check_fast_mode
-        fast=0
-        shift;;
-    *)
-        if test $# -gt 1 ; then
-            echo "Usage: $0 [-F]"
-            echo "-F only run function validation on modified soure files."
-        fi
-        ;;
-esac
+check_fast_mode_flag
 
 # Turn a C file into a line per function so we can use grep on it.
 file_parse()
@@ -32,11 +19,9 @@ file_parse()
         -e '{s/.*//;x;}'
 }
 
-if test $fast -eq 1 ; then
-    files=`find bench examples ext src test -name '*.c' -o -name '*_inline.h'`
-else
-    files=`git diff --name-only "$(last_commit_from_dev)" bench examples ext src test | grep -E '(.c|_inline.h)$'`
-fi
+files=`find bench examples ext src test -name '*.c' -o -name '*_inline.h' | filter_if_fast`
+
+[[ -z "$files" ]] && exit 0
 
 # Returns in functions after a jump to the error label, or an infinite loop
 # where there's a jump to the error label after the error label.
@@ -127,11 +112,7 @@ for f in $files; do
     }
 done
 
-if test $fast -eq 1 ; then
-    files=`find src -name '*.c' -o -name '*._inline.h'`
-else
-    files=`git diff --name-only "$(last_commit_from_dev)" src | grep -E '(.c|_inline.h)$'`
-fi
+files=`find src -name '*.c' -o -name '*._inline.h' | filter_if_fast`
 
 # __wt_verbose with a bitwise OR category parameter.
 for f in $files; do

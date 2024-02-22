@@ -6,23 +6,6 @@
 cd_dist
 t_pfx=__s_all_tmp_
 
-allchildpids() { # Recursively get PIDs of all child processes.
-    ps -o pid,ppid | python3 -c '
-import re, os, sys
-children = {}   # Map from parent PID to list of child PIDs.
-for line in sys.stdin.readlines():
-    (pid, ppid) = [*re.findall("""(\d+)""", line), 0, 0][:2]
-    if pid and ppid and pid != str(os.getpid()):
-        if ppid not in children: children[ppid] = []
-        children[ppid].append(pid)
-pids = children[sys.argv[1]].copy() if sys.argv[1] in children else []
-while len(pids):
-    (pid, pids) = (pids[0], pids[1:])   # pop one element and shift the list.
-    print(pid)
-    if pid in children: pids.extend(children[pid])
-' $$
-}
-
 CLRL=$'\e[K'     # Clear to the end of line.
 CLRS=$'\e[0J'    # Clear to the bottom of screen.
 BOL=$'\r'        # Move cursor to the beginning of line.
@@ -61,7 +44,7 @@ type python3 > /dev/null 2>&1 || {
 
 echo 'dist/s_all run started...'
 
-fast=""
+export WT_FAST=""
 force=
 errmode=0
 errfound=0
@@ -72,7 +55,7 @@ Run all presubmit tests.
 Usage: $0 [... options]
   -E                 Return an error code on failure.
   -f                 Force versions to be updated.
-  -F                 Run fast.
+  -F                 Run fast: Only process files that have changed since the code diverged from develop.
   --no-interactive   Disable interactitve terminal status.
   -h, --help         Display this help.
 _END
@@ -90,7 +73,7 @@ while [[ "$#" -gt 0 ]]
     -F)                # Run fast.
         check_fast_mode
         echo "dist/s_all running in fast mode..."
-        fast="-F"
+        export WT_FAST="-F"
         shift;;
     -h | --help) help 0;;
     --no-interactive)   # Force disable terminal status report
@@ -153,8 +136,8 @@ run "log.py"
 run "stat.py"
 run "verbose.py"
 run "s_copyright"
-run "s_style $fast"
-run "s_clang_format $fast"
+run "s_style"
+run "s_clang_format"
 run "prototypes.py"
 run "s_typedef -b"
 run "test_tag.py"
@@ -164,26 +147,26 @@ run "s_mentions" "--warning-only"
 run --bg "s_define" &
 run --bg "s_docs" &
 run --bg "s_evergreen" &
-run --bg "s_evergreen_validate $fast" &
+run --bg "s_evergreen_validate" &
 run --bg "s_test_suite_no_executable" &
 run --bg "s_export" &
 run --bg "s_free" &
 run --bg "s_funcs" &
-run --bg "s_function $fast" &
+run --bg "s_function" &
 run --bg "s_getopt" &
 run --bg "s_lang" &
 run --bg "s_longlines" &
 run --bg "s_python" &
 run --bg "s_stat" &
-run --bg "s_string $fast" &
+run --bg "s_string" &
 run --bg "s_tags" &
 run --bg "s_typedef -c" &
 run --bg "s_visibility_checks" &
-run --bg "s_void $fast" &
-run --bg "s_whitespace $fast" &
+run --bg "s_void" &
+run --bg "s_whitespace" &
 run --bg "function.py" &
 run --bg "style.py" &
-run --bg "comment_style.py $fast" &
+run --bg "comment_style.py" &
 run --bg "type_to_str.py" &
 
 # Wait for completion.

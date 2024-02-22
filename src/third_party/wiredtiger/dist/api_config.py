@@ -2,6 +2,20 @@
 
 import os, re, sys, textwrap
 from dist import compare_srcfile, format_srcfile, ModifyFile
+from common_functions import filter_if_fast
+
+if not [f for f in filter_if_fast([
+            "../dist/api_data.py",
+            "../dist/dist.py",
+            "../dist/test_data.py",
+            "../src/config/config_def.c",
+            "../src/config/test_config.c",
+            "../src/include/conf.h"
+            "../src/include/conf_keys.h"
+            "../src/include/config.h"
+            "../src/include/wiredtiger.in",
+        ], prefix="../")]:
+    sys.exit(0)
 
 test_config = False
 

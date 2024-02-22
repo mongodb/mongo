@@ -3,6 +3,7 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_top
+check_fast_mode_flag
 
 # Parse a C file, discarding functions that don't return an int, and formatting
 # the remaining functions as a single line.
@@ -189,13 +190,7 @@ func_ok()
 
 SUBDIRS="bench ext src test"
 
-if [[ "$1" = "-F" ]]; then
-    check_fast_mode
-    l=`git diff --name-only "$(last_commit_from_dev)" $SUBDIRS | grep -E '(_inline\.h|\.c)$' | egrep -Ev '/windows_shim\.c$'`
-else
-    l=`find $SUBDIRS -name '*.c' -o -name '*_inline.h' | egrep -Ev '/windows_shim\.c$'`
-fi
-for f in $l; do
+for f in `find $SUBDIRS -name '*.c' -o -name '*_inline.h' | egrep -Ev '/windows_shim\.c$' | filter_if_fast`; do
     # Complain about functions which return an "int" but which don't return
     # except at the end of the function.
     #

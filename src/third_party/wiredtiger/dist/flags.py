@@ -2,6 +2,13 @@
 
 import os, re, sys
 from dist import all_c_files, all_h_files, compare_srcfile
+from common_functions import filter_if_fast
+
+c_files = [f for f in all_c_files()]
+h_files = [f for f in all_h_files()]
+
+if not [f for f in filter_if_fast([*c_files, *h_files], prefix="../")]:
+    sys.exit(0)
 
 # Automatically build flags values: read through all of the header files, and
 # for each group of flags, sort them, check the start and stop boundaries on
@@ -98,7 +105,5 @@ def flag_declare(name):
         compare_srcfile(tmp_file, name)
 
 # Update function argument declarations.
-for name in all_h_files():
-    flag_declare(name)
-for name in all_c_files():
+for name in [*c_files, *h_files]:
     flag_declare(name)

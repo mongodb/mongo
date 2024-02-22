@@ -3,9 +3,10 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_dist
+check_fast_mode_flag
 
 # Complain if someone uses the wrong getopt.
-find ../src ../test ../bench -name '*.c' | xargs egrep '[^a-z_]getopt\(' > $t
+find ../src ../test ../bench -name '*.c' | filter_if_fast ../ | xargs egrep '[^a-z_]getopt\(' > $t
 
 test -s $t && {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
