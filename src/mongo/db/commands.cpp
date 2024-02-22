@@ -95,8 +95,6 @@ const int kFailedFindCommandDebugLevel = 3;
 
 const char kWriteConcernField[] = "writeConcern";
 
-auto& unknowns = *MetricBuilder<Counter64>{"commands.<UNKNOWN>"};
-
 // Returns true if found to be authorized, false if undecided. Throws if unauthorized.
 bool checkAuthorizationImplPreParse(OperationContext* opCtx,
                                     const Command* command,
@@ -1086,6 +1084,10 @@ CommandRegistry* getCommandRegistry(Service* service) {
     auto role = service->role();
     static auto makeReg = [](Service* service) {
         CommandRegistry reg;
+        // `reg` will be a singleton registry, so create a per-service unknowns
+        // counter for it.
+        auto unknowns = &*MetricBuilder<Counter64>{"commands.<UNKNOWN>"}.setRole(service->role());
+        reg.setOnUnknownCommandCallback([unknowns] { unknowns->increment(); });
         globalCommandConstructionPlan().execute(&reg, service);
         return reg;
     };
@@ -1139,10 +1141,6 @@ Command* CommandRegistry::findCommand(StringData name) const {
         return nullptr;
     }
     return it->second;
-}
-
-void CommandRegistry::incrementUnknownCommands() {
-    unknowns.increment();
 }
 
 CommandConstructionPlan& globalCommandConstructionPlan() {

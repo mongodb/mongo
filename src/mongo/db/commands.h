@@ -1426,9 +1426,17 @@ public:
 
     Command* findCommand(StringData name) const;
 
-    void incrementUnknownCommands();
+    void incrementUnknownCommands() {
+        if (_onUnknown)
+            _onUnknown();
+    }
 
     void logWeakRegistrations() const;
+
+    /** A production `CommandRegistry` will update a counter. */
+    std::function<void()> setOnUnknownCommandCallback(std::function<void()> cb) {
+        return std::exchange(_onUnknown, std::move(cb));
+    }
 
 private:
     struct Entry {
@@ -1437,6 +1445,7 @@ private:
 
     stdx::unordered_map<Command*, std::unique_ptr<Entry>> _commands;
     StringMap<Command*> _commandNames;
+    std::function<void()> _onUnknown;
 };
 
 CommandRegistry* getCommandRegistry(Service* service);
