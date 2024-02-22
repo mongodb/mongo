@@ -142,6 +142,8 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: concurrency_sharded_multi_stmt_txn_kill_primary
+      resmoke_args: >-
+        --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer
@@ -152,6 +154,8 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: concurrency_sharded_with_stepdowns_and_balancer
+      resmoke_args: >-
+        --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
@@ -166,6 +170,7 @@ tasks:
         --configShard=0
         --numShards=2
         --excludeWithAnyTags=config_shard_incompatible
+        --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
   name: antithesis_config_fuzzer_stress_concurrency_sharded_replication
@@ -180,6 +185,7 @@ tasks:
         --fuzzMongodConfigs=stress
         --fuzzMongosConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
+        --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
   name: antithesis_core
@@ -190,6 +196,8 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: core
+      resmoke_args: >-
+        --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
   name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
@@ -200,6 +208,8 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
+      resmoke_args: >-
+        --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
   name: antithesis_jstestfuzz_sharded
@@ -210,6 +220,8 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: jstestfuzz_sharded
+      resmoke_args: >-
+        --runAllFeatureFlagTests
 
 - <<: *antithesis_task_template
   name: antithesis_replica_sets_jscore_passthrough
@@ -220,6 +232,8 @@ tasks:
   - func: "antithesis image build and push"
     vars:
       suite: replica_sets_jscore_passthrough
+      resmoke_args: >-
+        --runAllFeatureFlagTests
 
 - name: build_metrics_tasks_gen
   tags: ["assigned_to_jira_team_devprod_build"]
