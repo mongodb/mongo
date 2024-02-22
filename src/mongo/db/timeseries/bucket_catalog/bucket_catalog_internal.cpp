@@ -499,7 +499,6 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         // Initialize BSONColumnBuilders from the compressed bucket data fields.
         bucket->intermediateBuilders.initBuilders(dataObj, bucket->numCommittedMeasurements);
-        bucket->memoryUsage += bucket->intermediateBuilders.getMemoryUsage();
     }
 
     // The metadata is stored in the bucket, we need to account for that.
@@ -662,7 +661,8 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
             bucket, doc, info.options.getMetaField(), newFieldNamesToBeInserted, sizeToBeAdded);
     }
 
-    auto batch = activeBatch(bucket, getOpId(opCtx, combine), stripeNumber, info.stats);
+    auto batch = activeBatch(
+        catalog.trackingContext, bucket, getOpId(opCtx, combine), stripeNumber, info.stats);
     batch->measurements.push_back(doc);
     for (auto&& field : newFieldNamesToBeInserted) {
         batch->newFieldNamesToBeInserted[field] = field.hash();

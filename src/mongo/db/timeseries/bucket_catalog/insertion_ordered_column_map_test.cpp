@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -46,12 +47,15 @@ const std::string testDbName = "db_timeseries_insertion_ordered_column_map_test"
 const TimeseriesOptions kTimeseriesOptions("time");
 
 class InsertionOrderedColumnMapTest : public unittest::Test {
+public:
+    InsertionOrderedColumnMapTest() : iocm(trackingContext) {}
+
 protected:
-    void setUp() override {}
     void tearDown() override {
         iocm._assertInternalStateIdentical_forTest();
     }
 
+    TrackingContext trackingContext;
     InsertionOrderedColumnMap iocm;
 };
 
@@ -131,7 +135,7 @@ TEST_F(InsertionOrderedColumnMapTest, IterationBasic) {
 
     // Check iteration works.
     size_t i = 0;
-    for (boost::optional<std::string> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
         ++i;
     }
     invariant(i == 2);
@@ -157,7 +161,7 @@ TEST_F(InsertionOrderedColumnMapTest, FillSkipsDifferentField) {
     iocm.insertOne(genMeasurementFieldsFromObj(bucketDocNewField));
 
     size_t i = 0;
-    for (boost::optional<std::string> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
         ++i;
     }
     invariant(i == 4);
@@ -178,7 +182,7 @@ TEST_F(InsertionOrderedColumnMapTest, FillSkipsAddField) {
     iocm.insertOne(genMeasurementFieldsFromObj(bucketDocWithField));
 
     size_t i = 0;
-    for (boost::optional<std::string> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
         ++i;
     }
     invariant(i == 4);
@@ -197,7 +201,7 @@ TEST_F(InsertionOrderedColumnMapTest, FillSkipsRemoveField) {
     iocm.insertOne(genMeasurementFieldsFromObj(bucketDocWithoutField));
 
     size_t i = 0;
-    for (boost::optional<std::string> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
         ++i;
     }
     invariant(i == 3);
@@ -251,7 +255,7 @@ TEST_F(InsertionOrderedColumnMapTest, InitBuilders) {
     iocm.initBuilders(dataBuilder.done(), 3);
 
     size_t i = 0;
-    for (boost::optional<std::string> key = iocm.begin(); key != boost::none; key = iocm.next()) {
+    for (boost::optional<StringData> key = iocm.begin(); key != boost::none; key = iocm.next()) {
         ++i;
     }
     invariant(i == 3);

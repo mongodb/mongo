@@ -72,7 +72,8 @@ struct CommitInfo {
  */
 struct WriteBatch {
     WriteBatch() = delete;
-    WriteBatch(const BucketHandle& bucketHandle,
+    WriteBatch(TrackingContext& trackingContext,
+               const BucketHandle& bucketHandle,
                const BucketKey& bucketKey,
                OperationId opId,
                ExecutionStatsController& stats,

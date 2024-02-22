@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include <string>
 #include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/db/timeseries/timeseries_tracked_types.h"
+#include "mongo/db/timeseries/timeseries_tracking_context.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -45,7 +46,7 @@ namespace mongo::timeseries::bucket_catalog {
  */
 class InsertionOrderedColumnMap {
 public:
-    InsertionOrderedColumnMap() = default;
+    explicit InsertionOrderedColumnMap(TrackingContext& trackingContext);
 
     /**
      * Inserts one measurement. Vector should contain every data field, including the time field,
@@ -58,17 +59,6 @@ public:
      */
     void insertOne(std::vector<BSONElement> oneMeasurementDataFields);
 
-    // TODO(SERVER-84101): remove when tracking allocator is implemented.
-    size_t getMemoryUsage() const {
-        size_t buildersSize = (sizeof(BSONColumnBuilder) + sizeof(size_t)) * _builders.size();
-        size_t insertionOrderAllocatedKeys = _insertionOrderSize;
-        size_t insertionOrderUnAllocatedKeys =
-            (_insertionOrder.capacity() - _insertionOrder.size()) * sizeof(std::string);
-        size_t remainingMembersSize = 3 * sizeof(size_t);
-        return buildersSize + insertionOrderAllocatedKeys + insertionOrderUnAllocatedKeys +
-            remainingMembersSize;
-    }
-
     /**
      * Sets internal state of builders to that of pre-existing compressed builders.
      * numMeasurements should be equal to the number of measurements in every data field in the
@@ -76,16 +66,15 @@ public:
      */
     void initBuilders(BSONObj bucketDataDocWithCompressedBuilders, size_t numMeasurements);
 
-    BSONColumnBuilder& getBuilder(const std::string& key) {
+    BSONColumnBuilder& getBuilder(StringData key) {
         return _builders[key].second;
     }
 
     /**
      * Iterates over keys, in insertion order.
      */
-    // TODO(SERVER-86187): Make these StringData
-    boost::optional<std::string> begin();
-    boost::optional<std::string> next();
+    boost::optional<StringData> begin();
+    boost::optional<StringData> next();
 
 private:
     /**
@@ -98,15 +87,17 @@ private:
     void _assertInternalStateIdentical_forTest();
 
     // Get current builder, checking invariants.
-    std::string _getDirect();
-    void _insertNewKey(const std::string& key,
+    StringData _getDirect();
+    void _insertNewKey(StringData key,
                        const BSONElement& elem,
                        BSONColumnBuilder builder,
                        size_t numMeasurements = 1);
 
+    std::reference_wrapper<TrackingContext> _trackingContext;
+
     using MeasurementCountAndBuilder = std::pair<size_t, BSONColumnBuilder>;
-    StringMap<MeasurementCountAndBuilder> _builders;
-    std::vector<std::string> _insertionOrder;  // keys, stored in insertion order
+    TrackedStringMap<MeasurementCountAndBuilder> _builders;
+    tracked_vector<tracked_string> _insertionOrder;  // keys, stored in insertion order
     size_t _insertionOrderSize{0};
     size_t _measurementCount{0};
     size_t _pos{0};

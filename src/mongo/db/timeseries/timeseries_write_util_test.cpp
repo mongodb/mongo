@@ -81,6 +81,7 @@ protected:
         auto collectionStats = std::make_shared<bucket_catalog::ExecutionStats>();
         bucket_catalog::ExecutionStatsController stats(collectionStats, _globalStats);
         return std::make_shared<bucket_catalog::WriteBatch>(
+            _trackingContext,
             bucket_catalog::BucketHandle{bucketId, stripe},
             bucket_catalog::BucketKey{uuid, bucketMetadata},
             opId,
@@ -89,6 +90,7 @@ protected:
     }
 
 private:
+    TrackingContext _trackingContext;
     bucket_catalog::ExecutionStats _globalStats;
 };
 

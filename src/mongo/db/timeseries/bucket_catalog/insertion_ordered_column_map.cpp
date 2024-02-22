@@ -32,6 +32,11 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
+InsertionOrderedColumnMap::InsertionOrderedColumnMap(TrackingContext& trackingContext)
+    : _trackingContext(trackingContext),
+      _builders(makeTrackedStringMap<MeasurementCountAndBuilder>(_trackingContext)),
+      _insertionOrder(make_tracked_vector<tracked_string>(_trackingContext)) {}
+
 void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressedBuilders,
                                              size_t numMeasurements) {
     for (auto&& [key, columnValue] : bucketDataDocWithCompressedBuilders) {
@@ -48,19 +53,19 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
             it->second.second.append(elem);
         }
 
-        _insertionOrder.emplace_back(key);
+        _insertionOrder.emplace_back(make_tracked_string(_trackingContext, key.data()));
         _insertionOrderSize += key.size();
     }
     _measurementCount = numMeasurements;
 }
 
-void InsertionOrderedColumnMap::_insertNewKey(const std::string& key,
+void InsertionOrderedColumnMap::_insertNewKey(StringData key,
                                               const BSONElement& elem,
                                               BSONColumnBuilder builder,
                                               size_t numMeasurements) {
     builder.append(elem);
     _builders.emplace(key, std::make_pair(numMeasurements, std::move(builder)));
-    _insertionOrder.emplace_back(key);
+    _insertionOrder.emplace_back(make_tracked_string(_trackingContext, key.data()));
     _insertionOrderSize += key.size();
 }
 
@@ -91,7 +96,7 @@ void InsertionOrderedColumnMap::insertOne(std::vector<BSONElement> oneMeasuremen
             for (size_t i = 0; i < _measurementCount; ++i) {
                 columnBuilder.skip();
             }
-            _insertNewKey(key.toString(), elem, std::move(columnBuilder), _measurementCount + 1);
+            _insertNewKey(key, elem, std::move(columnBuilder), _measurementCount + 1);
         } else {
             auto& [numMeasurements, columnBuilder] = builderIt->second;
             columnBuilder.append(elem);
@@ -102,21 +107,21 @@ void InsertionOrderedColumnMap::insertOne(std::vector<BSONElement> oneMeasuremen
     _fillSkipsInMissingFields();
 }
 
-std::string InsertionOrderedColumnMap::_getDirect() {
+StringData InsertionOrderedColumnMap::_getDirect() {
     invariant(_pos < _insertionOrder.size());
-    return _insertionOrder[_pos];
+    return StringData(_insertionOrder[_pos].c_str());
 }
 
-boost::optional<std::string> InsertionOrderedColumnMap::begin() {
+boost::optional<StringData> InsertionOrderedColumnMap::begin() {
     _pos = 0;
     return next();
 }
 
-boost::optional<std::string> InsertionOrderedColumnMap::next() {
+boost::optional<StringData> InsertionOrderedColumnMap::next() {
     if (_pos < _insertionOrder.size()) {
-        std::string result = _getDirect();
+        StringData result = _getDirect();
         ++_pos;
-        return boost::make_optional<std::string>(std::move(result));
+        return result;
     }
     return boost::none;
 }
@@ -133,7 +138,7 @@ void InsertionOrderedColumnMap::_assertInternalStateIdentical_forTest() {
         invariant(numMeasurements == _measurementCount);
 
         // All keys in _builders should exist in _insertionOrder.
-        invariant(std::find(_insertionOrder.begin(), _insertionOrder.end(), key) !=
+        invariant(std::find(_insertionOrder.begin(), _insertionOrder.end(), key.c_str()) !=
                   std::end(_insertionOrder));
     }
 
@@ -142,7 +147,7 @@ void InsertionOrderedColumnMap::_assertInternalStateIdentical_forTest() {
 
     // All keys in _insertionOrder should exist in _builders.
     for (auto& key : _insertionOrder) {
-        invariant(_builders.find(key) != _builders.end());
+        invariant(_builders.find(key.c_str()) != _builders.end());
     }
     invariant(keySizes == _insertionOrderSize);
 

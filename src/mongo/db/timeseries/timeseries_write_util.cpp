@@ -854,7 +854,7 @@ BSONObj buildCompressedBucketDataFieldDocEfficiently(
 
     auto& batchBuilders = batch->intermediateBuilders;
     BSONObjBuilder dataBuilder = bucketBuilder.subobjStart(kBucketDataFieldName);
-    for (boost::optional<std::string> key = batchBuilders.begin(); key != boost::none;
+    for (boost::optional<StringData> key = batchBuilders.begin(); key != boost::none;
          key = batchBuilders.next()) {
         // TODO SERVER-79416: This is a naive implementation that simulates the old behavior
         // when intermediate produced full binaries. Finalize is used to produce the binary and then
@@ -904,7 +904,7 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
 
     bool changedToUnsorted = false;
     Timestamp maxCommittedTime =
-        batch->intermediateBuilders.getBuilder(batch->timeField.toString()).last().timestamp();
+        batch->intermediateBuilders.getBuilder(batch->timeField).last().timestamp();
     std::vector<Measurement> sortedMeasurements = sortMeasurementsOnTimeField(batch);
     if (batch->bucketIsSortedByTime &&
         sortedMeasurements.begin()->timeField.timestamp() < maxCommittedTime) {

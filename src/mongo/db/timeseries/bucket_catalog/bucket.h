@@ -215,7 +215,8 @@ void calculateBucketFieldsAndSizeChange(const Bucket& bucket,
 /**
  * Return a pointer to the current, open batch for the operation. Opens a new batch if none exists.
  */
-std::shared_ptr<WriteBatch> activeBatch(Bucket& bucket,
+std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
+                                        Bucket& bucket,
                                         OperationId opId,
                                         std::uint8_t stripe,
                                         ExecutionStatsController& stats);

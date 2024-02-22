@@ -71,7 +71,8 @@ Bucket::Bucket(TrackingContext& trackingContext,
       minmax(trackingContext),
       schema(trackingContext),
       usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
-          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {}
+          serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
+      intermediateBuilders(trackingContext) {}
 
 Bucket::~Bucket() {
     decrementBucketCountForEra(bucketStateRegistry, lastChecked);
@@ -137,7 +138,8 @@ void calculateBucketFieldsAndSizeChange(const Bucket& bucket,
     }
 }
 
-std::shared_ptr<WriteBatch> activeBatch(Bucket& bucket,
+std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
+                                        Bucket& bucket,
                                         OperationId opId,
                                         std::uint8_t stripe,
                                         ExecutionStatsController& stats) {
@@ -145,7 +147,8 @@ std::shared_ptr<WriteBatch> activeBatch(Bucket& bucket,
     if (it == bucket.batches.end()) {
         it = bucket.batches
                  .try_emplace(opId,
-                              std::make_shared<WriteBatch>(BucketHandle{bucket.bucketId, stripe},
+                              std::make_shared<WriteBatch>(trackingContext,
+                                                           BucketHandle{bucket.bucketId, stripe},
                                                            bucket.key,
                                                            opId,
                                                            stats,

@@ -120,7 +120,6 @@ void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
     batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
     bucket.uncompressedBucketDoc = {};
     bucket.memoryUsage -= batch.uncompressedBucketDoc.objsize();
-    bucket.memoryUsage -= batch.intermediateBuilders.getMemoryUsage();
 
     if (bucket.compressedBucketDoc) {
         batch.compressedBucketDoc = std::move(bucket.compressedBucketDoc);
@@ -589,7 +588,6 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         bucket->preparedBatch.reset();
 
         auto prevMemoryUsage = bucket->memoryUsage;
-        bucket->memoryUsage += bucket->intermediateBuilders.getMemoryUsage();
 
         // The uncompressed and compressed images should have already been moved to the batch by
         // this point.
