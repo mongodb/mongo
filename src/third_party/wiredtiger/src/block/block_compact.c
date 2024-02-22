@@ -424,29 +424,24 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block)
     if (time_diff_msg > WT_PROGRESS_MSG_PERIOD) {
         session->compact->last_progress = cur_time;
 
+        __wt_verbose_debug1(session, WT_VERB_COMPACT_PROGRESS,
+          "Compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, rewritten %" PRIu64
+          " pages (%" PRIu64 "MB)",
+          block->name, time_diff_start, block->compact_pages_reviewed,
+          block->compact_pages_rewritten, block->compact_bytes_rewritten / WT_MEGABYTE);
         /*
          * If we don't have the estimate at this point, it means that we haven't reviewed even
          * enough pages. This should almost never happen.
          */
-        if (block->compact_pages_rewritten_expected == 0) {
-            __wt_verbose_debug1(session, WT_VERB_COMPACT_PROGRESS,
-              "compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64
-              " pages, rewritten %" PRIu64 " pages (%" PRIu64 "MB)",
-              block->name, time_diff_start, block->compact_pages_reviewed,
-              block->compact_pages_rewritten, block->compact_bytes_rewritten / WT_MEGABYTE);
-            __wt_verbose_debug1(session, WT_VERB_COMPACT,
-              "%s: still collecting information for estimating the progress", block->name);
-        } else {
+        if (block->compact_pages_rewritten_expected == 0)
+            __wt_verbose_debug1(session, WT_VERB_COMPACT_PROGRESS, "%s",
+              "Still collecting information for estimating the progress.");
+        else {
             progress = WT_MIN(
               (int)(100 * block->compact_pages_rewritten / block->compact_pages_rewritten_expected),
               100);
             __wt_verbose_debug1(session, WT_VERB_COMPACT_PROGRESS,
-              "compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64
-              " pages, rewritten %" PRIu64 " pages (%" PRIu64
-              "MB). Approx. %d%% of the estimated work done.%s",
-              block->name, time_diff_start, block->compact_pages_reviewed,
-              block->compact_pages_rewritten, block->compact_bytes_rewritten / WT_MEGABYTE,
-              progress,
+              "Approx. %d%% of the estimated work done.%s", progress,
               progress == 100 ? " More work has been discovered since the estimation." : "");
         }
     }
