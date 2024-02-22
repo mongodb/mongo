@@ -124,20 +124,13 @@ void HashJoinStage::prepare(CompileCtx& ctx) {
     }
 
     _probeKey.resize(_inInnerKeyAccessors.size());
-
-    _compiled = true;
 }
 
 value::SlotAccessor* HashJoinStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
-    if (_compiled) {
-        if (auto it = _outOuterAccessors.find(slot); it != _outOuterAccessors.end()) {
-            return it->second;
-        }
-
-        return _children[1]->getAccessor(ctx, slot);
+    if (auto it = _outOuterAccessors.find(slot); it != _outOuterAccessors.end()) {
+        return it->second;
     }
-
-    return ctx.getAccessor(slot);
+    return _children[1]->getAccessor(ctx, slot);
 }
 
 void HashJoinStage::open(bool reOpen) {
