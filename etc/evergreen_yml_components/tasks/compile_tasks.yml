@@ -370,6 +370,58 @@ tasks:
     vars:
       output: build/fast/mongo/platform/visibility_test1
 
+- name: run_bazel_scons_unittest
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "scons compile"
+    vars:
+      targets: >-
+        +visibility_test1
+      separate_debug: on
+      task_compile_flags: >-
+        BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
+        ICECC=
+        --build-profile=fast
+        --ninja=disabled
+        --link-model=dynamic
+        --modules=
+  - func: "verify build output present"
+    vars:
+      output: build/install/bin/visibility_test1
+
+- name: run_bazel_scons_unittest_sanitize
+  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "scons compile"
+    vars:
+      targets: >-
+        +visibility_test1
+      separate_debug: on
+      # TODO(SERVER-86893): Remove --config=local once asan+clang is working with remote execution
+      task_compile_flags: >-
+        BAZEL_BUILD_ENABLED=1
+        BAZEL_INTEGRATION_DEBUG=1
+        ICECC=
+        --build-profile=san
+        --ninja=disabled
+        --link-model=dynamic
+        --modules=
+        BAZEL_FLAGS=--config=local
+  - func: "verify build output present"
+    vars:
+      output: build/install/bin/visibility_test1
+
 - name: run_bazel_program
   tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
@@ -2309,6 +2361,8 @@ task_groups:
   - compile_bazel_c_and_asm_targets
   - compile_bazel_libunwind
   - compile_bazel_program
+  - run_bazel_scons_unittest
+  - run_bazel_scons_unittest_sanitize
   - run_bazel_program
 
 - <<: *compile_bazel_task_group_template

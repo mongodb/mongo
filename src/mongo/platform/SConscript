@@ -42,9 +42,6 @@ env.BazelLibrary(
     source=[
         "visibility_test_libcommon.cpp",
     ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
-    ],
     LIBDEPS=[],
     MONGO_API_NAME="visibility_test_libcommon",
 )
@@ -53,9 +50,6 @@ env.BazelLibrary(
     target="visibility_test_lib1",
     source=[
         "visibility_test_lib1.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
     ],
     LIBDEPS=[],
     LIBDEPS_PRIVATE=[
@@ -68,9 +62,6 @@ env.BazelLibrary(
     target="visibility_test_lib2",
     source=[
         "visibility_test_lib2.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
     ],
     LIBDEPS=[
         "visibility_test_lib1",
@@ -85,9 +76,6 @@ visibility_test1 = env.BazelProgram(
     target="visibility_test1",
     source=[
         "visibility_test1.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
     ],
     LIBDEPS=[
         "visibility_test_lib1",
@@ -105,9 +93,6 @@ visibility_test2 = env.Program(
     target="visibility_test2",
     source=[
         "visibility_test2.cpp",
-    ],
-    LIBDEPS_NO_INHERIT=[
-        '$BUILD_DIR/third_party/shim_allocator',
     ],
     LIBDEPS=[
         "visibility_test_lib2",

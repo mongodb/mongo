@@ -200,7 +200,7 @@ def bazel_builder_action(env: SCons.Environment.Environment, target: List[SCons.
     for t in target:
         s = Globals.scons2bazel_targets[t.path.replace('\\', '/')]['bazel_output']
         bazel_debug(f"Copying {s} from bazel tree to {t} in the scons tree.")
-        shutil.copyfile(s, str(t))
+        shutil.copy(s, str(t))
 
 
 BazelCopyOutputsAction = SCons.Action.FunctionAction(

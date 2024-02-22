@@ -468,8 +468,8 @@ def mongo_cc_library(
         "//conditions:default": [],
     })
 
-    linux_rpath_flags = ["-Wl,-z,origin", "-Wl,--enable-new-dtags", "-Wl,-rpath,\\$$ORIGIN/../lib", "-Wl,-h,lib" + name + ".so"]
-    macos_rpath_flags = ["-Wl,-rpath,\\$$ORIGIN/../lib", "-Wl,-install_name,@rpath/lib" + name + ".so"]
+    linux_rpath_flags = ["-Wl,-z,origin", "-Wl,--enable-new-dtags", "-Wl,-rpath,\\$ORIGIN/../lib", "-Wl,-h,lib" + name + ".so"]
+    macos_rpath_flags = ["-Wl,-rpath,\\$ORIGIN/../lib", "-Wl,-install_name,@rpath/lib" + name + ".so"]
 
     rpath_flags = select({
         "//bazel/config:linux_aarch64": linux_rpath_flags,
