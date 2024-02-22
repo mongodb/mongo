@@ -464,8 +464,8 @@ std::unique_ptr<MatchExpression> matchRewriteUpdateDescription(
                 return std::make_unique<AlwaysTrueMatchExpression>();
             }
             // We check whether this is a ComparisonMatchExpression to ensure that the predicate is
-            // type-bracketed, which means that it will *only* match missing, null, or undefined.
-            // None of these fields will ever be null or undefined in the change stream event.
+            // type-bracketed, which means that it will *only* match missing or null. None of these
+            // fields will ever be null or undefined in the change stream event.
             if (ComparisonMatchExpression::isComparisonMatchExpression(predicate) &&
                 predicate->matchesSingleElement({})) {
                 return std::make_unique<AlwaysFalseMatchExpression>();

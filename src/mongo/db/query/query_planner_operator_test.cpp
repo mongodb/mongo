@@ -417,7 +417,7 @@ TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchValueSparseMultiKeyIndex) {
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {x: 1},"
-        "bounds: {'x': [['MinKey', undefined, true, false], [null, 'MaxKey',false,true]]}}}}}");
+        "bounds: {'x': [['MinKey', null, true, false], [null, 'MaxKey',false,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NotEqualsNullInElemMatchObjectSparseMultiKeyBelowElemMatch) {
@@ -1358,7 +1358,7 @@ TEST_F(QueryPlannerTest, NENull) {
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, bounds: {a: "
-        "[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
+        "[['MinKey',null,true,false],[null,'MaxKey',false,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NinNull) {
@@ -1369,7 +1369,7 @@ TEST_F(QueryPlannerTest, NinNull) {
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
-        "bounds: {a: [['MinKey',undefined,true,false],"
+        "bounds: {a: [['MinKey',null,true,false],"
         "[null,4,false,false],"
         "[4,'MaxKey',false,true]]}}}}}");
 }
@@ -1385,7 +1385,7 @@ TEST_F(QueryPlannerTest, NENullWithSort) {
         "{cscan: {filter: {a: {$ne: null}}, dir: 1}}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
-        "bounds: {a: [['MinKey',undefined,true,false],"
+        "bounds: {a: [['MinKey',null,true,false],"
         "[null,'MaxKey',false,true]]}}}}}");
 }
 
@@ -1397,7 +1397,7 @@ TEST_F(QueryPlannerTest, NENullWithProjection) {
     assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {pattern: {a:1}, "
-        "bounds: {a: [['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
+        "bounds: {a: [['MinKey',null,true,false],[null,'MaxKey',false,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NENullWithSortAndProjection) {
@@ -1411,7 +1411,7 @@ TEST_F(QueryPlannerTest, NENullWithSortAndProjection) {
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: {"
         "  ixscan: {pattern: {a:1}, bounds: {"
-        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "    a: [['MinKey',null,true,false], [null,'MaxKey',false,true]]"
         "}}}}}");
 }
 

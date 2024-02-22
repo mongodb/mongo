@@ -151,7 +151,7 @@ runTest({query: {a: 1}},
 runTest({query: {a: 1}, projection: {c: 0}},
         [{_id: 0, a: 1}],
         {query: {a: null}, projection: {c: 0}},
-        [{_id: 7}, {_id: 9, a: undefined}, {_id: 10, a: null}],
+        [{_id: 7}, {_id: 10, a: null}],
         false);
 
 // Test basic auto-parameterization of $lt.
@@ -350,7 +350,7 @@ runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
 runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
         [{_id: 0}, {_id: 1}],
         {query: {a: {$in: [1, 2, null]}}, projection: {_id: 1}},
-        [{_id: 0}, {_id: 1}, {_id: 7}, {_id: 9}, {_id: 10}],
+        [{_id: 0}, {_id: 1}, {_id: 7}, {_id: 10}],
         false);
 
 // Adding a regex to an $in inhibits auto-parameterization.

@@ -201,6 +201,7 @@ selector:
   - jstests/core/query/not/not2.js
   - jstests/core/query/or/or8.js
   - jstests/core/query/sort/sorta.js
+  - jstests/core/query/type/null_undefined.js
   - jstests/core/query/type/type_array.js
   - jstests/core/write/update/update_numeric_field_name.js
   # Time-series collections have different indexes from regular collections.

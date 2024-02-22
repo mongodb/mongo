@@ -106,6 +106,9 @@ optimizer::ABT makeBinaryOp(optimizer::Operations binaryOp, optimizer::ABT lhs, 
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
 optimizer::ABT generateABTNullOrMissing(optimizer::ABT var);
 
+optimizer::ABT generateABTNullMissingOrUndefined(optimizer::ProjectionName var);
+optimizer::ABT generateABTNullMissingOrUndefined(optimizer::ABT var);
+
 /**
  * Generates an ABT that checks if the input expression is negative assuming that it has already
  * been verified to have numeric type and to not be NaN.

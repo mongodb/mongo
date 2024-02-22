@@ -3,7 +3,8 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
- *   requires_fcv_62,
+ *   # In 8.0, we changed behavior for equality to null.
+ *   requires_fcv_80,
  *   # This test could produce unexpected explain output if additional indexes are created.
  *   assumes_no_implicit_index_creation,
  * ]
@@ -16,6 +17,8 @@ import {
 
 const coll = db.cover_null_queries;
 coll.drop();
+
+const clustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
 
 assert.commandWorked(coll.insertMany([
     {_id: 1, a: 1, b: 1},
@@ -144,30 +147,20 @@ function validateGroupCountAggCmdOutputAndPlan({filter, expectedStages, expected
     });
 }
 
-function getExpectedStagesIndexScanAndFetch(extraStages) {
-    const clustered = ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo());
-    const result = clustered ? {"CLUSTERED_IXSCAN": 1} : {"FETCH": 1, "IXSCAN": 1};
-    for (const stage in extraStages) {
-        result[stage] = extraStages[stage];
-    }
-    return result;
-}
-
 assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
 
-// Verify count({a: null}) can be covered by an index. In the simplest case we can use two count
-// scans joined by an OR to evaluate it.
+// Verify count({a: null}) can be covered by an index.
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 4,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "IXSCAN": 0, "FETCH": 0},
 });
 
 // Verify $count stage in aggregation matching {a: null} yields the same plan.
 validateCountAggCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 4,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "IXSCAN": 0, "FETCH": 0},
 });
 
 // Verify find({a: null}, {_id: 1}) can be covered by an index.
@@ -210,17 +203,20 @@ validateFindCmdOutputAndPlan({
     expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
 });
 
-// We can cover a $in with null and an empty array predicate.
+// We cannot cover a $in with null and an empty array predicate, even when the index is not
+// multikey.
+// TODO SERVER-71058: It should be possible to cover this case and the more general case
+// of matching an array on a non-multikey index.
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     expectedCount: 4,
-    expectedStages: {"IXSCAN": 1, "FETCH": 0},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
 
 // We cannot cover a $in with null and an array predicate.
@@ -292,7 +288,7 @@ validateFindCmdOutputAndPlan({
 });
 
 // Verify find({a: null}, {a: 1}) still has a FETCH stage because the index alone cannot determine
-// if the value of field a is null, undefined, or missing.
+// if the value of field a is null or missing.
 validateFindCmdOutputAndPlan({
     filter: {a: null},
     projection: {a: 1},
@@ -314,8 +310,7 @@ validateFindCmdOutputAndPlan({
     expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 
-// Verify that if the index is multikey, this optimization cannot be applied when just querying for
-// null values, as the index alone cannot differentiate between null and [].
+// Verify that even when the index is multikey, we do not need a FETCH for equality to null queries.
 assert.commandWorked(coll.insertOne({_id: 8, a: []}));
 assert.commandWorked(coll.insertOne({_id: 9, a: [[]]}));
 assert.commandWorked(coll.insertOne({_id: 10, a: [null, []]}));
@@ -323,60 +318,87 @@ assert.commandWorked(coll.insertOne({_id: 10, a: [null, []]}));
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 5,
-    expectedStages: {"FETCH": 1, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0}
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1}
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 5,
-    expectedStages: {"FETCH": 1, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
 });
 validateFindCmdOutputAndPlan({
     filter: {a: null},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
 });
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, 2]}},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}, {_id: 7}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
-});
-validateSimpleCountCmdOutputAndPlan({
-    filter: {a: null, _id: 3},
-    expectedCount: 1,
-    expectedStages: getExpectedStagesIndexScanAndFetch({"OR": 0, "COUNT_SCAN": 0}),
-});
-validateCountAggCmdOutputAndPlan({
-    filter: {a: null, _id: 3},
-    expectedCount: 1,
-    expectedStages: getExpectedStagesIndexScanAndFetch({"OR": 0, "COUNT_SCAN": 0}),
-});
-validateFindCmdOutputAndPlan({
-    filter: {a: null, _id: 3},
-    projection: {_id: 1},
-    expectedOutput: [{_id: 3}],
-    expectedStages: getExpectedStagesIndexScanAndFetch({"PROJECTION_SIMPLE": 1}),
+    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
 });
 
+if (clustered) {
+    validateSimpleCountCmdOutputAndPlan({
+        filter: {a: null, _id: 3},
+        expectedCount: 1,
+        expectedStages: {"IXSCAN": 0, "COUNT_SCAN": 1, "FETCH": 0},
+    });
+    validateCountAggCmdOutputAndPlan({
+        filter: {a: null, _id: 3},
+        expectedCount: 1,
+        expectedStages: {"IXSCAN": 0, "COUNT_SCAN": 1, "FETCH": 0},
+    });
+
+    // The find can also use the compound index and does not require a fetch, however sometimes
+    // the planner chooses the clustered index, and sometimes it does not. So we only assert on
+    // the FETCH here.
+    validateFindCmdOutputAndPlan({
+        filter: {a: null, _id: 3},
+        projection: {_id: 1},
+        expectedOutput: [{_id: 3}],
+        expectedStages: {"FETCH": 0},
+    });
+} else {
+    // TODO SERVER-85856: We should be able to make use of the compound index to answer the query
+    // and avoid a FETCH.
+    validateSimpleCountCmdOutputAndPlan({
+        filter: {a: null, _id: 3},
+        expectedCount: 1,
+        expectedStages: {"IXSCAN": 1, "COUNT_SCAN": 0, "FETCH": 1},
+    });
+    validateCountAggCmdOutputAndPlan({
+        filter: {a: null, _id: 3},
+        expectedCount: 1,
+        expectedStages: {"IXSCAN": 1, "COUNT_SCAN": 0, "FETCH": 1},
+    });
+
+    // The find can use the compound index and does not require a fetch.
+    validateFindCmdOutputAndPlan({
+        filter: {a: null, _id: 3},
+        projection: {_id: 1},
+        expectedOutput: [{_id: 3}],
+        expectedStages: {"IXSCAN": 1, "FETCH": 0},
+    });
+}
+
 // Verify that if the index is multikey and the query searches for null and empty array values, then
-// the find does not require a FETCH stage, and a count can replace the IXSCAN with three
-// COUNT_SCANS joined by an OR.
+// the find does require a FETCH stage to disinguish [] and undefined.
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_COVERED": 0},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     expectedCount: 7,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "OR": 1, "COUNT_SCAN": 3},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     expectedCount: 7,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 3, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 0, "IXSCAN": 1, "FETCH": 1},
 });
 
 // Same as above, but using a different ordering in the $in clause.
@@ -384,30 +406,30 @@ validateFindCmdOutputAndPlan({
     filter: {a: {$in: [[], null]}},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "COUNT_SCAN": 0, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: {$in: [[], null]}},
     expectedCount: 7,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "OR": 1, "COUNT_SCAN": 3},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 
-// Verify that the same optimization is supported when using $or syntax.
+// Same as above, but using using $or syntax.
 validateFindCmdOutputAndPlan({
     filter: {$or: [{a: null}, {a: []}]},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {$or: [{a: null}, {a: []}]},
     expectedCount: 7,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "OR": 1, "COUNT_SCAN": 3},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {$or: [{a: null}, {a: []}]},
     expectedCount: 7,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 3, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 0, "IXSCAN": 1, "FETCH": 1},
 });
 
 // Same as above, but using a different ordering in the $in clauses.
@@ -415,32 +437,31 @@ validateFindCmdOutputAndPlan({
     filter: {$or: [{a: []}, {a: null}]},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {$or: [{a: []}, {a: null}]},
     expectedCount: 7,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "OR": 1, "COUNT_SCAN": 3},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 
-// Verify that if the index is multikey and the query searches for null, empty array, and other
-// values, then it does not require a FETCH, but we cannot replace the IXSCAN with COUNTs.
+// Same as above, but including other values in the in-list.
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, [], 1]}},
     projection: {_id: 1},
     expectedOutput:
         [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: {$in: [null, [], 1]}},
     expectedCount: 9,
-    expectedStages: {"FETCH": 0, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: {$in: [null, [], 1]}},
     expectedCount: 9,
-    expectedStages: {"OR": 0, "COUNT_SCAN": 0, "IXSCAN": 1, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 0, "IXSCAN": 1, "FETCH": 1},
 });
 
 // Verify that if the index is multikey and the query searches for null and empty array values, we
@@ -477,140 +498,157 @@ validateFindCmdOutputAndPlan({
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: 1, b: 1, _id: 1}));
 
-// Verify that if the index is multikey and compound and the query matches null and empty array
-// values, then it does not require a FETCH stage and can replace the IXSCAN with COUNTs.
+// Same as above but with a compound index: when the index is multikey and the query searches for
+// null and empty array values, then we need a FETCH stage to disinguish [] and undefined.
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     projection: {_id: 1},
     expectedOutput: [{_id: 3}, {_id: 4}, {_id: 6}, {_id: 7}, {_id: 8}, {_id: 9}, {_id: 10}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     expectedCount: 7,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "OR": 1, "COUNT_SCAN": 3},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}},
     expectedCount: 7,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 3, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 
-// Verify that if the index is multikey and compound and the query has an added compound predicate,
-// then it does not require a FETCH and can replace the IXSCAN with COUNTs.
+// Same as above, with an added compound predicate.
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}, b: {$eq: 2}},
     projection: {_id: 1},
     expectedOutput: [{_id: 6}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}, b: {$eq: 2}},
     expectedCount: 1,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "OR": 1, "COUNT_SCAN": 3},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}, b: {$eq: 2}},
     expectedCount: 1,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 3, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateFindCmdOutputAndPlan({
     filter: {a: 1, b: {$in: [null, []]}},
     projection: {_id: 1},
     expectedOutput: [{_id: 2}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: 1, b: {$in: [null, []]}},
     expectedCount: 1,
-    expectedStages: {"FETCH": 0, "IXSCAN": 0, "OR": 1, "COUNT_SCAN": 3},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: 1, b: {$in: [null, []]}},
     expectedCount: 1,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 3, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"FETCH": 1, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 
-// Verify if the index is multikey and compound and the query searches for null, empty array, and
-// other values, then it does not require a FETCH, but we cannot replace the IXSCAN with COUNTs.
-validateFindCmdOutputAndPlan({
-    filter: {a: {$in: [null, [], 1]}, b: {$eq: 2}},
-    projection: {_id: 1},
-    expectedOutput: [{_id: 6}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
-});
+// Verify that if the index is multikey and compound, and the query searches for null and
+// non-array values, then we do need a FETCH stage. Some of the queries below can take advantage of
+// a COUNT_SCAN when there is exact one interval; otherwise, they use an IXSCAN without a FETCH.
 validateCountAggCmdOutputAndPlan({
-    filter: {a: {$in: [null, [], 1]}, b: {$eq: 2}},
+    filter: {a: null, b: 2},
     expectedCount: 1,
-    expectedStages: {"FETCH": 0, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
 });
-validateSimpleCountCmdOutputAndPlan({
-    filter: {a: {$in: [null, [], 1]}, b: {$eq: 2}},
+validateCountAggCmdOutputAndPlan({
+    filter: {a: 2, b: null},
     expectedCount: 1,
-    expectedStages: {"OR": 0, "COUNT_SCAN": 0, "IXSCAN": 1, "FETCH": 0},
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
+});
+validateCountAggCmdOutputAndPlan({
+    filter: {a: null, b: null},
+    expectedCount: 3,
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
 });
 
-// Same as above, but using a different ordering in the $in clauses.
-validateFindCmdOutputAndPlan({
-    filter: {a: {$in: [null, 1, []]}, b: {$eq: 2}},
-    projection: {_id: 1},
-    expectedOutput: [{_id: 6}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+validateCountAggCmdOutputAndPlan({
+    filter: {a: null, b: {$in: [1, 2]}},
+    expectedCount: 2,
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 validateCountAggCmdOutputAndPlan({
-    filter: {a: {$in: [null, 1, []]}, b: {$eq: 2}},
-    expectedCount: 1,
-    expectedStages: {"FETCH": 0, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
+    filter: {a: null, b: {$in: [null, 2]}},
+    expectedCount: 4,
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
-
-// Verify if the index is multikey and compound and the query searches for null, empty array, and
-// other values for multiple fields, then it does not require a FETCH but cannot replace the IXSCAN
-// with COUNTs because there are multiple null intervals or because the intervals are complex.
 validateCountAggCmdOutputAndPlan({
-    filter: {a: {$in: [null, []]}, b: {$in: [null, []]}},
+    filter: {a: {$in: [null, 2]}, b: null},
+    expectedCount: 4,
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
+});
+validateCountAggCmdOutputAndPlan({
+    filter: {a: {$in: [null, 2]}, b: {$in: [null, 2]}},
     expectedCount: 5,
-    expectedStages: {"FETCH": 0, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
-});
-validateCountAggCmdOutputAndPlan({
-    filter: {a: {$in: [null, [], 1]}, b: {$in: [null, []]}},
-    expectedCount: 6,
-    expectedStages: {"FETCH": 0, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
-});
-validateCountAggCmdOutputAndPlan({
-    filter: {a: {$in: [null, []]}, b: {$in: [null, [], 4]}},
-    expectedCount: 5,
-    expectedStages: {"FETCH": 0, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
-});
-validateCountAggCmdOutputAndPlan({
-    filter: {a: {$in: [null, [], 1]}, b: {$in: [null, [], 4]}},
-    expectedCount: 6,
-    expectedStages: {"FETCH": 0, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
-});
-
-// Verify if the index is multikey and compound, the query predicate must match null and empty array
-// values for all queried fields.
-validateCountAggCmdOutputAndPlan({
-    filter: {a: {$in: [null, []]}, b: null},
-    expectedCount: 5,
-    expectedStages: {"FETCH": 1, "IXSCAN": 1, "OR": 0, "COUNT_SCAN": 0},
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 
 assert.commandWorked(coll.deleteMany({_id: {$in: [8, 9, 10]}}));
 
-// Same as above but when the index is not multikey. In this case, we can cover the query, but we
-// cannot do the COUNT_SCAN optimization because there are multiple null intervals.
+// Same as above but when the index is not multikey. We cannot cover the query when the in-list
+// contains an empty array.
+// TODO SERVER-71058: It should be possible to cover this case and the more general case of matching
+// an array on a non-multikey index.
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: 1, b: 1, _id: 1}));
 validateFindCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}, b: null},
     projection: {_id: 1},
     expectedOutput: [{_id: 4}, {_id: 7}],
-    expectedStages: {"IXSCAN": 1, "FETCH": 0, "PROJECTION_COVERED": 1},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1, "PROJECTION_SIMPLE": 1},
 });
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: {$in: [null, []]}, b: null},
     expectedCount: 2,
-    expectedStages: {"IXSCAN": 1, "FETCH": 0},
+    expectedStages: {"IXSCAN": 1, "FETCH": 1},
+});
+
+// We can cover the query when not looking for an array value. Some of the queries below can take
+// advantage of a COUNT_SCAN when there is exact one interval; otherwise, they use an IXSCAN without
+// a FETCH.
+validateCountAggCmdOutputAndPlan({
+    filter: {a: null, b: 2},
+    expectedCount: 1,
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
+});
+validateCountAggCmdOutputAndPlan({
+    filter: {a: 2, b: null},
+    expectedCount: 1,
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
+});
+validateCountAggCmdOutputAndPlan({
+    filter: {a: null, b: null},
+    expectedCount: 2,
+    expectedStages: {"FETCH": 0, "IXSCAN": 0, "COUNT_SCAN": 1},
+});
+
+validateCountAggCmdOutputAndPlan({
+    filter: {a: null, b: {$in: [1, 2]}},
+    expectedCount: 2,
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
+});
+validateCountAggCmdOutputAndPlan({
+    filter: {a: null, b: {$in: [null, 2]}},
+    expectedCount: 3,
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
+});
+validateCountAggCmdOutputAndPlan({
+    filter: {a: {$in: [null, 2]}, b: null},
+    expectedCount: 3,
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
+});
+validateCountAggCmdOutputAndPlan({
+    filter: {a: {$in: [null, 2]}, b: {$in: [null, 2]}},
+    expectedCount: 4,
+    expectedStages: {"FETCH": 0, "IXSCAN": 1, "COUNT_SCAN": 0},
 });
 
 // Test case when query is fully covered but we still need to fetch to correctly project a field.
@@ -659,12 +697,12 @@ validateFindCmdOutputAndPlan({
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: 1, b: null},
     expectedCount: 1,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "FETCH": 0},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: 1, b: null},
     expectedCount: 1,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "FETCH": 0},
 });
 
 validateFindCmdOutputAndPlan({
@@ -689,7 +727,7 @@ assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.createIndex({a: -1, b: -1}));
 validateCountAggCmdOutputAndPlan({
     expectedCount: 2,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "FETCH": 0},
     pipeline: /* Sort by field a in the opposite direction of the index. */
         [{$match: {a: null, b: {$gt: 0}}}, {$sort: {a: 1}}, {$count: "count"}],
 });
@@ -757,12 +795,12 @@ validateFindCmdOutputAndPlan({
 validateSimpleCountCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 4,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "IXSCAN": 0, "FETCH": 0},
 });
 validateCountAggCmdOutputAndPlan({
     filter: {a: null},
     expectedCount: 4,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "IXSCAN": 0, "FETCH": 0},
 });
 
 // Validate that we can use the optimization when we have regex without array elements in a $in or
@@ -879,12 +917,12 @@ validateFindCmdOutputAndPlan({
 validateSimpleCountCmdOutputAndPlan({
     filter: {"a.b": null},
     expectedCount: 5,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "IXSCAN": 0, "FETCH": 0},
 });
 validateGroupCountAggCmdOutputAndPlan({
     filter: {"a.b": null},
     expectedCount: 5,
-    expectedStages: {"OR": 1, "COUNT_SCAN": 2, "IXSCAN": 0, "FETCH": 0},
+    expectedStages: {"COUNT_SCAN": 1, "IXSCAN": 0, "FETCH": 0},
 });
 
 validateFindCmdOutputAndPlan({

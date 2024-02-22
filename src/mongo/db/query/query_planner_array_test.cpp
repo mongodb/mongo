@@ -2308,7 +2308,7 @@ TEST_F(QueryPlannerTest, ElemMatchValueNENull) {
     assertSolutionExists(
         "{fetch: {filter: {a: {$elemMatch: {$ne: null}}}, node: {"
         "  ixscan: {pattern: {a:1}, bounds: {"
-        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "    a: [['MinKey',null,true,false], [null,'MaxKey',false,true]]"
         "}}}}}");
 }
 
@@ -2320,7 +2320,7 @@ TEST_F(QueryPlannerTest, ElemMatchValueNotGteOrNotLteNull) {
     const auto ixScanSol =
         "{fetch: {node: {"
         "  ixscan: {pattern: {a:1}, bounds: {"
-        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "    a: [['MinKey',null,true,false], [null,'MaxKey',false,true]]"
         "}}}}}";
 
     assertNumSolutions(2U);
@@ -2355,7 +2355,7 @@ TEST_F(QueryPlannerTest, ElemMatchValueNENullOnMultikeyIndex) {
     assertSolutionExists(
         "{fetch: {filter: {a: {$elemMatch: {$ne: null}}}, node: {"
         "  ixscan: {pattern: {a: 1}, bounds: {"
-        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "    a: [['MinKey',null,true,false], [null,'MaxKey',false,true]]"
         "}}}}}");
 }
 
@@ -2392,7 +2392,7 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullWithProjectionMul
         "{proj: {spec: {_id: 0, 'c.d': 1}, node: {"
         "  ixscan: {filter: null, pattern: {'a': 1, 'c.d': 1}, bounds: {"
         "    'a': [['foo',{},false,false]], "
-        "    'c.d':[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]"
+        "    'c.d':[['MinKey',null,true,false],[null,'MaxKey',false,true]]"
         "}}}}}");
 }
 
@@ -2510,8 +2510,8 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsNotEqualsNullReverseIndex) {
         "      pattern: {a: 1, b: -1, c: 1},"
         "      bounds: {"
         "        a: [['foo', {}, false, false]],"
-        "        b: [['MaxKey', null, true, false], [undefined, 'MinKey', false, true]],"
-        "        c: [['MinKey', undefined, true, false], [null, 'MaxKey', false, true]]"
+        "        b: [['MaxKey', null, true, false], [null, 'MinKey', false, true]],"
+        "        c: [['MinKey', null, true, false], [null, 'MaxKey', false, true]]"
         "      },"
         "      dir: 1"
         "    }"

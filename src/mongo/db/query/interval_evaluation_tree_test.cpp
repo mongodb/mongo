@@ -248,9 +248,8 @@ TEST_F(IntervalEvaluationTreeTest, TranslateToConst) {
         {BSON("$in" << BSON_ARRAY(5 << 10 << BSON_ARRAY(11))),
          "(const [5, 5] [10, 10] [11, 11] [[ 11 ], [ 11 ]])"},
         {fromjson("{$in: [/alpha/i, 101]}"), "(const [101, 101] [\"\", {}) [/alpha/i, /alpha/i])"},
-        {BSON("$eq" << BSONNULL), "(const [undefined, undefined] [null, null])"},
-        {fromjson("{$not: {$in: [null, []]}}"),
-         "(const [MinKey, undefined) (null, []) ([], MaxKey])"},
+        {BSON("$eq" << BSONNULL), "(const [null, null])"},
+        {fromjson("{$not: {$in: [null, []]}}"), "(const [MinKey, null) (null, []) ([], MaxKey])"},
         {BSON("$type"
               << "array"),
          "(const [MinKey, MaxKey])"},
