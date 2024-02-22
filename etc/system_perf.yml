@@ -1856,6 +1856,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
     run_on:
       - amazon2-xlarge
     tasks:
@@ -1880,6 +1881,7 @@ buildvariants:
         MONGO_DISTMOD=amazon2
         -j$(grep -c ^processor /proc/cpuinfo)
         --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
     run_on:
       - amazon2-arm64-xlarge
     tasks:
