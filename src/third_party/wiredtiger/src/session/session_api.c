@@ -515,7 +515,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
      * Override any connection-level pre-fetch settings if a specific session-level setting was
      * provided.
      */
-    if (__wt_config_gets(session, cfg + 1, "prefetch.enabled", &cval) != WT_NOTFOUND) {
+    if (__wt_config_gets(session, cfg + 1, "prefetch.enabled", &cval) == 0) {
         if (cval.val) {
             if (!S2C(session)->prefetch_available) {
                 F_CLR(session, WT_SESSION_PREFETCH_ENABLED);
