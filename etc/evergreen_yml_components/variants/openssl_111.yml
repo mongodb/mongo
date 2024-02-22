@@ -3,6 +3,8 @@ buildvariants:
 - name: enterprise-amazon2-openssl111
   display_name: "Enterprise Amazon Linux 2 (openssl 1.1.1)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
   run_on:
   - amazon2-openssl111-small
   expansions:
@@ -67,6 +69,8 @@ buildvariants:
 - name: enterprise-amazon2-arm64-openssl111
   display_name: "Enterprise Amazon Linux 2 arm64 (openssl 1.1.1)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
   run_on:
   - amazon2-arm64-openssl111-small
   expansions:

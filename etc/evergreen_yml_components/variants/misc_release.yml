@@ -2176,6 +2176,8 @@ buildvariants:
 - name: enterprise-ubuntu1804-64
   display_name: Jepsen Tests on Enterprise Ubuntu 18.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
   run_on:
   - ubuntu1804-small
   expansions:
