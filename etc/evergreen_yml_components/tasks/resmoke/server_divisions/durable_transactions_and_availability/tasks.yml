@@ -427,7 +427,7 @@ tasks:
 ## initial sync generational fuzzer ##
 - <<: *jstestfuzz_template
   name: initial_sync_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_repl", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -442,7 +442,7 @@ tasks:
 ## initial sync multiversion fuzzer ##
 - <<: *jstestfuzz_template
   name: initial_sync_multiversion_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_repl", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -480,7 +480,7 @@ tasks:
 ## jstestfuzz concurrent replication continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_continuous_stepdown_flow_control_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "repl", "flow_control", "stepdowns", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "repl", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -496,7 +496,7 @@ tasks:
 ## jstestfuzz concurrent replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "common", "repl", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "common", "repl", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -510,7 +510,7 @@ tasks:
 ## jstestfuzz concurrent replica set with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_session_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "session", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -524,7 +524,7 @@ tasks:
 # jstestfuzz concurrent conflict #
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_write_conflicts_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "write_conflict", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "write_conflict", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -536,7 +536,7 @@ tasks:
 # jstestfuzz replication continuous stepdown with flow control engaged #
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_continuous_stepdown_flow_control_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "repl", "flow_control", "stepdowns", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "repl", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -552,7 +552,7 @@ tasks:
 ## jstestfuzz file copy based initial sync replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_fcbis_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "initsync", "fcbis", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "initsync", "fcbis", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -567,7 +567,7 @@ tasks:
 ## jstestfuzz replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "common", "repl", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "common", "repl", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -579,7 +579,7 @@ tasks:
 ## jstestfuzz initial sync replica set ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_initsync_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "initsync", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "initsync", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -593,7 +593,7 @@ tasks:
 ## jstestfuzz replica set multiversion ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_multiversion_gen
-  tags: ["assigned_to_jira_team_server_repl", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -615,7 +615,7 @@ tasks:
 ## jstestfuzz replica set with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_session_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "session", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -627,7 +627,7 @@ tasks:
 ## jstestfuzz replica set endpoint ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "jstestfuzz", "common", "sharding", "require_npm", "random_name", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "jstestfuzz", "common", "sharding", "require_npm", "random_name", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -639,7 +639,7 @@ tasks:
 # jstestfuzz write conflict #
 - <<: *jstestfuzz_template
   name: jstestfuzz_replication_write_conflicts_gen
-  tags: ["assigned_to_jira_team_server_repl", "jstestfuzz", "write_conflict", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jstestfuzz", "write_conflict", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -869,7 +869,7 @@ tasks:
 ## rollback generational fuzzer with clean shutdowns ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_clean_shutdowns_gen
-  tags: ["assigned_to_jira_team_server_repl", "rollbackfuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "rollbackfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -886,7 +886,7 @@ tasks:
 ## rollback generational fuzzer ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_repl", "rollbackfuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "rollbackfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -903,7 +903,7 @@ tasks:
 ## rollback generational fuzzer with unclean shutdowns ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_unclean_shutdowns_gen
-  tags: ["assigned_to_jira_team_server_repl", "rollbackfuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "rollbackfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -920,7 +920,7 @@ tasks:
 ## rollback multiversion fuzzer ##
 - <<: *jstestfuzz_template
   name: rollback_multiversion_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_repl", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -1234,7 +1234,7 @@ tasks:
 ## jstestfuzz concurrent ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_gen
-  tags: ["assigned_to_jira_team_server_execution", "jstestfuzz", "common", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_execution", "non_deterministic", "jstestfuzz", "common", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1248,7 +1248,7 @@ tasks:
 # jstestfuzz interrupt #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_gen
-  tags: ["assigned_to_jira_team_server_execution", "jstestfuzz", "interrupt", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_execution", "non_deterministic", "jstestfuzz", "interrupt", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1260,7 +1260,7 @@ tasks:
 # jstestfuzz interrupt with flow control engaged #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_replication_flow_control_gen
-  tags: ["assigned_to_jira_team_server_execution", "jstestfuzz", "interrupt", "flow_control", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_execution", "non_deterministic", "jstestfuzz", "interrupt", "flow_control", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1274,7 +1274,7 @@ tasks:
 # jstestfuzz interrupt #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_replication_gen
-  tags: ["assigned_to_jira_team_server_execution", "jstestfuzz", "interrupt", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_execution", "non_deterministic", "jstestfuzz", "interrupt", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:

@@ -135,7 +135,7 @@ tasks:
 ## Standalone generational fuzzer for multiversion aggregation expressions ##
 - <<: *jstestfuzz_template
   name: aggregation_expression_multiversion_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "aggfuzzer", "multiversion", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "aggfuzzer", "multiversion", "require_npm", "random_name"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -171,7 +171,7 @@ tasks:
 ## Standalone generational fuzzer for multiversion aggregation pipelines ##
 - <<: *jstestfuzz_template
   name: aggregation_multiversion_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "aggfuzzer", "common", "multiversion", "require_npm", "random_name", "future_git_tag_incompatible"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "aggfuzzer", "common", "multiversion", "require_npm", "random_name", "future_git_tag_incompatible"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -236,7 +236,7 @@ tasks:
 ## Standalone fuzzer for checking timeseries optimizations correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_timeseries_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -259,7 +259,7 @@ tasks:
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
   # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "no_debug_mode" tag.
-  tags: ["assigned_to_jira_team_server_query_execution", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -502,7 +502,7 @@ tasks:
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "jstestfuzz", "common", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "jstestfuzz", "common", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -523,7 +523,7 @@ tasks:
 ## jstestfuzz standalone fuzzer for checking find equivalence with and without plan cache ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_plan_cache_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "query_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -538,7 +538,7 @@ tasks:
 ## jstestfuzz sharded fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_sharded_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "query_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -553,7 +553,7 @@ tasks:
 ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_standalone_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "query_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -603,7 +603,7 @@ tasks:
 ## jstestfuzz standalone update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "updatefuzzer", "require_npm", "random_name", "multiversion"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "updatefuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -622,7 +622,7 @@ tasks:
 ## jstestfuzz replication update generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_fuzzer_replication_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "updatefuzzer", "require_npm", "random_name", "multiversion", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "updatefuzzer", "require_npm", "random_name", "multiversion", "no_debug_mode"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -641,7 +641,7 @@ tasks:
 # jstestfuzz standalone update time-series generational fuzzer ##
 - <<: *jstestfuzz_template
   name: update_timeseries_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "updatefuzzer", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "updatefuzzer", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -660,7 +660,7 @@ tasks:
 ## Standalone fuzzer for checking Bonsai optimizations correctness vs Classic ##
 - <<: *jstestfuzz_template
   name: aggregation_bonsai_m2_vs_classic_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -675,7 +675,7 @@ tasks:
 ## Standalone fuzzer for checking Bonsai optimizations correctness vs SBE stage-builders ##
 - <<: *jstestfuzz_template
   name: aggregation_bonsai_m2_vs_sbe_stagebuilders_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "common", "bonsai", "require_npm", "random_name", "no_debug_mode", "feature_flag_guarded", "cqf_only"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -699,7 +699,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
 - <<: *jstestfuzz_template
   name: aggregation_expression_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "aggfuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -714,7 +714,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines
 - <<: *jstestfuzz_template
   name: aggregation_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "aggfuzzer", "require_npm", "random_name", "optimization"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "require_npm", "random_name", "optimization"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -794,7 +794,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
 - <<: *jstestfuzz_template
   name: change_stream_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -808,7 +808,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: change_stream_serverless_no_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
   commands:
     - func: "generate resmoke tasks"
       vars:
@@ -822,7 +822,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: change_stream_serverless_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
   commands:
     - func: "generate resmoke tasks"
       vars:
@@ -919,7 +919,7 @@ tasks:
 ## Standalone fuzzer comparing find query results of Bonsai optimizations vs Classic ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_bonsai_m2_vs_classic_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -934,7 +934,7 @@ tasks:
 ## Standalone fuzzer comparing find query results of Bonsai optimizations vs SBE stage-builders ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_bonsai_m2_vs_sbe_stagebuilders_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "query_fuzzer", "require_npm", "random_name", "feature_flag_guarded", "cqf_only"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -983,7 +983,7 @@ tasks:
 # ## Standalone fuzzer for checking columnstore index correctness ##
 # - <<: *jstestfuzz_template
 #   name: aggregation_columnstore_fuzzer_gen
-#   tags: ["assigned_to_jira_team_server_query_integration", "aggfuzzer", "common", "columnstore", "require_npm", "random_name", "sbe_only", "feature_flag_guarded"]
+#   tags: ["assigned_to_jira_team_server_query_integration", "non_deterministic", "aggfuzzer", "common", "columnstore", "require_npm", "random_name", "sbe_only", "feature_flag_guarded"]
 #   commands:
 #   - func: "generate resmoke tasks"
 #     vars:

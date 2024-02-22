@@ -1031,7 +1031,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: move_collection_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "require_npm", "random_name", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "require_npm", "random_name", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1110,7 +1110,7 @@ tasks:
 ## resharding generational fuzzer ##
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_idempotency_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "resharding_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1123,7 +1123,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_inplace_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "resharding_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1136,7 +1136,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_merge_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "resharding_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1149,7 +1149,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_shuffle_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "resharding_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1162,7 +1162,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_split_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "resharding_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1175,7 +1175,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: resharding_fuzzer_stepup_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "resharding_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "resharding_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1391,7 +1391,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: unshard_collection_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "require_npm", "random_name", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "require_npm", "random_name", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1596,7 +1596,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster causal consistency ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_causal_consistency_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "causal", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "causal", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1610,7 +1610,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_continuous_stepdown_flow_control_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1626,7 +1626,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_continuous_stepdown_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "stepdowns", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1640,7 +1640,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "common", "sharding", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "common", "sharding", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1654,7 +1654,7 @@ tasks:
 ## jstestfuzz concurrent sharded cluster with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_sharded_session_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "session", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1668,7 +1668,7 @@ tasks:
 ## jstestfuzz sharded cluster causal consistency ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_causal_consistency_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "causal", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "causal", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1680,7 +1680,7 @@ tasks:
 ## jstestfuzz sharded cluster continuous stepdown with flow control engaged ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_continuous_stepdown_flow_control_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "flow_control", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1696,7 +1696,7 @@ tasks:
 ## jstestfuzz sharded cluster continuous stepdown ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_continuous_stepdown_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "stepdowns", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "stepdowns", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1710,7 +1710,7 @@ tasks:
 ## jstestfuzz sharded cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "common", "sharding", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "common", "sharding", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1722,7 +1722,7 @@ tasks:
 ## jstestfuzz sharded multiversion cluster ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_multiversion_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "multiversion_fuzzer", "require_npm", "random_name", "multiversion"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -1740,7 +1740,7 @@ tasks:
 ## jstestfuzz sharded cluster with logical session ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_session_gen
-  tags: ["assigned_to_jira_team_server_catalog_and_routing", "jstestfuzz", "session", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "non_deterministic", "jstestfuzz", "session", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -1752,7 +1752,7 @@ tasks:
 ## jstestfuzz sharded cluster with replica set endpoint ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_sharded_with_replica_set_endpoint_gen
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "jstestfuzz", "common", "sharding", "require_npm", "random_name", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "non_deterministic", "jstestfuzz", "common", "sharding", "require_npm", "random_name", "feature_flag_guarded"]
   commands:
   - func: "generate resmoke tasks"
     vars:

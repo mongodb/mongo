@@ -364,7 +364,7 @@ tasks:
 # Smoke test to ensure the Server still works with Jepsen
 - <<: *run_jepsen_template
   name: jepsen-config_fuzzer_smoke
-  tags: ["assigned_to_jira_team_server_repl"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -380,7 +380,7 @@ tasks:
 # Smoke test to ensure the Server still works with Jepsen
 - <<: *run_jepsen_template
   name: jepsen-smoke
-  tags: ["assigned_to_jira_team_server_repl"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -393,7 +393,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_list-append
-  tags: ["assigned_to_jira_team_server_repl", "jepsen_docker"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen_docker"]
   commands:
   - func: "do setup"
   - func: "do jepsen docker setup"
@@ -402,7 +402,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_read-concern-majority
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -416,7 +416,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_read-concern-majority_w1
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -431,7 +431,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_register_findAndModify
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -446,7 +446,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_register_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -461,7 +461,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_set_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -476,7 +476,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_list-append
-  tags: ["assigned_to_jira_team_server_repl", "jepsen_docker"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen_docker"]
   commands:
   - func: "do setup"
   - func: "do jepsen docker setup"
@@ -484,7 +484,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_read-concern-majority
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -496,7 +496,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_read-concern-majority_w1
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -509,7 +509,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -522,7 +522,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_register_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -535,7 +535,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_set_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
