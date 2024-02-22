@@ -34,6 +34,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-rhel-79-64-bit
+    core_analyzer_distro_name: rhel7.9-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
