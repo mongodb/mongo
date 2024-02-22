@@ -355,7 +355,7 @@ let testQueryExecutorStatsWithIndexScan = function(params) {
     // collection.
     assert.eq(localDocCount, curScannedKeys);
 
-    if (isSBELookupEnabled && !params.withUnwind) {
+    if (isSBEFullyEnabled || (isSBELookupEnabled && !params.withUnwind)) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
@@ -404,6 +404,10 @@ insertDocumentToCollection(localColl, localDocCount, "localField");
 // lastScannedObjects and lastScannedKeys with existing stats values in that case.
 getCurrentQueryExecutorStats();
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// TESTS
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 testQueryExecutorStatsWithCollectionScan({withUnwind: false});
 testQueryExecutorStatsWithHashLookup();
 testQueryExecutorStatsWithIndexScan({withUnwind: false});
@@ -411,7 +415,4 @@ testQueryExecutorStatsWithIndexScan({withUnwind: false});
 // Now test $lookup including an $unwind of the output field. This should result in the unwind
 // taking place within the lookup stage.
 testQueryExecutorStatsWithCollectionScan({withUnwind: true});
-// TODO SERVER-82298 Need to support $LU with strategy "IndexedLoopJoin" to make this pass.
-if (!checkSbeRestrictedOrFullyEnabled) {
-    testQueryExecutorStatsWithIndexScan({withUnwind: true});
-}
+testQueryExecutorStatsWithIndexScan({withUnwind: true});
