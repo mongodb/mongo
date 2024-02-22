@@ -220,6 +220,7 @@ LazyFS's
 LeafGreen
 LibFuzzer
 LoadLoad
+LoadStore
 LockFile
 LogBackend
 LogSink
@@ -881,6 +882,7 @@ isb
 isdigit
 ish
 ishld
+ishst
 islocked
 ispo
 isprint

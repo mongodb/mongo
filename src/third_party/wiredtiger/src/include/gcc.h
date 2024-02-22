@@ -252,11 +252,14 @@ WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
         __asm__ volatile("dmb ishld" ::: "memory"); \
     } while (0)
 /*
- * This is necessary as we're moving to utilizing acquire and release semantics. The ARM load
- * barrier does provide us with acquire semantics but the store barrier does not. We upgrade it to a
- * full barrier for that reason.
+ * In order to achieve release semantics we need two arm barrier instructions. Firstly dmb ishst
+ * which gives us StoreStore, secondly a dmb ishld which gives us LoadLoad, LoadStore.
+ *
+ * This is sufficient for the release semantics which is StoreStore, LoadStore. We could issue a
+ * single dmb ish here but that is more expensive because it adds a StoreLoad barrier which is the
+ * most expensive reordering to prevent.
  */
-#define WT_RELEASE_BARRIER() WT_FULL_BARRIER();
+#define WT_RELEASE_BARRIER() __asm__ volatile("dmb ishst; dmb ishld" ::: "memory");
 
 #elif defined(__s390x__)
 #define WT_PAUSE() __asm__ volatile("lr 0,0" ::: "memory")
