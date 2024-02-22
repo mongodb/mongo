@@ -9,8 +9,7 @@ include:
   - filename: etc/evergreen_yml_components/tasks/compile_tasks.yml
   - filename: etc/evergreen_yml_components/tasks/misc_tasks.yml
   - filename: etc/evergreen_yml_components/perf_tasks.yml
-  - filename: etc/evergreen_yml_components/variants/perf/perf.yml
-  - filename: etc/evergreen_yml_components/variants/perf/perf_branching.yml
+  - filename: etc/evergreen_yml_components/variants/perf.yml
 
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
