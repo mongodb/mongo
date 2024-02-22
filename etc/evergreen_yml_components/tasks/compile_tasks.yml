@@ -133,15 +133,12 @@ variables:
 # List of all variants that make mongocryptd
 # If a variant is listed here and has a push task, mongocryptd is pushed
 - mongocryptd_variants: &mongocryptd_variants
-  - enterprise-amazon2
   - enterprise-amazon2-openssl111
-  - enterprise-amazon2-arm64
   - enterprise-amazon2-arm64-openssl111
   - enterprise-amazon2023
   - enterprise-amazon2023-lto
   - enterprise-amazon2023-arm64
   - enterprise-amazon2023-arm64-lto
-  - enterprise-debian11-64
   - enterprise-debian12-64
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
@@ -155,7 +152,6 @@ variables:
   - enterprise-rhel-83-s390x
   - enterprise-rhel-90-64-bit
   - enterprise-rhel-90-arm64
-  - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-ubuntu2004-arm64
   - enterprise-ubuntu2204-arm64
