@@ -31,7 +31,7 @@ def find_fixme_tickets():
 
     fixme_tickets = set()
 
-    match_re = re.compile('FIX.?ME.*?(WT-[0-9]+)')
+    match_re = re.compile(r'FIX.?ME.*?(WT-[0-9]+)')
     for filepath in all_files():
         try:
             with open(filepath, 'r') as file:

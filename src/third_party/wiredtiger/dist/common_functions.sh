@@ -29,7 +29,7 @@ allchildpids() {
 import re, os, sys
 children = {}   # Map from parent PID to list of child PIDs.
 for line in sys.stdin.readlines():
-    (pid, ppid) = [*re.findall("""(\d+)""", line), 0, 0][:2]
+    (pid, ppid) = [*re.findall(r"(\d+)", line), 0, 0][:2]
     if pid and ppid and pid != str(os.getpid()):
         if ppid not in children: children[ppid] = []
         children[ppid].append(pid)

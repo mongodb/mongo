@@ -7,7 +7,7 @@ from dist import source_files
 # Display lines that could be joined.
 def lines_could_join():
     skip_re = re.compile(r'__asm__')
-    match_re = re.compile('(^[ \t].*\()\n^[ \t]*([^\n]*)', re.MULTILINE)
+    match_re = re.compile(r'(^[ \t].*\()\n^[ \t]*([^\n]*)', re.MULTILINE)
     for f in source_files():
         s = open(f, 'r').read()
         if skip_re.search(s):

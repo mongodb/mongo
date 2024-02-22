@@ -91,7 +91,7 @@ def convert_byte(inp):
 
 # Converts the output of ./verify -d dump_pages to bson.
 def wt_verify_to_bson(wt_output):
-    pattern = re.compile('V {(.*?)}$')
+    pattern = re.compile(r'V {(.*?)}$')
     for line in wt_output:
         print(line, end='')
         matches = pattern.findall(line.strip())
@@ -102,7 +102,7 @@ def wt_verify_to_bson(wt_output):
 # Converts the output of ./wt printlog -x -u.
 # Doesn't convert hex keys as I don't think they're bson.
 def wt_printlog_to_bson(wt_output):
-    pattern_value = re.compile('value-hex\": \"(.*)\"')
+    pattern_value = re.compile(r'value-hex\": \"(.*)\"')
     for line in wt_output:
         value_match = pattern_value.search(line)
         if value_match:

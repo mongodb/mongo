@@ -105,7 +105,7 @@ def print_defines():
  * @name Connection statistics
  * @anchor statistics_keys
  * @anchor statistics_conn
- * Statistics are accessed through cursors with \c "statistics:" URIs.
+ * Statistics are accessed through cursors with \\c "statistics:" URIs.
  * Individual statistics can be queried through the cursor using the following
  * keys.  See @ref data_statistics for more information.
  * @{

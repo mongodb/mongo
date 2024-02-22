@@ -129,7 +129,7 @@ if __name__ == '__main__':
     ]
 
     command = "find bench examples ext src test -name \"*.[ch]\" \
-        -o \( -name \"*.in\" ! -name \"Makefile.in\" \) \
+        -o \\( -name \"*.in\" ! -name \"Makefile.in\" \\) \
         -o -name \"*.cpp\" -o -name \"*.i\" "
 
     result = subprocess.run(command, shell=True, capture_output=True, text=True).stdout.splitlines()

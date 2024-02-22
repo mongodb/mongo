@@ -96,11 +96,11 @@ def typedesc(c):
         'category': 'a set of related configuration options defined as follows',
         'string'  : 'a string'}[ctype]
     if cmin and cmax:
-        desc += ' between \c ' + cmin + ' and \c ' + cmax
+        desc += ' between \\c ' + cmin + ' and \\c ' + cmax
     elif cmin:
-        desc += ' greater than or equal to \c ' + cmin
+        desc += ' greater than or equal to \\c ' + cmin
     elif cmax:
-        desc += ' no more than \c ' + cmax
+        desc += ' no more than \\c ' + cmax
     if choices:
         if ctype == 'list':
             desc += ', with values chosen from the following options: '

@@ -199,7 +199,7 @@ for line in open(doc, 'r'):
             if 'undoc' in err.flags:
                 continue
             tfile.write(
-                '@par \c ' + err.name.upper() + '\n' +
+                '@par \\c ' + err.name.upper() + '\n' +
                 " ".join(err.long_desc.split()) + '\n\n')
 tfile.close()
 format_srcfile(tmp_file)

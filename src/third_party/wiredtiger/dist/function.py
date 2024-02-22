@@ -119,7 +119,7 @@ def function_args(name, line):
 
     # Check for illegal types.
     for m in illegal_types:
-        if re.search('^' + m + "\s*[\w(*]", line):
+        if re.search('^' + m + r"\s*[\w(*]", line):
             print(name + ": illegal type: " + line.strip(), file=sys.stderr)
             sys.exit(1)
 
@@ -127,7 +127,7 @@ def function_args(name, line):
     for n,m in enumerate(types, 0):
         # Don't list '{' as a legal character in a declaration, that's what
         # prevents us from sorting inline union/struct declarations.
-        if re.search('^' + m + "\s*[\w(*]", line):
+        if re.search('^' + m + r"\s*[\w(*]", line):
             return True,n
     return False,0
 
@@ -158,7 +158,7 @@ def function_declaration():
                 found,n = function_args(name, line)
                 if found:
                     # List statics first.
-                    if re.search("^\s+static", line):
+                    if re.search(r"^\s+static", line):
                         static_list[n].append(line)
                         continue
 
@@ -166,7 +166,7 @@ def function_declaration():
                     # to allow automatic array initialization using constant
                     # initializers (and we've already skipped statics, which
                     # are also typically initialized in the declaration).
-                    if re.search("\s=\s[-\w]", line):
+                    if re.search(r"\s=\s[-\w]", line):
                         print(name + ": assignment in string: " + line.strip(),\
                               file=sys.stderr)
                         sys.exit(1);

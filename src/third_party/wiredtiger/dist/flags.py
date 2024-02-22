@@ -32,7 +32,7 @@ def flag_declare(name):
             lcnt = lcnt + 1
             if stopped != '':
                 stopped = ''
-                m = re.search("\d+", line)
+                m = re.search(r"\d+", line)
                 if m != None:
                     fld_size = int(m.group(0))
                     if max_flags > fld_size:
@@ -41,7 +41,7 @@ def flag_declare(name):
                                 + " is larger than field size " + str(fld_size))
                         sys.exit(1)
             if line.find('AUTOMATIC FLAG VALUE GENERATION START') != -1:
-                m = re.search("\d+", line)
+                m = re.search(r"\d+", line)
                 if m == None:
                     print(name + ": automatic flag generation start at line " +
                         str(lcnt) + " needs start value e.g. AUTOMATIC FLAG VALUE" +
@@ -52,7 +52,7 @@ def flag_declare(name):
                 defines = []
                 parsing = True
             elif line.find('AUTOMATIC FLAG VALUE GENERATION STOP') != -1:
-                m = re.search("\d+", line)
+                m = re.search(r"\d+", line)
                 if m == None:
                     print(name + ": automatic flag generation stop at line " +
                         str(lcnt) + " needs stop value e.g. AUTOMATIC FLAG VALUE" +
