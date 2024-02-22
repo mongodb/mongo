@@ -193,7 +193,7 @@ public:
                 int64_t lastEncodedValue = 0;
                 int64_t lastEncodedValueForDeltaOfDelta = 0;
                 uint8_t scaleIndex;
-                bool deltaOfDelta;
+                bool deltaOfDelta = false;
             };
 
             /**

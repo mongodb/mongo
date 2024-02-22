@@ -265,6 +265,7 @@ void BSONColumn::Iterator::_incrementRegular(Regular& regular) {
     _decompressed = result.element;
     _control += result.size;
 }
+
 void BSONColumn::Iterator::_incrementInterleaved(Interleaved& interleaved) {
     // Notify the internal allocator to keep all allocations in contigous memory. That way we can
     // produce the full BSONObj that we need to return.
@@ -505,8 +506,9 @@ BSONColumn::Iterator::DecodingState::loadControl(ElementStorage& allocator,
 BSONElement BSONColumn::Iterator::DecodingState::loadDelta(ElementStorage& allocator,
                                                            Decoder64& d64) {
     const auto& delta = *d64.pos;
-    // boost::none represent skip, just append EOO BSONElement.
-    if (!delta) {
+    // boost::none, or decompressing deltas without a previous uncompressed element (the
+    // lastValue will be EOO) represent skip, just append EOO BSONElement.
+    if (!delta || lastValue.eoo()) {
         return BSONElement();
     }
 

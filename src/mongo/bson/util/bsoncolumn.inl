@@ -72,8 +72,8 @@ const char* BSONColumnBlockBased::decompressAllDelta(const char* ptr,
                 if (*delta == 0) {
                     buffer.appendLast();
                 } else {
-                    last = expandDelta(last,
-                                    Simple8bTypeUtil::decodeInt<make_unsigned_t<Encoding>>(*delta));
+                    last = expandDelta(
+                        last, Simple8bTypeUtil::decodeInt<make_unsigned_t<Encoding>>(*delta));
                     materialize(last, reference, buffer);
                 }
             } else {
@@ -203,7 +203,6 @@ void BSONColumnBlockBased::decompress(Buffer& buffer) const {
         uint8_t size = numSimple8bBlocksForControlByte(control) * sizeof(uint64_t);
         Simple8b<uint64_t> s8b(ptr + 1, size);
         for (auto it = s8b.begin(); it != s8b.end(); ++it) {
-            uassert(8295702, "Beginning delta blocks should only contain skips", !(*it));
             buffer.appendMissing();
         }
         ptr += 1 + size;

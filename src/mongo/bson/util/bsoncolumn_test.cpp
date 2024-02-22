@@ -3187,6 +3187,21 @@ TEST_F(BSONColumnTest, ArrayEqual) {
     verifyDecompression(expected, elems, true);
 }
 
+TEST_F(BSONColumnTest, DeltasWithNoUncompressedByte) {
+    // This test validates decoding any deltas before an uncompressed byte will return EOO
+    // BSONElements.
+    BufBuilder expected;
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected,
+                           {deltaInt64(createElementInt64(10), createElementInt64(1)),
+                            deltaInt64(createElementInt64(20), createElementInt64(10)),
+                            kDeltaForBinaryEqualValues},
+                           1);
+    appendEOO(expected);
+
+    verifyDecompression(expected, {BSONElement(), BSONElement(), BSONElement()}, true);
+}
+
 TEST_F(BSONColumnTest, OnlySkipManyTwoControlBytes) {
     BSONColumnBuilder cb;
 
