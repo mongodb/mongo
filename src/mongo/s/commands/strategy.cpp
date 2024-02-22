@@ -174,7 +174,7 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
     bool clusterTimeWasOutput = VectorClock::get(opCtx)->gossipOut(opCtx, responseBuilder);
 
     // Ensure that either both operationTime and $clusterTime are output, or neither.
-    if (clusterTimeWasOutput) {
+    if (MONGO_likely(clusterTimeWasOutput)) {
         auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
         if (VectorClock::isValidComponentTime(operationTime)) {
             LOGV2_DEBUG(22764,
@@ -283,15 +283,6 @@ void ExecCommandClient::_prologue() {
     StringDataSet topLevelFields(8);
     for (auto&& element : request.body) {
         StringData fieldName = element.fieldNameStringData();
-        if (fieldName == CommandHelpers::kHelpFieldName && element.type() == Bool &&
-            element.Bool()) {
-            auto body = result->getBodyBuilder();
-            body.append(CommandHelpers::kHelpFieldName,
-                        "help for: {} {}"_format(c->getName(), c->help()));
-            CommandHelpers::appendSimpleCommandStatus(body, true, "");
-            iassert(Status(ErrorCodes::SkipCommandExecution, "Already served help command"));
-        }
-
         uassert(ErrorCodes::FailedToParse,
                 "Parsed command object contains duplicate top level key: {}"_format(fieldName),
                 topLevelFields.insert(fieldName).second);
@@ -305,7 +296,7 @@ void ExecCommandClient::_prologue() {
         iassert(Status(ErrorCodes::SkipCommandExecution, "Failed to check authorization"));
     }
 
-    if (shouldLog(logv2::LogComponent::kTracking, logv2::LogSeverity::Debug(1))) {
+    if (MONGO_unlikely(shouldLog(logv2::LogComponent::kTracking, logv2::LogSeverity::Debug(1)))) {
         rpc::TrackingMetadata trackingMetadata;
         trackingMetadata.initWithOperName(c->getName());
         rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
@@ -625,10 +616,20 @@ void ParseAndRunCommand::_parseCommand() {
         }
     }
 
-    if (!readConcernParseStatus.isOK()) {
+    if (MONGO_unlikely(!readConcernParseStatus.isOK())) {
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
         iassert(Status(ErrorCodes::SkipCommandExecution, "Failed to parse read concern"));
+    }
+
+    if (MONGO_unlikely(_requestArgs.getHelp().value_or(false))) {
+        const Command* c = _invocation->definition();
+        auto result = _rec->getReplyBuilder();
+        auto body = result->getBodyBuilder();
+        body.append(CommandHelpers::kHelpFieldName,
+                    "help for: {} {}"_format(c->getName(), c->help()));
+        CommandHelpers::appendSimpleCommandStatus(body, true, "");
+        iassert(Status(ErrorCodes::SkipCommandExecution, "Already served help command"));
     }
 }
 
@@ -672,7 +673,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         return Status(ErrorCodes::SkipCommandExecution, status.reason());
     };
 
-    if (_parc->_isHello.value()) {
+    if (MONGO_unlikely(_parc->_isHello.value())) {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
@@ -681,9 +682,9 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     enforceRequireAPIVersion(opCtx, command);
 
-    auto& apiParams = APIParameters::get(opCtx);
-    auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
     if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
+        auto& apiParams = APIParameters::get(opCtx);
+        auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
         auto appName = clientMetadata->getApplicationName().toString();
         apiVersionMetrics.update(appName, apiParams);
     }
@@ -719,7 +720,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     }
 
     bool supportsWriteConcern = invocation->supportsWriteConcern();
-    if (!supportsWriteConcern && requestArgs.getWriteConcern()) {
+    if (MONGO_unlikely(!supportsWriteConcern && requestArgs.getWriteConcern())) {
         // This command doesn't do writes so it should not be passed a writeConcern.
         const auto errorMsg = "Command does not support writeConcern";
         return appendStatusToReplyAndSkipCommandExecution({ErrorCodes::InvalidOptions, errorMsg});
@@ -927,13 +928,12 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     //
     // Individual transaction statements are checked later on, after we've unstashed the transaction
     // resources.
-    if (!TransactionRouter::get(opCtx) && readConcernArgs.hasLevel()) {
-        if (!readConcernSupport.readConcernSupport.isOK()) {
-            const std::string errorMsg = "Command {} does not support {}"_format(
-                invocation->definition()->getName(), readConcernArgs.toString());
-            return appendStatusToReplyAndSkipCommandExecution(
-                readConcernSupport.readConcernSupport.withContext(errorMsg));
-        }
+    if (MONGO_unlikely(!TransactionRouter::get(opCtx) && readConcernArgs.hasLevel() &&
+                       !readConcernSupport.readConcernSupport.isOK())) {
+        const std::string errorMsg = "Command {} does not support {}"_format(
+            invocation->definition()->getName(), readConcernArgs.toString());
+        return appendStatusToReplyAndSkipCommandExecution(
+            readConcernSupport.readConcernSupport.withContext(errorMsg));
     }
 
     // Remember whether or not this operation is starting a transaction, in case something later in
