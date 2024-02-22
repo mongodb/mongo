@@ -90,7 +90,7 @@ tasks:
 ## pretty_printer ##
 - <<: *task_template
   name: run_pretty_printer_tests
-  tags: ["assigned_to_jira_team_devprod_build"]
+  tags: ["assigned_to_jira_team_devprod_build", "default", "run_on_single_variant"]
   commands:
   - func: "git get project and add git tag"
   - func: "f_expansions_write"
@@ -127,7 +127,7 @@ tasks:
       exec_timeout_secs: 1800 # 30 min timeout.
 
 - name: buildscripts_test
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
   depends_on: []
   commands:
   - func: "f_expansions_write"
@@ -156,7 +156,7 @@ tasks:
 
 - <<: *gen_burn_in_task_template
   name: burn_in_tests_gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
   patch_only: true
   commands:
   - func: "generate resmoke tasks"
@@ -173,7 +173,7 @@ tasks:
 ## Tests that the multiversion test generation logic is not broken.
 - <<: *gen_task_template
   name: multiversion_sanity_check_gen
-  tags: ["assigned_to_jira_team_devprod_correctness", "multiversion", "multiversion_sanity_check"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "multiversion", "multiversion_sanity_check"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -189,7 +189,7 @@ tasks:
 
 - <<: *task_template
   name: resmoke_end2end_tests
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -208,7 +208,7 @@ tasks:
 
 - <<: *gen_task_template
   name: unittest_shell_hang_analyzer_gen
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -217,7 +217,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_streams
-  tags: ["assigned_to_jira_team_streams", "benchmarks"]
+  tags: ["assigned_to_jira_team_streams", "default", "run_on_single_variant", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -229,14 +229,14 @@ tasks:
 
 - <<: *task_template
   name: streams
-  tags: ["assigned_to_jira_team_streams"]
+  tags: ["assigned_to_jira_team_streams", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: streams_kafka
-  tags: ["assigned_to_jira_team_streams"]
+  tags: ["assigned_to_jira_team_streams", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"

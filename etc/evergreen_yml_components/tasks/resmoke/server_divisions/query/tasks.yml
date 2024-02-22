@@ -152,7 +152,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_facet_unwind_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "unwind"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "unwind"]
   depends_on:
   - name: aggregation
   commands:
@@ -161,7 +161,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_mongos_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "no_async"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "no_async"]
   depends_on:
   - name: aggregation
   commands:
@@ -188,7 +188,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_one_shard_sharded_collections
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "no_async", "sharded"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "no_async", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -197,7 +197,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_read_concern_majority_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "read_write_concern", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "read_write_concern", "no_debug_mode"]
   depends_on:
   - name: aggregation
   commands:
@@ -208,7 +208,7 @@ tasks:
 
 - <<: *gen_task_template
   name: aggregation_secondary_reads_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "secondary_reads"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "secondary_reads"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -217,7 +217,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_sharded_collections_causally_consistent_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "secondary_reads", "sharded"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "secondary_reads", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -226,7 +226,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_sharded_collections_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "aggregation", "common", "sharded"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "common", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -273,7 +273,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_expression
-  tags: ["assigned_to_jira_team_server_query_execution", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "run_on_single_variant", "benchmarks"]
   commands:
     - func: "do benchmark setup"
     - func: "run tests"
@@ -285,7 +285,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_expression_sbe
-  tags: ["assigned_to_jira_team_server_query_execution", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "run_on_single_variant", "benchmarks"]
   commands:
     - func: "do benchmark setup"
     - func: "run tests"
@@ -297,14 +297,14 @@ tasks:
 
 - <<: *task_template
   name: change_streams
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *gen_task_template
   name: change_streams_downgrade_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "multiversion_passthrough", "multiversion"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "multiversion_passthrough", "multiversion"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -316,7 +316,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_mongos_sessions_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   depends_on:
   - name: change_streams
   commands:
@@ -325,7 +325,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_multi_stmt_txn_mongos_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   depends_on:
   - name: change_streams
   commands:
@@ -334,7 +334,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_multi_stmt_txn_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   depends_on:
   - name: change_streams
   commands:
@@ -343,7 +343,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_multi_stmt_txn_sharded_collections_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   depends_on:
   - name: change_streams
   commands:
@@ -352,21 +352,21 @@ tasks:
 
 - <<: *task_template
   name: change_streams_multitenant_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution"]  # TODO SERVER-57866: Add the "change_streams" tag here.
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]  # TODO SERVER-57866: Add the "change_streams" tag here.
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: change_streams_multitenant_sharded_collections_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution"]  # TODO SERVER-57866: Add the "change_streams" tag here.
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]  # TODO SERVER-57866: Add the "change_streams" tag here.
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *gen_task_template
   name: change_streams_multiversion_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "multiversion", "multiversion_passthrough"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "multiversion", "multiversion_passthrough"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -383,14 +383,14 @@ tasks:
 
 - <<: *task_template
   name: change_streams_per_shard_cursor_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: change_streams_secondary_reads_sharded_collections
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams", "secondary_reads"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams", "secondary_reads"]
   depends_on:
   - name: change_streams
   commands:
@@ -399,7 +399,7 @@ tasks:
 
 - <<: *gen_task_template
   name: change_streams_sharded_collections_multiversion_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "multiversion_passthrough", "multiversion"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "multiversion_passthrough", "multiversion"]
   commands:
   - func: "initialize multiversion tasks"
     vars:
@@ -412,7 +412,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_whole_cluster_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   depends_on:
   - name: change_streams
   commands:
@@ -421,7 +421,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_whole_cluster_secondary_reads_sharded_collections
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams", "secondary_reads"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams", "secondary_reads"]
   depends_on:
   - name: change_streams_secondary_reads_sharded_collections
   commands:
@@ -430,7 +430,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_whole_db_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams"]
   depends_on:
   - name: change_streams
   commands:
@@ -439,7 +439,7 @@ tasks:
 
 - <<: *task_template
   name: change_streams_whole_db_secondary_reads_sharded_collections
-  tags: ["assigned_to_jira_team_server_query_execution", "change_streams", "secondary_reads"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "change_streams", "secondary_reads"]
   depends_on:
   - name: change_streams_secondary_reads_sharded_collections
   commands:
@@ -448,7 +448,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_compute_mode_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "concurrency", "no_passthrough", "compute_mode", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "concurrency", "no_passthrough", "compute_mode", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -464,28 +464,28 @@ tasks:
 
 - <<: *task_template
   name: cursor_hints_to_query_settings_replset_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cursor_hints_to_query_settings_sharded_collections_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cursor_hints_to_query_settings_unsharded_collections_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: index_filters_to_query_settings
-  tags: ["assigned_to_jira_team_server_query_execution", "sbe_only"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "sbe_only"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -567,7 +567,7 @@ tasks:
 
 - <<: *task_template
   name: search
-  tags: ["assigned_to_jira_team_server_query_execution"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -576,7 +576,7 @@ tasks:
 
 - <<: *task_template
   name: search_auth
-  tags: ["assigned_to_jira_team_server_query_execution"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -585,7 +585,7 @@ tasks:
 
 - <<: *task_template
   name: search_ssl
-  tags: ["assigned_to_jira_team_server_query_execution"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -594,7 +594,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_api_strict_passthrough_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "sharding"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "sharding"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -689,7 +689,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_disabled_optimization
-  tags: ["assigned_to_jira_team_server_query_optimization", "aggregation", "common"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "aggregation", "common"]
   depends_on:
   - name: aggregation
   commands:
@@ -728,7 +728,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_repeat_queries
-  tags: ["assigned_to_jira_team_server_query_optimization"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default"]
   depends_on:
   - name: aggregation
   commands:
@@ -737,7 +737,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_abt
-  tags: ["assigned_to_jira_team_server_query_optimization", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "run_on_single_variant", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -749,7 +749,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_abt_lowering
-  tags: ["assigned_to_jira_team_server_query_optimization", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "run_on_single_variant", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -761,7 +761,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_abt_path_lowering
-  tags: ["assigned_to_jira_team_server_query_optimization", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "run_on_single_variant", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -774,7 +774,7 @@ tasks:
 # Disabled under SERVER-64949.
 # - <<: *benchmark_template
 #   name: benchmarks_cst
-#   tags: ["assigned_to_jira_team_server_query_optimization", "benchmarks"]
+#   tags: ["assigned_to_jira_team_server_query_optimization", "default", "run_on_single_variant", "benchmarks"]
 #   commands:
 #   - func: "do benchmark setup"
 #   - func: "run tests"
@@ -786,7 +786,7 @@ tasks:
 
 - <<: *task_template
   name: cst_jscore_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", "jscore"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "jscore"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -836,35 +836,35 @@ tasks:
 
 - <<: *task_template
   name: cqf
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cqf_disabled_pipeline_opt
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cqf_experimental_aggregation_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cqf_experimental_jscore_passthrough
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *gen_task_template
   name: cqf_experimental_no_passthrough_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "cqf"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "cqf"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -873,7 +873,7 @@ tasks:
 
 - <<: *gen_task_template
   name: cqf_experimental_sharded_collections_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -882,7 +882,7 @@ tasks:
 
 - <<: *gen_task_template
   name: cqf_experimental_sharding_passthrough_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -891,7 +891,7 @@ tasks:
 
 - <<: *task_template
   name: cqf_parallel
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -900,7 +900,7 @@ tasks:
   name: jsCore_wildcard_indexes
   depends_on:
   - name: jsCore
-  tags: ["assigned_to_jira_team_server_query_optimization", "jscore"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "jscore"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -909,7 +909,7 @@ tasks:
 
 - <<: *task_template
   name: json_schema
-  tags: ["assigned_to_jira_team_server_query_optimization"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -948,7 +948,7 @@ tasks:
 
 - <<: *task_template
   name: query_golden_classic
-  tags: ["assigned_to_jira_team_server_query_optimization"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -957,7 +957,7 @@ tasks:
 
 - <<: *task_template
   name: query_golden_cqf
-  tags: ["assigned_to_jira_team_server_query_optimization", cqf]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -972,7 +972,7 @@ tasks:
   name: aggregation_column_store_index_passthrough
   # TODO SERVER-75026 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
   # variants.
-  tags: ["assigned_to_jira_team_server_query_integration", "aggregation", "sbe_only", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default", "aggregation", "sbe_only", "feature_flag_guarded"]
   depends_on:
   - name: aggregation
   commands:
@@ -997,7 +997,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_query
-  tags: ["assigned_to_jira_team_server_query_integration", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default", "run_on_single_variant", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -1012,7 +1012,7 @@ tasks:
   # variants.
   depends_on:
   - name: jsCore
-  tags: ["assigned_to_jira_team_server_query_integration", "jscore", "sbe_only", "feature_flag_guarded"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default", "jscore", "sbe_only", "feature_flag_guarded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1021,35 +1021,35 @@ tasks:
 
 - <<: *task_template
   name: query_stats_aggregation_passthrough
-  tags: ["assigned_to_jira_team_server_query_integration"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: query_stats_mongos_aggregation_passthrough
-  tags: ["assigned_to_jira_team_server_query_integration"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: query_stats_mongos_passthrough
-  tags: ["assigned_to_jira_team_server_query_integration"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: query_stats_passthrough
-  tags: ["assigned_to_jira_team_server_query_integration"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: vector_search
-  tags: ["assigned_to_jira_team_server_query_integration"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1058,7 +1058,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_auth
-  tags: ["assigned_to_jira_team_server_query_integration"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1067,7 +1067,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_ssl
-  tags: ["assigned_to_jira_team_server_query_integration"]
+  tags: ["assigned_to_jira_team_server_query_integration", "default"]
   commands:
   - func: "do setup"
   - func: "run tests"

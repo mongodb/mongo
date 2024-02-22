@@ -6,7 +6,6 @@
 variables:
 - &antithesis_task_template
   name: antithesis_task_template
-  tags: ["assigned_to_jira_team_devprod_correctness", "antithesis"]
   depends_on:
     name: archive_dist_test_debug
   commands:
@@ -136,6 +135,7 @@ variables:
 tasks:
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_multi_stmt_txn_kill_primary
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -145,6 +145,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -154,6 +155,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -167,6 +169,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_config_fuzzer_stress_concurrency_sharded_replication
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -180,6 +183,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_core
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -189,6 +193,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -198,6 +203,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_jstestfuzz_sharded
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -207,6 +213,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_replica_sets_jscore_passthrough
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -249,7 +256,7 @@ tasks:
       - src/build_metrics_task_gen.json
 
 - name: check_feature_flag_tags
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
   patch_only: true
   commands:
   - command: manifest.load
@@ -266,7 +273,7 @@ tasks:
       - "./src/evergreen/feature_flag_tags_check.sh"
 
 - name: check_for_todos
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -331,7 +338,7 @@ tasks:
       - "./src/evergreen/generate_buildid_debug_symbols_mapping.sh"
 
 - name: idl_tests
-  tags: ["assigned_to_jira_team_server_servicearch"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default"]
   depends_on:
   - name: archive_dist_test
   commands:
@@ -629,7 +636,7 @@ tasks:
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
   patch_only: true
   commands:
   - command: manifest.load
@@ -803,7 +810,7 @@ tasks:
   - func: "monitor mongo fork 10gen"
 
 - name: powercycle
-  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -829,7 +836,7 @@ tasks:
       num_tasks: 1
 
 - name: powercycle_kill_mongod
-  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -843,7 +850,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_last_lts_fcv
-  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -857,7 +864,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication
-  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -871,7 +878,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication_smalloplog
-  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -893,7 +900,7 @@ tasks:
       gen_task: powercycle_smoke_skip_compile_gen
 
 - name: powercycle_smoke
-  tags: ["assigned_to_jira_team_devprod_correctness"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -924,7 +931,7 @@ tasks:
       run_powercycle_args: --sshAccessRetryCount=1800
 
 - name: powercycle_syncdelay
-  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -938,7 +945,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_write_concern_majority
-  tags: ["assigned_to_jira_team_server_storage_engines", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -952,7 +959,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: selinux_rhel7_enterprise
-  tags: ["assigned_to_jira_team_server_security"]
+  tags: ["assigned_to_jira_team_server_security", "default"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -971,7 +978,7 @@ tasks:
       test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
 - name: selinux_rhel7_org
-  tags: ["assigned_to_jira_team_server_security"]
+  tags: ["assigned_to_jira_team_server_security", "default"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -990,7 +997,7 @@ tasks:
       test_list: jstests/selinux/*.js
 
 - name: selinux_rhel8_enterprise
-  tags: ["assigned_to_jira_team_server_security"]
+  tags: ["assigned_to_jira_team_server_security", "default"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1008,7 +1015,7 @@ tasks:
       test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
 - name: selinux_rhel8_org
-  tags: ["assigned_to_jira_team_server_security"]
+  tags: ["assigned_to_jira_team_server_security", "default"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1026,7 +1033,7 @@ tasks:
       test_list: jstests/selinux/*.js
 
 - name: selinux_rhel9_enterprise
-  tags: ["assigned_to_jira_team_server_security"]
+  tags: ["assigned_to_jira_team_server_security", "default"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1044,7 +1051,7 @@ tasks:
       test_list: jstests/selinux/*.js src/mongo/db/modules/enterprise/jstests/selinux/*.js
 
 - name: selinux_rhel9_org
-  tags: ["assigned_to_jira_team_server_security"]
+  tags: ["assigned_to_jira_team_server_security", "default"]
   depends_on:
   - name: archive_dist_test
   - name: package
@@ -1215,15 +1222,18 @@ tasks:
 task_groups:
 - <<: *compile_task_group_template
   name: build_metrics_gen_TG
+  tags: []
   tasks:
   - build_metrics_tasks_gen
 
 - <<: *compile_task_group_template
   name: libdeps_graph_linting_TG
+  tags: ["default", "run_on_single_variant"]
   tasks:
   - libdeps_graph_linting
 
 - <<: *compile_task_group_template
   name: iwyu_self_test_TG
+  tags: ["default", "run_on_single_variant"]
   tasks:
   - iwyu_self_test

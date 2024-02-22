@@ -2351,11 +2351,13 @@ tasks:
 task_groups:
 - <<: *compile_task_group_template
   name: compile_dist_test_TG
+  tags: []
   tasks:
   - compile_dist_test
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_TG
+  tags: []
   tasks:
   - compile_bazel_dist_test
   - compile_bazel_c_and_asm_targets
@@ -2367,27 +2369,32 @@ task_groups:
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_ninja_TG
+  tags: []
   tasks:
   - compile_ninja_bazel
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_windows_TG
+  tags: []
   tasks:
   - compile_bazel_dist_test_windows
   - run_bazel_program_windows
 
 - <<: *compile_bazel_task_group_template
   name: compile_bazel_macos_TG
+  tags: []
   tasks:
   - compile_bazel_dist_test_macos
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG
+  tags: []
   tasks:
   - compile_upload_benchmarks
 
 - <<: *compile_task_group_template
   name: compile_and_archive_dist_test_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2395,6 +2402,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_and_archive_dist_test_then_package_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2403,16 +2411,19 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_ninja_next_TG
+  tags: []
   tasks:
   - compile_ninja_next
 
 - <<: *compile_task_group_template
   name: compile_build_tools_next_TG
+  tags: []
   tasks:
   - compile_build_tools_next
 
 - <<: *compile_task_group_template
   name: compile_ninja_TG
+  tags: []
   tasks:
   - compile_ninja
   teardown_task:
@@ -2430,41 +2441,49 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_ninja_quick_TG
+  tags: []
   tasks:
   - compile_ninja_quick
 
 - <<: *compile_task_group_template
   name: compile_ninja_default_profile_TG
+  tags: []
   tasks:
   - compile_ninja_default_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_default_profile_linux_TG
+  tags: []
   tasks:
   - compile_ninja_default_profile_linux
 
 - <<: *compile_task_group_template
   name: compile_ninja_opt_profile_TG
+  tags: []
   tasks:
   - compile_ninja_opt_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_san_profile_TG
+  tags: []
   tasks:
   - compile_ninja_san_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_fast_profile_TG
+  tags: []
   tasks:
   - compile_ninja_fast_profile
 
 - <<: *compile_task_group_template
   name: compile_ninja_compiledb_profile_TG
+  tags: []
   tasks:
   - compile_ninja_compiledb_profile
 
 - <<: *compile_task_group_template
   name: compile_run_and_archive_dbtest_TG
+  tags: []
   tasks:
   - compile_dbtest
   - run_dbtest
@@ -2472,6 +2491,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_serial_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2482,6 +2502,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_serial_future_git_tag_multiversion_TG
+  tags: []
   tasks:
   - compile_dist_test_future_git_tag_multiversion
   - archive_dist_test_future_git_tag_multiversion
@@ -2495,6 +2516,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2511,6 +2533,7 @@ task_groups:
 # a terabyte of data.
 - <<: *compile_task_group_template
   name: compile_test_serial_no_unittests_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2522,6 +2545,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_no_unittests_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2536,6 +2560,7 @@ task_groups:
 # TODO: SERVER-79886 Fix commented out tasks
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_lto_no_unittests_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2550,6 +2575,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_and_package_serial_no_unittests_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2557,6 +2583,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_benchmark_serial_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2571,6 +2598,7 @@ task_groups:
 # a terabyte of data.
 - <<: *compile_task_group_template
   name: compile_test_benchmark_and_package_serial_no_unittests_TG
+  tags: []
   tasks:
   - compile_dist_test
   - archive_dist_test
@@ -2585,6 +2613,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_parallel_unittest_stream_TG
+  tags: []
   max_hosts: -1
   tasks:
   - compile_and_run_unittests_first_quarter
@@ -2603,6 +2632,7 @@ task_groups:
 # cost of re-running the setup tasks.
 - <<: *compile_task_group_template
   name: compile_test_parallel_core_stream_TG
+  tags: []
   tasks:
   - compile_dist_test
   - determine_patch_tests
@@ -2612,6 +2642,7 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_test_parallel_dbtest_stream_TG
+  tags: []
   tasks:
   - compile_dbtest
   - run_dbtest
@@ -2619,11 +2650,13 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: scons_compile_smoke_test_TG
+  tags: []
   tasks:
   - scons_dev_compile_smoke_test
 
 - <<: *compile_task_group_template
   name: ninja_compile_smoke_test_TG
+  tags: []
   tasks:
   - ninja_dev_compile_smoke_test
 
@@ -2662,6 +2695,7 @@ task_groups:
   - clang_tidy
 
 - name: visibility_test_TG
+  tags: ["default", "run_on_single_variant"]
   setup_group_can_fail_task: true
   max_hosts: 1
   setup_group:
@@ -2732,6 +2766,7 @@ task_groups:
   - "crypt_create_lib"
 
 - name: crypt_build_debug_and_test
+  tags: ["default", "run_on_single_variant"]
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"
