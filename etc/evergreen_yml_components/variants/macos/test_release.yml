@@ -32,7 +32,6 @@ buildvariants:
   - name: .jscore .common !.auth !.sharding !.feature_flag_guarded
   - name: replica_sets_gen
   - name: .replica_sets .common !.auth
-  - name: sharding_gen
   - name: .ssl
   - name: push
 
@@ -66,7 +65,6 @@ buildvariants:
   - name: .jscore .common !.auth !.sharding !.feature_flag_guarded
   - name: replica_sets_gen
   - name: .replica_sets .common !.auth
-  - name: sharding_gen
   - name: .ssl
   - name: push
 
