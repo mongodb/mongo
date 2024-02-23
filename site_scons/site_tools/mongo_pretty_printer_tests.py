@@ -70,22 +70,7 @@ def build_pretty_printer_test(env, target, **kwargs):
     else:
         kwargs["AIB_COMPONENTS_EXTRA"] = list(test_component)
 
-    # GDB has a built in python interpreter, but it may have a python binary on the system which
-    # we can use to check package requirements.
-    python_bin = None
-    result = subprocess.run([gdb_bin, '--configuration'], capture_output=True, text=True)
-    if result.returncode == 0:
-        for line in result.stdout.splitlines():
-            if line.strip().startswith('--with-python='):
-                python_root = line.strip()[len('--with-python=') - 1:]
-                if python_root.endswith(' (relocatable)'):
-                    python_root = python_root[:-len(' (relocatable)')]
-                python_bin = os.path.join(python_root, 'bin/python3')
-    if not python_bin:
-        print(
-            f"Failed to find gdb's python from gdb '--configuration', defaulting to {sys.executable}"
-        )
-        python_bin = sys.executable
+    python_bin = sys.executable
 
     test_program = kwargs.get("TEST_PROGRAM", ['$DESTDIR/$PREFIX/bin/mongod'])
     if isinstance(test_program, list):
@@ -103,7 +88,7 @@ def build_pretty_printer_test(env, target, **kwargs):
         gen_test_script = env.Textfile(
             target=os.path.basename(gdb_test_script),
             source=verify_reqs_file.get_contents().decode('utf-8').split('\n') + [
-                "import os,subprocess,sys",
+                "import os,subprocess,sys,traceback",
                 "cmd = 'python -c \"import os,sys;print(os.linesep.join(sys.path).strip())\"'",
                 "paths = subprocess.check_output(cmd,shell=True).decode('utf-8').split()",
                 "sys.path.extend(paths)",
@@ -122,10 +107,14 @@ def build_pretty_printer_test(env, target, **kwargs):
                 "gdb.execute('set confirm off')",
                 "gdb.execute('source .gdbinit')",
                 "try:",
-                "    verify_requirements(executable=f'@python_executable@')",
+                "    verify_requirements(executable='python3')",
                 "except MissingRequirements as ex:",
                 "    print(ex)",
                 "    print('continuing testing anyways!')",
+                "except Exception as exc:",
+                "    print('ERROR: failed while verifying requirements.')",
+                "    traceback.print_exc()",
+                "    sys.exit(1)",
             ] + [line.rstrip() for line in test_script.readlines()])
 
         gen_test_script_install = env.AutoInstall(

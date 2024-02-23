@@ -43,9 +43,19 @@ def verify_requirements(silent: bool = False, executable=sys.executable):
 
     verbose("Checking required python packages...")
 
-    poetry_dry_run_proc = subprocess.run(
-        [executable, "-m", "poetry", "install", "--no-root", "--sync", "--dry-run"], check=True,
-        capture_output=True, text=True)
+    try:
+        poetry_dry_run_proc = subprocess.run(
+            [executable, "-m", "poetry", "install", "--no-root", "--sync", "--dry-run"], check=True,
+            text=True, capture_output=True, errors='backslashreplace')
+    except subprocess.CalledProcessError as exc:
+        print("ERROR: poetry packages verification failed.")
+        print(exc.stdout)
+        print(exc.stderr)
+        raise MissingRequirements(
+            f"Detected one or more packages are out of date. "
+            f"Try running:\n"
+            f"    export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring\n"
+            f"    python3 -m poetry install --no-root --sync")
 
     # String match should look like the following
     # Package operations: 2 installs, 3 updates, 0 removals, 165 skipped
