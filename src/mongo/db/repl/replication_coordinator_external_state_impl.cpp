@@ -504,7 +504,7 @@ void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* 
     invariant(shard_role_details::getLocker(opCtx)->getAdmissionPriority() ==
                   AdmissionContext::Priority::kImmediate,
               "Replica Set state changes are critical to the cluster and should not be throttled");
-
+    // TODO(SERVER-85698): Also exit drain mode for the writer buffer.
     if (_oplogBuffer) {
         _oplogBuffer->exitDrainMode();
     }
@@ -1159,6 +1159,7 @@ void ReplicationCoordinatorExternalStateImpl::stopProducer() {
     if (_bgSync) {
         _bgSync->stop(false);
     }
+    // TODO(SERVER-85698): Only drain the writer buffer here.
     if (_oplogBuffer) {
         _oplogBuffer->enterDrainMode();
     }
@@ -1166,6 +1167,7 @@ void ReplicationCoordinatorExternalStateImpl::stopProducer() {
 
 void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
     stdx::lock_guard<Latch> lk(_threadMutex);
+    // TODO(SERVER-85698): Also exit drain mode for the writer buffer.
     if (_oplogBuffer) {
         _oplogBuffer->exitDrainMode();
     }

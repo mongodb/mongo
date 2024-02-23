@@ -203,6 +203,10 @@ public:
     virtual void exitDrainMode() {
         MONGO_UNIMPLEMENTED;
     }
+
+    virtual bool inDrainMode() {
+        MONGO_UNIMPLEMENTED;
+    }
 };
 
 class OplogBuffer::Counters {

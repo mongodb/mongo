@@ -77,6 +77,11 @@ private:
                          OplogWriterBatch* batch,
                          boost::optional<Date_t>& delaySecsLatestTimestamp);
 
+    /**
+     * Check if applier is Draining. If so, wait to avoid caller busy waiting if needed.
+     */
+    bool _processDrainingIfNecessary();
+
 private:
     // This should be a OplogBuffer that supports batch operations.
     // Not owned by us.
@@ -85,6 +90,9 @@ private:
     // Keep the last batch from buffer when the batch is not passing secondaryDelaySecs. This will
     // be reset to null once that batch passes secondaryDelaySecs and return to the caller.
     boost::optional<OplogWriterBatch> _stashedBatch = boost::none;
+
+    // Indicates whether we already see the oplogBuffer in drain mode.
+    bool _enteredDraining = false;
 };
 
 }  // namespace repl

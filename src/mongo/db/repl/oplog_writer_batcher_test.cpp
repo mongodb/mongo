@@ -63,6 +63,7 @@ public:
     }
 
     void push_forTest(OplogWriterBatch& batch) {
+        stdx::unique_lock<Latch> lk(_mutex);
         _queue.push(batch);
         _notEmptyCv.notify_one();
     }
@@ -72,6 +73,7 @@ public:
     }
 
     bool isEmpty() const {
+        stdx::lock_guard<Latch> lk(_mutex);
         return _queue.empty();
     }
 
@@ -96,6 +98,7 @@ public:
     }
 
     bool tryPopBatch(OperationContext* opCtx, OplogBatch<Value>* batch) {
+        stdx::lock_guard<Latch> lk(_mutex);
         if (_queue.empty()) {
             return false;
         }
@@ -105,7 +108,7 @@ public:
     }
 
     bool waitForDataFor(Milliseconds waitDuration, Interruptible* interruptible) {
-        stdx::unique_lock<Latch> lk(_notEmptyMutex);
+        stdx::unique_lock<Latch> lk(_mutex);
         interruptible->waitForConditionOrInterruptFor(
             _notEmptyCv, lk, waitDuration, [&] { return !_queue.empty(); });
         return !_queue.empty();
@@ -123,9 +126,25 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    Mutex _notEmptyMutex = MONGO_MAKE_LATCH("OplogWriterBuffer::mutex");
+    void enterDrainMode() {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _drainMode = true;
+    }
+
+    void exitDrainMode() {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _drainMode = false;
+    }
+
+    bool inDrainMode() {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return _drainMode;
+    }
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogWriterBufferMock::mutex");
     stdx::condition_variable _notEmptyCv;
     std::queue<OplogWriterBatch> _queue;
+    bool _drainMode = false;
 };
 
 BSONObj makeNoopOplogEntry(OpTime opTime) {
@@ -334,6 +353,40 @@ TEST_F(OplogWriterBatcherTest, BatcherWaitSecondaryDelaySecsReturnFirstBatch) {
 
     auto batch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
     ASSERT_EQ(16 * 1024 * 1024, batch.byteSize());
+}
+
+TEST_F(OplogWriterBatcherTest, BatcherCheckDraining) {
+    OplogWriterBufferMock writerBuffer;
+    OplogWriterBatcher writerBatcher(&writerBuffer);
+    writerBuffer.enterDrainMode();
+
+    // Keep polling from the batcher, we should get an empty draining batch every time and wait 1s
+    // inside.
+    for (auto i = 0; i < 5; i++) {
+        auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+        auto drainedBatch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
+        ASSERT_TRUE(drainedBatch.exhausted());
+        auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+        ASSERT_TRUE(endTime - startTime >= 1);
+    }
+
+    // Exit drain mode and the batcher should be able to get the batch from the buffer.
+    writerBuffer.exitDrainMode();
+    OplogWriterBatch batch1({makeNoopOplogEntry(Seconds(123))}, 16 * 1024 * 1024 /*16MB*/);
+    writerBuffer.push_forTest(batch1);
+    auto batch = writerBatcher.getNextBatch(opCtx(), Days(1));
+    ASSERT_FALSE(batch.exhausted());
+    ASSERT_EQ(16 * 1024 * 1024, batch.byteSize());
+
+    // Draining again, should still work.
+    writerBuffer.enterDrainMode();
+    for (auto i = 0; i < 5; i++) {
+        auto startTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+        auto drainedBatch = writerBatcher.getNextBatch(opCtx(), Seconds(1));
+        ASSERT_TRUE(drainedBatch.exhausted());
+        auto endTime = durationCount<Seconds>(Date_t::now().toDurationSinceEpoch());
+        ASSERT_TRUE(endTime - startTime >= 1);
+    }
 }
 
 }  // namespace repl

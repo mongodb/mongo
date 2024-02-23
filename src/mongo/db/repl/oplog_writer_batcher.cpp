@@ -52,6 +52,7 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Secon
     size_t totalBytes = 0;
     size_t totalOps = 0;
     auto delaySecsLatestTimestamp = _calculateSecondaryDelaySecsLatestTimestamp();
+    bool drained = false;
 
     while (true) {
         while (_pollFromBuffer(opCtx, &batch, delaySecsLatestTimestamp)) {
@@ -69,15 +70,27 @@ OplogWriterBatch OplogWriterBatcher::getNextBatch(OperationContext* opCtx, Secon
             }
         }
 
-        if (!batches.empty() || !_waitForData(opCtx, maxWaitTime)) {
+        if (!batches.empty()) {
+            // Once we get a non-empty batch, meaning the buffer is no longer in draining mode.
+            _enteredDraining = false;
+            break;
+        }
+
+        if (!_waitForData(opCtx, maxWaitTime)) {
+            drained = _processDrainingIfNecessary();
             break;
         }
     }
 
     // We can't wait for any data from the buffer, return an empty batch.
     if (batches.empty()) {
-        return OplogWriterBatch();
+        OplogWriterBatch batch;
+        if (drained) {
+            batch.setExhausted();
+        }
+        return batch;
     }
+
     if (batches.size() == 1) {
         return std::move(batches.front());
     }
@@ -165,6 +178,20 @@ boost::optional<Date_t> OplogWriterBatcher::_calculateSecondaryDelaySecsLatestTi
     }
     auto fastClockSource = service->getFastClockSource();
     return fastClockSource->now() - secondaryDelaySecs;
+}
+
+bool OplogWriterBatcher::_processDrainingIfNecessary() {
+    if (_oplogBuffer->inDrainMode() && _oplogBuffer->isEmpty()) {
+        if (_enteredDraining) {
+            // If we are already in drain mode, the underlying buffer will return an empty batch
+            // immediately, so we sleep 1s to avoid the writer thread busy waiting on the buffer.
+            sleepsecs(1);
+        } else {
+            _enteredDraining = true;
+        }
+        return true;
+    }
+    return false;
 }
 
 }  // namespace repl

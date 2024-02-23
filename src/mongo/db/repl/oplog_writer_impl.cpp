@@ -132,21 +132,29 @@ void OplogWriterImpl::_run() {
         // Transition to SECONDARY state, if possible.
         _replCoord->finishRecoveryIfEligible(opCtx);
 
-        auto batch = _batcher.getNextBatch(opCtx, Seconds(1)).releaseBatch();
+        auto batch = _batcher.getNextBatch(opCtx, Seconds(1));
+        auto ops = batch.releaseBatch();
         if (batch.empty()) {
             if (inShutdown()) {
                 return;
             }
+
+            if (batch.exhausted()) {
+                // The batcher is seeing the writer buffer in draining mode, so we signal the
+                // applier buffer to enter drain mode.
+                _applyBuffer->enterDrainMode();
+            }
+
             continue;
         }
 
         // Extract the opTime and wallTime of the last op in the batch.
-        auto lastOpTimeAndWallTime = invariantStatusOK(
-            OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(batch.back()));
+        auto lastOpTimeAndWallTime =
+            invariantStatusOK(OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(ops.back()));
 
         // Write the operations in this batch. 'writeOplogBatch' returns the optime of
         // the last op that was written, which should be the last optime in the batch.
-        auto swLastOpTime = writeOplogBatch(opCtx, batch);
+        auto swLastOpTime = writeOplogBatch(opCtx, ops);
         if (swLastOpTime.getStatus().code() == ErrorCodes::InterruptedAtShutdown) {
             return;
         }
@@ -157,7 +165,7 @@ void OplogWriterImpl::_run() {
         finalizeOplogBatch(opCtx, lastOpTimeAndWallTime);
 
         // Push the entries to the applier's buffer, may be blocked if buffer is full.
-        _applyBuffer->push(opCtx, batch.begin(), batch.end());
+        _applyBuffer->push(opCtx, ops.begin(), ops.end());
     }
 }
 

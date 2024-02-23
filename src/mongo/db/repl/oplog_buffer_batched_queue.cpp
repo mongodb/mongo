@@ -194,6 +194,11 @@ void OplogBufferBatchedQueue::exitDrainMode() {
     _drainMode = false;
 }
 
+bool OplogBufferBatchedQueue::inDrainMode() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _drainMode;
+}
+
 void OplogBufferBatchedQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size) {
     while (_curSize + size > _maxSize && !_isShutdown) {
         _notFullCV.wait(lk);

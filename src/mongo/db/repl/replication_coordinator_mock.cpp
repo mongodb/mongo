@@ -427,8 +427,13 @@ Status ReplicationCoordinatorMock::setFollowerModeRollback(OperationContext* opC
     return setFollowerMode(MemberState::RS_ROLLBACK);
 }
 
+void ReplicationCoordinatorMock::setApplierState(const ApplierState& newState) {
+    stdx::lock_guard<Mutex> lk(_mutex);
+    _applierState = newState;
+}
+
 ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState() {
-    return ApplierState::Running;
+    return _applierState;
 }
 
 void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) noexcept {}

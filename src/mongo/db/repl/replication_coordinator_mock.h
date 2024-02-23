@@ -499,6 +499,8 @@ public:
 
     void setSecondaryDelaySecs(Seconds sec);
 
+    void setApplierState(const ApplierState& newState);
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);
@@ -536,6 +538,7 @@ private:
     bool _updateCommittedSnapshot = true;
 
     Seconds _secondaryDelaySecs = Seconds(0);
+    ApplierState _applierState = ApplierState::Running;
 };
 
 }  // namespace repl
