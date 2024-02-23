@@ -19,8 +19,6 @@ filegroup(
 # referenced by: toolchain_suite (of type cc_toolchain_suite)
 
 COMMON_LINK_FLAGS = [
-    # Don't use remote system includes, only our toolchain includes
-    "-nostdinc++",
     # Make sure that our toolchain libraries are used for linking
     "-Lexternal/mongo_toolchain/v4/lib",
     "-Lexternal/mongo_toolchain/v4/lib64",
