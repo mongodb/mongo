@@ -232,6 +232,14 @@ tasks:
         use_large_distro: "true"
         resmoke_jobs_max: 1
 
+- <<: *gen_task_template
+  name: magic_restore_replica_sets_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_repl", "default", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
 - <<: *task_template
   name: causally_consistent_jscore_txns_passthrough
   tags: ["assigned_to_jira_team_server_repl", "release_critical", "causally_consistent"]
