@@ -91,6 +91,11 @@ inline auto fieldNameAndLength(const char* be) noexcept {
     return StringData{be + 1, strlen(be + 1)};
 }
 
+// add 1(typetag) + stringlength + 1(nullptr) to skip the null byte should give the value
+inline const char* getValue(const char* be) noexcept {
+    return be + 1 + strlen(be + 1) + 1;
+}
+
 inline const char* fieldNameRaw(const char* be) noexcept {
     return be + 1;
 }

@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
+#include "bson_block.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/bson_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
+
 
 namespace mongo::sbe::bsoncolumn {
 using ElementStorage = mongo::bsoncolumn::ElementStorage;
@@ -243,4 +247,21 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize(Element
     return bson::convertFrom<true /* view */>(allocatedElem.element());
 }
 
+/**
+ * The path we want to materialize from the reference object. Has method elementsToMaterialize which
+ * will return the vector of value pointers for the elements we need to materialize in the reference
+ * object.
+ */
+struct SBEPath {
+    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
+        invariant(_pathRequest.type == value::MaterializedCellBlock::kFilter,
+                  "we only support filter path requests.");
+        // Get the vector of value pointers the pathRequest asks for, in the refObj.
+        auto result = extractValuePointersFromBson(refObj, _pathRequest);
+        return result;
+    }
+
+    // Path request which consists of a combination of Get{x}, Traverse{}, and ends with Id{}.
+    value::CellBlock::PathRequest _pathRequest;
+};
 }  // namespace mongo::sbe::bsoncolumn

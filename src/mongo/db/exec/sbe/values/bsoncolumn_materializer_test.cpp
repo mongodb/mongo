@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/json.h"
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/values/bsoncolumn_materializer.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -257,23 +260,6 @@ TEST_F(BSONColumnMaterializerTest, DecompressIterativeSimpleWithSBEMaterializer)
     verifyDecompressionIterative(obj, {value::TypeTags::Nothing, 0});
 }
 
-/**
- * A simple path that just requests the field "a" if it exists. This corresponds to the path
- *     Get("a") / Id
- * This type is just a placeholder until SERVER-84620 is complete.
- */
-struct TestPath {
-    std::vector<const char*> elementsToMaterialize(BSONObj refObj) {
-        for (auto fld : refObj) {
-            if (fld.fieldNameStringData() == "a") {
-                return {fld.value()};
-            }
-        }
-
-        return {};
-    }
-};
-
 TEST_F(BSONColumnMaterializerTest, SBEMaterializerPath) {
     BSONColumnBuilder cb;
     std::vector<BSONObj> objs = {
@@ -289,7 +275,11 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerPath) {
     mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
 
     boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
-    std::vector<std::pair<TestPath, std::vector<Element>>> paths{{TestPath{}, {}}};
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{
+        {SBEPath{
+             value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
+                                           {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})},
+         {}}};
 
     // Decompress only the values of "a" to the vector.
     col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
@@ -302,5 +292,232 @@ TEST_F(BSONColumnMaterializerTest, SBEMaterializerPath) {
     ASSERT_EQ(container[3], Element({value::TypeTags::NumberInt32, 13}));
 }
 
+TEST_F(BSONColumnMaterializerTest, DecompressWithSBEPathTestSecondField) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {BSON("a" << 10 << "b" << 20),
+                                 BSON("a" << 11 << "b" << 21),
+                                 BSON("a" << 12 << "b" << 22),
+                                 BSON("a" << 13 << "b" << 23)};
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    SBEPath path{
+        value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
+                                      {value::CellBlock::Get{"b"}, value::CellBlock::Id{}})};
+    auto mockRefObj = fromjson("{a: 10, b: 20}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{{path, {}}};
+
+    // Decompress only the values of "b" to the vector.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    auto& container = paths[0].second;
+    ASSERT_EQ(container.size(), 4);
+    ASSERT_EQ(container[0], Element({value::TypeTags::NumberInt32, 20}));
+    ASSERT_EQ(container[1], Element({value::TypeTags::NumberInt32, 21}));
+    ASSERT_EQ(container[2], Element({value::TypeTags::NumberInt32, 22}));
+    ASSERT_EQ(container[3], Element({value::TypeTags::NumberInt32, 23}));
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressArrayWithSBEPathNoTraverse) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {BSON("a" << BSON_ARRAY(0 << 10)),
+                                 BSON("a" << BSON_ARRAY(10 << 20)),
+                                 BSON("a" << BSON_ARRAY(20 << 30)),
+                                 BSON("a" << BSON_ARRAY(30 << 40))};
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    SBEPath path{
+        value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
+                                      {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+    auto mockRefObj = fromjson("{a: [0, 10]}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{{path, {}}};
+
+    // Decompress the array without traversal.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), 4);
+    for (int i = 0; i < 4; ++i) {
+        auto bsonArr = BSON_ARRAY(i * 10 << (i + 1) * 10);
+        auto expectedElement = std::pair(value::TypeTags::bsonArray,
+                                         value::bitcastFrom<const char*>(bsonArr.objdata()));
+        assertSbeValueEquals(paths[0].second[i], expectedElement);
+    }
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressArrayWithSBEPathWithTraverse) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {BSON("a" << BSON_ARRAY(0 << 10)),
+                                 BSON("a" << BSON_ARRAY(20 << 30)),
+                                 BSON("a" << BSON_ARRAY(40 << 50)),
+                                 BSON("a" << BSON_ARRAY(60 << 70))};
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    SBEPath path{value::CellBlock::PathRequest(
+        value::CellBlock::PathRequestType::kFilter,
+        {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+    auto mockRefObj = fromjson("{a: [0, 10]}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 2);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{{path, {}}};
+
+    // Decompress the array with traversal.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    auto& container = paths[0].second;
+    ASSERT_EQ(container.size(), 8);
+    ASSERT_EQ(paths[0].second.size(), 8);
+    for (int i = 0; i < 8; ++i) {
+        assertSbeValueEquals(paths[0].second[i], {value::TypeTags::NumberInt32, i * 10});
+    }
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressNestedArrayWithSBEPath) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {BSON("a" << BSON_ARRAY(BSON_ARRAY(0 << 10))),
+                                 BSON("a" << BSON_ARRAY(BSON_ARRAY(10 << 20))),
+                                 BSON("a" << BSON_ARRAY(BSON_ARRAY(20 << 30))),
+                                 BSON("a" << BSON_ARRAY(BSON_ARRAY(30 << 40)))};
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    SBEPath path{value::CellBlock::PathRequest(
+        value::CellBlock::PathRequestType::kFilter,
+        {value::CellBlock::Get{"a"}, value::CellBlock::Traverse{}, value::CellBlock::Id{}})};
+    auto mockRefObj = fromjson("{a: [[0, 10]]}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{{path, {}}};
+
+    // Decompress the nested array.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), 4);
+    for (int i = 0; i < 4; ++i) {
+        auto bsonArr = BSON_ARRAY(i * 10 << (i + 1) * 10);
+        auto expectedElement = std::pair(value::TypeTags::bsonArray,
+                                         value::bitcastFrom<const char*>(bsonArr.objdata()));
+        assertSbeValueEquals(paths[0].second[i], expectedElement);
+    }
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectWithSBEPath) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {BSON("a" << BSON("b" << 0)),
+                                 BSON("a" << BSON("b" << 10)),
+                                 BSON("a" << BSON("b" << 20)),
+                                 BSON("a" << BSON("b" << 30))};
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    SBEPath path{
+        value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
+                                      {value::CellBlock::Get{"a"}, value::CellBlock::Id{}})};
+    auto mockRefObj = fromjson("{a: {b: 0}}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{{path, {}}};
+
+    // Decompress the nested object.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), 4);
+    for (int i = 0; i < 4; ++i) {
+        auto bsonObj = BSON("b" << i * 10);
+        auto expectedElement = std::pair(value::TypeTags::bsonObject,
+                                         value::bitcastFrom<const char*>(bsonObj.objdata()));
+        assertSbeValueEquals(paths[0].second[i], expectedElement);
+    }
+}
+
+
+TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectGetWithSBEPath) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {BSON("a" << BSON("b" << 0)),
+                                 BSON("a" << BSON("b" << 10)),
+                                 BSON("a" << BSON("b" << 20)),
+                                 BSON("a" << BSON("b" << 30))};
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    SBEPath path{value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
+                                               {value::CellBlock::Get{"a"},
+                                                value::CellBlock::Traverse{},
+                                                value::CellBlock::Get{"b"},
+                                                value::CellBlock::Id{}})};
+    auto mockRefObj = fromjson("{a: {b: 0}}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{{path, {}}};
+
+    // Decompress the nested object with traversal.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), 4);
+    for (int i = 0; i < 4; ++i) {
+        assertSbeValueEquals(paths[0].second[i], {value::TypeTags::NumberInt32, i * 10});
+    }
+}
+
+TEST_F(BSONColumnMaterializerTest, DecompressNestedObjectInArrayWithSBEPath) {
+    BSONColumnBuilder cb;
+    std::vector<BSONObj> objs = {BSON("a" << BSON_ARRAY(BSON("b" << 0))),
+                                 BSON("a" << BSON_ARRAY(BSON("b" << 10))),
+                                 BSON("a" << BSON_ARRAY(BSON("b" << 20))),
+                                 BSON("a" << BSON_ARRAY(BSON("b" << 30)))};
+    for (auto&& o : objs) {
+        cb.append(o);
+    }
+
+    mongo::bsoncolumn::BSONColumnBlockBased col{cb.finalize()};
+
+    SBEPath path{value::CellBlock::PathRequest(value::CellBlock::PathRequestType::kFilter,
+                                               {value::CellBlock::Get{"a"},
+                                                value::CellBlock::Traverse{},
+                                                value::CellBlock::Get{"b"},
+                                                value::CellBlock::Id{}})};
+    auto mockRefObj = fromjson("{a: {b: 0}}");
+    ASSERT_EQ(path.elementsToMaterialize(mockRefObj).size(), 1);
+
+    boost::intrusive_ptr<ElementStorage> allocator = new ElementStorage();
+    std::vector<std::pair<SBEPath, std::vector<Element>>> paths{{path, {}}};
+
+    // Decompress the nested object within the array.
+    col.decompress<SBEColumnMaterializer>(allocator, std::span(paths));
+
+    ASSERT_EQ(paths[0].second.size(), 4);
+    for (int i = 0; i < 4; ++i) {
+        assertSbeValueEquals(paths[0].second[i], {value::TypeTags::NumberInt32, i * 10});
+    }
+}
 }  // namespace
 }  // namespace mongo::sbe::bsoncolumn

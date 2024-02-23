@@ -278,8 +278,6 @@ void walkField(
         // We didn't see an array, so we apply the node below the traverse to this scalar.
         walkField(node->traverseChild.get(), eltTag, eltVal, bsonPtr, cb);
     }
-
-
     cb(node, eltTag, eltVal, bsonPtr);
 }
 
@@ -293,6 +291,10 @@ public:
         StringData topLevelField,
         const std::span<const TypeTags>& tags,
         const std::span<const Value>& vals);
+
+    BsonWalkNode* getRoot() {
+        return &_root;
+    }
 
 private:
     std::vector<std::unique_ptr<CellBlock>> constructOutputFromRecorders();
@@ -437,5 +439,26 @@ std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
 
     auto extractor = BSONCellExtractor::make(pathReqs);
     return extractor->extractFromBsons(bsons);
+}
+
+std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
+                                                      value::CellBlock::PathRequest pathRequest) {
+    std::vector<value::CellBlock::PathRequest> pathrequests{pathRequest};
+    auto extractor = BSONExtractorImpl(pathrequests);
+
+    std::vector<const char*> bsonPointers;
+
+    // Callback to record pointer values in bsonPointers.
+    auto recordValuePointer = [&bsonPointers](BsonWalkNode* node,
+                                              value::TypeTags eltTag,
+                                              Value eltVal,
+                                              const char* bson) {
+        if (node->filterPosInfoRecorder) {
+            bsonPointers.push_back(bson::getValue(bson));
+        }
+    };
+
+    walkObj(extractor.getRoot(), obj.objdata(), recordValuePointer);
+    return bsonPointers;
 }
 }  // namespace mongo::sbe::value

@@ -73,4 +73,10 @@ public:
  */
 std::vector<std::unique_ptr<CellBlock>> extractCellBlocksFromBsons(
     const std::vector<CellBlock::PathRequest>& pathReqs, const std::vector<BSONObj>& bsons);
+
+/**
+ * Given a BSONObj and PathRequest, return a vector of the value pointers requested by the path.
+ */
+std::vector<const char*> extractValuePointersFromBson(BSONObj& obj,
+                                                      CellBlock::PathRequest pathReqs);
 }  // namespace mongo::sbe::value
