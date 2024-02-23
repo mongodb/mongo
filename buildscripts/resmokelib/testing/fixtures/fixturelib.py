@@ -63,6 +63,12 @@ class FixtureLib:
         return core.programs.mongos_program(logger, job_num, executable, process_kwargs,
                                             mongos_options)
 
+    def mongot_program(self, logger, job_num, executable=None, process_kwargs=None,
+                       mongot_options=None):
+        """Return a Process instance that starts a mongot with arguments constructed from 'kwargs'."""
+        return core.programs.mongot_program(logger, job_num, executable, process_kwargs,
+                                            mongot_options)
+
     def generic_program(self, logger, args, process_kwargs=None, **kwargs):
         """Return a Process instance that starts an arbitrary executable.
 
@@ -153,6 +159,8 @@ class _FixtureConfig(object):
         self.DEFAULT_MONGOS_EXECUTABLE = config.DEFAULT_MONGOS_EXECUTABLE
         self.MONGOS_EXECUTABLE = config.MONGOS_EXECUTABLE
         self.MONGOS_SET_PARAMETERS = config.MONGOS_SET_PARAMETERS
+        self.DEFAULT_MONGOT_EXECUTABLE = config.DEFAULT_MONGOT_EXECUTABLE
+        self.MONGOT_EXECUTABLE = config.MONGOT_EXECUTABLE
         self.DBPATH_PREFIX = config.DBPATH_PREFIX
         self.DEFAULT_DBPATH_PREFIX = config.DEFAULT_DBPATH_PREFIX
         self.DOCKER_COMPOSE_BUILD_IMAGES = config.DOCKER_COMPOSE_BUILD_IMAGES

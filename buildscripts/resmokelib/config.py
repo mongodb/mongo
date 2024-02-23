@@ -29,6 +29,9 @@ DEFAULT_DBTEST_EXECUTABLE = os.path.join(os.curdir, "dbtest")
 DEFAULT_MONGO_EXECUTABLE = "mongo"
 DEFAULT_MONGOD_EXECUTABLE = "mongod"
 DEFAULT_MONGOS_EXECUTABLE = "mongos"
+# TODO SERVER-85977 potentially replace with "mongot" if possible to add a symlink from raw path
+# below as part of setup-mongot-repro.
+DEFAULT_MONGOT_EXECUTABLE = "mongot-localdev/mongot"
 
 DEFAULT_BENCHMARK_REPETITIONS = 3
 DEFAULT_BENCHMARK_MIN_TIME = datetime.timedelta(seconds=5)
@@ -81,6 +84,8 @@ DEFAULTS = {
     "mongod_set_parameters": [],
     "mongos_executable": None,
     "mongos_set_parameters": [],
+    "mongot-localdev/mongot_executable": None,
+    "mongot_set_parameters": [],
     "mongocryptd_set_parameters": [],
     "mrlog": None,
     "no_journal": False,
@@ -459,6 +464,12 @@ MONGOS_EXECUTABLE = None
 
 # The --setParameter options passed to mongos.
 MONGOS_SET_PARAMETERS = []
+
+# The path to the mongot executable used by resmoke.py.
+MONGOT_EXECUTABLE = None
+
+# The --setParameter options passed to mongot.
+MONGOT_SET_PARAMETERS = []
 
 # The --setParameter options passed to mongocryptd.
 MONGOCRYPTD_SET_PARAMETERS = []

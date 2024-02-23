@@ -49,7 +49,7 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
                  default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
                  replicaset_logging_prefix=None, replset_name=None, config_shard=None,
                  use_auto_bootstrap_procedure=None, initial_sync_uninitialized_fcv=False,
-                 hide_initial_sync_node_from_conn_string=False):
+                 hide_initial_sync_node_from_conn_string=False, launch_mongot=False):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -79,7 +79,8 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         # Used by the enhanced multiversion system to signify multiversion mode.
         # None implies no multiversion run.
         self.fcv = None
-
+        # Used by suites that run search integration tests.
+        self.launch_mongot = launch_mongot
         # Use the values given from the command line if they exist for linear_chain and num_nodes.
         linear_chain_option = self.fixturelib.default_if_none(self.config.LINEAR_CHAIN,
                                                               linear_chain)
@@ -263,9 +264,15 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self._await_secondaries()
         self._await_newly_added_removals()
 
-    def _all_mongo_d_s(self):
-        """Return a list of all `mongo{d,s}` `Process` instances in this fixture."""
-        return sum([node._all_mongo_d_s() for node in self.nodes], [])
+        if self.launch_mongot:
+            # To model Atlas Search's coupled architecture, resmoke deploys a mongot for each
+            # mongod node in a replica set.
+            for node in self.nodes:
+                node.setup_mongot()
+
+    def _all_mongo_d_s_t(self):
+        """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""
+        return sum([node._all_mongo_d_s_t() for node in self.nodes], [])
 
     def pids(self):
         """:return: all pids owned by this fixture if any."""

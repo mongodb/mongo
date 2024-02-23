@@ -10,6 +10,7 @@ ALLOWED_IMPORTS = [
     "buildscripts.resmokelib.testing.fixtures.external",
     "buildscripts.resmokelib.testing.fixtures.interface",
     "buildscripts.resmokelib.testing.fixtures.fixturelib",
+    "buildscripts.resmokelib.testing.fixtures.mongot",
     "buildscripts.resmokelib.multiversionconstants",
     "buildscripts.resmokelib.utils",
     "buildscripts.resmokelib.utils.registry",

@@ -243,27 +243,27 @@ class DockerComposeException(Exception):
 
 class _DockerComposeInterface:
     """
-    Implement the `_all_mongo_d_s_instances` method which returns all `mongo{d,s}` instances.
+    Implement the `_all_mongo_d_s_t_instances` method which returns all `mongo{d,s,t}` instances.
 
     Fixtures that use this interface can programmatically generate `docker-compose.yml` configurations
     by leveraging the `all_processes` method to access the startup args.
     """
 
-    def _all_mongo_d_s(self) -> List[Fixture]:
+    def _all_mongo_d_s_t(self) -> List[Fixture]:
         """
-        Return a list of all mongo{d,s} `Fixture` instances in this fixture.
+        Return a list of all mongo{d,s,t} `Fixture` instances in this fixture.
 
-        :return: A list of `mongo{d,s}` `Fixture` instances.
+        :return: A list of `mongo{d,s,t}` `Fixture` instances.
         """
         raise NotImplementedError(
-            "_all_mongo_d_s_instances must be implemented by Fixture subclasses that support `docker-compose.yml` generation."
+            "_all_mongo_d_s_t_instances must be implemented by Fixture subclasses that support `docker-compose.yml` generation."
         )
 
     def all_processes(self) -> List['Process']:
         """
-        Return a list of all `mongo{d,s}` `Process` instances in the fixture.
+        Return a list of all `mongo{d,s,t}` `Process` instances in the fixture.
 
-        :return: A list of mongo{d,s} processes for the current fixture.
+        :return: A list of mongo{d,s,t} processes for the current fixture.
         """
         if not self.config.DOCKER_COMPOSE_BUILD_IMAGES:
             raise DockerComposeException(
@@ -273,7 +273,7 @@ class _DockerComposeInterface:
 
         # If `mongo_d_s.NOOP_MONGO_D_S_PROCESSES=True`, `mongo_d_s.setup()` will setup a dummy process
         # to extract args from instead of a real `mongo{d,s}`.
-        for mongo_d_s in self._all_mongo_d_s():
+        for mongo_d_s in self._all_mongo_d_s_t():
             if mongo_d_s.__class__.__name__ == "MongoDFixture":
                 mongo_d_s.setup()
                 processes += [mongo_d_s.mongod]

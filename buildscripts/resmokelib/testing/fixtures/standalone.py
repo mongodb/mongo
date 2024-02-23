@@ -10,15 +10,18 @@ import yaml
 
 import pymongo
 import pymongo.errors
-
 from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
+from buildscripts.resmokelib.testing.fixtures.interface import _FIXTURES
+from buildscripts.resmokelib.testing.fixtures.mongot import MongoTFixture
 
 
 class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
     """Fixture which provides JSTests with a standalone mongod to run against."""
 
     def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-                 add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None):
+                 add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None,
+                 launch_mongot=False):
         """Initialize MongoDFixture with different options for the mongod process."""
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
@@ -55,6 +58,19 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
         self.mongod = None
         self.port = port or fixturelib.get_next_port(job_num)
         self.mongod_options["port"] = self.port
+
+        if launch_mongot:
+            self.launch_mongot = True
+            self.mongot_port = fixturelib.get_next_port(job_num)
+            self.mongod_options["mongotHost"] = "localhost:" + str(self.mongot_port)
+            # In future architectures, this could change
+            self.mongod_options["searchIndexManagementHostAndPort"] = self.mongod_options[
+                "mongotHost"]
+        else:
+            self.launch_mongot = False
+        # If a suite enables launching mongot, the MongoTFixture will be created in setup_mongot,
+        # which gets called by ReplicaSetFixture::setup().
+        self.mongot = None
 
         self.router_port = None
         if "routerPort" in self.mongod_options:
@@ -98,7 +114,7 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         self.mongod = mongod
 
-    def _all_mongo_d_s(self):
+    def _all_mongo_d_s_t(self):
         """Return the standalone `mongod` `Process` instance."""
         return [self]
 
@@ -118,6 +134,23 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
 
         self.logger.info("Waiting to connect to mongod on port %d.", self.port)
         time.sleep(0.1)  # Wait a little bit before trying again.
+
+    def setup_mongot(self):
+        mongot_options = {}
+        mongot_options["mongodHostAndPort"] = "localhost:" + str(self.port)
+        mongot_options["port"] = self.mongot_port
+
+        if "keyFile" not in self.mongod_options:
+            raise self.fixturelib.ServerFailure("Cannot launch mongot without providing a keyfile")
+
+        mongot_options["keyFile"] = self.mongod_options["keyFile"]
+
+        mongot = self.fixturelib.make_fixture("MongoTFixture", self.logger, self.job_num,
+                                              mongot_options=mongot_options)
+
+        mongot.setup()
+        self.mongot = mongot
+        self.mongot.await_ready()
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
@@ -172,6 +205,9 @@ class MongoDFixture(interface.Fixture, interface._DockerComposeInterface):
                    "Process exited with code {:d}.").format(self.port, exit_code)
             self.logger.warning(msg)
             raise self.fixturelib.ServerFailure(msg)
+
+        if self.mongot is not None:
+            self.mongot._do_teardown(mode)
 
         self.mongod.stop(mode)
         exit_code = self.mongod.wait()
@@ -272,6 +308,10 @@ class MongodLauncher(object):
         if self.config.MONGOD_SET_PARAMETERS is not None:
             suite_set_parameters.update(yaml.safe_load(self.config.MONGOD_SET_PARAMETERS))
 
+        if "mongotHost" in mongod_options:
+            suite_set_parameters["mongotHost"] = mongod_options.pop("mongotHost")
+            suite_set_parameters["searchIndexManagementHostAndPort"] = mongod_options.pop(
+                "searchIndexManagementHostAndPort")
         # Some storage options are both a mongod option (as in config file option and its equivalent
         # "--xyz" command line parameter) and a "--setParameter". In case of conflict, for instance
         # due to the config fuzzer adding "xyz" as a "--setParameter" when the "--xyz" option is

@@ -1,0 +1,41 @@
+config_variables:
+- &keyFile jstests/with_mongot/keyfile_for_testing
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+- &authOptions
+  authenticationDatabase: local
+  authenticationMechanism: SCRAM-SHA-256
+  password: *keyFileData
+  username: __system
+
+test_kind: js_test
+
+description: |
+  This suite spins up a single node replica set (eg a single, primary node) with a mongot for
+  running search integrations tests locally and on evergreen. Given that it is a single repl
+  node, the suite's read preference is the primary.
+
+selector:
+  roots:
+  - jstests/with_mongot/e2e/*.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData: &TestData
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
+      eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
+  fixture:
+    class: ReplicaSetFixture
+    auth_options: *authOptions
+    launch_mongot: true
+    num_nodes: 1
+    mongod_options:
+      keyFile: *keyFile
+      set_parameters:
+        enableTestCommands: 1

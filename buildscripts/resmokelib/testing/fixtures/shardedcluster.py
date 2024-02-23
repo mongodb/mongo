@@ -140,17 +140,17 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         for shard in self.shards:
             shard.setup()
 
-    def _all_mongo_d_s(self):
-        """Return a list of all `mongo{d,s}` `Process` instances in this fixture."""
+    def _all_mongo_d_s_t(self):
+        """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""
         # When config_shard is None, we have an additional replset for the configsvr.
         all_nodes = [self.configsvr] if self.config_shard is None else []
         all_nodes += self.mongos
         all_nodes += self.shards
-        return sum([node._all_mongo_d_s() for node in all_nodes], [])
+        return sum([node._all_mongo_d_s_t() for node in all_nodes], [])
 
     def get_shardsvrs(self):
         """Return a list of the `MongodFixture`s for all of the shardsvrs in the cluster."""
-        return sum([shard._all_mongo_d_s() for shard in self.shards], [])
+        return sum([shard._all_mongo_d_s_t() for shard in self.shards], [])
 
     def refresh_logical_session_cache(self, target):
         """Refresh logical session cache with no timeout."""
@@ -673,7 +673,7 @@ class _MongoSFixture(interface.Fixture, interface._DockerComposeInterface):
 
         self.mongos = mongos
 
-    def _all_mongo_d_s(self):
+    def _all_mongo_d_s_t(self):
         """Return the standalone `mongos` `Process` instance."""
         return [self]
 

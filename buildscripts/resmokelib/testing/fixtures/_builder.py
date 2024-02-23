@@ -177,6 +177,8 @@ class ReplSetBuilder(FixtureBuilder):
         :param existing_nodes: the list of mongod fixtures
         :return: configured replica set fixture
         """
+
+        launch_mongot = bool("launch_mongot" in kwargs)
         self._mutate_kwargs(kwargs)
         mixed_bin_versions, old_bin_version = _extract_multiversion_options(kwargs)
         self._validate_multiversion_options(kwargs, mixed_bin_versions)
@@ -199,15 +201,16 @@ class ReplSetBuilder(FixtureBuilder):
 
         for node_index in range(replset.num_nodes):
             node = self._new_mongod(replset, node_index, mongod_executables, mongod_class,
-                                    mongod_binary_versions[node_index], is_multiversion)
+                                    mongod_binary_versions[node_index], is_multiversion,
+                                    launch_mongot)
             replset.install_mongod(node)
 
         if replset.start_initial_sync_node:
             if not replset.initial_sync_node:
                 replset.initial_sync_node_idx = replset.num_nodes
-                replset.initial_sync_node = self._new_mongod(replset, replset.initial_sync_node_idx,
-                                                             mongod_executables, mongod_class,
-                                                             BinVersionEnum.NEW, is_multiversion)
+                replset.initial_sync_node = self._new_mongod(
+                    replset, replset.initial_sync_node_idx, mongod_executables, mongod_class,
+                    BinVersionEnum.NEW, is_multiversion, launch_mongot)
 
         return replset
 
@@ -302,7 +305,7 @@ class ReplSetBuilder(FixtureBuilder):
     @staticmethod
     def _new_mongod(replset: ReplicaSetFixture, replset_node_index: int,
                     executables: Dict[str, str], _class: str, cur_version: str,
-                    is_multiversion: bool) -> FixtureContainer:
+                    is_multiversion: bool, launch_mongot: bool) -> FixtureContainer:
         """Make a fixture container with configured mongod fixture(s) in it.
 
         In non-multiversion mode only a new mongod fixture will be in the fixture container.
@@ -334,11 +337,11 @@ class ReplSetBuilder(FixtureBuilder):
             new_fixture_port = old_fixture.port
 
         new_fixture_mongod_options = replset.get_options_for_mongod(replset_node_index)
-
         new_fixture = make_fixture(_class, mongod_logger, replset.job_num,
                                    mongod_executable=executables[BinVersionEnum.NEW],
                                    mongod_options=new_fixture_mongod_options,
-                                   preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port)
+                                   preserve_dbpath=replset.preserve_dbpath, port=new_fixture_port,
+                                   launch_mongot=launch_mongot)
 
         return FixtureContainer(new_fixture, old_fixture, cur_version)
 
