@@ -114,8 +114,8 @@ struct StringMapEq {
     }
 };
 
-template <typename V, typename Allocator = std::allocator<std::pair<const std::string, V>>>
-using StringMap = absl::flat_hash_map<std::string, V, StringMapHasher, StringMapEq, Allocator>;
+template <typename V>
+using StringMap = absl::flat_hash_map<std::string, V, StringMapHasher, StringMapEq>;
 
 using StringSet = absl::flat_hash_set<std::string, StringMapHasher, StringMapEq>;
 

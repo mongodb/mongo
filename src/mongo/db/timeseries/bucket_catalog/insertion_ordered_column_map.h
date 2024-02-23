@@ -66,9 +66,7 @@ public:
      */
     void initBuilders(BSONObj bucketDataDocWithCompressedBuilders, size_t numMeasurements);
 
-    BSONColumnBuilder& getBuilder(StringData key) {
-        return _builders[key].second;
-    }
+    BSONColumnBuilder& getBuilder(StringData key);
 
     /**
      * Iterates over keys, in insertion order.

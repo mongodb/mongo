@@ -47,7 +47,9 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
         // diff-producing state so this needs to be integrated together with the intermediate()
         // call.
         auto [it, inserted] =
-            _builders.emplace(key, std::make_pair(numMeasurements, BSONColumnBuilder()));
+            _builders.try_emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
+                                  numMeasurements,
+                                  BSONColumnBuilder());
         BSONColumn c(binData, binLength);
         for (auto&& elem : c) {
             it->second.second.append(elem);
@@ -64,7 +66,9 @@ void InsertionOrderedColumnMap::_insertNewKey(StringData key,
                                               BSONColumnBuilder builder,
                                               size_t numMeasurements) {
     builder.append(elem);
-    _builders.emplace(key, std::make_pair(numMeasurements, std::move(builder)));
+    _builders.try_emplace(make_tracked_string(_trackingContext, key.data(), key.size()),
+                          numMeasurements,
+                          std::move(builder));
     _insertionOrder.emplace_back(make_tracked_string(_trackingContext, key.data()));
     _insertionOrderSize += key.size();
 }
@@ -107,6 +111,12 @@ void InsertionOrderedColumnMap::insertOne(std::vector<BSONElement> oneMeasuremen
     _fillSkipsInMissingFields();
 }
 
+BSONColumnBuilder& InsertionOrderedColumnMap::getBuilder(StringData key) {
+    auto it = _builders.find(key);
+    invariant(it != _builders.end());
+    return it->second.second;
+}
+
 StringData InsertionOrderedColumnMap::_getDirect() {
     invariant(_pos < _insertionOrder.size());
     return StringData(_insertionOrder[_pos].c_str());
@@ -147,7 +157,7 @@ void InsertionOrderedColumnMap::_assertInternalStateIdentical_forTest() {
 
     // All keys in _insertionOrder should exist in _builders.
     for (auto& key : _insertionOrder) {
-        invariant(_builders.find(key.c_str()) != _builders.end());
+        invariant(_builders.find(key) != _builders.end());
     }
     invariant(keySizes == _insertionOrderSize);
 

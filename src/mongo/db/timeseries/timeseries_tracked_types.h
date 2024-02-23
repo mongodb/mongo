@@ -131,23 +131,60 @@ tracked_unordered_map<Key, Value, Hasher> make_tracked_unordered_map(
         trackingContext.makeAllocator<Value>());
 }
 
-template <class Value>
-using TrackedStringMap =
-    StringMap<Value,
-              std::scoped_allocator_adaptor<
-                  timeseries::TrackingAllocator<std::pair<const std::string, Value>>>>;
-
-template <class Value>
-TrackedStringMap<Value> makeTrackedStringMap(TrackingContext& trackingContext) {
-    return TrackedStringMap<Value>(trackingContext.makeAllocator<Value>());
-}
-
 using tracked_string =
     std::basic_string<char, std::char_traits<char>, timeseries::TrackingAllocator<char>>;
 
 template <class... Args>
 tracked_string make_tracked_string(TrackingContext& trackingContext, Args... args) {
     return tracked_string(args..., trackingContext.makeAllocator<char>());
+}
+
+struct TrackedStringMapHasher {
+    using is_transparent = void;
+
+    size_t operator()(StringData sd) const {
+        return absl::Hash<absl::string_view>{}(absl::string_view{sd.data(), sd.size()});
+    }
+
+    size_t operator()(const tracked_string& s) const {
+        return operator()(StringData{s.data(), s.size()});
+    }
+};
+
+struct TrackedStringMapEq {
+    using is_transparent = void;
+
+    bool operator()(StringData lhs, StringData rhs) const {
+        return lhs == rhs;
+    }
+
+    bool operator()(const tracked_string& lhs, StringData rhs) const {
+        return StringData{lhs.data(), lhs.size()} == rhs;
+    }
+
+    bool operator()(StringData lhs, const tracked_string& rhs) const {
+        return lhs == StringData{rhs.data(), rhs.size()};
+    }
+
+    bool operator()(const tracked_string& lhs, const tracked_string& rhs) const {
+        return lhs == rhs;
+    }
+};
+
+template <class Value>
+using TrackedStringMap =
+    absl::flat_hash_map<tracked_string,
+                        Value,
+                        TrackedStringMapHasher,
+                        TrackedStringMapEq,
+                        std::scoped_allocator_adaptor<
+                            timeseries::TrackingAllocator<std::pair<const tracked_string, Value>>>>;
+
+template <class Value>
+TrackedStringMap<Value> makeTrackedStringMap(TrackingContext& trackingContext) {
+    return TrackedStringMap<Value>(
+        trackingContext
+            .makeAllocator<typename TrackedStringMap<Value>::allocator_type::value_type>());
 }
 
 template <class T>
