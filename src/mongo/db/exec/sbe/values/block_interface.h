@@ -213,6 +213,19 @@ struct ValueBlock {
     virtual boost::optional<size_t> tryCount() const = 0;
 
     /**
+     * Returns the number of values in this block. If this cannot be done in O(1) then the values
+     * will be extracted and the count will be returned.
+     */
+    size_t count() {
+        auto elsNum = tryCount();
+        if (elsNum.has_value()) {
+            return elsNum.get();
+        }
+
+        return this->extract().count();
+    }
+
+    /**
      * Returns the minimum value in the block in O(1) time, otherwise returns Nothing value.
      */
     virtual std::pair<TypeTags, Value> tryMin() const {

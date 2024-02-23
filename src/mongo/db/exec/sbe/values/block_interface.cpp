@@ -95,7 +95,7 @@ std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op)
             auto [cmpTag, cmpVal] = value::compareValue(minResTag, minResVal, maxResTag, maxResVal);
             if (cmpTag == value::TypeTags::NumberInt32 && cmpVal == 0) {
                 minGuard.reset();
-                return std::make_unique<MonoBlock>(*tryCount(), minResTag, minResVal);
+                return std::make_unique<MonoBlock>(count(), minResTag, minResVal);
             }
         }
     }

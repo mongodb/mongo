@@ -81,12 +81,20 @@ public:
                                     value::ValueBlock* bitsetBlock,
                                     value::ValueBlock* leftBlock,
                                     value::ValueBlock* rightBlock,
-                                    bool monoBlockExpected);
+                                    bool monoBlockExpected = false);
     void testBlockScalarArithmeticOp(EPrimBinary::Op scalarOp,
                                      StringData blockFunctionName,
                                      value::ValueBlock* bitsetBlock,
                                      value::ValueBlock* block,
                                      std::pair<value::TypeTags, value::Value> scalar);
+
+    enum class BlockType { HETEROGENEOUS = 0, MONOBLOCK, BOOLBLOCK };
+
+    void testBlockLogicalOp(EPrimBinary::Op scalarOp,
+                            StringData blockFunctionName,
+                            value::ValueBlock* leftBlock,
+                            value::ValueBlock* rightBlock,
+                            BlockType bt = BlockType::HETEROGENEOUS);
 
     std::pair<std::vector<bool>, std::vector<bool>> naiveLogicalAndOr(
         std::unique_ptr<value::ValueBlock> leftBlock,
@@ -727,6 +735,396 @@ TEST_F(SBEBlockExpressionTest, BlockApplyMaskedLambdaTest) {
                       makeInt32(84), makeNothing(), makeInt32(88), makeNothing(), makeNothing()});
 }
 
+void SBEBlockExpressionTest::testBlockLogicalOp(EPrimBinary::Op scalarOp,
+                                                StringData blockFunctionName,
+                                                value::ValueBlock* leftBlock,
+                                                value::ValueBlock* rightBlock,
+                                                BlockType bt) {
+    auto leftValuesNum = leftBlock->count();
+    auto rightValuesNum = rightBlock->count();
+    ASSERT_EQ(leftValuesNum, rightValuesNum) << " left block has " << leftValuesNum
+                                             << " values while right block has " << rightValuesNum;
+
+    value::ViewOfValueAccessor leftAccessor;
+    value::ViewOfValueAccessor rightAccessor;
+    value::ViewOfValueAccessor leftScalarAccessor;
+    value::ViewOfValueAccessor rightScalarAccessor;
+
+    auto leftBlockSlot = bindAccessor(&leftAccessor);
+    auto rightBlockSlot = bindAccessor(&rightAccessor);
+    auto leftScalarSlot = bindAccessor(&leftScalarAccessor);
+    auto rightScalarSlot = bindAccessor(&rightScalarAccessor);
+
+    leftAccessor.reset(sbe::value::TypeTags::valueBlock,
+                       value::bitcastFrom<value::ValueBlock*>(leftBlock));
+    rightAccessor.reset(sbe::value::TypeTags::valueBlock,
+                        value::bitcastFrom<value::ValueBlock*>(rightBlock));
+
+    {
+        // Run the block expresseion.
+        auto blockExpr = makeE<sbe::EFunction>(
+            blockFunctionName,
+            sbe::makeEs(makeE<EVariable>(leftBlockSlot), makeE<EVariable>(rightBlockSlot)));
+        auto compiledBlockExpr = compileExpression(*blockExpr);
+        auto [resTag, resVal] = runCompiledExpression(compiledBlockExpr.get());
+        value::ValueGuard resGuard(resTag, resVal);
+
+        // Compare the results against the result of the scalar operation.
+        auto scalarExpr = sbe::makeE<sbe::EPrimBinary>(
+            scalarOp, makeE<EVariable>(leftScalarSlot), makeE<EVariable>(rightScalarSlot));
+
+
+        std::vector<std::pair<value::TypeTags, value::Value>> scalarResults;
+        scalarResults.reserve(leftValuesNum);
+
+        auto leftExtractedValues = leftBlock->extract();
+        auto rightExtractedValues = rightBlock->extract();
+
+        for (size_t i = 0; i < leftValuesNum; ++i) {
+            leftScalarAccessor.reset(leftExtractedValues.tags()[i], leftExtractedValues.vals()[i]);
+            rightScalarAccessor.reset(rightExtractedValues.tags()[i],
+                                      rightExtractedValues.vals()[i]);
+
+            auto compiledScalarExpr = compileExpression(*scalarExpr);
+            scalarResults.push_back(runCompiledExpression(compiledScalarExpr.get()));
+        }
+
+        assertBlockEq(resTag, resVal, scalarResults);
+
+        if (BlockType::MONOBLOCK == bt) {  // It should be a MonoBlock
+            auto* block = value::bitcastTo<value::ValueBlock*>(resVal);
+            ASSERT(block->as<value::MonoBlock>());
+        }
+
+        if (BlockType::BOOLBLOCK == bt) {  // It should be a BoolBlock
+            auto* block = value::bitcastTo<value::ValueBlock*>(resVal);
+            ASSERT(block->as<value::BoolBlock>());
+        }
+    }
+}
+
+TEST_F(SBEBlockExpressionTest, BlockHeterogeneousLogicAndOrTest) {
+    size_t monoBlockSize = 5;
+
+    auto [fTag, fVal] = makeBool(false);
+    std::unique_ptr<value::ValueBlock> falseMonoblock =
+        std::make_unique<value::MonoBlock>(monoBlockSize, fTag, fVal);
+
+    auto [tTag, tVal] = makeBool(true);
+    std::unique_ptr<value::ValueBlock> trueMonoblock =
+        std::make_unique<value::MonoBlock>(monoBlockSize, tTag, tVal);
+
+    auto [lTag, lVal] = makeDouble(2.5);
+    std::unique_ptr<value::ValueBlock> leftMonoblock =
+        std::make_unique<value::MonoBlock>(monoBlockSize, lTag, lVal);
+
+    auto [rTag, rVal] = value::makeSmallString("small");
+    value::ValueGuard sguard(rTag, rVal);
+    std::unique_ptr<value::ValueBlock> rightMonoblock =
+        std::make_unique<value::MonoBlock>(monoBlockSize, rTag, rVal);
+
+    value::HeterogeneousBlock leftBlockValues;
+    leftBlockValues.push_back(makeBool(true));
+    leftBlockValues.push_back(makeInt32(43));
+    leftBlockValues.push_back(makeBool(false));
+    leftBlockValues.push_back(makeNothing());
+    leftBlockValues.push_back(makeBool(true));
+
+    value::HeterogeneousBlock rightBlockValues;
+    rightBlockValues.push_back(makeBool(true));
+    rightBlockValues.push_back(makeBool(true));
+    rightBlockValues.push_back(makeBool(false));
+    rightBlockValues.push_back(makeBool(true));
+    rightBlockValues.push_back(makeBool(false));
+
+    {  // AND
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &leftBlockValues,
+                           &rightBlockValues);
+    }
+
+    {
+        // AND reverse inputs.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &rightBlockValues,
+                           &leftBlockValues);
+    }
+
+    {
+        // OR
+        testBlockLogicalOp(
+            sbe::EPrimBinary::logicOr, "valueBlockLogicalOr", &leftBlockValues, &rightBlockValues);
+    }
+
+    {
+        // OR reverse inputs.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           &rightBlockValues,
+                           &leftBlockValues,
+                           BlockType::BOOLBLOCK);
+    }
+
+    rightBlockValues.clear();
+    rightBlockValues.push_back(makeBool(false));
+    rightBlockValues.push_back(makeDouble(12.5));
+    rightBlockValues.push_back(makeNothing());
+    rightBlockValues.push_back(makeBool(true));
+    rightBlockValues.push_back(makeBool(true));
+
+    {
+        // AND
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &rightBlockValues,
+                           &leftBlockValues);
+    }
+
+    {
+        // AND reverse inputs.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &rightBlockValues,
+                           &leftBlockValues);
+    }
+
+    {
+        // OR
+        testBlockLogicalOp(
+            sbe::EPrimBinary::logicOr, "valueBlockLogicalOr", &leftBlockValues, &rightBlockValues);
+    }
+
+    {
+        // OR reverse inputs.
+        testBlockLogicalOp(
+            sbe::EPrimBinary::logicOr, "valueBlockLogicalOr", &rightBlockValues, &leftBlockValues);
+    }
+
+    // Monoblocks
+    {
+        // AND with false monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &leftBlockValues,
+                           falseMonoblock.get());
+    }
+
+    {
+        // AND with false monoblock reverse inputs.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           falseMonoblock.get(),
+                           &leftBlockValues,
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // OR with false monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           &leftBlockValues,
+                           falseMonoblock.get());
+    }
+
+    {
+        // OR with false monoblock reverse inputs.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           falseMonoblock.get(),
+                           &leftBlockValues);
+    }
+
+    {
+        // AND with true monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &leftBlockValues,
+                           trueMonoblock.get());
+    }
+
+    {
+        // AND with true monoblock reverse inputs.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           trueMonoblock.get(),
+                           &leftBlockValues);
+    }
+
+    {
+        // OR with true monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           &leftBlockValues,
+                           trueMonoblock.get());
+    }
+
+    {
+        // OR with true monoblock reverse inputs.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           trueMonoblock.get(),
+                           &leftBlockValues,
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // AND true monoblock and non boolean monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           leftMonoblock.get(),
+                           trueMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // AND true monoblock and non boolean monoblock reversed.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           trueMonoblock.get(),
+                           rightMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // AND false monoblock and non boolean monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           leftMonoblock.get(),
+                           falseMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // AND false monoblock and non boolean monoblock reversed.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           falseMonoblock.get(),
+                           rightMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // AND non boolean monoblocks.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           leftMonoblock.get(),
+                           rightMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // OR true monoblock and non boolean monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           leftMonoblock.get(),
+                           trueMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // OR true monoblock and non boolean monoblock reversed.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           trueMonoblock.get(),
+                           rightMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // OR false monoblock and non boolean monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           leftMonoblock.get(),
+                           falseMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // OR false monoblock and non boolean monoblock reversed.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           falseMonoblock.get(),
+                           rightMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // OR non boolean monoblocks.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           leftMonoblock.get(),
+                           rightMonoblock.get(),
+                           BlockType::MONOBLOCK);
+    }
+
+    leftBlockValues.clear();
+    leftBlockValues.push_back(value::makeSmallString("small"));
+    leftBlockValues.push_back(makeNothing());
+    leftBlockValues.push_back(makeNothing());
+    leftBlockValues.push_back(makeInt32(125));
+    leftBlockValues.push_back(makeDecimal("5.5"));
+
+    rightBlockValues.clear();
+    rightBlockValues.push_back(makeNothing());
+    rightBlockValues.push_back(makeInt32(124));
+    rightBlockValues.push_back(value::makeSmallString("another"));
+    rightBlockValues.push_back(makeNothing());
+    rightBlockValues.push_back(makeNothing());
+
+    {
+        // AND non boolean produces Nothing monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &leftBlockValues,
+                           &rightBlockValues,
+                           BlockType::MONOBLOCK);
+    }
+
+    {
+        // OR non boolean produces Nothing monoblock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           &leftBlockValues,
+                           &rightBlockValues,
+                           BlockType::MONOBLOCK);
+    }
+
+    // Bool block
+    leftBlockValues.clear();
+    leftBlockValues.push_back(makeBool(false));
+    leftBlockValues.push_back(makeBool(true));
+    leftBlockValues.push_back(makeBool(false));
+    leftBlockValues.push_back(makeBool(true));
+    leftBlockValues.push_back(makeBool(true));
+
+    rightBlockValues.clear();
+    rightBlockValues.push_back(makeBool(false));
+    rightBlockValues.push_back(makeBool(false));
+    rightBlockValues.push_back(makeBool(true));
+    rightBlockValues.push_back(makeBool(true));
+    rightBlockValues.push_back(makeBool(false));
+
+    {
+        // AND BoolBlock
+        testBlockLogicalOp(sbe::EPrimBinary::logicAnd,
+                           "valueBlockLogicalAnd",
+                           &leftBlockValues,
+                           &rightBlockValues,
+                           BlockType::BOOLBLOCK);
+    }
+
+    {
+        // OR BoolBlock.
+        testBlockLogicalOp(sbe::EPrimBinary::logicOr,
+                           "valueBlockLogicalOr",
+                           &leftBlockValues,
+                           &rightBlockValues,
+                           BlockType::BOOLBLOCK);
+    }
+}
+
 TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
     value::ViewOfValueAccessor blockAccessorLeft;
     value::ViewOfValueAccessor blockAccessorRight;
@@ -747,13 +1145,13 @@ TEST_F(SBEBlockExpressionTest, BlockLogicAndOrTest) {
 
     auto [fTag, fVal] = makeBool(false);
     std::unique_ptr<value::ValueBlock> falseMonoBlock =
-        std::make_unique<value::MonoBlock>(*leftBlock->tryCount(), fTag, fVal);
+        std::make_unique<value::MonoBlock>(leftBlock->count(), fTag, fVal);
     falseMonoBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
                                  value::bitcastFrom<value::ValueBlock*>(falseMonoBlock.get()));
 
     auto [tTag, tVal] = makeBool(true);
     std::unique_ptr<value::ValueBlock> trueMonoBlock =
-        std::make_unique<value::MonoBlock>(*leftBlock->tryCount(), tTag, tVal);
+        std::make_unique<value::MonoBlock>(leftBlock->count(), tTag, tVal);
     trueMonoBlockAccessor.reset(sbe::value::TypeTags::valueBlock,
                                 value::bitcastFrom<value::ValueBlock*>(trueMonoBlock.get()));
 
@@ -1161,7 +1559,7 @@ void SBEBlockExpressionTest::testBlockBlockArithmeticOp(EPrimBinary::Op scalarOp
                                                         value::ValueBlock* bitsetBlock,
                                                         value::ValueBlock* leftBlock,
                                                         value::ValueBlock* rightBlock,
-                                                        bool monoBlockExpected = false) {
+                                                        bool monoBlockExpected) {
     value::ViewOfValueAccessor bitsetBlockAccessor;
     value::ViewOfValueAccessor leftBlockAccessor;
     value::ViewOfValueAccessor rightBlockAccessor;
