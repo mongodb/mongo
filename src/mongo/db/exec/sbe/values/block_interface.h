@@ -261,6 +261,21 @@ struct ValueBlock {
 
     std::unique_ptr<ValueBlock> mapMonotonicFastPath(const ColumnOp& op);
 
+    /**
+     * If the block this is called on contains Nothings or other type tags that are not Boolean,
+     * return boost::none. If this is called on a block that is strictly all Booleans, return
+     * whether or not the values are all false/true. Any caller of this function that expects the
+     * presence of non-Booleans to be an error should check for this after getting a return value of
+     * boost::none.
+     */
+    virtual boost::optional<bool> allFalse() const {
+        return boost::none;
+    }
+
+    virtual boost::optional<bool> allTrue() const {
+        return boost::none;
+    }
+
 protected:
     virtual DeblockedTagVals deblock(boost::optional<DeblockedTagValStorage>& storage) = 0;
 
@@ -361,6 +376,20 @@ public:
 
     Value getValue() const {
         return _val;
+    }
+
+    boost::optional<bool> allFalse() const override {
+        if (_tag != TypeTags::Boolean) {
+            return boost::none;
+        }
+        return !value::bitcastTo<bool>(_val);
+    }
+
+    boost::optional<bool> allTrue() const override {
+        if (_tag != TypeTags::Boolean) {
+            return boost::none;
+        }
+        return value::bitcastTo<bool>(_val);
     }
 
 private:
@@ -510,7 +539,8 @@ public:
         } else {
             // The !std::is_same<T,T> is always false and will trigger a compile failure if this
             // branch is taken. If this branch is not taken, it will get discarded.
-            static_assert(!std::is_same<T, T>::value, "Not supported for deep types");
+            static_assert(!std::is_same<T, T>::value,
+                          "Constructor is only supported for BoolBlocks");
         }
     }
 
@@ -633,6 +663,30 @@ public:
 
         // TODO SERVER-83799 Return a BitsetBlock.
         return std::make_unique<HomogeneousBlock<bool, TypeTags::Boolean>>(std::move(vals));
+    }
+
+    boost::optional<bool> allFalse() const override {
+        if (TypeTag != TypeTags::Boolean || !_presentBitset.all()) {
+            return boost::none;
+        }
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            if (value::bitcastTo<bool>(_vals[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    boost::optional<bool> allTrue() const override {
+        if (TypeTag != TypeTags::Boolean || !_presentBitset.all()) {
+            return boost::none;
+        }
+        for (size_t i = 0; i < _vals.size(); ++i) {
+            if (!value::bitcastTo<bool>(_vals[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     const std::vector<Value>& getVector() const {

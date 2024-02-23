@@ -164,6 +164,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockFillEm
 template <bool less>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::valueBlockAggMinMaxImpl(
     value::ValueBlock* inputBlock, value::ValueBlock* bitsetBlock) {
+    // Finding the true minimum of the timefield has some computational overhead so can avoid this
+    // work if we aren't trying to find a minimum.
+    auto [minTag, minVal] = std::pair{value::TypeTags::Nothing, value::Value{0u}};
+    if constexpr (less) {
+        std::tie(minTag, minVal) = inputBlock->tryMin();
+    }
+    // The true maximum can be found with no extra cost.
+    auto [maxTag, maxVal] = inputBlock->tryMax();
+    if (bitsetBlock->allTrue().get_value_or(false)) {
+        if (less && minTag != value::TypeTags::Nothing) {
+            auto [minTagCpy, minValCpy] = value::copyValue(minTag, minVal);
+            return {true, minTagCpy, minValCpy};
+        } else if (!less && maxTag != value::TypeTags::Nothing) {
+            auto [maxTagCpy, maxValCpy] = value::copyValue(maxTag, maxVal);
+            return {true, maxTagCpy, maxValCpy};
+        }
+    }
+
     auto block = inputBlock->extract();
     auto bitset = bitsetBlock->extract();
 

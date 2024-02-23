@@ -79,6 +79,7 @@ TimeseriesTest.run((insert) => {
 
     function runTests(allowDiskUse) {
         const dateUpperBound = new Date(datePrefix + 500);
+        const dateLowerBound = new Date(datePrefix);
 
         const testcases = [
             {
@@ -95,6 +96,16 @@ TimeseriesTest.run((insert) => {
                 name: "Min_GroupByNull",
                 pipeline: [
                     {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: null, a: {$min: '$y'}}},
+                    {$project: {_id: 0, a: 1}}
+                ],
+                expectedResults: [{a: 11}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "Min_GroupByNullAllPass",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
                     {$group: {_id: null, a: {$min: '$y'}}},
                     {$project: {_id: 0, a: 1}}
                 ],
@@ -122,6 +133,16 @@ TimeseriesTest.run((insert) => {
                 usesBlockProcessing: sbeFullEnabled && !allowDiskUse
             },
             {
+                name: "Max_GroupByNullAllPass",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
+                    {$group: {_id: null, a: {$max: '$y'}}},
+                    {$project: {_id: 0, a: 1}}
+                ],
+                expectedResults: [{a: 99}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
                 name: "MinWithId_GroupByNull",
                 pipeline: [
                     {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
@@ -135,6 +156,16 @@ TimeseriesTest.run((insert) => {
                 name: "MaxMinusMin_GroupByNull",
                 pipeline: [
                     {$match: {[timeFieldName]: {$lt: dateUpperBound}}},
+                    {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
+                    {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
+                ],
+                expectedResults: [{a: 88}],
+                usesBlockProcessing: sbeFullEnabled && !allowDiskUse
+            },
+            {
+                name: "MaxMinusMin_GroupByNullAllPass",
+                pipeline: [
+                    {$match: {[timeFieldName]: {$gt: dateLowerBound}}},
                     {$group: {_id: null, a: {$min: '$y'}, b: {$max: '$y'}}},
                     {$project: {_id: 0, a: {$subtract: ['$b', '$a']}}}
                 ],
