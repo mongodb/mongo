@@ -247,7 +247,15 @@ void Simple8b<T>::Iterator::_loadValue() {
 
     // Shift in any trailing zeros that are stored in the count for extended selectors 7 and 8.
     auto trailingZeros = (value & _countMask);
-    _value = static_cast<T>((value >> _countBits)) << (trailingZeros * _countMultiplier);
+
+    // It is undefined behavior to bit shift values by more than their bit length. While no sensible
+    // encoders will produce these values, we must still define this behavior for UBSAN.
+    auto numZeroes = trailingZeros * _countMultiplier;
+    if constexpr (std::is_same<T, uint64_t>::value) {
+        numZeroes %= 64;
+    }
+
+    _value = static_cast<T>((value >> _countBits)) << (numZeroes);
 }
 
 template <typename T>

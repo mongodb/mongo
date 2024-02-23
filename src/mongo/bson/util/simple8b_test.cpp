@@ -656,6 +656,34 @@ TEST(Simple8b, MultipleFlushes) {
     }
 }
 
+TEST(Simple8b, BitShiftLargerThan64) {
+    // Construct a simple8b block directly that forces a bit shift larger than 64. The following
+    // example will have a bit shift of 68. We do not expect this to happen with sensible encoders,
+    // so we have to construct the simple8b block with a hex value.
+    //
+    // The binary is 10101011110011011100101110101001110100111110010101 10001 1101 1000
+    // Extended selector = 8 (1000), extension value = 13 (1101), shift = 68 (10001), and the value
+    // was chosen randomly to fit the remaining 51 bits.
+    // This produces the hex string: 55E6E5D4E9F2B1D8
+
+    // The expected value is the original value << (68 % 64 = 4) in decimal.
+    uint64_t expectedVal = 12089623907203408;
+    BufBuilder buffer;
+    buffer.appendNum(0x55E6E5D4E9F2B1D8);
+
+    auto size = buffer.len();
+    auto sharedBuffer = buffer.release();
+
+    Simple8b<uint64_t> s8b(sharedBuffer.get(), size);
+    auto it = s8b.begin();
+
+    // This is validating an undefined encoding, and is subject to change in future versions of the
+    // decoder. This test is to validate the modulo behavior.
+    ASSERT_EQ(*it, expectedVal);
+    ++it;
+    ASSERT_FALSE(it.more());
+}
+
 TEST(Simple8b, Selector7BaseTest) {
     // 57344 = 1110000000000000 = 3 value bits and 13 zeros
     // This should be encoded as:
