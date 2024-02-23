@@ -49,6 +49,12 @@ const writeConcern = {
 
 const debugBuild = primaryDB.adminCommand('buildInfo').debug;
 
+assert.commandWorked(primaryDB.adminCommand({
+    setParameter: 1,
+    maxDbCheckMBperSec:
+        0 /* Turn off throttling because stalls and pauses sometimes break this test */
+}));
+
 function setSnapshotSize(snapshotSize) {
     assert.commandWorked(primaryDB.adminCommand(
         {"setParameter": 1, "dbCheckMaxExtraIndexKeysReverseLookupPerSnapshot": snapshotSize}));

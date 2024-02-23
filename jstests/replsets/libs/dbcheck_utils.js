@@ -118,6 +118,10 @@ export const runDbCheck = (replSet,
                            awaitCompletion = false,
                            waitForHealthLogDbCheckStop = true,
                            allowedErrorCodes = []) => {
+    if (!parameters.hasOwnProperty('maxBatchTimeMillis')) {
+        // Make this huge because stalls and pauses sometimes break this test.
+        parameters['maxBatchTimeMillis'] = 20000;
+    }
     let dbCheckCommand = {dbCheck: collName};
     for (let parameter in parameters) {
         dbCheckCommand[parameter] = parameters[parameter];

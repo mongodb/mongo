@@ -27,10 +27,10 @@ for (let i = 0; i < collCount; i++) {
 }
 
 // Run dbCheck with a failpoint configured so that we're only ever able to process 1 document per
-// batch before hitting the 1-second default maxBatchTimeMillis.
+// batch before hitting the 1-second maxBatchTimeMillis.
 const fp = configureFailPoint(primary, 'SleepDbCheckInBatch', {sleepMs: 2000});
 const timesEntered = fp.count;
-assert.commandWorked(db.runCommand({dbCheck: coll.getName()}));
+assert.commandWorked(db.runCommand({dbCheck: coll.getName(), maxBatchTimeMillis: 1000}));
 
 // Wait for dbCheck to complete and disable the failpoint.
 assert.soon(function() {

@@ -309,36 +309,39 @@ function testDbCheckParameters() {
         }));
 
         // Insert nDocs, each slightly larger than the maxDbCheckMBperSec value (1MB), which is the
-        // default value, while maxBatchTimeMillis is defaulted to 1 second. Consequently, we will
-        // have only 1MB per batch.
+        // default value, while maxBatchTimeMillis is 1 second. Consequently, we will have only 1MB
+        // per batch.
         const nDocs = 5;
         const chars = ['a', 'b', 'c', 'd', 'e'];
         coll.insertMany([...Array(nDocs).keys()].map(x => ({a: chars[x].repeat(1024 * 1024 * 2)})),
                         {ordered: false});
-        [{}, {validateMode: "dataConsistency"}, {
-            validateMode: "dataConsistencyAndMissingIndexKeysCheck"
-        }].forEach(parameters => {
-            clearHealthLog(replSet);
-            runDbCheck(replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), parameters);
+        [{maxBatchTimeMillis: 1000},
+         {validateMode: "dataConsistency", maxBatchTimeMillis: 1000},
+         {validateMode: "dataConsistencyAndMissingIndexKeysCheck", maxBatchTimeMillis: 1000}]
+            .forEach(parameters => {
+                clearHealthLog(replSet);
+                runDbCheck(
+                    replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), parameters);
 
-            // DbCheck logs (nDocs + 1) batches to account for each batch hitting the time deadline
-            // after processing only one document. Then, DbCheck will run an additional empty batch
-            // at the end to confirm that there are no more documents.
-            let query = {"operation": "dbCheckBatch"};
-            checkHealthLog(healthlog, query, nDocs + 1);
+                // DbCheck logs (nDocs + 1) batches to account for each batch hitting the time
+                // deadline after processing only one document. Then, DbCheck will run an additional
+                // empty batch at the end to confirm that there are no more documents.
+                let query = {"operation": "dbCheckBatch"};
+                checkHealthLog(healthlog, query, nDocs + 1);
 
-            query = {"operation": "dbCheckBatch", "data.count": 1};
-            checkHealthLog(healthlog, query, nDocs);
+                query = {"operation": "dbCheckBatch", "data.count": 1};
+                checkHealthLog(healthlog, query, nDocs);
 
-            query = {"operation": "dbCheckBatch", "data.count": 0};
-            checkHealthLog(healthlog, query, 1);
-        });
+                query = {"operation": "dbCheckBatch", "data.count": 0};
+                checkHealthLog(healthlog, query, 1);
+            });
 
         clearHealthLog(replSet);
-        runDbCheck(replSet, db.getSiblingDB("maxDbCheckMBperSec"), coll.getName(), {
-            validateMode: "extraIndexKeysCheck",
-            secondaryIndex: "a_1",
-        });
+        runDbCheck(
+            replSet,
+            db.getSiblingDB("maxDbCheckMBperSec"),
+            coll.getName(),
+            {validateMode: "extraIndexKeysCheck", secondaryIndex: "a_1", maxBatchTimeMillis: 1000});
 
         // DbCheck logs (nDocs) batches to account for each batch hitting the time deadline after
         // processing only one document.

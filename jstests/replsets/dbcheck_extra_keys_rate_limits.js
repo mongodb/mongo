@@ -240,8 +240,8 @@ function exceedMaxDbCheckMBPerSec() {
     primaryDB[collName].drop();
     clearHealthLog(replSet);
     // Insert nDocs, each slightly larger than the maxDbCheckMBperSec value (1MB), which is the
-    // default value, while maxBatchTimeMillis is defaulted to 1 second. Consequently, we will
-    // have only 1MB per batch.
+    // default value, while maxBatchTimeMillis is 1 second. Consequently, we will have only 1MB
+    // per batch.
     const chars = ['a', 'b', 'c', 'd', 'e'];
     primaryColl.insertMany(
         [...Array(nDocs).keys()].map(x => ({a: chars[x].repeat(1024 * 1024 * 2)})),
@@ -267,7 +267,8 @@ function exceedMaxDbCheckMBPerSec() {
         validateMode: "extraIndexKeysCheck",
         secondaryIndex: "a_1",
         maxDocsPerBatch: batchSize,
-        batchWriteConcern: writeConcern
+        batchWriteConcern: writeConcern,
+        maxBatchTimeMillis: 1000
     };
     runDbCheck(replSet, primaryDB, collName, dbCheckParameters, true /*awaitCompletion*/);
 
