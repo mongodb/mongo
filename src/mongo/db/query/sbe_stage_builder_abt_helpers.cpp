@@ -142,23 +142,12 @@ optimizer::ABT generateABTNullOrMissing(optimizer::ABT var) {
     return makeFillEmptyTrue(
         makeABTFunction("typeMatch"_sd,
                         std::move(var),
-                        optimizer::Constant::int32(getBSONTypeMask(BSONType::jstNULL))));
-}
-
-optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
-    return generateABTNullOrMissing(makeVariable(std::move(var)));
-}
-
-optimizer::ABT generateABTNullMissingOrUndefined(optimizer::ABT var) {
-    return makeFillEmptyTrue(
-        makeABTFunction("typeMatch"_sd,
-                        std::move(var),
                         optimizer::Constant::int32(getBSONTypeMask(BSONType::jstNULL) |
                                                    getBSONTypeMask(BSONType::Undefined))));
 }
 
-optimizer::ABT generateABTNullMissingOrUndefined(optimizer::ProjectionName var) {
-    return generateABTNullMissingOrUndefined(makeVariable(std::move(var)));
+optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
+    return generateABTNullOrMissing(makeVariable(std::move(var)));
 }
 
 optimizer::ABT generateABTNonStringCheck(optimizer::ABT var) {
@@ -218,7 +207,7 @@ optimizer::ABT generateABTNonObjectCheck(optimizer::ProjectionName var) {
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::BinaryOp>(
         optimizer::Operations::Or,
-        generateABTNullMissingOrUndefined(var),
+        generateABTNullOrMissing(var),
         makeNot(makeABTFunction("exists"_sd,
                                 makeABTFunction("convert"_sd,
                                                 makeVariable(var),
@@ -284,7 +273,7 @@ optimizer::ABT makeIfNullExpr(std::vector<optimizer::ABT> values,
             var,
             std::move(values[idx]),
             optimizer::make<optimizer::If>(
-                generateABTNullMissingOrUndefined(var), std::move(expr), makeVariable(var)));
+                generateABTNullOrMissing(var), std::move(expr), makeVariable(var)));
     }
 
     return expr;

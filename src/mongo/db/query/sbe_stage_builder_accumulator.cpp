@@ -69,7 +69,7 @@ SbExpr wrapMinMaxArg(SbExpr arg, StageBuilderState& state) {
     auto binds = SbExpr::makeSeq(std::move(arg));
     auto var = SbVar(frameId, 0);
 
-    auto e = b.makeIf(b.generateNullMissingOrUndefined(var), b.makeNothingConstant(), var);
+    auto e = b.makeIf(b.generateNullOrMissing(var), b.makeNothingConstant(), var);
 
     return b.makeLet(frameId, std::move(binds), std::move(e));
 }
@@ -242,7 +242,7 @@ SbExpr::Vector buildAccumulatorAvg(const AccumulationExpression& expr,
     auto var = SbVar{frameId, 0};
 
     auto e = b.makeIf(b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                     b.generateNullMissingOrUndefined(var),
+                                     b.generateNullOrMissing(var),
                                      b.generateNonNumericCheck(var)),
                       b.makeInt64Constant(0),
                       b.makeInt64Constant(1));
@@ -599,9 +599,8 @@ SbExpr::Vector buildAccumulatorMergeObjects(const AccumulationExpression& expr,
     auto binds = SbExpr::makeSeq(std::move(arg));
     auto var = SbVar{frameId, 0};
 
-    auto typeCheckExpr = b.makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                        b.generateNullMissingOrUndefined(var),
-                                        b.makeFunction("isObject", var));
+    auto typeCheckExpr = b.makeBinaryOp(
+        sbe::EPrimBinary::logicOr, b.generateNullOrMissing(var), b.makeFunction("isObject", var));
 
     auto e =
         b.makeIf(std::move(typeCheckExpr),
@@ -1038,7 +1037,7 @@ SbExpr::Vector buildAccumulatorLocf(const AccumulationExpression& expr,
     auto binds = SbExpr::makeSeq(std::move(arg));
     auto var = SbVar{frameId, 0};
 
-    auto e = b.makeIf(b.generateNullMissingOrUndefined(var), b.makeFunction("aggState"), var);
+    auto e = b.makeIf(b.generateNullOrMissing(var), b.makeFunction("aggState"), var);
 
     auto localBind = b.makeLet(frameId, std::move(binds), std::move(e));
 

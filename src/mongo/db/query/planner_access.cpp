@@ -1351,8 +1351,8 @@ bool projNeedsFetch(const CanonicalQuery& query) {
 
     // This optimization can only be used for find when the index covers the projection completely.
     // However, if the indexed field is in the projection, the index may return an incorrect value
-    // for the field, since it does not distinguish between null and missing. Hence, only find
-    // queries projecting _id are covered.
+    // for the field, since it does not distinguish between null and undefined (and the empty list,
+    // in the multikey case). Hence, only find queries projecting _id are covered.
     auto proj = query.getProj();
     if (!proj) {
         return true;

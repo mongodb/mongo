@@ -17,7 +17,6 @@ assert.commandWorked(coll.insert([
     {a: 1},
     {a: 1, b: 1},
     {a: null, b: 2},
-    {b: 2},
     {b: 4},
     {a: {b: 4}},
     {a: [], b: 2},
@@ -66,8 +65,8 @@ runTest({index: {a: 1}, query: {a: 1}, expectedCount: 2, updatedQuery: {a: 3}, u
 // Test for multiKey and null case.
 runTest({
     index: {a: 1, b: 1, _id: 1},
-    query: {a: null, b: 2},
+    query: {a: {$in: [null, []]}, b: 2},
     expectedCount: 2,
-    updatedQuery: {a: null, b: 4},
+    updatedQuery: {a: {$in: [null, []]}, b: 4},
     updatedCount: 1
 });

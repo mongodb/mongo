@@ -2023,6 +2023,32 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 namespace {
 
 /**
+ * If 'isn' represents a non-multikey index and its bounds contain a single null interval, return
+ * its position. If 'isn' represents a multikey index and its bounds contain a single null and
+ * empty array interval, return its position. Otherwise return boost::none.
+ */
+boost::optional<size_t> boundsHasExactlyOneNullOrNullAndEmptyInterval(const IndexScanNode* isn) {
+    boost::optional<size_t> nullFieldNo;
+    for (size_t fieldNo = 0; fieldNo < isn->bounds.fields.size(); ++fieldNo) {
+        const OrderedIntervalList& oil = isn->bounds.fields[fieldNo];
+
+        auto isNullInterval = IndexBoundsBuilder::isNullInterval(oil);
+        auto isNullAndEmptyArrayInterval = IndexBoundsBuilder::isNullAndEmptyArrayInterval(oil);
+
+        // Return boost::none if we have multiple null intervals.
+        if ((isNullInterval || isNullAndEmptyArrayInterval) && nullFieldNo) {
+            return boost::none;
+        }
+
+        if ((isNullInterval && !isn->index.multikey) ||
+            (isNullAndEmptyArrayInterval && isn->index.multikey)) {
+            nullFieldNo = fieldNo;
+        }
+    }
+    return nullFieldNo;
+}
+
+/**
  * Returns 'true' if the provided solution 'soln' can be rewritten to use a fast counting stage.
  * Mutates the tree in 'soln->root'.
  *
@@ -2088,6 +2114,77 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
 
     if (!IndexBoundsBuilder::isSingleInterval(
             isn->bounds, &startKey, &startKeyInclusive, &endKey, &endKeyInclusive)) {
+        // If we have exactly one null interval, we should split the bounds and try to construct
+        // two COUNT_SCAN stages joined by an OR stage. If we have exactly one null and empty array
+        // interval, we should do the same with three COUNT_SCAN stages. If we had multiple such
+        // intervals, we would need at least 2^N count scans for N intervals, meaning this would
+        // quickly explode to a point where it would just be more efficient to use a single index
+        // scan. Consequently, we draw the line at one such interval.
+        if (auto nullFieldNo = boundsHasExactlyOneNullOrNullAndEmptyInterval(isn)) {
+            tassert(5506501,
+                    "The index of the null interval is invalid",
+                    *nullFieldNo < isn->bounds.fields.size());
+            auto nullFieldName = isn->bounds.fields[*nullFieldNo].name;
+            OrderedIntervalList undefinedPointOil(nullFieldName), nullPointOil(nullFieldName);
+            undefinedPointOil.intervals.push_back(IndexBoundsBuilder::kUndefinedPointInterval);
+            nullPointOil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
+
+            auto makeNullBoundsCountScan =
+                [&](OrderedIntervalList& oil) -> std::unique_ptr<QuerySolutionNode> {
+                std::swap(isn->bounds.fields[*nullFieldNo], oil);
+                ON_BLOCK_EXIT([&] { std::swap(isn->bounds.fields[*nullFieldNo], oil); });
+
+                BSONObj startKey, endKey;
+                bool startKeyInclusive, endKeyInclusive;
+                if (IndexBoundsBuilder::isSingleInterval(
+                        isn->bounds, &startKey, &startKeyInclusive, &endKey, &endKeyInclusive)) {
+                    // Build a new IET list based on the rewritten index bounds.
+                    std::vector<interval_evaluation_tree::IET> iets = isn->iets;
+                    if (!isn->iets.empty()) {
+                        tassert(8423396,
+                                "IETs and index bounds field must have same size.",
+                                iets.size() == isn->bounds.fields.size());
+                        iets[*nullFieldNo] = interval_evaluation_tree::IET::make<
+                            interval_evaluation_tree::ConstNode>(isn->bounds.fields[*nullFieldNo]);
+                    }
+                    return makeCountScan(
+                        startKey, startKeyInclusive, endKey, endKeyInclusive, std::move(iets));
+                }
+
+                return nullptr;
+            };
+
+            auto undefinedCsn = makeNullBoundsCountScan(undefinedPointOil);
+
+            if (undefinedCsn) {
+                // If undefinedCsn is non-null, then we should also be able to successfully generate
+                // a count scan for the null interval case and for the empty array interval case.
+                auto nullCsn = makeNullBoundsCountScan(nullPointOil);
+                tassert(5506500, "Invalid null bounds COUNT_SCAN", nullCsn);
+
+                auto csns = makeVector(std::move(undefinedCsn), std::move(nullCsn));
+                auto orn = std::make_unique<OrNode>();
+                orn->addChildren(std::move(csns));
+
+                if (isn->index.multikey) {
+                    // For a multikey index, add the third COUNT_SCAN stage for empty array values.
+                    OrderedIntervalList emptyArrayPointOil(nullFieldName);
+                    emptyArrayPointOil.intervals.push_back(
+                        IndexBoundsBuilder::kEmptyArrayPointInterval);
+                    auto emptyArrayCsn = makeNullBoundsCountScan(emptyArrayPointOil);
+                    tassert(6001000, "Invalid empty array bounds COUNT_SCAN", emptyArrayCsn);
+
+                    orn->addChildren(makeVector(std::move(emptyArrayCsn)));
+                } else {
+                    // Note that there is no need to deduplicate when the optimization is not
+                    // applied to multikey indexes.
+                    orn->dedup = false;
+                }
+                soln->setRoot(std::move(orn));
+
+                return true;
+            }
+        }
         return false;
     }
 

@@ -325,25 +325,12 @@ SbExpr SbExprBuilder::generateNullOrMissing(SbExpr expr) {
     }
 }
 
-SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbExpr expr) {
-    if (hasABT(expr)) {
-        return abt::wrap(stage_builder::generateABTNullMissingOrUndefined(extractABT(expr)));
-    } else {
-        return stage_builder::generateNullMissingOrUndefined(extractExpr(expr));
-    }
-}
-
-
 SbExpr SbExprBuilder::generatePositiveCheck(SbExpr expr) {
     return abt::wrap(stage_builder::generateABTPositiveCheck(extractABT(expr)));
 }
 
 SbExpr SbExprBuilder::generateNullOrMissing(SbVar var) {
     return abt::wrap(stage_builder::generateABTNullOrMissing(var.getABTName()));
-}
-
-SbExpr SbExprBuilder::generateNullMissingOrUndefined(SbVar var) {
-    return abt::wrap(stage_builder::generateABTNullMissingOrUndefined(var.getABTName()));
 }
 
 SbExpr SbExprBuilder::generateNonStringCheck(SbVar var) {

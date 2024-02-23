@@ -7,8 +7,6 @@
  * but another's is still not multikey, they may need to use different plans for certain queries).
  * @tags: [
  *   assumes_unsharded_collection,
- *   # In 8.0, we changed behavior for equality to null.
- *   requires_fcv_80,
  * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
@@ -50,7 +48,7 @@ assert.commandWorked(coll.insert({a: undefined}));
 assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
 
 // Be sure the index is used.
-checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 3, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 2, indexKeyPattern: keyPattern});
 checkQuery({
     query: elemMatchQuery,
     shouldUseIndex: true,
@@ -60,7 +58,7 @@ checkQuery({
 
 // When the index becomes multikey, it cannot support {$ne: null} queries.
 assert.commandWorked(coll.insert({a: [1, 2, 3]}));
-checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 4, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPattern: keyPattern});
 // But it can support queries with {$ne: null} within an $elemMatch.
 checkQuery({
     query: elemMatchQuery,
@@ -92,7 +90,7 @@ assert.commandWorked(coll.insert({a: undefined, b: 1}));
 assert.commandWorked(coll.createIndex(keyPattern, {sparse: true}));
 
 // Be sure the index is used.
-checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 3, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 2, indexKeyPattern: keyPattern});
 checkQuery({
     query: elemMatchQuery,
     shouldUseIndex: true,
@@ -102,7 +100,7 @@ checkQuery({
 
 // When the index becomes multikey on the second field, it should still be usable.
 assert.commandWorked(coll.insert({a: 1, b: [1, 2, 3]}));
-checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 4, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: true, nResultsExpected: 3, indexKeyPattern: keyPattern});
 checkQuery({
     query: elemMatchQuery,
     shouldUseIndex: true,
@@ -112,19 +110,12 @@ checkQuery({
 
 // When the index becomes multikey on the first field, it should no longer be usable.
 assert.commandWorked(coll.insert({a: [1, 2, 3], b: 1}));
-checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 5, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 4, indexKeyPattern: keyPattern});
 // Queries which use a $elemMatch should still be able to use the index.
 checkQuery({
     query: elemMatchQuery,
     shouldUseIndex: true,
     nResultsExpected: 1,
-    indexKeyPattern: keyPattern
-});
-assert.commandWorked(coll.insert({a: [undefined], b: 1}));
-checkQuery({
-    query: elemMatchQuery,
-    shouldUseIndex: true,
-    nResultsExpected: 2,
     indexKeyPattern: keyPattern
 });
 })();
@@ -151,7 +142,7 @@ const elemMatchValueQuery = {
 };
 
 // 'a.b' is multikey, so the index isn't used.
-checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 2, indexKeyPattern: keyPattern});
 // Since the multikey portion is above the $elemMatch, the $elemMatch query may use the
 // index.
 checkQuery({
@@ -163,7 +154,7 @@ checkQuery({
 
 // Make the index become multikey on 'a' (another field above the $elemMatch).
 assert.commandWorked(coll.insert({a: [{b: [{c: {d: 1}}]}]}));
-checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 4, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 3, indexKeyPattern: keyPattern});
 // The only multikey paths are still above the $elemMatch, queries which use a $elemMatch
 // should still be able to use the index.
 checkQuery({
@@ -175,7 +166,7 @@ checkQuery({
 
 // Make the index multikey for 'a.b.c'. Now the $elemMatch query may not use the index.
 assert.commandWorked(coll.insert({a: {b: [{c: [{d: 1}]}]}}));
-checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 5, indexKeyPattern: keyPattern});
+checkQuery({query: query, shouldUseIndex: false, nResultsExpected: 4, indexKeyPattern: keyPattern});
 checkQuery({
     query: elemMatchValueQuery,
     shouldUseIndex: true,
