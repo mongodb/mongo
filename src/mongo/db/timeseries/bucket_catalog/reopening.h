@@ -120,7 +120,7 @@ public:
     ReopeningContext(BucketCatalog& catalog,
                      Stripe& stripe,
                      WithLock stripeLock,
-                     const BucketKey& key,
+                     BucketKey key,
                      uint64_t era,
                      CandidateType&& candidate);
 

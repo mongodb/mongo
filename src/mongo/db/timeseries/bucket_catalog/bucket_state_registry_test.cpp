@@ -159,10 +159,11 @@ public:
     UUID uuid2 = UUID::gen();
     UUID uuid3 = UUID::gen();
     BSONElement elem;
-    BucketMetadata bucketMetadata{elem, nullptr, boost::none};
-    BucketKey bucketKey1{uuid1, bucketMetadata};
-    BucketKey bucketKey2{uuid2, bucketMetadata};
-    BucketKey bucketKey3{uuid3, bucketMetadata};
+    TrackingContext trackingContext;
+    BucketMetadata bucketMetadata{trackingContext, elem, nullptr, boost::none};
+    BucketKey bucketKey1{uuid1, bucketMetadata.cloneAsUntracked()};
+    BucketKey bucketKey2{uuid2, bucketMetadata.cloneAsUntracked()};
+    BucketKey bucketKey3{uuid3, bucketMetadata.cloneAsUntracked()};
     Date_t date = Date_t::now();
     TimeseriesOptions options;
     ExecutionStatsController stats = internal::getOrInitializeExecutionStats(*this, uuid1);
@@ -753,7 +754,7 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
     TrackingContext trackingContext;
     auto batch = std::make_shared<WriteBatch>(trackingContext,
                                               BucketHandle{bucketId, info1.stripe},
-                                              info1.key,
+                                              info1.key.cloneAsUntracked(),
                                               0,
                                               stats,
                                               bucket.timeField);
@@ -773,7 +774,7 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
     TrackingContext trackingContext;
     auto batch = std::make_shared<WriteBatch>(trackingContext,
                                               BucketHandle{bucketId, info1.stripe},
-                                              info1.key,
+                                              info1.key.cloneAsUntracked(),
                                               0,
                                               stats,
                                               bucket.timeField);

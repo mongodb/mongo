@@ -34,6 +34,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/bucket_compression',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_metadata',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_tracked_types',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/util/fail_point',
     ],
@@ -44,6 +45,7 @@ env.CppUnitTest(
     source=[
         'bucket_catalog_helpers_test.cpp',
         'bucket_catalog_test.cpp',
+        'bucket_metadata_test.cpp',
         'bucket_state_registry_test.cpp',
         'minmax_test.cpp',
         'insertion_ordered_column_map_test.cpp',

@@ -223,7 +223,7 @@ StatusWith<std::pair<BucketKey, Date_t>> extractBucketingParameters(
     auto key =
         BucketKey{collectionUUID, BucketMetadata{metadata, comparator, options.getMetaField()}};
 
-    return {std::make_pair(key, time)};
+    return {std::make_pair(std::move(key), time)};
 }
 
 const Bucket* findBucket(BucketStateRegistry& registry,
@@ -410,8 +410,9 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
     // bucket to a stripe by hashing the BucketKey.
-    auto key =
-        BucketKey{collectionUUID, BucketMetadata{metadata, comparator, options.getMetaField()}};
+    auto key = BucketKey{
+        collectionUUID,
+        BucketMetadata{catalog.trackingContext, metadata, comparator, options.getMetaField()}};
     if (expectedKey && key != *expectedKey) {
         return {ErrorCodes::BadValue, "Bucket metadata does not match (hash collision)"};
     }
@@ -423,7 +424,7 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
     unique_tracked_ptr<Bucket> bucket = make_unique_tracked<Bucket>(catalog.trackingContext,
                                                                     catalog.trackingContext,
                                                                     bucketId,
-                                                                    key,
+                                                                    std::move(key),
                                                                     options.getTimeField(),
                                                                     minTime,
                                                                     catalog.bucketStateRegistry);
@@ -501,9 +502,6 @@ StatusWith<unique_tracked_ptr<Bucket>> rehydrateBucket(OperationContext* opCtx,
         bucket->intermediateBuilders.initBuilders(dataObj, bucket->numCommittedMeasurements);
     }
 
-    // The metadata is stored in the bucket, we need to account for that.
-    bucket->memoryUsage += key.metadata.toBSON().objsize();
-
     updateStatsOnError.dismiss();
     return {std::move(bucket)};
 }
@@ -568,7 +566,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(OperationContext* opCtx,
     }
 
     // Now actually mark this bucket as open.
-    stripe.openBucketsByKey[key].emplace(unownedBucket);
+    stripe.openBucketsByKey[key.cloneAsUntracked()].emplace(unownedBucket);
     stats.incNumBucketsReopened();
 
     catalog.memoryUsage.addAndFetch(unownedBucket->memoryUsage);
@@ -675,8 +673,6 @@ std::variant<std::shared_ptr<WriteBatch>, RolloverReason> insertIntoBucket(
         if (info.openedDuetoMetadata) {
             batch->openedDueToMetadata = true;
         }
-        // Account for the size of the metadata.
-        bucket.memoryUsage += bucket.key.metadata.toBSON().objsize();
 
         auto updateStatus = bucket.schema.update(
             doc, info.options.getMetaField(), info.key.metadata.getComparator());
@@ -749,8 +745,8 @@ void removeBucket(
     markBucketNotIdle(stripe, stripeLock, bucket);
 
     // If the bucket was rolled over, then there may be a different open bucket for this metadata.
-    auto openIt =
-        stripe.openBucketsByKey.find({bucket.bucketId.collectionUUID, bucket.key.metadata});
+    auto openIt = stripe.openBucketsByKey.find(
+        {bucket.bucketId.collectionUUID, bucket.key.metadata.cloneAsUntracked()});
     if (openIt != stripe.openBucketsByKey.end()) {
         auto& openSet = openIt->second;
         auto bucketIt = openSet.find(&bucket);
@@ -906,11 +902,12 @@ InsertResult getReopeningContext(OperationContext* opCtx,
         }
 
         return ReopeningContext{
-            catalog, stripe, stripeLock, info.key, catalogEra, archived.value()};
+            catalog, stripe, stripeLock, info.key.cloneAsUntracked(), catalogEra, archived.value()};
     }
 
     if (allowQueryBasedReopening == AllowQueryBasedReopening::kDisallow) {
-        return ReopeningContext{catalog, stripe, stripeLock, info.key, catalogEra, {}};
+        return ReopeningContext{
+            catalog, stripe, stripeLock, info.key.cloneAsUntracked(), catalogEra, {}};
     }
 
     // Synchronize concurrent disk accesses. An outstanding reopening request or prepared batch for
@@ -939,7 +936,7 @@ InsertResult getReopeningContext(OperationContext* opCtx,
     return ReopeningContext{catalog,
                             stripe,
                             stripeLock,
-                            info.key,
+                            info.key.cloneAsUntracked(),
                             catalogEra,
                             generateReopeningPipeline(opCtx,
                                                       info.time,
@@ -1143,7 +1140,7 @@ Bucket& allocateBucket(OperationContext* opCtx,
             make_unique_tracked<Bucket>(catalog.trackingContext,
                                         catalog.trackingContext,
                                         bucketId,
-                                        info.key,
+                                        info.key.cloneAsTracked(catalog.trackingContext),
                                         info.options.getTimeField(),
                                         roundedTime,
                                         catalog.bucketStateRegistry));
@@ -1157,11 +1154,13 @@ Bucket& allocateBucket(OperationContext* opCtx,
             inserted);
 
     Bucket* bucket = it->second.get();
-    stripe.openBucketsByKey[info.key].emplace(bucket);
+    stripe.openBucketsByKey[info.key.cloneAsUntracked()].emplace(bucket);
 
     auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
     if (!status.isOK()) {
-        stripe.openBucketsByKey[info.key].erase(bucket);
+        // Don't track the memory usage for the bucket keys in this data structure because it is
+        // already being tracked by the Bucket itself.
+        stripe.openBucketsByKey[info.key.cloneAsUntracked()].erase(bucket);
         stripe.openBucketsById.erase(it);
         throwWriteConflictException(status.reason());
     }

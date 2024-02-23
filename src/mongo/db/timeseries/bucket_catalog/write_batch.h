@@ -74,7 +74,7 @@ struct WriteBatch {
     WriteBatch() = delete;
     WriteBatch(TrackingContext& trackingContext,
                const BucketHandle& bucketHandle,
-               const BucketKey& bucketKey,
+               BucketKey bucketKey,
                OperationId opId,
                ExecutionStatsController& stats,
                StringData timeField);

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,39 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/db/timeseries/timeseries_tracked_types.h"
 
-#include <absl/hash/hash.h>
+namespace mongo::timeseries {
 
-namespace mongo::timeseries::bucket_catalog {
-
-BucketId::BucketId(const UUID& u, const OID& o)
-    : collectionUUID{u}, oid{o}, hash{absl::Hash<BucketId>{}(*this)} {}
-
-BucketKey::BucketKey(const UUID& u, BucketMetadata m)
-    : collectionUUID(u), metadata(std::move(m)), hash(absl::Hash<BucketKey>{}(*this)) {}
-
-BucketKey::BucketKey(const UUID& u, BucketMetadata m, Hash h)
-    : collectionUUID(u), metadata(std::move(m)), hash(h) {}
-
-BucketKey BucketKey::cloneAsUntracked() const {
-    return {collectionUUID, metadata.cloneAsUntracked(), hash};
+TrackedBSONObj makeTrackedBson(TrackingContext& trackingContext, BSONObj obj) {
+    return trackingContext.makeTracked(TrackableBSONObj{std::move(obj)});
 }
 
-BucketKey BucketKey::cloneAsTracked(TrackingContext& trackingContext) const {
-    return {collectionUUID, metadata.cloneAsTracked(trackingContext), hash};
-}
-
-std::size_t BucketHasher::operator()(const BucketKey& key) const {
-    return key.hash;
-}
-
-std::size_t BucketHasher::operator()(const BucketId& bucketId) const {
-    return bucketId.hash;
-}
-
-std::size_t BucketHasher::operator()(const BucketKey::Hash& key) const {
-    return key;
-}
-
-}  // namespace mongo::timeseries::bucket_catalog
+}  // namespace mongo::timeseries

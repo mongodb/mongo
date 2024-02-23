@@ -36,33 +36,74 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/timeseries/metadata.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::timeseries::bucket_catalog {
+namespace {
+
+BSONObj buildNormalizedMetadata(BSONElement elem, boost::optional<StringData> trueMetaFieldName) {
+    if (!elem) {
+        return {};
+    }
+
+    BSONObjBuilder builder;
+    // We will get an object of equal size, just with reordered fields.
+    builder.bb().reserveBytes(elem.size());
+    metadata::normalize(elem, builder, trueMetaFieldName);
+    return builder.obj();
+}
+
+}  // namespace
 
 BucketMetadata::BucketMetadata(BSONElement elem,
                                const StringDataComparator* comparator,
                                boost::optional<StringData> trueMetaFieldName)
-    : _metadataElement(elem), _comparator(comparator) {
-    if (_metadataElement) {
-        BSONObjBuilder objBuilder;
-        // We will get an object of equal size, just with reordered fields.
-        objBuilder.bb().reserveBytes(_metadataElement.size());
-        metadata::normalize(_metadataElement, objBuilder, trueMetaFieldName);
-        _metadata = objBuilder.obj();
-    }
-    // Updates the BSONElement to refer to the copied BSONObj.
-    _metadataElement = _metadata.firstElement();
-}
+    : _metadata(buildNormalizedMetadata(elem, trueMetaFieldName)),
+      _metadataElement(toBSON().firstElement()),
+      _comparator(comparator) {}
+
+BucketMetadata::BucketMetadata(TrackingContext& trackingContext,
+                               BSONElement elem,
+                               const StringDataComparator* comparator,
+                               boost::optional<StringData> trueMetaFieldName)
+    : _metadata(makeTrackedBson(trackingContext, buildNormalizedMetadata(elem, trueMetaFieldName))),
+      _metadataElement(toBSON().firstElement()),
+      _comparator(comparator) {}
+
+BucketMetadata::BucketMetadata(BSONObj metadata,
+                               BSONElement metadataElement,
+                               const StringDataComparator* comparator)
+    : _metadata(std::move(metadata)), _metadataElement(metadataElement), _comparator(comparator) {}
+
+BucketMetadata::BucketMetadata(TrackingContext& trackingContext,
+                               BSONObj metadata,
+                               BSONElement metadataElement,
+                               const StringDataComparator* comparator)
+    : _metadata(makeTrackedBson(trackingContext, std::move(metadata))),
+      _metadataElement(metadataElement),
+      _comparator(comparator) {}
 
 bool BucketMetadata::operator==(const BucketMetadata& other) const {
     return _metadataElement.binaryEqualValues(other._metadataElement);
 }
 
-const BSONObj& BucketMetadata::toBSON() const {
-    return _metadata;
+BucketMetadata BucketMetadata::cloneAsUntracked() const {
+    return {toBSON(), element(), getComparator()};
 }
 
-const BSONElement& BucketMetadata::element() const {
+BucketMetadata BucketMetadata::cloneAsTracked(TrackingContext& trackingContext) const {
+    return {trackingContext, toBSON(), element(), getComparator()};
+}
+
+BSONObj BucketMetadata::toBSON() const {
+    return visit(OverloadedVisitor{
+                     [](const BSONObj& obj) { return obj; },
+                     [](const TrackedBSONObj& obj) { return obj.get().get(); },
+                 },
+                 _metadata);
+}
+
+BSONElement BucketMetadata::element() const {
     return _metadataElement;
 }
 

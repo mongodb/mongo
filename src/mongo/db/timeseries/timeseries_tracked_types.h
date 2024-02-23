@@ -35,6 +35,7 @@
 #include <scoped_allocator>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/timeseries/timeseries_tracking_allocator.h"
 #include "mongo/db/timeseries/timeseries_tracking_context.h"
 #include "mongo/stdx/unordered_map.h"
@@ -183,5 +184,30 @@ template <class T, std::size_t N>
 tracked_inlined_vector<T, N> make_tracked_inlined_vector(TrackingContext& trackingContext) {
     return tracked_inline_vector<T, N>(N, trackingContext);
 }
+
+class TrackableBSONObj {
+public:
+    explicit TrackableBSONObj(BSONObj obj) : _obj(std::move(obj)) {
+        invariant(_obj.isOwned() || _obj.isEmptyPrototype());
+    }
+
+    size_t allocated() const {
+        return !_obj.isEmptyPrototype() ? _obj.objsize() : 0;
+    }
+
+    BSONObj& get() {
+        return _obj;
+    }
+
+    const BSONObj& get() const {
+        return _obj;
+    }
+
+private:
+    BSONObj _obj;
+};
+using TrackedBSONObj = Tracked<TrackableBSONObj>;
+
+TrackedBSONObj makeTrackedBson(TrackingContext& trackingContext, BSONObj obj);
 
 }  // namespace mongo::timeseries

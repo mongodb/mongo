@@ -47,12 +47,12 @@ namespace mongo::timeseries::bucket_catalog {
 
 WriteBatch::WriteBatch(TrackingContext& trackingContext,
                        const BucketHandle& b,
-                       const BucketKey& k,
+                       BucketKey k,
                        OperationId o,
                        ExecutionStatsController& s,
                        StringData timeField)
     : bucketHandle(b),
-      bucketKey(k),
+      bucketKey(std::move(k)),
       opId(o),
       stats(s),
       timeField(timeField),

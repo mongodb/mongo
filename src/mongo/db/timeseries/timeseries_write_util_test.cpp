@@ -73,7 +73,8 @@ protected:
     using CatalogTestFixture::setUp;
 
     std::shared_ptr<bucket_catalog::WriteBatch> generateBatch(
-        const UUID& uuid, bucket_catalog::BucketMetadata bucketMetadata = {}) {
+        const UUID& uuid,
+        bucket_catalog::BucketMetadata bucketMetadata = {{}, nullptr, boost::none}) {
         OID oid = OID::createFromString("629e1e680958e279dc29a517"_sd);
         bucket_catalog::BucketId bucketId(uuid, oid);
         std::uint8_t stripe = 0;
@@ -83,7 +84,7 @@ protected:
         return std::make_shared<bucket_catalog::WriteBatch>(
             _trackingContext,
             bucket_catalog::BucketHandle{bucketId, stripe},
-            bucket_catalog::BucketKey{uuid, bucketMetadata},
+            bucket_catalog::BucketKey{uuid, std::move(bucketMetadata)},
             opId,
             stats,
             kTimeseriesOptions.getTimeField());

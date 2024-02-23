@@ -75,7 +75,7 @@ public:
 
     Bucket(TrackingContext&,
            const BucketId& bucketId,
-           const BucketKey& bucketKey,
+           BucketKey bucketKey,
            StringData timeField,
            Date_t minTime,
            BucketStateRegistry& bucketStateRegistry);

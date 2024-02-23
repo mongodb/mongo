@@ -58,12 +58,12 @@ uint8_t numDigits(uint32_t num) {
 
 Bucket::Bucket(TrackingContext& trackingContext,
                const BucketId& bId,
-               const BucketKey& k,
+               BucketKey k,
                StringData tf,
                Date_t mt,
                BucketStateRegistry& bsr)
     : bucketId(bId),
-      key(k),
+      key(std::move(k)),
       timeField(tf.toString()),
       minTime(mt),
       bucketStateRegistry(bsr),
@@ -149,7 +149,7 @@ std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
                  .try_emplace(opId,
                               std::make_shared<WriteBatch>(trackingContext,
                                                            BucketHandle{bucket.bucketId, stripe},
-                                                           bucket.key,
+                                                           bucket.key.cloneAsUntracked(),
                                                            opId,
                                                            stats,
                                                            bucket.timeField))

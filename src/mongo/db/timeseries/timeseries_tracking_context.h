@@ -29,9 +29,53 @@
 
 #pragma once
 
+#include <functional>
+
 #include "mongo/db/timeseries/timeseries_tracking_allocator.h"
 
 namespace mongo::timeseries {
+
+template <class T>
+class Tracked {
+public:
+    Tracked(TrackingAllocatorStats& stats, T obj) : _stats(stats), _obj(std::move(obj)) {
+        _stats.get().bytesAllocated.fetchAndAdd(_obj.allocated());
+    }
+
+    Tracked(Tracked&) = delete;
+    Tracked(Tracked&& other) : _stats(other._stats), _obj(std::move(other._obj)) {
+        invariant(other._obj.allocated() == 0);
+    }
+
+    Tracked& operator=(Tracked&) = delete;
+    Tracked& operator=(Tracked&& other) {
+        if (&other == this) {
+            return *this;
+        }
+
+        _stats = other._stats;
+        _obj = std::move(other._obj);
+        invariant(other._obj.allocated() == 0);
+
+        return *this;
+    }
+
+    ~Tracked() {
+        _stats.get().bytesAllocated.fetchAndSubtract(_obj.allocated());
+    }
+
+    T& get() {
+        return _obj;
+    }
+
+    const T& get() const {
+        return _obj;
+    }
+
+private:
+    std::reference_wrapper<TrackingAllocatorStats> _stats;
+    T _obj;
+};
 
 /**
  * A TrackingContext is a factory style class that constructs TrackingAllocator objects under a
@@ -41,6 +85,11 @@ class TrackingContext {
 public:
     TrackingContext() = default;
     ~TrackingContext() = default;
+
+    template <class T>
+    Tracked<T> makeTracked(T obj) {
+        return {_stats, std::move(obj)};
+    }
 
     template <class T>
     TrackingAllocator<T> makeAllocator() {

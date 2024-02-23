@@ -300,7 +300,9 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     if (metaFieldName) {
         metadata = bucketDoc.getField(kBucketMetaFieldName);
     }
-    auto key = BucketKey{uuid, BucketMetadata{metadata, coll->getDefaultCollator(), metaFieldName}};
+    TrackingContext trackingContext;
+    auto key = BucketKey{
+        uuid, BucketMetadata{trackingContext, metadata, coll->getDefaultCollator(), metaFieldName}};
 
     // Validate the bucket document against the schema.
     auto validator = [&](OperationContext * opCtx, const BSONObj& bucketDoc) -> auto {
@@ -2022,7 +2024,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ReopeningContext reopeningContext{*_bucketCatalog,
                                       *_bucketCatalog->stripes[0],
                                       WithLock::withoutLock(),
-                                      batch->bucketKey,
+                                      batch->bucketKey.cloneAsUntracked(),
                                       getCurrentEra(_bucketCatalog->bucketStateRegistry),
                                       {}};
     reopeningContext.bucketToReopen = BucketToReopen{bucketDoc, validator};
@@ -2111,7 +2113,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     ReopeningContext reopeningContext{*_bucketCatalog,
                                       *_bucketCatalog->stripes[0],
                                       WithLock::withoutLock(),
-                                      batch->bucketKey,
+                                      batch->bucketKey.cloneAsUntracked(),
                                       oldCatalogEra,
                                       {}};
     reopeningContext.bucketToReopen = BucketToReopen{bucketDoc, validator};
@@ -2267,7 +2269,9 @@ TEST_F(BucketCatalogTest, ArchiveBasedReopeningConflictsWithArchiveBasedReopenin
     // Inject an archived record.
     auto options = _getTimeseriesOptions(_ns1);
     BSONObj doc = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
-    BucketKey key{_uuid1, BucketMetadata{doc["tag"], nullptr, options.getMetaField()}};
+    TrackingContext trackingContext;
+    BucketKey key{_uuid1,
+                  BucketMetadata{trackingContext, doc["tag"], nullptr, options.getMetaField()}};
     auto minTime = roundTimestampToGranularity(doc["time"].Date(), options);
     BucketId id{_uuid1, OID::gen()};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id));
@@ -2318,7 +2322,9 @@ TEST_F(BucketCatalogTest,
     // Inject an archived record.
     auto options = _getTimeseriesOptions(_ns1);
     BSONObj doc1 = ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"},"tag":"c"})");
-    BucketKey key{_uuid1, BucketMetadata{doc1["tag"], nullptr, options.getMetaField()}};
+    TrackingContext trackingContext;
+    BucketKey key{_uuid1,
+                  BucketMetadata{trackingContext, doc1["tag"], nullptr, options.getMetaField()}};
     auto minTime1 = roundTimestampToGranularity(doc1["time"].Date(), options);
     BucketId id1{_uuid1, OID::gen()};
     ASSERT_OK(initializeBucketState(_bucketCatalog->bucketStateRegistry, id1));
@@ -2384,12 +2390,13 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     TrackingContext trackingContext;
     auto dummyUUID = UUID::gen();
     auto dummyBucketId = BucketId(dummyUUID, OID());
-    auto dummyBucketKey = BucketKey(dummyUUID, BucketMetadata());
+    auto dummyBucketKey =
+        BucketKey(dummyUUID, BucketMetadata(trackingContext, BSONElement{}, nullptr, boost::none));
     sideBucketCatalog->bucketStateRegistry.bucketStates.emplace(dummyBucketId,
                                                                 BucketState::kNormal);
     auto dummyBucket = std::make_unique<Bucket>(trackingContext,
                                                 dummyBucketId,
-                                                dummyBucketKey,
+                                                dummyBucketKey.cloneAsUntracked(),
                                                 "time",
                                                 Date_t(),
                                                 sideBucketCatalog->bucketStateRegistry);
@@ -2401,11 +2408,11 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
         make_unique_tracked<Bucket>(sideBucketCatalog->trackingContext,
                                     sideBucketCatalog->trackingContext,
                                     dummyBucketId,
-                                    dummyBucketKey,
+                                    dummyBucketKey.cloneAsUntracked(),
                                     "time",
                                     Date_t(),
                                     sideBucketCatalog->bucketStateRegistry));
-    stripe.openBucketsByKey[dummyBucketKey].emplace(dummyBucket.get());
+    stripe.openBucketsByKey[dummyBucketKey.cloneAsUntracked()].emplace(dummyBucket.get());
     stripe.idleBuckets.push_front(dummyBucket.get());
     stdx::lock_guard stripeLock{stripe.mutex};
 
