@@ -77,7 +77,7 @@ public:
     /**
      * Construct a new word with the given initial value.
      */
-    explicit constexpr Base(WordType v) : _value(v) {}
+    explicit(false) constexpr Base(WordType v) : _value(v) {}
 
     /**
      * Gets the current value of this AtomicWord.

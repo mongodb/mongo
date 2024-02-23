@@ -322,7 +322,7 @@ private:
     // later values in modification order. In other words, an aquire load that reads value V, is
     // synchronized with not just the operation that wrote V (if it was a release) but also all
     // prior release stores to this variable.
-    mutable BasicWaitableAtomic<uint32_t> _waitFlag{0};
+    mutable BasicWaitableAtomic<uint32_t> _waitFlag = 0;
 };
 
 }  // namespace mongo
