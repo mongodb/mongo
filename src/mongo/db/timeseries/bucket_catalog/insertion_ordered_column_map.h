@@ -93,7 +93,7 @@ private:
 
     std::reference_wrapper<TrackingContext> _trackingContext;
 
-    using MeasurementCountAndBuilder = std::pair<size_t, BSONColumnBuilder>;
+    using MeasurementCountAndBuilder = std::tuple<size_t, BSONColumnBuilder>;
     TrackedStringMap<MeasurementCountAndBuilder> _builders;
     tracked_vector<tracked_string> _insertionOrder;  // keys, stored in insertion order
     size_t _insertionOrderSize{0};

@@ -52,7 +52,7 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
                                   BSONColumnBuilder());
         BSONColumn c(binData, binLength);
         for (auto&& elem : c) {
-            it->second.second.append(elem);
+            std::get<1>(it->second).append(elem);
         }
 
         _insertionOrder.emplace_back(make_tracked_string(_trackingContext, key.data()));
@@ -114,7 +114,7 @@ void InsertionOrderedColumnMap::insertOne(std::vector<BSONElement> oneMeasuremen
 BSONColumnBuilder& InsertionOrderedColumnMap::getBuilder(StringData key) {
     auto it = _builders.find(key);
     invariant(it != _builders.end());
-    return it->second.second;
+    return std::get<1>(it->second);
 }
 
 StringData InsertionOrderedColumnMap::_getDirect() {
