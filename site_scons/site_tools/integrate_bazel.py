@@ -373,7 +373,7 @@ def create_idlc_builder(env: SCons.Environment.Environment) -> None:
 
 
 def validate_remote_execution_certs(env: SCons.Environment.Environment) -> bool:
-    running_in_evergreen = env.GetOption("evergreen-tmp-dir") is not None
+    running_in_evergreen = os.environ.get("CI")
 
     if running_in_evergreen and not os.path.exists("./engflow.cert"):
         print(

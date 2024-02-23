@@ -427,6 +427,49 @@ functions:
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
+  get engflow creds perf:
+  - command: s3.get
+    display_name: "get engflow key"
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/engflow.key
+      bucket: serverengflow
+      local_file: "src/engflow.key"
+  - command: s3.get
+    display_name: "get engflow cert"
+    params:
+      aws_key: ${engflow_key}
+      aws_secret: ${engflow_secret}
+      remote_file: engflow/engflow.cert
+      bucket: serverengflow
+      local_file: "src/engflow.cert"
+  - command: shell.exec
+    params:
+      display_name: "generate evergreen engflow bazelrc"
+      shell: bash
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # Pulled from evergreen/generate_evergreen_engflow_bazelrc.sh consider
+        # consolidating once prelude.sh is runnable in the perf project.
+
+        source ./evergreen/bazel_RBE_supported.sh
+
+        if bazel_rbe_supported; then
+
+          uri="https://spruce.mongodb.com/task/${task_id}?execution=${execution}"
+
+          echo "build --tls_client_certificate=./engflow.cert" > .bazelrc.evergreen_engflow_creds
+          echo "build --tls_client_key=./engflow.key" >> .bazelrc.evergreen_engflow_creds
+          echo "build --bes_keywords=engflow:CiCdPipelineName=${build_variant}" >> .bazelrc.evergreen_engflow_creds
+          echo "build --bes_keywords=engflow:CiCdJobName=${task_name}" >> .bazelrc.evergreen_engflow_creds
+          echo "build --bes_keywords=engflow:CiCdUri=$uri" >> .bazelrc.evergreen_engflow_creds
+          echo "build --bes_keywords=evg:project=${project}" >> .bazelrc.evergreen_engflow_creds
+          echo "build --workspace_status_command=./evergreen/engflow_workspace_status.sh" >> .bazelrc.evergreen_engflow_creds
+        fi
   compile prep old:
     # We create a virtual environment with the Python dependencies for compiling the server
     # installed.
@@ -848,6 +891,7 @@ tasks:
             enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep old"
+      - func: "get engflow creds perf"
       - func: "compile mongo tools old"
       - func: "generate feature flag list old"
       - func: "generate server params list old"
@@ -868,6 +912,7 @@ tasks:
             enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
       - func: "compile prep"
+      - func: "get engflow creds perf"
       - func: "compile mongo tools"
       - func: "generate feature flag list"
       - func: "generate server params list"
@@ -885,6 +930,7 @@ tasks:
           revisions:
             enterprise: ${enterprise_rev}
       - func: "compile prep"
+      - func: "get engflow creds perf"
       - func: "compile mongocrypt shlib"
 
   - name: industry_benchmarks

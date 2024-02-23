@@ -952,8 +952,15 @@ def fatal_error(env, msg, *args):
 
 def bazel_by_default():
     try:
-        return distro.name() == "Ubuntu" and distro.version().split(
-            ".")[0] == "22" and platform.machine() == "aarch64"
+        distro_name = distro.name()
+        distro_version = distro.version()
+        arch = platform.machine()
+
+        is_ubuntu_22_arm = distro_name == "Ubuntu" and distro_version.split(
+            ".")[0] == "22" and arch == "aarch64"
+        is_amazon_linux_2_arm = distro_name == "Amazon Linux" and distro_version == "2" and arch == "aarch64"
+
+        return is_ubuntu_22_arm or is_amazon_linux_2_arm
     except Exception as e:
         print(f"Error determining if Bazel should be enabled by default: {e}")
         print("Defaulting to disable Bazel")
