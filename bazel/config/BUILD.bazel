@@ -7,7 +7,6 @@ load(
     "build_mode",
     "compiler_type",
     "detect_odr_violations",
-    "disable_warnings_as_errors",
     "fsan",
     "http_client",
     "libunwind",
@@ -1064,7 +1063,7 @@ selects.config_setting_group(
 )
 
 # --------------------------------------
-# visibility_support
+# stream_release_build
 # --------------------------------------
 
 visibility_support(
@@ -1117,52 +1116,5 @@ selects.config_setting_group(
         ":not_windows",
         ":visibility_support_enabled_setting",
         ":linkstatic_disabled",
-    ],
-)
-
-# --------------------------------------
-# disable_warnings_as_errors
-# --------------------------------------
-
-disable_warnings_as_errors(
-    name = "disable_warnings_as_errors",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "disable_warnings_as_errors_enabled",
-    flag_values = {
-        "//bazel/config:disable_warnings_as_errors": "True",
-    },
-)
-
-config_setting(
-    name = "disable_warnings_as_errors_disabled",
-    flag_values = {
-        "//bazel/config:disable_warnings_as_errors": "False",
-    },
-)
-
-selects.config_setting_group(
-    name = "disable_warnings_as_errors_posix",
-    match_all = [
-        ":not_windows",
-        ":disable_warnings_as_errors_disabled",
-    ],
-)
-
-selects.config_setting_group(
-    name = "disable_warnings_as_errors_macos",
-    match_all = [
-        "@platforms//os:macos",
-        ":disable_warnings_as_errors_disabled",
-    ],
-)
-
-selects.config_setting_group(
-    name = "disable_warnings_as_errors_windows",
-    match_all = [
-        "@platforms//os:windows",
-        ":disable_warnings_as_errors_disabled",
     ],
 )

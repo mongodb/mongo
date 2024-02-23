@@ -607,7 +607,6 @@ def generate(env: SCons.Environment.Environment) -> None:
             f'--//bazel/config:streams_release_build={env.GetOption("streams-release-build") is not None}',
             f'--//bazel/config:build_enterprise={env.GetOption("modules") == "enterprise"}',
             f'--//bazel/config:visibility_support={env.GetOption("visibility-support")}',
-            f'--//bazel/config:disable_warnings_as_errors={env.GetOption("disable-warnings-as-errors") == "source"}',
             f'--platforms=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             f'--host_platform=//bazel/platforms:{normalized_os}_{normalized_arch}_{env.ToolchainName()}',
             '--compilation_mode=dbg',  # always build this compilation mode as we always build with -g

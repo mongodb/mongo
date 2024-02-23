@@ -65,9 +65,6 @@ mongo_cc_library(
             "-Isrc/third_party/gperftools/platform/windows_x86_64/internal/src",
         ],
     }) + select({
-        "@//bazel/config:not_windows": ["-Wno-deprecated-volatile"],
-        "//conditions:default": [],
-    }) + select({
         "@platforms//os:windows": [
             "/wd4141",
             "/wd4305",

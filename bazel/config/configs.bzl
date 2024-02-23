@@ -415,17 +415,3 @@ visibility_support = rule(
     implementation = visibility_support_impl,
     build_setting = config.string(flag = True),
 )
-
-# =========
-# disable-warnings-as-errors
-# =========
-
-disable_warnings_as_errors_provider = provider(
-    doc = """Don't add a warnings-as-errors flag to compiler command lines""",
-    fields = ["enabled"],
-)
-
-disable_warnings_as_errors = rule(
-    implementation = lambda ctx: disable_warnings_as_errors_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
-)

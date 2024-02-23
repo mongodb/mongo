@@ -327,31 +327,16 @@ DETECT_ODR_VIOLATIONS_LINKFLAGS = select({
     ("//bazel/config:detect_odr_violations_disabled"): [],
 }, no_match_error = DETECT_ODR_VIOLATIONS_ERROR_MESSAGE)
 
-DISABLE_SOURCE_WARNING_AS_ERRORS_COPTS = select({
-    ("//bazel/config:disable_warnings_as_errors_posix"): ["-Werror"],
-    ("//bazel/config:disable_warnings_as_errors_windows"): ["/WX"],
-    ("//bazel/config:disable_warnings_as_errors_enabled"): [],
-    "//conditions:default": [],
-})
-
-DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS = select({
-    ("//bazel/config:disable_warnings_as_errors_posix"): ["-Wl,--fatal-warnings"],
-    ("//bazel/config:disable_warnings_as_errors_macos"): ["-Wl,-fatal_warnings"],
-    ("//bazel/config:disable_warnings_as_errors_enabled"): [],
-    "//conditions:default": [],
-})
-
 MONGO_GLOBAL_DEFINES = DEBUG_DEFINES + LIBCXX_DEFINES + ADDRESS_SANITIZER_DEFINES + \
                        THREAD_SANITIZER_DEFINES + UNDEFINED_SANITIZER_DEFINES + GLIBCXX_DEBUG_DEFINES
 
 MONGO_GLOBAL_COPTS = ["-Isrc"] + WINDOWS_COPTS + LIBCXX_COPTS + ADDRESS_SANITIZER_COPTS + \
                      MEMORY_SANITIZER_COPTS + FUZZER_SANITIZER_COPTS + UNDEFINED_SANITIZER_COPTS + \
-                     THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS + DISABLE_SOURCE_WARNING_AS_ERRORS_COPTS
+                     THREAD_SANITIZER_COPTS + ANY_SANITIZER_AVAILABLE_COPTS
 
 MONGO_GLOBAL_LINKFLAGS = MEMORY_SANITIZER_LINKFLAGS + ADDRESS_SANITIZER_LINKFLAGS + FUZZER_SANITIZER_LINKFLAGS + \
                          UNDEFINED_SANITIZER_LINKFLAGS + THREAD_SANITIZER_LINKFLAGS + \
-                         LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS + \
-                         DISABLE_SOURCE_WARNING_AS_ERRORS_LINKFLAGS
+                         LIBCXX_LINKFLAGS + LINKER_LINKFLAGS + DETECT_ODR_VIOLATIONS_LINKFLAGS
 
 def force_includes_copt(package_name, name):
     if package_name.startswith("src/mongo"):
