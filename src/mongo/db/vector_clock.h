@@ -260,7 +260,8 @@ protected:
      */
     virtual ComponentSet _getGossipInternalComponents() const {
         VectorClock::ComponentSet toGossip{Component::ClusterTime};
-        if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::None)) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+            serverGlobalParams.clusterRole.has(ClusterRole::RouterServer)) {
             toGossip.insert(Component::ConfigTime);
             toGossip.insert(Component::TopologyTime);
         }
