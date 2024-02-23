@@ -1125,6 +1125,9 @@ private:
     // Returns a string representation of the current replica set status for logging purposes.
     std::string _getReplSetStatusString();
 
+    // Returns the member's corresponding opTime for recency check
+    OpTime _getMemberOpTimeForRecencyCheck(const MemberData& memberData, bool durablyWritten);
+
     // This node's role in the replication protocol.
     Role _role;
 

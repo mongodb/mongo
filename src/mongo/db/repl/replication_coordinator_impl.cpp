@@ -2164,17 +2164,6 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
 
             if (writeConcern.checkCondition == WriteConcernOptions::CheckCondition::OpTime &&
                 (getWriteConcernMajorityShouldJournal_inlock() || !useDurableOpTime)) {
-                if (kDebugBuild) {
-                    // At this stage all the tagged nodes should have reached the opTime, except
-                    // after the reconfig(see SERVER-47205). If the OpTime is greater than
-                    // LastCommittedInPrevConfig, check for that.
-                    if (_topCoord->getLastCommittedInPrevConfig() < opTime) {
-                        auto tagPattern = uassertStatusOK(_rsConfig.findCustomWriteMode(
-                            ReplSetConfig::kMajorityWriteConcernModeName));
-                        invariant(_topCoord->haveTaggedNodesReachedOpTime(
-                            opTime, tagPattern, useDurableOpTime));
-                    }
-                }
                 return true;
             }
             // Fallthrough to wait for "majority" write concern.
