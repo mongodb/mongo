@@ -41,9 +41,9 @@ function posix_workdir {
 }
 
 function set_sudo {
-  set -o > $TMPDIR/settings.log
+  set -o > /tmp/settings.log
   set +o errexit
-  grep errexit $TMPDIR/settings.log | grep on
+  grep errexit /tmp/settings.log | grep on
   errexit_on=$?
   # Set errexit "off".
   set +o errexit
