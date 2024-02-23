@@ -887,7 +887,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         'multitenancy',
         'server_base',
         'storage/capped_snapshots',
@@ -1063,7 +1062,6 @@ env.Library(
         'commands/fsync_locked',
         'concurrency/lock_manager',
         'not_primary_error_tracker',
-        'query/query_stats/query_stats',
         'read_concern_d_impl',
         's/sharding_runtime_d',
         'service_entry_point_common',
@@ -1286,7 +1284,6 @@ env.Library(
         'read_concern_mongod.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/s/grid',
         'concurrency/exception_util',
         'repl/repl_coordinator_interface',
@@ -1500,7 +1497,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth_checks',
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
@@ -1633,6 +1629,7 @@ env.Library(
         'pipeline/make_js_function.cpp',
         'pipeline/monotonic_expression.cpp',
         'pipeline/variables.cpp',
+        'query/query_shape/cmd_with_let_shape.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
@@ -1658,7 +1655,7 @@ env.Library(
         'query/collation/collator_interface',
         'query/datetime/date_time_support',
         'query/query_knobs',
-        'query_shape_common',
+        'query/query_shape/query_shape_common',
         'stats/counters',
         'update/pattern_cmp',
     ],
@@ -1669,19 +1666,6 @@ env.Library(
         'vector_clock',
     ],
 )
-
-env.Library(
-    target='query_shape_common', source=[
-        'query/query_shape.idl',
-        'query/shape_helpers.cpp',
-        'query/serialization_options.cpp',
-    ], LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-        '$BUILD_DIR/mongo/db/pipeline/field_path',
-    ], LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-    ])
 
 env.Library(
     target='startup_recovery',
@@ -2273,7 +2257,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         # NOTE: If you need to add a static or mongo initializer to mongod startup,
         # please add that library here, as a private library dependency.
-        '$BUILD_DIR/mongo/db/query/query_stats/query_stats',
         '$BUILD_DIR/mongo/executor/async_rpc_error_info',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/rpc/rpc',
@@ -2711,7 +2694,6 @@ if wiredtiger:
             'mirror_maestro',
             'multitenancy',
             'operation_time_tracker',
-            'query/query_stats/query_stats',
             'query_exec',
             'read_write_concern_defaults_mock',
             'record_id_helpers',

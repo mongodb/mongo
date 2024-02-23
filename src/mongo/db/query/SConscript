@@ -15,6 +15,7 @@ env.SConscript(
         'datetime',
         'optimizer',
         'query_stats',
+        'query_shape',
         'stats',
     ],
     exports=[
@@ -39,6 +40,8 @@ env.Library(
         'canonical_query.cpp',
         'canonical_query_encoder.cpp',
         'parsed_find_command.cpp',
+        'query_shape/find_cmd_shape.cpp',
+        'query_stats/find_key_generator.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
@@ -364,27 +367,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='query_shape',
-    source=[
-        'query_shape.cpp',
-        'query_stats/find_key_generator.cpp',
-        'query_stats/aggregate_key_generator.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        'canonical_query',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/query_shape_common',
-        'projection_ast',
-        'sort_pattern',
-    ],
-)
-
 env.CppUnitTest(
     target="db_query_test",
     source=[
@@ -395,6 +377,7 @@ env.CppUnitTest(
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cursor_response_test.cpp",
+        "query_shape/find_cmd_shape_test.cpp",
         "find_common_test.cpp",
         "get_executor_test.cpp",
         "getmore_request_test.cpp",
@@ -438,8 +421,6 @@ env.CppUnitTest(
         "query_planner_wildcard_index_test.cpp",
         "query_request_test.cpp",
         "query_settings_test.cpp",
-        "query_shape_test.cpp",
-        "query_shape_test.idl",
         "query_solution_test.cpp",
         "sbe_and_hash_test.cpp",
         "sbe_and_sorted_test.cpp",
@@ -482,7 +463,7 @@ env.CppUnitTest(
         "query_planner",
         "query_planner_test_fixture",
         "query_request",
-        "query_shape",
+        "query_shape/query_shape",
         "query_test_service_context",
     ],
 )

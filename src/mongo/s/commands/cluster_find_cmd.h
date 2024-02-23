@@ -39,7 +39,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/query_request_conversion.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/stats/counters.h"
@@ -221,12 +221,7 @@ public:
                     [&]() {
                         // This callback is either never invoked or invoked immediately within
                         // registerRequest, so use-after-move of parsedFind isn't an issue.
-                        BSONObj queryShape = query_shape::extractQueryShape(
-                            *parsedFind,
-                            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-                            expCtx);
-                        return std::make_unique<query_stats::FindKeyGenerator>(
-                            expCtx, *parsedFind, std::move(queryShape));
+                        return std::make_unique<query_stats::FindKey>(expCtx, *parsedFind);
                     },
                     /*requiresFullQueryStatsFeatureFlag*/ false);
             }

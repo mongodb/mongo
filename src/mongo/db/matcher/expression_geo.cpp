@@ -443,9 +443,10 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 }
 
 void GeoMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                       const SerializationOptions& opts) const {
+                                                       const SerializationOptions& opts,
+                                                       bool includePath) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        geoCustomSerialization(bob, _rawObj, opts);
+        geoCustomSerialization(bob, _rawObj, opts, includePath);
         return;
     }
     bob->appendElements(_rawObj);
@@ -499,9 +500,10 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
 }
 
 void GeoNearMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                                           const SerializationOptions& opts) const {
+                                                           const SerializationOptions& opts,
+                                                           bool includePath) const {
     if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
-        geoCustomSerialization(bob, _rawObj, opts);
+        geoCustomSerialization(bob, _rawObj, opts, includePath);
         return;
     }
     bob->appendElements(_rawObj);

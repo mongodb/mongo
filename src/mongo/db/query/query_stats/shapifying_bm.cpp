@@ -38,7 +38,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_stats/find_key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/query/query_stats/rate_limiting.h"
@@ -78,20 +78,15 @@ const auto kMetadataWrapper = fromjson(R"({metadata: {
     }})");
 auto kMockClientMetadataElem = kMetadataWrapper["metadata"];
 
-auto makeFindKeyGenerator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                          const ParsedFindCommand& parsedFind) {
-    return std::make_unique<query_stats::FindKeyGenerator>(
-        expCtx,
-        parsedFind,
-        query_shape::extractQueryShape(
-            parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx),
-        kCollectionType);
+auto makeFindKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                 const ParsedFindCommand& parsedFind) {
+    return std::make_unique<const query_stats::FindKey>(expCtx, parsedFind, kCollectionType);
 }
 
 int shapifyAndHashRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           const ParsedFindCommand& parsedFind) {
-    auto keyGenerator = makeFindKeyGenerator(expCtx, parsedFind);
-    [[maybe_unused]] auto hash = keyGenerator->hash();
+    auto key = makeFindKey(expCtx, parsedFind);
+    [[maybe_unused]] auto hash = absl::HashOf(key);
     return 0;
 }
 

@@ -1080,7 +1080,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         # Include serialization options only if there is a struct which is part of a query shape.
         if any(struct.query_shape_component for struct in spec.structs):
-            header_list.append('mongo/db/query/serialization_options.h')
+            header_list.append('mongo/db/query/query_shape/serialization_options.h')
 
         header_list.sort()
 
@@ -2190,25 +2190,49 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     if writer.is_function(field.type.serializer):
                         # SerializationContext bound to deserialize_with_tenant
                         if field.type.deserialize_with_tenant:
-                            # Call a method like method(value, StringData, BSONObjBuilder*, SerializationContext)
-                            self._writer.write_template(
-                                '${method_name}(${access_member}, ${field_name}, builder, ${serialization_context});'
-                            )
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like method(value, StringData, BSONObjBuilder*, SerializationContext, SerializationOptions)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder, ${serialization_context}, options);'
+                                )
+                            else:
+                                # Call a method like method(value, StringData, BSONObjBuilder*, SerializationContext)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder, ${serialization_context});'
+                                )
                         else:
-                            # Call a method like method(value, StringData, BSONObjBuilder*)
-                            self._writer.write_template(
-                                '${method_name}(${access_member}, ${field_name}, builder);')
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like method(value, StringData, BSONObjBuilder*, SerializationOptions)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder, options);'
+                                )
+                            else:
+                                # Call a method like method(value, StringData, BSONObjBuilder*)
+                                self._writer.write_template(
+                                    '${method_name}(${access_member}, ${field_name}, builder);')
                     else:
                         # SerializationContext bound to deserialize_with_tenant
                         if field.type.deserialize_with_tenant:
-                            # Call a method like class::method(StringData, BSONObjBuilder*, SerializationContext)
-                            self._writer.write_template(
-                                '${access_member}.${method_name}(${field_name}, builder, ${serialization_context});'
-                            )
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like class::method(StringData, BSONObjBuilder*, SerializationContext, SerializationOptions)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder, ${serialization_context}, options);'
+                                )
+                            else:
+                                # Call a method like class::method(StringData, BSONObjBuilder*, SerializationContext)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder, ${serialization_context});'
+                                )
                         else:
-                            # Call a method like class::method(StringData, BSONObjBuilder*)
-                            self._writer.write_template(
-                                '${access_member}.${method_name}(${field_name}, builder);')
+                            if field.query_shape == ast.QueryShapeFieldType.CUSTOM:
+                                # Call a method like class::method(StringData, BSONObjBuilder*, SerializationOptions)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder, options);'
+                                )
+                            else:
+                                # Call a method like class::method(StringData, BSONObjBuilder*)
+                                self._writer.write_template(
+                                    '${access_member}.${method_name}(${field_name}, builder);')
 
             else:
                 method_name = writer.get_method_name(field.type.serializer)

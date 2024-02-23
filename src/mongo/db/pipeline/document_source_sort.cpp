@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/serialization_options.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"

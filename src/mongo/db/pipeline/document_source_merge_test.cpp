@@ -32,6 +32,7 @@
 #include "mongo/unittest/bson_test_util.h"
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
@@ -1179,24 +1180,29 @@ TEST_F(DocumentSourceMergeServerlessTest,
 TEST_F(DocumentSourceMergeTest, QueryShape) {
     auto pipeline = BSON_ARRAY(BSON("$project" << BSON("x"
                                                        << "1")));
+    auto let = BSON("new"
+                    << "$$ROOT"
+                    << "year"
+                    << "2020");
     auto spec =
         BSON("$merge" << BSON("into"
                               << "target_collection"
-                              << "let" << BSONObj() << "whenMatched" << pipeline << "whenNotMatched"
+                              << "let" << let << "whenMatched" << pipeline << "whenNotMatched"
                               << "insert"));
     auto mergeStage = createMergeStage(spec);
     ASSERT(mergeStage);
     auto serialized = mergeStage->serialize().getDocument();
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
+
+    auto expectedBson = fromjson(R"({
             "$merge": {
                 "into": {
-                    "db": "unittests",
-                    "coll": "target_collection"
+                    "db": "HASH<unittests>",
+                    "coll": "HASH<target_collection>"
                 },
-                "on": "_id",
+                "on": "HASH<_id>",
                 "let": {
-                    "new": "$$ROOT"
+                        "HASH<year>": "?string",
+                        "HASH<new>": "$$ROOT"
                 },
                 "whenMatched": [
                     {
@@ -1208,8 +1214,11 @@ TEST_F(DocumentSourceMergeTest, QueryShape) {
                 ],
                 "whenNotMatched": "insert"
             }
-        })",
-        redact(*mergeStage));
+        })");
+    auto result = redact(*mergeStage);
+    UnorderedFieldsBSONObjComparator comparator;
+    ASSERT_EQ(0, comparator.compare(redact(*mergeStage), expectedBson))
+        << "Expected [" << expectedBson << "] but found [" << result << "]";
 }
 
 }  // namespace

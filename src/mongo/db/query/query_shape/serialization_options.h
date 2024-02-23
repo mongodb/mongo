@@ -76,6 +76,8 @@ struct SerializationOptions {
     // this purpose. We may do that on the $queryStats read path.
     static const SerializationOptions kRepresentativeQueryShapeSerializeOptions;
     static const SerializationOptions kDebugQueryShapeSerializeOptions;
+    static const SerializationOptions kMarkIdentifiers_FOR_TEST;
+    static const SerializationOptions kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     /**
      * Checks if this SerializationOptions represents the same options as another
@@ -84,7 +86,6 @@ struct SerializationOptions {
      */
     bool operator==(const SerializationOptions& other) const {
         return this->transformIdentifiers == other.transformIdentifiers &&
-            this->includePath == other.includePath &&
             // You cannot well determine std::function equivalence in C++, so this is the best we'll
             // do.
             (this->transformIdentifiersCallback == nullptr) ==
@@ -167,7 +168,6 @@ struct SerializationOptions {
         }
     }
 
-
     /**
      * Helper method to call 'serializeLiteral()' on 'e' and append the resulting value to 'bob'
      * using the same name as 'e'.
@@ -189,9 +189,6 @@ struct SerializationOptions {
      *   one given. For any number, this will be the number 1. For any boolean this will be true.
      *
      * Example usage: BSON("myArg" << options.serializeLiteral(_myArg));
-     *
-     * TODO SERVER-76330 If you need a different value to make sure it will parse, you should not
-     * use this API - but use serializeConstrainedLiteral() instead.
      */
     Value serializeLiteral(const BSONElement& e) const;
     Value serializeLiteral(const ImplicitValue& v) const;
@@ -212,20 +209,6 @@ struct SerializationOptions {
     // information (e.g., field paths/names, collection names) encountered before serializing them.
     bool transformIdentifiers = false;
     std::function<std::string(StringData)> transformIdentifiersCallback = defaultHmacStrategy;
-
-    // If set to false, serializes without including the path. For example {a: {$gt: 2}} would
-    // serialize as just {$gt: 2}.
-    //
-    // It is expected that most callers want to set 'includePath' to true to
-    // get a correct serialization. Internally, we may set this to false if we have a situation
-    // where an outer expression serializes a path and we don't want to repeat the path in the
-    // inner expression.
-    //
-    // For example in {a: {$elemMatch: {$eq: 2}}} the "a" is serialized by the $elemMatch, and
-    // should not be serialized by the EQ child.
-    // The $elemMatch will serialize {a: {$elemMatch: <recurse>}} and the EQ will serialize just
-    // {$eq: 2} instead of its usual {a: {$eq: 2}}.
-    bool includePath = true;
 
     // For aggregation indicate whether we should use the more verbose serialization format.
     boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;

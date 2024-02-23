@@ -42,7 +42,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/platform/atomic_word.h"

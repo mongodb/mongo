@@ -383,6 +383,13 @@ const BSONObj& ClientMetadata::getDocument() const {
     return _document;
 }
 
+unsigned long ClientMetadata::getHash() const {
+    if (!_hash) {
+        _hash = simpleHash(_document);
+    }
+    return *_hash;
+}
+
 void ClientMetadata::logClientMetadata(Client* client) const {
     if (getDocument().isEmpty()) {
         return;

@@ -82,16 +82,19 @@ structs:
     DocumentSourceMergeSpec:
         description: A document used to specify the $merge stage of an aggregation pipeline.
         strict: true
+        query_shape_component: true
         fields:
             into:
                 cpp_name: targetNss
                 type: MergeTargetNss
                 description: Target namespace to merge documents from an aggregation pipeline into.
+                query_shape: custom
 
             on:
                 type: MergeOnFields
                 optional: true
                 description: A single field or array of fields that uniquely identify a document.
+                query_shape: custom
 
             let:
                 type: object
@@ -99,18 +102,21 @@ structs:
                 description: Specifies variables to use in the update pipeline defined in
                              MergeWhenMatchedPolicy when the 'whenMatched' mode is a custom
                              pipeline.
+                query_shape: custom
 
             whenMatched:
                 type: MergeWhenMatchedPolicy
                 optional: true
                 description: The merge mode for the merge operation when source and target elements
                              match.
+                query_shape: parameter
 
             whenNotMatched:
                 type: MergeWhenNotMatchedMode
                 optional: true
                 description: The merge mode for the merge operation when source and target elements
                              do not match.
+                query_shape: parameter
 
             targetCollectionVersion:
                 type: ChunkVersion
@@ -120,3 +126,4 @@ structs:
                              in which case the shard key may have changed, or had its shard key
                              refined. This also can be used to detect if the collection has gone
                              from unsharded to sharded, and thus now has a shard key.
+                query_shape: parameter

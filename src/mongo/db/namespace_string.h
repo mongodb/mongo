@@ -1017,6 +1017,15 @@ public:
         return builder << o.toString();
     }
 
+    template <typename H>
+    friend H AbslHashValue(H h, const NamespaceStringOrUUID& nssOrUUID) {
+        if (nssOrUUID.isNamespaceString()) {
+            return H::combine(std::move(h), nssOrUUID.nss());
+        } else {
+            return H::combine(std::move(h), nssOrUUID.uuid());
+        }
+    }
+
 private:
     using UUIDWithDbName = std::tuple<DatabaseName, UUID>;
     stdx::variant<NamespaceString, UUIDWithDbName> _nssOrUUID;

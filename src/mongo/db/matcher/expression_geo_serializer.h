@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo {
 
@@ -57,5 +57,6 @@ namespace mongo {
  */
 void geoCustomSerialization(BSONObjBuilder* bob,
                             const BSONObj& obj,
-                            const SerializationOptions& opts);
+                            const SerializationOptions& opts = {},
+                            bool includePath = true);
 }  // namespace mongo

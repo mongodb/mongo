@@ -77,7 +77,8 @@ public:
     }
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts) const final {
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
         bob->appendArray(name(), _typeSet.toBSONArray());
     }
 
@@ -240,7 +241,8 @@ public:
     }
 
     void appendSerializedRightHandSide(BSONObjBuilder* bob,
-                                       const SerializationOptions& opts) const final {
+                                       const SerializationOptions& opts = {},
+                                       bool includePath = true) const final {
         if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
             bob->append(name(), _binDataSubType);
         } else {

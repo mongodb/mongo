@@ -30,7 +30,7 @@
 #include "serialization_options.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 #include <boost/optional.hpp>
 #include <string>
@@ -101,6 +101,15 @@ static const auto kRepresentativeDbPointer = BSONDBRef("?.?", OID::max());
 static const auto kRepresentativeJavascript = BSONCode("return ?;");
 static const auto kRepresentativeJavascriptWithScope = BSONCodeWScope("return ?;", BSONObj());
 static const auto kRepresentativeTimestamp = Timestamp::min();
+
+/**
+ * A default redaction strategy that generates easy to check results for testing purposes.
+ */
+std::string applyHmacForTest(StringData s) {
+    // Avoid ending in a parenthesis since the results will occur in a raw string where the )"
+    // sequence will accidentally terminate the string.
+    return str::stream() << "HASH<" << s << ">";
+}
 
 /**
  * Computes a debug string meant to represent "any value of type t", where "t" is the type of the
@@ -391,6 +400,14 @@ const SerializationOptions SerializationOptions::kRepresentativeQueryShapeSerial
 
 const SerializationOptions SerializationOptions::kDebugQueryShapeSerializeOptions =
     SerializationOptions{.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString};
+
+const SerializationOptions SerializationOptions::kMarkIdentifiers_FOR_TEST = SerializationOptions{
+    .transformIdentifiers = true, .transformIdentifiersCallback = applyHmacForTest};
+
+const SerializationOptions SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST =
+    SerializationOptions{.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString,
+                         .transformIdentifiers = true,
+                         .transformIdentifiersCallback = applyHmacForTest};
 
 // Overloads for BSONElem and Value.
 StringData debugTypeString(BSONElement e) {

@@ -26,19 +26,17 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "query_shape/serialization_options.h"
+
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/unittest/unittest.h"
-#include "serialization_options.h"
 namespace mongo {
 namespace {
-
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
 
 auto getExpCtx() {
     auto nss = NamespaceString::createNamespaceString_forTest("db", "coll");
@@ -48,9 +46,7 @@ auto getExpCtx() {
 TEST(SerializeSortPatternTest, SerializeAndRedactFieldName) {
     auto expCtx = getExpCtx();
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
-    SerializationOptions opts = {};
-    opts.transformIdentifiers = true;
-    opts.transformIdentifiersCallback = applyHmacForTest;
+    SerializationOptions opts = SerializationOptions::kMarkIdentifiers_FOR_TEST;
 
     // Most basic sort pattern, confirm that field name gets redacted.
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT

@@ -31,6 +31,7 @@ global:
 
 imports:
   - "mongo/db/basic_types.idl"
+  - "mongo/db/pipeline/aggregate_command.idl"
 
 structs:
   UnionWithSpec:
@@ -44,4 +45,4 @@ structs:
       pipeline:
         description: An optional pipeline to apply to the collection being unioned.
         optional: true
-        type: array<object>
+        type: pipeline

@@ -87,16 +87,36 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
  * vector of pairs that contain the cache key and a corresponding QueryStatsEntry. This ensures
  * that the partition mutex is only held for the duration of copying.
  */
-std::vector<std::pair<size_t, QueryStatsEntry>> copyPartition(
-    QueryStatsStore::Partition&& partition) {
-    std::vector<std::pair<size_t, QueryStatsEntry>> currKeyMetrics;
-    for (auto&& [key, metrics] : *partition) {
-        currKeyMetrics.push_back(std::make_pair(*key, QueryStatsEntry(*metrics)));
+std::vector<QueryStatsEntry> copyPartition(const QueryStatsStore::Partition& partition) {
+    // Note the intentional copy of QueryStatsEntry and intentional additional shared pointer
+    // reference to the key generator. This will give us a snapshot of all the metrics we want to
+    // report, and keep the key around even if the entry gets evicted.
+    std::vector<QueryStatsEntry> currKeyMetrics;
+    for (auto&& [hash, metrics] : *partition) {
+        currKeyMetrics.push_back(metrics);
     }
     return currKeyMetrics;
 }
 
 }  // namespace
+
+BSONObj DocumentSourceQueryStats::computeQueryStatsKey(std::shared_ptr<const Key> key) const {
+    static const auto sha256HmacStringDataHasher = [](std::string key, const StringData& sd) {
+        auto hashed = SHA256Block::computeHmac(
+            (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
+        return hashed.toString();
+    };
+
+    auto opts = SerializationOptions{};
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    if (_algorithm == TransformAlgorithmEnum::kHmacSha256) {
+        opts.transformIdentifiers = true;
+        opts.transformIdentifiersCallback = [&](StringData sd) {
+            return sha256HmacStringDataHasher(_hmacKey, sd);
+        };
+    }
+    return key->toBson(pExpCtx->opCtx, opts);
+}
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
@@ -140,18 +160,22 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
 }
 
 Value DocumentSourceQueryStats::serialize(const SerializationOptions& opts) const {
-    // This document source never contains any user information, so serialization options do not
-    // apply.
-    return Value{Document{
-        {kStageName,
-         _transformIdentifiers
-             ? Document{{"transformIdentifiers",
-                         Document{
-                             {"algorithm", TransformAlgorithm_serializer(_algorithm)},
-                             {"hmacKey",
-                              opts.serializeLiteral(BSONBinData(
-                                  _hmacKey.c_str(), _hmacKey.size(), BinDataType::Sensitive))}}}}
-             : Document{}}}};
+    auto hmacKey = opts.serializeLiteral(
+        BSONBinData(_hmacKey.c_str(), _hmacKey.size(), BinDataType::Sensitive));
+    if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
+        // The default shape for a BinData under this policy is empty and has sub-type 0 (general).
+        // This doesn't quite work for us since we assert when we parse that it is at least 32 bytes
+        // and also is sub-type 8 (sensitive).
+        hmacKey =
+            Value(BSONBinData("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", 32, BinDataType::Sensitive));
+    }
+    return Value{
+        Document{{kStageName,
+                  _transformIdentifiers
+                      ? Document{{"transformIdentifiers",
+                                  Document{{"algorithm", TransformAlgorithm_serializer(_algorithm)},
+                                           {"hmacKey", hmacKey}}}}
+                      : Document{}}}};
 }
 
 DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
@@ -204,31 +228,33 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
 
-        auto&& partition = _queryStatsStore.getPartition(_currentPartition);
         // We only keep the partition (which holds a lock) for the time needed to collect the key
         // and metric pairs
-        auto currKeyMetrics = copyPartition(std::move(partition));
+        auto currKeyMetrics = copyPartition(_queryStatsStore.getPartition(_currentPartition));
 
-        for (auto&& [key, metrics] : currKeyMetrics) {
+        for (auto&& metrics : currKeyMetrics) {
+            const auto& key = metrics.key;
+            const auto& hash = absl::HashOf(key);
             try {
-                auto queryStatsKey =
-                    metrics.computeQueryStatsKey(pExpCtx->opCtx, _algorithm, _hmacKey);
+                auto queryStatsKey = computeQueryStatsKey(key);
                 _materializedPartition.push_back({{"key", std::move(queryStatsKey)},
                                                   {"metrics", metrics.toBSON()},
                                                   {"asOf", partitionReadTime}});
             } catch (const DBException& ex) {
                 queryStatsHmacApplicationErrors.increment();
+                const auto queryShape = key->universalComponents()._queryShape->toBson(
+                    pExpCtx->opCtx,
+                    SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
                 LOGV2_DEBUG(7349403,
                             3,
                             "Error encountered when applying hmac to query shape, will not publish "
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
-                            "hash"_attr = key,
-                            "representativeQueryShape"_attr =
-                                metrics.getRepresentativeQueryShapeForDebug());
+                            "hash"_attr = hash,
+                            "debugQueryShape"_attr = queryShape);
+
                 if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
-                    auto keyString = std::to_string(key);
-                    auto queryShape = metrics.getRepresentativeQueryShapeForDebug();
+                    auto keyString = std::to_string(hash);
                     tasserted(7349401,
                               str::stream() << "Was not able to re-parse queryStats key when "
                                                "reading queryStats.Status "

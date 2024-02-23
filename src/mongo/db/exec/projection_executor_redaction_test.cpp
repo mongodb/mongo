@@ -35,7 +35,7 @@
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
-#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/inline_auto_update.h"
 #include "mongo/unittest/unittest.h"
 
@@ -58,16 +58,9 @@ std::unique_ptr<projection_executor::ProjectionExecutor> compileProjection(BSONO
         expCtx, &ast, policies, projection_executor::kDefaultBuilderParams);
     return exec;
 }
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
 
 TEST(Redaction, ProjectionTest) {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.transformIdentifiers = true;
-
-    options.transformIdentifiersCallback = applyHmacForTest;
+    SerializationOptions options = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
     auto redactProj = [&](std::string obj) {
         return compileProjection(fromjson(obj))->serializeTransformation(boost::none, options);
     };

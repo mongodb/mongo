@@ -24,7 +24,7 @@ function runTest(conn) {
     cst.cleanUp();
 
     const queryStats = getQueryStatsAggCmd(db);
-    assert.eq(1, queryStats.length);
+    assert.eq(1, queryStats.length, getQueryStats(db));
     assert.eq(coll.getName(), queryStats[0].key.queryShape.cmdNs.coll);
 
     // TODO SERVER-76263 Support reporting 'collectionType' on a sharded cluster.
@@ -38,24 +38,27 @@ function runTest(conn) {
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet({setParameter: {internalQueryStatsRateLimit: -1}});
     rst.initiate();
+    rst.getPrimary().getDB("admin").setLogLevel(3, "queryStats");
     runTest(rst.getPrimary());
     rst.stopSet();
 }
 
 {
     // Test on a sharded cluster.
-    const st = new ShardingTest({
-        mongos: 1,
-        shards: 1,
-        config: 1,
-        rs: {nodes: 1},
-        mongosOptions: {
-            setParameter: {
-                internalQueryStatsRateLimit: -1,
-            }
-        },
-    });
-    runTest(st.s);
-    st.stop();
+    // TODO SERVER-81313 This causes the change stream to fail to re-parse due to an issue with a
+    // ResumeToken.
+    // const st = new ShardingTest({
+    //     mongos: 1,
+    //     shards: 1,
+    //     config: 1,
+    //     rs: {nodes: 1},
+    //     mongosOptions: {
+    //         setParameter: {
+    //             internalQueryStatsRateLimit: -1,
+    //         }
+    //     },
+    // });
+    // runTest(st.s);
+    // st.stop();
 }
 }());

@@ -63,7 +63,9 @@ public:
         _debugStringAttachTagInfo(&debug);
     }
 
-    void serialize(BSONObjBuilder* out, const SerializationOptions& opts) const final {
+    void serialize(BSONObjBuilder* out,
+                   const SerializationOptions& opts = {},
+                   bool includePath = true) const final {
         opts.appendLiteral(out, name(), 1);
     }
 

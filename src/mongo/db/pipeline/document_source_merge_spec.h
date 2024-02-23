@@ -55,7 +55,8 @@ struct MergeWhenMatchedPolicy {
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
                                    BSONObjBuilder* bob,
-                                   const SerializationContext& serializationContext);
+                                   const SerializationContext& serializationContext,
+                                   const SerializationOptions& opts);
 NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
                                             const BSONElement& elem,
                                             const SerializationContext& serializationContext);
@@ -66,7 +67,8 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
  */
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
-                                  BSONObjBuilder* bob);
+                                  BSONObjBuilder* bob,
+                                  const SerializationOptions& opts = {});
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem);
 
 /**

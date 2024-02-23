@@ -68,14 +68,18 @@ structs:
         validator:
           callback: validateObjectIsEmpty
         optional: true
-        query_shape: literal
+        # Treat this value as a parameter (meaning it won't be abstracted or transformed) because
+        # the _only_ accepted value is the empty object. There's no transformation needed.
+        query_shape: parameter
       queryExecStats:
         description: Adds query execution statistics to the return document.
         type: object
         validator:
             callback: validateObjectIsEmpty
         optional: true
-        query_shape: literal
+        # Treat this value as a parameter (meaning it won't be abstracted or transformed) because
+        # the _only_ accepted value is the empty object. There's no transformation needed.
+        query_shape: parameter
       $_requestOnTimeseriesView:
         description: When set to true, $collStats stage requests statistics from the view namespace.
           When set to false, $collStats stage requests statistics from the underlying collection.

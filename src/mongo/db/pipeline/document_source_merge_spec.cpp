@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo {
 using namespace fmt::literals;
@@ -72,10 +73,12 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,
                                    StringData fieldName,
                                    BSONObjBuilder* bob,
-                                   const SerializationContext& serializationContext) {
+                                   const SerializationContext& serializationContext,
+                                   const SerializationOptions& opts) {
     bob->append(fieldName,
-                BSON("db" << DatabaseNameUtil::serialize(targetNss.dbName(), serializationContext)
-                          << "coll" << targetNss.coll()));
+                BSON("db" << opts.serializeIdentifier(DatabaseNameUtil::serialize(
+                                 targetNss.dbName(), serializationContext))
+                          << "coll" << opts.serializeIdentifier(targetNss.coll())));
 }
 
 std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
@@ -112,11 +115,12 @@ std::vector<std::string> mergeOnFieldsParseFromBSON(const BSONElement& elem) {
 
 void mergeOnFieldsSerializeToBSON(const std::vector<std::string>& fields,
                                   StringData fieldName,
-                                  BSONObjBuilder* bob) {
+                                  BSONObjBuilder* bob,
+                                  const SerializationOptions& opts) {
     if (fields.size() == 1) {
-        bob->append(fieldName, fields.front());
+        bob->append(fieldName, opts.serializeFieldPathFromString(fields.front()));
     } else {
-        bob->append(fieldName, fields);
+        bob->append(fieldName, opts.serializeFieldPathFromString(fields));
     }
 }
 

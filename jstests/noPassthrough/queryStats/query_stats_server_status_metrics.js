@@ -2,8 +2,6 @@
  * Test the telemetry related serverStatus metrics.
  * @tags: [featureFlagQueryStats]
  */
-load('jstests/libs/analyze_plan.js');
-
 (function() {
 "use strict";
 
@@ -70,7 +68,7 @@ function evictionTest(conn, testDB, coll, testOptions) {
     addApprox2MBOfStatsData(testDB, coll);
     if (!testOptions.resetCacheSize) {
         const evictedAfter = testDB.serverStatus().metrics.queryStats.numEvicted;
-        assert.gt(evictedAfter, 0);
+        assert.gt(evictedAfter, 0, testDB.serverStatus().metrics.queryStats);
         return;
     }
     // Make sure number of evicted entries increases when the cache size is reset, which forces out

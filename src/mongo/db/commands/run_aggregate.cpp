@@ -73,7 +73,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/db/query/query_stats/aggregate_key_generator.h"
+#include "mongo/db/query/query_stats/agg_key_generator.h"
 #include "mongo/db/query/query_stats/key_generator.h"
 #include "mongo/db/query/query_stats/query_stats.h"
 #include "mongo/db/read_concern.h"
@@ -438,8 +438,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     const AggregateCommandRequest& request,
     std::unique_ptr<CollatorInterface> collator,
     boost::optional<UUID> uuid,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault,
-    boost::optional<CollectionOptions> collectionOptions = boost::none) {
+    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
                               request,
@@ -663,13 +662,14 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createExecutor
 }
 
 Status _runAggregate(OperationContext* opCtx,
-                     const NamespaceString& origNss,
                      AggregateCommandRequest& request,
                      const LiteParsedPipeline& liteParsedPipeline,
                      const BSONObj& cmdObj,
                      const PrivilegeVector& privileges,
                      rpc::ReplyBuilderInterface* result,
-                     std::shared_ptr<ExternalDataSourceScopeGuard> externalDataSourceGuard);
+                     std::shared_ptr<ExternalDataSourceScopeGuard> externalDataSourceGuard,
+                     boost::optional<const ResolvedView&> resolvedView,
+                     boost::optional<const AggregateCommandRequest&> origRequest);
 
 Status runAggregateOnView(OperationContext* opCtx,
                           const NamespaceString& origNss,
@@ -677,15 +677,11 @@ Status runAggregateOnView(OperationContext* opCtx,
                           const MultipleCollectionAccessor& collections,
                           boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse,
                           const ViewDefinition* view,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           std::shared_ptr<const CollectionCatalog> catalog,
                           const PrivilegeVector& privileges,
-                          CurOp* curOp,
                           rpc::ReplyBuilderInterface* result,
                           const std::function<void(void)>& resetContextFn) {
     auto nss = request.getNamespace();
-    checkCollectionUUIDMismatch(
-        opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
 
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "mapReduce on a view is not supported",
@@ -734,8 +730,15 @@ Status runAggregateOnView(OperationContext* opCtx,
 
     auto status{Status::OK()};
     try {
-        status = _runAggregate(
-            opCtx, origNss, newRequest, {newRequest}, newCmd, privileges, result, nullptr);
+        status = _runAggregate(opCtx,
+                               newRequest,
+                               {newRequest},
+                               newCmd,
+                               privileges,
+                               result,
+                               nullptr,
+                               resolvedView,
+                               request);
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // Since we expect the view to be UNSHARDED, if we reached to this point there are
         // two possibilities:
@@ -755,21 +758,127 @@ Status runAggregateOnView(OperationContext* opCtx,
         // Set the namespace of the curop back to the view namespace so ctx records
         // stats on this view namespace on destruction.
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp->setNS_inlock(nss);
+        CurOp::get(opCtx)->setNS_inlock(nss);
     }
 
     return status;
 }
 
+/**
+ * Determines the collection type of the query by precedence of various configurations. The order
+ * of these checks is critical since there may be overlap (e.g., a view over a virtual collection
+ * is classified as a view).
+ */
+query_shape::CollectionType determineCollectionType(
+    const boost::optional<AutoGetCollectionForReadCommandMaybeLockFree>& ctx,
+    boost::optional<const ResolvedView&> resolvedView,
+    bool hasChangeStream,
+    bool isCollectionless) {
+    if (resolvedView.has_value()) {
+        if (resolvedView->timeseries()) {
+            return query_shape::CollectionType::kTimeseries;
+        }
+        return query_shape::CollectionType::kView;
+    }
+    if (isCollectionless) {
+        return query_shape::CollectionType::kVirtual;
+    }
+    if (hasChangeStream) {
+        return query_shape::CollectionType::kChangeStream;
+    }
+    return ctx ? ctx->getCollectionType() : query_shape::CollectionType::kUnknown;
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
+    OperationContext* opCtx,
+    const NamespaceString& origNss,
+    const AggregateCommandRequest& request,
+    const boost::optional<AutoGetCollectionForReadCommandMaybeLockFree>& ctx,
+    std::unique_ptr<CollatorInterface> collator,
+    boost::optional<UUID> uuid,
+    ExpressionContext::CollationMatchesDefault collationMatchesDefault,
+    const MultipleCollectionAccessor& collections,
+    stdx::unordered_set<NamespaceString> pipelineInvolvedNamespaces,
+    bool hasChangeStream,
+    bool isCollectionless,
+    boost::optional<const ResolvedView&> resolvedView,
+    boost::optional<const AggregateCommandRequest&> origRequest) {
+    // If we're operating over a view, we first parse just the original user-given request
+    // for the sake of registering query stats. Then, we'll parse the view pipeline and stitch
+    // the two pipelines together below.
+    auto expCtx =
+        makeExpressionContext(opCtx, request, std::move(collator), uuid, collationMatchesDefault);
+    // If any involved collection contains extended-range data, set a flag which individual
+    // DocumentSource parsers can check.
+    collections.forEach([&](const CollectionPtr& coll) {
+        if (coll->getRequiresTimeseriesExtendedRangeSupport())
+            expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+    });
+
+    auto requestForQueryStats = origRequest.has_value() ? *origRequest : request;
+    expCtx->startExpressionCounters();
+    auto pipeline = Pipeline::parse(requestForQueryStats.getPipeline(), expCtx);
+    expCtx->stopExpressionCounters();
+
+    // Register query stats with the pre-optimized pipeline. Exclude queries against collections
+    // with encrypted fields. We still collect query stats on collection-less aggregations.
+    bool hasEncryptedFields = ctx && ctx->getCollection() &&
+        ctx->getCollection()->getCollectionOptions().encryptedFieldConfig;
+    if (!hasEncryptedFields) {
+        // If this is a query over a resolved view, we want to register query stats with the
+        // original user-given request and pipeline, rather than the new request generated when
+        // resolving the view.
+        auto collectionType =
+            determineCollectionType(ctx, resolvedView, hasChangeStream, isCollectionless);
+
+        query_stats::registerRequest(opCtx, origNss, [&]() {
+            return std::make_unique<query_stats::AggKey>(requestForQueryStats,
+                                                         *pipeline,
+                                                         expCtx,
+                                                         pipelineInvolvedNamespaces,
+                                                         origNss,
+                                                         collectionType);
+        });
+    }
+
+    if (resolvedView.has_value()) {
+        expCtx->startExpressionCounters();
+
+        if (resolvedView->timeseries()) {
+            // For timeseries, there may have been rewrites done on the raw BSON pipeline
+            // during view resolution. We must parse the request's full resolved pipeline
+            // which will account for those rewrites.
+            // TODO SERVER-82101 Re-organize timeseries rewrites so timeseries can follow the
+            // same pattern here as other views
+            pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+        } else {
+            // Parse the view pipeline, then stitch the user pipeline and view pipeline together
+            // to build the total aggregation pipeline.
+            auto userPipeline = std::move(pipeline);
+            pipeline = Pipeline::parse(resolvedView->getPipeline(), expCtx);
+            pipeline->appendPipeline(std::move(userPipeline));
+        }
+
+        expCtx->stopExpressionCounters();
+    }
+
+    // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
+    // $$USER_ROLES for the aggregation.
+    expCtx->setUserRoles();
+    return pipeline;
+}
+
+
 Status _runAggregate(OperationContext* opCtx,
-                     const NamespaceString& origNss,
                      AggregateCommandRequest& request,
                      const LiteParsedPipeline& liteParsedPipeline,
                      const BSONObj& cmdObj,
                      const PrivilegeVector& privileges,
                      rpc::ReplyBuilderInterface* result,
-                     std::shared_ptr<ExternalDataSourceScopeGuard> externalDataSourceGuard) {
-
+                     std::shared_ptr<ExternalDataSourceScopeGuard> externalDataSourceGuard,
+                     boost::optional<const ResolvedView&> resolvedView,
+                     boost::optional<const AggregateCommandRequest&> origRequest) {
+    auto origNss = origRequest.has_value() ? origRequest->getNamespace() : request.getNamespace();
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
     performValidationChecks(opCtx, request, liteParsedPipeline);
@@ -929,12 +1038,11 @@ Status _runAggregate(OperationContext* opCtx,
                     !request.getCollectionUUID());
 
             // If this is a collectionless agg with no foreign namespaces, don't acquire any locks.
-            statsTracker.emplace(
-                opCtx,
-                nss,
-                Top::LockType::NotLocked,
-                AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+            statsTracker.emplace(opCtx,
+                                 nss,
+                                 Top::LockType::NotLocked,
+                                 AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                                 catalog->getDatabaseProfileLevel(nss.dbName()));
             auto [collator, match] = PipelineD::resolveCollator(
                 opCtx, request.getCollation().get_value_or(BSONObj()), CollectionPtr());
             collatorToUse.emplace(std::move(collator));
@@ -956,39 +1064,9 @@ Status _runAggregate(OperationContext* opCtx,
             }
         }
 
-        auto parsePipeline = [&](std::unique_ptr<CollatorInterface> collator) {
-            expCtx =
-                makeExpressionContext(opCtx,
-                                      request,
-                                      std::move(collator),
-                                      uuid,
-                                      collatorToUseMatchesDefault,
-                                      collections.getMainCollection()
-                                          ? collections.getMainCollection()->getCollectionOptions()
-                                          : boost::optional<CollectionOptions>(boost::none));
-
-            // If any involved collection contains extended-range data, set a flag which individual
-            // DocumentSource parsers can check.
-            collections.forEach([&](const CollectionPtr& coll) {
-                if (coll->getRequiresTimeseriesExtendedRangeSupport())
-                    expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
-            });
-
-            expCtx->startExpressionCounters();
-            auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-            curOp->beginQueryPlanningTimer();
-            expCtx->stopExpressionCounters();
-
-            return std::make_pair(expCtx, std::move(pipeline));
-        };
-
-        auto collectionType =
-            ctx ? ctx->getCollectionType() : query_shape::CollectionType::kUnknown;
-        if (liteParsedPipeline.hasChangeStream()) {
-            collectionType = query_shape::CollectionType::kChangeStream;
-        } else if (nss.isCollectionlessAggregateNS()) {
-            collectionType = query_shape::CollectionType::kVirtual;
-        }
+        // If collectionUUID was provided, verify the collection exists and has the expected UUID.
+        checkCollectionUUIDMismatch(
+            opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
 
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
@@ -1001,77 +1079,35 @@ Status _runAggregate(OperationContext* opCtx,
         // underlying bucket collection.
         if (ctx && ctx->getView() &&
             (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
-            try {
-                invariant(collatorToUse.has_value());
-                query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
-                    // In this path we haven't yet parsed the pipeline, but we need to do so for
-                    // query shape stats - which should track the queries before views are resolved.
-                    // Inside this callback we know we have already checked that query stats are
-                    // enabled and know that this request has not been rate limited.
-
-                    // We can't move out of collatorToUse as it's needed for runAggregateOnView().
-                    // Clone instead.
-                    auto&& [expCtx, pipeline] = parsePipeline(
-                        *collatorToUse == nullptr ? nullptr : (*collatorToUse)->clone());
-
-                    return std::make_unique<query_stats::AggregateKeyGenerator>(
-                        request,
-                        *pipeline,
-                        expCtx,
-                        pipelineInvolvedNamespaces,
-                        origNss,
-                        collectionType);
-                });
-            } catch (const DBException& ex) {
-                if (ex.code() == 6347902) {
-                    // TODO Handle the $$SEARCH_META case in SERVER-76087.
-                    LOGV2_WARNING(7198701,
-                                  "Failed to parse pipeline before view resolution",
-                                  "error"_attr = ex.toStatus());
-                } else {
-                    throw;
-                }
-            }
             return runAggregateOnView(opCtx,
                                       origNss,
                                       request,
                                       collections,
                                       std::move(collatorToUse),
                                       ctx->getView(),
-                                      expCtx,
                                       catalog,
                                       privileges,
-                                      curOp,
                                       result,
                                       resetContext);
         }
 
-        // If collectionUUID was provided, verify the collection exists and has the expected UUID.
-        checkCollectionUUIDMismatch(
-            opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
-
         invariant(collatorToUse);
-        auto&& expCtxAndPipeline = parsePipeline(std::move(*collatorToUse));
-        auto expCtx = expCtxAndPipeline.first;
-        auto pipeline = std::move(expCtxAndPipeline.second);
-        // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
-        // $$USER_ROLES for the aggregation.
-        expCtx->setUserRoles();
+        auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
+                                                           origNss,
+                                                           request,
+                                                           ctx,
+                                                           std::move(*collatorToUse),
+                                                           uuid,
+                                                           collatorToUseMatchesDefault,
+                                                           collections,
+                                                           pipelineInvolvedNamespaces,
+                                                           liteParsedPipeline.hasChangeStream(),
+                                                           nss.isCollectionlessAggregateNS(),
+                                                           resolvedView,
+                                                           origRequest);
+        expCtx = pipeline->getContext();
 
-        // Register query stats with the pre-optimized pipeline. Exclude queries against collections
-        // with encrypted fields. We still collect query stats on collection-less aggregations.
-        if (!(ctx && ctx->getCollection() &&
-              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerRequest(opCtx, request.getNamespace(), [&]() {
-                return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request,
-                    *pipeline,
-                    expCtx,
-                    pipelineInvolvedNamespaces,
-                    request.getNamespace(),
-                    collectionType);
-            });
-        }
+        CurOp::get(opCtx)->beginQueryPlanningTimer();
 
         if (!request.getAllowDiskUse().value_or(true)) {
             allowDiskUseFalseCounter.increment();
@@ -1267,24 +1303,27 @@ Status _runAggregate(OperationContext* opCtx,
 }  // namespace
 
 Status runAggregate(OperationContext* opCtx,
-                    const NamespaceString& nss,
                     AggregateCommandRequest& request,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
-                    rpc::ReplyBuilderInterface* result) {
-    return _runAggregate(opCtx, nss, request, {request}, cmdObj, privileges, result, nullptr);
+                    rpc::ReplyBuilderInterface* result,
+                    boost::optional<const ResolvedView&> resolvedView,
+                    boost::optional<const AggregateCommandRequest&> origRequest) {
+    return _runAggregate(
+        opCtx, request, {request}, cmdObj, privileges, result, nullptr, resolvedView, origRequest);
 }
 
 Status runAggregate(
     OperationContext* opCtx,
-    const NamespaceString& nss,
     AggregateCommandRequest& request,
     const LiteParsedPipeline& liteParsedPipeline,
     const BSONObj& cmdObj,
     const PrivilegeVector& privileges,
     rpc::ReplyBuilderInterface* result,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
-        usedExternalDataSources) {
+        usedExternalDataSources,
+    boost::optional<const ResolvedView&> resolvedView,
+    boost::optional<const AggregateCommandRequest&> origRequest) {
     // Create virtual collections and drop them when aggregate command is done.
     // If a cursor is registered, the ExternalDataSourceScopeGuard will be stored in the cursor;
     // when the cursor is later destroyed, the scope guard will also be destroyed, and any virtual
@@ -1295,8 +1334,15 @@ Status runAggregate(
     auto extDataSrcGuard = usedExternalDataSources.size() > 0
         ? std::make_shared<ExternalDataSourceScopeGuard>(opCtx, usedExternalDataSources)
         : nullptr;
-    return _runAggregate(
-        opCtx, nss, request, liteParsedPipeline, cmdObj, privileges, result, extDataSrcGuard);
+    return _runAggregate(opCtx,
+                         request,
+                         liteParsedPipeline,
+                         cmdObj,
+                         privileges,
+                         result,
+                         extDataSrcGuard,
+                         resolvedView,
+                         origRequest);
 }
 
 }  // namespace mongo

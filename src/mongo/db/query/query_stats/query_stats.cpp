@@ -45,8 +45,8 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_stats/util.h"
-#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -56,15 +56,18 @@
 #include "mongo/util/system_clock_source.h"
 #include <optional>
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQueryStats
 
 namespace mongo::query_stats {
+
+CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
 
 namespace {
 
 CounterMetric queryStatsEvictedMetric("queryStats.numEvicted");
 CounterMetric queryStatsRateLimitedRequestsMetric("queryStats.numRateLimitedRequests");
 CounterMetric queryStatsStoreWriteErrorsMetric("queryStats.numQueryStatsStoreWriteErrors");
+
 
 /**
  * Cap the queryStats store size.
@@ -187,6 +190,19 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     return true;
 }
 
+void updateStatistics(const QueryStatsStore::Partition& proofOfLock,
+                      QueryStatsEntry& toUpdate,
+                      const uint64_t queryExecMicros,
+                      const uint64_t firstResponseExecMicros,
+                      const uint64_t docsReturned) {
+    toUpdate.latestSeenTimestamp = Date_t::now();
+    toUpdate.lastExecutionMicros = queryExecMicros;
+    toUpdate.execCount++;
+    toUpdate.totalExecMicros.aggregate(queryExecMicros);
+    toUpdate.firstResponseExecMicros.aggregate(firstResponseExecMicros);
+    toUpdate.docsReturned.aggregate(docsReturned);
+}
+
 }  // namespace
 
 /**
@@ -207,7 +223,7 @@ bool isQueryStatsFeatureEnabled(bool requiresFullQueryStatsFeatureFlag) {
 
 void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator,
+                     std::function<std::unique_ptr<Key>(void)> makeKey,
                      bool requiresFullQueryStatsFeatureFlag) {
     if (!isQueryStatsEnabled(opCtx->getServiceContext(), requiresFullQueryStatsFeatureFlag)) {
         return;
@@ -223,7 +239,7 @@ void registerRequest(OperationContext* opCtx,
     }
     auto& opDebug = CurOp::get(opCtx)->debug();
 
-    if (opDebug.queryStatsKeyGenerator) {
+    if (opDebug.queryStatsKey) {
         // A find() request may have already registered the shapifier. Ie, it's a find command over
         // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
         LOGV2_DEBUG(7198700,
@@ -238,7 +254,7 @@ void registerRequest(OperationContext* opCtx,
     // in a BSON object that exceeds the 16 MB memory limit. In these cases, we want to exclude the
     // original query from queryStats metrics collection and let it execute normally.
     try {
-        opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+        opDebug.queryStatsKey = makeKey();
     } catch (ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
         LOGV2_DEBUG(7979400,
                     1,
@@ -247,7 +263,11 @@ void registerRequest(OperationContext* opCtx,
         queryStatsStoreWriteErrorsMetric.increment();
         return;
     }
-    opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
+    opDebug.queryStatsKeyHash = absl::HashOf(*opDebug.queryStatsKey);
+    // TODO look up this query shape (sub-component of query stats store key) in some new shared
+    // data structure that the query settings component could share. See if the query SHAPE hash has
+    // been computed before. If so, record the query shape hash on the opDebug. If not, compute the
+    // hash and store it there so we can avoid re-doing this for each request.
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
@@ -261,7 +281,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     std::unique_ptr<KeyGenerator> keyGenerator,
+                     std::unique_ptr<Key> key,
                      const uint64_t queryExecMicros,
                      const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
@@ -285,39 +305,40 @@ void writeQueryStats(OperationContext* opCtx,
     auto&& queryStatsStore = getQueryStatsStore(opCtx);
     auto&& [statusWithMetrics, partitionLock] =
         queryStatsStore.getWithPartitionLock(*queryStatsKeyHash);
-    std::shared_ptr<QueryStatsEntry> metrics;
     if (statusWithMetrics.isOK()) {
-        metrics = *statusWithMetrics.getValue();
-    } else {
-        tassert(7315200,
-                "keyGenerator cannot be null when writing a new entry to the telemetry store",
-                keyGenerator != nullptr);
-        size_t numEvicted =
-            queryStatsStore.put(*queryStatsKeyHash,
-                                std::make_shared<QueryStatsEntry>(std::move(keyGenerator)),
-                                partitionLock);
-        queryStatsEvictedMetric.increment(numEvicted);
-        auto newMetrics = partitionLock->get(*queryStatsKeyHash);
-        if (!newMetrics.isOK()) {
-            // This can happen if the budget is immediately exceeded. Specifically if the there is
-            // not enough room for a single new entry if the number of partitions is too high
-            // relative to the size.
-            queryStatsStoreWriteErrorsMetric.increment();
-            LOGV2_DEBUG(7560900,
-                        1,
-                        "Failed to store queryStats entry.",
-                        "status"_attr = newMetrics.getStatus(),
-                        "queryStatsKeyHash"_attr = queryStatsKeyHash);
-            return;
-        }
-        metrics = newMetrics.getValue()->second;
+        // Found an existing entry! Just update the metrics and we're done.
+        return updateStatistics(partitionLock,
+                                *statusWithMetrics.getValue(),
+                                queryExecMicros,
+                                firstResponseExecMicros,
+                                docsReturned);
     }
 
-    metrics->latestSeenTimestamp = Date_t::now();
-    metrics->lastExecutionMicros = queryExecMicros;
-    metrics->execCount++;
-    metrics->totalExecMicros.aggregate(queryExecMicros);
-    metrics->firstResponseExecMicros.aggregate(firstResponseExecMicros);
-    metrics->docsReturned.aggregate(docsReturned);
+    // Otherwise we didn't find an existing entry. Try to create one.
+    tassert(7315200,
+            "key cannot be null when writing a new entry to the telemetry store",
+            key != nullptr);
+    size_t numEvicted =
+        queryStatsStore.put(*queryStatsKeyHash, QueryStatsEntry(std::move(key)), partitionLock);
+    queryStatsEvictedMetric.increment(numEvicted);
+    auto newMetrics = partitionLock->get(*queryStatsKeyHash);
+    if (!newMetrics.isOK()) {
+        // This can happen if the budget is immediately exceeded. Specifically if the there is
+        // not enough room for a single new entry if the number of partitions is too high
+        // relative to the size.
+        queryStatsStoreWriteErrorsMetric.increment();
+        LOGV2_DEBUG(7560900,
+                    0,
+                    "Failed to store queryStats entry.",
+                    "status"_attr = newMetrics.getStatus(),
+                    "queryStatsKeyHash"_attr = queryStatsKeyHash);
+        return;
+    }
+
+    return updateStatistics(partitionLock,
+                            newMetrics.getValue()->second,
+                            queryExecMicros,
+                            firstResponseExecMicros,
+                            docsReturned);
 }
 }  // namespace mongo::query_stats

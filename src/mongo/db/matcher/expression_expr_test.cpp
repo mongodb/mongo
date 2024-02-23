@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/inline_auto_update.h"
 #include "mongo/unittest/unittest.h"
@@ -800,21 +801,11 @@ DEATH_TEST_REGEX(ExprMatchTest, GetChildFailsIndexGreaterThanZero, "Tripwire ass
     ASSERT_THROWS_CODE(matchExpr->getChild(0), AssertionException, 6400207);
 }
 
-/**
- * A default redaction strategy that generates easy to check results for testing purposes.
- */
-std::string applyHmacForTest(StringData s) {
-    return str::stream() << "HASH<" << s << ">";
-}
-
 TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     createMatcher(fromjson("{$expr: {$sum: [\"$a\", \"$b\"]}}"));
 
-    SerializationOptions opts;
-    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    opts.transformIdentifiersCallback = applyHmacForTest;
-    opts.transformIdentifiers = true;
+    SerializationOptions opts = SerializationOptions::kDebugShapeAndMarkIdentifiers_FOR_TEST;
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"$expr":{"$sum":["$HASH<a>","$HASH<b>"]}})",

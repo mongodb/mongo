@@ -287,7 +287,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/set_user_write_block_mode_idl',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index_commands_idl',
-        '$BUILD_DIR/mongo/db/query_shape_common',
+        '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/caching',
         'analyze_shard_key_common',

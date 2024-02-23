@@ -29,9 +29,24 @@
 
 #pragma once
 
-#include "mongo/db/query/query_shape.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/query/query_shape/query_shape.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 
 namespace mongo::shape_helpers {
+
+int64_t inline optionalObjSize(boost::optional<BSONObj> optionalObj) {
+    if (!optionalObj)
+        return 0;
+    return optionalObj->objsize();
+}
+
+template <typename T>
+int64_t optionalSize(boost::optional<T> optionalVal) {
+    if (!optionalVal)
+        return 0;
+    return optionalVal->size();
+}
 
 /**
  * Serializes the given 'hintObj' in accordance with the options. Assumes the hint is correct and
