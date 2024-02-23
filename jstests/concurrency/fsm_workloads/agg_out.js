@@ -11,8 +11,6 @@
  * the server doesn't deadlock or crash.
  *
  * @tags: [
- *   # TODO SERVER-86802: Disabled due to problems with moving unsplittable collections
- *   assumes_balancer_off,
  *   requires_capped,
  * ]
  */
@@ -90,6 +88,9 @@ export const $config = extendWorkload($baseConfig, function($config, $super) {
             // Locally it fails with explicit collection dropped error. When doing remote reads,
             // it fails with cursor not found error.
             ErrorCodes.CursorNotFound,
+            // When running in suites with random migrations $out can fail copying the indexes due
+            // to a resharding operation in progress
+            ErrorCodes.ReshardCollectionInProgress,
         ];
         assert.commandWorkedOrFailedWithCode(res, allowedErrorCodes);
 
