@@ -182,7 +182,7 @@ using tracked_inlined_vector =
 
 template <class T, std::size_t N>
 tracked_inlined_vector<T, N> make_tracked_inlined_vector(TrackingContext& trackingContext) {
-    return tracked_inline_vector<T, N>(N, trackingContext);
+    return tracked_inlined_vector<T, N>(trackingContext.makeAllocator<T>());
 }
 
 class TrackableBSONObj {
