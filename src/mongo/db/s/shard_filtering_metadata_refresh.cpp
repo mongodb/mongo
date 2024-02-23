@@ -241,12 +241,14 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
 
             if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
                 LOGV2(6697204, "Refreshed database metadata", logAttrs(dbName));
-            } else {
-                LOGV2_ERROR(6697205,
-                            "Failed database metadata refresh",
-                            logAttrs(dbName),
-                            "error"_attr = redact(status));
+                return Status::OK();
             }
+
+            LOGV2_ERROR(6697205,
+                        "Failed database metadata refresh",
+                        logAttrs(dbName),
+                        "error"_attr = redact(status));
+            return status;
         })
         .semi()
         .share();
