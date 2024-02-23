@@ -29,12 +29,11 @@
 
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <cerrno>
 #include <ctime>
-#include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/service_context.h"
@@ -175,12 +174,12 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Interrupt
                                                                        AdmissionContext* admCtx,
                                                                        Date_t until) {
     stdx::unique_lock<Latch> lk(_mutex);
-
     bool taken = interruptible.waitForConditionOrInterruptUntil(
         _newTicket, lk, until, [this] { return _tryAcquire(); });
     if (!taken) {
         return boost::none;
     }
+
     return Ticket{this, admCtx};
 }
 

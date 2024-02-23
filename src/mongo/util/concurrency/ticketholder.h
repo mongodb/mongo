@@ -31,18 +31,13 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
-#include <utility>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/future.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -118,24 +113,6 @@ public:
      */
     int32_t getAndResetPeakUsed();
 
-    /**
-     * 'Immediate' admissions don't need to acquire or wait for a ticket. However, they should
-     * report to the TicketHolder for tracking purposes.
-     *
-     * Increments the count of 'immediate' priority admissions reported.
-     */
-    virtual void reportImmediatePriorityAdmission() {
-        _immediatePriorityAdmissionsCount.fetchAndAdd(1);
-    }
-
-    /**
-     * Returns the number of 'immediate' priority admissions, which always bypass ticket
-     * acquisition.
-     */
-    int64_t getImmediatePriorityAdmissionsCount() const {
-        return _immediatePriorityAdmissionsCount.loadRelaxed();
-    }
-
     virtual void appendStats(BSONObjBuilder& b) const;
 
     /**
@@ -202,7 +179,7 @@ private:
 
     Mutex _resizeMutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "TicketHolder::_resizeMutex");
-    AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount;
+    AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount{0};
 
 protected:
     /**
@@ -232,8 +209,6 @@ public:
                                                Microseconds& timeQueuedForTicketMicros) override;
 
     void appendStats(BSONObjBuilder& b) const override {}
-
-    void reportImmediatePriorityAdmission() override {}
 
     int32_t available() const override {
         return _available;

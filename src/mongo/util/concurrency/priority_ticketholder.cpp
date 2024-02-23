@@ -32,7 +32,6 @@
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-
 #include <boost/optional/optional.hpp>
 
 #include "mongo/db/service_context.h"
@@ -122,8 +121,6 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(Interrupti
 }
 
 void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
-    // 'Immediate' priority operations should bypass the ticketing system completely.
-    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
     _pool.release();
 }
 

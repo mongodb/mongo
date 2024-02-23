@@ -1671,22 +1671,22 @@ _Code spelunking starting points:_
 # Global Lock Admission Control
 There are 2 separate ticketing mechanisms placed in front of the global lock acquisition. Both aim to limit the number of concurrent operations from overwhelming the system. Before an operation can acquire the global lock, it must acquire a ticket from one, or both, of the ticketing mechanisms. When both ticket mechanisms are necessary, the acquisition order is as follows:
 1. Flow Control - Required only for global lock requests in MODE_IX
-2. Execution Admission Control - Required for all global lock requests
+2. Execution Control - Required for all global lock requests
 
 
-Flow Control is in place to prevent a majority of secondaries from falling behind in replication, whereas Execution Admission Control aims to limit the number of concurrent storage engine transactions on a single node.
+Flow Control is in place to prevent a majority of secondaries from falling behind in replication, whereas Execution Control aims to limit the number of concurrent storage engine transactions on a single node.
 
 ## Admission Priority
 Associated with every operation is an admission priority, stored as a part of the [AdmissionContext](https://github.com/mongodb/mongo/blob/r6.3.0-rc0/src/mongo/util/concurrency/admission_context.h#L40). By default, operations are 'normal' priority.
 
-In both the Execution Admission and Flow Control ticketing system, operations of 'immediate' priority bypass ticket acquisition, regardless of ticket availability. Otherwise, tickets that are not 'immediate' priority must throttle when there are no tickets available.
+In the Flow Control ticketing system, operations of 'immediate' priority bypass ticket acquisition regardless of ticket availability. Tickets that are not 'immediate' priority must throttle when there are no tickets available in both Flow Control and Execution Control.
 
-Flow Control is only concerned whether an operation is 'immediate' priority and does not differentiate between 'normal' and 'low' priorities. The current version of Execution Admission Control relies on admission priority to administer tickets when the server is under load.
+Flow Control is only concerned whether an operation is 'immediate' priority and does not differentiate between 'normal' and 'low' priorities. The current version of Execution Control relies on admission priority to administer tickets when the server is under load.
 
 **AdmissionContext::Priority**
-* `kImmediate` - An operation that bypasses ticket acquisition in both ticketing mechanisms. Reserved for operations critical to availability (e.g replication workers), or observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting prepared transactions).
+* `kImmediate` - Reserved for operations critical to availability (e.g replication workers), or observability (e.g. FTDC), and any operation releasing resources (e.g. committing or aborting prepared transactions).
 * `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate' priority.
-* `kLow` - It's of low importance that the operation acquires a ticket in Execution Admission Control. Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Admission Control.
+* `kLow` - Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Control.
 
 [See AdmissionContext::Priority for more details](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/util/concurrency/admission_context.h#L45-L67).
 
@@ -1717,7 +1717,7 @@ Examples of Deprioritized Operations:
 * [Unbounded Collection Scans](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_analysis.cpp#L1254)
 * Index Builds [(1)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3064), [(2)](https://github.com/mongodb/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3105)
 
-## Execution Admission Control
+## Execution Control
 A ticketing mechanism that limits the number of concurrent storage engine transactions in a single mongod to reduce contention on storage engine resources.
 
 ### Ticket Management

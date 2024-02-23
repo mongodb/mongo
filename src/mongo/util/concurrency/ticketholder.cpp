@@ -31,15 +31,10 @@
 
 #include <algorithm>
 #include <boost/none.hpp>
-#include <mutex>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/feature_flag.h"
-#include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
-#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
-#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -111,17 +106,22 @@ void TicketHolder::appendStats(BSONObjBuilder& b) const {
     b.append("out", used());
     b.append("available", available());
     b.append("totalTickets", outof());
-    b.append("immediatePriorityAdmissionsCount", getImmediatePriorityAdmissionsCount());
+    b.append("immediatePriorityAdmissionsCount", _immediatePriorityAdmissionsCount.loadRelaxed());
     _appendImplStats(b);
 }
 
 void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
+    if (admCtx->getPriority() == AdmissionContext::Priority::kImmediate) {
+        return;
+    }
+
     if (MONGO_unlikely(hangTicketRelease.shouldFail())) {
         LOGV2(8435300,
               "Hanging hangTicketRelease in _releaseToTicketPool() due to 'hangTicketRelease' "
               "failpoint");
         hangTicketRelease.pauseWhileSet();
     }
+
     auto& queueStats = _getQueueStatsToUse(admCtx);
     updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
     _releaseToTicketPoolImpl(admCtx);
@@ -136,25 +136,25 @@ Ticket TicketHolder::waitForTicket(Interruptible& interruptible,
 }
 
 boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
-    // 'kImmediate' operations should always bypass the ticketing system.
-    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
-    auto ticket = _tryAcquireImpl(admCtx);
+    if (admCtx->getPriority() == AdmissionContext::Priority::kImmediate) {
+        _immediatePriorityAdmissionsCount.fetchAndAdd(1);
+        return Ticket{this, admCtx};
+    }
 
+    auto ticket = _tryAcquireImpl(admCtx);
     if (ticket) {
         auto& queueStats = _getQueueStatsToUse(admCtx);
         updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
         _updatePeakUsed();
     }
+
     return ticket;
 }
-
 
 boost::optional<Ticket> TicketHolder::waitForTicketUntil(Interruptible& interruptible,
                                                          AdmissionContext* admCtx,
                                                          Date_t until,
                                                          Microseconds& timeQueuedForTicketMicros) {
-    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
-
     // Attempt a quick acquisition first.
     if (auto ticket = tryAcquire(admCtx)) {
         return ticket;

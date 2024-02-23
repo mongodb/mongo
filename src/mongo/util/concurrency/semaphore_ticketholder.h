@@ -35,18 +35,14 @@
 #include <algorithm>
 #include <boost/optional/optional.hpp>
 #include <cstdint>
-#include <queue>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/admission_context.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -83,7 +79,6 @@ private:
     }
 #if defined(__linux__)
     mutable sem_t _sem;
-
 #else
     bool _tryAcquire();
 
@@ -92,6 +87,7 @@ private:
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "SemaphoreTicketHolder::_mutex");
     stdx::condition_variable _newTicket;
 #endif
+
     QueueStats _semaphoreStats;
 };
 
