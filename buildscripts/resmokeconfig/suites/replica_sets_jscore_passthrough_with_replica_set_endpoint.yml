@@ -65,22 +65,13 @@ selector:
     # TODO (SERVER-79353): Support role-aware serverStatus on mongod with router role.
     - jstests/core/write/find_and_modify/find_and_modify_metrics.js
     - jstests/core/write/update/update_metrics.js
-    # TODO (SERVER-81359): Support role-aware currentOp on mongod with router role.
-    - jstests/core/administrative/current_op/currentop_cursors.js
-    - jstests/core/administrative/current_op/currentop_shell.js
-    - jstests/core/query/count/count_plan_summary.js
-    - jstests/core/query/mr/mr_killop.js
+    # TODO (SERVER-86777): Investigate why timeseries_delete_with_meta_concurrent.js and
+    # timeseries_update_concurrent.js can't run on sharded cluster with replica set endpoint.
     - jstests/core/timeseries/timeseries_delete_with_meta_concurrent.js
     - jstests/core/timeseries/timeseries_update_concurrent.js
-    - jstests/core/txns/listcollections_autocomplete.js
-    - jstests/core/txns/write_conflicts_with_non_txns.js
-    - jstests/core/txns/aggregation_in_transaction.js
-    - jstests/core/txns/currentop_blocked_operations.js
+    # TODO (SERVER-86771): renameCollection on sharded cluster doesn't support implicitly creating
+    # the destination database.
     - jstests/core/txns/transactions_block_ddl.js
-    - jstests/core/txns/kill_sessions_kills_transaction.js
-    - jstests/core/txns/abort_expired_transaction.js
-    - jstests/core/txns/transactions_profiling_with_drops.js
-    - jstests/core/txns/kill_cursors_in_transaction.js
     # TODO (SERVER-75857): Unify behavior between mongod and mongos when running explain on a
     # nonexistent database.
     - jstests/core/query/explain/explain_missing_database.js

@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/generic_cursor_gen.h"
 #include "mongo/db/logical_time.h"
@@ -93,40 +94,52 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
     auto blockedOpGuard = DiagnosticInfo::maybeMakeBlockedOpForTest(opCtx->getClient());
 #endif
 
-    for (Service::LockedClientsCursor cursor(opCtx->getClient()->getService());
-         Client* client = cursor.next();) {
-        invariant(client);
+    auto reportCurrentOpForService = [&](Service* service) {
+        for (Service::LockedClientsCursor cursor(service); Client* client = cursor.next();) {
+            invariant(client);
 
-        stdx::lock_guard<Client> lk(*client);
+            stdx::lock_guard<Client> lk(*client);
 
-        if (ctxAuth->getAuthorizationManager().isAuthEnabled()) {
-            // If auth is disabled, ignore the allUsers parameter.
-            if (userMode == CurrentOpUserMode::kExcludeOthers &&
-                !ctxAuth->isCoauthorizedWithClient(client, lk)) {
+            if (ctxAuth->getAuthorizationManager().isAuthEnabled()) {
+                // If auth is disabled, ignore the allUsers parameter.
+                if (userMode == CurrentOpUserMode::kExcludeOthers &&
+                    !ctxAuth->isCoauthorizedWithClient(client, lk)) {
+                    continue;
+                }
+
+                // If currOp is being run for a particular tenant, ignore any ops that don't belong
+                // to it.
+                if (auto expCtxTenantId = expCtx->ns.tenantId()) {
+                    auto userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
+                    if ((userName && userName->getTenant() &&
+                         userName->getTenant() != expCtxTenantId) ||
+                        (userName && !userName->getTenant() &&
+                         !CurOp::currentOpBelongsToTenant(client, *expCtxTenantId))) {
+                        continue;
+                    }
+                }
+            }
+
+            // Ignore inactive connections unless 'idleConnections' is true.
+            if (connMode == CurrentOpConnectionsMode::kExcludeIdle &&
+                !client->hasAnyActiveCurrentOp()) {
                 continue;
             }
 
-            // If currOp is being run for a particular tenant, ignore any ops that don't belong to
-            // it.
-            if (auto expCtxTenantId = expCtx->ns.tenantId()) {
-                auto userName = AuthorizationSession::get(client)->getAuthenticatedUserName();
-                if ((userName && userName->getTenant() &&
-                     userName->getTenant() != expCtxTenantId) ||
-                    (userName && !userName->getTenant() &&
-                     !CurOp::currentOpBelongsToTenant(client, *expCtxTenantId))) {
-                    continue;
-                }
-            }
+            // Delegate to the mongoD- or mongoS-specific implementation of
+            // _reportCurrentOpForClient.
+            ops.emplace_back(
+                _reportCurrentOpForClient(expCtx, client, truncateMode, backtraceMode));
         }
+    };
 
-        // Ignore inactive connections unless 'idleConnections' is true.
-        if (connMode == CurrentOpConnectionsMode::kExcludeIdle &&
-            !client->hasAnyActiveCurrentOp()) {
-            continue;
-        }
-
-        // Delegate to the mongoD- or mongoS-specific implementation of _reportCurrentOpForClient.
-        ops.emplace_back(_reportCurrentOpForClient(expCtx, client, truncateMode, backtraceMode));
+    if (opCtx->routedByReplicaSetEndpoint()) {
+        // On the replica set endpoint, currentOp should report both router and shard operations.
+        auto serviceContext = opCtx->getServiceContext();
+        reportCurrentOpForService(serviceContext->getService(ClusterRole::RouterServer));
+        reportCurrentOpForService(serviceContext->getService(ClusterRole::ShardServer));
+    } else {
+        reportCurrentOpForService(opCtx->getService());
     }
 
     // If 'cursorMode' is set to include idle cursors, retrieve them and add them to ops.

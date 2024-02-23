@@ -247,6 +247,10 @@ Client::TagMask Client::getTags() const {
 int Client::getLocalPort() const {
     if (_service->role().hasExclusively(ClusterRole::RouterServer) &&
         serverGlobalParams.routerPort) {
+        if (_opCtx && _opCtx->routedByReplicaSetEndpoint()) {
+            // This is a client connected to the replica set endpoint so return the shard/main port.
+            return serverGlobalParams.port;
+        }
         return serverGlobalParams.routerPort.value();
     }
     return serverGlobalParams.port;

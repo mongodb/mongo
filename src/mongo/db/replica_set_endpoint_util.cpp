@@ -63,24 +63,11 @@ bool isLocalDatabaseCommandRequest(const OpMsgRequest& opMsgReq) {
 }
 
 /**
- * Returns true if this is a request for an aggregate command with a $currentOp stage.
- */
-bool isCurrentOpAggregateCommandRequest(const OpMsgRequest& opMsgReq) {
-    if (opMsgReq.getDbName().isAdminDB() && opMsgReq.getCommandName() == "aggregate") {
-        auto aggRequest = AggregateCommandRequest::parse(
-            IDLParserContext("ServiceEntryPointMongod::isCurrentOp"), opMsgReq.body);
-        return !aggRequest.getPipeline().empty() &&
-            aggRequest.getPipeline()[0].firstElementFieldNameStringData() == "$currentOp";
-    }
-    return false;
-}
-
-/**
- * Returns true if this is a request for a command that needs to run on the mongod it arrives on.
+ * Returns true if this is a request for a command that needs to run directly on the mongod it
+ * arrives on.
  */
 bool isTargetedCommandRequest(OperationContext* opCtx, const OpMsgRequest& opMsgReq) {
-    return kTargetedCmdNames.contains(opMsgReq.getCommandName()) ||
-        isCurrentOpAggregateCommandRequest(opMsgReq);
+    return kTargetedCmdNames.contains(opMsgReq.getCommandName());
 }
 
 /**

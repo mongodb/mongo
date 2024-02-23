@@ -4,6 +4,8 @@
  * @tags: [
  *   # The test runs commands that are not allowed with security token: fsyncUnlock.
  *   not_allowed_with_signed_security_token,
+ *   # The test expects currentOp to report the insert operation which runs on the primary.
+ *   assumes_read_preference_unchanged,
  *   assumes_superuser_permissions,
  *   uses_parallel_shell,
  * ]

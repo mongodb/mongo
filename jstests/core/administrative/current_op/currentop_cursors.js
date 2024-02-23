@@ -71,7 +71,9 @@ runTest({
     assertFunc: function(cursorId, result) {
         assert.eq(result.length, 1, result);
         // Plan summary does not exist on mongos, so skip this test on mongos.
-        if (!FixtureHelpers.isMongos(db)) {
+        // TODO (SERVER-86780): idleCursor currentOp doc on sharded cluster doesn't have
+        // "planSummary".
+        if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
             assert.eq(result[0].planSummary, "COLLSCAN", result);
         } else {
             assert(!result[0].hasOwnProperty("planSummary"), result);
@@ -212,7 +214,8 @@ runTest({
 });
 
 // planSummary does not exist on Mongos, so skip this test.
-if (!FixtureHelpers.isMongos(db)) {
+// TODO (SERVER-86780): idleCursor currentOp doc on sharded cluster doesn't have "planSummary".
+if (!FixtureHelpers.isMongos(db) && !TestData.testingReplicaSetEndpoint) {
     runTest({
         findFunc: function() {
             assert.commandWorked(coll.createIndex({"val": 1}));

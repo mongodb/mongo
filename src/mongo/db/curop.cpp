@@ -309,6 +309,12 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
         CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
     }
 
+    if (expCtx->opCtx->routedByReplicaSetEndpoint()) {
+        // On the replica set endpoint, currentOp reports both router and shard operations so it
+        // should label each op with its associated role.
+        infoBuilder->append("role", toString(client->getService()->role()));
+    }
+
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
     if (auto diagnostic = DiagnosticInfo::get(*client)) {
         BSONObjBuilder waitingForLatchBuilder(infoBuilder->subobjStart("waitingForLatch"));

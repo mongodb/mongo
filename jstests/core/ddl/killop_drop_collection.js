@@ -57,10 +57,13 @@ const isMongos = FixtureHelpers.isMongos(db);
 let dropCommandOpId = null;
 assert.soon(function() {
     let dropOpsInProgress = [];
-    dropOpsInProgress = db.currentOp().inprog.filter(
-        op => op.command &&
-            (op.command.drop === collection.getName() ||
-             op.command._shardsvrDropCollection === collection.getName()));
+    if (!isMongos) {
+        dropOpsInProgress = db.currentOp().inprog.filter(
+            op => op.command && op.command.drop === collection.getName());
+    } else {
+        dropOpsInProgress = db.currentOp().inprog.filter(
+            op => op.command && op.command._shardsvrDropCollection === collection.getName());
+    }
     if (dropOpsInProgress.length > 0) {
         dropCommandOpId = dropOpsInProgress[0].opid;
     }

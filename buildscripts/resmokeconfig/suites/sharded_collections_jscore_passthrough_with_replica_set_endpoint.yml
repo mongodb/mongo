@@ -70,10 +70,6 @@ selector:
   - jstests/core/**/sort_array.js
 
   # The tests below are disabled because of embedded router role and replica set endpoint.
-  # TODO (SERVER-81359): Support role-aware currentOp on mongod with router role.
-  - jstests/core/administrative/current_op/currentop_shell.js
-  - jstests/core/query/count/count_plan_summary.js
-  - jstests/core/query/mr/mr_killop.js
   # TODO (SERVER-75855): Support running the find command via mongos by specifying a UUID
   # (instead of a collection name).
   - jstests/core/commands_with_uuid.js

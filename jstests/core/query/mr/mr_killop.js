@@ -27,6 +27,13 @@ function getOpCode() {
             return false;
         }
 
+        if (TestData.testingReplicaSetEndpoint && op.role == "ClusterRole{shard}") {
+            // On the replica set endpoint, currentOp reports both router and shard operations. To
+            // interrupt the mapReduce operation, the killOp command must be use the opId of the
+            // router mapReduce operation.
+            return false;
+        }
+
         const cmdBody = op.command;
         if (cmdBody.$truncated) {
             const stringifiedCmd = cmdBody.$truncated;

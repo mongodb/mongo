@@ -222,10 +222,16 @@ try {
 
         // Wait for the parent shell to start watching for the next document.
         jsTestLog("Checking getMore is being blocked...");
-        assert.soon(() => db.currentOp({
-                                op: "getmore",
-                                "cursor.originatingCommand.comment": "uniquifier_comment"
-                            }).inprog.length == 1,
+        const filter0 = {
+            op: "getmore",
+            "cursor.originatingCommand.comment": "uniquifier_comment",
+        };
+        if (TestData.testingReplicaSetEndpoint) {
+            // On the replica set endpoint, currentOp reports both router and shard operations. So
+            // filter out one of them.
+            filter0.role = "ClusterRole{router}";
+        }
+        assert.soon(() => db.currentOp(filter0).inprog.length == 1,
                     () => tojson(db.currentOp().inprog));
 
         // Now write a non-matching document to the collection.
@@ -234,11 +240,13 @@ try {
         // Make sure the getMore has not ended after a while.
         sleep(2000);
         jsTestLog("Checking getMore is still being blocked...");
-        assert.eq(
-            db.currentOp({op: "getmore", "cursor.originatingCommand.comment": "uniquifier_comment"})
-                .inprog.length,
-            1,
-            tojson(db.currentOp().inprog));
+        const filter1 = {op: "getmore", "cursor.originatingCommand.comment": "uniquifier_comment"};
+        if (TestData.testingReplicaSetEndpoint) {
+            // On the replica set endpoint, currentOp reports both router and shard operations. So
+            // filter out one of them.
+            filter1.role = "ClusterRole{router}";
+        }
+        assert.eq(db.currentOp(filter1).inprog.length, 1, tojson(db.currentOp().inprog));
 
         // Now write a matching document to wake it up.
         jsTestLog("Sending signal to getMore...");

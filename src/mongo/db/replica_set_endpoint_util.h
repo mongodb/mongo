@@ -43,7 +43,6 @@ const StringDataSet kTargetedCmdNames = {
                 // CommandNotSupported.
     "configureFailPoint",
     "connectionStatus",
-    "currentOp",
     "fsync",
     "fsyncUnlock",
     "getDiagnosticData",  // TODO (SERVER-79353): Support role-aware serverStatus on mongod with

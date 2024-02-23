@@ -99,6 +99,12 @@ void readRequestMetadata(OperationContext* opCtx,
 
         if (opCtx->routedByReplicaSetEndpoint()) {
             ReadPreferenceSetting::get(opCtx).isPretargeted = true;
+        } else if (ReadPreferenceSetting::get(opCtx).isPretargeted) {
+            // '$_isPretargeted' is used exclusively by the replica set endpoint to mark commands
+            // that it forces to go through the router as needing to target the local mongod.
+            // Given that this request has been marked as pre-targeted, it must have originated from
+            // a request routed by the replica set endpoint. Mark the opCtx with this info.
+            opCtx->setRoutedByReplicaSetEndpoint(true);
         }
     }
 

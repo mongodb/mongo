@@ -121,7 +121,16 @@ serverCommandTest();
 
 // Test that the db.currentOp() shell helper does not truncate ops.
 const shellHelperTest = startShellWithOp("currentOp_shell");
-res = db.currentOp({"ns": "test.currentOp_cursor", "command.comment": "currentOp_shell"});
+res = db.currentOp({
+    $and: [
+        {"ns": "test.currentOp_cursor"},
+        {"command.comment": "currentOp_shell"},
+        // On the replica set endpoint, currentOp reports both router and shard operations. So
+        // filter out one of them.
+        TestData.testingReplicaSetEndpoint ? {role: "ClusterRole{router}"}
+                                           : {role: {$exists: false}}
+    ]
+});
 
 if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
     assert(res.inprog.length >= 1, res);
