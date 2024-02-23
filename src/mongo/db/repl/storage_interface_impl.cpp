@@ -1204,23 +1204,18 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     invariant(oplog);
     invariant(shard_role_details::getLocker(opCtx)->isLocked());
 
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec = InternalPlanner::collectionScan(
-        opCtx, &oplog, PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY, InternalPlanner::BACKWARD);
-
     // A record id in the oplog collection is equivalent to the document's timestamp field.
     RecordId desiredRecordId = RecordId(timestamp.asULL());
-
-    // Iterate the collection in reverse until the desiredRecordId, or one less than, is found.
-    BSONObj bson;
-    RecordId recordId;
-    PlanExecutor::ExecState state;
-    while (PlanExecutor::ADVANCED == (state = exec->getNext(&bson, &recordId))) {
-        if (recordId <= desiredRecordId) {
-            invariant(!bson.isEmpty(),
-                      "An empty oplog entry was returned while searching for an oplog entry <= " +
-                          timestamp.toString());
-            return bson.getOwned();
-        }
+    // Define a backward cursor so that the seek operation returns the first recordId less than or
+    // equal to the 'desiredRecordId', if it exists.
+    auto cursor = oplog->getRecordStore()->getCursor(opCtx, false /* forward */);
+    if (auto record =
+            cursor->seek(desiredRecordId, SeekableRecordCursor::BoundInclusion::kInclude)) {
+        invariant(record->id <= desiredRecordId,
+                  "RecordId returned from seek (" + record->id.toString() +
+                      ") is greater than the desired recordId (" + desiredRecordId.toString() +
+                      ").");
+        return record->data.releaseToBson().getOwned();
     }
 
     return boost::none;
