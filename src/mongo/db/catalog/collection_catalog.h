@@ -185,8 +185,8 @@ public:
      *
      * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
      *
-     * Caller must ensure corresponding database exists. Expects db.system.views MODE_X lock and
-     * view namespace MODE_IX lock (unless 'durability' is set to kAlreadyDurable).
+     * Expects db.system.views MODE_X lock and view namespace MODE_IX lock (unless 'durability' is
+     * set to kAlreadyDurable).
      */
     Status createView(OperationContext* opCtx,
                       const NamespaceString& viewName,
@@ -201,8 +201,6 @@ public:
      * Drop the view named 'viewName'.
      *
      * Must be in WriteUnitOfWork. The drop rolls back if the unit of work aborts.
-     *
-     * Caller must ensure corresponding database exists.
      */
     Status dropView(OperationContext* opCtx, const NamespaceString& viewName) const;
 
@@ -210,8 +208,6 @@ public:
      * Modify the view named 'viewName' to have the new 'viewOn' and 'pipeline'.
      *
      * Must be in WriteUnitOfWork. The modification rolls back if the unit of work aborts.
-     *
-     * Caller must ensure corresponding database exists.
      */
     Status modifyView(OperationContext* opCtx,
                       const NamespaceString& viewName,
@@ -463,8 +459,6 @@ public:
     /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
      * 'callback' to each view.  If the 'callback' returns false, the iterator exits early.
-     *
-     * Caller must ensure corresponding database exists.
      */
     void iterateViews(OperationContext* opCtx,
                       const DatabaseName& dbName,
@@ -473,8 +467,6 @@ public:
     /**
      * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition,
      * or nullptr if it doesn't exist.
-     *
-     * Caller must ensure corresponding database exists.
      */
     std::shared_ptr<const ViewDefinition> lookupView(OperationContext* opCtx,
                                                      const NamespaceString& nss) const;
@@ -482,8 +474,6 @@ public:
     /**
      * Same functionality as above, except this function skips validating durable views in the
      * view catalog.
-     *
-     * Caller must ensure corresponding database exists.
      */
     std::shared_ptr<const ViewDefinition> lookupViewWithoutValidatingDurable(
         OperationContext* opCtx, const NamespaceString& nss) const;

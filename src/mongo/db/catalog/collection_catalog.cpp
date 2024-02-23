@@ -822,8 +822,13 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
 
-    invariant(_viewsForDatabase.find(viewName.dbName()));
-    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
+    auto optViewsForDB = _getViewsForDatabase(opCtx, viewName.dbName());
+    if (!optViewsForDB) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "cannot create view on non existing database "
+                                    << viewName.toStringForErrorMsg());
+    }
+    const ViewsForDatabase& viewsForDb = *optViewsForDB;
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(viewName.dbName())) {
@@ -870,8 +875,14 @@ Status CollectionCatalog::modifyView(
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_X));
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
-    invariant(_viewsForDatabase.find(viewName.dbName()));
-    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
+
+    auto optViewsForDB = _getViewsForDatabase(opCtx, viewName.dbName());
+    if (!optViewsForDB) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "cannot modify view on non existing database "
+                                    << viewName.toStringForErrorMsg());
+    }
+    const ViewsForDatabase& viewsForDb = *optViewsForDB;
 
     if (!viewName.isEqualDb(viewOn))
         return Status(ErrorCodes::BadValue,
@@ -916,8 +927,14 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
-    invariant(_viewsForDatabase.find(viewName.dbName()));
-    const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
+
+    auto optViewsForDB = _getViewsForDatabase(opCtx, viewName.dbName());
+    if (!optViewsForDB) {
+        // If the database does not exist, the view does not exist either
+        return Status::OK();
+    }
+    const ViewsForDatabase& viewsForDb = *optViewsForDB;
+
     assertViewCatalogValid(viewsForDb);
     if (!viewsForDb.lookup(viewName)) {
         return Status::OK();

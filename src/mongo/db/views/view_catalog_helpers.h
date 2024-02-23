@@ -61,8 +61,6 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
  * collations. So in the case of queries on timeseries collections, we create a ResolvedView
  * with the request's collation (timeSeriesCollator) rather than the collection's default
  * collator.
- *
- * Caller must ensure corresponding database exists.
  */
 StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                                      std::shared_ptr<const CollectionCatalog> catalog,

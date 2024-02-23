@@ -300,6 +300,43 @@ TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
                   AssertionException);
 }
 
+TEST_F(ViewCatalogFixture, ViewOnNonExistingDatabase) {
+    const std::string nonExistingDB = "view_catalog_test_not_exists";
+    NamespaceString viewName = NamespaceString::createNamespaceString_forTest(
+        boost::none, nonExistingDB, "nonexistingView");
+    NamespaceString collName = NamespaceString::createNamespaceString_forTest(
+        boost::none, nonExistingDB, "nonexistingCollection");
+
+    Status status =
+        createView(operationContext(), viewName, collName, emptyPipeline, emptyCollation);
+    ASSERT_EQ(status.code(), ErrorCodes::NamespaceNotFound);
+
+    status = dropView(operationContext(), viewName);
+    ASSERT_EQ(status.code(), ErrorCodes::OK);
+
+    status = modifyView(operationContext(), viewName, collName, emptyPipeline);
+    ASSERT_EQ(status.code(), ErrorCodes::NamespaceNotFound);
+
+    int viewsIterated = 0;
+    getCatalog()->iterateViews(
+        operationContext(), viewName.dbName(), [&](const ViewDefinition& view) {
+            viewsIterated++;
+            return true;
+        });
+    ASSERT_EQ(viewsIterated, 0);
+
+    std::shared_ptr<const ViewDefinition> viewDefinition =
+        getCatalog()->lookupView(operationContext(), viewName);
+    ASSERT_EQ(viewDefinition, nullptr);
+
+    viewDefinition = getCatalog()->lookupViewWithoutValidatingDurable(operationContext(), viewName);
+    ASSERT_EQ(viewDefinition, nullptr);
+
+    auto resolvedView =
+        view_catalog_helpers::resolveView(operationContext(), getCatalog(), viewName, boost::none);
+    ASSERT_EQ(status.code(), ErrorCodes::NamespaceNotFound);
+}
+
 TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnChangeStreamsStage) {
     const NamespaceString viewName = NamespaceString::createNamespaceString_forTest("db.view");
     const NamespaceString viewOn = NamespaceString::createNamespaceString_forTest("db.coll");
