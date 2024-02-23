@@ -67,7 +67,7 @@ BSONObj createDebugQueryShape(const BSONObj& representativeQuery,
 DocumentSource::GetNextResult createResult(OperationContext* opCtx,
                                            const boost::optional<TenantId>& tenantId,
                                            QueryShapeConfiguration&& configuration,
-                                           bool includeDebugQueryShape) {
+                                           bool includeDebugQueryShape) try {
     BSONObjBuilder bob;
     configuration.serialize(&bob);
     if (includeDebugQueryShape) {
@@ -75,6 +75,13 @@ DocumentSource::GetNextResult createResult(OperationContext* opCtx,
                    createDebugQueryShape(configuration.getRepresentativeQuery(), opCtx, tenantId));
     }
     return Document{bob.obj()};
+} catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+    uasserted(ErrorCodes::BSONObjectTooLarge,
+              str::stream() << "query settings object exceeds " << BSONObjMaxInternalSize
+                            << " bytes"
+                            << (includeDebugQueryShape
+                                    ? "; consider not setting 'showDebugQueryShape' to true"
+                                    : ""));
 }
 }  // namespace
 

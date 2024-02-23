@@ -94,6 +94,8 @@ selector:
     # response by modifying the original filter. This causes the command to not bypass the views
     # validation and fail.
     - jstests/core/catalog/list_collections_no_views.js
+    # The following test requires query settings / cluster parameter modification.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

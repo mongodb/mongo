@@ -38,6 +38,8 @@ selector:
   - jstests/core/top.js
   # Creating an implicit index causes the plan cache entry we're expecting to be invalidated.
   - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+  # The following test fires a large query that takes too long with wildcard indexes.
+  - jstests/core/query/query_settings/query_settings_size_limits.js
 
   exclude_with_any_tags:
   # This suite implicitly creates compound wildcard indexes.

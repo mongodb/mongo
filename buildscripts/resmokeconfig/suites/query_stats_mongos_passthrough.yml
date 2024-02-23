@@ -40,6 +40,8 @@ selector:
   # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
   # we expect a second drop to return status OK.
   - jstests/core/**/explain_upsert.js
+  # The following test fires a query that is too large for a debug query shape.
+  - jstests/core/query/query_settings/query_settings_size_limits.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   - assumes_against_mongod_not_mongos

@@ -88,6 +88,8 @@ selector:
     # TODO (SERVER-84329): renameCollection command against a collection with invalid views fails on
     # sharded cluster but succeeds on replica set
     - jstests/core/views/invalid_system_views.js
+    # The following test requires query settings / cluster parameter modification.
+    - jstests/core/query/query_settings/query_settings_size_limits.js
 
   exclude_with_any_tags:
     - assumes_standalone_mongod

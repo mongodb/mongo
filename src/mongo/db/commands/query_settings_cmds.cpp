@@ -56,7 +56,8 @@ MONGO_FAIL_POINT_DEFINE(querySettingsPlanCacheInvalidation);
 static constexpr auto kQuerySettingsClusterParameterName = "querySettings"_sd;
 
 SetClusterParameter makeSetClusterParameterRequest(
-    const std::vector<QueryShapeConfiguration>& settingsArray, const mongo::DatabaseName& dbName) {
+    const std::vector<QueryShapeConfiguration>& settingsArray,
+    const mongo::DatabaseName& dbName) try {
     BSONObjBuilder bob;
     BSONArrayBuilder arrayBuilder(
         bob.subarrayStart(QuerySettingsClusterParameterValue::kSettingsArrayFieldName));
@@ -68,6 +69,10 @@ SetClusterParameter makeSetClusterParameterRequest(
         BSON(QuerySettingsManager::kQuerySettingsClusterParameterName << bob.done()));
     setClusterParameterRequest.setDbName(dbName);
     return setClusterParameterRequest;
+} catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+    uasserted(ErrorCodes::BSONObjectTooLarge,
+              str::stream() << "cannot modify query settings: the total size exceeds "
+                            << BSONObjMaxInternalSize << " bytes");
 }
 
 /**
