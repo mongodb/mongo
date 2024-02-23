@@ -18,8 +18,8 @@ coll.insert(docs);
 print(`Collection count: ${coll.find().itcount()}`);
 
 for (const leaf of leafs()) {
-    // TODO SERVER-67550 Equality to null does not match undefined, in Bonsai.
-    if (tojson(leaf).match(/null|undefined/))
+    // Direct comparisons against undefined ({$eq: undefined}) are not allowed.
+    if (tojson(leaf).match(/undefined/))
         continue;
 
     const query = coll.find({a: {$eq: leaf}}, {_id: 0});

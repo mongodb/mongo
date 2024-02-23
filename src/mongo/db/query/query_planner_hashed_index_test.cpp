@@ -220,9 +220,9 @@ TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedPrefix) {
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: null}}, node: {ixscan: {pattern: {x: 'hashed', y: 1, z: -1}, "
         "bounds: {x: [" +
-        getHashedBound(BSONUndefined) + "," + getHashedBound(BSONNULL) +
+        getHashedBound(BSONNULL) +
         "], y: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, true]], z: "
-        "[['MaxKey', null, true, false], [undefined, 'MinKey', false, true]]}}}}}");
+        "[['MaxKey', null, true, false], [null, 'MinKey', false, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedNonPrefix) {
@@ -238,7 +238,7 @@ TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedNonPrefix) {
         "{fetch: {filter: {y: {$ne: null}}, node: {ixscan: {pattern: {x: 1, y: 'hashed', z: -1}, "
         "bounds: {x: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, "
         "true]], y: [['MinKey', 'MaxKey', true, true]], z: [['MaxKey', null, true, false], "
-        "[undefined, 'MinKey', false, true]]}}}}}");
+        "[null, 'MinKey', false, true]]}}}}}");
 
     runQuery(fromjson("{x: {$nin: [1, 2]}, y: {$ne: 5}, z: {$ne: null}}"));
     assertNumSolutions(1);
@@ -246,7 +246,7 @@ TEST_F(QueryPlannerHashedTest, NegationQueriesOnHashedNonPrefix) {
         "{fetch: {filter: {y: {$ne: 5}}, node: {ixscan: {pattern: {x: 1, y: 'hashed', z: -1}, "
         "bounds: {x: [['MinKey', 1, true, false], [1, 2, false, false], [2,'MaxKey', false, "
         "true]], y: [['MinKey', 'MaxKey', true, true]], z: [['MaxKey', null, true, false], "
-        "[undefined, 'MinKey', false, true]]}}}}}");
+        "[null, 'MinKey', false, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerHashedTest, EqualsNullQueries) {
@@ -259,7 +259,7 @@ TEST_F(QueryPlannerHashedTest, EqualsNullQueries) {
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: null}}, node: {ixscan:{pattern: {x: 'hashed', y: 1, z: "
         "-1},bounds: {x: [" +
-        getHashedBound(BSONUndefined) + "," + getHashedBound(BSONNULL) +
+        getHashedBound(BSONNULL) +
         "],y: [['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]"
         "}}}}}");
 
@@ -271,7 +271,7 @@ TEST_F(QueryPlannerHashedTest, EqualsNullQueries) {
     runQuery(fromjson("{x: {$eq: null}}"));
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: null}}, node: {ixscan:{pattern: {x: 1, y: 'hashed', z: -1}, "
-        "bounds: {x:[[undefined, undefined, true, true],[null, null, true, true]], y: "
+        "bounds: {x:[[null, null, true, true]], y: "
         "[['MinKey','MaxKey',true,true]], z: [['MaxKey','MinKey',true,true]]"
         "}}}}}");
 }

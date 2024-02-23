@@ -265,7 +265,7 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
     auto varStr = makeLocalVariableName(_context->state.frameId(), 0);
 
     auto totalCaseConversionExpr = optimizer::make<optimizer::If>(
-        generateABTNullOrMissing(varStr),
+        generateABTNullMissingOrUndefined(varStr),
         makeABTConstant(""_sd),
         optimizer::make<optimizer::If>(
             makeABTFunction(
@@ -676,7 +676,8 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto absExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputName),
                 makeABTFail(ErrorCodes::Error{7157700}, "$abs only supports numeric types")},
@@ -722,11 +723,11 @@ public:
             auto varRight = makeVariable(nameRight);
 
             auto addExpr = buildABTMultiBranchConditional(
-                ABTCaseValuePair{
-                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                         generateABTNullOrMissing(nameLeft),
-                                                         generateABTNullOrMissing(nameRight)),
-                    optimizer::Constant::null()},
+                ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(
+                                     optimizer::Operations::Or,
+                                     generateABTNullMissingOrUndefined(nameLeft),
+                                     generateABTNullMissingOrUndefined(nameRight)),
+                                 optimizer::Constant::null()},
                 ABTCaseValuePair{
                     optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
                                                          makeABTFunction("isDate", varLeft),
@@ -783,7 +784,7 @@ public:
                     makeABTFail(ErrorCodes::Error{7157723},
                                 "only numbers and dates are allowed in an $add expression")));
 
-                checkArgIsNull.push_back(generateABTNullOrMissing(name));
+                checkArgIsNull.push_back(generateABTNullMissingOrUndefined(name));
                 names.push_back(std::move(name));
             }
 
@@ -916,7 +917,8 @@ public:
 
         // Create validation checks when builtin returns nothing
         auto validationExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonObjectCheck(argName),
                 makeABTFail(ErrorCodes::Error{5153215}, "$objectToArray requires an object input")},
@@ -944,7 +946,8 @@ public:
 
         // Create validation checks when builtin returns nothing
         auto validationExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonArrayCheck(argName),
                 makeABTFail(ErrorCodes::Error{5153200}, "$arrayToObject requires an array input")},
@@ -971,7 +974,8 @@ public:
         auto argName = makeLocalVariableName(_context->state.frameId(), 0);
 
         auto bsonSizeExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonObjectCheck(argName),
                 makeABTFail(ErrorCodes::Error{7158301}, "$bsonSize requires a document input")},
@@ -985,7 +989,8 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto ceilExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputName),
                 makeABTFail(ErrorCodes::Error{7157702}, "$ceil only supports numeric types")},
@@ -1085,7 +1090,7 @@ public:
         optimizer::ABTVector checkStringArg;
         optimizer::ABTVector argVars;
         for (auto& bind : binds) {
-            checkNullArg.push_back(generateABTNullOrMissing(bind.first));
+            checkNullArg.push_back(generateABTNullMissingOrUndefined(bind.first));
             checkStringArg.push_back(makeABTFunction("isString"_sd, makeVariable(bind.first)));
             argVars.push_back(makeVariable(bind.first));
         }
@@ -1138,7 +1143,7 @@ public:
         for (size_t i = 0; i < numChildren; ++i) {
             argNames.emplace_back(makeLocalVariableName(_context->state.frameId(), 0));
             argVars.emplace_back(makeVariable(argNames.back()));
-            argIsNullOrMissing.emplace_back(generateABTNullOrMissing(argNames.back()));
+            argIsNullOrMissing.emplace_back(generateABTNullMissingOrUndefined(argNames.back()));
         }
 
         auto anyArgumentNullOrMissing =
@@ -1248,15 +1253,16 @@ public:
         std::vector<ABTCaseValuePair> inputValidationCases;
 
         // Return null if any of the parameters is either null or missing.
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(startDateVar));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(endDateVar));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(unitVar));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullMissingOrUndefined(startDateVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullMissingOrUndefined(endDateVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullMissingOrUndefined(unitVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullMissingOrUndefined(timezoneVar));
         if (expr->isStartOfWeekSpecified()) {
             inputValidationCases.emplace_back(
-                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                     unitIsWeekVar,
-                                                     generateABTNullOrMissing(startOfWeekName)),
+                optimizer::make<optimizer::BinaryOp>(
+                    optimizer::Operations::And,
+                    unitIsWeekVar,
+                    generateABTNullMissingOrUndefined(startOfWeekName)),
                 optimizer::Constant::null());
         }
 
@@ -1381,7 +1387,7 @@ public:
 
         // Return onNull if dateString is null or missing.
         inputValidationCases.push_back(
-            {generateABTNullOrMissing(makeVariable(dateStringName)), onNullExpression});
+            {generateABTNullMissingOrUndefined(makeVariable(dateStringName)), onNullExpression});
 
         // Create an expression to return Nothing if specified, or raise a conversion failure.
         // As long as onError is specified, a Nothing return will always be filled with onError.
@@ -1397,10 +1403,10 @@ public:
             if (timezoneExpression.is<optimizer::Constant>()) {
                 // Return null if timezone is specified as either null or missing.
                 inputValidationCases.push_back(
-                    generateABTReturnNullIfNullOrMissing(timezoneExpression));
+                    generateABTReturnNullIfNullMissingOrUndefined(timezoneExpression));
             } else {
                 inputValidationCases.push_back(
-                    generateABTReturnNullIfNullOrMissing(makeVariable(timezoneName)));
+                    generateABTReturnNullIfNullMissingOrUndefined(makeVariable(timezoneName)));
             }
         }
 
@@ -1409,7 +1415,7 @@ public:
             if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
                 formatExpressionConst) {
                 inputValidationCases.push_back(
-                    generateABTReturnNullIfNullOrMissing(formatExpression));
+                    generateABTReturnNullIfNullMissingOrUndefined(formatExpression));
                 auto [formatTag, formatVal] = formatExpressionConst->get();
                 if (!sbe::value::isNullish(formatTag)) {
                     // We don't want to error on null.
@@ -1420,7 +1426,7 @@ public:
                 }
             } else {
                 inputValidationCases.push_back(
-                    generateABTReturnNullIfNullOrMissing(makeVariable(formatName)));
+                    generateABTReturnNullIfNullMissingOrUndefined(makeVariable(formatName)));
                 inputValidationCases.emplace_back(
                     generateABTNonStringCheck(makeVariable(formatName)),
                     makeABTFail(ErrorCodes::Error{4997803},
@@ -1718,14 +1724,14 @@ public:
         // Make a disjunction of null checks for each date part by over this vector. These checks
         // are necessary after the initial conversion computation because we need have the outer let
         // binding evaluate to null if any field is null.
-        auto nullExprs = optimizer::ABTVector{generateABTNullOrMissing(timeZoneName),
-                                              generateABTNullOrMissing(millisecName),
-                                              generateABTNullOrMissing(secName),
-                                              generateABTNullOrMissing(minName),
-                                              generateABTNullOrMissing(hourName),
-                                              generateABTNullOrMissing(dayName),
-                                              generateABTNullOrMissing(monthName),
-                                              generateABTNullOrMissing(yearName)};
+        auto nullExprs = optimizer::ABTVector{generateABTNullMissingOrUndefined(timeZoneName),
+                                              generateABTNullMissingOrUndefined(millisecName),
+                                              generateABTNullMissingOrUndefined(secName),
+                                              generateABTNullMissingOrUndefined(minName),
+                                              generateABTNullMissingOrUndefined(hourName),
+                                              generateABTNullMissingOrUndefined(dayName),
+                                              generateABTNullMissingOrUndefined(monthName),
+                                              generateABTNullMissingOrUndefined(yearName)};
 
         auto checkPartsForNull =
             makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(nullExprs));
@@ -1830,19 +1836,22 @@ public:
 
         // Check that each argument exists, is not null, and is the correct type.
         auto totalDateToPartsFunc = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(timezoneName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(timezoneName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 makeNot(makeABTFunction("isString", timezoneVar)),
                 makeABTFail(ErrorCodes::Error{7157912}, "$dateToParts timezone must be a string")},
             ABTCaseValuePair{makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneVar)),
                              makeABTFail(ErrorCodes::Error{7157913},
                                          "$dateToParts timezone must be a valid timezone")},
-            ABTCaseValuePair{generateABTNullOrMissing(isoflagName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(isoflagName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 makeNot(makeABTFunction(
                     "typeMatch", isoflagVar, optimizer::Constant::int32(isoTypeMask))),
                 makeABTFail(ErrorCodes::Error{7157914}, "$dateToParts iso8601 must be a boolean")},
-            ABTCaseValuePair{generateABTNullOrMissing(dateName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(dateName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{makeNot(makeABTFunction(
                                  "typeMatch", dateVar, optimizer::Constant::int32(dateTypeMask()))),
                              makeABTFail(ErrorCodes::Error{7157915},
@@ -1897,10 +1906,12 @@ public:
         std::vector<ABTCaseValuePair> inputValidationCases;
         // Return onNull if date is null or missing.
         inputValidationCases.push_back(
-            {generateABTNullOrMissing(dateExpression), onNullExpression});
+            {generateABTNullMissingOrUndefined(dateExpression), onNullExpression});
         // Return null if format or timezone is null or missing.
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(formatExpression));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneExpression));
+        inputValidationCases.push_back(
+            generateABTReturnNullIfNullMissingOrUndefined(formatExpression));
+        inputValidationCases.push_back(
+            generateABTReturnNullIfNullMissingOrUndefined(timezoneExpression));
 
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
@@ -2040,14 +2051,18 @@ public:
         std::vector<ABTCaseValuePair> inputValidationCases;
 
         // Return null if any of the parameters is either null or missing.
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(dateVar));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(unitExpression));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(binSizeExpression));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneExpression));
+        inputValidationCases.push_back(generateABTReturnNullIfNullMissingOrUndefined(dateVar));
+        inputValidationCases.push_back(
+            generateABTReturnNullIfNullMissingOrUndefined(unitExpression));
+        inputValidationCases.push_back(
+            generateABTReturnNullIfNullMissingOrUndefined(binSizeExpression));
+        inputValidationCases.push_back(
+            generateABTReturnNullIfNullMissingOrUndefined(timezoneExpression));
         inputValidationCases.emplace_back(
-            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
-                                                 unitIsWeekVar,
-                                                 generateABTNullOrMissing(startOfWeekExpression)),
+            optimizer::make<optimizer::BinaryOp>(
+                optimizer::Operations::And,
+                unitIsWeekVar,
+                generateABTNullMissingOrUndefined(startOfWeekExpression)),
             optimizer::Constant::null());
 
         // "timezone" parameter validation.
@@ -2199,8 +2214,8 @@ public:
 
         auto checkIsNullOrMissing =
             optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullOrMissing(lhsName),
-                                                 generateABTNullOrMissing(rhsName));
+                                                 generateABTNullMissingOrUndefined(lhsName),
+                                                 generateABTNullMissingOrUndefined(rhsName));
 
         auto divideExpr = buildABTMultiBranchConditional(
             ABTCaseValuePair{std::move(checkIsNullOrMissing), optimizer::Constant::null()},
@@ -2220,7 +2235,8 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto expExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputName),
                 makeABTFail(ErrorCodes::Error{7157704}, "$exp only supports numeric types")},
@@ -2318,7 +2334,8 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto floorExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputName),
                 makeABTFail(ErrorCodes::Error{7157703}, "$floor only supports numeric types")},
@@ -2398,7 +2415,8 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto lnExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputName),
                 makeABTFail(ErrorCodes::Error{7157705}, "$ln only supports numeric types")},
@@ -2424,7 +2442,8 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto log10Expr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputName),
                 makeABTFail(ErrorCodes::Error{7157707}, "$log10 only supports numeric types")},
@@ -2496,8 +2515,8 @@ public:
         auto modExpr = buildABTMultiBranchConditional(
             ABTCaseValuePair{
                 optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                     generateABTNullOrMissing(lhsName),
-                                                     generateABTNullOrMissing(rhsName)),
+                                                     generateABTNullMissingOrUndefined(lhsName),
+                                                     generateABTNullMissingOrUndefined(rhsName)),
                 optimizer::Constant::null()},
             ABTCaseValuePair{
                 optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
@@ -2539,11 +2558,11 @@ public:
             auto varRight = makeVariable(nameRight);
 
             auto mulExpr = buildABTMultiBranchConditional(
-                ABTCaseValuePair{
-                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                         generateABTNullOrMissing(nameLeft),
-                                                         generateABTNullOrMissing(nameRight)),
-                    optimizer::Constant::null()},
+                ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(
+                                     optimizer::Operations::Or,
+                                     generateABTNullMissingOrUndefined(nameLeft),
+                                     generateABTNullMissingOrUndefined(nameRight)),
+                                 optimizer::Constant::null()},
                 optimizer::make<optimizer::BinaryOp>(
                     optimizer::Operations::Mult, varLeft, varRight));
             return optimizer::make<optimizer::Let>(
@@ -2588,7 +2607,7 @@ public:
                 makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
             names.push_back(currentName);
 
-            checkExprsNull.push_back(generateABTNullOrMissing(currentName));
+            checkExprsNull.push_back(generateABTNullMissingOrUndefined(currentName));
             checkExprsNumber.push_back(makeABTFunction("isNumber", makeVariable(currentName)));
             variables.push_back(makeVariable(currentName));
         }
@@ -2674,8 +2693,8 @@ public:
 
         auto checkIsNullOrMissing =
             optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullOrMissing(lhsName),
-                                                 generateABTNullOrMissing(rhsName));
+                                                 generateABTNullMissingOrUndefined(lhsName),
+                                                 generateABTNullMissingOrUndefined(rhsName));
 
         // Create an expression to invoke built-in "pow" function
         auto powFunctionCall = makeABTFunction("pow", makeVariable(lhsName), makeVariable(rhsName));
@@ -2859,14 +2878,16 @@ public:
 
         replaceOneExpr =
             optimizer::make<optimizer::Let>(std::move(replacementArgNullName),
-                                            generateABTNullOrMissing(replacementArgName),
+                                            generateABTNullMissingOrUndefined(replacementArgName),
                                             std::move(replaceOneExpr));
-        replaceOneExpr = optimizer::make<optimizer::Let>(std::move(findArgNullName),
-                                                         generateABTNullOrMissing(findArgName),
-                                                         std::move(replaceOneExpr));
-        replaceOneExpr = optimizer::make<optimizer::Let>(std::move(inputArgNullName),
-                                                         generateABTNullOrMissing(inputArgName),
-                                                         std::move(replaceOneExpr));
+        replaceOneExpr =
+            optimizer::make<optimizer::Let>(std::move(findArgNullName),
+                                            generateABTNullMissingOrUndefined(findArgName),
+                                            std::move(replaceOneExpr));
+        replaceOneExpr =
+            optimizer::make<optimizer::Let>(std::move(inputArgNullName),
+                                            generateABTNullMissingOrUndefined(inputArgName),
+                                            std::move(replaceOneExpr));
 
         replaceOneExpr = optimizer::make<optimizer::Let>(
             std::move(replacementArgName), std::move(replacementArg), std::move(replaceOneExpr));
@@ -2929,7 +2950,7 @@ public:
         auto argumentIsNotArray = makeNot(makeABTFunction("isArray", var));
 
         auto exprReverseArr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
             ABTCaseValuePair{
                 std::move(argumentIsNotArray),
                 makeABTFail(ErrorCodes::Error{7158002}, "$reverseArray argument must be an array")},
@@ -2958,7 +2979,7 @@ public:
         }
 
         auto exprSortArr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
             ABTCaseValuePair{std::move(argumentIsNotArray),
                              makeABTFail(ErrorCodes::Error{7158001},
                                          "$sortArray input argument must be an array")},
@@ -3004,11 +3025,11 @@ public:
         // then make further validity checks against the input. Fail if the delimiter is an
         // empty string. Return [""] if the string expression is an empty string.
         auto totalSplitFunc = buildABTMultiBranchConditional(
-            ABTCaseValuePair{
-                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                     generateABTNullOrMissing(varString),
-                                                     generateABTNullOrMissing(varDelimiter)),
-                optimizer::Constant::null()},
+            ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(
+                                 optimizer::Operations::Or,
+                                 generateABTNullMissingOrUndefined(varString),
+                                 generateABTNullMissingOrUndefined(varDelimiter)),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{makeNot(makeABTFunction("isString"_sd, makeVariable(varString))),
                              makeABTFail(ErrorCodes::Error{7158202},
                                          "$split string expression must be a string")},
@@ -3036,7 +3057,8 @@ public:
         auto inputName = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
 
         auto sqrtExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputName),
                 makeABTFail(ErrorCodes::Error{7157709}, "$sqrt only supports numeric types")},
@@ -3092,8 +3114,8 @@ public:
 
         auto checkNullArguments =
             optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullOrMissing(lhsName),
-                                                 generateABTNullOrMissing(rhsName));
+                                                 generateABTNullMissingOrUndefined(lhsName),
+                                                 generateABTNullMissingOrUndefined(rhsName));
 
         auto checkArgumentTypes = makeNot(optimizer::make<optimizer::If>(
             makeABTFunction("isNumber", makeVariable(lhsName)),
@@ -3153,7 +3175,7 @@ public:
         auto inputString = _context->popABTExpr();
         auto trimBuiltinName = expr->getTrimTypeString();
 
-        auto checkCharsNullish = isCharsProvided ? generateABTNullOrMissing(charsName)
+        auto checkCharsNullish = isCharsProvided ? generateABTNullMissingOrUndefined(charsName)
                                                  : optimizer::Constant::boolean(false);
 
         auto checkCharsNotString = isCharsProvided
@@ -3183,7 +3205,8 @@ public:
            }
         */
         auto trimFunc = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(inputName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{
                 makeNot(makeABTFunction("isString"_sd, makeVariable(inputName))),
                 makeABTFail(ErrorCodes::Error{5156302},
@@ -3404,7 +3427,7 @@ public:
         auto var = makeVariable(name);
 
         auto tsSecondExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
             ABTCaseValuePair{generateABTNonTimestampCheck(name),
                              makeABTFail(ErrorCodes::Error{7157900},
                                          str::stream() << expr->getOpName()
@@ -3423,7 +3446,7 @@ public:
         auto var = makeVariable(name);
 
         auto tsIncrementExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(name), optimizer::Constant::null()},
             ABTCaseValuePair{generateABTNonTimestampCheck(name),
                              makeABTFail(ErrorCodes::Error{7157901},
                                          str::stream() << expr->getOpName()
@@ -3464,14 +3487,14 @@ private:
 
         // We always need to validate the number parameter, since it will always exist.
         std::vector<ABTCaseValuePair> inputValidationCases{
-            generateABTReturnNullIfNullOrMissing(makeVariable(inputNumName)),
+            generateABTReturnNullIfNullMissingOrUndefined(makeVariable(inputNumName)),
             ABTCaseValuePair{
                 generateABTNonNumericCheck(inputNumName),
                 makeABTFail(ErrorCodes::Error{5155300}, opName + " only supports numeric types")}};
         // Only add these cases if we have a "place" argument.
         if (hasPlaceArg) {
             inputValidationCases.emplace_back(
-                generateABTReturnNullIfNullOrMissing(makeVariable(inputPlaceName)));
+                generateABTReturnNullIfNullMissingOrUndefined(makeVariable(inputPlaceName)));
             inputValidationCases.emplace_back(generateInvalidRoundPlaceArgCheck(inputPlaceName),
                                               makeABTFail(ErrorCodes::Error{5155301},
                                                           opName +
@@ -3579,8 +3602,9 @@ private:
         std::vector<ABTCaseValuePair> inputValidationCases;
 
         // Return null if any of the parameters is either null or missing.
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(dateVar));
-        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneExpression));
+        inputValidationCases.push_back(generateABTReturnNullIfNullMissingOrUndefined(dateVar));
+        inputValidationCases.push_back(
+            generateABTReturnNullIfNullMissingOrUndefined(timezoneExpression));
 
         // "timezone" parameter validation.
         if (timezoneExpression.is<optimizer::Constant>()) {
@@ -3675,18 +3699,21 @@ private:
 
     /**
      * Creates a CaseValuePair such that Null value is returned if a value of variable denoted by
-     * 'variable' is null or missing.
+     * 'variable' is null, missing, or undefined.
      */
-    static CaseValuePair generateReturnNullIfNullOrMissing(const sbe::EVariable& variable) {
-        return {generateNullOrMissing(variable), makeNullConstant()};
+    static CaseValuePair generateReturnNullIfNullMissingOrUndefined(
+        const sbe::EVariable& variable) {
+        return {generateNullMissingOrUndefined(variable), makeNullConstant()};
     }
 
-    static ABTCaseValuePair generateABTReturnNullIfNullOrMissing(const optimizer::ABT& name) {
-        return {generateABTNullOrMissing(name), optimizer::Constant::null()};
+    static ABTCaseValuePair generateABTReturnNullIfNullMissingOrUndefined(
+        const optimizer::ABT& name) {
+        return {generateABTNullMissingOrUndefined(name), optimizer::Constant::null()};
     }
 
-    static CaseValuePair generateReturnNullIfNullOrMissing(std::unique_ptr<sbe::EExpression> expr) {
-        return {generateNullOrMissing(std::move(expr)), makeNullConstant()};
+    static CaseValuePair generateReturnNullIfNullOrMissingOrUndefined(
+        std::unique_ptr<sbe::EExpression> expr) {
+        return {generateNullMissingOrUndefined(std::move(expr)), makeNullConstant()};
     }
 
     /**
@@ -3720,7 +3747,8 @@ private:
         auto argName = makeLocalVariableName(frameId, 0);
 
         auto genericTrigonometricExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{makeABTFunction("isNumber", makeVariable(argName)),
                              makeABTFunction(exprName, makeVariable(argName))},
             makeABTFail(ErrorCodes::Error{7157800},
@@ -3746,8 +3774,8 @@ private:
 
         auto checkNullOrMissing =
             optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
-                                                 generateABTNullOrMissing(lhsName),
-                                                 generateABTNullOrMissing(rhsName));
+                                                 generateABTNullMissingOrUndefined(lhsName),
+                                                 generateABTNullMissingOrUndefined(rhsName));
 
         auto checkIsNumber =
             optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
@@ -3796,7 +3824,8 @@ private:
         auto trigonometricExpr = makeABTFunction(exprName, variable);
 
         auto genericTrigonometricExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(argName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{makeNot(std::move(checkIsNumber)),
                              makeABTFail(ErrorCodes::Error{7157802},
                                          str::stream() << "$" << exprName.toString()
@@ -3902,13 +3931,14 @@ private:
 
         // Check if string or substring are null or missing before calling indexOfFunction.
         auto resultExpr = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(strName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(strName),
+                             optimizer::Constant::null()},
             ABTCaseValuePair{generateABTNonStringCheck(strName),
                              makeABTFail(ErrorCodes::Error{7158007},
                                          str::stream()
                                              << "$" << indexOfFunction
                                              << " string must resolve to a string or null")},
-            ABTCaseValuePair{generateABTNullOrMissing(substrName),
+            ABTCaseValuePair{generateABTNullMissingOrUndefined(substrName),
                              makeABTFail(ErrorCodes::Error{7158008},
                                          str::stream() << "$" << indexOfFunction
                                                        << " substring must resolve to a string")},
@@ -3972,7 +4002,7 @@ private:
             argNames.push_back(argName);
             variables.push_back(makeVariable(argName));
 
-            checkNulls.push_back(generateABTNullOrMissing(argName));
+            checkNulls.push_back(generateABTNullMissingOrUndefined(argName));
             checkNotArrays.push_back(generateABTNonArrayCheck(std::move(argName)));
         }
         // Reverse the args array to preserve the original order of the arguments, since some set
@@ -4213,7 +4243,7 @@ private:
         }();
 
         auto regexCall = optimizer::make<optimizer::If>(
-            generateABTNullOrMissing(inputVar),
+            generateABTNullMissingOrUndefined(inputVar),
             generateRegexNullResponse(),
             optimizer::make<optimizer::If>(
                 makeNot(makeABTFunction("isString"_sd, makeVariable(inputVar))),
@@ -4268,10 +4298,10 @@ private:
         auto timeZoneDBVar = makeABTVariable(timeZoneDBSlot);
 
         optimizer::ABTVector checkNullArg;
-        checkNullArg.push_back(generateABTNullOrMissing(startDateName));
-        checkNullArg.push_back(generateABTNullOrMissing(unitName));
-        checkNullArg.push_back(generateABTNullOrMissing(origAmountName));
-        checkNullArg.push_back(generateABTNullOrMissing(tzName));
+        checkNullArg.push_back(generateABTNullMissingOrUndefined(startDateName));
+        checkNullArg.push_back(generateABTNullMissingOrUndefined(unitName));
+        checkNullArg.push_back(generateABTNullMissingOrUndefined(origAmountName));
+        checkNullArg.push_back(generateABTNullMissingOrUndefined(tzName));
 
         auto checkNullAnyArgument =
             makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));

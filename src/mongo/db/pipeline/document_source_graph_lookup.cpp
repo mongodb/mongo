@@ -454,10 +454,11 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(
     // We wrap the query in a $match so that it can be parsed into a DocumentSourceMatch when
     // constructing a pipeline to execute.
 
-    // $match stages will conflate null, and undefined values. Keep track of which ones are
-    // present and eliminate documents that would match the others later.
+    // $graphLookup and regular $match semantics differ in treatment of null/missing. Regular $match
+    // stages may conflate null/missing values. Here, null only matches null.
+
+    // Keep track of whether we see null or missing in the frontier.
     bool matchNull = false;
-    bool matchUndefined = false;
     bool seenMissing = false;
     BSONObjBuilder match;
     {
@@ -477,8 +478,6 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(
                         for (auto&& value : _frontier) {
                             if (value.getType() == BSONType::jstNULL) {
                                 matchNull = true;
-                            } else if (value.getType() == BSONType::Undefined) {
-                                matchUndefined = true;
                             } else if (value.missing()) {
                                 seenMissing = true;
                             }
@@ -489,24 +488,9 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(
             }
             // We never want to see documents where the 'connectToField' is missing. Only add a
             // check for it in situations where we might match it accidentally.
-            if (matchNull || matchUndefined || seenMissing) {
+            if (matchNull || seenMissing) {
                 auto existsMatch = BSON(_connectToField.fullPath() << BSON("$exists" << true));
                 andObj << existsMatch;
-            }
-            // If matching null or undefined, make sure we don't match the other one.
-            // If seenMissing is true, we've already filtered out missing values above.
-            if (matchNull || matchUndefined) {
-                if (!matchUndefined) {
-                    auto notUndefined =
-                        BSON(_connectToField.fullPath() << BSON("$not" << BSON("$type"
-                                                                               << "undefined")));
-                    andObj << notUndefined;
-                } else if (!matchNull) {
-                    auto notUndefined =
-                        BSON(_connectToField.fullPath() << BSON("$not" << BSON("$type"
-                                                                               << "null")));
-                    andObj << notUndefined;
-                }
             }
         }
     }
