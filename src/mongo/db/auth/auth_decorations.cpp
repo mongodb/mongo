@@ -43,10 +43,10 @@
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/sequence_util.h"
-#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 namespace {
@@ -63,8 +63,7 @@ struct DisabledAuthMechanisms {
 
 const auto getDisabledAuthMechanisms = Service::declareDecoration<DisabledAuthMechanisms>();
 
-const auto getClusterAuthMode =
-    ServiceContext::declareDecoration<synchronized_value<ClusterAuthMode>>();
+const auto getClusterAuthMode = ServiceContext::declareDecoration<AtomicWord<ClusterAuthMode>>();
 
 class AuthzClientObserver final : public ServiceContext::ClientObserver {
 public:
@@ -136,18 +135,27 @@ void AuthorizationSession::set(Client* client,
 }
 
 ClusterAuthMode ClusterAuthMode::get(ServiceContext* svcCtx) {
-    return getClusterAuthMode(svcCtx).get();
+    return getClusterAuthMode(svcCtx).loadRelaxed();
 }
 
-ClusterAuthMode ClusterAuthMode::set(ServiceContext* svcCtx, const ClusterAuthMode& mode) {
-    auto sv = getClusterAuthMode(svcCtx).synchronize();
-    if (!sv->canTransitionTo(mode)) {
-        uasserted(5579202,
-                  fmt::format("Illegal state transition for clusterAuthMode from '{}' to '{}'",
-                              sv->toString(),
-                              mode.toString()));
+ClusterAuthMode ClusterAuthMode::set(ServiceContext* svcCtx, const ClusterAuthMode& newMode) {
+    auto& authMode = getClusterAuthMode(svcCtx);
+    while (true) {
+        // We eventually return from this loop, either by throwing an exception if the transition is
+        // not allowed, or finally beating other writers. Since `ClusterAuthMode` is excepted to be
+        // a read-mostly-write-rarely value, the latter is expected to happen at most after 1 or 2
+        // iterations of the loop.
+        auto current = authMode.load();
+        if (!current.canTransitionTo(newMode)) {
+            uasserted(5579202,
+                      fmt::format("Illegal state transition for clusterAuthMode from '{}' to '{}'",
+                                  current.toString(),
+                                  newMode.toString()));
+        }
+        if (authMode.compareAndSwap(&current, newMode)) {
+            return current;
+        }
     }
-    return std::exchange(*sv, mode);
 }
 
 void disableX509Auth(Service* service) {
