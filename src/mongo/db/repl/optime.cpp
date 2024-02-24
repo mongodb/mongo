@@ -121,8 +121,8 @@ StatusWith<OpTimeAndWallTime> OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplog
             OpTime(base.getTimestamp(), base.getTerm().value_or(OpTime::kUninitializedTerm));
 
         return OpTimeAndWallTime(opTime, base.getWall());
-    } catch (...) {
-        return exceptionToStatus();
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 }
 
