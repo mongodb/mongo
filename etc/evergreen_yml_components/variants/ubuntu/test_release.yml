@@ -9,10 +9,13 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-small
+  # TODO SERVER-86538 see if we can use --allocator=tcmalloc-google on
+  # new distributions and/or fix the current libfaketime issues
   expansions:
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=ubuntu1804
+      --allocator=tcmalloc-gperf
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     scons_cache_scope: shared
