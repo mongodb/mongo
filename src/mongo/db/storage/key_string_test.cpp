@@ -756,9 +756,9 @@ TEST_F(KeyStringBuilderTest, KeyStringBuilderDiscriminator) {
     ks.appendBSONElement(doc["fieldA"]);
     ks.appendBSONElement(doc["fieldB"]);
     key_string::Value data = ks.release();
-    uint8_t appendedDescriminator = (uint8_t)(*(data.getBuffer() + (data.getSize() - 2)));
+    uint8_t appendedDiscriminator = (uint8_t)(*(data.getBuffer() + (data.getSize() - 2)));
     uint8_t end = (uint8_t)(*(data.getBuffer() + (data.getSize() - 1)));
-    ASSERT_EQ((uint8_t)'\001', appendedDescriminator);
+    ASSERT_EQ((uint8_t)'\001', appendedDiscriminator);
     ASSERT_EQ((uint8_t)'\004', end);
 }
 

@@ -488,15 +488,13 @@ PlanState ScanStage::getNext() {
     //     from. If it is present, the code below expects us to leave the cursor on that record to
     //     do some checks, and there will be a FilterStage above the scan to filter out this record.
     //   o '_minRecordIdAccessor' and/or '_maxRecordIdAccessor' mean we are doing a bounded scan on
-    //     a clustered collection, and we will do a seekNear() to the start bound on the first call.
+    //     a clustered collection, and we will do a seek() to the start bound on the first call.
     //     - If the bound(s) came in via an expression, we are to assume both bounds are inclusive.
     //       A FilterStage above this stage will exist to filter out any that are really exclusive.
     //     - If the bound(s) came in via the "min" and/or "max" keywords, this stage must enforce
     //       them directly as there may be no FilterStage above it. In this case the start bound is
     //       always inclusive, so the logic is unchanged, but the end bound is always exclusive, so
-    //       we use '_excludeScanEndRecordId' to indicate this for scan termination.
-    //     - Since there may not be a FilterStage for a bounded scan, we need to skip the first
-    //       record here if the seekNear() positioned on a recordId before the target range.
+    //       we use '_includeScanEndRecordId' to indicate this for scan termination.
     bool doSeekExact = false;
     boost::optional<Record> nextRecord;
     if (!_state->useRandomCursor) {
@@ -504,14 +502,6 @@ PlanState ScanStage::getNext() {
             nextRecord = _cursor->next();
         } else {
             _firstGetNext = false;
-            auto seekAndSkipUntil =
-                [](auto& cursor, const auto& startRecordId, const auto& condition) {
-                    auto record = cursor->seekNear(startRecordId);
-                    while (record && !condition(record->id <=> startRecordId)) {
-                        record = cursor->next();
-                    }
-                    return record;
-                };
             if (_seekRecordIdAccessor) {  // fetch or scan resume
                 if (_seekRecordId.isNull()) {
                     // Attempting to resume from a null record ID gives a null '_seekRecordId'.
@@ -525,15 +515,18 @@ PlanState ScanStage::getNext() {
                 doSeekExact = true;
                 nextRecord = _cursor->seekExact(_seekRecordId);
             } else if (_minRecordIdAccessor && _state->forward) {
-                // seekNear() may land on the record just before the start bound.
-                // Additionally, the range may be exclusive of the start record.
-                // Keep advancing until the first record equal to _minRecordId
+                // The range may be exclusive of the start record.
+                // Find the first record equal to _minRecordId
                 // or, if exclusive, the first record "after" it.
-                nextRecord = seekAndSkipUntil(
-                    _cursor, _minRecordId, _includeScanStartRecordId ? std::is_gteq : std::is_gt);
+                nextRecord = _cursor->seek(_minRecordId,
+                                           _includeScanStartRecordId
+                                               ? SeekableRecordCursor::BoundInclusion::kInclude
+                                               : SeekableRecordCursor::BoundInclusion::kExclude);
             } else if (_maxRecordIdAccessor && !_state->forward) {
-                nextRecord = seekAndSkipUntil(
-                    _cursor, _maxRecordId, _includeScanStartRecordId ? std::is_lteq : std::is_lt);
+                nextRecord = _cursor->seek(_maxRecordId,
+                                           _includeScanStartRecordId
+                                               ? SeekableRecordCursor::BoundInclusion::kInclude
+                                               : SeekableRecordCursor::BoundInclusion::kExclude);
             } else {
                 nextRecord = _cursor->next();
             }

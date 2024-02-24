@@ -159,7 +159,7 @@ for (var i = 0; i < indices.length; i++) {
     if (collectionIsClustered) {
         expectedPlan = "CLUSTERED_IXSCAN";
         expectedKeysExamined = 0;
-        expectedDocsExamined = (i + 1 == indices.length) ? 1 : 2;
+        expectedDocsExamined = 1;
         expectedKeysInserted = 1;
     }
 

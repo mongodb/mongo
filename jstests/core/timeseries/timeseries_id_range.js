@@ -14,6 +14,8 @@
  *   tenant_migration_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # The expected doc examined is incorrect in multiversion tests with mongod below 8.0.
+ *   requires_fcv_80,
  * ]
  */
 import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
@@ -122,7 +124,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(7, res.length, coll.explain().aggregate(pipeline));
 
         expl = getSingleNodeExplain(coll.explain("executionStats").aggregate(pipeline));
-        assert.eq(6, expl.stages[0].$cursor.executionStats.totalDocsExamined);
+        assert.eq(5, expl.stages[0].$cursor.executionStats.totalDocsExamined);
     })();
 
     (function testGT() {
@@ -143,7 +145,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(6, res.length);
 
         expl = getSingleNodeExplain(coll.explain("executionStats").aggregate(pipeline));
-        assert.eq(6, expl.stages[0].$cursor.executionStats.totalDocsExamined);
+        assert.eq(5, expl.stages[0].$cursor.executionStats.totalDocsExamined);
     })();
 
     (function testRange1() {
@@ -166,7 +168,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(3, res.length);
 
         expl = getSingleNodeExplain(coll.explain("executionStats").aggregate(pipeline));
-        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
+        assert.eq(2, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
     })();
 
     (function testRange2() {
@@ -189,7 +191,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         expl = getSingleNodeExplain(coll.explain("executionStats").aggregate(pipeline));
-        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
+        assert.eq(2, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
     })();
 
     (function testRange3() {
@@ -212,7 +214,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         expl = getSingleNodeExplain(coll.explain("executionStats").aggregate(pipeline));
-        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
+        assert.eq(2, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
     })();
 
     (function testRange4() {
@@ -235,6 +237,6 @@ TimeseriesTest.run((insert) => {
         assert.eq(0, res.length);
 
         expl = getSingleNodeExplain(coll.explain("executionStats").aggregate(pipeline));
-        assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
+        assert.eq(2, expl.stages[0].$cursor.executionStats.totalDocsExamined, expl);
     })();
 });

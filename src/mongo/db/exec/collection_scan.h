@@ -105,7 +105,10 @@ private:
      * If the member (with id memberID) passes our filter, set *out to memberID and return that
      * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
      */
-    StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
+    StageState returnIfMatches(WorkingSetMember* member,
+                               WorkingSetID memberID,
+                               WorkingSetID* out,
+                               bool needsStartBoundCheck);
 
     /**
      * Sets '_latestOplogEntryTimestamp' to the current read timestamp, if available. This is
@@ -146,6 +149,8 @@ private:
 
     // Stats
     CollectionScanStats _specificStats;
+
+    bool _useSeek = false;
 };
 
 }  // namespace mongo

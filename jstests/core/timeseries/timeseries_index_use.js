@@ -412,9 +412,8 @@ const generateTest = (useHint) => {
             {_id: 2, [timeFieldName]: ISODate('2010-01-01 00:00:00.000Z'), [metaFieldName]: 2}
         ]));
 
-        if (!FixtureHelpers.isSharded(bucketsColl)) {
-            // Skip if the collection is implicitly sharded: it may use the implicitly created
-            // index.
+        if (useHint) {
+            // Skip if without hint: it may use the implicitly created index.
             testAggregationUsesIndex([{
                                          $match: {
                                              $expr: {

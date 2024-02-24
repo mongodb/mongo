@@ -76,6 +76,12 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+bool shouldIncludeStartRecord(const CollectionScanParams& params) {
+    return params.boundInclusion ==
+        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
+        params.boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
+}
+
 const char* getStageName(const VariantCollectionPtrOrAcquisition& coll,
                          const CollectionScanParams& params) {
     return (!coll.getCollectionPtr()->ns().isOplog() && (params.minRecord || params.maxRecord))
@@ -105,9 +111,12 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         // applies only to forwards scans of the oplog and scans on clustered collections.
         invariant(!params.resumeAfterRecordId);
         if (collPtr->ns().isOplogOrChangeCollection()) {
+            // TODO SERVER-86216 Oplog/change collections may require examining the record previous
+            // to the one we are seeking, which is not compatible with the bounded seek() API.
             invariant(params.direction == CollectionScanParams::FORWARD);
         } else {
             invariant(collPtr->isClustered());
+            _useSeek = true;
         }
     }
 
@@ -170,6 +179,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     boost::optional<Record> record;
     const bool needToMakeCursor = !_cursor;
     const auto& collPtr = collectionPtr();
+    bool calledSeek = false;
 
     const auto ret = handlePlanStageYield(
         expCtx(),
@@ -238,17 +248,35 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
             if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::FORWARD &&
                 _params.minRecord) {
-                // Seek to the approximate start location.
-                record = _cursor->seekNear(_params.minRecord->recordId());
+                if (_useSeek) {
+                    // Seek to the start location.
+                    record = _cursor->seek(_params.minRecord->recordId(),
+                                           shouldIncludeStartRecord(_params)
+                                               ? SeekableRecordCursor::BoundInclusion::kInclude
+                                               : SeekableRecordCursor::BoundInclusion::kExclude);
+                    calledSeek = true;
+                } else {
+                    // Seek to the approximate start location.
+                    record = _cursor->seekNear(_params.minRecord->recordId());
+                }
             }
 
             if (_lastSeenId.isNull() && _params.direction == CollectionScanParams::BACKWARD &&
                 _params.maxRecord) {
-                // Seek to the approximate start location (at the end).
-                record = _cursor->seekNear(_params.maxRecord->recordId());
+                if (_useSeek) {
+                    // Seek to the start location.
+                    record = _cursor->seek(_params.maxRecord->recordId(),
+                                           shouldIncludeStartRecord(_params)
+                                               ? SeekableRecordCursor::BoundInclusion::kInclude
+                                               : SeekableRecordCursor::BoundInclusion::kExclude);
+                    calledSeek = true;
+                } else {
+                    // Seek to the approximate start location (at the end).
+                    record = _cursor->seekNear(_params.maxRecord->recordId());
+                }
             }
 
-            if (!record) {
+            if (!calledSeek && !record) {
                 record = _cursor->next();
             }
 
@@ -299,7 +327,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                           record->data.releaseToBson());
     _workingSet->transitionToRecordIdAndObj(id);
 
-    return returnIfMatches(member, id, out);
+    return returnIfMatches(member, id, out, !calledSeek /* needsStartBoundCheck */);
 }
 
 void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
@@ -394,12 +422,6 @@ BSONObj CollectionScan::getPostBatchResumeToken() const {
 }
 
 namespace {
-bool shouldIncludeStartRecord(const CollectionScanParams& params) {
-    return params.boundInclusion ==
-        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
-        params.boundInclusion == CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
-}
-
 bool shouldIncludeEndRecord(const CollectionScanParams& params) {
     return params.boundInclusion ==
         CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords ||
@@ -452,11 +474,12 @@ bool beforeStartOfRange(const CollectionScanParams& params, const WorkingSetMemb
 
 PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
                                                       WorkingSetID memberID,
-                                                      WorkingSetID* out) {
+                                                      WorkingSetID* out,
+                                                      bool needsStartBoundCheck) {
     ++_specificStats.docsTested;
 
-    // The 'minRecord' and 'maxRecord' bounds are always inclusive, even if the query predicate is
-    // an exclusive inequality like $gt or $lt. In such cases, we rely on '_filter' to either
+    // The 'maxRecord' bound is always inclusive, even if the query predicate is
+    // an exclusive inequality like $lt. In such cases, we rely on '_filter' to either
     // exclude or include the endpoints as required by the user's query.
     if (pastEndOfRange(_params, *member)) {
         _workingSet->free(memberID);
@@ -469,10 +492,8 @@ PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
     // scan. Ensure that we do not return a record out of the requested range. Require that the
     // caller advance our cursor until it is positioned within the correct range.
     //
-    // In the future, we could change seekNear() to always return a record after minRecord in the
-    // direction of the scan. However, tailable scans depend on the current behavior in order to
-    // mark their position for resuming the tailable scan later on.
-    if (beforeStartOfRange(_params, *member)) {
+    // Because bounded seek does not have this problem, only perform this check for seekNear().
+    if (needsStartBoundCheck && beforeStartOfRange(_params, *member)) {
         _workingSet->free(memberID);
         return PlanStage::NEED_TIME;
     }
