@@ -252,6 +252,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
 
     _fromExpCtx = expCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
     _fromExpCtx->inLookup = true;
+
     if (fromCollator) {
         _fromExpCtx->setCollator(std::move(fromCollator.value()));
         _hasExplicitCollation = true;
@@ -652,6 +653,11 @@ PipelinePtr DocumentSourceLookUp::buildPipeline(
     // Copy all 'let' variables into the foreign pipeline's expression context.
     _variables.copyToExpCtx(_variablesParseState, fromExpCtx.get());
     fromExpCtx->forcePlanCache = true;
+
+    // Query settings are looked up after parsing and therefore are not populated in the
+    // 'fromExpCtx' as part of DocumentSourceLookUp constructor. Assign query settings to the
+    // 'fromExpCtx' by copying them from the parent query ExpressionContext.
+    fromExpCtx->setQuerySettings(getContext()->getQuerySettings());
 
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &fromExpCtx->variables);

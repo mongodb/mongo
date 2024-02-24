@@ -24,37 +24,41 @@ import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 const coll = assertDropAndRecreateCollection(db, jsTestName());
 const qsutils = new QuerySettingsUtils(db, coll.getName());
 const qstests = new QuerySettingsIndexHintsTests(qsutils);
+const mainNs = {
+    db: db.getName(),
+    coll: coll.getName()
+};
 
 // Ensure query settings are applied as expected in a straightforward scenario for distinct.
-function testQuerySettingsDistinctIndexApplication(querySettingsQuery) {
+function assertQuerySettingsDistinctIndexApplication(querySettingsQuery) {
     const query = qsutils.withoutDollarDB(querySettingsQuery);
     for (const index of [qstests.indexA, qstests.indexAB]) {
         const settings = {indexHints: {allowedIndexes: [index]}};
         qsutils.withQuerySettings(querySettingsQuery, settings, () => {
             // Avoid checking plan cache entries. Multiplanner is not involved into plans with
             // DISTINCT_SCAN stage thus one shouldn't expect new plan cache entries.
-            qsutils.assertDistinctScanStage(query, index);
+            qstests.assertDistinctScanStage(query, index);
         });
     }
 }
 
 // Ensure that the hint gets ignored when query settings for the particular 'distinct' query are
 // set.
-function testQuerySettingsDistinctScanIgnoreCursorHints(querySettingsQuery) {
+function assertQuerySettingsDistinctScanIgnoreCursorHints(querySettingsQuery) {
     const query = qsutils.withoutDollarDB(querySettingsQuery);
     const settings = {indexHints: {allowedIndexes: [qstests.indexAB]}};
     const queryWithHint = {...query, hint: qstests.indexA};
     qsutils.withQuerySettings(querySettingsQuery, settings, () => {
         // Avoid checking plan cache entries. Multiplanner is not involved into plans with
         // DISTINCT_SCAN stage thus one shouldn't expect new plan cache entries.
-        qsutils.assertDistinctScanStage(queryWithHint, qstests.indexAB);
+        qstests.assertDistinctScanStage(queryWithHint, qstests.indexAB);
     });
 }
 
 // Ensure that distinct queries fall back to running distinct scan without query settings
 // when
 // the provided settings don't generate any viable plans.
-function testQuerySettingsDistinctFallback(querySettingsQuery) {
+function assertQuerySettingsDistinctFallback(querySettingsQuery) {
     // DISTINCT_SCAN has priority over query settings, i.e. if applying query settings falls
     // query planner back to IXSCAN or COLLSCAN but ignoring query settings would keep
     // DISTINCT_SCAN plan generated then query settings should be ignored.
@@ -64,7 +68,7 @@ function testQuerySettingsDistinctFallback(querySettingsQuery) {
         // Here any index is considered just as good as any other as long as DISTINCT_SCAN plan
         // is generated. Don't expect any particular index from the planner.
         const expectedIndex = undefined;
-        qsutils.assertDistinctScanStage(query, expectedIndex);
+        qstests.assertDistinctScanStage(query, expectedIndex);
     });
 }
 
@@ -96,11 +100,11 @@ function setIndexes(coll, indexList) {
         query: {a: 1, b: 1},
     });
 
-    qstests.testQuerySettingsIndexApplication(querySettingsDistinctQuery);
-    qstests.testQuerySettingsNaturalApplication(querySettingsDistinctQuery);
-    qstests.testQuerySettingsIgnoreCursorHints(querySettingsDistinctQuery);
-    qstests.testQuerySettingsFallback(querySettingsDistinctQuery);
-    qstests.testQuerySettingsCommandValidation(querySettingsDistinctQuery);
+    qstests.assertQuerySettingsIndexApplication(querySettingsDistinctQuery);
+    qstests.assertQuerySettingsNaturalApplication(querySettingsDistinctQuery);
+    qstests.assertQuerySettingsIgnoreCursorHints(querySettingsDistinctQuery, mainNs);
+    qstests.assertQuerySettingsFallback(querySettingsDistinctQuery);
+    qstests.assertQuerySettingsCommandValidation(querySettingsDistinctQuery);
 })();
 
 (function testDistinctWithDistinctScanQuerySettingsApplication() {
@@ -113,7 +117,7 @@ function setIndexes(coll, indexList) {
 
     const querySettingsDistinctQuery = qsutils.makeDistinctQueryInstance({key: 'a'});
 
-    testQuerySettingsDistinctIndexApplication(querySettingsDistinctQuery);
-    testQuerySettingsDistinctScanIgnoreCursorHints(querySettingsDistinctQuery);
-    testQuerySettingsDistinctFallback(querySettingsDistinctQuery);
+    assertQuerySettingsDistinctIndexApplication(querySettingsDistinctQuery);
+    assertQuerySettingsDistinctScanIgnoreCursorHints(querySettingsDistinctQuery);
+    assertQuerySettingsDistinctFallback(querySettingsDistinctQuery);
 })();

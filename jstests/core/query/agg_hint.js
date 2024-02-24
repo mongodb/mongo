@@ -12,6 +12,9 @@
 // command against views, which is converted to a hinted aggregation on execution.
 
 import {getAggPlanStage, getOptimizer, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {checkSbeRestrictedOrFullyEnabled} from "jstests/libs/sbe_util.js";
+
+const isCursorHintsToQuerySettings = TestData.isCursorHintsToQuerySettings || false;
 
 const testDB = db.getSiblingDB("agg_hint");
 assert.commandWorked(testDB.dropDatabase());
@@ -19,6 +22,7 @@ const collName = jsTestName() + "_col"
 const coll = testDB.getCollection(collName);
 const viewName = jsTestName() + "_view"
 const view = testDB.getCollection(viewName);
+const isSbeEnabled = checkSbeRestrictedOrFullyEnabled(db);
 
 function confirmWinningPlanUsesExpectedIndex(
     explainResult, expectedKeyPattern, stageName, pipelineOptimizedAway) {
@@ -35,7 +39,7 @@ function confirmWinningPlanUsesExpectedIndex(
 
     switch (optimizer) {
         case "classic":
-            assert.neq(null, planStage);
+            assert.neq(null, planStage, tojson(explainResult));
             assert.eq(planStage.keyPattern, expectedKeyPattern, tojson(planStage));
             break;
         case "CQF":
@@ -91,7 +95,7 @@ function confirmAggUsesIndex({
         options = {hint: hintKeyPattern};
     }
     const res = assert.commandWorked(
-        testDB.getCollection(collName).explain().aggregate(aggPipeline, options));
+        testDB.getCollection(collName).explain("executionStats").aggregate(aggPipeline, options));
     confirmWinningPlanUsesExpectedIndex(res, expectedKeyPattern, stageName, pipelineOptimizedAway);
 }
 
@@ -136,13 +140,17 @@ confirmAggUsesIndex({
     expectedKeyPattern: {x: 1},
     pipelineOptimizedAway: true
 });
-confirmAggUsesIndex({
-    collName: coll.getName(),
-    aggPipeline: [{$match: {x: 3}}],
-    hintKeyPattern: {_id: 1},
-    expectedKeyPattern: {_id: 1},
-    pipelineOptimizedAway: true
-});
+
+// Query settings do not force indexes and therefore '_id' index is not used when filtering on 'x'.
+if (!isCursorHintsToQuerySettings) {
+    confirmAggUsesIndex({
+        collName: coll.getName(),
+        aggPipeline: [{$match: {x: 3}}],
+        hintKeyPattern: {_id: 1},
+        expectedKeyPattern: {_id: 1},
+        pipelineOptimizedAway: true
+    });
+}
 
 // With no hint specified, aggregation will always prefer an index that provides sort order over
 // one that requires a blocking sort. A hinted aggregation should allow for choice of an index
@@ -171,7 +179,8 @@ confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$sort: {y: 1}}],
     hintKeyPattern: {x: 1},
-    expectedKeyPattern: {x: 1}
+    expectedKeyPattern: {x: 1},
+    pipelineOptimizedAway: true
 });
 
 // With no hint specified, aggregation will always prefer an index that provides a covered
@@ -201,8 +210,14 @@ confirmAggUsesIndex({
     collName: coll.getName(),
     aggPipeline: [{$match: {x: {$gte: 0}}}, {$project: {x: 1, y: 1, _id: 0}}],
     hintKeyPattern: {x: 1},
-    expectedKeyPattern: {x: 1}
+    expectedKeyPattern: {x: 1},
+    pipelineOptimizedAway: true
 });
+
+// TODO:SERVER-81601 Apply QuerySettings for queries involving views.
+if (isCursorHintsToQuerySettings) {
+    quit();
+}
 
 // Confirm that a hinted agg can be executed against a view.
 coll.drop();
@@ -275,16 +290,16 @@ assert.commandWorked(testDB.createView(viewName, collName, []));
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},
     expectedKeyPattern: {x: 1},
-    stageName: {"classic": "COUNT_SCAN", "CQF": ""}
+    stageName: {"classic": "COUNT_SCAN", "CQF": ""},
 });
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},
     hintKeyPattern: {x: 1},
     expectedKeyPattern: {x: 1},
-    stageName: {"classic": "COUNT_SCAN", "CQF": ""}
+    stageName: {"classic": "COUNT_SCAN", "CQF": ""},
 });
 confirmCommandUsesIndex({
     command: {count: view.getName(), query: {x: 3}},
     hintKeyPattern: {_id: 1},
-    expectedKeyPattern: {_id: 1}
+    expectedKeyPattern: {_id: 1},
 });

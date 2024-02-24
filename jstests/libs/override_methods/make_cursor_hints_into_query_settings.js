@@ -1,4 +1,4 @@
-import {getWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
+import {getQueryPlanners, getWinningPlan, isIdhackOrExpress} from "jstests/libs/analyze_plan.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
 
@@ -7,8 +7,7 @@ function hasSupportedHint(cmdObj) {
 }
 
 function getCommandType(cmdObj) {
-    // TODO SERVER-79231 Add 'aggregate' to the supported commands.
-    const supportedCommands = ["find", "distinct"];
+    const supportedCommands = ["aggregate", "distinct", "find"];
     return supportedCommands.find((key) => (key in cmdObj));
 }
 
@@ -30,7 +29,8 @@ function requestsResumeToken(cmdObj) {
 function isIdHackQuery(db, cmdObj) {
     const {hint, ...queryWithoutHint} = cmdObj;
     const explain = db.runCommand({explain: queryWithoutHint});
-    return isIdhackOrExpress(db, getWinningPlan(explain.queryPlanner));
+    const queryPlanners = getQueryPlanners(explain);
+    return queryPlanners.every(queryPlanner => isIdhackOrExpress(db, getWinningPlan(queryPlanner)));
 }
 
 function getInnerCommand(cmdObj) {
@@ -63,10 +63,11 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
 
     // Construct the equivalent query settings, remove the hint from the original command object and
     // build the representative query.
-    const settings = {indexHints: {allowedIndexes: [innerCmd.hint]}};
+    const allowedIndexes = [innerCmd.hint];
     delete innerCmd.hint;
     const commandType = getCommandType(innerCmd);
     const collectionName = innerCmd[commandType];
+    const settings = {indexHints: {ns: {db: dbName, coll: collectionName}, allowedIndexes}};
     const qsutils = new QuerySettingsUtils(db, collectionName);
     const representativeQuery = (function() {
         switch (commandType) {

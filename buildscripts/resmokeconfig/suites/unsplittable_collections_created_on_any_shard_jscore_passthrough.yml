@@ -52,6 +52,7 @@ selector:
 
   # TODO: SERVER-82206 Reenable once explain provides information for the merging part of a split pipeline.
   - jstests/core/query/explain/explain_find_trivially_false_predicates_in_agg_pipelines.js
+  - jstests/core/query/query_settings/query_settings_index_application_aggregate.js
 
   # TODO: SERVER-73641 Reenable.
   - jstests/core/timeseries/timeseries_filter_extended_range.js

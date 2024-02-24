@@ -8,7 +8,20 @@
 //
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
+import {DiscoverTopology} from "jstests/libs/discover_topology.js";
 import {QuerySettingsUtils} from "jstests/libs/query_settings_utils.js";
+import {setParameterOnAllHosts} from "jstests/noPassthrough/libs/server_parameter_helpers.js";
+
+/**
+ * Ensures that the 'expectedEngine' is used for a given 'query', in the situation when query
+ * 'settings' are set. Before asserting, sets the 'internalQueryFrameworkControl' on all nodes.
+ */
+function assertQueryFramework(qsutils, {query, settings, knob, expectedEngine}) {
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(qsutils.db.getMongo()),
+                           "internalQueryFrameworkControl",
+                           knob);
+    qsutils.assertQueryFramework({query, settings, expectedEngine});
+}
 
 function test(db) {
     // Create the collection, because some sharding passthrough suites are failing when explain
@@ -25,35 +38,35 @@ function test(db) {
     const sbeRestrictedQuery = qsutils.makeAggregateQueryInstance(
         {pipeline: [{$group: {_id: "$groupID", count: {$sum: 1}}}]});
 
-    qsutils.testQueryFramework({
+    assertQueryFramework(qsutils, {
         query: sbeEligibleQuery,
         settings: {queryFramework: "classic"},
         knob: "trySbeRestricted",
         expectedEngine: "classic",
     });
 
-    qsutils.testQueryFramework({
+    assertQueryFramework(qsutils, {
         query: sbeEligibleQuery,
         settings: {queryFramework: "sbe"},
         knob: "trySbeRestricted",
         expectedEngine: "sbe",
     });
 
-    qsutils.testQueryFramework({
+    assertQueryFramework(qsutils, {
         query: sbeEligibleQuery,
         settings: {queryFramework: "sbe"},
         knob: "forceClassicEngine",
         expectedEngine: "sbe",
     });
 
-    qsutils.testQueryFramework({
+    assertQueryFramework(qsutils, {
         query: sbeRestrictedQuery,
         settings: {queryFramework: "classic"},
         knob: "trySbeRestricted",
         expectedEngine: "classic",
     });
 
-    qsutils.testQueryFramework({
+    assertQueryFramework(qsutils, {
         query: sbeRestrictedQuery,
         knob: "trySbeRestricted",
         expectedEngine: "sbe",

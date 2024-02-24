@@ -1308,7 +1308,8 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
             // Need to extend the solution with the agg pipeline and rebuild the execution tree.
             // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
             // fillOutSecondaryCollectionsInformation() planner param calls.
-            plannerParams.fillOutSecondaryCollectionsPlannerParams(opCtx, *cq.get(), collections);
+            plannerParams.fillOutPlannerParams(
+                opCtx, *cq.get(), collections, false /* ignoreQuerySettings */);
             solutions[0] = QueryPlanner::extendWithAggPipeline(
                 *cq, std::move(solutions[0]), plannerParams.secondaryCollectionsInfo);
             roots[0] = stage_builder::buildSlotBasedExecutableTree(

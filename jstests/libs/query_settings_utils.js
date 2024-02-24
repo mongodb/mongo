@@ -5,10 +5,8 @@ import {
     getEngine,
     getPlanStages,
     getQueryPlanners,
-    getWinningPlan,
     getWinningPlanFromExplain
 } from "jstests/libs/analyze_plan.js";
-import {checkSbeFullyEnabled} from "jstests/libs/sbe_util.js";
 
 export class QuerySettingsUtils {
     /**
@@ -154,70 +152,6 @@ export class QuerySettingsUtils {
     }
 
     /**
-     * Asserts that after executing 'command' the most recent query plan from cache would have
-     * 'querySettings' set.
-     */
-    assertQuerySettingsInCacheForCommand(command, querySettings) {
-        // Single solution plans are not cached in classic, therefore do not perform plan cache
-        // checks for classic.
-        if (!checkSbeFullyEnabled(this.db)) {
-            return;
-        }
-
-        // Clear the plan cache before running any queries.
-        this.db[this.collName].getPlanCache().clear();
-
-        // Take the newest plan cache entry (based on 'timeOfCreation' sorting) and ensure that it
-        // contains the 'settings'.
-        assert.commandWorked(this.db.runCommand(command));
-        const planCacheStatsAfterRunningCmd =
-            this.db[this.collName].aggregate([{$planCacheStats: {}}]).toArray();
-        assert.gte(planCacheStatsAfterRunningCmd.length,
-                   1,
-                   "Expecting at least 1 entry in query plan cache");
-        planCacheStatsAfterRunningCmd.forEach(
-            plan => assert.docEq(plan.querySettings, querySettings, plan));
-    }
-
-    assertIndexScanStage(cmd, expectedIndex) {
-        const explain = assert.commandWorked(this.db.runCommand({explain: cmd}));
-        const winningPlan = getWinningPlan(explain.queryPlanner);
-        const ixscanStages = getPlanStages(winningPlan, "IXSCAN");
-        assert.gte(ixscanStages.length, 1, explain);
-        if (expectedIndex == undefined) {
-            // Don't verify index name.
-            return;
-        }
-        for (const ixscanStage of ixscanStages) {
-            assert.docEq(ixscanStage.keyPattern, expectedIndex, explain);
-        }
-    }
-
-    assertDistinctScanStage(cmd, expectedIndex) {
-        const explain = assert.commandWorked(this.db.runCommand({explain: cmd}));
-        const winningPlan = getWinningPlan(explain.queryPlanner);
-        const ixscanStages = getPlanStages(winningPlan, "DISTINCT_SCAN");
-        assert.gte(ixscanStages.length, 1, explain);
-        if (expectedIndex == undefined) {
-            // Don't verify index name.
-            return;
-        }
-        for (const ixscanStage of ixscanStages) {
-            assert.docEq(ixscanStage.keyPattern, expectedIndex, explain);
-        }
-    }
-
-    assertCollScanStage(cmd, allowedDirections) {
-        const explain = assert.commandWorked(this.db.runCommand({explain: cmd}));
-        const winningPlan = getWinningPlan(explain.queryPlanner);
-        const collscanStages = getPlanStages(winningPlan, "COLLSCAN");
-        assert.gte(collscanStages.length, 1, explain);
-        for (const collscanStage of collscanStages) {
-            assert(allowedDirections.includes(collscanStage.direction), explain);
-        }
-    }
-
-    /**
      * Remove all query settings for the current tenant.
      */
     removeAllQuerySettings() {
@@ -256,10 +190,9 @@ export class QuerySettingsUtils {
     }
 
     /**
-     * Asserts that the expected engine is run on the input query and settings,
-     * including overriding a provided internalQueryFrameworkControl query knob.
+     * Asserts that the expected engine is run on the input query and settings.
      */
-    testQueryFramework({query, settings, knob, expectedEngine}) {
+    assertQueryFramework({query, settings, expectedEngine}) {
         // Ensure that query settings cluster parameter is empty.
         this.assertQueryShapeConfiguration([]);
 
@@ -272,11 +205,6 @@ export class QuerySettingsUtils {
             this.assertQueryShapeConfiguration(expectedConfiguration);
         }
 
-        // Set framework control knob
-        if (knob) {
-            assert.commandWorked(
-                this.db.adminCommand({setParameter: 1, internalQueryFrameworkControl: knob}))
-        }
         const withoutDollarDB = query.aggregate ? {...this.withoutDollarDB(query), cursor: {}}
                                                 : this.withoutDollarDB(query);
         const explain = assert.commandWorked(this.db.runCommand({explain: withoutDollarDB}));

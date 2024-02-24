@@ -79,7 +79,8 @@ CandidatePlans CachedSolutionPlanner::plan(
         // immediately replan without ever running a trial period.
         // TODO: SERVER-86174 Avoid unnecessary fillOutPlannerParams() and
         // fillOutSecondaryCollectionsInformation() planner param calls.
-        _queryParams.fillOutSecondaryCollectionsPlannerParams(_opCtx, _cq, _collections);
+        _queryParams.fillOutPlannerParams(
+            _opCtx, _cq, _collections, false /* ignoreQuerySettings */);
 
         const auto& secondaryCollectionsInfo = _queryParams.secondaryCollectionsInfo;
 

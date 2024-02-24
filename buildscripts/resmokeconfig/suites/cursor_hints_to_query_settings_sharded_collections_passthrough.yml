@@ -9,7 +9,6 @@ selector:
   exclude_files:
     # TODO SERVER-81601 Re-enable once query settings support views.
     - jstests/core/views/*.js
-    - jstests/core/query/agg_hint.js
 
     # TODO SERVER-85242 Re-enable once the fallback mechanism also covers runtime planning errors.
     - jstests/core/query/or/orj.js
@@ -73,6 +72,7 @@ selector:
     - jstests/core/index/index_multikey.js
     - jstests/core/query/covered_multikey.js
     - jstests/core/query/explain/explain_shell_helpers.js
+    - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
     - jstests/core/return_key.js
 
     # This suite emits additional explains alongside the tested command. This interferes with the number of

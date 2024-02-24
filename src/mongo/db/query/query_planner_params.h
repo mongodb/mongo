@@ -194,13 +194,6 @@ struct QueryPlannerParams {
                               const MultipleCollectionAccessor& collections,
                               bool ignoreQuerySettings);
 
-    /**
-     * Fills planner parameters for the secondary collections.
-     */
-    void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
-                                                  const CanonicalQuery& canonicalQuery,
-                                                  const MultipleCollectionAccessor& collections);
-
     // See Options enum above.
     size_t options;
 
@@ -253,6 +246,13 @@ struct QueryPlannerParams {
     bool querySettingsApplied{false};
 
 private:
+    /**
+     * Fills planner parameters for the secondary collections.
+     */
+    void fillOutSecondaryCollectionsPlannerParams(OperationContext* opCtx,
+                                                  const CanonicalQuery& canonicalQuery,
+                                                  const MultipleCollectionAccessor& collections);
+
     /**
      * Fills planner parameters for the main collection.
      */

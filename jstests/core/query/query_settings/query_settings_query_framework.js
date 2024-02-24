@@ -37,25 +37,25 @@ const nonSbeEligibleQuery = {
     hint: indexKeyPattern,
 };
 
-qsutils.testQueryFramework({
+qsutils.assertQueryFramework({
     query: sbeEligibleQuery,
     settings: {queryFramework: "classic"},
     expectedEngine: "classic",
 });
 
-qsutils.testQueryFramework({
+qsutils.assertQueryFramework({
     query: sbeEligibleQuery,
     settings: {queryFramework: "sbe"},
     expectedEngine: "sbe",
 });
 
-qsutils.testQueryFramework({
+qsutils.assertQueryFramework({
     query: nonSbeEligibleQuery,
     settings: {queryFramework: "classic"},
     expectedEngine: "classic",
 });
 
-qsutils.testQueryFramework({
+qsutils.assertQueryFramework({
     query: nonSbeEligibleQuery,
     settings: {queryFramework: "sbe"},
     expectedEngine: "classic",
