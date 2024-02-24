@@ -62,15 +62,9 @@ namespace mongo {
 
 namespace {
 
-/**
- * Use the dedicated threading model for embedded clients. The following ensures any request
- * initiated by the embedded service entry point will always go through the synchronous command
- * execution path, and will never get scheduled on a borrowed thread.
- */
 class EmbeddedClientObserver final : public ServiceContext::ClientObserver {
     void onCreateClient(Client* client) {
         auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
-        seCtx->setThreadModel(seCtx->kSynchronous);
         transport::ServiceExecutorContext::set(client, std::move(seCtx));
     }
     void onDestroyClient(Client*) {}

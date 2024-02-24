@@ -359,18 +359,6 @@ void ExecCommandClient::_onCompletion() {
     auto opCtx = _rec->getOpCtx();
     auto body = _rec->getReplyBuilder()->getBodyBuilder();
     appendRequiredFieldsToResponse(opCtx, &body);
-
-    auto seCtx = transport::ServiceExecutorContext::get(opCtx->getClient());
-    if (!seCtx) {
-        // We were run by a background worker.
-        return;
-    }
-
-    if (!_invocation->isSafeForBorrowedThreads()) {
-        // If the last command wasn't safe for a borrowed thread,
-        // then let's move off of it.
-        seCtx->setThreadModel(seCtx->kSynchronous);
-    }
 }
 
 Future<void> ExecCommandClient::run() {
