@@ -43,6 +43,8 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator_for_bucket_auto.h"
+#include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -184,10 +186,15 @@ DocumentSource::GetNextResult DocumentSourceBucketAuto::populateSorter() {
         _sorter.reset(Sorter<Value, Document>::make(opts, comparator));
     }
 
+    long long position = 0;
     auto next = pSource->getNext();
     for (; next.isAdvanced(); next = pSource->getNext()) {
         auto nextDoc = next.releaseDocument();
-        _sorter->add(extractKey(nextDoc), nextDoc);
+        auto key = extractKey(nextDoc);
+
+        auto doc = Document{{AccumulatorN::kFieldNameOutput, Value(std::move(nextDoc))},
+                            {AccumulatorN::kFieldNameGeneratedSortKey, Value(position++)}};
+        _sorter->add(std::move(key), std::move(doc));
         ++_nDocuments;
     }
     return next;
@@ -232,9 +239,20 @@ void DocumentSourceBucketAuto::addDocumentToBucket(const pair<Value, Document>& 
     const size_t numAccumulators = _accumulatedFields.size();
     for (size_t k = 0; k < numAccumulators; k++) {
         if (bucket._accums[k]->needsInput()) {
-            bucket._accums[k]->process(
-                _accumulatedFields[k].expr.argument->evaluate(entry.second, &pExpCtx->variables),
-                false);
+            bool isPositionalAccum = isPositionalAccumulator(bucket._accums[k]->getOpName());
+            auto value = entry.second.getField(AccumulatorN::kFieldNameOutput);
+            auto evaluated = _accumulatedFields[k].expr.argument->evaluate(value.getDocument(),
+                                                                           &pExpCtx->variables);
+            if (isPositionalAccum) {
+                auto wrapped = Value(Document{
+                    {AccumulatorN::kFieldNameGeneratedSortKey,
+                     entry.second.getField(AccumulatorN::kFieldNameGeneratedSortKey)},
+                    {AccumulatorN::kFieldNameOutput, std::move(evaluated)},
+                });
+                bucket._accums[k]->process(Value(std::move(wrapped)), false);
+            } else {
+                bucket._accums[k]->process(std::move(evaluated), false);
+            }
         }
     }
 }
@@ -536,8 +554,10 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                     argument.type() == BSONType::Object);
 
             for (auto&& outputField : argument.embeddedObject()) {
-                auto stmt = AccumulationStatement::parseAccumulationStatement(
+                auto parsedStmt = AccumulationStatement::parseAccumulationStatement(
                     pExpCtx.get(), outputField, vps);
+                auto stmt =
+                    replaceAccumulationStatementForBucketAuto(pExpCtx.get(), std::move(parsedStmt));
                 stmt.expr.initializer = stmt.expr.initializer->optimize();
                 uassert(4544714,
                         "Can't refer to the group key in $bucketAuto",

@@ -116,6 +116,7 @@ env.Library(
         'accumulator_covariance.cpp',
         'accumulator_exp_moving_avg.cpp',
         'accumulator_first.cpp',
+        'accumulator_for_bucket_auto.cpp',
         'accumulator_integral.cpp',
         'accumulator_js_reduce.cpp',
         'accumulator_last.cpp',

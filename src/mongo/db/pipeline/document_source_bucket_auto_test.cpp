@@ -718,7 +718,7 @@ TEST_F(BucketAutoTests, ShouldFailIfBufferingTooManyDocuments) {
 TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
     auto expCtx = getExpCtx();
     expCtx->allowDiskUse = false;
-    const size_t maxMemoryUsageBytes = 1000;
+    const size_t maxMemoryUsageBytes = 2000;
 
     VariablesParseState vps = expCtx->variablesParseState;
     auto groupByExpression = ExpressionFieldPath::parse(expCtx.get(), "$a", vps);
