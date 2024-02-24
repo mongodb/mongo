@@ -403,19 +403,6 @@ void executeChildBatches(OperationContext* opCtx,
                                                             stats))) {
                     break;
                 }
-
-                if (response.shardHostAndPort) {
-                    // Remember that we successfully wrote to this shard
-                    // NOTE: This will record lastOps for shards where we actually didn't update
-                    // or delete any documents, which preserves old behavior but is conservative
-                    stats->noteWriteAt(*response.shardHostAndPort,
-                                       batchedCommandResponse.isLastOpSet()
-                                           ? batchedCommandResponse.getLastOp()
-                                           : repl::OpTime(),
-                                       batchedCommandResponse.isElectionIdSet()
-                                           ? batchedCommandResponse.getElectionId()
-                                           : OID());
-                }
             } else {
                 // The ARS failed to retrieve the response due to some sort of local failure.
                 if ((abortBatch = processErrorResponseFromLocal(opCtx,
@@ -681,19 +668,6 @@ void executeNonTargetedSingleWriteWithoutShardKeyWithId(
             // Since we are not in a transaction we can not abort on Write Errors and the following
             // value must be false.
             dassert(abortBatch == false);
-
-            if (response.shardHostAndPort) {
-                // Remember that we successfully wrote to this shard
-                // NOTE: This will record lastOps for shards where we actually didn't update
-                // or delete any documents, which preserves old behavior but is conservative
-                stats->noteWriteAt(*response.shardHostAndPort,
-                                   batchedCommandResponse.isLastOpSet()
-                                       ? batchedCommandResponse.getLastOp()
-                                       : repl::OpTime(),
-                                   batchedCommandResponse.isElectionIdSet()
-                                       ? batchedCommandResponse.getElectionId()
-                                       : OID());
-            }
         } else {
             bool abortBatch = processErrorResponseFromLocal(
                 opCtx, batchOp, batch, responseStatus, shardInfo, response.shardHostAndPort);
@@ -968,12 +942,6 @@ void BatchWriteExecStats::noteTargetedShard(const ShardId& shardId) {
     _targetedShards.insert(shardId);
 }
 
-void BatchWriteExecStats::noteWriteAt(const HostAndPort& host,
-                                      repl::OpTime opTime,
-                                      const OID& electionId) {
-    _writeOpTimes[ConnectionString(host)] = HostOpTime(opTime, electionId);
-}
-
 void BatchWriteExecStats::noteNumShardsOwningChunks(const int nShardsOwningChunks) {
     _numShardsOwningChunks.emplace(nShardsOwningChunks);
 }
@@ -984,10 +952,6 @@ void BatchWriteExecStats::noteTargetedCollectionIsSharded(bool isSharded) {
 
 const std::set<ShardId>& BatchWriteExecStats::getTargetedShards() const {
     return _targetedShards;
-}
-
-const HostOpTimeMap& BatchWriteExecStats::getWriteOpTimes() const {
-    return _writeOpTimes;
 }
 
 boost::optional<int> BatchWriteExecStats::getNumShardsOwningChunks() const {
