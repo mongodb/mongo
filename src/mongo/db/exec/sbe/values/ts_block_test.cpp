@@ -30,6 +30,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/cell_interface.h"
 #include "mongo/db/exec/sbe/values/ts_block.h"
@@ -55,17 +56,56 @@ const BSONObj kSampleBucket = fromjson(R"(
     }
 })");
 
+int getBucketVersion(const BSONObj& bucket) {
+    return bucket[timeseries::kBucketControlFieldName].embeddedObject().getIntField(
+        timeseries::kBucketControlVersionFieldName);
+}
+
+std::unique_ptr<value::TsBlock> makeTsBlockFromBucket(const BSONObj& bucket, StringData fieldName) {
+    auto bucketElem = bucket["data"][fieldName];
+    const auto nFields = [&]() -> size_t {
+        if (bucketElem.type() == BSONType::Object) {
+            return bucketElem.embeddedObject().nFields();
+        } else {
+            invariant(bucketElem.type() == BSONType::BinData);
+            BSONColumn col(bucketElem);
+            return col.size();
+        }
+    }();
+
+
+    auto [columnTag, columnVal] = bson::convertFrom<true /* View */>(bucketElem);
+
+    const auto nothing =
+        std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u});
+
+    const auto [min, max] = [&]() {
+        if (bucket["control"]["min"]) {
+            return std::pair(bson::convertFrom<true>(bucket["control"]["min"][fieldName]),
+                             bson::convertFrom<true>(bucket["control"]["max"][fieldName]));
+        }
+        return std::pair(nothing, nothing);
+    }();
+
+    return std::make_unique<value::TsBlock>(nFields,
+                                            false, /* owned */
+                                            columnTag,
+                                            columnVal,
+                                            getBucketVersion(bucket),
+                                            // isTimefield: this check is only safe for the tests
+                                            // here where the time field is called 'time'.
+                                            fieldName == "time",
+                                            min,
+                                            max);
+}
+
+
 TEST_F(SbeValueTest, CloneCreatesIndependentCopy) {
     // A TsCellBlockForTopLevelField can be created in an "unowned" state.
+
+    auto tsBlock = makeTsBlockFromBucket(kSampleBucket, "_id");
     auto bucketElem = kSampleBucket["data"]["_id"].embeddedObject();
-    auto cellBlock = std::make_unique<value::TsCellBlockForTopLevelField>(
-        bucketElem.nFields(), /* count */
-        false,                /* owned */
-        value::TypeTags::bsonObject,
-        value::bitcastFrom<const char*>(bucketElem.objdata()),
-        false, /* isTimefield */
-        std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u}),
-        std::pair<value::TypeTags, value::Value>(value::TypeTags::Nothing, value::Value{0u}));
+    auto cellBlock = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
 
     auto& valBlock = cellBlock->getValueBlock();
 
@@ -146,47 +186,49 @@ const BSONObj kBucketWithMinMaxV1 = fromjson(R"(
 
 TEST_F(SbeValueTest, TsBlockMinMaxV1Schema) {
     {
-        auto cellBlockId = std::make_unique<value::TsCellBlockForTopLevelField>(
-            3,     /* count */
-            false, /* owned */
-            value::TypeTags::bsonObject,
-            value::bitcastFrom<const char*>(
-                kBucketWithMinMaxV1["data"]["_id"].embeddedObject().objdata()),
-            false, /* isTimefield */
-            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["_id"]),
-            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["max"]["_id"]));
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxV1, "_id");
+        auto cellBlockId = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
 
         auto& valBlock = cellBlockId->getValueBlock();
 
         const auto expectedMinId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["0"]);
         const auto expectedMaxId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["2"]);
+        invariant(expectedMinId.first != value::TypeTags::Nothing);
+        invariant(expectedMaxId.first != value::TypeTags::Nothing);
 
         {
             auto [minTag, minVal] = valBlock.tryMin();
-            ASSERT_NE(minTag, value::TypeTags::Nothing) << "Expected block min to be non-nothing";
             ASSERT_THAT(std::make_pair(minTag, minVal), ValueEq(expectedMinId))
                 << "Expected block min to be the true min val in the block";
+        }
 
+        {
             auto [maxTag, maxVal] = valBlock.tryMax();
-            ASSERT_NE(maxTag, value::TypeTags::Nothing) << "Expected block max to be non-nothing";
             ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMaxId))
                 << "Expected block max to be the max val in the block";
+        }
+
+        {
+            auto [lowerBoundTag, lowerBoundVal] = valBlock.tryLowerBound();
+            ASSERT_THAT(std::make_pair(lowerBoundTag, lowerBoundVal), ValueEq(expectedMinId))
+                << "Expected block lower bound to be the true min val in the block";
+        }
+
+        {
+            auto [upperBoundTag, upperBoundVal] = valBlock.tryUpperBound();
+            ASSERT_THAT(std::make_pair(upperBoundTag, upperBoundVal), ValueEq(expectedMaxId))
+                << "Expected block upper bound to be the true max val in the block";
         }
     }
 
     {
-        auto cellBlockTime = std::make_unique<value::TsCellBlockForTopLevelField>(
-            3,     /* count */
-            false, /* owned */
-            value::TypeTags::bsonObject,
-            value::bitcastFrom<const char*>(
-                kBucketWithMinMaxV1["data"]["time"].embeddedObject().objdata()),
-            true, /* isTimefield */
-            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["time"]),
-            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["max"]["time"]));
+        auto tsBlock = makeTsBlockFromBucket(kBucketWithMinMaxV1, "time");
+        auto cellBlockTime = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
 
         auto& valBlock = cellBlockTime->getValueBlock();
 
+        const auto expectedLowerBoundTime =
+            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["time"]);
         const auto expectedMaxTime =
             bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["2"]);
 
@@ -196,11 +238,24 @@ TEST_F(SbeValueTest, TsBlockMinMaxV1Schema) {
             // should return Nothing.
             ASSERT_EQ(minTag, value::TypeTags::Nothing)
                 << "Expected block min of the time field to be nothing";
+        }
 
+        {
             auto [maxTag, maxVal] = valBlock.tryMax();
-            ASSERT_NE(maxTag, value::TypeTags::Nothing) << "Expected block max to be non-nothing";
             ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMaxTime))
                 << "Expected block max for to be the max val in the block";
+        }
+        {
+            auto [lowerBoundTag, lowerBoundVal] = valBlock.tryLowerBound();
+            ASSERT_THAT(std::make_pair(lowerBoundTag, lowerBoundVal),
+                        ValueEq(expectedLowerBoundTime))
+                << "Expected block lower bound to be the control min val in the block";
+        }
+
+        {
+            auto [upperBoundTag, upperBoundVal] = valBlock.tryUpperBound();
+            ASSERT_THAT(std::make_pair(upperBoundTag, upperBoundVal), ValueEq(expectedMaxTime))
+                << "Expected block upper bound to be the true max val in the block";
         }
     }
 }
@@ -212,16 +267,101 @@ TEST_F(SbeValueTest, TsBlockMinMaxV2Schema) {
     auto compressedBucket = *compressedBucketOpt;
 
     {
-        auto [columnTag, columnVal] =
-            bson::convertFrom<true /* View */>(compressedBucket["data"]["_id"]);
-        auto cellBlockId = std::make_unique<value::TsCellBlockForTopLevelField>(
-            3,     /* count */
-            false, /* owned */
-            columnTag,
-            columnVal,
-            false, /* isTimefield */
-            bson::convertFrom<true>(compressedBucket["control"]["min"]["_id"]),
-            bson::convertFrom<true>(compressedBucket["control"]["max"]["_id"]));
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+        auto cellBlockId = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
+
+        auto& valBlock = cellBlockId->getValueBlock();
+
+        const auto expectedMinId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["0"]);
+        const auto expectedMaxId = bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["_id"]["2"]);
+        invariant(expectedMinId.first != value::TypeTags::Nothing);
+        invariant(expectedMaxId.first != value::TypeTags::Nothing);
+
+        {
+            auto [minTag, minVal] = valBlock.tryMin();
+            ASSERT_THAT(std::make_pair(minTag, minVal), ValueEq(expectedMinId))
+                << "Expected block min to be the true min val in the block";
+
+            auto [maxTag, maxVal] = valBlock.tryMax();
+            ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMaxId))
+                << "Expected block max to be the max val in the block";
+        }
+
+        {
+            auto [lowerBoundTag, lowerBoundVal] = valBlock.tryLowerBound();
+            ASSERT_THAT(std::make_pair(lowerBoundTag, lowerBoundVal), ValueEq(expectedMinId))
+                << "Expected block lower bound to be the true min val in the block";
+        }
+
+        {
+            auto [upperBoundTag, upperBoundVal] = valBlock.tryUpperBound();
+            ASSERT_THAT(std::make_pair(upperBoundTag, upperBoundVal), ValueEq(expectedMaxId))
+                << "Expected block upper bound to be the true max val in the block";
+        }
+    }
+
+    {
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "time");
+        auto cellBlockTime = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
+
+        auto& valBlock = cellBlockTime->getValueBlock();
+
+        const auto expectedMinTime =
+            bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["0"]);
+        const auto expectedMaxTime =
+            bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["2"]);
+        const auto expectedLowerBoundTime =
+            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["time"]);
+
+        {
+            // The min time field value for v2 buckets can be determined in O(1), so tryMin() should
+            // return the true min.
+            {
+                auto [minTag, minVal] = valBlock.tryMin();
+                ASSERT_THAT(std::make_pair(minTag, minVal), ValueEq(expectedMinTime))
+                    << "Expected block min of the time field to be the true min";
+            }
+
+            {
+                auto [maxTag, maxVal] = valBlock.tryMax();
+                ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMaxTime))
+                    << "Expected block max of the time field to be the max val in the block";
+            }
+
+            {
+                auto [lowerBoundTag, lowerBoundVal] = valBlock.tryLowerBound();
+                ASSERT_THAT(std::make_pair(lowerBoundTag, lowerBoundVal),
+                            ValueEq(expectedLowerBoundTime))
+                    << "Expected block lower bound to be the control.min in the bucket";
+            }
+
+            {
+                auto [upperBoundTag, upperBoundVal] = valBlock.tryUpperBound();
+                ASSERT_THAT(std::make_pair(upperBoundTag, upperBoundVal), ValueEq(expectedMaxTime))
+                    << "Expected block upper bound to be the true max val in the block";
+            }
+        }
+    }
+}
+
+TEST_F(SbeValueTest, TsBlockMinMaxV3Schema) {
+    auto compressedBucketOpt =
+        timeseries::compressBucket(kBucketWithMinMaxV1, "time"_sd, {}, false).compressedBucket;
+    ASSERT(compressedBucketOpt) << "Should have been able to create compressed v2 bucket";
+
+    auto compressedBucket = *compressedBucketOpt;
+
+    // Now bump the version field to 3. A v3 bucket is the same format as a v2 bucket, except
+    // there's no guarantee the time field is sorted.
+    Document d(compressedBucket);
+    MutableDocument md(d);
+    md.setNestedField("control.version", Value(3));
+
+    compressedBucket = md.freeze().toBson();
+
+    {
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "_id");
+        auto cellBlockId = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
 
         auto& valBlock = cellBlockId->getValueBlock();
 
@@ -230,51 +370,66 @@ TEST_F(SbeValueTest, TsBlockMinMaxV2Schema) {
 
         {
             auto [minTag, minVal] = valBlock.tryMin();
-            ASSERT_NE(minTag, value::TypeTags::Nothing) << "Expected block min to be non-nothing";
             ASSERT_THAT(std::make_pair(minTag, minVal), ValueEq(expectedMinId))
                 << "Expected block min to be the true min val in the block";
 
             auto [maxTag, maxVal] = valBlock.tryMax();
-            ASSERT_NE(maxTag, value::TypeTags::Nothing) << "Expected block max to be non-nothing";
             ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMaxId))
                 << "Expected block max to be the max val in the block";
+        }
+
+        {
+            auto [lowerBoundTag, lowerBoundVal] = valBlock.tryLowerBound();
+            ASSERT_THAT(std::make_pair(lowerBoundTag, lowerBoundVal), ValueEq(expectedMinId))
+                << "Expected block lower bound to be the true min val in the block";
+        }
+
+        {
+            auto [upperBoundTag, upperBoundVal] = valBlock.tryUpperBound();
+            ASSERT_THAT(std::make_pair(upperBoundTag, upperBoundVal), ValueEq(expectedMaxId))
+                << "Expected block upper bound to be the true max val in the block";
         }
     }
 
     {
-        auto [columnTag, columnVal] =
-            bson::convertFrom<true /* View */>(compressedBucket["data"]["time"]);
-        auto cellBlockTime = std::make_unique<value::TsCellBlockForTopLevelField>(
-            3,     /* count */
-            false, /* owned */
-            columnTag,
-            columnVal,
-            true, /* isTimefield */
-            bson::convertFrom<true>(compressedBucket["control"]["min"]["time"]),
-            bson::convertFrom<true>(compressedBucket["control"]["max"]["time"]));
+        auto tsBlock = makeTsBlockFromBucket(compressedBucket, "time");
+        auto cellBlockTime = std::make_unique<value::TsCellBlockForTopLevelField>(tsBlock.get());
 
         auto& valBlock = cellBlockTime->getValueBlock();
 
-        const auto expectedMinTime =
-            bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["0"]);
         const auto expectedMaxTime =
             bson::convertFrom<true>(kBucketWithMinMaxV1["data"]["time"]["2"]);
+        const auto expectedLowerBoundTime =
+            bson::convertFrom<true>(kBucketWithMinMaxV1["control"]["min"]["time"]);
 
         {
-            // The min time field value for v2 buckets can be determined in O(1), so tryMin() should
-            // return the true min.
-            auto [minTag, minVal] = valBlock.tryMin();
-            ASSERT_NE(minTag, value::TypeTags::Nothing)
-                << "Expected block min of the time field to be non-nothing";
-            ASSERT_THAT(std::make_pair(minTag, minVal), ValueEq(expectedMinTime))
-                << "Expected block min of the time field to be the true min";
+            {
+                // V3 buckets are not guaranteed to be sorted, so there is no way to compute the
+                // minimum time value in O(1).
+                auto [minTag, minVal] = valBlock.tryMin();
+                ASSERT_EQ(minTag, value::TypeTags::Nothing)
+                    << "Expected block min of the time field to be nothing";
+            }
 
-            auto [maxTag, maxVal] = valBlock.tryMax();
-            ASSERT_NE(maxTag, value::TypeTags::Nothing) << "Expected block max to be non-nothing";
-            ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMaxTime))
-                << "Expected block max of the time field to be the max val in the block";
+            {
+                auto [maxTag, maxVal] = valBlock.tryMax();
+                ASSERT_THAT(std::make_pair(maxTag, maxVal), ValueEq(expectedMaxTime))
+                    << "Expected block max of the time field to be the max val in the block";
+            }
+
+            {
+                auto [lowerBoundTag, lowerBoundVal] = valBlock.tryLowerBound();
+                ASSERT_THAT(std::make_pair(lowerBoundTag, lowerBoundVal),
+                            ValueEq(expectedLowerBoundTime))
+                    << "Expected block lower bound to be the bucket control.min";
+            }
+
+            {
+                auto [upperBoundTag, upperBoundVal] = valBlock.tryUpperBound();
+                ASSERT_THAT(std::make_pair(upperBoundTag, upperBoundVal), ValueEq(expectedMaxTime))
+                    << "Expected block upper bound to be the true max val in the block";
+            }
         }
     }
 }
-
 }  // namespace mongo::sbe

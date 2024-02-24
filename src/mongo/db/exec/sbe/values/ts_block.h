@@ -92,6 +92,10 @@ private:
  */
 class TsBlock : public ValueBlock {
 public:
+    static bool canUseControlValue(value::TypeTags tag) {
+        return !isObject(tag) && !isArray(tag);
+    }
+
     // Note: This constructor is special and is only used by the TsCellBlockForTopLevelField to
     // create a TsBlock for a top-level field, where the 'ncells` is actually same as the number of
     // values in this block.
@@ -99,6 +103,7 @@ public:
             bool owned,
             TypeTags blockTag,
             Value blockVal,
+            int bucketVersion,
             bool isTimefield = false,
             std::pair<TypeTags, Value> controlMin = {TypeTags::Nothing, Value{0u}},
             std::pair<TypeTags, Value> controlMax = {TypeTags::Nothing, Value{0u}});
@@ -139,10 +144,23 @@ public:
             BinDataType::Column});
     }
 
+    std::pair<TypeTags, Value> tryLowerBound() const override {
+        // The time field's control value is rounded down, so we can use it as a lower bound,
+        // but cannot necessarily use it as the min().
+        if (canUseControlValue(_controlMin.first)) {
+            return _controlMin;
+        }
+        return std::pair{TypeTags::Nothing, Value{0u}};
+    }
+
+    std::pair<TypeTags, Value> tryUpperBound() const override {
+        return tryMax();
+    }
+
     std::pair<TypeTags, Value> tryMin() const override;
 
     std::pair<TypeTags, Value> tryMax() const override {
-        if (!isObject(_controlMax.first) && !isArray(_controlMax.first)) {
+        if (canUseControlValue(_controlMax.first)) {
             return _controlMax;
         }
         return std::pair{TypeTags::Nothing, Value{0u}};
@@ -167,6 +185,8 @@ private:
     void deblockFromBsonColumn(std::vector<TypeTags>& deblockedTags,
                                std::vector<Value>& deblockedVals) const;
 
+    bool isTimeFieldSorted() const;
+
     // TsBlock owned by the TsCellBlockForTopLevelField which in turn is owned by the
     // TsBucketToCellBlockStage can be in a special unowned state of '_blockVal', where it is merely
     // a view on the BSON provided by the stage tree below. This is done as an optimization to avoid
@@ -181,6 +201,10 @@ private:
 
     // The number of values in this block.
     size_t _count;
+
+    // The version of the bucket, which indicates whether the data is compressed and whether the
+    // time field is sorted.
+    int _bucketVersion;
 
     // true if all values in the block are non-nothing. Currently only true for timeField
     bool _isTimeField;
@@ -200,29 +224,6 @@ private:
  */
 class TsCellBlockForTopLevelField : public CellBlock {
 public:
-    /**
-     * Constructor.
-     *
-     * Note: The topLevel in 'topLevel*' parameters means that the value is not nested one inside
-     * sub-field of TS bucket "data" field. For example, in the following TS bucket "data" field:
-     * {
-     *   "control": {...},
-     *   "data": {
-     *     "foo": {"0": {"a": 1, "b": 1}, "1": [{"a": 2, "b": 2}, {"a": 3, "b": 3}]},
-     *   }
-     * }
-     * the 'topLevelTag' and 'topLevelVal' must be for the value of path "foo" field (hence the
-     * top-level), not for the value of paths "foo.a" or "foo.b". The top-level path does not
-     * require path navigation.
-     */
-    TsCellBlockForTopLevelField(size_t count,
-                                bool owned,
-                                TypeTags topLevelTag,
-                                Value topLevelVal,
-                                bool isTimefield,
-                                std::pair<TypeTags, Value> controlMin,
-                                std::pair<TypeTags, Value> controlMax);
-
     TsCellBlockForTopLevelField(TsBlock* block);
 
     // We don't have use cases for copy/move constructors and assignment operators and so disable

@@ -83,19 +83,19 @@ std::unique_ptr<ValueBlock> ValueBlock::mapMonotonicFastPath(const ColumnOp& op)
     // bucket to a MonoBlock instead of mapping each value iteratively.
     if ((op.opType.flags & ColumnOpType::kMonotonic) && tryDense().get_value_or(false) &&
         tryCount()) {
-        auto [minTag, minVal] = tryMin();
-        auto [maxTag, maxVal] = tryMax();
+        auto [lbTag, lbVal] = tryLowerBound();
+        auto [ubTag, ubVal] = tryUpperBound();
 
-        if (minTag == maxTag && minTag != value::TypeTags::Nothing) {
-            auto [minResTag, minResVal] = op.processSingle(minTag, minVal);
-            ValueGuard minGuard(minResTag, minResVal);
-            auto [maxResTag, maxResVal] = op.processSingle(maxTag, maxVal);
-            ValueGuard maxGuard(maxResTag, maxResVal);
+        if (lbTag == ubTag && lbTag != value::TypeTags::Nothing) {
+            auto [lbResTag, lbResVal] = op.processSingle(lbTag, lbVal);
+            ValueGuard minGuard(lbResTag, lbResVal);
+            auto [ubResTag, ubResVal] = op.processSingle(ubTag, ubVal);
+            ValueGuard maxGuard(ubResTag, ubResVal);
 
-            auto [cmpTag, cmpVal] = value::compareValue(minResTag, minResVal, maxResTag, maxResVal);
+            auto [cmpTag, cmpVal] = value::compareValue(lbResTag, lbResVal, ubResTag, ubResVal);
             if (cmpTag == value::TypeTags::NumberInt32 && cmpVal == 0) {
                 minGuard.reset();
-                return std::make_unique<MonoBlock>(count(), minResTag, minResVal);
+                return std::make_unique<MonoBlock>(count(), lbResTag, lbResVal);
             }
         }
     }

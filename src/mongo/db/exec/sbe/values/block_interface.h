@@ -213,6 +213,22 @@ struct ValueBlock {
     virtual boost::optional<size_t> tryCount() const = 0;
 
     /**
+     * Returns an upper bound for the values in this block. This may be the maximum value, but
+     * it's not necessarily.
+     */
+    virtual std::pair<TypeTags, Value> tryLowerBound() const {
+        return tryMin();
+    }
+
+    /**
+     * Returns an upper bound for the values in this block. This may be the maximum value, but
+     * it's not necessarily.
+     */
+    virtual std::pair<TypeTags, Value> tryUpperBound() const {
+        return tryMax();
+    }
+
+    /**
      * Returns the number of values in this block. If this cannot be done in O(1) then the values
      * will be extracted and the count will be returned.
      */
@@ -258,6 +274,9 @@ struct ValueBlock {
 
     virtual std::unique_ptr<ValueBlock> map(const ColumnOp& op);
 
+    /**
+     * Returns a list of unique values in the block as well as their positions.
+     */
     virtual TokenizedBlock tokenize();
 
     /**
