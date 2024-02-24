@@ -1599,8 +1599,6 @@ void ExecCommandDatabase::_initiateCommand() {
         apiVersionMetrics.update(appName, apiParams);
     }
 
-    rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
-
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     _sessionOptions =
@@ -1923,6 +1921,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (shouldLog(logv2::LogComponent::kTracking, logv2::LogSeverity::Debug(1)) &&
         rpc::TrackingMetadata::get(opCtx).getParentOperId()) {
+        rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
         LOGV2_DEBUG_OPTIONS(4615605,
                             1,
                             {logv2::LogComponent::kTracking},

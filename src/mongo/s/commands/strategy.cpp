@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/logv2/log_severity.h"
 #include <boost/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
@@ -304,10 +305,11 @@ void ExecCommandClient::_prologue() {
         iassert(Status(ErrorCodes::SkipCommandExecution, "Failed to check authorization"));
     }
 
-    // attach tracking
-    rpc::TrackingMetadata trackingMetadata;
-    trackingMetadata.initWithOperName(c->getName());
-    rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
+    if (shouldLog(logv2::LogComponent::kTracking, logv2::LogSeverity::Debug(1))) {
+        rpc::TrackingMetadata trackingMetadata;
+        trackingMetadata.initWithOperName(c->getName());
+        rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
+    }
 }
 
 Future<void> ExecCommandClient::_run() {
