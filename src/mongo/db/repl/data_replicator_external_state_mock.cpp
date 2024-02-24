@@ -42,6 +42,8 @@ namespace repl {
 
 namespace {
 
+constexpr std::size_t kTestOplogBufferSize = 64 * 1024 * 1024;
+
 class OplogApplierMock : public OplogApplier {
     OplogApplierMock(const OplogApplierMock&) = delete;
     OplogApplierMock& operator=(const OplogApplierMock&) = delete;
@@ -127,7 +129,7 @@ ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetchingOnErro
 
 std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeInitialSyncOplogBuffer(
     OperationContext* opCtx) const {
-    return std::make_unique<OplogBufferBlockingQueue>();
+    return std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize);
 }
 
 std::unique_ptr<OplogApplier> DataReplicatorExternalStateMock::makeOplogApplier(

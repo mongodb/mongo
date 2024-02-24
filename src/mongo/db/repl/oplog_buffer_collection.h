@@ -119,7 +119,7 @@ public:
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              std::size_t size = -1) override;
+              boost::optional<std::size_t> bytes = boost::none) override;
     /**
      * Like push(), but allows the operations in the batch to be out of order with
      * respect to themselves and to the buffer. Legal to be called only before reading anything,

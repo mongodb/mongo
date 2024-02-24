@@ -40,21 +40,28 @@ namespace repl {
 
 namespace {
 
-// Limit buffer to 256MB
-const size_t kOplogBufferSize = 256 * 1024 * 1024;
+std::size_t getSingleDocumentSize(const BSONObj& doc) {
+    return static_cast<size_t>(doc.objsize());
+}
 
-size_t getDocumentSize(const BSONObj& o) {
-    // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
-    return static_cast<size_t>(o.objsize());
+std::size_t getTotalDocumentSize(OplogBuffer::Batch::const_iterator begin,
+                                 OplogBuffer::Batch::const_iterator end) {
+    std::size_t totalSize = 0;
+    for (auto it = begin; it != end; ++it) {
+        totalSize += getSingleDocumentSize(*it);
+    }
+    return totalSize;
 }
 
 }  // namespace
 
-OplogBufferBlockingQueue::OplogBufferBlockingQueue() : OplogBufferBlockingQueue(nullptr) {}
-OplogBufferBlockingQueue::OplogBufferBlockingQueue(Counters* counters)
-    : _counters(counters), _queue(kOplogBufferSize, &getDocumentSize) {}
+OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize)
+    : OplogBufferBlockingQueue(maxSize, nullptr) {}
+OplogBufferBlockingQueue::OplogBufferBlockingQueue(std::size_t maxSize, Counters* counters)
+    : _maxSize(maxSize), _counters(counters) {}
 
 void OplogBufferBlockingQueue::startup(OperationContext*) {
+    invariant(!_isShutdown);
     // Update server status metric to reflect the current oplog buffer's max size.
     if (_counters) {
         _counters->setMaxSize(getMaxSize());
@@ -62,96 +69,190 @@ void OplogBufferBlockingQueue::startup(OperationContext*) {
 }
 
 void OplogBufferBlockingQueue::shutdown(OperationContext* opCtx) {
-    clear(opCtx);
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _isShutdown = true;
+        _clear_inlock(lk);
+    }
+
+    if (_counters) {
+        _counters->clear();
+    }
 }
 
 void OplogBufferBlockingQueue::push(OperationContext*,
                                     Batch::const_iterator begin,
                                     Batch::const_iterator end,
-                                    std::size_t size) {
-    invariant(!_drainMode);
-    _queue.pushAllBlocking(begin, end);
-    _notEmptyCv.notify_one();
+                                    boost::optional<std::size_t> bytes) {
+    if (begin == end) {
+        return;
+    }
+
+    // Get the total byte size if caller did not provide one.
+    //
+    // It is the caller's responsibility to make sure that the total byte
+    // size provided is equal to the sum of all document sizes, we do not
+    // verify it here.
+    auto size = bytes ? *bytes : getTotalDocumentSize(begin, end);
+    auto count = std::distance(begin, end);
+
+    {
+        stdx::unique_lock<Latch> lk(_mutex);
+
+        // Block until enough space is available.
+        invariant(!_drainMode);
+        _waitForSpace_inlock(lk, size);
+
+        // Do not push anything if already shutdown.
+        if (_isShutdown) {
+            return;
+        }
+
+        bool startedEmpty = _queue.empty();
+        _queue.insert(_queue.end(), begin, end);
+        _curSize += size;
+
+        if (startedEmpty) {
+            _notEmptyCV.notify_one();
+        }
+    }
 
     if (_counters) {
-        for (auto i = begin; i != end; ++i) {
-            _counters->increment(*i);
-        }
+        _counters->incrementN(count, size);
     }
 }
 
 void OplogBufferBlockingQueue::waitForSpace(OperationContext*, std::size_t size) {
-    _queue.waitForSpace(size);
+    stdx::unique_lock<Latch> lk(_mutex);
+    _waitForSpace_inlock(lk, size);
 }
 
 bool OplogBufferBlockingQueue::isEmpty() const {
+    stdx::lock_guard<Latch> lk(_mutex);
     return _queue.empty();
 }
 
 std::size_t OplogBufferBlockingQueue::getMaxSize() const {
-    return kOplogBufferSize;
+    return _maxSize;
 }
 
 std::size_t OplogBufferBlockingQueue::getSize() const {
-    return _queue.size();
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _curSize;
 }
 
 std::size_t OplogBufferBlockingQueue::getCount() const {
-    return _queue.count();
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _queue.size();
 }
 
 void OplogBufferBlockingQueue::clear(OperationContext*) {
-    _queue.clear();
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _clear_inlock(lk);
+    }
+
     if (_counters) {
         _counters->clear();
     }
 }
 
 bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
-    if (!_queue.tryPop(*value)) {
-        return false;
+    {
+        stdx::lock_guard<Latch> lk(_mutex);
+
+        if (_queue.empty()) {
+            return false;
+        }
+
+        *value = _queue.front();
+        _queue.pop_front();
+        _curSize -= getSingleDocumentSize(*value);
+        invariant(_curSize >= 0);
+
+        // Only notify producer if there is a waiting producer and enough space available.
+        if (_waitSize > 0 && _curSize + _waitSize <= _maxSize) {
+            _notFullCV.notify_one();
+        }
     }
+
     if (_counters) {
         _counters->decrement(*value);
     }
+
     return true;
 }
 
 bool OplogBufferBlockingQueue::waitForDataFor(Milliseconds waitDuration,
                                               Interruptible* interruptible) {
-    Value ignored;
-    stdx::unique_lock<Latch> lk(_notEmptyMutex);
-    interruptible->waitForConditionOrInterruptFor(
-        _notEmptyCv, lk, waitDuration, [&] { return _drainMode || _queue.peek(ignored); });
-    return _queue.peek(ignored);
+    stdx::unique_lock<Latch> lk(_mutex);
+
+    interruptible->waitForConditionOrInterruptFor(_notEmptyCV, lk, waitDuration, [this] {
+        return !_queue.empty() || _drainMode || _isShutdown;
+    });
+
+    return !_queue.empty();
 }
 
 bool OplogBufferBlockingQueue::waitForDataUntil(Date_t deadline, Interruptible* interruptible) {
-    Value ignored;
-    stdx::unique_lock<Latch> lk(_notEmptyMutex);
+    stdx::unique_lock<Latch> lk(_mutex);
+
     interruptible->waitForConditionOrInterruptUntil(
-        _notEmptyCv, lk, deadline, [&] { return _drainMode || _queue.peek(ignored); });
-    return _queue.peek(ignored);
+        _notEmptyCV, lk, deadline, [this] { return !_queue.empty() || _drainMode || _isShutdown; });
+
+    return !_queue.empty();
 }
 
 bool OplogBufferBlockingQueue::peek(OperationContext*, Value* value) {
-    return _queue.peek(*value);
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    if (_queue.empty()) {
+        return false;
+    }
+    *value = _queue.front();
+
+    return true;
 }
 
 boost::optional<OplogBuffer::Value> OplogBufferBlockingQueue::lastObjectPushed(
     OperationContext*) const {
-    return _queue.lastObjectPushed();
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (_queue.empty()) {
+        return {};
+    }
+
+    return _queue.back();
 }
 
 void OplogBufferBlockingQueue::enterDrainMode() {
-    stdx::lock_guard<Latch> lk(_notEmptyMutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _drainMode = true;
-    _notEmptyCv.notify_one();
+    _notEmptyCV.notify_one();
 }
 
 void OplogBufferBlockingQueue::exitDrainMode() {
-    stdx::lock_guard<Latch> lk(_notEmptyMutex);
+    stdx::lock_guard<Latch> lk(_mutex);
     _drainMode = false;
+}
+
+void OplogBufferBlockingQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk,
+                                                    std::size_t size) {
+    invariant(size > 0);
+    invariant(!_waitSize);
+
+    while (_curSize + size > _maxSize && !_isShutdown) {
+        // We only support one concurrent producer.
+        _waitSize = size;
+        _notFullCV.wait(lk);
+        _waitSize = 0;
+    }
+}
+
+void OplogBufferBlockingQueue::_clear_inlock(WithLock lk) {
+    _queue = {};
+    _curSize = 0;
+    _notFullCV.notify_one();
+    _notEmptyCV.notify_one();
 }
 
 }  // namespace repl

@@ -70,13 +70,13 @@ void OplogBufferProxy::shutdown(OperationContext* opCtx) {
 void OplogBufferProxy::push(OperationContext* opCtx,
                             Batch::const_iterator begin,
                             Batch::const_iterator end,
-                            std::size_t size) {
+                            boost::optional<std::size_t> bytes) {
     if (begin == end) {
         return;
     }
     stdx::lock_guard<Latch> lk(_lastPushedMutex);
     _lastPushed = *(end - 1);
-    _target->push(opCtx, begin, end, size);
+    _target->push(opCtx, begin, end, bytes);
 }
 
 void OplogBufferProxy::waitForSpace(OperationContext* opCtx, std::size_t size) {

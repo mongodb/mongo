@@ -2162,11 +2162,8 @@ Status InitialSyncer::_enqueueDocuments(OplogFetcher::Documents::const_iterator 
 
     invariant(_oplogBuffer);
 
-    // Wait for enough space.
-    _oplogApplier->waitForSpace(makeOpCtx().get(), info.toApplyDocumentBytes);
-
     // Buffer docs for later application.
-    _oplogApplier->enqueue(makeOpCtx().get(), begin, end);
+    _oplogApplier->enqueue(makeOpCtx().get(), begin, end, info.toApplyDocumentBytes);
 
     _lastFetched = info.lastDocument;
 

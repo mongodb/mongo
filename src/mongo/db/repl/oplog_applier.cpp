@@ -112,23 +112,25 @@ void OplogApplier::waitForSpace(OperationContext* opCtx, std::size_t size) {
  */
 void OplogApplier::enqueue(OperationContext* opCtx,
                            std::vector<OplogEntry>::const_iterator begin,
-                           std::vector<OplogEntry>::const_iterator end) {
+                           std::vector<OplogEntry>::const_iterator end,
+                           boost::optional<std::size_t> bytes) {
     OplogBuffer::Batch batch;
     for (auto i = begin; i != end; ++i) {
         batch.push_back(i->getEntry().getRaw());
     }
-    enqueue(opCtx, batch.cbegin(), batch.cend());
+    enqueue(opCtx, batch.cbegin(), batch.cend(), bytes);
 }
 
 void OplogApplier::enqueue(OperationContext* opCtx,
                            OplogBuffer::Batch::const_iterator begin,
-                           OplogBuffer::Batch::const_iterator end) {
+                           OplogBuffer::Batch::const_iterator end,
+                           boost::optional<std::size_t> bytes) {
     static Occasionally sampler;
     if (sampler.tick()) {
         LOGV2_DEBUG(
             21226, 2, "Oplog buffer size", "oplogBufferSizeBytes"_attr = _oplogBuffer->getSize());
     }
-    _oplogBuffer->push(opCtx, begin, end);
+    _oplogBuffer->push(opCtx, begin, end, bytes);
 }
 
 StatusWith<OpTime> OplogApplier::applyOplogBatch(OperationContext* opCtx,

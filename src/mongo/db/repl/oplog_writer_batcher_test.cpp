@@ -58,7 +58,7 @@ public:
     void push(OperationContext*,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              std::size_t size = -1) {
+              boost::optional<std::size_t> bytes) {
         MONGO_UNIMPLEMENTED;
     }
 

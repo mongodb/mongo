@@ -122,6 +122,7 @@
 namespace mongo {
 namespace {
 
+constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
 class TestServiceContext {
 public:
     TestServiceContext(int numThreads) {
@@ -209,6 +210,8 @@ public:
             std::make_unique<MongoDSessionCatalog>(
                 std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
+        _oplogBuffer = std::make_unique<repl::OplogBufferBlockingQueue>(kOplogBufferSize);
+
         repl::replWriterThreadCount = numThreads;  // Repl worker thread count
         repl::replWriterMinThreadCount = numThreads;
 
@@ -219,7 +222,7 @@ public:
             false /*allowNamespaceNotFoundErrorsOnCrudOps*/,
             false /*skipWritesToOplog*/);  // Write oplog
         _oplogApplier = std::make_unique<repl::OplogApplierImpl>(nullptr,
-                                                                 &_oplogBuffer,
+                                                                 _oplogBuffer.get(),
                                                                  &repl::noopOplogApplierObserver,
                                                                  _replCoord,
                                                                  &_consistencyMarkers,
@@ -312,7 +315,7 @@ private:
     repl::StorageInterface* _storageInterface;
 
     // This class also owns objects necessary for `_oplogApplier`.
-    repl::OplogBufferBlockingQueue _oplogBuffer;
+    std::unique_ptr<repl::OplogBufferBlockingQueue> _oplogBuffer;
     repl::ReplicationConsistencyMarkersMock _consistencyMarkers;
     std::unique_ptr<ThreadPool> _oplogApplierThreadPool;
     boost::optional<unittest::TempDir> _tempDir;

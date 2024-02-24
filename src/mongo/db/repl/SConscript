@@ -1836,6 +1836,7 @@ if wiredtiger:
             'oplog_applier_test.cpp',
             'oplog_batcher_test_fixture.cpp',
             'oplog_buffer_batched_queue_test.cpp',
+            'oplog_buffer_blocking_queue_test.cpp',
             'oplog_buffer_collection_test.cpp',
             'oplog_buffer_proxy_test.cpp',
             'oplog_entry_test.cpp',

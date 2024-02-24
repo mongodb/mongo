@@ -1479,11 +1479,8 @@ Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
 
     auto opCtx = cc().makeOperationContext();
     if (info.toApplyDocumentCount != 0) {
-        // Wait for enough space.
-        donorOplogBuffer->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
-
         // Buffer docs for later application.
-        donorOplogBuffer->push(opCtx.get(), begin, end);
+        donorOplogBuffer->push(opCtx.get(), begin, end, info.toApplyDocumentBytes);
     }
 
     if (info.resumeToken.isNull()) {
@@ -1514,7 +1511,7 @@ Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
     noopEntry.setWallClockTime({});
 
     OplogBuffer::Batch noopVec = {noopEntry.toBSON()};
-    donorOplogBuffer->push(opCtx.get(), noopVec.cbegin(), noopVec.cend());
+    donorOplogBuffer->push(opCtx.get(), noopVec.cbegin(), noopVec.cend(), boost::none);
     return Status::OK();
 }
 

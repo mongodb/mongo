@@ -46,19 +46,22 @@ namespace mongo {
 namespace repl {
 
 /**
- * Oplog buffer backed by in memory blocking queue of BSONObj.
+ * Oplog buffer backed by an in-memory blocking queue that supports point operations
+ * like peek(), tryPop() but does not support batch operations like tryPopBatch().
+ *
+ * Note: This buffer only works for single-producer, single-consumer use cases.
  */
 class OplogBufferBlockingQueue final : public OplogBuffer {
 public:
-    OplogBufferBlockingQueue();
-    explicit OplogBufferBlockingQueue(Counters* counters);
+    explicit OplogBufferBlockingQueue(std::size_t maxSize);
+    OplogBufferBlockingQueue(std::size_t maxSize, Counters* counters);
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              std::size_t size = -1) override;
+              boost::optional<std::size_t> bytes = boost::none) override;
     void waitForSpace(OperationContext* opCtx, std::size_t size) override;
     bool isEmpty() const override;
     std::size_t getMaxSize() const override;
@@ -77,11 +80,19 @@ public:
     void exitDrainMode() final;
 
 private:
-    Mutex _notEmptyMutex = MONGO_MAKE_LATCH("OplogBufferBlockingQueue::mutex");
-    stdx::condition_variable _notEmptyCv;
+    void _waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size);
+    void _clear_inlock(WithLock lk);
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferBlockingQueue::_mutex");
+    stdx::condition_variable _notEmptyCV;
+    stdx::condition_variable _notFullCV;
+    const std::size_t _maxSize;
+    std::size_t _curSize = 0;
+    std::size_t _waitSize = 0;
     bool _drainMode = false;
+    bool _isShutdown = false;
     Counters* const _counters;
-    BlockingQueue<BSONObj> _queue;
+    std::deque<BSONObj> _queue;
 };
 
 }  // namespace repl

@@ -166,7 +166,7 @@ void OplogBufferCollection::shutdown(OperationContext* opCtx) {
 void OplogBufferCollection::push(OperationContext* opCtx,
                                  Batch::const_iterator begin,
                                  Batch::const_iterator end,
-                                 std::size_t size) {
+                                 boost::optional<std::size_t> bytes) {
     if (begin == end) {
         return;
     }

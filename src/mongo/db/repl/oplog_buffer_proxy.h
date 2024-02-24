@@ -66,7 +66,7 @@ public:
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              std::size_t size = -1) override;
+              boost::optional<std::size_t> bytes = boost::none) override;
     void waitForSpace(OperationContext* opCtx, std::size_t size) override;
     bool isEmpty() const override;
     std::size_t getMaxSize() const override;

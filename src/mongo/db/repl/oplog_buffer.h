@@ -98,7 +98,7 @@ public:
     virtual void push(OperationContext* opCtx,
                       Batch::const_iterator begin,
                       Batch::const_iterator end,
-                      std::size_t size = -1) = 0;
+                      boost::optional<std::size_t> bytes = boost::none) = 0;
 
     /**
      * Returns when enough space is available.

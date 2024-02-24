@@ -233,7 +233,7 @@ public:
     void push(OperationContext*,
               Batch::const_iterator,
               Batch::const_iterator,
-              std::size_t size = -1) final {
+              boost::optional<std::size_t> bytes) final {
         MONGO_UNREACHABLE;
     }
     void waitForSpace(OperationContext*, std::size_t) final {

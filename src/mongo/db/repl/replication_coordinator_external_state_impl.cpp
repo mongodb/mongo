@@ -162,6 +162,9 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 
+// The maximum size of the oplog buffer is set to 256MB.
+constexpr std::size_t kOplogBufferSize = 256 * 1024 * 1024;
+
 // The count of items in the buffer
 OplogBuffer::Counters bufferGauge("repl.buffer");
 
@@ -251,7 +254,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     invariant(storageEngine);
 
-    _oplogBuffer = std::make_unique<OplogBufferBlockingQueue>(&bufferGauge);
+    _oplogBuffer = std::make_unique<OplogBufferBlockingQueue>(kOplogBufferSize, &bufferGauge);
 
     // No need to log OplogBuffer::startup because the blocking queue implementation
     // does not start any threads or access the storage layer.

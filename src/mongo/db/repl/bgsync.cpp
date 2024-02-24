@@ -642,9 +642,6 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
 
     auto opCtx = cc().makeOperationContext();
 
-    // Wait for enough space.
-    _oplogApplier->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
-
     {
         // Don't add more to the buffer if we are in shutdown. Continue holding the lock until we
         // are done to prevent going into shutdown.
@@ -654,7 +651,7 @@ Status BackgroundSync::_enqueueDocuments(OplogFetcher::Documents::const_iterator
         }
 
         // Buffer docs for later application.
-        _oplogApplier->enqueue(opCtx.get(), begin, end);
+        _oplogApplier->enqueue(opCtx.get(), begin, end, info.toApplyDocumentBytes);
 
         // Update last fetched info.
         _lastOpTimeFetched = info.lastDocument;

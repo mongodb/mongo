@@ -1752,10 +1752,8 @@ Status ShardMergeRecipientService::Instance::_enqueueDocuments(
 
     if (info.toApplyDocumentCount != 0) {
         auto opCtx = cc().makeOperationContext();
-        // Wait for enough space.
-        _donorOplogBuffer->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
         // Buffer docs for later application.
-        _donorOplogBuffer->push(opCtx.get(), begin, end);
+        _donorOplogBuffer->push(opCtx.get(), begin, end, info.toApplyDocumentBytes);
     }
 
     return Status::OK();

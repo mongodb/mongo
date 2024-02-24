@@ -38,23 +38,25 @@ namespace repl {
 
 /**
  * Oplog buffer backed by a bounded, in-memory queue that supports batched operations
- * like tryPopBatch() but does not supporting point operations like peek(), tryPop().
+ * like tryPopBatch() but does not support point operations like peek(), tryPop().
  *
  * Values of this buffer are stored in batches and popped out in batches, in the same
  * way as they were pushed in. An important assumption is that each batch pushed into
  * the buffer is not too large in byte size, normally less than 16MB.
+ *
+ * Note: This buffer only works for single-producer, single-consumer use cases.
  */
 class OplogBufferBatchedQueue final : public OplogBuffer {
 public:
-    explicit OplogBufferBatchedQueue(size_t maxSize);
-    OplogBufferBatchedQueue(size_t maxSize, Counters* counters);
+    explicit OplogBufferBatchedQueue(std::size_t maxSize);
+    OplogBufferBatchedQueue(std::size_t maxSize, Counters* counters);
 
     void startup(OperationContext* opCtx) override;
     void shutdown(OperationContext* opCtx) override;
     void push(OperationContext* opCtx,
               Batch::const_iterator begin,
               Batch::const_iterator end,
-              std::size_t size = -1) override;
+              boost::optional<std::size_t> bytes = boost::none) override;
     void waitForSpace(OperationContext* opCtx, std::size_t size) override;
     bool isEmpty() const override;
     std::size_t getMaxSize() const override;
@@ -87,9 +89,10 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("OplogBufferBatchedQueue::_mutex");
     stdx::condition_variable _notEmptyCV;
     stdx::condition_variable _notFullCV;
-    const size_t _maxSize;
-    size_t _curSize = 0;
-    size_t _curCount = 0;
+    const std::size_t _maxSize;
+    std::size_t _curSize = 0;
+    std::size_t _waitSize = 0;
+    std::size_t _curCount = 0;
     bool _drainMode = false;
     bool _isShutdown = false;
     Counters* const _counters;

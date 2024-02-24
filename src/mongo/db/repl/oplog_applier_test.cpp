@@ -58,6 +58,8 @@ namespace mongo {
 namespace repl {
 namespace {
 
+constexpr std::size_t kTestOplogBufferSize = 64 * 1024 * 1024;
+
 /**
  * Minimal implementation of OplogApplier for testing.
  * executor::TaskExecutor is required only to test startup().
@@ -114,7 +116,7 @@ protected:
 };
 
 void OplogApplierTest::setUp() {
-    _buffer = std::make_unique<OplogBufferBlockingQueue>(nullptr);
+    _buffer = std::make_unique<OplogBufferBlockingQueue>(kTestOplogBufferSize, nullptr);
     _applier = std::make_unique<OplogApplierMock>(_buffer.get());
     _opCtxHolder = makeOperationContext();
 

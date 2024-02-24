@@ -32,10 +32,10 @@
 namespace mongo {
 namespace repl {
 
-OplogBufferBatchedQueue::OplogBufferBatchedQueue(size_t maxSize)
+OplogBufferBatchedQueue::OplogBufferBatchedQueue(std::size_t maxSize)
     : OplogBufferBatchedQueue(maxSize, nullptr) {}
 
-OplogBufferBatchedQueue::OplogBufferBatchedQueue(size_t maxSize, Counters* counters)
+OplogBufferBatchedQueue::OplogBufferBatchedQueue(std::size_t maxSize, Counters* counters)
     : _maxSize(maxSize), _counters(counters) {}
 
 void OplogBufferBatchedQueue::startup(OperationContext*) {
@@ -61,13 +61,13 @@ void OplogBufferBatchedQueue::shutdown(OperationContext* opCtx) {
 void OplogBufferBatchedQueue::push(OperationContext*,
                                    Batch::const_iterator begin,
                                    Batch::const_iterator end,
-                                   std::size_t size) {
-    invariant(size >= 0);
-
+                                   boost::optional<std::size_t> bytes) {
     if (begin == end) {
         return;
     }
 
+    invariant(bytes);
+    auto size = *bytes;
     auto count = std::distance(begin, end);
 
     {
@@ -104,15 +104,8 @@ void OplogBufferBatchedQueue::waitForSpace(OperationContext* opCtx, std::size_t 
 
 bool OplogBufferBatchedQueue::isEmpty() const {
     stdx::lock_guard<Latch> lk(_mutex);
-
-    if (_queue.empty()) {
-        invariant(!_curCount);
-        return true;
-    }
-
-    invariant(_curCount);
-
-    return false;
+    invariant(!_curCount == _queue.empty());
+    return !_curCount;
 }
 
 std::size_t OplogBufferBatchedQueue::getMaxSize() const {
@@ -144,7 +137,7 @@ bool OplogBufferBatchedQueue::tryPopBatch(OperationContext* opCtx, OplogBatch<Va
     {
         stdx::lock_guard<Latch> lk(_mutex);
 
-        if (_queue.empty() || _isShutdown) {
+        if (_queue.empty()) {
             return false;
         }
 
@@ -153,7 +146,10 @@ bool OplogBufferBatchedQueue::tryPopBatch(OperationContext* opCtx, OplogBatch<Va
         _curSize -= batch->byteSize();
         _curCount -= batch->count();
 
-        _notFullCV.notify_one();
+        // Only notify producer if there is a waiting producer and enough space available.
+        if (_waitSize > 0 && _curSize + _waitSize <= _maxSize) {
+            _notFullCV.notify_one();
+        }
     }
 
     if (_counters) {
@@ -200,8 +196,14 @@ bool OplogBufferBatchedQueue::inDrainMode() {
 }
 
 void OplogBufferBatchedQueue::_waitForSpace_inlock(stdx::unique_lock<Latch>& lk, std::size_t size) {
+    invariant(size > 0);
+    invariant(!_waitSize);
+
     while (_curSize + size > _maxSize && !_isShutdown) {
+        // We only support one concurrent producer.
+        _waitSize = size;
         _notFullCV.wait(lk);
+        _waitSize = 0;
     }
 }
 
