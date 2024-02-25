@@ -4207,11 +4207,11 @@ buildvariants:
   run_on:
   - windows-64-vs2017-test
   expansions:
-    python_binary: '/cygdrive/c/Python311/python'
-    configure_env_vars: PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH
-    compile_env_vars: PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH
+    python_binary: '/cygdrive/c/python/Python311/python'
+    configure_env_vars: PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
+    compile_env_vars: PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
     test_env_vars:
-      PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH
+      PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       PYTHONPATH=($WT_TOPDIR/lang/python/wiredtiger):$(cygpath -w $WT_TOPDIR/lang/python)
