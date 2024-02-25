@@ -173,6 +173,7 @@ functions:
         # Autoconf/Libtool if $is_cmake_build is not declared.
         if [ ${is_cmake_build|false} = true ]; then
           if [ "$OS" = "Windows_NT" ]; then
+            export "PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH"
             # Use the Windows powershell script to configure the CMake build.
             # We execute it in a powershell environment as its easier to detect and source the Visual Studio
             # toolchain in a native Windows environment. We can't easily execute the build in a cygwin environment.
