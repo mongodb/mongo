@@ -51,6 +51,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
@@ -242,6 +243,7 @@ public:
         Timer timer;
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
+        auto bodyBuilder = result->getBodyBuilder();
         try {
             const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
@@ -259,33 +261,9 @@ public:
                 boost::none /*letParameters*/,
                 boost::none /*runtimeConstants*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-
-            auto aggCmdOnView = canonicalDistinct.asAggregationCommand();
-            if (!aggCmdOnView.isOK()) {
-                return aggCmdOnView.getStatus();
-            }
-
-            auto viewAggCmd =
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView.getValue())
-                    .body;
-            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                opCtx,
-                nss,
-                viewAggCmd,
-                verbosity,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false));
-
-
-            auto bodyBuilder = result->getBodyBuilder();
-            // An empty PrivilegeVector is acceptable because these privileges are only checked on
-            // getMore and explain will not open a cursor.
-            return ClusterAggregate::retryOnViewError(opCtx,
-                                                      aggRequestOnView,
-                                                      *ex.extraInfo<ResolvedView>(),
-                                                      nss,
-                                                      PrivilegeVector(),
-                                                      &bodyBuilder);
+            runDistinctOnView(
+                opCtx, canonicalDistinct, *ex.extraInfo<ResolvedView>(), verbosity, bodyBuilder);
+            return Status::OK();
         }
 
         long long millisElapsed = timer.millis();
@@ -293,7 +271,6 @@ public:
         const char* mongosStageName =
             ClusterExplain::getStageNameForReadOp(shardResponses.size(), cmdObj);
 
-        auto bodyBuilder = result->getBodyBuilder();
         return ClusterExplain::buildExplainResult(
             opCtx, shardResponses, mongosStageName, millisElapsed, cmdObj, &bodyBuilder);
     }
@@ -343,37 +320,11 @@ public:
                 boost::none /*runtimeConstants*/,
                 true /* eligibleForSampling */);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            auto aggCmdOnView = canonicalDistinct.asAggregationCommand();
-            uassertStatusOK(aggCmdOnView.getStatus());
-
-            auto viewAggCmd =
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    nss.dbName(), auth::ValidatedTenancyScope::get(opCtx), aggCmdOnView.getValue())
-                    .body;
-            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
-                opCtx,
-                nss,
-                viewAggCmd,
-                boost::none,
-                APIParameters::get(opCtx).getAPIStrict().value_or(false));
-
-            auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView);
-            auto resolvedAggCmd =
-                aggregation_request_helper::serializeToCommandObj(resolvedAggRequest);
-
-            if (auto txnRouter = TransactionRouter::get(opCtx)) {
-                txnRouter.onViewResolutionError(opCtx, nss);
-            }
-
-            BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx,
-                OpMsgRequestBuilder::createWithValidatedTenancyScope(
-                    dbName, auth::ValidatedTenancyScope::get(opCtx), std::move(resolvedAggCmd)));
-
-            ViewResponseFormatter formatter(aggResult);
-            auto formatStatus = formatter.appendAsDistinctResponse(&result, boost::none);
-            uassertStatusOK(formatStatus);
-
+            runDistinctOnView(opCtx,
+                              canonicalDistinct,
+                              *ex.extraInfo<ResolvedView>(),
+                              boost::none /* verbosity */,
+                              result);
             return true;
         }
 
@@ -424,6 +375,51 @@ public:
                           repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime()->asTimestamp());
         }
         return true;
+    }
+
+    void runDistinctOnView(OperationContext* opCtx,
+                           const CanonicalDistinct& canonicalDistinct,
+                           const ResolvedView& resolvedView,
+                           boost::optional<ExplainOptions::Verbosity> verbosity,
+                           BSONObjBuilder& bob) const {
+        const auto& nss = canonicalDistinct.getQuery()->nss();
+        const auto& dbName = nss.dbName();
+        const auto& vts = auth::ValidatedTenancyScope::get(opCtx);
+        const auto viewAggCmd =
+            OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                dbName, vts, uassertStatusOK(canonicalDistinct.asAggregationCommand()))
+                .body;
+        auto viewAggRequest = aggregation_request_helper::parseFromBSON(
+            opCtx,
+            nss,
+            viewAggCmd,
+            verbosity,
+            APIParameters::get(opCtx).getAPIStrict().value_or(false),
+            canonicalDistinct.getQuery()->getFindCommandRequest().getSerializationContext());
+
+        // If running explain distinct on view, then aggregate is executed without plivilege checks
+        // and without response formatting.
+        if (verbosity) {
+            uassertStatusOK(ClusterAggregate::retryOnViewError(
+                opCtx, viewAggRequest, resolvedView, nss, PrivilegeVector(), &bob));
+            return;
+        }
+
+        const auto privileges = uassertStatusOK(
+            auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
+                                            viewAggRequest.getNamespace(),
+                                            viewAggRequest,
+                                            true /* isMongos */));
+        uassertStatusOK(ClusterAggregate::retryOnViewError(
+            opCtx, viewAggRequest, resolvedView, nss, privileges, &bob));
+
+        // Copy the result from the aggregate command.
+        CommandHelpers::extractOrAppendOk(bob);
+        ViewResponseFormatter responseFormatter(bob.asTempObj().copy());
+
+        // Reset the builder state, as the response will be written to the same builder.
+        bob.resetToEmpty();
+        uassertStatusOK(responseFormatter.appendAsDistinctResponse(&bob, dbName.tenantId()));
     }
 };
 MONGO_REGISTER_COMMAND(DistinctCmd).forRouter();
