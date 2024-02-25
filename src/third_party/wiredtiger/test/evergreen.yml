@@ -239,7 +239,9 @@ functions:
             ${make_command|ninja} ${smp_command|} 2>&1
           fi
         elif [ "Windows_NT" == "$OS" ]; then
-          export "PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH"
+          # Add paths to both global and user Python scripts
+          export "PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH"
+          export "PATH=/cygdrive/c/Users/$USER/AppData/Roaming/Python/Python311/Scripts:$PATH"
 
           python --version
           python -m pip install scons==3.1.1
@@ -433,7 +435,7 @@ functions:
         set -o verbose
 
         if [ "Windows_NT" = "$OS" ]; then
-          export "PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH"
+          export "PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH"
           export "PYTHONPATH=$(pwd)/../lang/python/wiredtiger):$(cygpath -w $(pwd)/../lang/python)"
         fi
         if [ ${is_cmake_build|false} = true ]; then
@@ -2034,7 +2036,10 @@ tasks:
             set -o errexit
             set -o verbose
 
-            export "PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH"
+            # Add paths to both global and user Python scripts
+            export "PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH"
+            export "PATH=/cygdrive/c/Users/$USER/AppData/Roaming/Python/Python311/Scripts:$PATH"
+
             python --version
             python -m pip install scons==3.1.1
             scons-3.1.1.bat ${scons_smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /we4133" wiredtiger.dll libwiredtiger.lib
@@ -2052,7 +2057,10 @@ tasks:
             set -o errexit
             set -o verbose
 
-            export "PATH=/cygdrive/c/Python311:/cygdrive/c/Python311/Scripts:$PATH"
+            # Add paths to both global and user Python scripts
+            export "PATH=/cygdrive/c/python/Python311:/cygdrive/c/python/Python311/Scripts:$PATH"
+            export "PATH=/cygdrive/c/Users/$USER/AppData/Roaming/Python/Python311/Scripts:$PATH"
+
             python --version
             python -m pip install scons==3.1.1
             # The check target is not run in parallel.
