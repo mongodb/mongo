@@ -1145,7 +1145,7 @@ err:
 
 /*
  * __hs_delete_record --
- *     Delete an update from the history store if it is not obsolete
+ *     Delete an update from the history store if it is not obsolete.
  */
 static int
 __hs_delete_record(
@@ -1173,7 +1173,7 @@ __hs_delete_record(
          * The history store update may not exist even if there is no tombstone associated with it
          * as this update may have already been removed by rollback to stable.
          */
-        WT_ASSERT(session, tombstone != NULL && __wt_txn_upd_visible_all(session, tombstone));
+        WT_ASSERT(session, tombstone == NULL || __wt_txn_upd_visible_all(session, tombstone));
         ret = 0;
     } else {
         /*
