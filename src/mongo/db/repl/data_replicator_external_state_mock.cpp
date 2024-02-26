@@ -99,11 +99,13 @@ std::shared_ptr<executor::TaskExecutor> DataReplicatorExternalStateMock::getShar
 }
 
 OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOpTime() {
+    stdx::lock_guard<Latch> lk(_mutex);
     return {currentTerm, lastCommittedOpTime};
 }
 
 void DataReplicatorExternalStateMock::processMetadata(const rpc::ReplSetMetadata& replMetadata,
                                                       const rpc::OplogQueryMetadata& oqMetadata) {
+    stdx::lock_guard<Latch> lk(_mutex);
     replMetadataProcessed = rpc::ReplSetMetadata(replMetadata);
     oqMetadataProcessed = rpc::OplogQueryMetadata(oqMetadata);
     metadataWasProcessed = true;
@@ -115,6 +117,7 @@ ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetching(
     const rpc::OplogQueryMetadata& oqMetadata,
     const OpTime& previousOpTimeFetched,
     const OpTime& lastOpTimeFetched) const {
+    stdx::lock_guard<Latch> lk(_mutex);
     lastSyncSourceChecked = source;
     syncSourceLastOpTime = oqMetadata.getLastOpApplied();
     syncSourceHasSyncSource = oqMetadata.getSyncSourceIndex() != -1;
@@ -123,6 +126,7 @@ ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetching(
 
 ChangeSyncSourceAction DataReplicatorExternalStateMock::shouldStopFetchingOnError(
     const HostAndPort& source, const OpTime& lastOpTimeFetched) const {
+    stdx::lock_guard<Latch> lk(_mutex);
     lastSyncSourceChecked = source;
     return shouldStopFetchingResult;
 }
@@ -143,11 +147,13 @@ std::unique_ptr<OplogApplier> DataReplicatorExternalStateMock::makeOplogApplier(
 }
 
 StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
+    stdx::lock_guard<Latch> lk(_mutex);
     return replSetConfigResult;
 }
 
 StatusWith<BSONObj> DataReplicatorExternalStateMock::loadLocalConfigDocument(
     OperationContext* opCtx) const {
+    stdx::lock_guard<Latch> lk(_mutex);
     if (replSetConfigResult.isOK()) {
         return replSetConfigResult.getValue().toBSON();
     }

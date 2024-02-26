@@ -51,6 +51,7 @@
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -106,8 +107,74 @@ public:
 
     JournalListener* getReplicationJournalListener() override;
 
+    void setCurrentTerm(long long newTerm) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        currentTerm = newTerm;
+    }
+
+    long long getCurrentTerm() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return currentTerm;
+    }
+
+    void setLastCommittedOpTime(OpTime newOpTime) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        lastCommittedOpTime = newOpTime;
+    }
+
+    void setShouldStopFetchingResult(ChangeSyncSourceAction result) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        shouldStopFetchingResult = result;
+    }
+
+    void setReplSetConfigResult(StatusWith<ReplSetConfig> config) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        replSetConfigResult = config;
+    }
+
+    bool getIsPrimary() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return replMetadataProcessed.getIsPrimary();
+    }
+
+    bool getHasPrimaryIndex() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return oqMetadataProcessed.hasPrimaryIndex();
+    }
+
+    bool getMetadataWasProcessed() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return metadataWasProcessed;
+    }
+
+    HostAndPort getLastSyncSourceChecked() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return lastSyncSourceChecked;
+    }
+
+    OpTime getSyncSourceLastOpTime() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return syncSourceLastOpTime;
+    }
+
+    bool getSyncSourceHasSyncSource() const {
+        stdx::lock_guard<Latch> lk(_mutex);
+        return syncSourceHasSyncSource;
+    }
+
     // Task executor.
     std::shared_ptr<executor::TaskExecutor> taskExecutor = nullptr;
+
+    // Override to change applyOplogBatch behavior.
+    using ApplyOplogBatchFn = std::function<StatusWith<OpTime>(
+        OperationContext*, std::vector<OplogEntry>, OplogApplier::Observer*)>;
+    ApplyOplogBatchFn applyOplogBatchFn;
+
+private:
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("DataReplicatorExternalStateMock::_mutex");
+
+    // Returned by shouldStopFetching.
+    ChangeSyncSourceAction shouldStopFetchingResult = ChangeSyncSourceAction::kContinueSyncing;
 
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;
@@ -122,14 +189,6 @@ public:
     mutable HostAndPort lastSyncSourceChecked;
     mutable OpTime syncSourceLastOpTime;
     mutable bool syncSourceHasSyncSource = false;
-
-    // Returned by shouldStopFetching.
-    ChangeSyncSourceAction shouldStopFetchingResult = ChangeSyncSourceAction::kContinueSyncing;
-
-    // Override to change applyOplogBatch behavior.
-    using ApplyOplogBatchFn = std::function<StatusWith<OpTime>(
-        OperationContext*, std::vector<OplogEntry>, OplogApplier::Observer*)>;
-    ApplyOplogBatchFn applyOplogBatchFn;
 
     StatusWith<ReplSetConfig> replSetConfigResult = ReplSetConfig();
 };
