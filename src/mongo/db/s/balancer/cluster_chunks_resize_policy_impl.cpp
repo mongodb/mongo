@@ -26,11 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/bson/bsonobj.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/db/s/balancer/cluster_chunks_resize_policy_impl.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/balancer/cluster_chunks_resize_policy_impl.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 
@@ -324,16 +325,26 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
 
     if (_collectionsBeingProcessed.empty() && !unprocessedCollections->more()) {
         LOGV2(6417104, "Cluster chunks resize process completed. Clearing up internal state");
-        PersistentTaskStore<CollectionType> store(CollectionType::ConfigNS);
         try {
-            BSONObj allDocsQuery;
-            store.update(opCtx,
-                         allDocsQuery,
-                         BSON("$unset" << BSON(
-                                  CollectionType::kChunksAlreadySplitForDowngradeFieldName << "")),
-                         WriteConcerns::kMajorityWriteConcernNoTimeout);
-        } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
-            // ignore
+            DBDirectClient dbClient(opCtx);
+            auto ignoreWriteResponse = write_ops::checkWriteErrors(dbClient.update([&] {
+                write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+                BSONObj allDocsQuery;
+                auto unsetResizeField = write_ops::UpdateModification::parseFromClassicUpdate(
+                    BSON("$unset" << BSON(CollectionType::kChunksAlreadySplitForDowngradeFieldName
+                                          << "")));
+                write_ops::UpdateOpEntry updateEntry(allDocsQuery, unsetResizeField);
+                updateEntry.setMulti(true);
+                updateEntry.setUpsert(false);
+
+                updateOp.setUpdates({updateEntry});
+                return updateOp;
+            }()));
+
+            WriteConcernResult ignoreResult;
+            auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+            uassertStatusOK(waitForWriteConcern(
+                opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernNoTimeout, &ignoreResult));
         } catch (const DBException& e) {
             LOGV2_WARNING(
                 6417105,
