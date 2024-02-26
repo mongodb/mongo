@@ -74,8 +74,7 @@ class UpgradeDowngradeTestFixture {
         } else {
             // Check that $queryStats related parameter does not work.
             assert.commandFailedWithCode(
-                this.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1}),
-                ErrorCodes.InvalidOptions);
+                this.adminCommand({setParameter: 1, internalQueryStatsRateLimit: -1}), 7506200);
         }
     }
 
@@ -140,7 +139,7 @@ function runTest(fixture) {
     // 1.a. Verify queryStats is disabled by checking that setting queryStats related parameters and
     // running the $queryStats stage both fail.
     fixture.testQueryStatsParam(false);
-    fixture.testQueryStatsCommandFailure(40324);
+    fixture.testQueryStatsCommandFailure(ErrorCodes.QueryFeatureNotAllowed);
 
     // 1.b. Run some queries while running base binary. We don't expect these queries to be
     // collected by queryStats.
