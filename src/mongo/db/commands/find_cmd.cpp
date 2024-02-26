@@ -408,7 +408,7 @@ public:
 
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
-                     rpc::ReplyBuilderInterface* result) override {
+                     rpc::ReplyBuilderInterface* replyBuilder) override {
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
             // TODO SERVER-79175: Make nicer. We need to instantiate the AutoStatsTracker before the
@@ -471,27 +471,7 @@ public:
             if (collectionOrView->isView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
-
-                // Convert the find command into an aggregation using $match (and other stages, as
-                // necessary), if possible.
-                const auto& findCommand = cq->getFindCommandRequest();
-                auto aggRequest = query_request_conversion::asAggregateCommandRequest(findCommand);
-                aggRequest.setExplain(verbosity);
-
-                try {
-                    // An empty PrivilegeVector is acceptable because these privileges are only
-                    // checked on getMore and explain will not open a cursor.
-                    uassertStatusOK(
-                        runAggregate(opCtx, aggRequest, _request.body, PrivilegeVector(), result));
-                } catch (DBException& error) {
-                    if (error.code() == ErrorCodes::InvalidPipelineOperator) {
-                        uasserted(ErrorCodes::InvalidPipelineOperator,
-                                  str::stream()
-                                      << "Unsupported in view pipeline: " << error.what());
-                    }
-                    throw;
-                }
-                return;
+                return runFindOnView(opCtx, *cq, verbosity, replyBuilder);
             }
 
             cq->setUseCqfIfEligible(true);
@@ -503,7 +483,7 @@ public:
                                                         std::move(cq),
                                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO));
 
-            auto bodyBuilder = result->getBodyBuilder();
+            auto bodyBuilder = replyBuilder->getBodyBuilder();
             // Got the execution tree. Explain it.
             Explain::explainStages(
                 exec.get(), collection, verbosity, BSONObj(), respSc, _request.body, &bodyBuilder);
@@ -518,7 +498,7 @@ public:
          *   --Save state for getMore, transferring ownership of the executor to a ClientCursor.
          *   --Generate response to send to the client.
          */
-        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) {
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* replyBuilder) {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
             const BSONObj& cmdObj = _request.body;
@@ -721,24 +701,7 @@ public:
             if (collectionOrView->isView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 collectionOrView.reset();
-
-                // Convert the find command into an aggregation using $match (and other stages, as
-                // necessary), if possible.
-                auto aggRequest =
-                    query_request_conversion::asAggregateCommandRequest(findCommandReq);
-
-                auto privileges = uassertStatusOK(
-                    auth::getPrivilegesForAggregate(AuthorizationSession::get(opCtx->getClient()),
-                                                    aggRequest.getNamespace(),
-                                                    aggRequest,
-                                                    false));
-                auto status = runAggregate(opCtx, aggRequest, _request.body, privileges, result);
-                if (status.code() == ErrorCodes::InvalidPipelineOperator) {
-                    uasserted(ErrorCodes::InvalidPipelineOperator,
-                              str::stream() << "Unsupported in view pipeline: " << status.reason());
-                }
-                uassertStatusOK(status);
-                return;
+                return runFindOnView(opCtx, *cq, boost::none /* verbosity */, replyBuilder);
             }
 
             const auto& collection = collectionOrView->getCollection();
@@ -784,7 +747,7 @@ public:
                 endQueryOp(opCtx, collectionPtr, *exec, numResults, boost::none, cmdObj);
                 CursorResponseBuilder::Options options;
                 options.isInitialResponse = true;
-                CursorResponseBuilder builder(result, options);
+                CursorResponseBuilder builder(replyBuilder, options);
                 boost::optional<CursorMetrics> metrics = includeMetrics
                     ? boost::make_optional(CurOp::get(opCtx)->debug().getCursorMetrics())
                     : boost::none;
@@ -803,7 +766,7 @@ public:
             if (!opCtx->inMultiDocumentTransaction()) {
                 options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
             }
-            CursorResponseBuilder firstBatch(result, options);
+            CursorResponseBuilder firstBatch(replyBuilder, options);
             BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;
@@ -927,10 +890,35 @@ public:
             // documents.
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementDocUnitsReturned(toStringForLogging(nss), docUnitsReturned);
-            query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
+            query_request_helper::validateCursorResponse(replyBuilder->getBodyBuilder().asTempObj(),
                                                          auth::ValidatedTenancyScope::get(opCtx),
                                                          nss.tenantId(),
                                                          respSc);
+        }
+
+        void runFindOnView(OperationContext* opCtx,
+                           const CanonicalQuery& cq,
+                           boost::optional<ExplainOptions::Verbosity> verbosity,
+                           rpc::ReplyBuilderInterface* replyBuilder) {
+            auto aggRequest =
+                query_request_conversion::asAggregateCommandRequest(cq.getFindCommandRequest());
+            aggRequest.setExplain(verbosity);
+
+            // An empty PrivilegeVector for explain is acceptable because these privileges are only
+            // checked on getMore and explain will not open a cursor.
+            const auto privileges = verbosity ? PrivilegeVector()
+                                              : uassertStatusOK(auth::getPrivilegesForAggregate(
+                                                    AuthorizationSession::get(opCtx->getClient()),
+                                                    aggRequest.getNamespace(),
+                                                    aggRequest,
+                                                    false));
+            const auto status =
+                runAggregate(opCtx, aggRequest, _request.body, privileges, replyBuilder);
+            if (status.code() == ErrorCodes::InvalidPipelineOperator) {
+                uasserted(ErrorCodes::InvalidPipelineOperator,
+                          str::stream() << "Unsupported in view pipeline: " << status.reason());
+            }
+            uassertStatusOK(status);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {
