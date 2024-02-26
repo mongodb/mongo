@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_DRIVER_DEBUG_LOG_PARSER_H
-#define MODEL_DRIVER_DEBUG_LOG_PARSER_H
+#pragma once
 
 #include <memory>
 #include <unordered_map>
@@ -227,4 +226,3 @@ private:
 };
 
 } /* namespace model */
-#endif

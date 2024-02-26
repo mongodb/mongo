@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_KV_TRANSACTION_UPDATE_H
-#define MODEL_KV_TRANSACTION_UPDATE_H
+#pragma once
 
 #include <list>
 #include <memory>
@@ -95,4 +94,3 @@ private:
 };
 
 } /* namespace model */
-#endif

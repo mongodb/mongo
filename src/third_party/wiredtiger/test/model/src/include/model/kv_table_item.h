@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_KV_TABLE_ITEM_H
-#define MODEL_KV_TABLE_ITEM_H
+#pragma once
 
 #include <deque>
 #include <memory>
@@ -233,4 +232,3 @@ private:
 };
 
 } /* namespace model */
-#endif

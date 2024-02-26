@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_UTIL_H
-#define MODEL_UTIL_H
+#pragma once
 
 #include <cstring>
 #include <functional>
@@ -491,4 +490,3 @@ wt_cursor_update(WT_CURSOR *cursor, const data_value &key, const data_value &val
 std::vector<std::string> wt_list_tables(WT_CONNECTION *conn);
 
 } /* namespace model */
-#endif

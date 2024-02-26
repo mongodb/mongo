@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_DRIVER_KV_WORKLOAD_SEQUENCE_H
-#define MODEL_DRIVER_KV_WORKLOAD_SEQUENCE_H
+#pragma once
 
 #include <deque>
 #include <memory>
@@ -218,4 +217,3 @@ protected:
 using kv_workload_sequence_ptr = std::shared_ptr<kv_workload_sequence>;
 
 } /* namespace model */
-#endif

@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_KV_CHECKPOINT_H
-#define MODEL_KV_CHECKPOINT_H
+#pragma once
 
 #include <memory>
 
@@ -98,4 +97,3 @@ private:
 using kv_checkpoint_ptr = std::shared_ptr<kv_checkpoint>;
 
 } /* namespace model */
-#endif

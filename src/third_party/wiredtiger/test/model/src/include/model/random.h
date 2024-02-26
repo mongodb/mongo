@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_RANDOM_H
-#define MODEL_RANDOM_H
+#pragma once
 
 #include <cstddef>
 #include "model/core.h"
@@ -113,4 +112,3 @@ private:
 #define probability_default if (__r >= 0)
 
 } /* namespace model */
-#endif

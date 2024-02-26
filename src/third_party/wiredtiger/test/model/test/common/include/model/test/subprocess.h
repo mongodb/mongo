@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_TEST_SUBPROCESS_H
-#define MODEL_TEST_SUBPROCESS_H
+#pragma once
 
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -123,5 +122,3 @@ private:
 
     struct sigaction _previous_sigaction;
 };
-
-#endif

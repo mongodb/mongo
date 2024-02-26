@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_KV_UPDATE_H
-#define MODEL_KV_UPDATE_H
+#pragma once
 
 #include <memory>
 
@@ -383,4 +382,3 @@ private:
 };
 
 } /* namespace model */
-#endif

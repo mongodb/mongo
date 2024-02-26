@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_KV_TABLE_H
-#define MODEL_KV_TABLE_H
+#pragma once
 
 #include <atomic>
 #include <functional>
@@ -417,4 +416,3 @@ private:
 using kv_table_ptr = std::shared_ptr<kv_table>;
 
 } /* namespace model */
-#endif

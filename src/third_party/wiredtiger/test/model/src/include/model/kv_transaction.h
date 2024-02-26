@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_KV_TRANSACTION_H
-#define MODEL_KV_TRANSACTION_H
+#pragma once
 
 #include <atomic>
 #include <list>
@@ -297,4 +296,3 @@ private:
 using kv_transaction_ptr = std::shared_ptr<kv_transaction>;
 
 } /* namespace model */
-#endif

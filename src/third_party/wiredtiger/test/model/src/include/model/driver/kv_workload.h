@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_DRIVER_KV_WORKLOAD_H
-#define MODEL_DRIVER_KV_WORKLOAD_H
+#pragma once
 
 #include <deque>
 #include <iostream>
@@ -567,4 +566,3 @@ operator<<(std::ostream &out, const std::shared_ptr<kv_workload> &workload)
 }
 
 } /* namespace model */
-#endif

@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_KV_TRANSACTION_SNAPSHOT_H
-#define MODEL_KV_TRANSACTION_SNAPSHOT_H
+#pragma once
 
 #include <algorithm>
 #include <memory>
@@ -128,4 +127,3 @@ private:
 using kv_transaction_snapshot_ptr = std::shared_ptr<kv_transaction_snapshot>;
 
 } /* namespace model */
-#endif

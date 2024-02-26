@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_VERIFY_H
-#define MODEL_VERIFY_H
+#pragma once
 
 #include <stdexcept>
 #include <string>
@@ -150,4 +149,3 @@ private:
 };
 
 } /* namespace model */
-#endif

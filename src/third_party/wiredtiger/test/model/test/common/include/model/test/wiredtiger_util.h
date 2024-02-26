@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_TEST_WIREDTIGER_UTIL_H
-#define MODEL_TEST_WIREDTIGER_UTIL_H
+#pragma once
 
 #include "model/data_value.h"
 #include "model/kv_database.h"
@@ -328,5 +327,3 @@ wt_rollback_to_stable(WT_CONNECTION *conn)
         wt_rollback_to_stable(conn);       \
         database.rollback_to_stable();     \
     }
-
-#endif

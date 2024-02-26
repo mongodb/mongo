@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_CORE_H
-#define MODEL_CORE_H
+#pragma once
 
 #include <limits>
 #include <stdexcept>
@@ -248,4 +247,3 @@ public:
 };
 
 } /* namespace model */
-#endif

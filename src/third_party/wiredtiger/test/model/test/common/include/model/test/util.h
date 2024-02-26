@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_TEST_UTIL_H
-#define MODEL_TEST_UTIL_H
+#pragma once
 
 #include <string>
 #include "model/driver/kv_workload.h"
@@ -67,5 +66,3 @@ void verify_using_debug_log(TEST_OPTS *opts, const char *home, bool test_failing
  */
 void verify_workload(const model::kv_workload &workload, TEST_OPTS *opts, const std::string &home,
   const char *env_config);
-
-#endif

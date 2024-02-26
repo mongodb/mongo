@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_DRIVER_KV_WORKLOAD_RUNNER_WT_H
-#define MODEL_DRIVER_KV_WORKLOAD_RUNNER_WT_H
+#pragma once
 
 #include <memory>
 #include <shared_mutex>
@@ -380,4 +379,3 @@ private:
 };
 
 } /* namespace model */
-#endif

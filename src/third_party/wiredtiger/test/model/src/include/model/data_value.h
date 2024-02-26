@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_DATA_VALUE_H
-#define MODEL_DATA_VALUE_H
+#pragma once
 
 #include <ostream>
 #include <string>
@@ -181,4 +180,3 @@ void set_wt_cursor_key(WT_CURSOR *cursor, const data_value &value);
 void set_wt_cursor_value(WT_CURSOR *cursor, const data_value &value);
 
 } /* namespace model */
-#endif

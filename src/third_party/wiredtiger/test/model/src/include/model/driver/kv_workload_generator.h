@@ -26,8 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef MODEL_DRIVER_KV_WORKLOAD_GENERATOR_H
-#define MODEL_DRIVER_KV_WORKLOAD_GENERATOR_H
+#pragma once
 
 #include <atomic>
 #include <deque>
@@ -399,4 +398,3 @@ private:
 };
 
 } /* namespace model */
-#endif
