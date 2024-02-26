@@ -664,8 +664,22 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
                 currentReadOnly = existingParticipant->readOnly;
             }
 
-            if (okResponse)
-                setReadOnly(participantToAdd, currentReadOnly, participantElem.getReadOnly());
+            // Only check that all additional participants have a readOnly value on the parent
+            // router. It's possible for a shard to act as a sub-router and target itself, in which
+            // case the shard acting as the participant targeted by the sub-router would include
+            // itself as an additional participant in its response to the sub-router, and would not
+            // have a value for readOnly yet (this value would be set when the shard acting as the
+            // participant targeted by the parent router builds its response to the parent router).
+            if (okResponse) {
+                if (!o().subRouter)
+                    uassert(8664400,
+                            str::stream() << "readOnly is missing from additional participant "
+                                          << participantToAdd << " response metadata",
+                            participantElem.getReadOnly());
+
+                if (participantElem.getReadOnly())
+                    setReadOnly(participantToAdd, currentReadOnly, participantElem.getReadOnly());
+            }
 
             if (!p().isRecoveringCommit) {
                 // Don't update participant stats during recovery since the participant list isn't
@@ -742,7 +756,6 @@ const boost::optional<ShardId>& TransactionRouter::Router::getRecoveryShardId() 
 boost::optional<StringMap<boost::optional<bool>>>
 TransactionRouter::Router::getAdditionalParticipantsForResponse(
     OperationContext* opCtx,
-    bool includeReadOnly,
     boost::optional<const std::string&> commandName,
     boost::optional<const NamespaceString&> nss) {
     boost::optional<StringMap<boost::optional<bool>>> participants = boost::none;
@@ -778,15 +791,14 @@ TransactionRouter::Router::getAdditionalParticipantsForResponse(
     }
 
     participants.emplace();
-    for (const auto& p : o().participants) {
+    for (const auto& participant : o().participants) {
         boost::optional<bool> readOnly = boost::none;
-        if (includeReadOnly) {
-            invariant(p.second.readOnly != Participant::ReadOnly::kUnset);
-            readOnly = boost::make_optional<bool>(
-                p.second.readOnly == Participant::ReadOnly::kReadOnly ? true : false);
+        if (participant.second.readOnly != Participant::ReadOnly::kUnset) {
+            readOnly =
+                participant.second.readOnly == Participant::ReadOnly::kReadOnly ? true : false;
         }
 
-        participants->try_emplace(p.first, readOnly);
+        participants->try_emplace(participant.first, readOnly);
     }
 
     return participants;

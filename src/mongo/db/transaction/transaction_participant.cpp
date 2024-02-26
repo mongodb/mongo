@@ -993,6 +993,11 @@ void TransactionParticipant::Participant::_continueMultiDocumentTransaction(
                 << " has been aborted because an earlier command in this transaction failed.");
     }
 
+    // A shard acting as a transaction router will generally include readConcern in the request, as
+    // the shard cannot know whether this shard is already a participant in the transaction. The
+    // readConcern sent must match the readConcern this shard has for the transaction. A shard will
+    // not generally send readConcern with getMores, as it's guaranteed the shard already started
+    // the transaction on the cursor-opening request.
     if (action == TransactionParticipant::TransactionActions::kStartOrContinue &&
         o().txnResourceStash) {
         uassert(ErrorCodes::IllegalOperation,

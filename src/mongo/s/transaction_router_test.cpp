@@ -116,6 +116,9 @@ const BSONObj kOkReadOnlyTrueAdditionalParticipantsReadOnlyFalseResponse = BSON(
 const BSONObj kOkReadOnlyTrueAdditionalParticipantsReadOnlyTrueResponse = BSON(
     "ok" << 1 << "readOnly" << true << "additionalParticipants"
          << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3") << "readOnly" << true))));
+const BSONObj kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly =
+    BSON("ok" << 1 << "readOnly" << false << "additionalParticipants"
+              << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
 const BSONObj kErrorWithAdditionalParticipantsResponse =
     BSON("ok" << 0 << "additionalParticipants"
               << BSONArray(BSON("0" << BSON("shardId" << ShardId("shard3")))));
@@ -777,8 +780,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
 
-    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext(),
-                                                                       true /* includeReadOnly */);
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
     ASSERT(participants);
 
     std::set<std::pair<std::string, bool>> expectedAdditionalParticipants{
@@ -808,8 +810,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterReturnsAdditionalPartic
                                            << "test"));
     txnRouter.processParticipantResponse(operationContext(), shard1, kDummyErrorRes);
 
-    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext(),
-                                                                       false /* includeReadOnly */);
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
     ASSERT(participants);
     ASSERT_EQ(participants->size(), 1);
     auto p = participants->find(shard1.toString());
@@ -817,9 +818,9 @@ TEST_F(TransactionRouterTestWithDefaultSession, SubRouterReturnsAdditionalPartic
     ASSERT(!p->second);
 }
 
-DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
-             SubRouterCrashesIfTryToGetAdditionalParticipantsBeforeReceivedAllResponses,
-             "invariant") {
+TEST_F(
+    TransactionRouterTestWithDefaultSession,
+    SubRouterOkayIfGetsSuccessResponseWithAdditionalParticipantsBeforeAllAdditionalParticipantsResponded) {
     TxnNumber txnNum{3};
     operationContext()->setTxnNumber(txnNum);
 
@@ -829,19 +830,48 @@ DEATH_TEST_F(TransactionRouterTestWithDefaultSession,
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStartOrContinue);
 
-    // Send two requests, but only process one response
     txnRouter.attachTxnFieldsIfNeeded(operationContext(),
                                       shard1,
                                       BSON("insert"
                                            << "test"));
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                      shard2,
-                                      BSON("find"
-                                           << "test"));
-    txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
+    txnRouter.processParticipantResponse(
+        operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly);
 
-    // The readOnly value for shard2 is not set, so this should invariant
-    txnRouter.getAdditionalParticipantsForResponse(operationContext(), true /* includeReadOnly */);
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
+    ASSERT(participants);
+
+    std::set<std::pair<std::string, boost::optional<bool>>> expectedAdditionalParticipants{
+        {shard1.toString(), boost::make_optional<bool>(false) /* readOnly */},
+        {shard3.toString(), boost::none /* readOnly */}};
+    std::set<std::pair<std::string, boost::optional<bool>>> seenAdditionalParticipants;
+    for (const auto& p : *participants) {
+        seenAdditionalParticipants.insert({p.first, p.second});
+    }
+
+    ASSERT(expectedAdditionalParticipants == seenAdditionalParticipants);
+}
+
+TEST_F(
+    TransactionRouterTestWithDefaultSession,
+    ParentRouterThrowsIfGetsSuccessResponseWithAdditionalParticipantsBeforeAllAdditionalParticpantsResponded) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(),
+                                      shard1,
+                                      BSON("insert"
+                                           << "test"));
+    ASSERT_THROWS_CODE(
+        txnRouter.processParticipantResponse(
+            operationContext(), shard1, kOkReadOnlyFalseAdditionalParticipantsMissingReadOnly),
+        AssertionException,
+        8664400);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, NoAdditionalParticipantsIfNotSubRouter) {
@@ -866,8 +896,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NoAdditionalParticipantsIfNotSub
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
     txnRouter.processParticipantResponse(operationContext(), shard2, kOkReadOnlyTrueResponse);
 
-    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext(),
-                                                                       true /* includeReadOnly */);
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
     ASSERT(!participants);
 }
 
@@ -888,8 +917,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, NoAdditionalParticipantsIfTxnNum
                                            << "test"));
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
-    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext(),
-                                                                       true /* includeReadOnly */);
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
     ASSERT(!participants);
 }
 
@@ -913,8 +941,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
                                            << "test"));
     txnRouter.processParticipantResponse(operationContext(), shard1, kOkReadOnlyFalseResponse);
 
-    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext(),
-                                                                       true /* includeReadOnly */);
+    auto participants = txnRouter.getAdditionalParticipantsForResponse(operationContext());
     ASSERT(!participants);
 }
 

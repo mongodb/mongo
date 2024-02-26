@@ -519,10 +519,8 @@ public:
         /**
          * If this router is a sub-router and the txnNumber and retryCounter match that on the
          * opCtx, returns a map containing {participantShardId : readOnly} for each participant
-         * added by this router. If `includeReadOnly` is true, the "readOnly" value is expected to
-         * be set for every participant. If "includeReadOnly" is false, this function will only
-         * return the shard names (as the map keys) - it will not initialize the values (readOnly
-         * values).
+         * added by this router. It's possible that readOnly is not set if either an error occured
+         * before receiving a response from a particular shard, or a shard returned an error.
          *
          * Returns boost::none if this router is not a sub-router, or if the txnNumber or
          * retryCounter on this router do not match that on the opCtx.
@@ -531,7 +529,6 @@ public:
         // failpoint
         boost::optional<StringMap<boost::optional<bool>>> getAdditionalParticipantsForResponse(
             OperationContext* opCtx,
-            bool includeReadOnly,
             boost::optional<const std::string&> commandName = boost::none,
             boost::optional<const NamespaceString&> nss = boost::none);
 

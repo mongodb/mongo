@@ -447,14 +447,13 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
 void appendAdditionalParticipants(OperationContext* opCtx,
                                   BSONObjBuilder* commandBodyFieldsBob,
                                   const std::string& commandName,
-                                  const NamespaceString& nss,
-                                  bool errorResponse) {
+                                  const NamespaceString& nss) {
     auto txnRouter = TransactionRouter::get(opCtx);
     if (!txnRouter)
         return;
 
     auto additionalParticipants =
-        txnRouter.getAdditionalParticipantsForResponse(opCtx, !errorResponse, commandName, nss);
+        txnRouter.getAdditionalParticipantsForResponse(opCtx, commandName, nss);
     if (!additionalParticipants)
         return;
 
@@ -462,18 +461,15 @@ void appendAdditionalParticipants(OperationContext* opCtx,
     for (const auto& p : *additionalParticipants) {
         auto shardId = ShardId(p.first);
 
-        // The "readOnly" value is set for participants upon a successful response, and is not set
-        // upon an unsuccessful response.
-        if (errorResponse) {
-            participantArray.emplace_back(BSON("shardId" << shardId));
-            continue;
-        }
-
+        // The "readOnly" value is set for participants upon a successful response. If an error
+        // occurred before getting a response from a participant, it will not have a readOnly value
+        // set.
         auto readOnly = p.second;
-        // If this request finished successfully, all participants should have had their "readOnly"
-        // values set
-        invariant(readOnly);
-        participantArray.emplace_back(BSON("shardId" << shardId << "readOnly" << *readOnly));
+        if (readOnly) {
+            participantArray.emplace_back(BSON("shardId" << shardId << "readOnly" << *readOnly));
+        } else {
+            participantArray.emplace_back(BSON("shardId" << shardId));
+        }
     }
 
     commandBodyFieldsBob->appendElements(BSON("additionalParticipants" << participantArray));
@@ -1064,13 +1060,6 @@ void CheckoutSessionAndInvokeCommand::_tapError(Status status) {
     const OperationSessionInfoFromClient& sessionOptions = _ecd->getSessionOptions();
     auto opCtx = _ecd->getExecutionContext()->getOpCtx();
 
-    auto bodyBuilder = _ecd->getExecutionContext()->getReplyBuilder()->getBodyBuilder();
-    appendAdditionalParticipants(opCtx,
-                                 &bodyBuilder,
-                                 _ecd->getExecutionContext()->getCommand()->getName(),
-                                 _ecd->getInvocation()->ns(),
-                                 true /* errorResponse */);
-
     if (status.code() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
         // Exceptions are used to resolve views in a sharded cluster, so they should be handled
         // specially to avoid unnecessary aborts.
@@ -1127,8 +1116,7 @@ void CheckoutSessionAndInvokeCommand::_commitInvocation() {
             appendAdditionalParticipants(execContext->getOpCtx(),
                                          &bodyBuilder,
                                          _ecd->getExecutionContext()->getCommand()->getName(),
-                                         _ecd->getInvocation()->ns(),
-                                         false /* errorResponse */);
+                                         _ecd->getInvocation()->ns());
         }
     }
 }
