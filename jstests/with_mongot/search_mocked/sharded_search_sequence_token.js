@@ -65,9 +65,10 @@ const cursorId = NumberLong(123);
 const secondCursorId = NumberLong(cursorId + 1001);
 
 function runTestOnPrimaries(testFn) {
+    const owningShardMerge = {"specificShard": st.shard0.shardName};
     testDB.getMongo().setReadPref("primary");
-    testFn(st.rs0.getPrimary(), st.rs1.getPrimary(), "primaryShard", true);
-    testFn(st.rs0.getPrimary(), st.rs1.getPrimary(), "primaryShard", false);
+    testFn(st.rs0.getPrimary(), st.rs1.getPrimary(), owningShardMerge, true);
+    testFn(st.rs0.getPrimary(), st.rs1.getPrimary(), owningShardMerge, false);
 }
 
 function runTestOnSecondaries(testFn) {

@@ -202,10 +202,10 @@ function assertAggResultAndRouting(pipeline, expectedResults, opts, expected) {
 // $unionWith tests
 //
 
-// Ensure the $unionWith stage is executed on the primary to reduce flakiness.
+// Ensure the $unionWith stage is executed on the same shard to reduce flakiness.
 let pipeline = [
     {$unionWith: {coll: foreign.getName(), pipeline: [{$match: {b: {$gte: 0}}}]}},
-    {$_internalSplitPipeline: {mergeType: "primaryShard"}}
+    {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}
 ];
 let expectedRes = [
     {_id: -2, a: -2},

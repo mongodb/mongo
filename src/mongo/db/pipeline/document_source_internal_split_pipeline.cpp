@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -59,27 +60,50 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
     auto specObj = elem.embeddedObject();
 
     HostTypeRequirement mergeType = HostTypeRequirement::kNone;
-
+    boost::optional<ShardId> mergeShardId = boost::none;
     for (auto&& elt : specObj) {
         if (elt.fieldNameStringData() == "mergeType"_sd) {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "'mergeType' must be a string value but found: " << elt.type(),
-                    elt.type() == BSONType::String);
+            const auto type = elt.type();
 
-            auto mergeTypeString = elt.valueStringData();
+            if (type == BSONType::String) {
+                auto mergeTypeString = elt.valueStringData();
+                if ("localOnly"_sd == mergeTypeString) {
+                    mergeType = HostTypeRequirement::kLocalOnly;
+                } else if ("anyShard"_sd == mergeTypeString) {
+                    mergeType = HostTypeRequirement::kAnyShard;
+                } else if ("mongos"_sd == mergeTypeString) {
+                    mergeType = HostTypeRequirement::kMongoS;
+                } else {
+                    uasserted(ErrorCodes::BadValue,
+                              str::stream() << "unrecognized field while parsing mergeType: '"
+                                            << mergeTypeString << "'");
+                }
+            } else if (type == BSONType::Object) {
+                auto specificShardObj = elt.Obj();
+                auto specificShardElem = specificShardObj.getField("specificShard"_sd);
+                uassert(7958300,
+                        "Object argument to $_internalSplitPipeline must contain a single string "
+                        "field named 'specificShard'",
+                        specificShardObj.nFields() == 1 &&
+                            specificShardElem.type() == BSONType::String);
 
-            if ("localOnly"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kLocalOnly;
-            } else if ("anyShard"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kAnyShard;
-            } else if ("primaryShard"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kPrimaryShard;
-            } else if ("mongos"_sd == mergeTypeString) {
-                mergeType = HostTypeRequirement::kMongoS;
+                auto* opCtx = expCtx->opCtx;
+                auto* grid = Grid::get(opCtx);
+                uassert(
+                    7958301,
+                    "Cannot specify 'mergeType' of 'specificShard' and not have sharding enabled",
+                    grid && grid->isInitialized() && grid->isShardingInitialized());
+
+                // Verify that the specified shardId references an actual shard.
+                auto shardName = specificShardElem.str();
+                ShardId shardId(shardName);
+                uassertStatusOK(grid->shardRegistry()->getShard(opCtx, shardId));
+                mergeShardId = shardId;
             } else {
                 uasserted(ErrorCodes::BadValue,
-                          str::stream() << "unrecognized field while parsing mergeType: '"
-                                        << elt.fieldNameStringData() << "'");
+                          str::stream()
+                              << "'mergeType' must be a string value or an object but found: "
+                              << type);
             }
         } else {
             uasserted(ErrorCodes::BadValue,
@@ -88,7 +112,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSplitPipeline::create
         }
     }
 
-    return new DocumentSourceInternalSplitPipeline(expCtx, mergeType);
+    return new DocumentSourceInternalSplitPipeline(expCtx, mergeType, mergeShardId);
 }
 
 DocumentSource::GetNextResult DocumentSourceInternalSplitPipeline::doGetNext() {
@@ -97,14 +121,11 @@ DocumentSource::GetNextResult DocumentSourceInternalSplitPipeline::doGetNext() {
 
 Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions& opts) const {
     std::string mergeTypeString;
+    Document specificShardDoc;
 
     switch (_mergeType) {
         case HostTypeRequirement::kAnyShard:
             mergeTypeString = "anyShard";
-            break;
-
-        case HostTypeRequirement::kPrimaryShard:
-            mergeTypeString = "primaryShard";
             break;
 
         case HostTypeRequirement::kLocalOnly:
@@ -116,14 +137,20 @@ Value DocumentSourceInternalSplitPipeline::serialize(const SerializationOptions&
             break;
 
         case HostTypeRequirement::kNone:
+            if (_mergeShardId.has_value()) {
+                specificShardDoc = Document{{"specificShard", Value(_mergeShardId->toString())}};
+            }
+            break;
         default:
             break;
     }
 
-    return Value(
-        Document{{getSourceName(),
-                  Value{Document{{"mergeType",
-                                  mergeTypeString.empty() ? Value() : Value(mergeTypeString)}}}}});
+    return Value(Document{
+        {getSourceName(),
+         Value{Document{{"mergeType",
+                         mergeTypeString.empty()
+                             ? (specificShardDoc.empty() ? Value() : Value(specificShardDoc))
+                             : Value(mergeTypeString)}}}}});
 }
 
 }  // namespace mongo

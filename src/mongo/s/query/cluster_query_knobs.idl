@@ -32,10 +32,11 @@ global:
 server_parameters:
     internalQueryAlwaysMergeOnPrimaryShard:
         description: >-
-            If set to true on mongos, all aggregations delivered to the mongos which require a merging shard
-            will select the primary shard as the merger. False by default, which means that the merging shard
-            will be selected randomly amongst the shards participating in the query. Pipelines capable of
-            merging on mongoS are unaffected by this setting, unless internalQueryProhibitMergingOnMongoS is true.
+            Formerly, if this was set to true on mongos, all aggregations delivered to the mongos
+            which require a merging shard would select the primary shard as the merger. However,
+            because shard targeting no longer relies on the notion of a primary shard, this knob
+            is a no-op and is maintained to avoid breaking any configurations that depend on this
+            knob.
         cpp_vartype: AtomicWord<bool>
         cpp_varname: internalQueryAlwaysMergeOnPrimaryShard
         set_at: [ startup, runtime ]

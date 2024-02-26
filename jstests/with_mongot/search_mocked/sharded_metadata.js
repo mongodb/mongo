@@ -275,21 +275,24 @@ function testMergeAtLocationSearchMeta(mergeType, localColl, isView) {
     assert.eq(localColl.aggregate(pipeline).toArray(), expectedDocs);
 }
 
+const owningShardMerge = {
+    "specificShard": st.shard0.shardName
+};
 testMergeAtLocation("mongos", testColl, false);
 testMergeAtLocation("anyShard", testColl, false);
-testMergeAtLocation("primaryShard", testColl, false);
+testMergeAtLocation(owningShardMerge, testColl, false);
 testMergeAtLocation("localOnly", testColl, false);
 
 testMergeAtLocationSearchMeta("mongos", testColl, false);
 testMergeAtLocationSearchMeta("anyShard", testColl, false);
-testMergeAtLocationSearchMeta("primaryShard", testColl, false);
+testMergeAtLocationSearchMeta(owningShardMerge, testColl, false);
 // Repeat, but the collection is a view.
 assert.commandWorked(
     testDB.createView(collName + "viewColl", testColl.getName(), [{$search: mongotQuery}], {}));
 let viewColl = testDB.getCollection(collName + "viewColl");
 testMergeAtLocation("mongos", viewColl, true);
 testMergeAtLocation("anyShard", viewColl, true);
-testMergeAtLocation("primaryShard", viewColl, true);
+testMergeAtLocation(owningShardMerge, viewColl, true);
 testMergeAtLocation("localOnly", viewColl, true);
 
 assert(viewColl.drop());
@@ -301,7 +304,7 @@ assert.commandWorked(testDB.createView(
 viewColl = testDB.getCollection(collName + "viewColl");
 testSearchMetaFailure("mongos", viewColl, true);
 testSearchMetaFailure("anyShard", viewColl, true);
-testSearchMetaFailure("primaryShard", viewColl, true);
+testSearchMetaFailure(owningShardMerge, viewColl, true);
 testSearchMetaFailure("localOnly", viewColl, true);
 
 assert(viewColl.drop());
@@ -311,5 +314,5 @@ assert.commandWorked(
 viewColl = testDB.getCollection(collName + "viewColl");
 testMergeAtLocationSearchMeta("mongos", testColl, false);
 testMergeAtLocationSearchMeta("anyShard", viewColl, true);
-testMergeAtLocationSearchMeta("primaryShard", viewColl, true);
+testMergeAtLocationSearchMeta(owningShardMerge, viewColl, true);
 stWithMock.stop();

@@ -2,9 +2,8 @@
  * Tests to verify that the current op output shows all the sub-pipelines of a $unionWith. In this
  * test we also validate that current op shows the expected stages and comment.
  *
- * In 5.1, new behavior was introduced regarding reading from an unsharded collection on the primary
- * shard. This behavior affects which operations are logged.
- *  @tags: [ requires_fcv_51 ]
+ * This test uses a new $_internalSplitPipeline syntax introduced in 8.0.
+ * @tags: [  requires_fcv_80, ]
  */
 import {waitForCurOpByFailPoint} from "jstests/libs/curop_helpers.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
@@ -142,7 +141,7 @@ runTest({
                     }]
                 }
             },
-            {$_internalSplitPipeline: {mergeType: "primaryShard"}}
+            {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}
         ],
         cursor: {}
     },

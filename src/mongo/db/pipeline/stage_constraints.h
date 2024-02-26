@@ -75,8 +75,6 @@ struct StageConstraints {
         // router to a shard to execute if some other stage in the pipeline needs to run on a
         // shard. The stage provides its own data and is independent of any collection.
         kRunOnceAnyNode,
-        // Indicates that the stage must run on the primary shard.
-        kPrimaryShard,
         // Indicates that the stage must run on any participating shard.
         kAnyShard,
         // Indicates that the stage can only run on mongoS.
@@ -198,7 +196,6 @@ struct StageConstraints {
         // shard, since it needs to be able to run on mongoS in a cluster.
         invariant(!(changeStreamRequirement == ChangeStreamRequirement::kAllowlist &&
                     (hostRequirement == HostTypeRequirement::kAnyShard ||
-                     hostRequirement == HostTypeRequirement::kPrimaryShard ||
                      hostRequirement == HostTypeRequirement::kAllShardHosts)));
 
         // A stage which is allowlisted for $changeStream cannot have a position requirement.

@@ -180,21 +180,14 @@ AsyncRequestsSender::Response establishMergingShardCursor(OperationContext* opCt
 }
 
 ShardId pickMergingShard(OperationContext* opCtx,
-                         bool needsPrimaryShardMerge,
                          const boost::optional<ShardId>& pipelineMergeShardId,
-                         const std::vector<ShardId>& targetedShards,
-                         ShardId primaryShard) {
-    auto& prng = opCtx->getClient()->getPrng();
+                         const std::vector<ShardId>& targetedShards) {
     // If we cannot merge on mongoS, establish the merge cursor on a shard. Perform the merging
     // command on random shard, unless the pipeline dictates that it needs to be run on a specific
     // shard for the database.
-    if (needsPrimaryShardMerge) {
-        return primaryShard;
-    } else if (pipelineMergeShardId) {
-        return *pipelineMergeShardId;
-    } else {
-        return targetedShards[prng.nextInt32(targetedShards.size())];
-    }
+    return pipelineMergeShardId
+        ? *pipelineMergeShardId
+        : targetedShards[opCtx->getClient()->getPrng().nextInt32(targetedShards.size())];
 }
 
 BSONObj createCommandForMergingShard(Document serializedCommand,
@@ -304,7 +297,7 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     // then ignore the internalQueryProhibitMergingOnMongoS parameter.
     if (mergePipeline->requiredToRunOnMongos() ||
         (!internalQueryProhibitMergingOnMongoS.load() && mergePipeline->canRunOnMongos().isOK() &&
-         !mergePipeline->needsSpecificShardMerger())) {
+         !shardDispatchResults.mergeShardId)) {
         return runPipelineOnMongoS(namespaces,
                                    batchSize,
                                    std::move(shardDispatchResults.splitPipeline->mergePipeline),
@@ -316,11 +309,8 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     // therefore must have a valid routing table.
     invariant(cri);
 
-    const ShardId mergingShardId = pickMergingShard(opCtx,
-                                                    shardDispatchResults.needsPrimaryShardMerge,
-                                                    mergePipeline->needsSpecificShardMerger(),
-                                                    targetedShards,
-                                                    cri->cm.dbPrimary());
+    const ShardId mergingShardId =
+        pickMergingShard(opCtx, shardDispatchResults.mergeShardId, targetedShards);
     const bool mergingShardContributesData =
         std::find(targetedShards.begin(), targetedShards.end(), mergingShardId) !=
         targetedShards.end();
@@ -335,7 +325,8 @@ Status dispatchMergingPipeline(const boost::intrusive_ptr<ExpressionContext>& ex
     LOGV2_DEBUG(22835,
                 1,
                 "Dispatching merge pipeline to designated shard",
-                "command"_attr = redact(mergeCmdObj));
+                "command"_attr = redact(mergeCmdObj),
+                "mergingShardId"_attr = mergingShardId);
 
     // Dispatch $mergeCursors to the chosen shard, store the resulting cursor, and return.
     auto mergeResponse =
@@ -589,7 +580,7 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
             static_cast<DocumentSourceMergeCursors*>(pipeline.shardsPipeline->peekFront());
         mergeCursors->dismissCursorOwnership();
     }
-    return DispatchShardPipelineResults{false,
+    return DispatchShardPipelineResults{boost::none /* mergeShardId  */,
                                         std::move(ownedCursors),
                                         {},
                                         std::move(splitPipeline),

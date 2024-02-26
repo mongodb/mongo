@@ -54,10 +54,10 @@ namespace mongo {
  * An internal stage available for testing. Acts as a simple passthrough of intermediate results
  * from the source stage, but forces the pipeline to split at the point where this stage appears
  * (assuming that no earlier splitpoints exist). Takes a single parameter, 'mergeType', which can be
- * one of 'primaryShard', 'anyShard' or 'mongos' to control where the merge may occur. Omitting this
- * parameter or specifying 'mongos' produces the default merging behaviour; the merge half of the
- * pipeline will be executed on mongoS if all other stages are eligible, and will be sent to a
- * random participating shard otherwise.
+ * one of 'anyShard' or 'mongos' to control where the merge may occur. Omitting this parameter or
+ * specifying 'mongos' produces the default merging behaviour; the merge half of the  pipeline will
+ * be executed on mongoS if all other stages are eligible, and will be sent to a random
+ * participating shard otherwise.
  */
 class DocumentSourceInternalSplitPipeline final : public DocumentSource {
 public:
@@ -67,8 +67,10 @@ public:
         BSONElement, const boost::intrusive_ptr<ExpressionContext>&);
 
     static boost::intrusive_ptr<DocumentSource> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, HostTypeRequirement mergeType) {
-        return new DocumentSourceInternalSplitPipeline(expCtx, mergeType);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        HostTypeRequirement mergeType,
+        boost::optional<ShardId> mergeShardId = boost::none) {
+        return new DocumentSourceInternalSplitPipeline(expCtx, mergeType, mergeShardId);
     }
 
     const char* getSourceName() const final {
@@ -81,27 +83,36 @@ public:
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                _mergeType,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed,
-                TransactionRequirement::kAllowed,
-                _mergeType == HostTypeRequirement::kMongoS ? LookupRequirement::kNotAllowed
-                                                           : LookupRequirement::kAllowed,
-                UnionRequirement::kAllowed};
+        StageConstraints constraints{StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     _mergeType,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     _mergeType == HostTypeRequirement::kMongoS
+                                         ? LookupRequirement::kNotAllowed
+                                         : LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed};
+        if (_mergeShardId) {
+            constraints.mergeShardId = _mergeShardId;
+        }
+        return constraints;
     }
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
     DocumentSourceInternalSplitPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        HostTypeRequirement mergeType)
-        : DocumentSource(kStageName, expCtx), _mergeType(mergeType) {}
+                                        HostTypeRequirement mergeType,
+                                        boost::optional<ShardId> mergeShardId)
+        : DocumentSource(kStageName, expCtx), _mergeType(mergeType), _mergeShardId(mergeShardId) {}
 
     GetNextResult doGetNext() final;
     Value serialize(const SerializationOptions& opts = SerializationOptions{}) const final override;
     HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
+
+    // Populated with a valid ShardId if this stage was constructed with
+    boost::optional<ShardId> _mergeShardId = boost::none;
 };
 
 }  // namespace mongo

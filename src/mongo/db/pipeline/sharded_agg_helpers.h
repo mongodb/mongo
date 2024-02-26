@@ -93,9 +93,9 @@ struct ShardedExchangePolicy {
 };
 
 struct DispatchShardPipelineResults {
-    // True if this pipeline was split, and the second half of the pipeline needs to be run on
-    // the primary shard for the database.
-    bool needsPrimaryShardMerge;
+    // Contains a value when the second half of the pipeline was requested to run on a specific
+    // shard.
+    boost::optional<ShardId> mergeShardId;
 
     // Populated if this *is not* an explain, this vector represents the cursors on the remote
     // shards.

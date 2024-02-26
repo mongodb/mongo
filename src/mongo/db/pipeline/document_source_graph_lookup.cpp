@@ -580,8 +580,12 @@ StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pip
         // Note that we can only check sharding state when we're on mongos as we may be holding
         // locks on mongod (which would inhibit looking up sharding state in the catalog cache).
         if (pExpCtx->inMongos) {
-            constraints.mergeShardId =
-                pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx, _from);
+            // Only nominate a merging shard if the outer collection is unsharded.
+            if (!pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, pExpCtx->ns)) {
+                constraints.mergeShardId =
+                    pExpCtx->mongoProcessInterface->determineSpecificMergeShard(pExpCtx->opCtx,
+                                                                                _from);
+            }
         } else {
             constraints.mergeShardId = ShardingState::get(pExpCtx->opCtx)->shardId();
         }

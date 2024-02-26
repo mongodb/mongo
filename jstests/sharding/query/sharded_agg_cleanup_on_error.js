@@ -8,6 +8,8 @@
  * @tags: [
  *   do_not_wrap_aggregations_in_facets,
  *   requires_sharding,
+ *   # This test uses a new $_internalSplitPipeline syntax introduced in 8.0.
+ *   requires_fcv_80,
  * ]
  */
 import {assertMergeFailsForAllModesWithCode} from "jstests/aggregation/extras/merge_helpers.js";
@@ -26,7 +28,7 @@ const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
 
 assert.commandWorked(
-    mongosDB.adminCommand({enableSharding: kDBName, primaryShard: st.shard0.name}));
+    mongosDB.adminCommand({enableSharding: kDBName, primaryShard: st.shard0.shardName}));
 let coll = mongosDB.sharded_agg_cleanup_on_error;
 
 for (let i = 0; i < 10; i++) {
@@ -97,7 +99,7 @@ try {
     assertFailsAndCleansUpCursors({
         pipeline: [
             {$project: {out: {$divide: ["$_id", 0]}}},
-            {$_internalSplitPipeline: {mergeType: "primaryShard"}}
+            {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}
         ],
         errCode: kDivideByZeroErrCodes
     });

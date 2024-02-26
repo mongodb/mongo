@@ -4120,7 +4120,7 @@ TEST_F(PipelineOptimizations, ShouldNotCoalesceUnwindNotOnAs) {
 
 }  // namespace coalesceLookUpAndUnwind
 
-namespace needsPrimaryShardMerger {
+namespace needsSpecificShardMerger {
 
 class PipelineOptimizationsShardMerger : public PipelineOptimizations {
 public:
@@ -4135,13 +4135,11 @@ public:
     void doTest(std::string inputPipeJson,
                 std::string shardPipeJson,
                 std::string mergePipeJson,
-                bool needsPrimaryShardMerger,
                 boost::optional<ShardId> needsSpecificShardMerger = boost::none) {
         PipelineOptimizations::doTest(
             std::move(inputPipeJson), std::move(shardPipeJson), std::move(mergePipeJson));
-        ASSERT_EQUALS(mergePipe->needsPrimaryShardMerger(), needsPrimaryShardMerger);
         ASSERT_EQUALS(mergePipe->needsSpecificShardMerger(), needsSpecificShardMerger);
-        ASSERT(!shardPipe->needsPrimaryShardMerger());
+        ASSERT(!shardPipe->needsSpecificShardMerger());
     }
 
     void doMergeWithCollectionWithRoutingTableTest(bool unsplittable) {
@@ -4183,7 +4181,6 @@ public:
         doTest("[{$merge: 'outColl'}]" /*inputPipeJson*/,
                std::move(shardPipeJson),
                std::move(mergePipeJson),
-               false /*needsPrimaryShardMerger*/,
                mergeShardId);
     }
 };
@@ -4200,7 +4197,6 @@ TEST_F(PipelineOptimizationsShardMerger, Out) {
     doTest("[{$out: 'outColl'}]" /*inputPipeJson*/,
            "[]" /*shardPipeJson*/,
            "[{$out: {coll: 'outColl', db: 'a'}}]" /*mergePipeJson*/,
-           false,
            kMyShardName /* mergeShardId */);
 };
 
@@ -4218,7 +4214,6 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUntrackedCollection) {
            "[]" /*shardPipeJson*/,
            "[{$merge: {into: {db: 'a', coll: 'outColl'}, on: '_id', "
            "whenMatched: 'merge', whenNotMatched: 'insert'}}]" /*mergePipeJson*/,
-           false /*needsPrimaryShardMerger*/,
            kMyShardName /*needsSpecificShardMerger*/);
 };
 
@@ -4233,8 +4228,7 @@ TEST_F(PipelineOptimizationsShardMerger, MergeWithUnsplittableCollection) {
 TEST_F(PipelineOptimizationsShardMerger, Project) {
     doTest("[{$project: {a : 1}}]" /*inputPipeJson*/,
            "[{$project: {_id: true, a: true}}]" /*shardPipeJson*/,
-           "[]" /*mergePipeJson*/,
-           false /*needsPrimaryShardMerger*/);
+           "[]" /*mergePipeJson*/);
 };
 
 TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
@@ -4270,7 +4264,6 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpUnsplittableFromCollection) {
         "[]" /* shardPipeJson */,
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
         ,
-        false /* needsPrimaryShardMerger */,
         kMyShardName /* needsSpecificShardMerger */);
 };
 
@@ -4307,11 +4300,10 @@ TEST_F(PipelineOptimizationsShardMerger, LookUpShardedFromCollection) {
         "[]" /* shardPipeJson */,
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: 'right'}}]" /* mergePipeJson */
         ,
-        false /* needsPrimaryShardMerger */,
         kMyShardName /* needsSpecificShardMerger */);
 };
 
-}  // namespace needsPrimaryShardMerger
+}  // namespace needsSpecificShardMerger
 
 namespace mustRunOnMongoS {
 

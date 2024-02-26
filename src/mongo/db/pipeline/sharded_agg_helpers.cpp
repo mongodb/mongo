@@ -150,6 +150,7 @@ MONGO_FAIL_POINT_DEFINE(shardedAggregateHangBeforeEstablishingShardCursors);
 struct TargetingResults {
     BSONObj shardQuery;
     BSONObj shardTargetingCollation;
+    boost::optional<ShardId> mergeShardId;
     std::set<ShardId> shardIds;
     bool needsSplit;
     bool mustRunOnAllShards;
@@ -1196,9 +1197,6 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
                                 PipelineDataSource pipelineDataSource,
                                 ShardTargetingPolicy shardTargetingPolicy,
                                 const boost::optional<CollectionRoutingInfo>& cri) {
-    const bool needsPrimaryShardMerge =
-        (pipeline->needsPrimaryShardMerger() || internalQueryAlwaysMergeOnPrimaryShard.load());
-
     const bool needsMongosMerge = pipeline->needsMongosMerger();
 
     auto shardQuery = pipeline->getInitialQuery();
@@ -1225,15 +1223,9 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
 
     bool targetAllHosts = pipeline->needsAllShardHosts();
     // Don't need to split the pipeline if we are only targeting a single shard, unless:
-    // - There is a stage that needs to be run on the primary shard and the single target shard
-    //   is not the primary.
     // - The pipeline contains one or more stages which must always merge on mongoS.
     // - The pipeline requires the merge to be performed on a specific shard that is not targeted.
-    // TODO SERVER-79583: This reference to dbPrimary can be removed once
-    // HostTypeRequirement::kPrimaryShard is no longer used.
-    const bool needsSplit =
-        (shardIds.size() > 1u || needsMongosMerge || targetAllHosts ||
-         (needsPrimaryShardMerge && cri && *(shardIds.begin()) != cri->cm.dbPrimary())) ||
+    const bool needsSplit = (shardIds.size() > 1u) || needsMongosMerge || targetAllHosts ||
         (mergeShardId && *(shardIds.begin()) != mergeShardId);
 
     if (mergeShardId) {
@@ -1268,6 +1260,7 @@ TargetingResults targetPipeline(const boost::intrusive_ptr<ExpressionContext>& e
 
     return {std::move(shardQuery),
             shardTargetingCollation,
+            mergeShardId,
             std::move(shardIds),
             needsSplit,
             mustRunOnAllShards,
@@ -1353,6 +1346,7 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
 
     const auto& [shardQuery,
                  shardTargetingCollation,
+                 mergeShardId,
                  shardIds,
                  needsSplit,
                  mustRunOnAllShards,
@@ -1374,16 +1368,16 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     boost::optional<ShardedExchangePolicy> exchangeSpec;
     boost::optional<SplitPipeline> splitPipelines;
     const bool targetAllHosts = pipeline->needsAllShardHosts();
-    const bool needsPrimaryShardMerger = pipeline->needsPrimaryShardMerger();
 
     if (needsSplit) {
         LOGV2_DEBUG(20906,
                     5,
                     "Splitting pipeline: targeting = {shardIds_size} shards, needsMongosMerge = "
-                    "{needsMongosMerge}, needsPrimaryShardMerge = {needsPrimaryShardMerge}",
+                    "{needsMongosMerge}, needsSpecificShardMerger = {needsSpecificShardMerger}",
                     "shardIds_size"_attr = shardCount,
                     "needsMongosMerge"_attr = pipeline->needsMongosMerger(),
-                    "needsPrimaryShardMerge"_attr = pipeline->needsPrimaryShardMerger());
+                    "needsSpecificShardMerger"_attr =
+                        mergeShardId.has_value() ? mergeShardId->toString() : "false");
         splitPipelines = splitPipeline(std::move(pipeline));
 
         // If the first stage of the pipeline is a $search stage, exchange optimization isn't
@@ -1473,15 +1467,12 @@ DispatchShardPipelineResults dispatchTargetedShardPipeline(
     }
 
     // Record the number of shards involved in the aggregation. If we are required to merge on
-    // the primary shard, but the primary shard was not in the set of targeted shards, then we
+    // a specific shard, but the merging shard was not in the set of targeted shards, then we
     // must increment the number of involved shards.
-    // TODO SERVER-79583: Revisit this computation. In particular, even when we are no longer
-    // merging on the primary shard specifically, we may need to account for the chase where the
-    // merging shard is not in 'shardIds'.
     CurOp::get(opCtx)->debug().nShards =
-        shardCount + (needsPrimaryShardMerger && cri && !shardIds.count(cri->cm.dbPrimary()));
+        shardCount + (mergeShardId && !shardIds.count(*mergeShardId));
 
-    return DispatchShardPipelineResults{needsPrimaryShardMerger,
+    return DispatchShardPipelineResults{std::move(mergeShardId),
                                         std::move(ownedCursors),
                                         std::move(shardResults),
                                         std::move(splitPipelines),
@@ -1518,8 +1509,11 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     // Return if we don't need to establish any cursors.
     if (shardIds.empty()) {
+        tassert(7958303,
+                "Expected no merge shard id when shardIds are empty",
+                !targeting.mergeShardId.has_value());
         return DispatchShardPipelineResults{
-            false, {}, {}, boost::none, nullptr, BSONObj(), 0, boost::none};
+            boost::none, {}, {}, boost::none, nullptr, BSONObj(), 0, boost::none};
     }
     return dispatchTargetedShardPipeline(std::move(serializedCommand),
                                          targeting,
@@ -1669,7 +1663,7 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
                             BSONObjBuilder* result) {
     if (dispatchResults.splitPipeline) {
         auto* mergePipeline = dispatchResults.splitPipeline->mergePipeline.get();
-        auto specificMergeShardId = mergePipeline->needsSpecificShardMerger();
+        auto specificMergeShardId = dispatchResults.mergeShardId;
         auto mergeType = [&]() -> std::string {
             if (mergePipeline->canRunOnMongos().isOK() && !specificMergeShardId) {
                 if (mergeCtx->inMongos) {
@@ -1678,8 +1672,6 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
                 return "local";
             } else if (dispatchResults.exchangeSpec) {
                 return "exchange";
-            } else if (mergePipeline->needsPrimaryShardMerger()) {
-                return "primaryShard";
             } else if (specificMergeShardId) {
                 return "specificShard";
             } else {

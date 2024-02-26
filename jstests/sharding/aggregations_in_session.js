@@ -1,5 +1,11 @@
-// Tests running aggregations within a client session. This test was designed to reproduce
-// SERVER-33660.
+/**
+ * Tests running aggregations within a client session. This test was designed to reproduce
+ * SERVER-33660.
+ * @tags: [
+ *   # This test uses a new $_internalSplitPipeline syntax introduced in 8.0.
+ *   requires_fcv_80,
+ * ]
+ */
 const st = new ShardingTest({shards: 2});
 
 // Gate this test to transaction supporting engines only as it uses txnNumber.
@@ -21,11 +27,13 @@ st.shardColl(mongosColl, {_id: 1}, {_id: 1}, {_id: 1});
 assert.commandWorked(mongosColl.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
 
 // This assertion will reproduce the hang described in SERVER-33660.
-assert.eq(
-    [{_id: 0}, {_id: 1}, {_id: 2}],
-    mongosColl
-        .aggregate([{$_internalSplitPipeline: {mergeType: "primaryShard"}}, {$sort: {_id: 1}}])
-        .toArray());
+assert.eq([{_id: 0}, {_id: 1}, {_id: 2}],
+          mongosColl
+              .aggregate([
+                  {$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}},
+                  {$sort: {_id: 1}}
+              ])
+              .toArray());
 
 // Test a couple more aggregations to be sure.
 assert.eq(

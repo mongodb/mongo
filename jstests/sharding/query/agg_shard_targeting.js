@@ -20,6 +20,8 @@
  *   requires_sharding,
  *   requires_spawning_own_processes,
  *   requires_profiling,
+ *   # This test uses a new $_internalSplitPipeline syntax introduced in 8.0.
+ *   requires_fcv_80,
  * ]
  */
 import {
@@ -85,8 +87,9 @@ const shardExceptions = [
     ErrorCodes.StaleEpoch,
 ];
 
-// Create an $_internalSplitPipeline stage that forces the merge to occur on the Primary shard.
-const forcePrimaryMerge = [{$_internalSplitPipeline: {mergeType: "primaryShard"}}];
+// Create an $_internalSplitPipeline stage that forces the merge to occur on the same shard.
+let forceOwningShardMerge =
+    [{$_internalSplitPipeline: {mergeType: {"specificShard": st.shard0.shardName}}}];
 
 function runAggShardTargetTest({splitPoint}) {
     // Ensure that both mongoS have up-to-date caches, and enable the profiler on both shards.
@@ -199,7 +202,7 @@ function runAggShardTargetTest({splitPoint}) {
     assert.eq(mongosColl
                   .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
                                  .concat(splitPoint)
-                                 .concat(forcePrimaryMerge),
+                                 .concat(forceOwningShardMerge),
                              {comment: testName})
                   .itcount(),
               2);
@@ -286,7 +289,7 @@ function runAggShardTargetTest({splitPoint}) {
     assert.eq(mongosColl
                   .aggregate([{$match: {_id: {$gte: -150, $lte: -50}}}]
                                  .concat(splitPoint)
-                                 .concat(forcePrimaryMerge),
+                                 .concat(forceOwningShardMerge),
                              {comment: testName})
                   .itcount(),
               2);

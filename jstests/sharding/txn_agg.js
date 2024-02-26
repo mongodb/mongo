@@ -1,7 +1,11 @@
-// @tags: [
-//   uses_multi_shard_transaction,
-//   uses_transactions,
-// ]
+/**
+ * @tags: [
+ *   uses_multi_shard_transaction,
+ *   uses_transactions,
+ *   # This test uses a new $_internalSplitPipeline syntax introduced in 8.0.
+ *   requires_fcv_80,
+ * ]
+ */
 const st = new ShardingTest({shards: 2});
 
 assert.commandWorked(
@@ -93,12 +97,15 @@ assert.commandWorked(session.abortTransaction_forTesting());
 assert.commandWorked(sessionColl.insert([{_id: -1}, {_id: 0}, {_id: 1}]));
 
 // Run an aggregation which requires merging on a shard as the first operation in a transaction.
+const specificShardName = st.shard0.shardName;
 session.startTransaction();
-assert.eq(
-    [{_id: -1}, {_id: 0}, {_id: 1}],
-    sessionColl
-        .aggregate([{$_internalSplitPipeline: {mergeType: "primaryShard"}}, {$sort: {_id: 1}}])
-        .toArray());
+assert.eq([{_id: -1}, {_id: 0}, {_id: 1}],
+          sessionColl
+              .aggregate([
+                  {$_internalSplitPipeline: {mergeType: {"specificShard": specificShardName}}},
+                  {$sort: {_id: 1}}
+              ])
+              .toArray());
 assert.commandWorked(session.commitTransaction_forTesting());
 
 // Move all of the data to shard 1.
@@ -106,7 +113,10 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: 'test.user', find: {_id: -1}, to: st.shard1.shardName}));
 
 // Be sure that only one shard will be targeted after the moveChunk.
-const pipeline = [{$_internalSplitPipeline: {mergeType: "primaryShard"}}, {$sort: {_id: 1}}];
+const pipeline = [
+    {$_internalSplitPipeline: {mergeType: {"specificShard": specificShardName}}},
+    {$sort: {_id: 1}}
+];
 const explain = sessionColl.explain().aggregate(pipeline);
 assert.eq(Object.keys(explain.shards), [st.shard1.shardName], explain);
 

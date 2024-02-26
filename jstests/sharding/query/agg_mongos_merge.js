@@ -23,16 +23,10 @@ const st = new ShardingTest({shards: 2, mongos: 1});
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 const unshardedColl = mongosDB[jsTestName() + "_unsharded"];
-const primaryShardDB = st.shard0.getDB(jsTestName());
-const nonPrimaryShardDB = st.shard1.getDB(jsTestName());
+const owningShardDB = st.shard0.getDB(jsTestName());
+const nonOwningShardDB = st.shard1.getDB(jsTestName());
 
 assert.commandWorked(mongosDB.dropDatabase());
-
-// Always merge pipelines which cannot merge on mongoS on the primary shard instead, so we know
-// where to check for $mergeCursors.
-assert.commandWorked(
-    mongosDB.adminCommand({setParameter: 1, internalQueryAlwaysMergeOnPrimaryShard: true}));
-
 // Enable sharding on the test DB and ensure its primary is shard0.
 assert.commandWorked(
     mongosDB.adminCommand({enableSharding: mongosDB.getName(), primaryShard: st.shard0.shardName}));
@@ -70,10 +64,10 @@ for (let i = -200; i < 200; i++) {
 
 let testNameHistory = new Set();
 
-// Clears system.profile and restarts the profiler on the primary shard. We enable profiling to
+// Clears system.profile and restarts the profiler on the owning shard. We enable profiling to
 // verify that no $mergeCursors occur during tests where we expect the merge to run on mongoS.
 function startProfiling() {
-    for (let shard of [primaryShardDB, nonPrimaryShardDB]) {
+    for (let shard of [owningShardDB, nonOwningShardDB]) {
         assert.commandWorked(shard.setProfilingLevel(0));
         shard.system.profile.drop();
         assert.commandWorked(shard.setProfilingLevel(2));
@@ -115,33 +109,25 @@ function assertMergeBehaviour(
         "command.comment": testName,
         "command.pipeline.$mergeCursors": {$exists: 1}
     };
-    const primaryShardMergeCount = primaryShardDB.system.profile.find(mergeFilter).itcount();
-    const nonPrimaryShardMergeCount = nonPrimaryShardDB.system.profile.find(mergeFilter).itcount()
+    const owningShardMergeCount = owningShardDB.system.profile.find(mergeFilter).itcount();
+    const nonPrimaryShardMergeCount = nonOwningShardDB.system.profile.find(mergeFilter).itcount()
 
     const foundMessage =
         function() {
-        return "found " + primaryShardMergeCount + " merges on the primary shard and " +
+        return "found " + owningShardMergeCount + " merges on the owning shard and " +
             nonPrimaryShardMergeCount + " on the other shard. Total merges on shards: " +
-            (primaryShardMergeCount + nonPrimaryShardMergeCount);
+            (owningShardMergeCount + nonPrimaryShardMergeCount);
     }
 
     if (mergeType === "mongos") {
-        assert.eq(primaryShardMergeCount + nonPrimaryShardMergeCount,
+        assert.eq(owningShardMergeCount + nonPrimaryShardMergeCount,
                   0,
                   "Expected merge on mongos, but " + foundMessage());
-    }
-    else if (mergeType === "primaryShard") {
-        assert.eq(primaryShardMergeCount,
-                  1,
-                  "Expected merge on the primary shard, but " + foundMessage());
-        assert.eq(nonPrimaryShardMergeCount,
-                  0,
-                  "Expected merge on the primary shard, but " + foundMessage());
     }
     else {
         assert(mergeType === "anyShard" || mergeType === "specificShard",
                "unknown merge type: " + mergeType);
-        assert.eq(primaryShardMergeCount + nonPrimaryShardMergeCount,
+        assert.eq(owningShardMergeCount + nonPrimaryShardMergeCount,
                   1,
                   "Expected merge on some shard, but " + foundMessage());
     }
@@ -326,7 +312,7 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
     // Test that a merge pipeline which needs to run on a shard is NOT merged on mongoS
     // regardless of 'allowDiskUse'.
     assertMergeOnMongoD({
-        testName: "agg_mongos_merge_primary_shard_disk_use_" + allowDiskUse,
+        testName: "agg_mongos_merge_owning_shard_disk_use_" + allowDiskUse,
         pipeline: [
             {$match: {_id: {$gte: -200, $lte: 200}}},
             {$_internalSplitPipeline: {mergeType: "anyShard"}}
@@ -336,7 +322,7 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
         expectedCount: 400
     });
 
-    // Test that equality $lookup continues to be merged on the primary shard when the foreign
+    // Test that equality $lookup continues to be merged on the owning shard when the foreign
     // collection is unsharded.
     assertMergeOnMongoD({
         testName: "agg_mongos_merge_lookup_unsharded_flag_on_disk_use_" + allowDiskUse,

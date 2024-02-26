@@ -123,6 +123,9 @@ function testMergeAtLocation(mergeType, localColl, isView, limit = Infinity) {
               expectedDocs.slice(0, Math.min(vectorSearchQuery.limit, limit)));
 }
 
+const owningShardMerge = {
+    "specificShard": st.shard0.shardName
+};
 testMergeAtLocation("mongos", testColl, false);
 testMergeAtLocation("mongos", testColl, false, 3);
 testMergeAtLocation("mongos", testColl, false, 5);
@@ -131,10 +134,10 @@ testMergeAtLocation("anyShard", testColl, false);
 testMergeAtLocation("anyShard", testColl, false, 3);
 testMergeAtLocation("anyShard", testColl, false, 5);
 testMergeAtLocation("anyShard", testColl, false, 10);
-testMergeAtLocation("primaryShard", testColl, false);
-testMergeAtLocation("primaryShard", testColl, false, 3);
-testMergeAtLocation("primaryShard", testColl, false, 5);
-testMergeAtLocation("primaryShard", testColl, false, 10);
+testMergeAtLocation(owningShardMerge, testColl, false);
+testMergeAtLocation(owningShardMerge, testColl, false, 3);
+testMergeAtLocation(owningShardMerge, testColl, false, 5);
+testMergeAtLocation(owningShardMerge, testColl, false, 10);
 testMergeAtLocation("localOnly", testColl, false);
 testMergeAtLocation("localOnly", testColl, false, 3);
 testMergeAtLocation("localOnly", testColl, false, 5);
@@ -153,10 +156,10 @@ testMergeAtLocation("anyShard", viewColl, true);
 testMergeAtLocation("anyShard", viewColl, true, 3);
 testMergeAtLocation("anyShard", viewColl, true, 5);
 testMergeAtLocation("anyShard", viewColl, true, 10);
-testMergeAtLocation("primaryShard", viewColl, true);
-testMergeAtLocation("primaryShard", viewColl, true, 3);
-testMergeAtLocation("primaryShard", viewColl, true, 5);
-testMergeAtLocation("primaryShard", viewColl, true, 10);
+testMergeAtLocation(owningShardMerge, viewColl, true);
+testMergeAtLocation(owningShardMerge, viewColl, true, 3);
+testMergeAtLocation(owningShardMerge, viewColl, true, 5);
+testMergeAtLocation(owningShardMerge, viewColl, true, 10);
 testMergeAtLocation("localOnly", viewColl, true);
 testMergeAtLocation("localOnly", viewColl, true, 3);
 testMergeAtLocation("localOnly", viewColl, true, 5);

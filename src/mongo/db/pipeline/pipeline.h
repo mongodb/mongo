@@ -311,11 +311,6 @@ public:
     }
 
     /**
-     * Returns 'true' if the pipeline must merge on the primary shard.
-     */
-    bool needsPrimaryShardMerger() const;
-
-    /**
      * Returns a specific ShardId that should be merger for this pipeline or boost::none if it is
      * not needed.
      */
