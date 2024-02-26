@@ -669,7 +669,8 @@ TEST(Simple8b, BitShiftLargerThan64) {
     // The expected value is the original value << (68 % 64 = 4) in decimal.
     uint64_t expectedVal = 12089623907203408;
     BufBuilder buffer;
-    buffer.appendNum(0x55E6E5D4E9F2B1D8);
+    const int64_t inputVal = 0x55E6E5D4E9F2B1D8;
+    buffer.appendNum(inputVal);
 
     auto size = buffer.len();
     auto sharedBuffer = buffer.release();
