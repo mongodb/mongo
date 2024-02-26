@@ -380,7 +380,8 @@ void startFTDC(Service* service,
     // These are collected on the period interval in FTDCConfig.
     // NOTE: For each command here, there must be an equivalent privilege check in
     // GetDiagnosticDataCommand
-    controller->addPeriodicCollector(std::make_unique<FTDCServerStatusCommandCollector>());
+    controller->addPeriodicCollector(std::make_unique<FTDCServerStatusCommandCollector>(),
+                                     service->role());
 
     registerCollectors(controller.get());
 
@@ -391,16 +392,22 @@ void startFTDC(Service* service,
     // These are collected on each file rotation.
 
     // CmdBuildInfo
-    controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-        "buildInfo", "buildInfo", DatabaseName::kEmpty, BSON("buildInfo" << 1)));
+    controller->addOnRotateCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "buildInfo", "buildInfo", DatabaseName::kEmpty, BSON("buildInfo" << 1)),
+        ClusterRole::None);
 
     // CmdGetCmdLineOpts
-    controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-        "getCmdLineOpts", "getCmdLineOpts", DatabaseName::kEmpty, BSON("getCmdLineOpts" << 1)));
+    controller->addOnRotateCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "getCmdLineOpts", "getCmdLineOpts", DatabaseName::kEmpty, BSON("getCmdLineOpts" << 1)),
+        ClusterRole::None);
 
     // HostInfoCmd
-    controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-        "hostInfo", "hostInfo", DatabaseName::kEmpty, BSON("hostInfo" << 1)));
+    controller->addOnRotateCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "hostInfo", "hostInfo", DatabaseName::kEmpty, BSON("hostInfo" << 1)),
+        ClusterRole::None);
 
     // Install the new controller
     auto& staticFTDC = ftdcControllerDecoration(service);

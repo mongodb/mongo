@@ -111,16 +111,22 @@ public:
     Status setDirectory(const boost::filesystem::path& path);
 
     /**
-     * Add a metric collector to collect periodically. i.e., serverStatus
+     * Add a metric collector to collect periodically (e.g., serverStatus).
+     *
+     * `role` is used to disambiguate role-specific collectors with colliding names.
+     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
      */
-    void addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector);
+    void addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
 
     /**
-     * Add a collector to collect on server start, and file rotation. i.e. hostInfo
+     * Add a collector that gathers machine or process configuration settings (not metrics).
+     * These are emitted at the top of every log file the server produces, which is
+     * why the "on rotate" terminology is used.
      *
-     * This is for machine configuration settings, not metrics.
+     * `role` is used to disambiguate role-specific collectors with colliding names.
+     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
      */
-    void addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector);
+    void addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector, ClusterRole role);
 
     /**
      * Start the controller.

@@ -183,9 +183,9 @@ TEST_F(FTDCControllerTest, TestFull) {
 
     c1Ptr->setSignalOnCount(100);
 
-    c.addPeriodicCollector(std::move(c1));
+    c.addPeriodicCollector(std::move(c1), ClusterRole::None);
 
-    c.addOnRotateCollector(std::move(c2));
+    c.addOnRotateCollector(std::move(c2), ClusterRole::None);
 
     c.start();
 
@@ -253,7 +253,7 @@ TEST_F(FTDCControllerTest, TestStartAsDisabled) {
 
     FTDCController c(dir, config);
 
-    c.addPeriodicCollector(std::move(c1));
+    c.addPeriodicCollector(std::move(c1), ClusterRole::None);
 
     c.start();
 

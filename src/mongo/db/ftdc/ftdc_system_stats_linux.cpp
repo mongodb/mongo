@@ -269,22 +269,26 @@ void collectUlimits(OperationContext*, BSONObjBuilder& builder) {
 
 
 void installSystemMetricsCollector(FTDCController* controller) {
-    controller->addPeriodicCollector(std::make_unique<LinuxSystemMetricsCollector>());
+    controller->addPeriodicCollector(std::make_unique<LinuxSystemMetricsCollector>(),
+                                     ClusterRole::None);
 
     // Total max open files is only collected on rotate, since it changes infrequently
-    controller->addOnRotateCollector(std::make_unique<SimpleFunctionCollector>(
-        "sysMaxOpenFiles", [](OperationContext* ctx, BSONObjBuilder& builder) {
-            auto status = procparser::parseProcSysFsFileNrFile(
-                "/proc/sys/fs/file-nr", procparser::FileNrKey::kMaxFileHandles, &builder);
-            // Handle errors here similarly to system stats.
-            if (!status.isOK()) {
-                builder.append("error", status.toString());
-            }
-        }));
+    controller->addOnRotateCollector(
+        std::make_unique<SimpleFunctionCollector>(
+            "sysMaxOpenFiles",
+            [](OperationContext* ctx, BSONObjBuilder& builder) {
+                auto status = procparser::parseProcSysFsFileNrFile(
+                    "/proc/sys/fs/file-nr", procparser::FileNrKey::kMaxFileHandles, &builder);
+                // Handle errors here similarly to system stats.
+                if (!status.isOK()) {
+                    builder.append("error", status.toString());
+                }
+            }),
+        ClusterRole::None);
 
     // Collect ULimits settings on rotation.
     controller->addOnRotateCollector(
-        std::make_unique<SimpleFunctionCollector>("ulimits", collectUlimits));
+        std::make_unique<SimpleFunctionCollector>("ulimits", collectUlimits), ClusterRole::None);
 }
 
 }  // namespace mongo

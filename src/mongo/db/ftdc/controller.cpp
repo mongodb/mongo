@@ -120,22 +120,20 @@ Status FTDCController::setDirectory(const boost::filesystem::path& path) {
 }
 
 
-void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector) {
-    {
-        stdx::lock_guard<Latch> lock(_mutex);
-        invariant(_state == State::kNotStarted);
+void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector,
+                                          ClusterRole role) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    invariant(_state == State::kNotStarted);
 
-        _periodicCollectors.add(std::move(collector));
-    }
+    _periodicCollectors.add(std::move(collector), role);
 }
 
-void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector) {
-    {
-        stdx::lock_guard<Latch> lock(_mutex);
-        invariant(_state == State::kNotStarted);
+void FTDCController::addOnRotateCollector(std::unique_ptr<FTDCCollectorInterface> collector,
+                                          ClusterRole role) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    invariant(_state == State::kNotStarted);
 
-        _rotateCollectors.add(std::move(collector));
-    }
+    _rotateCollectors.add(std::move(collector), role);
 }
 
 BSONObj FTDCController::getMostRecentPeriodicDocument() {

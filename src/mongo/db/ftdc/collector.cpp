@@ -46,15 +46,22 @@
 
 namespace mongo {
 
-void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector) {
+void FTDCCollectorCollection::add(std::unique_ptr<FTDCCollectorInterface> collector,
+                                  ClusterRole role) {
     // TODO: ensure the collectors all have unique names.
-    _collectors.emplace_back(std::move(collector));
+    _collectors[role].emplace_back(std::move(collector));
 }
 
 std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
+    static constexpr std::array roles{
+        ClusterRole::ShardServer,
+        ClusterRole::RouterServer,
+        ClusterRole::None,
+    };
+
     // If there are no collectors, just return an empty BSONObj so that that are caller knows we did
     // not collect anything
-    if (_collectors.empty()) {
+    if (std::all_of(roles.begin(), roles.end(), [&](auto r) { return _collectors[r].empty(); })) {
         return std::tuple<BSONObj, Date_t>(BSONObj(), Date_t());
     }
 
@@ -74,34 +81,36 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     shard_role_details::getLocker(opCtx.get())
         ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
-    for (auto& collector : _collectors) {
-        // Skip collection if this collector has no data to return
-        if (!collector->hasData()) {
-            continue;
+    for (auto r : roles) {
+        for (auto& collector : _collectors[r]) {
+            // Skip collection if this collector has no data to return
+            if (!collector->hasData()) {
+                continue;
+            }
+
+            BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
+
+            // Add a Date_t before and after each BSON is collected so that we can track timing of
+            // the collector.
+            Date_t now = start;
+
+            if (!firstLoop) {
+                now = client->getServiceContext()->getPreciseClockSource()->now();
+            }
+
+            firstLoop = false;
+
+            subObjBuilder.appendDate(kFTDCCollectStartField, now);
+
+            collector->collect(opCtx.get(), subObjBuilder);
+
+            end = client->getServiceContext()->getPreciseClockSource()->now();
+            subObjBuilder.appendDate(kFTDCCollectEndField, end);
+
+            // Ensure the collector did not set a read timestamp.
+            invariant(shard_role_details::getRecoveryUnit(opCtx.get())->getTimestampReadSource() ==
+                      RecoveryUnit::ReadSource::kNoTimestamp);
         }
-
-        BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
-
-        // Add a Date_t before and after each BSON is collected so that we can track timing of the
-        // collector.
-        Date_t now = start;
-
-        if (!firstLoop) {
-            now = client->getServiceContext()->getPreciseClockSource()->now();
-        }
-
-        firstLoop = false;
-
-        subObjBuilder.appendDate(kFTDCCollectStartField, now);
-
-        collector->collect(opCtx.get(), subObjBuilder);
-
-        end = client->getServiceContext()->getPreciseClockSource()->now();
-        subObjBuilder.appendDate(kFTDCCollectEndField, end);
-
-        // Ensure the collector did not set a read timestamp.
-        invariant(shard_role_details::getRecoveryUnit(opCtx.get())->getTimestampReadSource() ==
-                  RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
     builder.appendDate(kFTDCCollectEndField, end);

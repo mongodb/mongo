@@ -116,18 +116,22 @@ public:
 
 void registerMongoSCollectors(FTDCController* controller) {
     // PoolStats
-    controller->addPeriodicCollector(std::make_unique<ConnPoolStatsCollector>());
+    controller->addPeriodicCollector(std::make_unique<ConnPoolStatsCollector>(),
+                                     ClusterRole::RouterServer);
 
-    controller->addPeriodicCollector(std::make_unique<NetworkInterfaceStatsCollector>());
+    controller->addPeriodicCollector(std::make_unique<NetworkInterfaceStatsCollector>(),
+                                     ClusterRole::RouterServer);
 
-    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>());
+    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>(),
+                                     ClusterRole::RouterServer);
 
     // GetDefaultRWConcern
     controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-        "getDefaultRWConcern",
-        "getDefaultRWConcern",
-        DatabaseName::kEmpty,
-        BSON("getDefaultRWConcern" << 1 << "inMemory" << true)));
+                                         "getDefaultRWConcern",
+                                         "getDefaultRWConcern",
+                                         DatabaseName::kEmpty,
+                                         BSON("getDefaultRWConcern" << 1 << "inMemory" << true)),
+                                     ClusterRole::None);
 }
 
 void startMongoSFTDC(ServiceContext* serviceContext) {

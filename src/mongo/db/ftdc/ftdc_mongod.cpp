@@ -125,35 +125,43 @@ void registerMongoDCollectors(FTDCController* controller) {
     if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getSettings().isReplSet()) {
         // CmdReplSetGetStatus
         controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "replSetGetStatus",
-            "replSetGetStatus",
-            DatabaseName::kEmpty,
-            BSON("replSetGetStatus" << 1 << "initialSync" << 0)));
+                                             "replSetGetStatus",
+                                             "replSetGetStatus",
+                                             DatabaseName::kEmpty,
+                                             BSON("replSetGetStatus" << 1 << "initialSync" << 0)),
+                                         ClusterRole::ShardServer);
 
         // CollectionStats
-        controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-            "aggregate",
-            "local.oplog.rs.stats",
-            DatabaseName::kLocal,
-            BSON("aggregate"
-                 << "oplog.rs"
-                 << "cursor" << BSONObj{} << "pipeline"
-                 << BSON_ARRAY(BSON("$collStats" << BSON(
-                                        "storageStats" << BSON(
-                                            "waitForLock" << false << "numericOnly" << true)))))));
+        controller->addPeriodicCollector(
+            std::make_unique<FTDCSimpleInternalCommandCollector>(
+                "aggregate",
+                "local.oplog.rs.stats",
+                DatabaseName::kLocal,
+                BSON("aggregate"
+                     << "oplog.rs"
+                     << "cursor" << BSONObj{} << "pipeline"
+                     << BSON_ARRAY(BSON(
+                            "$collStats"
+                            << BSON("storageStats"
+                                    << BSON("waitForLock" << false << "numericOnly" << true)))))),
+            ClusterRole::ShardServer);
         if (!serverGlobalParams.clusterRole.hasExclusively(ClusterRole::ShardServer)) {
             // GetDefaultRWConcern
-            controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
-                "getDefaultRWConcern",
-                "getDefaultRWConcern",
-                DatabaseName::kEmpty,
-                BSON("getDefaultRWConcern" << 1 << "inMemory" << true)));
+            controller->addOnRotateCollector(
+                std::make_unique<FTDCSimpleInternalCommandCollector>(
+                    "getDefaultRWConcern",
+                    "getDefaultRWConcern",
+                    DatabaseName::kEmpty,
+                    BSON("getDefaultRWConcern" << 1 << "inMemory" << true)),
+                ClusterRole::None);
         }
     }
 
-    controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>());
+    controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>(),
+                                     ClusterRole::ShardServer);
 
-    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>());
+    controller->addPeriodicCollector(std::make_unique<transport::TransportLayerFTDCCollector>(),
+                                     ClusterRole::ShardServer);
 }
 
 }  // namespace
