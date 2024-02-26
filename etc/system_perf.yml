@@ -1035,14 +1035,6 @@ tasks:
           mongodb_setup: "external_data_source"
           test_control: "external_data_source_4"
 
-  - name: resharding-3shard-snapshot-update
-    priority: 5
-    exec_timeout_secs: 216000 # 2.5 days
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "resharding-3shard-snapshot-update.2023-10"
-
 buildvariants:
   - name: task_generation
     display_name: Task Generation

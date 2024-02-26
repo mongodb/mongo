@@ -971,6 +971,7 @@ tasks:
     exec_timeout_secs: 172800 # 2 days
     commands:
       - func: f_dsi_run_workload
+        timeout_secs: 43200 # 12 hours
         vars:
           test_control: auto_genny_workload
           auto_workload_path: ./src/genny/dist/etc/genny/workloads/sharding/ReshardCollectionWithIndexes.yml
@@ -1299,3 +1300,11 @@ tasks:
     - func: f_dsi_run_workload
       vars:
         test_control: streams.2023-10
+
+  - name: resharding-3shard-snapshot-update
+    priority: 5
+    exec_timeout_secs: 216000 # 2.5 days
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "resharding-3shard-snapshot-update.2023-10"

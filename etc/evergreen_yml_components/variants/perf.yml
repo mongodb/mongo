@@ -2467,6 +2467,7 @@ buildvariants:
     infrastructure_provisioning_release: 2023-09
     infrastructure_provisioning: resharding-3shard.2023-08
     workload_setup: 2022-11
+    snapshotId: snap-04f729f7224909902 # FCV 8.0
     platform: linux
     authentication: disabled
     storageEngine: wiredTiger
@@ -2478,6 +2479,32 @@ buildvariants:
     - *schedule_patch_auto_tasks_task
     - *schedule_variant_auto_tasks_task
     - name: genny_resharding_withIndexes
+
+# Uncomment this to run resharding snapshot FCV updates automatically.
+# This is only intended to be run in patch builds.
+# - <<: *amazon_linux2_arm64_compile_variant_dependency
+#   name: resharding-3shard-snapshot-update
+#   display_name: Resharding 3-Shard Snapshot Update
+#   cron: "0 0 * * 4"  # 00:00 on Thursday
+#   modules: *perf_modules
+#   expansions:
+#     mongodb_setup_release: 2022-11
+#     mongodb_setup: resharding-3shard-snapshot-update.2023-10
+#     infrastructure_provisioning_release: 2022-11
+#     infrastructure_provisioning: resharding-3shard-snapshot-update.2023-10
+#     # Update this to latest snapshot after each LTS release.
+#     snapshotId: snap-0e7434150d05e0e47 # FCV 7.3
+#     platform: linux
+#     authentication: disabled
+#     storageEngine: wiredTiger
+#     project_dir: *perf_project_dir
+#     compile_variant: amazon2-arm64-compile
+#   run_on:
+#     - "rhel70-perf-shard"
+#   tasks:
+#     - *schedule_patch_auto_tasks_task
+#     - *schedule_variant_auto_tasks_task
+#     - name: resharding-3shard-snapshot-update
 
 - <<: *amazon_linux2_arm64_compile_variant_dependency
   name: perf-3-node-replSet-query-settings.arm.aws.2023-11
