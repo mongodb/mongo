@@ -396,10 +396,10 @@ void CurOp::setEndOfOpMetrics(long long nreturned) {
 }
 
 void CurOp::setMessage_inlock(StringData message) {
-    if (_progressMeter.isActive()) {
+    if (_progressMeter && _progressMeter->isActive()) {
         LOGV2_ERROR(
             20527, "Updating message", "old"_attr = redact(_message), "new"_attr = redact(message));
-        MONGO_verify(!_progressMeter.isActive());
+        MONGO_verify(!_progressMeter->isActive());
     }
     _message = message.toString();  // copy
 }
@@ -408,9 +408,14 @@ ProgressMeter& CurOp::setProgress_inlock(StringData message,
                                          unsigned long long progressMeterTotal,
                                          int secondsBetween) {
     setMessage_inlock(message);
-    _progressMeter.reset(progressMeterTotal, secondsBetween);
-    _progressMeter.setName(message);
-    return _progressMeter;
+    if (_progressMeter) {
+        _progressMeter->reset(progressMeterTotal, secondsBetween);
+        _progressMeter->setName(message);
+    } else {
+        _progressMeter.emplace(progressMeterTotal, secondsBetween, 100, "", message.toString());
+    }
+
+    return _progressMeter.value();
 }
 
 void CurOp::setNS_inlock(NamespaceString nss) {
@@ -853,13 +858,13 @@ void CurOp::reportState(BSONObjBuilder* builder,
     }
 
     if (!_message.empty()) {
-        if (_progressMeter.isActive()) {
+        if (_progressMeter && _progressMeter->isActive()) {
             StringBuilder buf;
-            buf << _message << " " << _progressMeter.toString();
+            buf << _message << " " << _progressMeter->toString();
             builder->append("msg", buf.str());
             BSONObjBuilder sub(builder->subobjStart("progress"));
-            sub.appendNumber("done", (long long)_progressMeter.done());
-            sub.appendNumber("total", (long long)_progressMeter.total());
+            sub.appendNumber("done", (long long)_progressMeter->done());
+            sub.appendNumber("total", (long long)_progressMeter->total());
             sub.done();
         } else {
             builder->append("msg", _message);

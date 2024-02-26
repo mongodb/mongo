@@ -1005,9 +1005,7 @@ public:
     const std::string& getMessage() const {
         return _message;
     }
-    const ProgressMeter& getProgressMeter() {
-        return _progressMeter;
-    }
+
     CurOp* parent() const {
         return _parent;
     }
@@ -1132,7 +1130,7 @@ private:
     OpDebug _debug;
     std::string _failPointMessage;  // Used to store FailPoint information.
     std::string _message;
-    ProgressMeter _progressMeter;
+    boost::optional<ProgressMeter> _progressMeter;
     AtomicWord<int> _numYields{0};
     // A GenericCursor containing information about the active cursor for a getMore operation.
     boost::optional<GenericCursor> _genericCursor;
