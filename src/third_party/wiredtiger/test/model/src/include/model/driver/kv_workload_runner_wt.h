@@ -148,8 +148,11 @@ public:
      * kv_workload_runner_wt::kv_workload_runner_wt --
      *     Create a new workload
      */
-    inline kv_workload_runner_wt(const char *home, const char *connection_config)
-        : _connection(nullptr), _connection_config(connection_config), _home(home), _state(nullptr)
+    inline kv_workload_runner_wt(
+      const char *home, const char *connection_config, const char *table_config)
+        : _connection(nullptr),
+          _connection_config(connection_config == nullptr ? "" : connection_config), _home(home),
+          _state(nullptr), _table_config(table_config == nullptr ? "" : table_config)
     {
     }
 
@@ -365,6 +368,7 @@ protected:
 private:
     std::string _connection_config;
     std::string _home;
+    std::string _table_config;
 
     shared_state *_state; /* The shared state between the executor and the parent process. */
 

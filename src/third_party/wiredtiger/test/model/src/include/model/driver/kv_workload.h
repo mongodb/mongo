@@ -536,7 +536,8 @@ public:
      * kv_workload::run_in_wiredtiger --
      *     Run the workload in WiredTiger.
      */
-    void run_in_wiredtiger(const char *home, const char *connection_config) const;
+    void run_in_wiredtiger(const char *home, const char *connection_config = nullptr,
+      const char *table_config = nullptr) const;
 
 private:
     std::deque<operation::any> _operations;

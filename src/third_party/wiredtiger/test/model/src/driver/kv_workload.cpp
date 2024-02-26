@@ -53,9 +53,10 @@ kv_workload::run(kv_database &database) const
  *     Run the workload in WiredTiger.
  */
 void
-kv_workload::run_in_wiredtiger(const char *home, const char *connection_config) const
+kv_workload::run_in_wiredtiger(
+  const char *home, const char *connection_config, const char *table_config) const
 {
-    kv_workload_runner_wt runner{home, connection_config};
+    kv_workload_runner_wt runner{home, connection_config, table_config};
     runner.run(*this);
 }
 

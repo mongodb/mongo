@@ -29,6 +29,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 #include "model/driver/kv_workload.h"
 
 extern "C" {
@@ -53,6 +54,31 @@ extern "C" {
  *     Create an empty temporary file and return its name.
  */
 std::string create_tmp_file(const char *dir, const char *prefix, const char *suffix = nullptr);
+
+/*
+ * current_time --
+ *     Get the current time in seconds.
+ */
+double current_time();
+
+/*
+ * parse_uint64 --
+ *     Parse the string into a number. Throw an exception on error.
+ */
+uint64_t parse_uint64(const char *str, char **end = nullptr);
+
+/*
+ * parse_uint64_range --
+ *     Parse the string into a range of numbers (two numbers separated by '-'). Throw an exception
+ *     on error.
+ */
+std::pair<uint64_t, uint64_t> parse_uint64_range(const char *str);
+
+/*
+ * trim --
+ *     Trim whitespace from a string.
+ */
+std::string trim(const std::string &str, const std::string &to_trim = " \n\r\t");
 
 /*
  * verify_using_debug_log --

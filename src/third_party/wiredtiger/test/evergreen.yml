@@ -3664,6 +3664,22 @@ tasks:
             ${PREPARE_TEST_ENV}
             ./test_model.sh
 
+  - name: model-test-long
+    tags: ["model_checking"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/model/tools"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            # Keep repeating the model test for 600 seconds
+            ./model_test -l 2000-3000 -t 600
+
   - name: format-stress-zseries-test
     tags: ["stress-test-zseries-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
@@ -5223,6 +5239,8 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
+    - name: model-test-long
+      batchtime: 1440 # once a day
     - name: csuite-long-running
       batchtime: 1440 # once a day
 
@@ -5573,6 +5591,8 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
+    - name: model-test-long
+      batchtime: 1440 # once a day
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"

@@ -178,8 +178,6 @@ kv_workload_runner_wt::run(const kv_workload &workload)
 
         if (_state->expect_crash) {
             /* The crash was intentional. Continue the workload. */
-            if (p >= _state->crash_index)
-                throw model_exception("Workload crash did not advance the operation index");
             p = _state->crash_index + 1;
             continue;
         }
@@ -340,6 +338,8 @@ kv_workload_runner_wt::do_operation(const operation::create_table &op)
      */
     config << "log=(enabled=false)";
     config << ",key_format=" << op.key_format << ",value_format=" << op.value_format;
+    if (!_table_config.empty())
+        config << "," << _table_config;
     std::string config_str = config.str();
 
     std::string uri = std::string("table:") + op.name;
