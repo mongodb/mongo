@@ -632,7 +632,11 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
-    if (_recipientCtx.getState() == RecipientStateEnum::kBuildingIndex) {
+    auto state = [this] {
+        stdx::lock_guard lk(_mutex);
+        return _recipientCtx.getState();
+    }();
+    if (state == RecipientStateEnum::kBuildingIndex) {
         _fetchBuildIndexMetrics();
     }
     return _metrics->reportForCurrentOp();
