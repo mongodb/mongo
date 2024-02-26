@@ -135,6 +135,8 @@ last-continuous:
     ticket: SERVER-85156
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-82353
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -332,6 +334,8 @@ last-lts:
     ticket: SERVER-85156
   - test_file: jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js
     ticket: SERVER-82353
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

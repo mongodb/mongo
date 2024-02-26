@@ -73,12 +73,10 @@ public:
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;
-            doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx,
-                                                           thisRequest.getFrom(),
-                                                           toNss,
-                                                           options,
-                                                           std::move(indexList),
-                                                           thisRequest.getCollectionOptions());
+            options.originalIndexes = std::move(indexList);
+            options.originalCollectionOptions = thisRequest.getCollectionOptions();
+            doLocalRenameIfOptionsAndIndexesHaveNotChanged(
+                opCtx, thisRequest.getFrom(), toNss, options);
         }
 
     private:
