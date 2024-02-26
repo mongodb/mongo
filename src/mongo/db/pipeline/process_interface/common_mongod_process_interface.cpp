@@ -739,10 +739,10 @@ BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
         }
 
         // Append lock stats before returning.
-        if (auto lockerInfo = shard_role_details::getLocker(clientOpCtx)
-                                  ->getLockerInfo(CurOp::get(*clientOpCtx)->getLockStatsBase())) {
-            fillLockerInfo(*lockerInfo, builder);
-        }
+        auto lockerInfo = shard_role_details::getLocker(clientOpCtx)
+                              ->getLockerInfo(CurOp::get(*clientOpCtx)->getLockStatsBase());
+        fillLockerInfo(lockerInfo, builder);
+
 
         if (auto tcWorkerRepo = getTransactionCoordinatorWorkerCurOpRepository()) {
             tcWorkerRepo->reportState(clientOpCtx, &builder);

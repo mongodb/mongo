@@ -2780,7 +2780,7 @@ ReplicationCoordinatorImpl::AutoGetRstlForStepUpStepDown::AutoGetRstlForStepUpSt
         auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(
             CurOp::get(opCtx)->getLockStatsBase());
         BSONObjBuilder lockRep;
-        lockerInfo->stats.report(&lockRep);
+        lockerInfo.stats.report(&lockRep);
 
         LOGV2_FATAL_CONTINUE(
             5675600,

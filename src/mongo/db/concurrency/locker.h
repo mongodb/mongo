@@ -341,13 +341,13 @@ public:
      * lockStatsBase.
      */
     void getLockerInfo(LockerInfo* lockerInfo,
-                       boost::optional<SingleThreadedLockStats> alreadyCountedStats) const;
+                       const boost::optional<SingleThreadedLockStats>& alreadyCountedStats) const;
 
     /**
      * Returns diagnostics information for the locker.
      */
-    boost::optional<LockerInfo> getLockerInfo(
-        boost::optional<SingleThreadedLockStats> alreadyCountedStats) const;
+    LockerInfo getLockerInfo(
+        const boost::optional<SingleThreadedLockStats>& alreadyCountedStats) const;
 
     /**
      * LockSnapshot captures the state of all resources that are locked, what modes they're

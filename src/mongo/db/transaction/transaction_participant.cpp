@@ -2551,8 +2551,9 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     }
 
     if (o().txnResourceStash) {
+        auto lockStats = o().txnResourceStash->locker()->getLockerInfo(boost::none).stats;
         _logSlowTransaction(opCtx,
-                            &(o().txnResourceStash->locker()->getLockerInfo(boost::none))->stats,
+                            &lockStats,
                             TerminationCause::kAborted,
                             o().txnResourceStash->getAPIParameters(),
                             o().txnResourceStash->getReadConcernArgs());
@@ -2574,10 +2575,11 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
 void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
     OperationContext* opCtx, TerminationCause terminationCause, bool isSplitPreparedTxn) {
     // Log the transaction if its duration is longer than the slowMS command threshold.
+    auto lockStats = shard_role_details::getLocker(opCtx)
+                         ->getLockerInfo(CurOp::get(*opCtx)->getLockStatsBase())
+                         .stats;
     _logSlowTransaction(opCtx,
-                        &(shard_role_details::getLocker(opCtx)->getLockerInfo(
-                              CurOp::get(*opCtx)->getLockStatsBase()))
-                             ->stats,
+                        &lockStats,
                         terminationCause,
                         APIParameters::get(opCtx),
                         repl::ReadConcernArgs::get(opCtx));
@@ -2640,34 +2642,33 @@ BSONObj TransactionParticipant::Observer::reportStashedState(OperationContext* o
 void TransactionParticipant::Observer::reportStashedState(OperationContext* opCtx,
                                                           BSONObjBuilder* builder) const {
     if (o().txnResourceStash && o().txnResourceStash->locker()) {
-        if (auto lockerInfo = o().txnResourceStash->locker()->getLockerInfo(boost::none)) {
-            invariant(o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
-            builder->append("type", "idleSession");
-            builder->append("host", prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
-            builder->append("desc", "inactive transaction");
+        auto lockerInfo = o().txnResourceStash->locker()->getLockerInfo(boost::none);
+        invariant(o().activeTxnNumberAndRetryCounter.getTxnNumber() != kUninitializedTxnNumber);
+        builder->append("type", "idleSession");
+        builder->append("host", prettyHostNameAndPort(opCtx->getClient()->getLocalPort()));
+        builder->append("desc", "inactive transaction");
 
-            const auto& lastClientInfo =
-                o().transactionMetricsObserver.getSingleTransactionStats().getLastClientInfo();
-            builder->append("client", lastClientInfo.clientHostAndPort);
-            builder->append("connectionId", lastClientInfo.connectionId);
-            builder->append("appName", lastClientInfo.appName);
-            builder->append("clientMetadata", lastClientInfo.clientMetadata);
+        const auto& lastClientInfo =
+            o().transactionMetricsObserver.getSingleTransactionStats().getLastClientInfo();
+        builder->append("client", lastClientInfo.clientHostAndPort);
+        builder->append("connectionId", lastClientInfo.connectionId);
+        builder->append("appName", lastClientInfo.appName);
+        builder->append("clientMetadata", lastClientInfo.clientMetadata);
 
-            {
-                BSONObjBuilder lsid(builder->subobjStart("lsid"));
-                _sessionId().serialize(&lsid);
-            }
-
-            BSONObjBuilder transactionBuilder;
-            _reportTransactionStats(
-                opCtx, &transactionBuilder, o().txnResourceStash->getReadConcernArgs());
-
-            builder->append("transaction", transactionBuilder.obj());
-            builder->append("waitingForLock", false);
-            builder->append("active", false);
-
-            fillLockerInfo(*lockerInfo, *builder);
+        {
+            BSONObjBuilder lsid(builder->subobjStart("lsid"));
+            _sessionId().serialize(&lsid);
         }
+
+        BSONObjBuilder transactionBuilder;
+        _reportTransactionStats(
+            opCtx, &transactionBuilder, o().txnResourceStash->getReadConcernArgs());
+
+        builder->append("transaction", transactionBuilder.obj());
+        builder->append("waitingForLock", false);
+        builder->append("active", false);
+
+        fillLockerInfo(lockerInfo, *builder);
     }
 }
 

@@ -191,10 +191,8 @@ private:
         // If `curOp` is a sub-operation, we store the snapshot of lock stats as the base lock stats
         // of the current operation.
         if (_top) {
-            if (auto lockerInfo =
-                    shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none)) {
-                curOp->_lockStatsBase = lockerInfo->stats;
-            }
+            auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
+            curOp->_lockStatsBase = lockerInfo.stats;
         }
 
         _top = curOp;
@@ -467,9 +465,10 @@ Microseconds CurOp::computeElapsedTimeTotal(TickSource::Tick startTime,
 }
 
 Milliseconds CurOp::_sumBlockedTimeTotal() {
-    auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(_lockStatsBase);
-    auto waitForLocks = duration_cast<Milliseconds>(
-        Microseconds(lockerInfo ? lockerInfo->stats.getCumulativeWaitTimeMicros() : 0));
+    auto waitForLocks =
+        duration_cast<Milliseconds>(Microseconds(shard_role_details::getLocker(opCtx())
+                                                     ->getLockerInfo(_lockStatsBase)
+                                                     .stats.getCumulativeWaitTimeMicros()));
     auto waitForTickets = _debug.waitForTicketDurationMillis;
     auto waitForWriteConcern = _debug.waitForWriteConcernDurationMillis;
 
@@ -620,8 +619,7 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         }();
 
         logv2::DynamicAttributes attr;
-        _debug.report(
-            opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), operationMetricsPtr, &attr);
+        _debug.report(opCtx, &lockerInfo.stats, operationMetricsPtr, &attr);
 
         LOGV2_OPTIONS(51803, logOptions, "Slow query", attr);
 
@@ -1651,11 +1649,10 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     });
 
     addIfNeeded("locks", [](auto field, auto args, auto& b) {
-        if (auto lockerInfo = shard_role_details::getLocker(args.opCtx)
-                                  ->getLockerInfo(args.curop.getLockStatsBase())) {
-            BSONObjBuilder locks(b.subobjStart(field));
-            lockerInfo->stats.report(&locks);
-        }
+        auto lockerInfo =
+            shard_role_details::getLocker(args.opCtx)->getLockerInfo(args.curop.getLockStatsBase());
+        BSONObjBuilder locks(b.subobjStart(field));
+        lockerInfo.stats.report(&locks);
     });
 
     addIfNeeded("authorization", [](auto field, auto args, auto& b) {

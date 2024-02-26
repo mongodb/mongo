@@ -130,8 +130,7 @@ int wiredTigerPrepareConflictRetrySlow(OperationContext* opCtx, std::function<in
     wiredTigerPrepareConflictLog(attempts);
 
     const auto lockerInfo = shard_role_details::getLocker(opCtx)->getLockerInfo(boost::none);
-    invariant(lockerInfo);
-    for (const auto& lock : lockerInfo->locks) {
+    for (const auto& lock : lockerInfo.locks) {
         const auto type = lock.resourceId.getType();
         // If a user operation on secondaries acquires a lock in MODE_S and then blocks on a prepare
         // conflict with a prepared transaction, deadlock will occur at the commit time of the

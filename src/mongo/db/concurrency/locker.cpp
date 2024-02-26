@@ -447,7 +447,7 @@ ResourceId Locker::getWaitingResource() const {
 MONGO_TSAN_IGNORE
 void Locker::getLockerInfo(
     LockerInfo* lockerInfo,
-    const boost::optional<SingleThreadedLockStats> alreadyCountedStats) const {
+    const boost::optional<SingleThreadedLockStats>& alreadyCountedStats) const {
     invariant(lockerInfo);
 
     // Zero-out the contents
@@ -480,11 +480,11 @@ void Locker::getLockerInfo(
         lockerInfo->stats.subtract(*alreadyCountedStats);
 }
 
-boost::optional<Locker::LockerInfo> Locker::getLockerInfo(
-    const boost::optional<SingleThreadedLockStats> alreadyCountedStats) const {
+Locker::LockerInfo Locker::getLockerInfo(
+    const boost::optional<SingleThreadedLockStats>& alreadyCountedStats) const {
     Locker::LockerInfo lockerInfo;
     getLockerInfo(&lockerInfo, alreadyCountedStats);
-    return std::move(lockerInfo);
+    return lockerInfo;
 }
 
 bool Locker::canSaveLockState() {
