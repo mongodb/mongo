@@ -275,6 +275,10 @@ public:
             return true;
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassertStatusOK(auth::checkAuthForCreate(
                 opCtx, AuthorizationSession::get(opCtx->getClient()), request(), false));

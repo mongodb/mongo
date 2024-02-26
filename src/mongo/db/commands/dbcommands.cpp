@@ -211,6 +211,11 @@ public:
         NamespaceString ns() const final {
             return request().getNamespace();
         }
+
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto ns = request().getNamespace();
             uassert(ErrorCodes::Unauthorized,
@@ -557,6 +562,10 @@ public:
 
         NamespaceString ns() const final {
             return request().getNamespace();
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

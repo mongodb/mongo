@@ -268,6 +268,10 @@ public:
         return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
     }
 
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+
     bool shouldAffectReadOptionCounters() const override {
         return true;
     }

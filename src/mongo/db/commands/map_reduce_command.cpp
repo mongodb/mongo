@@ -62,6 +62,10 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
+    bool isSubjectToIngressAdmissionControl() const override {
+        return true;
+    }
+
     std::size_t reserveBytesForReply() const override {
         return FindCommon::kInitReplyBufferSize;
     }

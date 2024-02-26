@@ -762,11 +762,16 @@ public:
     bool allowedWithSecurityToken() const final {
         return true;
     }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
         bool supportsWriteConcern() const final {
+            return true;
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
 

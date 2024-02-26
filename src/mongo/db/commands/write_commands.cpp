@@ -263,6 +263,7 @@ public:
     bool allowedInTransactions() const final {
         return true;
     }
+
     class Invocation final : public InvocationBaseGen {
     public:
         Invocation(OperationContext* opCtx,
@@ -273,6 +274,10 @@ public:
         }
 
         bool supportsWriteConcern() const final {
+            return true;
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
 
@@ -419,6 +424,10 @@ public:
         }
 
         bool supportsWriteConcern() const final {
+            return true;
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
 
@@ -691,6 +700,10 @@ public:
         }
 
         bool supportsWriteConcern() const final {
+            return true;
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
             return true;
         }
 

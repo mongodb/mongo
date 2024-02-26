@@ -333,6 +333,10 @@ public:
             return false;
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
             uassertStatusOK(authzSession->checkAuthorizedToListCollections(request()));

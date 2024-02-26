@@ -397,6 +397,10 @@ public:
             return kSupportsReadConcernResult;
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return !_cmd.getTerm().has_value();
+        }
+
         bool allowsAfterClusterTime() const override {
             return false;
         }

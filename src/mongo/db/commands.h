@@ -904,6 +904,14 @@ public:
     }
 
     /**
+     * Returns true if this command invocation should wait until there are ingress admission tickets
+     * available before it is allowed to run.
+     */
+    virtual bool isSubjectToIngressAdmissionControl() const {
+        return false;
+    }
+
+    /**
      * The command definition that this invocation runs.
      * Note: nonvirtual.
      */
@@ -1063,6 +1071,14 @@ public:
      * can guarantee they will only perform reads may ignore prepare conflicts.
      */
     virtual bool canIgnorePrepareConflicts() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this command should wait until there are ingress admission tickets
+     * available before it is allowed to run.
+     */
+    virtual bool isSubjectToIngressAdmissionControl() const {
         return false;
     }
 

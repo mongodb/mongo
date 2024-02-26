@@ -101,6 +101,7 @@ public:
     bool allowedWithSecurityToken() const final {
         return true;
     }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
@@ -110,6 +111,11 @@ public:
         NamespaceString ns() const final {
             return request().getNamespace();
         }
+
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to drop index(es) on collection"

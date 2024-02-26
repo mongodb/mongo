@@ -966,6 +966,10 @@ private:
         return _command->supportsReadConcern(cmdObj(), level, isImplicitDefault);
     }
 
+    bool isSubjectToIngressAdmissionControl() const override {
+        return _command->isSubjectToIngressAdmissionControl();
+    }
+
     bool supportsReadMirroring() const override {
         return _command->supportsReadMirroring(cmdObj());
     }

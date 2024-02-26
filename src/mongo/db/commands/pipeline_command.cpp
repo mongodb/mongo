@@ -242,6 +242,10 @@ public:
             return true;
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         bool canIgnorePrepareConflicts() const override {
             // Aggregate is a special case for prepare conflicts. It may do writes to an output
             // collection, but it enables enforcement of prepare conflicts before doing so.

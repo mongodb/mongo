@@ -262,6 +262,10 @@ public:
             return false;
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         NamespaceString ns() const final {
             auto nssOrUUID = request().getNamespaceOrUUID();
             if (nssOrUUID.isUUID()) {

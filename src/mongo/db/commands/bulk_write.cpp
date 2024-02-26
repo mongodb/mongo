@@ -1291,6 +1291,10 @@ public:
             return true;
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         NamespaceString ns() const final {
             return NamespaceString(request().getDbName());
         }

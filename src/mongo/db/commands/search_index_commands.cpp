@@ -153,6 +153,10 @@ public:
             return false;
         }
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         NamespaceString ns() const final {
             return request().getNamespace();
         }
@@ -228,6 +232,10 @@ public:
 
         bool supportsWriteConcern() const final {
             return false;
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
         }
 
         NamespaceString ns() const final {
@@ -345,6 +353,10 @@ public:
 
         bool supportsWriteConcern() const final {
             return false;
+        }
+
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
         }
 
         NamespaceString ns() const final {

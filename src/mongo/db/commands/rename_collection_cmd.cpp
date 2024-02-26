@@ -87,6 +87,10 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
+        bool isSubjectToIngressAdmissionControl() const override {
+            return true;
+        }
+
         void typedRun(OperationContext* opCtx) {
             const auto& fromNss = ns();
             const auto& toNss = request().getTo();
