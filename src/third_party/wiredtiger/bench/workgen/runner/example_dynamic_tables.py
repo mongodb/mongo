@@ -61,6 +61,7 @@ workload.options.create_interval = 5
 workload.options.create_count = 3
 workload.options.create_trigger = 100
 workload.options.create_target = 200
+workload.options.max_num_files = 100
 
 # Define a workload thread to drop tables periodically:
 #   - Start dropping tables when the database size exceeds 250 MB.

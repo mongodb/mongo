@@ -451,6 +451,7 @@ struct WorkloadOptions {
     int max_idle_table_cycle;
     bool max_idle_table_cycle_fatal;
     int max_latency;
+    int max_num_files;
     std::string mirror_suffix;
     bool mirror_tables;
     double oldest_timestamp_lag;
