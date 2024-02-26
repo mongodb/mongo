@@ -339,6 +339,28 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
+    if (options.originalCollectionOptions) {
+        // Check target collection options match expected.
+        const BSONObj collectionOptions =
+            targetColl ? targetColl->getCollectionOptions().toBSON() : BSONObj();
+        status = checkTargetCollectionOptionsMatch(
+            target, options.originalCollectionOptions.get(), collectionOptions);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    if (options.originalIndexes) {
+        // Check target collection indexes match expected.
+        const auto currentIndexes =
+            listIndexesEmptyListIfMissing(opCtx, target, ListIndexesInclude::Nothing);
+        status = checkTargetCollectionIndexesMatch(
+            target, options.originalIndexes.get(), currentIndexes);
+
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     AutoStatsTracker statsTracker(
         opCtx,
         source,
@@ -773,44 +795,44 @@ Status renameBetweenDBs(OperationContext* opCtx,
 void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     const NamespaceString& sourceNs,
                                                     const NamespaceString& targetNs,
-                                                    const RenameCollectionOptions& options,
-                                                    std::list<BSONObj> originalIndexes,
-                                                    BSONObj originalCollectionOptions) {
-    AutoGetDb dbLock(opCtx, targetNs.db(), MODE_X);
-    auto collection = dbLock.getDb()
-        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, targetNs)
-        : nullptr;
-    BSONObj collectionOptions = {};
-    if (collection) {
-        // We do not include the UUID field in the options comparison. It is ok if the target
-        // collection was dropped and recreated, as long as the new target collection has the same
-        // options and indexes as the original one did. This is mainly to support concurrent $out
-        // to the same collection.
-        collectionOptions = collection->getCollectionOptions().toBSON().removeField("uuid");
-    }
-
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "collection options of target collection " << targetNs.ns()
-                          << " changed during processing. Original options: "
-                          << originalCollectionOptions << ", new options: " << collectionOptions,
-            SimpleBSONObjComparator::kInstance.evaluate(
-                originalCollectionOptions.removeField("uuid") == collectionOptions));
-
-    auto currentIndexes =
-        listIndexesEmptyListIfMissing(opCtx, targetNs, ListIndexesInclude::Nothing);
-
-    UnorderedFieldsBSONObjComparator comparator;
-    uassert(
-        ErrorCodes::CommandFailed,
-        str::stream() << "indexes of target collection " << targetNs.ns()
-                      << " changed during processing.",
-        originalIndexes.size() == currentIndexes.size() &&
-            std::equal(originalIndexes.begin(),
-                       originalIndexes.end(),
-                       currentIndexes.begin(),
-                       [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; }));
-
+                                                    const RenameCollectionOptions& options) {
+    // Pass in originalIndexes and originalCollectionOptions to be evaluated later,
+    // under a collection lock in renameCollectionWithinDB.
     validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
+}
+
+Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
+                                         const BSONObj& expectedOptions,
+                                         const BSONObj& currentOptions) {
+    // We do not include the UUID field in the options comparison. It is ok if the target collection
+    // was dropped and recreated, as long as the new target collection has the same options and
+    // indexes as the original one did. This is mainly to support concurrent $out to the same
+    // collection.
+    if (SimpleBSONObjComparator::kInstance.evaluate(expectedOptions.removeField("uuid") !=
+                                                    currentOptions.removeField("uuid"))) {
+        return Status(ErrorCodes::CommandFailed,
+                      str::stream()
+                          << "collection options of target collection " << targetNss.toString()
+                          << " changed during processing. Original options: " << expectedOptions
+                          << ", new options: " << currentOptions);
+    };
+    return Status::OK();
+}
+
+Status checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
+                                         const std::list<BSONObj>& expectedIndexes,
+                                         const std::list<BSONObj>& currentIndexes) {
+    UnorderedFieldsBSONObjComparator comparator;
+    if (expectedIndexes.size() != currentIndexes.size() ||
+        !(std::equal(expectedIndexes.begin(),
+                     expectedIndexes.end(),
+                     currentIndexes.begin(),
+                     [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) == 0; }))) {
+        return Status(ErrorCodes::CommandFailed,
+                      str::stream() << "indexes of target collection " << targetNss.toString()
+                                    << " changed during processing.");
+    }
+    return Status::OK();
 }
 
 void validateNamespacesForRenameCollection(OperationContext* opCtx,

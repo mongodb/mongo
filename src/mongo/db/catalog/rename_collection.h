@@ -53,14 +53,35 @@ struct RenameCollectionOptions {
     bool markFromMigrate = false;
     boost::optional<UUID> expectedSourceUUID;
     boost::optional<UUID> expectedTargetUUID;
+    boost::optional<UUID> newTargetCollectionUuid;
+    boost::optional<std::list<BSONObj>> originalIndexes;
+    boost::optional<BSONObj> originalCollectionOptions;
 };
 
 void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     const NamespaceString& sourceNs,
                                                     const NamespaceString& targetNs,
-                                                    const RenameCollectionOptions& options,
-                                                    std::list<BSONObj> originalIndexes,
-                                                    BSONObj collectionOptions);
+                                                    const RenameCollectionOptions& options);
+
+/**
+ * Checks that CollectionOptions 'expectedOptions' and 'currentOptions' are equal, except for the
+ * 'uuid' field. Returns a CommandFailed status otherwise.
+ * To be used by doLocalRenameIfOptionsAndIndexesHaveNotChanged and also its sharding-aware
+ * equivalent in RenameCollectionCoordinator.
+ */
+Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
+                                         const BSONObj& expectedOptions,
+                                         const BSONObj& currentOptions);
+
+/**
+ * Checks that the lists of index specs 'expectedIndexes' and 'currentIndexes' are equal.
+ * To be used by doLocalRenameIfOptionsAndIndexesHaveNotChanged and also its sharding-aware
+ * equivalent in RenameCollectionCoordinator. Returns a CommandFailed status if indexes do not
+ * match.
+ */
+Status checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
+                                         const std::list<BSONObj>& expectedIndexes,
+                                         const std::list<BSONObj>& currentIndexes);
 
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,

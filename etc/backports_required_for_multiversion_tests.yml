@@ -323,6 +323,8 @@ last-continuous:
     ticket: SERVER-83119
   - test_file: jstests/change_streams/split_large_event_with_other_stages.js
     ticket: SERVER-85848
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   suites: null
 last-lts:
   all:
@@ -692,4 +694,6 @@ last-lts:
     ticket: SERVER-83119
   - test_file: jstests/change_streams/split_large_event_with_other_stages.js
     ticket: SERVER-85848
+  - test_file: jstests/core/txns/out_not_blocked_by_txn.js
+    ticket: SERVER-72703
   suites: null

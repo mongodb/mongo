@@ -112,8 +112,9 @@ public:
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;
-            doLocalRenameIfOptionsAndIndexesHaveNotChanged(
-                opCtx, fromNss, toNss, options, std::move(indexList), collectionOptions);
+            options.originalIndexes = indexList;
+            options.originalCollectionOptions = collectionOptions;
+            doLocalRenameIfOptionsAndIndexesHaveNotChanged(opCtx, fromNss, toNss, options);
         }
 
         NamespaceString ns() const override {
