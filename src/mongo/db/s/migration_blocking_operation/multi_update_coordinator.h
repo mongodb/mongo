@@ -31,45 +31,11 @@
 
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
+#include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_external_state.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_gen.h"
 #include "mongo/db/s/primary_only_service_helpers/retry_until_majority_commit.h"
 
 namespace mongo {
-
-class MultiUpdateCoordinatorExternalState {
-public:
-    virtual Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
-                                                                const Message& message) const = 0;
-    virtual void startBlockingMigrations(OperationContext* opCtx,
-                                         const MultiUpdateCoordinatorMetadata& metadata) const = 0;
-    virtual void stopBlockingMigrations(OperationContext* opCtx,
-                                        const MultiUpdateCoordinatorMetadata& metadata) const = 0;
-    virtual ~MultiUpdateCoordinatorExternalState() {}
-};
-
-class MultiUpdateCoordinatorExternalStateImpl : public MultiUpdateCoordinatorExternalState {
-public:
-    Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
-                                                        const Message& message) const override;
-    void startBlockingMigrations(OperationContext* opCtx,
-                                 const MultiUpdateCoordinatorMetadata& metadata) const override;
-    void stopBlockingMigrations(OperationContext* opCtx,
-                                const MultiUpdateCoordinatorMetadata& metadata) const override;
-};
-
-class MultiUpdateCoordinatorExternalStateFactory {
-public:
-    virtual std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const = 0;
-    virtual ~MultiUpdateCoordinatorExternalStateFactory() {}
-};
-
-class MultiUpdateCoordinatorExternalStateFactoryImpl
-    : public MultiUpdateCoordinatorExternalStateFactory {
-public:
-    std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const {
-        return std::make_unique<MultiUpdateCoordinatorExternalStateImpl>();
-    }
-};
 
 class MultiUpdateCoordinatorInstance;
 
@@ -79,10 +45,11 @@ public:
 
     friend MultiUpdateCoordinatorInstance;
 
+    MultiUpdateCoordinatorService(ServiceContext* serviceContext);
+
     MultiUpdateCoordinatorService(
         ServiceContext* serviceContext,
-        std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory =
-            std::make_unique<MultiUpdateCoordinatorExternalStateFactoryImpl>());
+        std::unique_ptr<MultiUpdateCoordinatorExternalStateFactory> factory);
 
     StringData getServiceName() const override;
 
@@ -125,28 +92,43 @@ public:
 
 private:
     MultiUpdateCoordinatorMutableFields _getMutableFields() const;
-    MultiUpdateCoordinatorStateEnum _getCurrentState() const;
+    MultiUpdateCoordinatorPhaseEnum _getCurrentPhase() const;
     MultiUpdateCoordinatorDocument _buildCurrentStateDocument() const;
+
+    void _acquireSession();
+    void _releaseSession();
+    const LogicalSessionId& _getSessionId() const;
+    bool _sessionIsCheckedOut() const;
+    bool _sessionIsPersisted() const;
+    bool _shouldReleaseSession() const;
+    bool _shouldUnblockMigrations() const;
+    bool _updatesPossiblyRunningFromPreviousTerm() const;
 
     void _initializeRun(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                         const CancellationToken& stepdownToken);
-    ExecutorFuture<void> _transitionToState(MultiUpdateCoordinatorStateEnum newState);
+    ExecutorFuture<void> _transitionToPhase(MultiUpdateCoordinatorPhaseEnum newPhase);
 
     void _updateInMemoryState(const MultiUpdateCoordinatorDocument& newStateDocument);
     void _updateOnDiskState(OperationContext* opCtx,
                             const MultiUpdateCoordinatorDocument& newStateDocument);
 
-    ExecutorFuture<void> _startBlockingMigrations();
-    ExecutorFuture<void> _performUpdate();
-    ExecutorFuture<void> _checkForPendingUpdates();
-    ExecutorFuture<void> _cleanup();
-    void _stopBlockingMigrations();
+    ExecutorFuture<BSONObj> _runWorkflow();
+    ExecutorFuture<void> _doAcquireSessionPhase();
+    ExecutorFuture<void> _doBlockMigrationsPhase();
+    ExecutorFuture<void> _doPerformUpdatePhase();
+    ExecutorFuture<void> _stopBlockingMigrationsIfNeeded();
+
+    Message getUpdateAsClusterCommand() const;
+    ExecutorFuture<void> _sendUpdateRequest();
+    ExecutorFuture<void> _waitForPendingUpdates();
+
 
     const MultiUpdateCoordinatorService* const _service;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MultiUpdateCoordinatorInstance::_mutex");
     const MultiUpdateCoordinatorMetadata _metadata;
     MultiUpdateCoordinatorMutableFields _mutableFields;
+    const MultiUpdateCoordinatorPhaseEnum _beganInPhase;
     std::unique_ptr<MultiUpdateCoordinatorExternalState> _externalState;
 
     std::shared_ptr<executor::ScopedTaskExecutor> _taskExecutor;

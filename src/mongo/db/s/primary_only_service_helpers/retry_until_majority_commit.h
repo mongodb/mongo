@@ -56,9 +56,9 @@ public:
      * PrimaryOnlyService. Returns an executor future.
      */
     template <typename Function>
-    auto untilStepdownOrMajorityCommit(const std::string& operationName, Function&& function) {
-        return untilMajorityCommit(
-            operationName, std::forward<Function>(function), _retryUntilStepdown);
+    auto untilStepdownOrSuccess(const std::string& operationName, Function&& function) {
+        return _retryUntilStepdown.untilSuccessOrCancel(operationName,
+                                                        std::forward<Function>(function));
     }
 
     /**
@@ -67,6 +67,26 @@ public:
      * with_automatic_retry.h), or the CancelState::_abortOrStepdownToken is cancelled (i.e. we are
      * stepping down or were explicitly aborted). Use this for operations that are allowed to fail
      * and use a future continuation to handle this failure. Returns an executor future.
+     */
+    template <typename Function>
+    auto untilAbortOrSuccess(const std::string& operationName, Function&& function) {
+        return _retryUntilAbort.untilSuccessOrCancel(operationName,
+                                                     std::forward<Function>(function));
+    }
+
+    /**
+     * Same as untilStepdownOrSuccess, except will also wait for the most recent opTime to be
+     * majority committed after the operation succeeds.
+     */
+    template <typename Function>
+    auto untilStepdownOrMajorityCommit(const std::string& operationName, Function&& function) {
+        return untilMajorityCommit(
+            operationName, std::forward<Function>(function), _retryUntilStepdown);
+    }
+
+    /**
+     * Same as untilAbortOrSuccess, except will also wait for the most recent opTime to be
+     * majority committed after the operation succeeds.
      */
     template <typename Function>
     auto untilAbortOrMajorityCommit(const std::string& operationName, Function&& function) {

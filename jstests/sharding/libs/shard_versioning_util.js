@@ -62,12 +62,20 @@ export var ShardVersioningUtil = (function() {
         failPoint.off();
     };
 
+    const getDbVersion = function(mongos, dbName) {
+        const version = mongos.getDB('config')['databases'].findOne({_id: dbName}).version;
+        // Explicitly make lastMod an int so that the server doesn't complain
+        // it's a double if you pass a dbVersion to a parallel shell.
+        return {...version, lastMod: NumberInt(version.lastMod)};
+    };
+
     return {
         kIgnoredShardVersion,
         getMetadataOnShard,
         assertCollectionVersionEquals,
         assertCollectionVersionOlderThan,
         assertShardVersionEquals,
-        moveChunkNotRefreshRecipient
+        moveChunkNotRefreshRecipient,
+        getDbVersion
     };
 })();

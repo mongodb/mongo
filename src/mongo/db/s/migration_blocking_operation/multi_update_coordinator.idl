@@ -31,13 +31,16 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/s/database_version.idl"
 
 enums:
-    MultiUpdateCoordinatorState:
-        description: The state of a MultiUpdateCoordinator.
+    MultiUpdateCoordinatorPhase:
+        description: The phase of a MultiUpdateCoordinator.
         type: string
         values:
             kUnused: "unused"
+            kAcquireSession: "acquireSession"
             kBlockMigrations: "blockMigrations"
             kPerformUpdate: "performUpdate"
             kCleanup: "cleanup"
@@ -64,14 +67,22 @@ structs:
         description: Contains mutable fields for a MultiUpdateCoordinator.
         strict: false
         fields:
-            state:
-                type: MultiUpdateCoordinatorState
-                description: The state of the MultiUpdateCoordinator.
+            phase:
+                type: MultiUpdateCoordinatorPhase
+                description: The phase of the MultiUpdateCoordinator.
                 default: kUnused
             result:
                 type: object_owned
                 description: >-
                     Stores the result of the underlying update command.
+                optional: true
+            lsid:
+                type: LogicalSessionId
+                description: "The sessionId to track this update."
+                optional: true
+            txnNumber:
+                type: TxnNumber
+                description: "The txnNumber for the update session."
                 optional: true
 
     MultiUpdateCoordinatorDocument:

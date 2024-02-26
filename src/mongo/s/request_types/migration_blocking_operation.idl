@@ -28,17 +28,42 @@
 
 global:
     cpp_namespace: "mongo"
-    cpp_includes:
-        - "mongo/s/database_version.h"
 
 imports:
-    - "mongo/s/database_version_base.idl"
+    - "mongo/db/basic_types.idl"
 
-types:
-    DatabaseVersion:
-        description: ""
-        cpp_type: DatabaseVersion
-        bson_serialization_type: object
-        serializer: "mongo::DatabaseVersion::toBSON"
-        deserializer: "mongo::DatabaseVersion"
-        is_view: false
+commands:
+  _shardsvrBeginMigrationBlockingOperation:
+    command_name: _shardsvrBeginMigrationBlockingOperation
+    cpp_name: ShardsvrBeginMigrationBlockingOperation
+    description: |
+      Begins a migration blocking operation on a given namespace. Can only be
+      called on the DB primary shard for that namespace. Must later call a
+      corresponding _shardvrEndMigrationBlockingOperation with the same UUID and
+      namespace to unblock migrations if this command is successful. Multiple
+      migration blocking operations can be active on a single namespace
+      simultaneously. As long as any operations are ongoing, chunk migrations
+      will be disabled for that namespace.
+    strict: false
+    namespace: type
+    api_version: ""
+    type: namespacestring
+    fields:
+      operationId:
+        description: The unique identifier for this operation.
+        type: uuid
+        optional: false
+
+  _shardsvrEndMigrationBlockingOperation:
+    command_name: _shardsvrEndMigrationBlockingOperation
+    cpp_name: ShardsvrEndMigrationBlockingOperation
+    description: Ends an operation began by _shardsvrBeginMigrationBlockingOperation.
+    strict: false
+    namespace: type
+    api_version: ""
+    type: namespacestring
+    fields:
+      operationId:
+        description: The unique identifier for this operation.
+        type: uuid
+        optional: false

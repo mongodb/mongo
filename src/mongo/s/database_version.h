@@ -40,7 +40,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder_fwd.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/s/database_version_gen.h"
+#include "mongo/s/database_version_base_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

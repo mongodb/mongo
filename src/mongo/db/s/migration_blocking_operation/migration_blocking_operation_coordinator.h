@@ -54,13 +54,6 @@ public:
     void beginOperation(OperationContext* opCtx, const UUID& operationUUID);
     void endOperation(OperationContext* opCtx, const UUID& operationUUID);
 
-    static void beginOperation(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const UUID& operationUUID);
-    static void endOperation(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             const UUID& operationUUID);
-
 private:
     virtual StringData serializePhase(const Phase& phase) const override;
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,

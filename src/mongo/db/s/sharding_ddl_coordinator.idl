@@ -33,11 +33,11 @@ global:
     cpp_includes:
         - "mongo/db/s/forwardable_operation_metadata.h"
         - "mongo/db/s/sharding_ddl_util.h"
-        - "mongo/s/database_version.h"
 
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
+    - "mongo/s/database_version.idl"
 
 enums:
     DDLCoordinatorType:
@@ -70,14 +70,6 @@ types:
         serializer: "mongo::ForwardableOperationMetadata::toBSON"
         deserializer: "mongo::ForwardableOperationMetadata"
         # ForwardableOperationMetadata has only non view members.
-        is_view: false
-
-    DatabaseVersion:
-        description: ""
-        cpp_type: DatabaseVersion
-        bson_serialization_type: object
-        serializer: "mongo::DatabaseVersion::toBSON"
-        deserializer: "mongo::DatabaseVersion"
         is_view: false
 
     ErrorStatus:

@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
+#include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_external_state.h"
 #include "mongo/db/s/migration_blocking_operation/multi_update_coordinator_gen.h"
-#include "mongo/db/s/primary_only_service_helpers/state_transition_progress_gen.h"
+#include "mongo/db/s/primary_only_service_helpers/phase_transition_progress_gen.h"
 #include "mongo/db/s/primary_only_service_helpers/with_automatic_retry.h"
+#include "mongo/db/session/internal_session_pool.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -43,9 +48,10 @@ namespace mongo {
 namespace {
 
 const Status kRetryableError{ErrorCodes::Interrupted, "Interrupted"};
-constexpr auto kPauseInStateFailpoint = "pauseDuringMultiUpdateCoordinatorStateTransition";
-constexpr auto kPauseInStateFailpointAlternate =
-    "pauseDuringMultiUpdateCoordinatorStateTransitionAlternate";
+const auto kNamespace = NamespaceString::createNamespaceString_forTest("test.coll");
+constexpr auto kPauseInPhaseFailpoint = "pauseDuringMultiUpdateCoordinatorPhaseTransition";
+constexpr auto kPauseInPhaseFailpointAlternate =
+    "pauseDuringMultiUpdateCoordinatorPhaseTransitionAlternate";
 constexpr auto kRunFailpoint = "hangDuringMultiUpdateCoordinatorRun";
 
 BSONObj updateSuccessResponseBSONObj() {
@@ -63,8 +69,31 @@ BSONObj updateFailedResponseBSONObj() {
     return bodyBob.obj();
 }
 
-class MultiUpdateOpCounters {
+class ExternalStateFake {
 public:
+    void setAutoCompleteUpdates(bool value) {
+        _autoCompleteUpdates = value;
+    }
+
+    void setAutoCompleteResponse(BSONObj response) {
+        _autoCompleteResponse = std::move(response);
+    }
+
+    void completeUpdates(BSONObj result) {
+        ASSERT_TRUE(_isUpdatePending.load());
+        OpMsgBuilder builder;
+        builder.setBody(std::move(result));
+        auto response = builder.finish();
+        response.header().setId(nextMessageId());
+        response.header().setResponseToMsgId(1);
+        OpMsg::appendChecksum(&response);
+
+        DbResponse dbResponse;
+        dbResponse.response = std::move(response);
+        _updateResponse.emplaceValue(std::move(dbResponse));
+        _isUpdatePending.store(false);
+    }
+
     int getStartBlockingMigrationsCount() const {
         return _startBlockingMigrationsCount.load();
     }
@@ -73,114 +102,167 @@ public:
         return _stopBlockingMigrationsCount.load();
     }
 
-    void onStartBlockingMigrations() {
-        _startBlockingMigrationsCount.fetchAndAdd(1);
+    bool sessionIsCheckedOut() const {
+        return _sessionIsCheckedOut.load();
     }
 
-    void onStopBlockingMigrations() {
-        _stopBlockingMigrationsCount.fetchAndAdd(1);
+    bool migrationsAreBlocked() const {
+        return _migrationsAreBlocked.load();
+    }
+
+    bool updatesArePending() const {
+        return _isUpdatePending.load();
     }
 
 private:
+    Future<DbResponse> beginUpdates() {
+        ASSERT_FALSE(_isUpdatePending.load());
+        _isUpdatePending.store(true);
+
+        if (_autoCompleteUpdates) {
+            completeUpdates(std::move(_autoCompleteResponse));
+        }
+
+        return _updateResponse.getFuture().unsafeToInlineFuture();
+    }
+
+    void startBlockingMigrations() {
+        _startBlockingMigrationsCount.fetchAndAdd(1);
+        _migrationsAreBlocked.store(true);
+    }
+
+    void stopBlockingMigrations() {
+        _stopBlockingMigrationsCount.fetchAndAdd(1);
+        _migrationsAreBlocked.store(false);
+    }
+
+    bool isUpdatePending() const {
+        // If we release the session too early, our check for pending operations may see some
+        // unrelated operation if someone else checks out the same session.
+        ASSERT_TRUE(_sessionIsCheckedOut.load());
+        return _isUpdatePending.load();
+    }
+
+    InternalSessionPool::Session acquireSession() {
+        ASSERT_FALSE(_sessionIsCheckedOut.load());
+        _sessionIsCheckedOut.store(true);
+        return _session;
+    }
+
+    void releaseSession(InternalSessionPool::Session session) {
+        ASSERT_TRUE(_sessionIsCheckedOut.load());
+        ASSERT_EQ(session.getSessionId(), _session.getSessionId());
+        ASSERT_EQ(session.getTxnNumber(), _session.getTxnNumber());
+        _sessionIsCheckedOut.store(false);
+    }
+
+    friend class MultiUpdateCoordinatorExternalStateForTest;
+    SharedPromise<DbResponse> _updateResponse;
+    bool _autoCompleteUpdates{true};
+    BSONObj _autoCompleteResponse{updateSuccessResponseBSONObj()};
+    AtomicWord<bool> _isUpdatePending{false};
     AtomicWord<int> _startBlockingMigrationsCount{0};
     AtomicWord<int> _stopBlockingMigrationsCount{0};
+    const InternalSessionPool::Session _session{makeLogicalSessionIdForTest(), 42};
+    AtomicWord<bool> _sessionIsCheckedOut{false};
+    AtomicWord<bool> _migrationsAreBlocked{false};
 };
 
 class MultiUpdateCoordinatorExternalStateForTest : public MultiUpdateCoordinatorExternalState {
 public:
     explicit MultiUpdateCoordinatorExternalStateForTest(
-        std::shared_ptr<MultiUpdateOpCounters> counters, bool shouldFail)
-        : _counters{counters}, _shouldFail{shouldFail} {}
+        std::shared_ptr<ExternalStateFake> fakeState)
+        : _fakeState{fakeState} {}
 
     Future<DbResponse> sendClusterUpdateCommandToShards(OperationContext* opCtx,
                                                         const Message& message) const override {
-        OpMsgBuilder builder;
-
-        if (_shouldFail) {
-            builder.setBody(updateFailedResponseBSONObj());
-        } else {
-            builder.setBody(updateSuccessResponseBSONObj());
-        }
-
-        auto response = builder.finish();
-        response.header().setId(nextMessageId());
-        response.header().setResponseToMsgId(1);
-        OpMsg::appendChecksum(&response);
-
-        auto dbResponse = DbResponse();
-        dbResponse.response = response;
-        return Future<DbResponse>::makeReady(dbResponse);
+        return _fakeState->beginUpdates();
     }
 
     void startBlockingMigrations(OperationContext* opCtx,
-                                 const MultiUpdateCoordinatorMetadata& metadata) const override {
-        _counters->onStartBlockingMigrations();
+                                 const NamespaceString& nss,
+                                 const UUID& operationId) override {
+        _fakeState->startBlockingMigrations();
     }
 
     void stopBlockingMigrations(OperationContext* opCtx,
-                                const MultiUpdateCoordinatorMetadata& metadata) const override {
-        _counters->onStopBlockingMigrations();
+                                const NamespaceString& nss,
+                                const UUID& operationId) override {
+        _fakeState->stopBlockingMigrations();
+    }
+
+    int getStartBlockingMigrationsCount() const {
+        return _fakeState->getStartBlockingMigrationsCount();
+    }
+
+    int getStopBlockingMigrationsCount() const {
+        return _fakeState->getStopBlockingMigrationsCount();
+    }
+
+    bool isUpdatePending(OperationContext* opCtx,
+                         const NamespaceString& nss,
+                         mongo::AggregateCommandRequest& request) const override {
+        return _fakeState->isUpdatePending();
+    }
+
+    InternalSessionPool::Session acquireSession() override {
+        return _fakeState->acquireSession();
+    }
+
+    void releaseSession(InternalSessionPool::Session session) override {
+        return _fakeState->releaseSession(std::move(session));
     }
 
 private:
-    std::shared_ptr<MultiUpdateOpCounters> _counters;
-    bool _shouldFail = false;
+    std::shared_ptr<ExternalStateFake> _fakeState;
 };
 
 class MultiUpdateCoordinatorExternalStateFactoryForTest
     : public MultiUpdateCoordinatorExternalStateFactory {
 public:
-    MultiUpdateCoordinatorExternalStateFactoryForTest(
-        std::shared_ptr<MultiUpdateOpCounters> counters, bool shouldFail)
-        : _counters{counters}, _shouldFail{shouldFail} {}
+    MultiUpdateCoordinatorExternalStateFactoryForTest(std::shared_ptr<ExternalStateFake> fakeState)
+        : _fakeState{fakeState} {}
 
     std::unique_ptr<MultiUpdateCoordinatorExternalState> createExternalState() const {
-        return std::make_unique<MultiUpdateCoordinatorExternalStateForTest>(_counters, _shouldFail);
+        return std::make_unique<MultiUpdateCoordinatorExternalStateForTest>(_fakeState);
     }
 
 private:
-    std::shared_ptr<MultiUpdateOpCounters> _counters;
-    bool _shouldFail;
+    std::shared_ptr<ExternalStateFake> _fakeState;
 };
 
 class MultiUpdateCoordinatorServiceForTest : public MultiUpdateCoordinatorService {
 public:
     explicit MultiUpdateCoordinatorServiceForTest(ServiceContext* serviceContext,
-                                                  std::shared_ptr<MultiUpdateOpCounters> counters,
-                                                  bool shouldFail = false)
-        : MultiUpdateCoordinatorService{serviceContext,
-                                        std::make_unique<
-                                            MultiUpdateCoordinatorExternalStateFactoryForTest>(
-                                            counters, shouldFail)},
-          _serviceContext(serviceContext) {}
-
-private:
-    ServiceContext* _serviceContext;
+                                                  std::shared_ptr<ExternalStateFake> fakeState)
+        : MultiUpdateCoordinatorService{
+              serviceContext,
+              std::make_unique<MultiUpdateCoordinatorExternalStateFactoryForTest>(
+                  std::move(fakeState))} {}
 };
 
 class MultiUpdateCoordinatorTest : public repl::PrimaryOnlyServiceMongoDTest {
 protected:
     using Service = MultiUpdateCoordinatorServiceForTest;
     using Instance = MultiUpdateCoordinatorInstance;
-    using State = MultiUpdateCoordinatorStateEnum;
-    using Progress = StateTransitionProgressEnum;
+    using Phase = MultiUpdateCoordinatorPhaseEnum;
+    using Progress = PhaseTransitionProgressEnum;
 
     ServiceContext::UniqueOperationContext _opCtxHolder;
     OperationContext* _opCtx;
-    std::shared_ptr<MultiUpdateOpCounters> _counters;
-
-    MultiUpdateCoordinatorTest() {
-        _counters = std::make_shared<MultiUpdateOpCounters>();
-    }
+    std::shared_ptr<ExternalStateFake> _externalState;
 
     void setUp() override {
+        _externalState = std::make_shared<ExternalStateFake>();
         repl::PrimaryOnlyServiceMongoDTest::setUp();
         _opCtxHolder = makeOperationContext();
         _opCtx = _opCtxHolder.get();
     }
 
-    const MultiUpdateOpCounters& getCounters() {
-        return *_counters;
+    void tearDown() override {
+        ASSERT_FALSE(_externalState->migrationsAreBlocked());
+        ASSERT_FALSE(_externalState->sessionIsCheckedOut());
+        repl::PrimaryOnlyServiceMongoDTest::tearDown();
     }
 
     auto failCrudOpsOn(NamespaceString nss, ErrorCodes::Error code) {
@@ -197,7 +279,7 @@ protected:
     }
 
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<Service>(serviceContext, _counters);
+        return std::make_unique<Service>(serviceContext, _externalState);
     }
 
     MultiUpdateCoordinatorMetadata createMetadata() {
@@ -212,7 +294,7 @@ protected:
                         << "coll"
                         << "updates" << BSON_ARRAY(rawUpdate));
         metadata.setUpdateCommand(cmd);
-        metadata.setNss(NamespaceString::createNamespaceString_forTest("test.coll"));
+        metadata.setNss(kNamespace);
         return metadata;
     }
 
@@ -222,13 +304,13 @@ protected:
         return document;
     }
 
-    MultiUpdateCoordinatorDocument getStateDocumentOnDisk(OperationContext* opCtx,
+    MultiUpdateCoordinatorDocument getPhaseDocumentOnDisk(OperationContext* opCtx,
                                                           UUID instanceId) {
         ASSERT_TRUE(stateDocumentExistsOnDisk(opCtx, instanceId));
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kMultiUpdateCoordinatorsNamespace,
                                   BSON(MultiUpdateCoordinatorDocument::kIdFieldName << instanceId));
-        IDLParserContext errCtx("MultiUpdateCoordinatorTest::getStateDocumentOnDisk()");
+        IDLParserContext errCtx("MultiUpdateCoordinatorTest::getPhaseDocumentOnDisk()");
         return MultiUpdateCoordinatorDocument::parse(errCtx, doc);
     }
 
@@ -239,9 +321,9 @@ protected:
         return count > 0;
     }
 
-    MultiUpdateCoordinatorDocument getStateDocumentOnDisk(
+    MultiUpdateCoordinatorDocument getPhaseDocumentOnDisk(
         const std::shared_ptr<Instance>& instance) {
-        return getStateDocumentOnDisk(_opCtx, instance->getMetadata().getId());
+        return getPhaseDocumentOnDisk(_opCtx, instance->getMetadata().getId());
     }
 
     std::shared_ptr<Instance> createInstance() {
@@ -263,22 +345,33 @@ protected:
         return *maybeInstance;
     }
 
-    auto pauseStateTransition(Progress progress, State state, const std::string& failpointName) {
+    auto pausePhaseTransition(Progress progress, Phase phase, const std::string& failpointName) {
         auto fp = globalFailPointRegistry().find(failpointName);
         auto count =
             fp->setMode(FailPoint::alwaysOn,
                         0,
-                        fromjson(fmt::format("{{progress: '{}', state: '{}'}}",
-                                             StateTransitionProgress_serializer(progress),
-                                             MultiUpdateCoordinatorState_serializer(state))));
+                        fromjson(fmt::format("{{progress: '{}', phase: '{}'}}",
+                                             PhaseTransitionProgress_serializer(progress),
+                                             MultiUpdateCoordinatorPhase_serializer(phase))));
         return std::tuple{fp, count};
     }
 
-    auto createInstanceInState(Progress progress, State state) {
-        auto [fp, count] = pauseStateTransition(progress, state, kPauseInStateFailpoint);
+    auto createInstanceInPhase(Progress progress, Phase phase) {
+        auto [fp, count] = pausePhaseTransition(progress, phase, kPauseInPhaseFailpoint);
         auto instance = createInstance();
         fp->waitForTimesEntered(count + 1);
         return std::tuple{instance, fp};
+    }
+
+    std::shared_ptr<Instance> createInstancePendingUpdates() {
+        _externalState->setAutoCompleteUpdates(false);
+        auto fp = globalFailPointRegistry().find("hangAfterMultiUpdateCoordinatorSendsUpdates");
+        auto count = fp->setMode(FailPoint::alwaysOn);
+        auto instance = createInstance();
+        fp->waitForTimesEntered(count + 1);
+        fp->setMode(FailPoint::off);
+        ASSERT_TRUE(_externalState->updatesArePending());
+        return instance;
     }
 
     BSONObj getMetrics(const std::shared_ptr<Instance>& instance) {
@@ -289,18 +382,18 @@ protected:
         return *currentOp;
     }
 
-    State getState(const std::shared_ptr<Instance>& instance) {
-        auto stateString =
-            getMetrics(instance).getObjectField("mutableFields").getStringField("state").toString();
-        IDLParserContext errCtx("MultiUpdateCoordinatorTest::getState()");
-        return MultiUpdateCoordinatorState_parse(errCtx, stateString);
+    Phase getPhase(const std::shared_ptr<Instance>& instance) {
+        auto phaseString =
+            getMetrics(instance).getObjectField("mutableFields").getStringField("phase").toString();
+        IDLParserContext errCtx("MultiUpdateCoordinatorTest::getPhase()");
+        return MultiUpdateCoordinatorPhase_parse(errCtx, phaseString);
     }
 
-    void testStateTransitionUpdatesState(State state) {
-        auto [instance, fp] = createInstanceInState(Progress::kAfter, state);
-        ASSERT_EQ(getState(instance), state);
-        auto doc = getStateDocumentOnDisk(instance);
-        ASSERT_EQ(doc.getMutableFields().getState(), state);
+    void testPhaseTransitionUpdatesState(Phase phase) {
+        auto [instance, fp] = createInstanceInPhase(Progress::kAfter, phase);
+        ASSERT_EQ(getPhase(instance), phase);
+        auto doc = getPhaseDocumentOnDisk(instance);
+        ASSERT_EQ(doc.getMutableFields().getPhase(), phase);
         fp->setMode(FailPoint::off);
 
         auto status = instance->getCompletionFuture().getNoThrow();
@@ -310,18 +403,18 @@ protected:
     }
 
     void assertStatusAndUpdateResponse(StatusWith<BSONObj> status,
-                                       bool expectFailureResponse = false) {
-        if (expectFailureResponse) {
-            ASSERT_NOT_OK(status);
-            ASSERT_EQ(status.getStatus().code(), 8126701);
-        } else {
+                                       ErrorCodes::Error code = ErrorCodes::OK) {
+        if (code == ErrorCodes::OK) {
             ASSERT_OK(status);
             ASSERT_BSONOBJ_EQ(status.getValue(), updateSuccessResponseBSONObj());
+        } else {
+            ASSERT_NOT_OK(status);
+            ASSERT_EQ(status.getStatus().code(), code);
         }
     }
 
-    auto createInstanceAndStepDown(Progress progress, State state) {
-        auto [instance, fp] = createInstanceInState(progress, state);
+    auto createInstanceAndStepDown(Progress progress, Phase phase) {
+        auto [instance, fp] = createInstanceInPhase(progress, phase);
         boost::optional<UUID> instanceId = instance->getMetadata().getId();
         ASSERT_TRUE(instanceId);
         stepDown();
@@ -330,8 +423,8 @@ protected:
         return instanceId;
     }
 
-    auto createInstanceAndSimulateFailover(Progress progress, State state) {
-        auto instanceId = createInstanceAndStepDown(progress, state);
+    auto createInstanceAndSimulateFailover(Progress progress, Phase phase) {
+        auto instanceId = createInstanceAndStepDown(progress, phase);
 
         auto fpAlternate = globalFailPointRegistry().find(kRunFailpoint);
         auto countAlternate = fpAlternate->setMode(FailPoint::alwaysOn);
@@ -342,34 +435,33 @@ protected:
         return std::tuple{newInstance, fpAlternate};
     }
 
-    void testFailOverBeforeStateTransition(State state, bool expectFailureResponse = false) {
-        auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kBefore, state);
-        auto initialStartCount = getCounters().getStartBlockingMigrationsCount();
-        auto initialStopCount = getCounters().getStopBlockingMigrationsCount();
+    void testFailOverBeforePhaseTransition(Phase phase, ErrorCodes::Error code = ErrorCodes::OK) {
+        auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kBefore, phase);
+        auto initialStartCount = _externalState->getStartBlockingMigrationsCount();
+        auto initialStopCount = _externalState->getStopBlockingMigrationsCount();
 
         fp->setMode(FailPoint::off);
         auto status = instance->getCompletionFuture().getNoThrow();
 
-        if (state <= State::kPerformUpdate) {
-            ASSERT_GT(getCounters().getStartBlockingMigrationsCount(), initialStartCount);
-        } else if (state <= State::kDone) {
-            ASSERT_GT(getCounters().getStopBlockingMigrationsCount(), initialStopCount);
+        if (phase <= Phase::kPerformUpdate) {
+            ASSERT_GT(_externalState->getStartBlockingMigrationsCount(), initialStartCount);
+        } else if (phase <= Phase::kDone) {
+            ASSERT_GT(_externalState->getStopBlockingMigrationsCount(), initialStopCount);
         }
 
-        assertStatusAndUpdateResponse(status, expectFailureResponse);
+        assertStatusAndUpdateResponse(status, code);
     }
 
-    void testFailOverDuringStateTransition(State state, bool expectFailureResponse = false) {
-        auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kAfter, state);
+    void testFailOverAfterPhaseTransition(Phase phase, ErrorCodes::Error code = ErrorCodes::OK) {
+        auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kAfter, phase);
         fp->setMode(FailPoint::off);
-        assertStatusAndUpdateResponse(instance->getCompletionFuture().getNoThrow(),
-                                      expectFailureResponse);
+        assertStatusAndUpdateResponse(instance->getCompletionFuture().getNoThrow(), code);
     }
 
-    void testStateTransitionUpdatesOnDiskStateWithWriteFailure(State state) {
-        auto [instance, beforeFp] = createInstanceInState(Progress::kBefore, state);
+    void testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase phase) {
+        auto [instance, beforeFp] = createInstanceInPhase(Progress::kBefore, phase);
         auto [afterFp, afterCount] =
-            pauseStateTransition(Progress::kAfter, state, kPauseInStateFailpointAlternate);
+            pausePhaseTransition(Progress::kAfter, phase, kPauseInPhaseFailpointAlternate);
 
         auto [failCrud, crudCount] = failCrudOpsOn(
             NamespaceString::kMultiUpdateCoordinatorsNamespace, kRetryableError.code());
@@ -378,7 +470,7 @@ protected:
         failCrud->setMode(FailPoint::off);
 
         afterFp->waitForTimesEntered(afterCount + 1);
-        ASSERT_EQ(getState(instance), state);
+        ASSERT_EQ(getPhase(instance), phase);
 
         afterFp->setMode(FailPoint::off);
 
@@ -386,13 +478,6 @@ protected:
         ASSERT_OK(status);
         auto expectedBSONObj = updateSuccessResponseBSONObj();
         ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
-    }
-};
-
-class MultiUpdateCoordinatorExternalStateFailTest : public MultiUpdateCoordinatorTest {
-public:
-    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<Service>(serviceContext, _counters, true);
     }
 };
 
@@ -408,78 +493,116 @@ TEST_F(MultiUpdateCoordinatorTest, CompletesSuccessfullyAndCleansUp) {
     ASSERT_FALSE(stateDocumentExistsOnDisk(_opCtx, instance->getMetadata().getId()));
 }
 
+/**
+ *  Test that phase transitions update the on-disk state for each phase. kDone
+ *  is omitted because the state document is deleted when transitioning to this
+ *  phase.
+ */
+
+TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringAcquireSession) {
+    testPhaseTransitionUpdatesState(Phase::kAcquireSession);
+}
+
 TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringBlockMigrations) {
-    testStateTransitionUpdatesState(State::kBlockMigrations);
+    testPhaseTransitionUpdatesState(Phase::kBlockMigrations);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringPerfomUpdate) {
-    testStateTransitionUpdatesState(State::kPerformUpdate);
+    testPhaseTransitionUpdatesState(Phase::kPerformUpdate);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringCleanup) {
-    testStateTransitionUpdatesState(State::kCleanup);
+    testPhaseTransitionUpdatesState(Phase::kCleanup);
+}
+
+/**
+ *  Test that all phase transitions retry and complete successfully even if
+ *  there is a failure when trying to update the state document once.
+ */
+
+TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureAcquireSession) {
+    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kAcquireSession);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureBlockMigrations) {
-    testStateTransitionUpdatesOnDiskStateWithWriteFailure(State::kBlockMigrations);
+    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kBlockMigrations);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailurePerformUpdate) {
-    testStateTransitionUpdatesOnDiskStateWithWriteFailure(State::kPerformUpdate);
+    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kPerformUpdate);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureCleanup) {
-    testStateTransitionUpdatesOnDiskStateWithWriteFailure(State::kCleanup);
+    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kCleanup);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureDone) {
-    testStateTransitionUpdatesOnDiskStateWithWriteFailure(State::kDone);
+    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kDone);
 }
 
-TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeBlockMigrations) {
-    testFailOverBeforeStateTransition(State::kBlockMigrations);
-}
+/**
+ *  Triggers a failover before transitioning to each phase (i.e. the phase in
+ *  the state document will be the phase just prior to the argument to
+ *  testFailOverBeforePhaseTransition). Verifies that after stepping up, the
+ *  coordinator completes as expected without violating any of our constraints.
+ *  kAcquireSession is a special case because there is no state document on disk
+ *  before transitioning to this phase.
+ */
 
-TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeCleanup) {
-    testFailOverBeforeStateTransition(State::kCleanup, true /* expectFailureResponse */);
-}
-
-TEST_F(MultiUpdateCoordinatorTest, StepUpBeforePerformUpdate) {
-    testFailOverBeforeStateTransition(State::kPerformUpdate);
-}
-
-TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeDone) {
-    testFailOverBeforeStateTransition(State::kDone);
-}
-
-TEST_F(MultiUpdateCoordinatorTest, StepUpAfterBlockMigrations) {
-    testFailOverDuringStateTransition(State::kBlockMigrations);
-}
-
-TEST_F(MultiUpdateCoordinatorTest, StepUpAfterPerformUpdate) {
-    testFailOverDuringStateTransition(State::kPerformUpdate, true /* expectFailureResponse */);
-}
-
-TEST_F(MultiUpdateCoordinatorTest, StepUpAfterCleanup) {
-    testFailOverDuringStateTransition(State::kCleanup);
-}
-
-TEST_F(MultiUpdateCoordinatorTest, StepUpAfterDone) {
-    auto instanceId = createInstanceAndStepDown(Progress::kAfter, State::kDone);
+TEST_F(MultiUpdateCoordinatorTest, StepDownBeforePersistStateDocument) {
+    auto instanceId = createInstanceAndStepDown(Progress::kBefore, Phase::kAcquireSession);
     stepUp(_opCtx);
     ASSERT_FALSE(stateDocumentExistsOnDisk(_opCtx, *instanceId));
 }
 
-TEST_F(MultiUpdateCoordinatorTest, StepDownBeforeBlockMigrations) {
-    auto instanceId = createInstanceAndStepDown(Progress::kBefore, State::kBlockMigrations);
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeBlockMigrations) {
+    testFailOverBeforePhaseTransition(Phase::kBlockMigrations);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforePerformUpdate) {
+    testFailOverBeforePhaseTransition(Phase::kPerformUpdate);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeCleanup) {
+    testFailOverBeforePhaseTransition(Phase::kCleanup, ErrorCodes::duplicateCodeForTest(8126701));
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeDone) {
+    testFailOverBeforePhaseTransition(Phase::kDone);
+}
+
+/**
+ *  Triggers a failover immediately after transitioning to each phase. Verifies
+ *  that after stepping up, the coordinator completes as expected without
+ *  violating any of our constraints. kDone is a special case because the state
+ *  document is deleted after transitioning to kDone.
+ */
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterAcquireSession) {
+    testFailOverAfterPhaseTransition(Phase::kAcquireSession);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterBlockMigrations) {
+    testFailOverAfterPhaseTransition(Phase::kBlockMigrations);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterPerformUpdate) {
+    testFailOverAfterPhaseTransition(Phase::kPerformUpdate,
+                                     ErrorCodes::duplicateCodeForTest(8126701));
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterCleanup) {
+    testFailOverAfterPhaseTransition(Phase::kCleanup);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterDeleteStateDocument) {
+    auto instanceId = createInstanceAndStepDown(Progress::kAfter, Phase::kDone);
     stepUp(_opCtx);
     ASSERT_FALSE(stateDocumentExistsOnDisk(_opCtx, *instanceId));
 }
 
 TEST_F(MultiUpdateCoordinatorTest, FailsForUnsupportedCmd) {
-    MultiUpdateCoordinatorMetadata metadata;
-    metadata.setId(UUID::gen());
-
+    auto document = createStateDocument();
     const BSONObj query = BSON("member"
                                << "abc123");
     const BSONObj update = BSON("$set" << BSON("points" << 50));
@@ -487,22 +610,36 @@ TEST_F(MultiUpdateCoordinatorTest, FailsForUnsupportedCmd) {
     auto cmd = BSON("NotARealUpdateCmd"
                     << "coll"
                     << "updates" << BSON_ARRAY(rawUpdate));
-    metadata.setUpdateCommand(cmd);
-    metadata.setNss(NamespaceString::createNamespaceString_forTest("test.coll"));
-
-    MultiUpdateCoordinatorDocument document;
-    document.setMetadata(metadata);
+    document.getMetadata().setUpdateCommand(cmd);
 
     auto instance = createInstanceFrom(document);
     ASSERT_THROWS_CODE(instance->getCompletionFuture().get(_opCtx), DBException, 8126601);
 }
 
-TEST_F(MultiUpdateCoordinatorExternalStateFailTest, CompletesSuccessfullyIfUnderlyingUpdateFails) {
+TEST_F(MultiUpdateCoordinatorTest, CompletesSuccessfullyIfUnderlyingUpdateFails) {
+    auto expected = updateFailedResponseBSONObj();
+    _externalState->setAutoCompleteResponse(expected);
     auto instance = createInstance();
-    auto status = instance->getCompletionFuture().getNoThrow();
-    ASSERT_OK(status);
-    auto expectedBSONObj = updateFailedResponseBSONObj();
-    ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
+    auto result = instance->getCompletionFuture().getNoThrow();
+    ASSERT_OK(result);
+    ASSERT_BSONOBJ_EQ(result.getValue(), expected);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, CoordinatorWaitsForPendingUpdates) {
+    auto fp = globalFailPointRegistry().find("hangDuringMultiUpdateCoordinatorPendingUpdates");
+    auto count = fp->setMode(FailPoint::alwaysOn);
+    boost::optional<UUID> instanceId;
+    {
+        auto instance = createInstancePendingUpdates();
+        instanceId = instance->getMetadata().getId();
+    }
+    stepDown();
+    stepUp(_opCtx);
+    auto instance = getOrCreateInstance(_opCtx, *instanceId);
+    fp->waitForTimesEntered(count + 1);
+    fp->setMode(FailPoint::off);
+    _externalState->completeUpdates(updateSuccessResponseBSONObj());
+    ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 }  // namespace

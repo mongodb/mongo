@@ -135,6 +135,8 @@ const allCommands = {
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},
+    _shardsvrBeginMigrationBlockingOperation: {skip: isAnInternalCommand},
+    _shardsvrEndMigrationBlockingOperation: {skip: isAnInternalCommand},
     streams_startStreamProcessor: {skip: isAnInternalCommand},
     streams_startStreamSample: {skip: isAnInternalCommand},
     streams_stopStreamProcessor: {skip: isAnInternalCommand},

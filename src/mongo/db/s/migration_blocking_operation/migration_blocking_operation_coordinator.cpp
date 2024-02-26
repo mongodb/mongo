@@ -38,8 +38,6 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingDiskState);
 MONGO_FAIL_POINT_DEFINE(hangBeforeBlockingMigrations);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAllowingMigrations);
 MONGO_FAIL_POINT_DEFINE(hangBeforeFulfillingPromise);
-MONGO_FAIL_POINT_DEFINE(hangAfterFetchingMigrationBlockingOperationCoordinator);
-MONGO_FAIL_POINT_DEFINE(hangAfterCatchingCleanupError);
 
 MigrationBlockingOperationCoordinator::UUIDSet populateOperations(
     MigrationBlockingOperationCoordinatorDocument doc) {
@@ -224,30 +222,6 @@ void MigrationBlockingOperationCoordinator::_insertOrUpdateStateDocument(
     } else {
         _updateStateDocument(opCtx, std::move(newStateDocument));
     }
-}
-
-void MigrationBlockingOperationCoordinator::beginOperation(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           const UUID& operationUUID) {
-    auto migrationBlockingOperationCoordinator = getOrCreate(opCtx, nss);
-    hangAfterFetchingMigrationBlockingOperationCoordinator.pauseWhileSet();
-
-    try {
-        migrationBlockingOperationCoordinator->beginOperation(opCtx, operationUUID);
-    } catch (const ExceptionFor<ErrorCodes::MigrationBlockingOperationCoordinatorCleaningUp>&) {
-        hangAfterCatchingCleanupError.pauseWhileSet();
-        migrationBlockingOperationCoordinator->getCompletionFuture().wait(opCtx);
-
-        migrationBlockingOperationCoordinator = getOrCreate(opCtx, nss);
-        migrationBlockingOperationCoordinator->beginOperation(opCtx, operationUUID);
-    }
-}
-
-void MigrationBlockingOperationCoordinator::endOperation(OperationContext* opCtx,
-                                                         const NamespaceString& nss,
-                                                         const UUID& operationUUID) {
-    auto migrationBlockingOperationCoordinator = getOrCreate(opCtx, nss);
-    migrationBlockingOperationCoordinator->endOperation(opCtx, operationUUID);
 }
 
 }  // namespace mongo

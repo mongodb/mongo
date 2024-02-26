@@ -33,13 +33,13 @@ imports:
     - "mongo/db/basic_types.idl"
 
 enums:
-    StateTransitionProgress:
+    PhaseTransitionProgress:
         description: >-
-            Progress of a state transition for use with PauseDuringStateTransitionFailPoint. The 
+            Progress of a phase transition for use with PauseDuringPhaseTransitionFailPoint. The 
             failpoint should be evaluated at the following times for each progress value:
-                Before: Prior to updating state in any way.
-                Partial: After writing to disk, but before updating in-memory state.
-                After: After state is updated on-disk and in-memory.
+                Before: Prior to updating phase in any way.
+                Partial: After writing to disk, but before updating in-memory phase.
+                After: After phase is updated on-disk and in-memory.
         type: string
         values:
             kBefore: "before"

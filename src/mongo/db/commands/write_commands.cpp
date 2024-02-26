@@ -114,6 +114,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangInsertBeforeWrite);
+MONGO_FAIL_POINT_DEFINE(hangUpdateBeforeWrite);
 
 void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
     namespace mmb = mutablebson;
@@ -535,6 +536,13 @@ public:
                 write_ops_exec::runTimeseriesRetryableUpdates(
                     opCtx, bucketNs, request(), executor, &reply);
             } else {
+                if (hangUpdateBeforeWrite.shouldFail([&](const BSONObj& data) {
+                        const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
+                        return fpNss == request().getNamespace();
+                    })) {
+                    hangUpdateBeforeWrite.pauseWhileSet();
+                }
+
                 reply = write_ops_exec::performUpdates(opCtx, request(), source);
             }
 

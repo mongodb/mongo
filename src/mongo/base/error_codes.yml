@@ -544,6 +544,8 @@ error_codes:
 
     - {code: 411, name: QueryRejectedBySettings}
 
+    - {code: 412, name: UpdatesStillPending, categories: [RetriableError]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
