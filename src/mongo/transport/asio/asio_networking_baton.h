@@ -38,6 +38,7 @@
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/platform/waitable_atomic.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/baton.h"
@@ -168,40 +169,65 @@ private:
     bool _inPoll = false;
 
     /**
-     * We use `_notificationState` to send a notification without going through the eventfd
-     * where possible. If we're in the middle of polling, we must use the eventfd so as
-     * to wake up the polling thread. Otherwise, we just transition to the `kNotificationPending`
-     * state, which is seen in the next call to `_poll()`.
+     * We use `_notificationState` to allow the baton to use different polling/waiting mechanisms
+     * (for efficiency) depending on what circumstances allow. Calls to `notify()` take the current
+     * state into consideration when deciding which mechanism to use to wake up the polling
+     * thread. In all states, notifiers must set the notification state to `kNotificationPending`.
+     * If we're in the middle of a call to `::poll` (state `kInPoll`), notifiers must then use
+     * the eventfd to to wake the polling thread. If we're in the middle of waiting on
+     * `_notificationState` itself (state `kInAtomicWait`), notifiers must notify on
+     * `_notificationState`. In state `kNone`, no thread is blocked polling or waiting, so the
+     * notifier only needs to set the state to `kNotificationPending`. Finally, in state
+     * `kNotificationPending`, `notify()` is a no-op.
      *
      * In `notify()`, a thread sending a notification can cause a transition from any state to
      * `kNotificationPending`. Graphically:
      *
-     * kNone ----1----> kNotificationPending <----2---- kInPoll
-     * (1) The polling thread is not blocked in `::poll()` - don't call `notify()`
-     * (2) The polling thread may be blocked in `::poll()` - call `notify()`
+     * kNone ----1----> kNotificationPending <----2---- kInPoll          kInAtomicWait
+     *                                   ^                                  |
+     *                                   +-------------------------3--------+
+     * (1) The polling thread is not blocked - just transition to `kNotificationPending`.
+     * (2) The polling thread may be blocked in `::poll()` - notify the eventfd.
+     * (3) The polling thread may be blocked on `_notificationState` - notify it.
      *
-     * In `_poll()`, the polling thread transitions to `kInPoll` (from any other state) before
-     * calling `::poll()`, and transitions to `kNone` after `::poll()` returns.
-     * There is also a fast path from `kNotificationPending` to `kNone` when a notification is
-     * pending and there are no sessions to poll on.
+     * In `_poll()`, if there are active sessions, the polling thread transitions to `kInPoll`
+     * (from `kNone` or `kNotificationPending`) before calling `::poll()`, and transitions to
+     * `kNone` after `::poll()` returns. Alternatively, when there are no active sessions and no
+     * pending notifications, the polling thread instead transitions from `kNone` to
+     * `kInAtomicWait` and waits on `_notificationState`. There is also a fast path from
+     * `kNotificationPending` to `kNone` when a notification is pending and there are no sessions
+     * to poll on.
      *
      * +-------+ -----2-----> +---------+            +----------------------+
      * | kNone |              | kInPoll | <----3---- | kNotificationPending |
      * +-------+ <----1------ +---------+            +----------------------+
-     *    ^                                               |
-     *    +---------------------4-------------------------+
+     *  |     ^                                           |
+     *  5     +-----------------4-------------------------+
+     *  V
+     * +---------------+
+     * | kInAtomicWait |
+     * +---------------+
      *
      * (1) Return from `::poll()`
-     * (2) Start polling with no notification pending - use blocking call to `::poll()`
-     * (3) Start polling with a pending notification - use non-blocking call to `::poll()`
-     * (4) Start polling with a pending notification and no active sessions - skip `::poll()`
+     * (2) Start polling with no pending notification and at least one active session
+     *      - use a blocking call to `::poll()`.
+     * (3) Start polling with a pending notification and at least one active session
+     *      - use a non-blocking call to `::poll()`.
+     * (4) Start polling with a pending notification and no active sessions
+     *      - go straight to `kNone` without blocking.
+     * (5) Start polling with no pending notification and no active sessions
+     *      - wait on `_notificationState`.
      *
      * Notice that only notifying threads transition to `kNotificationPending` and only the polling
      * thread transitions out of `kNotificationPending`. This gives the polling thread exclusive
      * ownership over `_notificationState` in that state (i.e., no one else will write to it).
+     *
+     * `_notificationState` is a BasicWaitableAtomic because the state tells us if anyone is
+     * waiting. The only time there might be a waiter is in `kInAtomicWait`, and there is only
+     * ever one waiter.
      */
-    enum NotificationState { kNone, kNotificationPending, kInPoll };
-    AtomicWord<NotificationState> _notificationState;
+    enum NotificationState : uint32_t { kNone, kNotificationPending, kInPoll, kInAtomicWait };
+    BasicWaitableAtomic<NotificationState> _notificationState;
 
     /**
      * Stores the sessions we need to poll on.

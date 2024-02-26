@@ -162,7 +162,9 @@ void AsioNetworkingBaton::schedule(Task func) noexcept {
 
 void AsioNetworkingBaton::notify() noexcept {
     NotificationState old = _notificationState.swap(kNotificationPending);
-    if (old == kInPoll)
+    if (old == kInAtomicWait)
+        _notificationState.notifyAll();
+    else if (old == kInPoll)
         efd(_opCtx).notify();
 }
 
@@ -466,26 +468,35 @@ std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBato
             _notificationState.storeRelaxed(kNone);
             return {};
         }
-    }
+    } else {
+        _pollSet.clear();
+        _pollSet.reserve(_sessions.size() + 1);
+        _pollSet.push_back({efd(_opCtx).fd, POLLIN, 0});
 
-    _pollSet.clear();
-    _pollSet.reserve(_sessions.size() + 1);
-    _pollSet.push_back({efd(_opCtx).fd, POLLIN, 0});
+        _pollSessions.clear();
+        _pollSessions.reserve(_sessions.size());
 
-    _pollSessions.clear();
-    _pollSessions.reserve(_sessions.size());
-
-    for (auto iter = _sessions.begin(); iter != _sessions.end(); ++iter) {
-        _pollSet.push_back({iter->second.fd, iter->second.events, 0});
-        _pollSessions.push_back(iter);
+        for (auto iter = _sessions.begin(); iter != _sessions.end(); ++iter) {
+            _pollSet.push_back({iter->second.fd, iter->second.events, 0});
+            _pollSessions.push_back(iter);
+        }
     }
 
     int events = [&] {
         _inPoll = true;
         lk.unlock();
 
-        const NotificationState oldState = _notificationState.swap(kInPoll);
+        // Because _inPoll is true, we have ownership over the baton's state and can safely
+        // check if _sessions is empty without holding the lock.
+        const NotificationState newState = _sessions.empty() ? kInAtomicWait : kInPoll;
+
+        // If the state was previously kNone, then we're going to wait (either in ::poll or
+        // using the WaitableAtomic). We need to set the state accordingly.
+        auto oldState = kNone;
+        // If the old state was kNone, then there was no notification pending.
+        bool wasNotificationPending = !_notificationState.compareAndSwap(&oldState, newState);
         invariant(oldState != kInPoll);
+        invariant(oldState != kInAtomicWait);
 
         const ScopeGuard guard([&] {
             // Both consumes a notification (if-any) and mark us as no-longer in poll.
@@ -497,18 +508,31 @@ std::pair<std::list<Promise<void>>, std::list<Promise<void>>> AsioNetworkingBato
 
         blockAsioNetworkingBatonBeforePoll.pauseWhileSet();
 
-        int timeout = oldState == kNotificationPending
-            ? 0  // Don't wait if there is a notification pending.
-            : deadline ? Milliseconds(*deadline - now).count()
-                       : -1;
+        if (newState == kInPoll) {
+            int timeout = wasNotificationPending
+                ? 0  // Don't wait if there is a notification pending.
+                : deadline ? Milliseconds(*deadline - now).count()
+                           : -1;
 
-        int events = ::poll(_pollSet.data(), _pollSet.size(), timeout);
-        if (events < 0) {
-            auto ec = lastSystemError();
-            if (ec != systemError(EINTR))
-                LOGV2_FATAL(50834, "error in poll", "error"_attr = errorMessage(ec));
+            int events = ::poll(_pollSet.data(), _pollSet.size(), timeout);
+            if (events < 0) {
+                auto ec = lastSystemError();
+                if (ec != systemError(EINTR))
+                    LOGV2_FATAL(50834, "error in poll", "error"_attr = errorMessage(ec));
+            }
+            return events;
+        } else {
+            invariant(newState == kInAtomicWait);
+            if (wasNotificationPending)
+                return 0;
+
+            // Passing Date_t::max() to waitUntil will cause a duration overflow.
+            if (deadline && deadline != Date_t::max())
+                _notificationState.waitUntil(kInAtomicWait, *deadline);
+            else
+                _notificationState.wait(kInAtomicWait);
+            return 0;
         }
-        return events;
     }();
 
     if (events <= 0)
