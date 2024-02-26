@@ -24,12 +24,15 @@ cat << EOF > $HOME/azure_e2e_config.json
     "oidc_azure_managed_identity_api_version": "${oidc_azure_managed_identity_api_version}"
 }
 EOF
-cat << EOF > $HOME/azure_remote_key
+cat << EOF > $HOME/oidc_azure_container_key
 ${oidc_azure_container_key}
 EOF
 
-# EVG project variables do not preserve line breaks - rather these are replaced with spaces, so we will need to convert our pem back into proper format
-sed s/\ OPENSSH\ PRIVATE\ KEY/OPENSSHPRIVATEKEY/g $HOME/azure_remote_key | sed s/\ /\\n/g | sed s/OPENSSHPRIVATEKEY/\ OPENSSH\ PRIVATE\ KEY/g > $HOME/azure_remote_key
+# EVG project variables do not preserve line breaks so we store them as base64 and decode here
+sed s/[[:space:]]//g $HOME/oidc_azure_container_key | base64 --decode > $HOME/azure_remote_key
+
+# Clean up temp file
+rm -f $HOME/oidc_azure_container_key
 
 # SSH will complain and fail if the private key permissions are too lenient (by default it is created with 644), so modify to run the test
 chmod 600 $HOME/azure_remote_key
