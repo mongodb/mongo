@@ -29,10 +29,9 @@ classicColl.insert(docs);
 
 for (const op of ['$eq', '$lt', '$lte', '$gt', '$gte']) {
     for (const leaf of leafs()) {
-        // Direct comparisons against undefined ({$eq: undefined}) are not allowed.
-        if (tojson(leaf).match(/undefined/))
+        // TODO SERVER-67550 Equality to null does not match undefined, in Bonsai.
+        if (tojson(leaf).match(/null|undefined/))
             continue;
-
         // Regex with non-equality predicate is not allowed.
         if (leaf instanceof RegExp && op !== '$eq')
             continue;

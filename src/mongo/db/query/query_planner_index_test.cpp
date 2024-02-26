@@ -79,7 +79,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenIndexSatisfiesNullQ
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{ixscan: {pattern: {x: 1}, bounds: "
-        "{x: [[null,null,true,true]]}}}");
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}");
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenIndexSatisfiesNullAndOtherQuery) {
@@ -90,32 +90,23 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenIndexSatisfiesNullAndOtherQ
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{ixscan: {pattern: {x: 1}, bounds: "
-        "{x: [[null,null,true,true], [2, 2, true, true]]}}}");
+        "{x: [[undefined,undefined,true,true],[null,null,true,true], [2, 2, true, true]]}}}");
 }
 
-TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanCountWhenMultikeyIndexSatisfiesNullQuery) {
+TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullQuery) {
     params.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(fromjson("{x: 1}"), multikeyPaths);
     runQuery(fromjson("{x: null}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertSolutionExists("{ixscan: {pattern: {x: 1}, bounds: {x: [[null,null,true,true]]}}}");
-}
-
-TEST_F(QueryPlannerTest, PlannerAddsFetchWhenMultikeyIndexSatisfiesDottedNullQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
-    setIsCountLike();
-    MultikeyPaths multikeyPaths{{0U}};
-    addIndex(fromjson("{'x.y': 1}"), multikeyPaths);
-    runQuery(fromjson("{'x.y': null}"));
-    ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{fetch: {filter: {'x.y': null}, node: {ixscan: {pattern: {'x.y': 1}, bounds: {'x.y': "
-        "[[null,null,true,true]]}}}}}");
+        "{fetch: {filter: {x: null}, node: {ixscan: "
+        "{pattern: {x: 1}, bounds: "
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullEmptyQuery) {
+TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanForCountWhenMultikeyIndexSatisfiesNullEmptyQuery) {
     params.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
@@ -123,11 +114,11 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchForCountWhenMultikeyIndexSatisfiesNullE
     runQuery(fromjson("{x: {$in: [null, []]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{fetch: {filter: {x: {$in: [null, []]}}, node: {ixscan: {pattern: {x: 1}, bounds: "
-        "{x: [[undefined,undefined,true,true], [null,null,true,true], [[], [], true, true]]}}}}}");
+        "{ixscan: {pattern: {x: 1}, bounds: "
+        "{x: [[undefined,undefined,true,true],[null,null,true,true], [[], [], true, true]]}}}");
 }
 
-TEST_F(QueryPlannerTest, PlannerAddsFetchWhenMultikeyIndexSatisfiesNullEmptyAndOtherQuery) {
+TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenMultikeyIndexSatisfiesNullEmptyAndOtherQuery) {
     params.options = QueryPlannerParams::DEFAULT;
     setIsCountLike();
     MultikeyPaths multikeyPaths{{0U}};
@@ -135,21 +126,9 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchWhenMultikeyIndexSatisfiesNullEmptyAndO
     runQuery(fromjson("{x: {$in: [null, [], 2]}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{fetch: {filter: {x: {$in: [null, [], 2]}}, node: {ixscan: {pattern: {x: 1}, bounds: "
-        "{x: [[undefined,undefined,true,true], [null,null,true,true], [2, 2, true, true], [[], [], "
-        "true, true]]}}}}}");
-}
-
-TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanWhenMultikeyIndexSatisfiesNullAndOtherQuery) {
-    params.options = QueryPlannerParams::DEFAULT;
-    setIsCountLike();
-    MultikeyPaths multikeyPaths{{0U}};
-    addIndex(fromjson("{x: 1}"), multikeyPaths);
-    runQuery(fromjson("{x: {$in: [null, 2]}}"));
-    ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertSolutionExists(
         "{ixscan: {pattern: {x: 1}, bounds: "
-        "{x: [[null,null,true,true], [2, 2, true, true]]}}}");
+        "{x: [[undefined,undefined,true,true],[null,null,true,true], [2, 2, true, true], [[], [], "
+        "true, true]]}}}");
 }
 
 TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanFindWhenIndexSatisfiesNullQuery) {
@@ -160,7 +139,7 @@ TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanFindWhenIndexSatisfiesNullQuery
     assertSolutionExists(
         "{proj: {spec: {_id: 1}, node:"
         "{ixscan: {pattern: {x: 1, _id: 1}, bounds: "
-        "{x: [[null,null,true,true]]}}}}}");
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, PlannerAddsFetchForFindWhenMultikeyIndexSatisfiesNullQuery) {
@@ -170,11 +149,13 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchForFindWhenMultikeyIndexSatisfiesNullQu
     runQuerySortProj(fromjson("{x: null}}"), BSONObj(), fromjson("{_id: 1}}"));
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
-        "{proj: {spec: {_id: 1}, node: {ixscan: {pattern: {x: 1, _id: 1}, bounds: "
-        "{x: [[null,null,true,true]]}}}}}");
+        "{proj: {spec: {_id: 1}, node:"
+        "{fetch: {filter: {x: null}, node: {ixscan: "
+        "{pattern: {x: 1, _id: 1}, bounds: "
+        "{x: [[undefined,undefined,true,true],[null,null,true,true]]}}}}}}}");
 }
 
-TEST_F(QueryPlannerTest, PlannerAddsFetchFindWhenMultikeyIndexSatisfiesNullEmptyQuery) {
+TEST_F(QueryPlannerTest, PlannerUsesCoveredIxscanFindWhenMultikeyIndexSatisfiesNullEmptyQuery) {
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
     addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
@@ -182,21 +163,8 @@ TEST_F(QueryPlannerTest, PlannerAddsFetchFindWhenMultikeyIndexSatisfiesNullEmpty
     ASSERT_EQUALS(getNumSolutions(), 1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 1}, node:"
-        "{fetch: {filter: {x: {$in: [null, []]}}, node: {ixscan: {pattern: {x: 1, _id: 1}, bounds: "
-        "{x: [[undefined,undefined,true,true],[null,null,true,true], [[], [], true, true]]}}}}}}}");
-}
-
-TEST_F(QueryPlannerTest,
-       PlannerUsesCoveredIxscanForFindWhenMultikeyIndexSatisfiesNullAndOtherQuery) {
-    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
-    MultikeyPaths multikeyPaths{{0U}, MultikeyComponents{}};
-    addIndex(fromjson("{x: 1, _id: 1}"), multikeyPaths);
-    runQuerySortProj(fromjson("{x: {$in: [null, 2]}}}"), BSONObj(), fromjson("{_id: 1}}"));
-    ASSERT_EQUALS(getNumSolutions(), 1U);
-    assertSolutionExists(
-        "{proj: {spec: {_id: 1}, node:"
         "{ixscan: {pattern: {x: 1, _id: 1}, bounds: "
-        "{x: [[null,null,true,true], [2, 2, true, true]]}}}}}");
+        "{x: [[undefined,undefined,true,true],[null,null,true,true], [[], [], true, true]]}}}}}");
 }
 
 //
@@ -303,7 +271,7 @@ TEST_F(QueryPlannerTest, NinListWithOnlyNullAndEmptyArrayShouldUseMultikeyIndex)
         "{fetch: {filter: {a: {$not: {$in: [null, []]}}}, node: {ixscan: "
         "{pattern: {a: 1}, bounds: "
         "{a: ["
-        "['MinKey', null, true, false],"
+        "['MinKey', undefined, true, false],"
         "[null, [], false, false],"
         "[[], 'MaxKey', false, true]"
         "]}}}}}");
@@ -319,7 +287,7 @@ TEST_F(QueryPlannerTest, NinListWithOnlyNullAndEmptyArrayShouldUseIndex) {
         "{fetch: {node: {ixscan: "
         "{pattern: {a: 1}, bounds: "
         "{a: ["
-        "['MinKey', null, true, false],"
+        "['MinKey', undefined, true, false],"
         "[null, [], false, false],"
         "[[], 'MaxKey', false, true]"
         "]}}}}}");
@@ -374,13 +342,13 @@ TEST_F(QueryPlannerTest, SparseIndexCanSupportGTEOrLTENull) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {i: {$gte: null}}, node: {ixscan: {pattern: "
-        "{i: 1}, bounds: {i: [[null,null,true,true]]}}}}}");
+        "{i: 1}, bounds: {i: [[undefined,undefined,true,true], [null,null,true,true]]}}}}}");
 
     runQuery(fromjson("{i: {$lte: null}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {i: {$lte: null}}, node: {ixscan: {pattern: "
-        "{i: 1}, bounds: {i: [[null,null,true,true]]}}}}}");
+        "{i: 1}, bounds: {i: [[undefined,undefined,true,true], [null,null,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, PlannerCanUseIndexesWithSameKeyButDifferentSparseProperty) {
@@ -637,7 +605,7 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsNotEqualsNull) {
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: "
         "{a: 1, b: 1}, bounds: {a: [['foo',{},false,false]], "
-        "b:[['MinKey',null,true,false],[null,'MaxKey',false,true]]}}}}}");
+        "b:[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNull) {
@@ -649,7 +617,7 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNull) {
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {filter: null, pattern: "
         "{'a.b': 1, 'c.d': 1}, bounds: {'a.b': [['foo',{},false,false]], "
-        "'c.d':[['MinKey',null,true,false],[null,'MaxKey',false,true]]}}}}}");
+        "'c.d':[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullWithProjection) {
@@ -664,7 +632,7 @@ TEST_F(QueryPlannerTest, CompoundIndexBoundsDottedNotEqualsNullWithProjection) {
         "{proj: {spec: {_id: 0, 'c.d': 1}, node: {"
         "  ixscan: {filter: null, pattern: {'a.b': 1, 'c.d': 1}, bounds: {"
         "    'a.b': [['foo',{},false,false]], "
-        "    'c.d':[['MinKey',null,true,false],[null,'MaxKey',false,true]]"
+        "    'c.d':[['MinKey',undefined,true,false],[null,'MaxKey',false,true]]"
         "}}}}}");
 }
 

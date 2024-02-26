@@ -55,12 +55,15 @@ namespace mongo {
 namespace {
 
 /**
- * Asserts that 'oil' contains exactly one bound: [null, null]].
+ * Asserts that 'oil' contains exactly two bounds: [[undefined, undefined], [null, null]].
  */
 void assertBoundsRepresentEqualsNull(const OrderedIntervalList& oil) {
-    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': undefined, '': undefined}"), true, true)));
     ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
-                  oil.intervals[0].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
+                  oil.intervals[1].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
 }
 
 TEST_F(IndexBoundsBuilderTest, TranslateExprEqualToNullIsExactMaybeCovered) {
@@ -74,7 +77,12 @@ TEST_F(IndexBoundsBuilderTest, TranslateExprEqualToNullIsExactMaybeCovered) {
     interval_evaluation_tree::Builder ietBuilder{};
     IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness, &ietBuilder);
     ASSERT_EQUALS(oil.name, "a");
-    assertBoundsRepresentEqualsNull(oil);
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': undefined, '': undefined}"), true, true)));
+    ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
+                  oil.intervals[1].compare(Interval(fromjson("{'': null, '': null}"), true, true)));
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT_MAYBE_COVERED);
     assertIET(inputParamIdMap, ietBuilder, elt, testIndex, oil);
 }
@@ -119,7 +127,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateDottedEqualsToNullShouldBuildExactMaybeC
     assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
-TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullMultiKeyShouldBuildExactBounds) {
+TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullMultiKeyShouldBuildInexactBounds) {
     BSONObj indexPattern = BSON("a" << 1);
     auto testIndex = buildSimpleIndexEntry(indexPattern);
     testIndex.multikey = true;
@@ -134,32 +142,12 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullMultiKeyShouldBuildExactBoun
         expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
     ASSERT_EQUALS(oil.name, "a");
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT_MAYBE_COVERED);
-    assertBoundsRepresentEqualsNull(oil);
-    assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
-}
-
-TEST_F(IndexBoundsBuilderTest, TranslateDottedEqualsToNullMultiKeyShouldBuildInexactBounds) {
-    BSONObj indexPattern = BSON("a.b" << 1);
-    auto testIndex = buildSimpleIndexEntry(indexPattern);
-    testIndex.multikey = true;
-
-    BSONObj obj = BSON("a.b" << BSONNULL);
-    auto [expr, inputParamIdMap] = parseMatchExpression(obj);
-
-    OrderedIntervalList oil;
-    IndexBoundsBuilder::BoundsTightness tightness;
-    interval_evaluation_tree::Builder ietBuilder{};
-    IndexBoundsBuilder::translate(
-        expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
-
-    ASSERT_EQUALS(oil.name, "a.b");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
     assertBoundsRepresentEqualsNull(oil);
     assertIET(inputParamIdMap, ietBuilder, indexPattern.firstElement(), testIndex, oil);
 }
 
-TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildOneIntervalForHashedIndex) {
+TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildTwoIntervalsForHashedIndex) {
     BSONObj indexPattern = BSON("a"
                                 << "hashed");
     auto testIndex = buildSimpleIndexEntry(indexPattern);
@@ -176,13 +164,28 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildOneIntervalForHas
 
     ASSERT_EQUALS(oil.name, "a");
     ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
-    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    // We should have one for undefined, and one for null.
+    ASSERT_EQUALS(oil.intervals.size(), 2U);
+    {
+        const BSONObj undefinedElementObj = BSON("" << BSONUndefined);
+        const BSONObj hashedUndefinedInterval =
+            ExpressionMapping::hash(undefinedElementObj.firstElement());
+        ASSERT_EQ(hashedUndefinedInterval.firstElement().type(), BSONType::NumberLong);
+
+        const auto& firstInterval = oil.intervals[0];
+        ASSERT_TRUE(firstInterval.startInclusive);
+        ASSERT_TRUE(firstInterval.endInclusive);
+        ASSERT_EQ(firstInterval.start.type(), BSONType::NumberLong);
+        ASSERT_EQ(firstInterval.start.numberLong(),
+                  hashedUndefinedInterval.firstElement().numberLong());
+    }
+
     {
         const BSONObj nullElementObj = BSON("" << BSONNULL);
         const BSONObj hashedNullInterval = ExpressionMapping::hash(nullElementObj.firstElement());
         ASSERT_EQ(hashedNullInterval.firstElement().type(), BSONType::NumberLong);
 
-        const auto& secondInterval = oil.intervals[0];
+        const auto& secondInterval = oil.intervals[1];
         ASSERT_TRUE(secondInterval.startInclusive);
         ASSERT_TRUE(secondInterval.endInclusive);
         ASSERT_EQ(secondInterval.start.type(), BSONType::NumberLong);
@@ -193,14 +196,14 @@ TEST_F(IndexBoundsBuilderTest, TranslateEqualsToNullShouldBuildOneIntervalForHas
 }
 
 /**
- * Asserts that 'oil' contains exactly two bounds: [MinKey, null) and (null, MaxKey].
+ * Asserts that 'oil' contains exactly two bounds: [MinKey, undefined) and (null, MaxKey].
  */
 void assertBoundsRepresentNotEqualsNull(const OrderedIntervalList& oil) {
     ASSERT_EQUALS(oil.intervals.size(), 2U);
     {
         BSONObjBuilder bob;
         bob.appendMinKey("");
-        bob.appendNull("");
+        bob.appendUndefined("");
         ASSERT_EQUALS(Interval::INTERVAL_EQUALS,
                       oil.intervals[0].compare(Interval(bob.obj(), true, false)));
     }
@@ -234,7 +237,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsIfIn
         IndexBoundsBuilder::translate(
             expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
-        // Bounds should be [MinKey, null), (null, MaxKey].
+        // Bounds should be [MinKey, undefined), (null, MaxKey].
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         assertBoundsRepresentNotEqualsNull(oil);
@@ -261,7 +264,7 @@ TEST_F(IndexBoundsBuilderTest,
         IndexBoundsBuilder::translate(
             expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
-        // Bounds should be [MinKey, null), (null, MaxKey].
+        // Bounds should be [MinKey, undefined), (null, MaxKey].
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         assertBoundsRepresentNotEqualsNull(oil);
@@ -285,7 +288,7 @@ TEST_F(IndexBoundsBuilderTest, TranslateNotEqualToNullShouldBuildExactBoundsOnRe
         IndexBoundsBuilder::translate(
             expr.get(), indexPattern.firstElement(), testIndex, &oil, &tightness, &ietBuilder);
 
-        // Bounds should be [MinKey, null), (null, MaxKey].
+        // Bounds should be [MinKey, undefined), (null, MaxKey].
         ASSERT_EQUALS(oil.name, "a");
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
         assertBoundsRepresentNotEqualsNull(oil);

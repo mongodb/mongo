@@ -121,17 +121,6 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(sbe::FrameId frameId,
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg);
 
 /**
- * Generates an EExpression that checks if the input expression is null, missing, or undefined.
- */
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(const sbe::EVariable& var);
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(sbe::FrameId frameId,
-                                                                 sbe::value::SlotId slotId);
-
-std::unique_ptr<sbe::EExpression> generateNullMissingOrUndefined(
-    std::unique_ptr<sbe::EExpression> arg);
-
-/**
  * Generates an EExpression that checks if the input expression is a non-numeric type _assuming
  * that_ it has already been verified to be neither null nor missing.
  */

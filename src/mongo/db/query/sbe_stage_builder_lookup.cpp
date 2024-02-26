@@ -722,6 +722,11 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
  *         project lowKey = ks (1, 0, valueForIndexBounds, 1),
  *                 highKey = ks (1, 0, valueForIndexBounds, 2)
  *         union [valueForIndexBounds] [
+ *           cfilter {isNull (localValue)}
+ *           project [valueForIndexBounds = undefined]
+ *           limit 1
+ *           coscan
+ *           ,
  *           cfilter {isArray (localValue)}
  *           project [valueForIndexBounds = fillEmpty (getElement (localValue, 0), undefined)]
  *           limit 1
@@ -741,6 +746,7 @@ std::pair<SlotId /* matched docs */, std::unique_ptr<sbe::PlanStage>> buildNljLo
  *   filter {isMember (foreignValue, localValueSet)}
  *   // Below is the tree performing path traversal on the 'foreignDocument' and producing value
  *   // into 'foreignValue'.
+ *
  */
 std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     StageBuilderState& state,
@@ -793,6 +799,9 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // We need to lookup value in 'singleLocalValueSlot' in the index defined on the foreign
     // collection. To do this, we need to generate set of point intervals corresponding to this
     // value. Single value can correspond to multiple point intervals:
+    // - Null values:
+    //   a. [Null, Null]
+    //   b. [Undefined, Undefined]
     // - Array values:
     //   a. If array is empty, [Undefined, Undefined]
     //   b. If array is NOT empty, [array[0], array[0]] (point interval composed from the first
@@ -803,6 +812,12 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     // To implement these rules, we use the union stage:
     //   union pointValue [
     //       // Branch 1
+    //       cfilter isNull(rawValue)
+    //       project pointValue = Undefined
+    //       limit 1
+    //       coscan
+    //       ,
+    //       // Branch 2
     //       filter isArray(rawValue) && !isMember(pointValue, localKeyValueSet)
     //       project pointValue = fillEmpty(
     //           getElement(rawValue, 0),
@@ -811,14 +826,22 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     //       limit 1
     //       coscan
     //       ,
-    //       // Branch 2
+    //       // Branch 3
     //       project pointValue = rawValue
     //       limit 1
     //       coscan
     //   ]
     //
-    // For array values, branches (1) and (2) both produce values. For all other types, only (2)
-    // produces a value.
+    // For null values, only branches (1) and (3) produce values. For array values, only branches
+    // (2) and (3) produce values. For all other types, only (3) produces value.
+    auto nullBranchOutput = slotIdGenerator.generate();
+    auto nullBranch = makeProjectStage(makeLimitCoScanTree(nodeId, 1),
+                                       nodeId,
+                                       nullBranchOutput,
+                                       makeConstant(TypeTags::bsonUndefined, 0));
+    nullBranch = makeS<FilterStage<true /*IsConst*/>>(
+        std::move(nullBranch), makeFunction("isNull", makeVariable(singleLocalValueSlot)), nodeId);
+
     auto arrayBranchOutput = slotIdGenerator.generate();
     auto arrayBranch = makeProjectStage(
         makeLimitCoScanTree(nodeId, 1),
@@ -845,11 +868,11 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
                                         makeVariable(singleLocalValueSlot));
 
     auto valueForIndexBounds = slotIdGenerator.generate();
-    auto valueGeneratorStage =
-        makeS<UnionStage>(makeSs(std::move(arrayBranch), std::move(valueBranch)),
-                          makeVector(makeSV(arrayBranchOutput), makeSV(valueBranchOutput)),
-                          makeSV(valueForIndexBounds),
-                          nodeId);
+    auto valueGeneratorStage = makeS<UnionStage>(
+        makeSs(std::move(nullBranch), std::move(arrayBranch), std::move(valueBranch)),
+        makeVector(makeSV(nullBranchOutput), makeSV(arrayBranchOutput), makeSV(valueBranchOutput)),
+        makeSV(valueForIndexBounds),
+        nodeId);
 
     // For hashed indexes, we need to hash value before computing keystrings.
     if (index.type == INDEX_HASHED) {

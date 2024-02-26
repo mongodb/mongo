@@ -1630,9 +1630,9 @@ TEST_F(QueryPlannerTest, ContainedOrNotEqualsNull) {
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {pattern: {b: 1, a: 1}, bounds: {b: [[6, 6, true, true]], a: [['MinKey', "
-        "null, true, false], [null, 'MaxKey', false, true]]}}},"
+        "undefined, true, false], [null, 'MaxKey', false, true]]}}},"
         "{ixscan: {pattern: {c: 1, a: 1}, bounds: {c: [[7, 7, true, true]], a: [['MinKey', "
-        "null, true, false], [null, 'MaxKey', false, true]]}}}"
+        "undefined, true, false], [null, 'MaxKey', false, true]]}}}"
         "]}}}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }

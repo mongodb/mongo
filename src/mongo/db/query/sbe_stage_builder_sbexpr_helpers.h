@@ -156,10 +156,8 @@ public:
 
     SbExpr generateNullOrMissing(SbExpr expr);
     SbExpr generatePositiveCheck(SbExpr expr);
-    SbExpr generateNullMissingOrUndefined(SbExpr expr);
 
     SbExpr generateNullOrMissing(SbVar var);
-    SbExpr generateNullMissingOrUndefined(SbVar var);
     SbExpr generateNonStringCheck(SbVar var);
     SbExpr generateNonTimestampCheck(SbVar var);
     SbExpr generateNegativeCheck(SbVar var);
