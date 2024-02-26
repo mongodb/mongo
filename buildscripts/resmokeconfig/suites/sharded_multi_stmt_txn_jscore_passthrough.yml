@@ -3,6 +3,7 @@ test_kind: multi_stmt_txn_passthrough
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/core_sharding/**/*.js
   exclude_files:
   # These tests already run with transactions.
   - jstests/core/txns/**/*.js

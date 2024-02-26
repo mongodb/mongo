@@ -57,7 +57,6 @@ selector:
   - jstests/sharding/rename_across_mongos.js
   - jstests/sharding/shard2.js
   - jstests/sharding/shard3.js
-  - jstests/sharding/shard_collection_basic.js
   - jstests/sharding/tag_range.js
   - jstests/sharding/count_config_servers.js
   - jstests/sharding/split_large_key.js

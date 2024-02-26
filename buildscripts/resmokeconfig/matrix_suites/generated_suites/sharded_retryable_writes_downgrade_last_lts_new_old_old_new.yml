@@ -142,4 +142,5 @@ selector:
   - requires_timeseries
   roots:
   - jstests/core/**/*.js
+  - jstests/core_sharding/**/*.js
 test_kind: js_test

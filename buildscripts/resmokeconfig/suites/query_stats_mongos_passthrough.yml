@@ -11,6 +11,7 @@ description: |
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/core_sharding/**/*.js
   exclude_files:
   - jstests/core/txns/**/*.js
   # The following tests fail because a certain command or functionality is not supported on

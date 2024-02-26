@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
+  - jstests/core_sharding/**/*.js
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
   - jstests/libs/random_data_shard_suite_selftest.js
@@ -63,6 +64,9 @@ selector:
   # TODO: SERVER-85382 re-enable this test with tracked collection once create collection coordinator
   # support all timeseries/bucket namespace cases.
   - jstests/core/timeseries/timeseries_user_system_buckets.js
+
+  # TODO: SERVER-80135 re-enable once shardCollection works for tracked collection living on non-db-primary shard
+  - jstests/core_sharding/shard_collection_basic.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
