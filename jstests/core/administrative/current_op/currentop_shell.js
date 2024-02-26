@@ -96,7 +96,7 @@ res = db.adminCommand({
     $and: [{"ns": "test.currentOp_cursor"}, {"command.comment": "currentOp_server"}]
 });
 
-if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
+if (FixtureHelpers.numberOfShardsForCollection(coll) > 1) {
     // Assert currentOp truncation behavior for each shard in the cluster.
     assert(res.inprog.length >= 1, res);
     res.inprog.forEach((result) => {
@@ -132,7 +132,7 @@ res = db.currentOp({
     ]
 });
 
-if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(coll)) {
+if (FixtureHelpers.numberOfShardsForCollection(coll) > 1) {
     assert(res.inprog.length >= 1, res);
     res.inprog.forEach((result) => {
         assert.eq(result.op, "getmore", res);
