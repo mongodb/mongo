@@ -117,3 +117,9 @@ structs:
                 type: array<shard_id>
                 description: "The list of shards involved in the create collection operation."
                 optional: true
+            newEmptyCollectionCreated:
+                type: bool
+                description:  >-
+                    True if the collection has been created by the coordinator, otherwise false.
+                    Only used for rollback.
+                default: false

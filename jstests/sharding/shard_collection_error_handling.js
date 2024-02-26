@@ -63,11 +63,15 @@ function testNonRetriableErrorInsideCommitPhase(createAsUnsharded) {
 
     // Validate that there is no local collection on the db primary shard in case of implicit
     // shardCollection create, otherwise it must exist.
-    // TODO SERVER-83774: Create collection coordinator should clean up the collection on the db
-    // primary shard in case of rollback.
-    let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
-        {listCollections: 1, filter: {name: collName}}));
-    assert.eq(1, rs0Collections.cursor.firstBatch.length);
+    if (createAsUnsharded) {
+        let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
+            {listCollections: 1, filter: {name: collName}}));
+        assert.eq(1, rs0Collections.cursor.firstBatch.length);
+    } else {
+        let rs0Collections = assert.commandWorked(st.rs0.getPrimary().getDB(dbName).runCommand(
+            {listCollections: 1, filter: {name: collName}}));
+        assert.eq(0, rs0Collections.cursor.firstBatch.length);
+    }
 
     // Validate that there is no local collection on the participant shard.
     let rs1Collections = assert.commandWorked(st.rs1.getPrimary().getDB(dbName).runCommand(
