@@ -225,12 +225,10 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
                     str::stream() << "expected time-series buckets collection "
                                   << (*resolvedNss).toStringForErrorMsg() << " to exist",
                     tsCollection);
-            if (tsCollection) {
-                mixedData = tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData();
-                tsOptions = tsCollection->getTimeseriesOptions();
-                hasExtendedRange = tsCollection->getRequiresTimeseriesExtendedRangeSupport();
-                fixedBuckets = tsCollection->areTimeseriesBucketsFixed();
-            }
+            mixedData = tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData();
+            tsOptions = tsCollection->getTimeseriesOptions();
+            hasExtendedRange = tsCollection->getRequiresTimeseriesExtendedRangeSupport();
+            fixedBuckets = tsCollection->areTimeseriesBucketsFixed();
         }
 
         dependencyChain.push_back(*resolvedNss);
