@@ -1914,6 +1914,9 @@ commands:
         access_check:
             complex:
                 - check: checkOne
+                - privilege:
+                    resource_pattern: resourcePatternOne
+                    action_type: [actionTypeOne]
 
     addedAggStage:
         description: "new command passes when a agg stage is added"
