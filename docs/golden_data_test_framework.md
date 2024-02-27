@@ -61,8 +61,8 @@ be included in the diff.
 * When resolving merge conflicts on the expected output files, one of the approaches below SHOULD be 
 used:
   * "Accept theirs", rerun the tests and verify new outputs. This doesn't require knowledge of 
-  production/test code changes in "theirs" branch, but requires re-review and re-acceptance of c
-  hanges done by local branch.
+  production/test code changes in "theirs" branch, but requires re-review and re-acceptance of 
+  changes done by local branch.
   * "Accept yours", rerun the tests and verify the new outputs. This approach requires knowledge of 
   production/test code changes in "theirs" branch. However, if such changes resulted in 
   straightforward and repetitive output changes, like due to printing code change or fixture change,

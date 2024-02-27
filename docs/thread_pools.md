@@ -4,7 +4,7 @@ A thread pool ([Wikipedia][thread_pools_wikipedia]) accepts and executes
 lightweight work items called "tasks", using a carefully managed group
 of dedicated long-running worker threads. The worker threads perform
 the work items in parallel without forcing each work item to assume the
-burden of starting and destroying a dedicated thead.
+burden of starting and destroying a dedicated thread.
 
 ## Classes
 
