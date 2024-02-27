@@ -110,6 +110,25 @@ export const resetAndInsert = (replSet, db, collName, nDocs, docSuffix = null) =
     assert.eq(db.getCollection(collName).find({}).count(), nDocs);
 };
 
+// Clear health log and insert nDocs documents with two fields `a` and `b`.
+export const resetAndInsertTwoFields = (replSet, db, collName, nDocs, docSuffix = null) => {
+    db[collName].drop();
+    clearHealthLog(replSet);
+
+    if (docSuffix) {
+        assert.commandWorked(db[collName].insertMany(
+            [...Array(nDocs).keys()].map(
+                x => ({a: x.toString() + docSuffix, b: x.toString() + docSuffix})),
+            {ordered: false}));
+    } else {
+        assert.commandWorked(db[collName].insertMany(
+            [...Array(nDocs).keys()].map(x => ({a: x, b: x})), {ordered: false}));
+    }
+
+    replSet.awaitReplication();
+    assert.eq(db.getCollection(collName).find({}).count(), nDocs);
+};
+
 // Run dbCheck with given parameters and potentially wait for completion.
 export const runDbCheck = (replSet,
                            db,

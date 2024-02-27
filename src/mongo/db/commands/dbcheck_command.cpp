@@ -664,9 +664,14 @@ boost::optional<key_string::Value> DbChecker::getExtraIndexKeysCheckLookupStart(
 
     if (SimpleBSONObjComparator::kInstance.evaluate(BSONObj::stripFieldNames(_info.start) ==
                                                     kMinBSONKey)) {
-        key_string::Builder firstKeyString(
-            version, BSONObj(), ordering, key_string::Discriminator::kExclusiveBefore);
-        return firstKeyString.getValueCopy();
+        auto indexCursor =
+            std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_info.dataThrottle);
+        boost::optional<KeyStringEntry> firstKeyStringEntry = indexCursor->nextKeyString(opCtx);
+        boost::optional<key_string::Value> firstKeyString;
+        if (firstKeyStringEntry) {
+            firstKeyString = firstKeyStringEntry.get().keyString;
+        }
+        return firstKeyString;
     } else {
         key_string::Builder firstKeyString(version);
         firstKeyString.resetToKey(_info.start, ordering);
@@ -916,8 +921,8 @@ Status DbChecker::_hashExtraIndexKeysCheck(OperationContext* opCtx,
     LOGV2_DEBUG(7844900,
                 3,
                 "hashed one batch on primary",
-                "firstKeyString"_attr = firstBson,
-                "lastKeyString"_attr = lastBson,
+                "firstKeyString"_attr = key_string::rehydrateKey(index->keyPattern(), firstBson),
+                "lastKeyString"_attr = key_string::rehydrateKey(index->keyPattern(), lastBson),
                 "md5"_attr = md5,
                 "keysHashed"_attr = hasher->keysSeen(),
                 "bytesHashed"_attr = hasher->bytesSeen(),
@@ -1078,16 +1083,18 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
     int64_t numKeys = 0;
     int64_t numBytes = 0;
 
+    auto lookupStartKeyStringBsonRehydrated = key_string::rehydrateKey(
+        index->keyPattern(),
+        key_string::toBsonSafe(
+            lookupStart.getBuffer(), lookupStart.getSize(), ordering, lookupStart.getTypeBits()));
 
-    LOGV2_DEBUG(
-        7844800,
-        3,
-        "starting extra index keys batch at",
-        "lookupStartKeyStringBson"_attr = key_string::toBsonSafe(
-            lookupStart.getBuffer(), lookupStart.getSize(), ordering, lookupStart.getTypeBits()),
-        "indexName"_attr = indexName,
-        logAttrs(_info.nss),
-        "uuid"_attr = _info.uuid);
+    LOGV2_DEBUG(7844800,
+                3,
+                "starting extra index keys batch at",
+                "lookupStartKeyStringBson"_attr = lookupStartKeyStringBsonRehydrated,
+                "indexName"_attr = indexName,
+                logAttrs(_info.nss),
+                "uuid"_attr = _info.uuid);
 
     auto currIndexKey = indexCursor->seekForKeyString(opCtx, lookupStart);
 
@@ -1102,11 +1109,7 @@ Status DbChecker::_getCatalogSnapshotAndRunReverseLookup(
                     3,
                     "could not find any keys in index",
                     "endPosition"_attr = maxKey,
-                    "lookupStartKeyStringBson"_attr =
-                        key_string::toBsonSafe(lookupStart.getBuffer(),
-                                               lookupStart.getSize(),
-                                               ordering,
-                                               lookupStart.getTypeBits()),
+                    "lookupStartKeyStringBson"_attr = lookupStartKeyStringBsonRehydrated,
                     "indexName"_attr = indexName,
                     logAttrs(_info.nss),
                     "uuid"_attr = _info.uuid);
@@ -1241,7 +1244,11 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
     auto seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
         opCtx, collection->getRecordStore(), &_info.dataThrottle);
 
+    const IndexDescriptor* indexDescriptor =
+        collection.get()->getIndexCatalog()->findIndexByName(opCtx, indexName);
     auto record = seekRecordStoreCursor->seekExact(opCtx, recordId);
+    BSONObj keyStringBsonRehydrated =
+        key_string::rehydrateKey(indexDescriptor->keyPattern(), keyStringBson);
     if (!record) {
         // TODO SERVER-79850: Investigate refactoring dbcheck code to only check for errors in
         // one location.
@@ -1249,7 +1256,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                     3,
                     "reverse lookup failed to find record data",
                     "recordId"_attr = recordId.toStringHumanReadable(),
-                    "keyString"_attr = keyStringBson,
+                    "keyString"_attr = keyStringBsonRehydrated,
                     "indexName"_attr = indexName,
                     logAttrs(_info.nss),
                     "uuid"_attr = _info.uuid);
@@ -1260,7 +1267,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                                  << recordId.toStringHumanReadable() << " from index " << indexName
                                  << " for ns " << _info.nss.toStringForErrorMsg());
         BSONObjBuilder context;
-        context.append("keyString", keyStringBson);
+        context.append("keyString", keyStringBsonRehydrated);
         context.append("recordId", recordId.toStringHumanReadable());
         context.append("indexSpec", indexSpec);
 
@@ -1311,7 +1318,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                 "reverse lookup found record data",
                 "recordData"_attr = recordBson,
                 "recordId"_attr = recordId.toStringHumanReadable(),
-                "expectedKeyString"_attr = keyStringBson,
+                "expectedKeyString"_attr = keyStringBsonRehydrated,
                 "indexName"_attr = indexName,
                 logAttrs(_info.nss),
                 "uuid"_attr = _info.uuid);
@@ -1326,7 +1333,7 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
                 "does not contain expected keystring",
                 "recordData"_attr = recordBson,
                 "recordId"_attr = recordId.toStringHumanReadable(),
-                "expectedKeyString"_attr = keyStringBson,
+                "expectedKeyString"_attr = keyStringBsonRehydrated,
                 "indexName"_attr = indexName,
                 logAttrs(_info.nss),
                 "uuid"_attr = _info.uuid);
@@ -1334,10 +1341,10 @@ void DbChecker::_reverseLookup(OperationContext* opCtx,
         Status(ErrorCodes::NoSuchKey,
                str::stream() << "found index key entry with corresponding document and "
                                 "key string set that does not contain expected keystring "
-                             << keyStringBson << " from index " << indexName << " for ns "
+                             << keyStringBsonRehydrated << " from index " << indexName << " for ns "
                              << _info.nss.toStringForErrorMsg());
     BSONObjBuilder context;
-    context.append("expectedKeyString", keyStringBson);
+    context.append("expectedKeyString", keyStringBsonRehydrated);
     context.append("recordId", recordId.toStringHumanReadable());
     context.append("recordData", recordBson);
     context.append("indexSpec", indexSpec);
