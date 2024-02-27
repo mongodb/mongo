@@ -63,6 +63,33 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::timeseries {
+namespace details {
+inline bool operator==(const Measurement& lhs, const Measurement& rhs) {
+    bool timeFieldEqual = (lhs.timeField.woCompare(rhs.timeField) == 0);
+    if (!timeFieldEqual || (lhs.dataFields.size() != rhs.dataFields.size())) {
+        return false;
+    }
+
+    StringMap<BSONElement> rhsFields;
+    for (auto& field : rhs.dataFields) {
+        rhsFields.insert({field.fieldNameStringData().toString(), field});
+    }
+
+    for (size_t i = 0; i < lhs.dataFields.size(); ++i) {
+        auto& lhsField = lhs.dataFields[i];
+        auto it = rhsFields.find(lhsField.fieldNameStringData().toString());
+        if (it == rhsFields.end()) {
+            return false;
+        }
+
+        if (it->second.woCompare(lhsField) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+}  // namespace details
+
 namespace {
 
 const std::string testDbName = "db_timeseries_write_util_test";
@@ -1034,6 +1061,44 @@ TEST_F(TimeseriesWriteUtilTest, TrackInsertedBuckets) {
             /*stmtId=*/kUninitializedStmtId,
             &bucketIds));
         ASSERT_EQ(bucketIds.size(), 2);
+    }
+}
+
+TEST_F(TimeseriesWriteUtilTest, SortMeasurementsOnTimeField) {
+    const BSONObj metaField = fromjson(R"({"meta":{"tag":1}})");
+
+    // The meta field should be filtered by the sorting process.
+    const std::vector<BSONObj> measurements = {
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:50.000Z"},"meta":{"tag":1},"a":1,"b":1})"),
+        fromjson(R"({"time":{"$date":"2022-06-07T15:34:30.000Z"},"meta":{"tag":1},"a":2,"b":2})"),
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"meta":{"tag":1},"a":3,"b":3})")};
+
+    auto batch = generateBatch(UUID::gen(), {metaField.getField("meta"), nullptr, boost::none});
+    batch->measurements = {measurements.begin(), measurements.end()};
+    batch->min = fromjson(R"({"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1})");
+    batch->max = fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})");
+    batch->timeField = kTimeseriesOptions.getTimeField();
+
+    std::vector testMeasurements = details::sortMeasurementsOnTimeField(batch);
+
+    const std::vector<BSONObj> sortedMeasurements = {
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3})"),
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:50.000Z"},"a":1,"b":1})"),
+        fromjson(R"({"time":{"$date":"2022-06-07T15:34:30.000Z"},"a":2,"b":2})")};
+
+    const std::vector<BSONObj> sortedTimeFields = {
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:30.000Z"}})"),
+        fromjson(R"({"time":{"$date":"2022-06-06T15:34:50.000Z"}})"),
+        fromjson(R"({"time":{"$date":"2022-06-07T15:34:30.000Z"}})")};
+
+    ASSERT_EQ(testMeasurements.size(), sortedMeasurements.size());
+    for (size_t i = 0; i < sortedMeasurements.size(); ++i) {
+        details::Measurement m;
+        m.timeField = sortedTimeFields[i].getField("time");
+        m.dataFields.push_back(sortedMeasurements[i].getField("time"));
+        m.dataFields.push_back(sortedMeasurements[i].getField("a"));
+        m.dataFields.push_back(sortedMeasurements[i].getField("b"));
+        ASSERT_EQ(m, testMeasurements[i]);
     }
 }
 

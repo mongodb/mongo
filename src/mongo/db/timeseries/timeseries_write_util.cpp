@@ -105,12 +105,6 @@
 namespace mongo::timeseries {
 namespace {
 
-// Helper for measurement sorting.
-struct Measurement {
-    BSONElement timeField;
-    std::vector<BSONElement> dataFields;
-};
-
 // Builds the data field of a bucket document. Computes the min and max fields if necessary.
 boost::optional<std::pair<BSONObj, BSONObj>> processTimeseriesMeasurements(
     const std::vector<BSONObj>& measurements,
@@ -558,6 +552,38 @@ StatusWith<bucket_catalog::InsertResult> attemptInsertIntoBucketWithReopening(
 
 }  // namespace
 
+namespace details {
+std::vector<Measurement> sortMeasurementsOnTimeField(
+    std::shared_ptr<bucket_catalog::WriteBatch> batch) {
+    std::vector<Measurement> measurements;
+
+    // Convert measurements in batch from BSONObj to vector of data fields.
+    // Store timefield separate to allow simple sort.
+    for (auto& measurementObj : batch->measurements) {
+        Measurement measurement;
+        for (auto& dataField : measurementObj) {
+            StringData key = dataField.fieldNameStringData();
+            if (key == batch->bucketKey.metadata.getMetaField()) {
+                continue;
+            } else if (key == batch->timeField) {
+                // Add time field to both members of Measurement, fallthrough expected.
+                measurement.timeField = dataField;
+            }
+            measurement.dataFields.push_back(dataField);
+        }
+        measurements.push_back(std::move(measurement));
+    }
+
+    std::sort(measurements.begin(),
+              measurements.end(),
+              [](const Measurement& lhs, const Measurement& rhs) {
+                  return lhs.timeField.timestamp() < rhs.timeField.timestamp();
+              });
+
+    return measurements;
+}
+}  // namespace details
+
 write_ops::UpdateCommandRequest buildSingleUpdateOp(const write_ops::UpdateCommandRequest& wholeOp,
                                                     size_t opIndex) {
     write_ops::UpdateCommandRequest singleUpdateOp(wholeOp.getNamespace(),
@@ -801,40 +827,6 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
 
 
 /**
- * Returns newly allocated collection of measurements sorted on time field.
- * Filters out meta field from input and does not include it in output.
- */
-std::vector<Measurement> sortMeasurementsOnTimeField(
-    std::shared_ptr<bucket_catalog::WriteBatch> batch) {
-    std::vector<Measurement> measurements;
-
-    // Convert measurements in batch from BSONObj to vector of data fields.
-    // Store timefield separate to allow simple sort.
-    for (auto& measurementObj : batch->measurements) {
-        Measurement measurement;
-        for (auto& dataField : measurementObj) {
-            StringData key = dataField.fieldNameStringData();
-            if (key == batch->bucketKey.metadata.getMetaField()) {
-                continue;
-            } else if (key == batch->timeField) {
-                // Add time field to both members of Measurement, fallthrough expected.
-                measurement.timeField = dataField;
-            }
-            measurement.dataFields.push_back(dataField);
-        }
-        measurements.push_back(std::move(measurement));
-    }
-
-    std::sort(measurements.begin(),
-              measurements.end(),
-              [](const Measurement& lhs, const Measurement& rhs) {
-                  return lhs.timeField.timestamp() < rhs.timeField.timestamp();
-              });
-
-    return measurements;
-}
-
-/**
  * Performs lightweight compression utilizing in-memory BSONColumnBuilders from WriteBatch and
  * returns the partial bucket document with data fields only.
  *
@@ -891,6 +883,7 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     std::shared_ptr<bucket_catalog::WriteBatch> batch,
     const NamespaceString& bucketsNs,
     std::vector<StmtId>&& stmtIds) {
+    using namespace details;
     invariant(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
         serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
 

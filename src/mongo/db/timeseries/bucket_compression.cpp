@@ -53,6 +53,7 @@
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -78,18 +79,13 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
                                   bool validateDecompression) try {
     CompressionResult result;
 
-    // Helper for uncompressed measurements
-    struct Measurement {
-        BSONElement timeField;
-        std::vector<BSONElement> dataFields;
-    };
-
     // Buffer to help manipulate data if simulateBsonColumnCompressionDataLoss is set.
     // Contents must outlive `measurements` defined below.
     std::unique_ptr<char[]> tamperedData;
 
-    BSONObjBuilder builder;                 // builder to build the compressed bucket
-    std::vector<Measurement> measurements;  // Extracted measurements from uncompressed bucket
+    BSONObjBuilder builder;  // builder to build the compressed bucket
+    std::vector<details::Measurement>
+        measurements;                       // Extracted measurements from uncompressed bucket
     boost::optional<BSONObjIterator> time;  // Iterator to read time fields from uncompressed bucket
     std::vector<std::pair<StringData, BSONObjIterator>>
         columns;  // Iterators to read data fields from uncompressed bucket
@@ -141,7 +137,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
         auto timeElement = time->next();
 
         // Get BSONElement's to all data elements. Missing data fields are represented as EOO.
-        Measurement measurement;
+        details::Measurement measurement;
         measurement.timeField = timeElement;
         measurement.dataFields.resize(columns.size());
 
@@ -188,7 +184,7 @@ CompressionResult _compressBucket(const BSONObj& bucketDoc,
     // Sort all the measurements on time order.
     std::sort(measurements.begin(),
               measurements.end(),
-              [](const Measurement& lhs, const Measurement& rhs) {
+              [](const details::Measurement& lhs, const details::Measurement& rhs) {
                   return lhs.timeField.timestamp() < rhs.timeField.timestamp();
               });
 

@@ -313,4 +313,24 @@ void deleteRequestCheckFunction(DeleteRequest* request, const TimeseriesOptions&
  * Function that performs checks on an update request being performed on a timeseries collection.
  */
 void updateRequestCheckFunction(UpdateRequest* request, const TimeseriesOptions& options);
+
+
+namespace details {
+/**
+ * Helper for measurement sorting.
+ * timeField: {"<timeField>": "2022-06-06T15:34:30.000Z"}
+ * dataFields: [{"<timefield>": 2022-06-06T15:34:30.000Z}, {"a": 1}, {"b": 2}]
+ */
+struct Measurement {
+    BSONElement timeField;
+    std::vector<BSONElement> dataFields;
+};
+
+/**
+ * Returns collection of measurements sorted on time field.
+ * Filters out meta field from input and does not include it in output.
+ */
+std::vector<Measurement> sortMeasurementsOnTimeField(
+    std::shared_ptr<bucket_catalog::WriteBatch> batch);
+}  // namespace details
 }  // namespace mongo::timeseries
