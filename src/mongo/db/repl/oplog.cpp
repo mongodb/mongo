@@ -1138,7 +1138,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& entry = *op;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
+              opCtx, extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"deleteIndexes",
@@ -1147,7 +1147,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& entry = *op;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
+              opCtx, extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndex",
@@ -1156,7 +1156,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& entry = *op;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
+              opCtx, extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
@@ -1165,7 +1165,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& entry = *op;
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
+              opCtx, extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",
