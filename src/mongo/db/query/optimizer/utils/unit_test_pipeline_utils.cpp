@@ -52,7 +52,6 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/pipeline_test_util.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/explain.h"
@@ -101,8 +100,7 @@ ABT translatePipeline(const Metadata& metadata,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss,
                       bool shouldParameterize,
                       QueryParameterMap* parameters,
-                      size_t maxFilterDepth,
-                      bool shouldNormalizeMatchExpr) {
+                      size_t maxFilterDepth) {
     auto opCtx = cc().makeOperationContext();
     auto pipeline =
         parsePipeline(NamespaceString::createNamespaceString_forTest("a." + scanDefName),
@@ -110,13 +108,6 @@ ABT translatePipeline(const Metadata& metadata,
                       *opCtx,
                       involvedNss);
     pipeline->optimizePipeline();
-
-    // We normalize match expressions in the pipeline here to ensure the stability of the predicate
-    // order after optimizations.
-    if (shouldNormalizeMatchExpr) {
-        pipeline = normalizeMatchStageInPipeline(std::move(pipeline));
-    }
-
     if (shouldParameterize) {
         pipeline->parameterize();
     }
@@ -354,24 +345,15 @@ std::string ABTGoldenTestFixture::testABTTranslationAndOptimization(
     Metadata metadata,
     PathToIntervalFn pathToInterval,
     bool phaseManagerDisableScan,
-    const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss,
-    bool shouldNormalizeMatchExpr) {
+    const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
     auto&& stream = _ctx->outStream();
 
     formatGoldenTestHeader(
         variationName, pipelineStr, StringData{}, scanDefName, phaseSet, metadata, stream);
 
     auto prefixId = PrefixId::createForTests();
-    ABT translated = translatePipeline(metadata,
-                                       pipelineStr,
-                                       prefixId.getNextId("scan"),
-                                       scanDefName,
-                                       prefixId,
-                                       involvedNss,
-                                       false /* shouldParameterize */,
-                                       nullptr /* QueryParameterMap */,
-                                       kMaxPathConjunctionDecomposition /* maxDepth */,
-                                       shouldNormalizeMatchExpr);
+    ABT translated = translatePipeline(
+        metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId, involvedNss);
     return formatGoldenTestExplain(!phaseSet.empty()
                                        ? optimizeABT(translated,
                                                      phaseSet,

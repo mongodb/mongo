@@ -60,8 +60,7 @@ ABT translatePipeline(const Metadata& metadata,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {},
                       bool shouldParameterize = false,
                       QueryParameterMap* = nullptr,
-                      size_t maxDepth = kMaxPathConjunctionDecomposition,
-                      bool shouldNormalizeMatchExpr = false);
+                      size_t maxDepth = kMaxPathConjunctionDecomposition);
 
 void formatGoldenTestHeader(StringData variationName,
                             StringData pipelineStr,
@@ -108,8 +107,7 @@ protected:
         Metadata metadata = {{{"collection", createScanDef({}, {})}}},
         PathToIntervalFn pathToInterval = {},
         bool phaseManagerDisableScan = false,
-        const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {},
-        bool shouldNormalizeMatchExpr = false);
+        const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
 
     std::string testParameterizedABTTranslation(StringData variationName,
                                                 StringData findCmd = "",

@@ -100,17 +100,7 @@ TEST_F(ABTTranslationTest, InTranslation) {
 TEST_F(ABTTranslationTest, AndOrTranslation) {
     testABTTranslationAndOptimization("$match conjunction", "[{$match: {$and: [{a: 1}, {b: 2}]}}]");
 
-    // We need to set call with shouldNormalizeMatchExpr = true to ensure the stability of the
-    // predicate order after optimizations.
-    testABTTranslationAndOptimization("$match disjunction",
-                                      "[{$match: {$or: [{a: 1}, {b: 2}]}}]",
-                                      "collection" /* scanDefName */,
-                                      {} /* phaseSet */,
-                                      {{{"collection", createScanDef({}, {})}}} /* metadata */,
-                                      {} /* pathToInterval */,
-                                      false /* phaseManagerDisableScan */,
-                                      {} /* involvedNss */,
-                                      true /* shouldNormalizeMatchExpr */);
+    testABTTranslationAndOptimization("$match disjunction", "[{$match: {$or: [{a: 1}, {b: 2}]}}]");
 
     testABTTranslationAndOptimization("$match nested conjunction",
                                       "[{$match: {$and: [{$and: [{a: 1}, {b: 2}]}, {c: 3}]}}]");

@@ -138,25 +138,11 @@ const positiveTestQueries = [
     // The OR above should produce the same plan for any order of its arguments
     [{$or: [{f1: "a"}, {f1: "b"}, {f1: /c/}]}, {$or: [{f1: /c/}, {f1: "a"}, {f1: "b"}]}],
     [{$or: [{f1: "a"}, {f1: "b"}, {f1: /c/}]}, {$or: [{f1: "a"}, {f1: /c/}, {f1: "b"}]}],
-    [{$or: [{f2: 9}, {f1: 1}, {f1: 99}]}, {$or: [{f2: 9}, {f1: {$in: [1, 99]}}]}],
-    [
-        {$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}]},
-        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}
-    ],
-    // Same as above, but different order of predicates.
-    [
-        {$or: [{f1: 1}, {f2: 3}, {f1: 2}, {f2: 4}]},
-        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}]}
-    ],
-    [
-        {$or: [{f1: 1}, {f1: 2}, {f2: 3}, {f2: 4}, {f3: 5}]},
-        {$or: [{f1: {$in: [1, 2]}}, {f2: {$in: [3, 4]}}, {f3: 5}]}
-    ],
-    [{$or: [{f1: 1}, {f1: 1}]}, {f1: 1}],
 ];
 
 // These $or queries should not be rewritten into $in because of different semantics.
 const negativeTestQueries = [
+    {$or: [{f2: 9}, {f1: 1}, {f1: 99}]},
     {$or: [{f1: {$eq: /^x/}}, {f1: {$eq: /ab/}}]},
     {$or: [{f1: {$lt: 2}}, {f1: {$gt: 3}}]},
 ];

@@ -529,13 +529,8 @@ TEST_F(QueryPlannerTest, OrInexactWithExact2) {
     addIndex(BSON("b" << 1));
     runQuery(fromjson("{$or: [{a: 'foo'}, {a: /bar/}, {b: 'foo'}, {b: /bar/}]}"));
 
-    assertNumSolutions(2U);
+    assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");
-    assertSolutionExists(
-        "{fetch: {node: {or: {nodes: ["
-        "{ixscan: {filter: {$or: [{b: {$in:['foo',/bar/]}}]}, pattern: {b: 1}}},"
-        "{ixscan: {filter: {$or: [{a: {$in:['foo',/bar/]}}]}, pattern: {a: 1}}}"
-        "]}}}}");
 }
 
 // SERVER-13960: an exact, inexact covered, and inexact fetch predicate.

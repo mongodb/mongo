@@ -354,7 +354,6 @@ pipelineEnv.Library(
         'match_processor.cpp',
         'merge_processor.cpp',
         'pipeline.cpp',
-        'pipeline_test_util.cpp',
         'redact_processor.cpp',
         'search/document_source_internal_search_id_lookup.cpp',
         'search/document_source_internal_search_mongot_remote.cpp',
