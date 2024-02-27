@@ -642,6 +642,8 @@ TEST_F(NamespaceStringTest, ConstRefAssignmentOperator) {
 
     ASSERT_EQ(actual, expected);
     ASSERT_EQ(actual.coll(), "bar");
+    ASSERT_EQ(actual.sizeWithTenant(), 7);
+    ASSERT_EQ(actual.size(), 7);
 }
 
 // Verify we can create a new NamespaceString with a DatabaseName created by ns.dbName(). We must
