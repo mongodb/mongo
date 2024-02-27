@@ -355,6 +355,8 @@ __compact_worker(WT_SESSION_IMPL *session)
                       session->op_handle[i]->name);
                 }
 
+                WT_STAT_CONN_INCR(session, session_table_compact_conflicting_checkpoint);
+
                 __wt_verbose_info(session, WT_VERB_COMPACT,
                   "The compaction of the data handle %s returned EBUSY due to an in-progress "
                   "conflicting checkpoint.%s",

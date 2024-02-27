@@ -935,6 +935,7 @@ struct __wt_connection_stats {
     int64_t session_table_alter_success;
     int64_t session_table_alter_trigger_checkpoint;
     int64_t session_table_alter_skip;
+    int64_t session_table_compact_conflicting_checkpoint;
     int64_t session_table_compact_dhandle_success;
     int64_t session_table_compact_fail;
     int64_t session_table_compact_fail_cache_pressure;
