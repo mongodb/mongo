@@ -141,28 +141,54 @@ template <class K,
           class KeyValueBudgetEstimator,
           class InsertionEvictionListener = NoopInsertionEvictionListener,
           class KeyHasher = std::hash<K>,
-          class Eq = std::equal_to<K>>
+          class KeyEq = std::equal_to<K>>
 class LRUKeyValue {
 public:
-    LRUKeyValue(size_t maxSize) : _budgetTracker{maxSize} {}
+    /** A hasher wrapper class that converts references to pointers and enables 'KVMap' to store
+     * pointers.
+     */
+    template <typename Hasher>
+    struct HasherWrapper {
+        std::size_t operator()(const K* key) const {
+            return hasher(*key);
+        }
 
-    ~LRUKeyValue() {
-        clear();
-    }
+        Hasher hasher;
+    };
 
-    typedef std::pair<const K*, V> KVListEntry;
+    /**
+     * An equality wrapper class that converts references to pointers and enables 'KVMap' to store
+     * pointers.
+     */
+    template <typename Eq>
+    struct EqWrapper {
+        bool operator()(const K* lhs, const K* rhs) const {
+            return eq(*lhs, *rhs);
+        }
+
+        Eq eq;
+    };
+
+    typedef std::pair<K, V> KVListEntry;
 
     typedef std::list<KVListEntry> KVList;
     typedef typename KVList::iterator KVListIt;
     typedef typename KVList::const_iterator KVListConstIt;
 
-    typedef stdx::unordered_map<K, KVListIt, KeyHasher, Eq> KVMap;
+    typedef stdx::unordered_map<const K*, KVListIt, HasherWrapper<KeyHasher>, EqWrapper<KeyEq>>
+        KVMap;
     typedef typename KVMap::const_iterator KVMapConstIt;
 
     // These type declarations are required by the 'Partitioned' utility.
-    using key_type = typename KVMap::key_type;
+    using key_type = K;
     using mapped_type = typename KVMap::mapped_type;
     using value_type = typename KVMap::value_type;
+
+    LRUKeyValue(size_t maxSize) : _budgetTracker{maxSize} {}
+
+    ~LRUKeyValue() {
+        clear();
+    }
 
     /**
      * Add an (K, V) pair to the store, where 'key' can be used to retrieve value 'entry' from the
@@ -172,7 +198,7 @@ public:
      * evicted entries.
      */
     size_t add(const K& key, V entry) {
-        KVMapConstIt i = _kvMap.find(key);
+        KVMapConstIt i = _kvMap.find(&key);
         if (i != _kvMap.end()) {
             KVListIt found = i->second;
             _budgetTracker.onRemove(key, found->second);
@@ -181,9 +207,8 @@ public:
         }
 
         _budgetTracker.onAdd(key, entry);
-        _kvList.push_front(std::make_pair(nullptr, std::move(entry)));
-        _kvMap[key] = _kvList.begin();
-        _kvList.begin()->first = &(_kvMap.find(key)->first);
+        auto& newEntry = _kvList.emplace_front(std::make_pair(key, std::move(entry)));
+        _kvMap[&newEntry.first] = _kvList.begin();
 
         return evict();
     }
@@ -194,18 +219,17 @@ public:
      * class. As a side effect, the retrieved entry is promoted to the most recently used.
      */
     StatusWith<KVListIt> get(const K& key) const {
-        KVMapConstIt i = _kvMap.find(key);
+        KVMapConstIt i = _kvMap.find(&key);
         if (i == _kvMap.end()) {
             return Status(ErrorCodes::NoSuchKey, "no such key in LRU key-value store");
         }
         KVListIt found = i->second;
 
         // Promote the kv-store entry to the front of the list. It is now the most recently used.
-        _kvList.push_front(std::make_pair(nullptr, std::move(found->second)));
+        const auto& newEntry = _kvList.emplace_front(key, std::move(found->second));
         _kvMap.erase(i);
         _kvList.erase(found);
-        _kvMap[key] = _kvList.begin();
-        _kvList.begin()->first = &(_kvMap.find(key)->first);
+        _kvMap[&newEntry.first] = _kvList.begin();
 
         return _kvList.begin();
     }
@@ -215,7 +239,7 @@ public:
      * Returns false if there doesn't exist such 'key', otherwise returns true.
      */
     bool erase(const K& key) {
-        KVMapConstIt i = _kvMap.find(key);
+        KVMapConstIt i = _kvMap.find(&key);
         if (i == _kvMap.end()) {
             return false;
         }
@@ -234,9 +258,9 @@ public:
     size_t removeIf(KeyValuePredicate predicate) {
         size_t removed = 0;
         for (auto it = _kvList.begin(); it != _kvList.end();) {
-            if (predicate(*it->first, *it->second)) {
-                _budgetTracker.onRemove(*it->first, it->second);
-                _kvMap.erase(*it->first);
+            if (predicate(it->first, *it->second)) {
+                _budgetTracker.onRemove(it->first, it->second);
+                _kvMap.erase(&it->first);
                 it = _kvList.erase(it);
                 ++removed;
             } else {
@@ -250,8 +274,8 @@ public:
      * Deletes all entries in the kv-store.
      */
     void clear() {
-        _kvList.clear();
         _kvMap.clear();
+        _kvList.clear();
         _budgetTracker.onClear();
     }
 
@@ -267,7 +291,7 @@ public:
      * Returns true if entry is found in the kv-store.
      */
     bool hasKey(const K& key) const {
-        return _kvMap.find(key) != _kvMap.end();
+        return _kvMap.find(&key) != _kvMap.end();
     }
 
     /**
@@ -299,8 +323,8 @@ private:
         while (_budgetTracker.isOverBudget()) {
             invariant(!_kvList.empty());
 
-            _budgetTracker.onRemove(*_kvList.back().first, _kvList.back().second);
-            _kvMap.erase(*_kvList.back().first);
+            _budgetTracker.onRemove(_kvList.back().first, _kvList.back().second);
+            _kvMap.erase(&_kvList.back().first);
             _kvList.pop_back();
 
             ++nEvicted;

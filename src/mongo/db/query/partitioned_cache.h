@@ -214,7 +214,7 @@ public:
             auto lockedPartition = _partitionedCache->lockOnePartitionById(partitionId);
 
             for (auto&& [key, entry] : *lockedPartition) {
-                op(*key, entry);
+                op(key, entry);
             }
         }
     }

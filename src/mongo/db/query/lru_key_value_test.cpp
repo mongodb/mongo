@@ -335,10 +335,10 @@ TEST(LRUKeyValueTest, IterationTest) {
     cache.add(2, std::make_shared<int>(2));
 
     auto i = cache.begin();
-    ASSERT_EQUALS(*i->first, 2);
+    ASSERT_EQUALS(i->first, 2);
     ASSERT_EQUALS(*i->second, 2);
     ++i;
-    ASSERT_EQUALS(*i->first, 1);
+    ASSERT_EQUALS(i->first, 1);
     ASSERT_EQUALS(*i->second, 1);
     ++i;
     ASSERT(i == cache.end());
