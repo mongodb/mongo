@@ -46,13 +46,11 @@ executor:
   #     global_vars:
   #       TestData:
   #         skipValidationOnInvalidViewDefinitions: true
-  # TODO (SERVER-86630): Investigate ObjectIsBusy error in the replica set endpoint jstestfuzz suite
-  # when the ValidateCollections hook is enabled
-  # - class: ValidateCollections
-  #   shell_options:
-  #     global_vars:
-  #       TestData:
-  #         skipValidationOnInvalidViewDefinitions: true
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnInvalidViewDefinitions: true
   fixture:
     class: MultiReplicaSetFixture
     num_replica_sets: 2
