@@ -472,7 +472,7 @@ server_parameters:
     cpp_varname: "internalInsertMaxBatchSize"
     cpp_vartype: AtomicWord<int>
     default:
-      expr: internalQueryExecYieldIterations.load() / 2
+      expr: 64
       is_constexpr: false
     validator:
       gt: 0
