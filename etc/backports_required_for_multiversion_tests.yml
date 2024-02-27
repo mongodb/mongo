@@ -577,6 +577,8 @@ last-continuous:
     ticket: SERVER-84589
   - test_file: jstests/core/clustered/clustered_collection_creation.js
     ticket: SERVER-84331
+  - test_file: jstests/core/administrative/apply_ops/apply_ops1.js
+    ticket: SERVER-82349
   suites: null
 last-lts:
   all:
@@ -1212,4 +1214,6 @@ last-lts:
     ticket: SERVER-84589
   - test_file: jstests/core/clustered/clustered_collection_creation.js
     ticket: SERVER-84331
+  - test_file: jstests/core/administrative/apply_ops/apply_ops1.js
+    ticket: SERVER-82349
   suites: null
