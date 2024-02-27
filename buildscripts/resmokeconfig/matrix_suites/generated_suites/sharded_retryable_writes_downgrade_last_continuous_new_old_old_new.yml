@@ -113,7 +113,6 @@ selector:
   - jstests/core/**/shell_connection_strings.js
   - jstests/core/**/geo_s2ordering.js
   - jstests/core/**/dbhash.js
-  - jstests/core/**/explain_missing_database.js
   - jstests/core/**/geo_2d_explain.js
   - jstests/core/**/geo_s2explain.js
   - jstests/core/**/geo_s2sparse.js

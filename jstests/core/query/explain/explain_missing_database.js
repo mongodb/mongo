@@ -1,4 +1,12 @@
-// Test explain of various operations against a non-existent database
+/*
+ * Test explain of various operations against a non-existent database
+ *
+ * @tags: [
+ *  # Explain on non-existent database return an error when executed on mongos
+ *  # TODO SERVER-18047: re-enable in sharding suites
+ *  assumes_against_mongod_not_mongos,
+ * ]
+ */
 var explainMissingDb = db.getSiblingDB("explainMissingDb");
 
 var explain;

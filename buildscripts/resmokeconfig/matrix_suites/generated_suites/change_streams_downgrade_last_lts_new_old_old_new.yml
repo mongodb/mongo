@@ -96,7 +96,6 @@ selector:
   - jstests/core/**/tailable_getmore_batch_size.js
   - jstests/core/**/tailable_skip_limit.js
   - jstests/core/**/top.js
-  - jstests/core/**/explain_missing_database.js
   - jstests/core/**/geo_2d_explain.js
   - jstests/core/**/geo_s2explain.js
   - jstests/core/**/geo_s2sparse.js

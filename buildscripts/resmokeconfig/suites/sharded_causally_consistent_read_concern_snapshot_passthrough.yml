@@ -27,8 +27,6 @@ selector:
   - jstests/core/**/tailable_skip_limit.js # capped collections.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
-  # Behavior with no db different on mongos, SERVER-18047.
-  - jstests/core/**/explain_missing_database.js
   - jstests/core/**/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/**/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
