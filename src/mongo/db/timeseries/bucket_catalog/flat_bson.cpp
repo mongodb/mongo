@@ -1008,7 +1008,8 @@ Schema::UpdateStatus Schema::_maybeUpdateValue(SchemaStore::Obj& obj,
 
     if (data.type() == SchemaStore::Type::kUnset) {
         data.setValue(elem);
-    } else if (typeComp(elem, data.value().type()) != 0) {
+    } else if (data.type() != SchemaStore::Type::kValue ||
+               typeComp(elem, data.value().type()) != 0) {
         // Type mismatch
         status = UpdateStatus::Failed;
     }

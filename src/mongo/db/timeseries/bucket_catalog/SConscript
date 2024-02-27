@@ -49,6 +49,7 @@ env.CppUnitTest(
         'bucket_state_registry_test.cpp',
         'minmax_test.cpp',
         'insertion_ordered_column_map_test.cpp',
+        'schema_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
