@@ -2,7 +2,7 @@
  * Basic tests for _shardsvrBeginMigrationBlockingOperation/_shardsvrEndMigrationBlockingOperation.
  * @tags: [
  *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
- *  requires_fcv_73
+ *  requires_fcv_80
  * ]
  */
 

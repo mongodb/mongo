@@ -33,6 +33,7 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/s/database_version.idl"
+    - "mongo/s/error_status.idl"
 
 enums:
     MultiUpdateCoordinatorPhase:
@@ -43,7 +44,8 @@ enums:
             kAcquireSession: "acquireSession"
             kBlockMigrations: "blockMigrations"
             kPerformUpdate: "performUpdate"
-            kCleanup: "cleanup"
+            kSuccess: "success"
+            kFailure: "failure"
             kDone: "done"
 
 structs:
@@ -74,7 +76,11 @@ structs:
             result:
                 type: object_owned
                 description: >-
-                    Stores the result of the underlying update command.
+                    Stores the result of the underlying update command. By the end of the operation either this field or abortReason will be set.
+                optional: true
+            abortReason:
+                type: ErrorStatus
+                description: Stores the abort reason in the case of a failure. By the end of the operation either this field or result will be set.
                 optional: true
             lsid:
                 type: LogicalSessionId

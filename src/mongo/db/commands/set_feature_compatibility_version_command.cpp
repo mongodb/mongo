@@ -99,6 +99,7 @@
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/migration_blocking_operation/multi_update_coordinator.h"
 #include "mongo/db/s/replica_set_endpoint_feature_flag_gen.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -127,6 +128,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/migration_blocking_operation/migration_blocking_operation_feature_flags_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/sharding_state.h"
@@ -1341,6 +1343,8 @@ private:
                 requestedVersion,
                 originalVersion,
                 NamespaceString::kShardIndexCatalogNamespace);
+
+            abortAllMultiUpdateCoordinators(opCtx, requestedVersion, originalVersion);
         } else {
             _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
         }
@@ -1426,6 +1430,22 @@ private:
                     deletionStatus.isOK() ||
                         deletionStatus.code() == ErrorCodes::NamespaceNotFound);
         }
+    }
+
+    void abortAllMultiUpdateCoordinators(
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        const multiversion::FeatureCompatibilityVersion originalVersion) {
+        if (!migration_blocking_operation::gFeatureFlagPauseMigrationsDuringMultiUpdatesAvailable
+                 .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            return;
+        }
+        MultiUpdateCoordinatorService::abortAndWaitForAllInstances(
+            opCtx,
+            {ErrorCodes::IllegalOperation,
+             fmt::format("FCV downgrading to {} and pauseMigrationsDuringMultiUpdates is not "
+                         "supported on this version",
+                         toString(requestedVersion))});
     }
 
     /**

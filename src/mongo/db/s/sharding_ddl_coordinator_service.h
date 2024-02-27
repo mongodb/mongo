@@ -71,6 +71,8 @@ public:
 
     static ShardingDDLCoordinatorService* getService(OperationContext* opCtx);
 
+    using repl::PrimaryOnlyService::getAllInstances;
+
     StringData getServiceName() const override {
         return kServiceName;
     }

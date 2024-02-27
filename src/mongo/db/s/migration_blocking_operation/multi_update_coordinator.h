@@ -45,6 +45,8 @@ public:
 
     friend MultiUpdateCoordinatorInstance;
 
+    static void abortAndWaitForAllInstances(OperationContext* opCtx, Status reason);
+
     MultiUpdateCoordinatorService(ServiceContext* serviceContext);
 
     MultiUpdateCoordinatorService(
@@ -78,6 +80,7 @@ public:
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& stepdownToken) noexcept override;
 
+    void abort(Status reason);
     void interrupt(Status status) override;
 
     boost::optional<BSONObj> reportForCurrentOp(
@@ -91,6 +94,9 @@ public:
     SharedSemiFuture<BSONObj> getCompletionFuture() const;
 
 private:
+    const boost::optional<Status>& _getAbortReason() const;
+    StatusWith<BSONObj> _getResult() const;
+
     MultiUpdateCoordinatorMutableFields _getMutableFields() const;
     MultiUpdateCoordinatorPhaseEnum _getCurrentPhase() const;
     MultiUpdateCoordinatorDocument _buildCurrentStateDocument() const;
@@ -103,6 +109,7 @@ private:
     bool _shouldReleaseSession() const;
     bool _shouldUnblockMigrations() const;
     bool _updatesPossiblyRunningFromPreviousTerm() const;
+    bool _currentlySteppingDown() const;
 
     void _initializeRun(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                         const CancellationToken& stepdownToken);
@@ -137,6 +144,7 @@ private:
 
     SharedPromise<BSONObj> _completionPromise;
     boost::optional<BSONObj> _cmdResponse;
+    boost::optional<Status> _abortReason;
 };
 
 }  // namespace mongo

@@ -243,6 +243,7 @@ env.Library(
         'database_version.cpp',
         'database_version.idl',
         'database_version_base.idl',
+        'error_status.idl',
         'gossiped_routing_cache.idl',
         'index_version.cpp',
         'index_version.idl',

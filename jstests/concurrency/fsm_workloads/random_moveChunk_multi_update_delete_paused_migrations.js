@@ -9,6 +9,7 @@
  * requires_sharding,
  * assumes_balancer_off,
  * featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
+ * requires_fcv_80
  * ];
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";

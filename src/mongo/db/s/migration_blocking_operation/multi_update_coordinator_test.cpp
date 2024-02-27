@@ -40,6 +40,7 @@
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -48,6 +49,7 @@ namespace mongo {
 namespace {
 
 const Status kRetryableError{ErrorCodes::Interrupted, "Interrupted"};
+const Status kAbortReason{ErrorCodes::UnknownError, "Something bad happened"};
 const auto kNamespace = NamespaceString::createNamespaceString_forTest("test.coll");
 constexpr auto kPauseInPhaseFailpoint = "pauseDuringMultiUpdateCoordinatorPhaseTransition";
 constexpr auto kPauseInPhaseFailpointAlternate =
@@ -331,6 +333,15 @@ protected:
         return createInstanceFrom(stateDocument);
     }
 
+    auto createAbortedInstance(Status reason = kAbortReason) {
+        auto fp = globalFailPointRegistry().find(kRunFailpoint);
+        auto count = fp->setMode(FailPoint::alwaysOn);
+        auto instance = createInstance();
+        fp->waitForTimesEntered(count + 1);
+        instance->abort(reason);
+        return std::tuple{instance, fp};
+    }
+
     std::shared_ptr<Instance> createInstanceFrom(const MultiUpdateCoordinatorDocument& document) {
         return Instance::getOrCreate(_opCtx, _service, document.toBSON());
     }
@@ -358,7 +369,14 @@ protected:
 
     auto createInstanceInPhase(Progress progress, Phase phase) {
         auto [fp, count] = pausePhaseTransition(progress, phase, kPauseInPhaseFailpoint);
-        auto instance = createInstance();
+        auto instance = [&] {
+            if (phase != Phase::kFailure) {
+                return createInstance();
+            }
+            auto [instance, fp] = createAbortedInstance();
+            fp->setMode(FailPoint::off);
+            return instance;
+        }();
         fp->waitForTimesEntered(count + 1);
         return std::tuple{instance, fp};
     }
@@ -389,6 +407,40 @@ protected:
         return MultiUpdateCoordinatorPhase_parse(errCtx, phaseString);
     }
 
+    enum ResultCategory { kSuccess, kFailure };
+    void assertCoordinatorResult(const std::shared_ptr<Instance>& instance,
+                                 ErrorCodes::Error code) {
+        assertCoordinatorResult(instance,
+                                code == ErrorCodes::OK ? ResultCategory::kSuccess
+                                                       : ResultCategory::kFailure,
+                                code);
+    }
+
+    void assertCoordinatorResult(const std::shared_ptr<Instance>& instance, Phase finalPhase) {
+        assertCoordinatorResult(instance,
+                                finalPhase == Phase::kFailure ? ResultCategory::kFailure
+                                                              : ResultCategory::kSuccess);
+    }
+
+    void assertCoordinatorResult(const std::shared_ptr<Instance>& instance,
+                                 ResultCategory category,
+                                 boost::optional<ErrorCodes::Error> expectedError = boost::none) {
+        auto result = instance->getCompletionFuture().getNoThrow();
+        switch (category) {
+            case kSuccess:
+                ASSERT_OK(result);
+                ASSERT_BSONOBJ_EQ(result.getValue(), updateSuccessResponseBSONObj());
+                return;
+            case kFailure:
+                ASSERT_NOT_OK(result);
+                if (expectedError) {
+                    invariant(*expectedError != ErrorCodes::OK);
+                    ASSERT_EQ(result.getStatus(), *expectedError);
+                }
+                return;
+        }
+    }
+
     void testPhaseTransitionUpdatesState(Phase phase) {
         auto [instance, fp] = createInstanceInPhase(Progress::kAfter, phase);
         ASSERT_EQ(getPhase(instance), phase);
@@ -396,21 +448,7 @@ protected:
         ASSERT_EQ(doc.getMutableFields().getPhase(), phase);
         fp->setMode(FailPoint::off);
 
-        auto status = instance->getCompletionFuture().getNoThrow();
-        ASSERT_OK(status);
-        auto expectedBSONObj = updateSuccessResponseBSONObj();
-        ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
-    }
-
-    void assertStatusAndUpdateResponse(StatusWith<BSONObj> status,
-                                       ErrorCodes::Error code = ErrorCodes::OK) {
-        if (code == ErrorCodes::OK) {
-            ASSERT_OK(status);
-            ASSERT_BSONOBJ_EQ(status.getValue(), updateSuccessResponseBSONObj());
-        } else {
-            ASSERT_NOT_OK(status);
-            ASSERT_EQ(status.getStatus().code(), code);
-        }
+        assertCoordinatorResult(instance, phase);
     }
 
     auto createInstanceAndStepDown(Progress progress, Phase phase) {
@@ -441,7 +479,7 @@ protected:
         auto initialStopCount = _externalState->getStopBlockingMigrationsCount();
 
         fp->setMode(FailPoint::off);
-        auto status = instance->getCompletionFuture().getNoThrow();
+        instance->getCompletionFuture().wait();
 
         if (phase <= Phase::kPerformUpdate) {
             ASSERT_GT(_externalState->getStartBlockingMigrationsCount(), initialStartCount);
@@ -449,13 +487,13 @@ protected:
             ASSERT_GT(_externalState->getStopBlockingMigrationsCount(), initialStopCount);
         }
 
-        assertStatusAndUpdateResponse(status, code);
+        assertCoordinatorResult(instance, code);
     }
 
     void testFailOverAfterPhaseTransition(Phase phase, ErrorCodes::Error code = ErrorCodes::OK) {
         auto [instance, fp] = createInstanceAndSimulateFailover(Progress::kAfter, phase);
         fp->setMode(FailPoint::off);
-        assertStatusAndUpdateResponse(instance->getCompletionFuture().getNoThrow(), code);
+        assertCoordinatorResult(instance, code);
     }
 
     void testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase phase) {
@@ -474,10 +512,14 @@ protected:
 
         afterFp->setMode(FailPoint::off);
 
-        auto status = instance->getCompletionFuture().getNoThrow();
-        ASSERT_OK(status);
-        auto expectedBSONObj = updateSuccessResponseBSONObj();
-        ASSERT_BSONOBJ_EQ(status.getValue(), expectedBSONObj);
+        assertCoordinatorResult(instance, phase);
+    }
+
+    void testAbortInPhase(Phase phase, Status expected = kAbortReason) {
+        auto [instance, fp] = createInstanceInPhase(Progress::kAfter, phase);
+        instance->abort(kAbortReason);
+        fp->setMode(FailPoint::off);
+        ASSERT_EQ(instance->getCompletionFuture().getNoThrow(), expected);
     }
 };
 
@@ -511,8 +553,12 @@ TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringPerfomUpdate) {
     testPhaseTransitionUpdatesState(Phase::kPerformUpdate);
 }
 
-TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringCleanup) {
-    testPhaseTransitionUpdatesState(Phase::kCleanup);
+TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringSuccess) {
+    testPhaseTransitionUpdatesState(Phase::kSuccess);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StateUpdatedDuringFailure) {
+    testPhaseTransitionUpdatesState(Phase::kFailure);
 }
 
 /**
@@ -532,8 +578,12 @@ TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailurePerformUpdate)
     testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kPerformUpdate);
 }
 
-TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureCleanup) {
-    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kCleanup);
+TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureSuccess) {
+    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kSuccess);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureFailure) {
+    testPhaseTransitionUpdatesOnDiskStateWithWriteFailure(Phase::kFailure);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, RetryAfterTransientWriteFailureDone) {
@@ -563,8 +613,12 @@ TEST_F(MultiUpdateCoordinatorTest, StepUpBeforePerformUpdate) {
     testFailOverBeforePhaseTransition(Phase::kPerformUpdate);
 }
 
-TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeCleanup) {
-    testFailOverBeforePhaseTransition(Phase::kCleanup, ErrorCodes::duplicateCodeForTest(8126701));
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeSuccess) {
+    testFailOverBeforePhaseTransition(Phase::kSuccess, ErrorCodes::duplicateCodeForTest(8126701));
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeFailure) {
+    testFailOverBeforePhaseTransition(Phase::kFailure);
 }
 
 TEST_F(MultiUpdateCoordinatorTest, StepUpBeforeDone) {
@@ -591,14 +645,47 @@ TEST_F(MultiUpdateCoordinatorTest, StepUpAfterPerformUpdate) {
                                      ErrorCodes::duplicateCodeForTest(8126701));
 }
 
-TEST_F(MultiUpdateCoordinatorTest, StepUpAfterCleanup) {
-    testFailOverAfterPhaseTransition(Phase::kCleanup);
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterSuccess) {
+    testFailOverAfterPhaseTransition(Phase::kSuccess);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, StepUpAfterFailure) {
+    testFailOverAfterPhaseTransition(Phase::kFailure, kAbortReason.code());
 }
 
 TEST_F(MultiUpdateCoordinatorTest, StepUpAfterDeleteStateDocument) {
     auto instanceId = createInstanceAndStepDown(Progress::kAfter, Phase::kDone);
     stepUp(_opCtx);
     ASSERT_FALSE(stateDocumentExistsOnDisk(_opCtx, *instanceId));
+}
+
+/**
+ *  Test that we can abort from each state. kSuccess and kDone are special cases
+ *  because by the time we reach these phases, it's too late to abort.
+ */
+
+TEST_F(MultiUpdateCoordinatorTest, AbortAfterAcquireSession) {
+    testAbortInPhase(Phase::kAcquireSession);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, AbortAfterBlockMigrations) {
+    testAbortInPhase(Phase::kBlockMigrations);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, AbortAfterPerformUpdate) {
+    testAbortInPhase(Phase::kPerformUpdate);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, AbortAfterSuccess) {
+    testAbortInPhase(Phase::kSuccess, Status::OK());
+}
+
+TEST_F(MultiUpdateCoordinatorTest, AbortAfterFailure) {
+    testAbortInPhase(Phase::kFailure);
+}
+
+TEST_F(MultiUpdateCoordinatorTest, AbortAfterDone) {
+    testAbortInPhase(Phase::kDone, Status::OK());
 }
 
 TEST_F(MultiUpdateCoordinatorTest, FailsForUnsupportedCmd) {
@@ -640,6 +727,10 @@ TEST_F(MultiUpdateCoordinatorTest, CoordinatorWaitsForPendingUpdates) {
     fp->setMode(FailPoint::off);
     _externalState->completeUpdates(updateSuccessResponseBSONObj());
     ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+DEATH_TEST_F(MultiUpdateCoordinatorTest, AbortReasonMustBeError, "!reason.isOK()") {
+    auto [instance, fp] = createAbortedInstance(Status::OK());
 }
 
 }  // namespace

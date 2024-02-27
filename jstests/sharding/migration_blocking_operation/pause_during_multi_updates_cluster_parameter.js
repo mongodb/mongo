@@ -2,7 +2,7 @@
  * Tests that pauseMigrationsDuringMultiUpdates cluster parameter is off by default.
  * @tags: [
  *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
- *  requires_fcv_72
+ *  requires_fcv_80
  * ]
  */
 

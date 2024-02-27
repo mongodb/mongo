@@ -3,7 +3,7 @@
  * MigrationBlockingOperationCoordinator throws a cleanup error.
  * @tags: [
  *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
- *  requires_fcv_72
+ *  requires_fcv_80
  * ]
  */
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

@@ -4,7 +4,7 @@
  * failover, so this behavior should be considered best effort.
  * @tags: [
  *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
- *  requires_fcv_73
+ *  requires_fcv_80
  * ]
  */
 

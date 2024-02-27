@@ -59,6 +59,7 @@ MONGO_FAIL_POINT_DEFINE(pauseDuringMultiUpdateCoordinatorPhaseTransitionAlternat
 MONGO_FAIL_POINT_DEFINE(hangDuringMultiUpdateCoordinatorRun);
 MONGO_FAIL_POINT_DEFINE(hangDuringMultiUpdateCoordinatorPendingUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAfterMultiUpdateCoordinatorSendsUpdates);
+MONGO_FAIL_POINT_DEFINE(hangAfterAbortingMultiUpdateCoordinators);
 using Phase = MultiUpdateCoordinatorPhaseEnum;
 
 primary_only_service_helpers::PauseDuringPhaseTransitionFailPoint<MultiUpdateCoordinatorPhaseEnum>
@@ -85,7 +86,44 @@ AggregateCommandRequest makeAggregationToCheckForPendingUpdates(const NamespaceS
     return request;
 }
 
+auto getPhaseTransitionStopEvent(MultiUpdateCoordinatorPhaseEnum phase) {
+    using Event = primary_only_service_helpers::RetryUntilMajorityCommit::Event;
+    switch (phase) {
+        case Phase::kSuccess:
+        case Phase::kFailure:
+        case Phase::kDone:
+            return Event::kStepdown;
+        default:
+            return Event::kAbort;
+    }
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace
+
+void MultiUpdateCoordinatorService::abortAndWaitForAllInstances(OperationContext* opCtx,
+                                                                Status reason) {
+    auto service = [&] {
+        auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+        const auto& name = MultiUpdateCoordinatorService::kServiceName;
+        return checked_cast<MultiUpdateCoordinatorService*>(registry->lookupServiceByName(name));
+    }();
+    auto instances = [&] {
+        auto untyped = service->getAllInstances(opCtx);
+        std::vector<std::shared_ptr<MultiUpdateCoordinatorInstance>> typed;
+        for (const auto& instance : untyped) {
+            typed.emplace_back(checked_pointer_cast<MultiUpdateCoordinatorInstance>(instance));
+        }
+        return typed;
+    }();
+    for (const auto& instance : instances) {
+        instance->abort(reason);
+    }
+    hangAfterAbortingMultiUpdateCoordinators.pauseWhileSet();
+    for (const auto& instance : instances) {
+        instance->getCompletionFuture().wait();
+    }
+}
 
 MultiUpdateCoordinatorService::MultiUpdateCoordinatorService(ServiceContext* serviceContext)
     : MultiUpdateCoordinatorService{
@@ -134,10 +172,22 @@ MultiUpdateCoordinatorInstance::MultiUpdateCoordinatorInstance(
       _mutableFields{std::move(initialDocument.getMutableFields())},
       _beganInPhase{_mutableFields.getPhase()},
       _externalState{service->_externalStateFactory->createExternalState()},
-      _cmdResponse{_mutableFields.getResult()} {}
+      _cmdResponse{_mutableFields.getResult()},
+      _abortReason{_mutableFields.getAbortReason()} {}
 
 SharedSemiFuture<BSONObj> MultiUpdateCoordinatorInstance::getCompletionFuture() const {
     return _completionPromise.getFuture();
+}
+
+void MultiUpdateCoordinatorInstance::abort(Status reason) {
+    invariant(!reason.isOK());
+    stdx::lock_guard lock(_mutex);
+    if (_abortReason) {
+        return;
+    }
+    LOGV2(8127500, "Sending MultiUpdateCoordinator signal to abort", "reason"_attr = reason);
+    _abortReason = std::move(reason);
+    _cancelState->abort();
 }
 
 SemiFuture<void> MultiUpdateCoordinatorInstance::run(
@@ -165,26 +215,24 @@ ExecutorFuture<BSONObj> MultiUpdateCoordinatorInstance::_runWorkflow() {
         .then([this] { return _doBlockMigrationsPhase(); })
         .then([this] { return _transitionToPhase(Phase::kPerformUpdate); })
         .then([this] { return _doPerformUpdatePhase(); })
-        .then([this] { return _transitionToPhase(Phase::kCleanup); })
-        .onCompletion([this](Status operationStatus) {
-            return _stopBlockingMigrationsIfNeeded()
-                .then([this] { return _transitionToPhase(Phase::kDone); })
-                .onCompletion([this, operationStatus](Status cleanupStatus) {
-                    // Validating that cleanup status is ok is redundant because
-                    // untilStepdownOrMajorityCommit() will only stop retrying on a stepdown, which
-                    // means we will directly run the instance cleanup executor chain with a non-ok
-                    // status.
-                    return operationStatus;
-                });
+        .onCompletion([this](Status status) {
+            if (status.isOK()) {
+                invariant(_cmdResponse);
+                return _transitionToPhase(Phase::kSuccess);
+            }
+            abort(status);
+            return _transitionToPhase(Phase::kFailure);
         })
         .thenRunOn(_service->getInstanceCleanupExecutor())
-        .onCompletion([this, self = shared_from_this()](Status status) {
+        .then([this] { return _stopBlockingMigrationsIfNeeded(); })
+        .then([this] { return _transitionToPhase(Phase::kDone); })
+        .onCompletion([this, self = shared_from_this()](Status okOrStepdownError) {
             if (_shouldReleaseSession()) {
                 _releaseSession();
             }
-            uassertStatusOK(status);
-            invariant(_cmdResponse);
-            return *_cmdResponse;
+            const auto steppingDown = _currentlySteppingDown();
+            invariant(okOrStepdownError.isOK() || steppingDown);
+            return steppingDown ? okOrStepdownError : _getResult();
         });
 }
 
@@ -297,6 +345,20 @@ const MultiUpdateCoordinatorMetadata& MultiUpdateCoordinatorInstance::getMetadat
     return _metadata;
 }
 
+const boost::optional<Status>& MultiUpdateCoordinatorInstance::_getAbortReason() const {
+    stdx::lock_guard lock(_mutex);
+    return _abortReason;
+}
+
+StatusWith<BSONObj> MultiUpdateCoordinatorInstance::_getResult() const {
+    if (_cmdResponse) {
+        return *_cmdResponse;
+    }
+    const auto& abortReason = _getAbortReason();
+    invariant(abortReason);
+    return *abortReason;
+}
+
 MultiUpdateCoordinatorMutableFields MultiUpdateCoordinatorInstance::_getMutableFields() const {
     stdx::unique_lock lock(_mutex);
     return _mutableFields;
@@ -340,10 +402,10 @@ bool MultiUpdateCoordinatorInstance::_sessionIsCheckedOut() const {
 }
 
 bool MultiUpdateCoordinatorInstance::_shouldReleaseSession() const {
-    if (_getCurrentPhase() >= Phase::kDone) {
-        return true;
+    if (!_sessionIsCheckedOut()) {
+        return false;
     }
-    return _sessionIsCheckedOut() && !_sessionIsPersisted();
+    return !_sessionIsPersisted() || _getCurrentPhase() >= Phase::kDone;
 }
 
 bool MultiUpdateCoordinatorInstance::_shouldUnblockMigrations() const {
@@ -354,18 +416,26 @@ bool MultiUpdateCoordinatorInstance::_updatesPossiblyRunningFromPreviousTerm() c
     return _beganInPhase == Phase::kPerformUpdate;
 }
 
+bool MultiUpdateCoordinatorInstance::_currentlySteppingDown() const {
+    return _cancelState->isSteppingDown() || (**_taskExecutor)->isShuttingDown();
+}
+
 void MultiUpdateCoordinatorInstance::_initializeRun(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) {
     _taskExecutor = executor;
     _cancelState.emplace(stepdownToken);
+    if (_getAbortReason()) {
+        _cancelState->abort();
+    }
     _retry.emplace(
         _service->getServiceName(), _taskExecutor, _cancelState.get_ptr(), getMetadata().toBSON());
 }
 
 ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
     MultiUpdateCoordinatorPhaseEnum newPhase) {
-    return _retry->untilAbortOrMajorityCommit(
+    return _retry->untilMajorityCommitOr(
+        getPhaseTransitionStopEvent(newPhase),
         fmt::format("_transitionToPhase({})", MultiUpdateCoordinatorPhase_serializer(newPhase)),
         [this, newPhase](const auto& factory) {
             auto oldPhase = _getCurrentPhase();
@@ -375,8 +445,10 @@ ExecutorFuture<void> MultiUpdateCoordinatorInstance::_transitionToPhase(
             auto opCtx = factory.makeOperationContext(&cc());
             auto newDocument = _buildCurrentStateDocument();
             newDocument.getMutableFields().setPhase(newPhase);
-            if (newPhase == Phase::kCleanup) {
+            if (newPhase == Phase::kSuccess) {
                 newDocument.getMutableFields().setResult(_cmdResponse);
+            } else if (newPhase == Phase::kFailure) {
+                newDocument.getMutableFields().setAbortReason(_abortReason);
             }
             pauseDuringPhaseTransitions.evaluate(PhaseTransitionProgressEnum::kBefore, newPhase);
             _updateOnDiskState(opCtx.get(), newDocument);

@@ -94,6 +94,31 @@ public:
             operationName, std::forward<Function>(function), _retryUntilAbort);
     }
 
+    enum Event { kAbort, kStepdown };
+
+    template <typename Function>
+    auto untilSuccessOr(Event event, const std::string& operationName, Function&& function) {
+        switch (event) {
+            case Event::kAbort:
+                return untilAbortOrSuccess(operationName, std::forward<Function>(function));
+            case Event::kStepdown:
+                return untilStepdownOrSuccess(operationName, std::forward<Function>(function));
+        }
+        MONGO_UNREACHABLE;
+    }
+
+    template <typename Function>
+    auto untilMajorityCommitOr(Event event, const std::string& operationName, Function&& function) {
+        switch (event) {
+            case Event::kAbort:
+                return untilAbortOrMajorityCommit(operationName, std::forward<Function>(function));
+            case Event::kStepdown:
+                return untilStepdownOrMajorityCommit(operationName,
+                                                     std::forward<Function>(function));
+        }
+        MONGO_UNREACHABLE;
+    }
+
 private:
     template <typename Function>
     auto untilMajorityCommit(const std::string& operationName,

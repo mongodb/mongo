@@ -32,12 +32,12 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/s/forwardable_operation_metadata.h"
-        - "mongo/db/s/sharding_ddl_util.h"
 
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/s/database_version.idl"
+    - "mongo/s/error_status.idl"
 
 enums:
     DDLCoordinatorType:
@@ -71,15 +71,6 @@ types:
         serializer: "mongo::ForwardableOperationMetadata::toBSON"
         deserializer: "mongo::ForwardableOperationMetadata"
         # ForwardableOperationMetadata has only non view members.
-        is_view: false
-
-    ErrorStatus:
-        bson_serialization_type: any
-        description: "Status representing an error state"
-        cpp_type: "::mongo::Status"
-        serializer: "::mongo::sharding_ddl_util_serializeErrorStatusToBSON"
-        deserializer: "::mongo::sharding_ddl_util_deserializeErrorStatusFromBSON"
-        # Status is a non view type.
         is_view: false
 
 structs:

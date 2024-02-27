@@ -2,7 +2,7 @@
  * Basic tests for _shardsvrCoordinateMultiUpdate.
  * @tags: [
  *  featureFlagPauseMigrationsDuringMultiUpdatesAvailable,
- *  requires_fcv_72
+ *  requires_fcv_80
  * ]
  */
 
