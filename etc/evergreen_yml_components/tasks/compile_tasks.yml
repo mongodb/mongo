@@ -2109,7 +2109,7 @@ tasks:
 
 - name: crypt_push
   run_on: rhel8.7-small
-  tags: ["assigned_to_jira_team_server_security", "release_critical", "publish_crypt"]
+  tags: ["assigned_to_jira_team_server_security", "publish_crypt"]
   patchable: false
   stepback: false
   depends_on:
@@ -2696,7 +2696,7 @@ task_groups:
   - "stitch_support_run_tests"
 
 - name: crypt_build
-  tags: ["release_critical", "crypt"]
+  tags: ["release_critical", "incompatible_community", "crypt"]
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"

@@ -197,7 +197,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_read_concern_majority_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "read_write_concern", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggregation", "read_write_concern", "no_debug_mode"]
   depends_on:
   - name: aggregation
   commands:
@@ -226,7 +226,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_sharded_collections_passthrough
-  tags: ["assigned_to_jira_team_server_query_execution", "default", "aggregation", "common", "sharded"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggregation", "common", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -236,7 +236,7 @@ tasks:
 ## Standalone fuzzer for checking timeseries optimizations correctness ##
 - <<: *jstestfuzz_template
   name: aggregation_timeseries_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggfuzzer", "common", "timeseries", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -259,7 +259,7 @@ tasks:
 - <<: *jstestfuzz_template
   name: aggregation_wildcard_fuzzer_gen
   # TODO SERVER-85881: Re-enable wildcard fuzzers on debug builds by removing "no_debug_mode" tag.
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "aggfuzzer", "common", "wildcard", "require_npm", "random_name", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -456,7 +456,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "concurrency", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "requires_large_host", "concurrency", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -492,7 +492,7 @@ tasks:
 
 - <<: *task_template
   name: jsCore
-  tags: ["assigned_to_jira_team_server_query_execution", "development_critical", "jscore", "common"]
+  tags: ["assigned_to_jira_team_server_query_execution", "development_critical", "requires_large_host", "jscore", "common"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -502,7 +502,7 @@ tasks:
 ## jstestfuzz ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "jstestfuzz", "common", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "jstestfuzz", "common", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -523,7 +523,7 @@ tasks:
 ## jstestfuzz standalone fuzzer for checking find equivalence with and without plan cache ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_plan_cache_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "query_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -538,7 +538,7 @@ tasks:
 ## jstestfuzz sharded fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_sharded_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "query_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -553,7 +553,7 @@ tasks:
 ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_standalone_gen
-  tags: ["assigned_to_jira_team_server_query_execution", "non_deterministic", "query_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_execution", "default", "query_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -567,7 +567,7 @@ tasks:
 
 - <<: *task_template
   name: search
-  tags: ["assigned_to_jira_team_server_query_execution", "default"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -576,7 +576,7 @@ tasks:
 
 - <<: *task_template
   name: search_auth
-  tags: ["assigned_to_jira_team_server_query_execution", "default"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -585,7 +585,7 @@ tasks:
 
 - <<: *task_template
   name: search_ssl
-  tags: ["assigned_to_jira_team_server_query_execution", "default"]
+  tags: ["assigned_to_jira_team_server_query_execution", "release_critical", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -689,7 +689,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_disabled_optimization
-  tags: ["assigned_to_jira_team_server_query_optimization", "default", "aggregation", "common"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "aggregation", "common"]
   depends_on:
   - name: aggregation
   commands:
@@ -699,7 +699,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
 - <<: *jstestfuzz_template
   name: aggregation_expression_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "aggfuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -714,7 +714,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized aggregation pipelines
 - <<: *jstestfuzz_template
   name: aggregation_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "aggfuzzer", "require_npm", "random_name", "optimization"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "release_critical", "aggfuzzer", "require_npm", "random_name", "optimization"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -794,7 +794,7 @@ tasks:
 ## Standalone generational fuzzer for checking optimized and unoptimized change stream pipelines ##
 - <<: *jstestfuzz_template
   name: change_stream_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "change_stream_fuzzer", "require_npm", "random_name"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -808,7 +808,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: change_stream_serverless_no_optimization_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "change_stream_fuzzer", "require_npm", "random_name"]
   commands:
     - func: "generate resmoke tasks"
       vars:
@@ -822,7 +822,7 @@ tasks:
 
 - <<: *jstestfuzz_template
   name: change_stream_serverless_fuzzer_gen
-  tags: ["assigned_to_jira_team_server_query_optimization", "non_deterministic", "change_stream_fuzzer", "require_npm", "random_name"]
+  tags: ["assigned_to_jira_team_server_query_optimization", "default", "change_stream_fuzzer", "require_npm", "random_name"]
   commands:
     - func: "generate resmoke tasks"
       vars:
@@ -1049,7 +1049,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search
-  tags: ["assigned_to_jira_team_server_query_integration", "default"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1058,7 +1058,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_auth
-  tags: ["assigned_to_jira_team_server_query_integration", "default"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -1067,7 +1067,7 @@ tasks:
 
 - <<: *task_template
   name: vector_search_ssl
-  tags: ["assigned_to_jira_team_server_query_integration", "default"]
+  tags: ["assigned_to_jira_team_server_query_integration", "release_critical", "incompatible_community"]
   commands:
   - func: "do setup"
   - func: "run tests"
