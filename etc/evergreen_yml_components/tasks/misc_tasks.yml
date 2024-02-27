@@ -135,7 +135,7 @@ variables:
 tasks:
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_multi_stmt_txn_kill_primary
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -147,7 +147,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -159,7 +159,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_concurrency_sharded_with_stepdowns_and_balancer_config_shard
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -174,7 +174,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_config_fuzzer_stress_concurrency_sharded_replication
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -189,7 +189,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_core
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -201,7 +201,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_fcv_upgrade_downgrade_sharded_collections_jscore_passthrough
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -213,7 +213,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_jstestfuzz_sharded
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -225,7 +225,7 @@ tasks:
 
 - <<: *antithesis_task_template
   name: antithesis_replica_sets_jscore_passthrough
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant", "antithesis"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default", "antithesis"]
   commands:
   - func: "do setup"
   - func: "do setup for antithesis"
@@ -270,7 +270,7 @@ tasks:
       - src/build_metrics_task_gen.json
 
 - name: check_feature_flag_tags
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   patch_only: true
   commands:
   - command: manifest.load
@@ -287,7 +287,7 @@ tasks:
       - "./src/evergreen/feature_flag_tags_check.sh"
 
 - name: check_for_todos
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -378,7 +378,7 @@ tasks:
 # Smoke test to ensure the Server still works with Jepsen
 - <<: *run_jepsen_template
   name: jepsen-config_fuzzer_smoke
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -394,7 +394,7 @@ tasks:
 # Smoke test to ensure the Server still works with Jepsen
 - <<: *run_jepsen_template
   name: jepsen-smoke
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -407,7 +407,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_list-append
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen_docker"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen_docker"]
   commands:
   - func: "do setup"
   - func: "do jepsen docker setup"
@@ -416,7 +416,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_read-concern-majority
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -430,7 +430,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_read-concern-majority_w1
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -445,7 +445,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_register_findAndModify
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -460,7 +460,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_register_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -475,7 +475,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_config_fuzzer_set_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -490,7 +490,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_list-append
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen_docker"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen_docker"]
   commands:
   - func: "do setup"
   - func: "do jepsen docker setup"
@@ -498,7 +498,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_read-concern-majority
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -510,7 +510,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_read-concern-majority_w1
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -523,7 +523,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -536,7 +536,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_register_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -549,7 +549,7 @@ tasks:
 
 - <<: *run_jepsen_template
   name: jepsen_set_linearizableRead
-  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "run_on_single_variant", "jepsen"]
+  tags: ["assigned_to_jira_team_server_repl", "non_deterministic", "jepsen"]
   commands:
   - func: "do setup"
   - func: "do jepsen setup"
@@ -561,7 +561,7 @@ tasks:
       jepsen_test_name: set
 
 - name: lint_clang_format
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -581,7 +581,7 @@ tasks:
       targets: lint-clang-format
 
 - name: lint_cpplint
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -601,7 +601,7 @@ tasks:
       targets: lint-lint.py
 
 - name: lint_errorcodes
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -616,7 +616,7 @@ tasks:
       targets: lint-errorcodes
 
 - name: lint_eslint
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -650,7 +650,7 @@ tasks:
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
 - name: lint_fuzzer_sanity_patch
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   patch_only: true
   commands:
   - command: manifest.load
@@ -663,7 +663,7 @@ tasks:
   - func: "lint fuzzer sanity patch"
 
 - name: lint_large_files_check
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant"]
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -686,7 +686,7 @@ tasks:
 
 # Confirm that the poetry.lock file is up to date with pyproject.toml
 - name: lint_poetry_lock
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -704,7 +704,7 @@ tasks:
       - "evergreen/functions/poetry_lock_check.py"
 
 - name: lint_bazel
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -737,7 +737,7 @@ tasks:
       - "lint-all"
 
 - name: lint_pylinters
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -757,7 +757,7 @@ tasks:
       targets: lint-pylinters
 
 - name: lint_sconslinters
-  tags: ["assigned_to_jira_team_devprod_build", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:
   - command: timeout.update
     params:
@@ -777,7 +777,7 @@ tasks:
       targets: lint-sconslinters
 
 - name: lint_shellscripts
-  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant", "lint"]
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -794,7 +794,7 @@ tasks:
       - "src/evergreen/lint_shellscripts.sh"
 
 - name: lint_yaml
-  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant", "lint"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant", "lint"]
   depends_on: []
   commands:
   - command: manifest.load
@@ -824,7 +824,7 @@ tasks:
   - func: "monitor mongo fork 10gen"
 
 - name: powercycle
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -850,7 +850,7 @@ tasks:
       num_tasks: 1
 
 - name: powercycle_kill_mongod
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -864,7 +864,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_last_lts_fcv
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -878,7 +878,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -892,7 +892,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication_smalloplog
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -945,7 +945,7 @@ tasks:
       run_powercycle_args: --sshAccessRetryCount=1800
 
 - name: powercycle_syncdelay
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -959,7 +959,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_write_concern_majority
-  tags: ["assigned_to_jira_team_server_storage_engines", "default", "run_on_single_variant", "powercycle"]
+  tags: ["assigned_to_jira_team_server_storage_engines", "default", "powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -1095,7 +1095,7 @@ tasks:
   - func: "sync repo with copybara"
 
 - name: test_api_version_compatibility
-  tags: ["assigned_to_jira_team_server_repl", "development_and_release_critical", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_server_repl", "development_critical_single_variant"]
   depends_on:
   - name: archive_dist_test
   commands:
@@ -1149,7 +1149,7 @@ tasks:
       docker_password: ${dockerhub_password}
 
 - name: validate_commit_message
-  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant"]
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
   - command: manifest.load
@@ -1217,7 +1217,7 @@ tasks:
   - func: "generate version"
 
 - name: version_gen_validation
-  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant"]
   commands:
   - command: manifest.load
   - func: "git get project"
@@ -1242,12 +1242,12 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: libdeps_graph_linting_TG
-  tags: ["default", "run_on_single_variant"]
+  tags: ["default"]
   tasks:
   - libdeps_graph_linting
 
 - <<: *compile_task_group_template
   name: iwyu_self_test_TG
-  tags: ["default", "run_on_single_variant"]
+  tags: ["default"]
   tasks:
   - iwyu_self_test

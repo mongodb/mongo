@@ -90,7 +90,7 @@ tasks:
 ## pretty_printer ##
 - <<: *task_template
   name: run_pretty_printer_tests
-  tags: ["assigned_to_jira_team_devprod_build", "default", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_build", "default"]
   commands:
   - func: "git get project and add git tag"
   - func: "f_expansions_write"
@@ -127,7 +127,7 @@ tasks:
       exec_timeout_secs: 1800 # 30 min timeout.
 
 - name: buildscripts_test
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   depends_on: []
   commands:
   - func: "f_expansions_write"
@@ -156,7 +156,7 @@ tasks:
 
 - <<: *gen_burn_in_task_template
   name: burn_in_tests_gen
-  tags: ["assigned_to_jira_team_devprod_correctness", "default", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "default"]
   patch_only: true
   commands:
   - func: "generate resmoke tasks"
@@ -196,7 +196,7 @@ tasks:
 
 - <<: *task_template
   name: resmoke_validation_tests
-  tags: ["assigned_to_jira_team_devprod_correctness", "development_and_release_critical", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_devprod_correctness", "development_critical_single_variant"]
   depends_on:
   - name: archive_dist_test
   commands:
@@ -217,7 +217,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_streams
-  tags: ["assigned_to_jira_team_streams", "default", "run_on_single_variant", "benchmarks"]
+  tags: ["assigned_to_jira_team_streams", "default", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"

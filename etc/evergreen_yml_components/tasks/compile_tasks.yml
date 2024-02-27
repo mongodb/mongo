@@ -2621,7 +2621,7 @@ task_groups:
   - ninja_dev_compile_smoke_test
 
 - name: clang_tidy_TG
-  tags: ["development_and_release_critical", "run_on_single_variant"]
+  tags: ["development_critical_single_variant"]
   setup_group_can_fail_task: true
   setup_group:
   - command: manifest.load
@@ -2655,7 +2655,7 @@ task_groups:
   - clang_tidy
 
 - name: visibility_test_TG
-  tags: ["default", "run_on_single_variant"]
+  tags: ["default"]
   setup_group_can_fail_task: true
   max_hosts: 1
   setup_group:
@@ -2726,7 +2726,7 @@ task_groups:
   - "crypt_create_lib"
 
 - name: crypt_build_debug_and_test
-  tags: ["default", "run_on_single_variant"]
+  tags: ["default"]
   setup_task:
   - func: "f_expansions_write"
   - func: "apply compile expansions"

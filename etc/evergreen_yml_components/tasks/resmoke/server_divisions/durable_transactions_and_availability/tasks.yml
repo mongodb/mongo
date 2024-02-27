@@ -118,7 +118,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_replication
-  tags: ["assigned_to_jira_team_server_repl", "default", "run_on_single_variant", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_repl", "default", "benchmarks"]
   commands:
     - func: "do benchmark setup"
     - func: "run tests"
@@ -1017,7 +1017,7 @@ tasks:
       use_large_distro: "true"
 
 - name: tla_plus
-  tags: ["assigned_to_jira_team_server_repl", "default", "run_on_single_variant"]
+  tags: ["assigned_to_jira_team_server_repl", "default"]
   commands:
   - func: "f_expansions_write"
   - func: "do non-compile setup"

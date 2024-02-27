@@ -197,7 +197,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_namespace
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "run_on_single_variant", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -208,7 +208,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_orphaned_first_half
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "run_on_single_variant", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -222,7 +222,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_orphaned_second_half
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "run_on_single_variant", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -236,7 +236,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_sep
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "run_on_single_variant", "benchmarks_sep"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "benchmarks_sep"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -641,7 +641,7 @@ tasks:
 # This is a separate task because it is only supported on Ubuntu 16.04+ which are not inmemory builders
 - <<: *task_template
   name: watchdog_inmemory
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "run_on_single_variant", "watchdog"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "watchdog"]
   commands:
   - func: "do setup"
   - func: "do watchdog setup"
@@ -653,7 +653,7 @@ tasks:
 
 - <<: *task_template
   name: watchdog_wiredtiger
-  tags: ["assigned_to_jira_team_server_servicearch", "default", "run_on_single_variant", "watchdog"]
+  tags: ["assigned_to_jira_team_server_servicearch", "default", "watchdog"]
   commands:
   - func: "do setup"
   - func: "do watchdog setup"
@@ -1008,7 +1008,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_sharding
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "run_on_single_variant", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
@@ -1020,7 +1020,7 @@ tasks:
 
 - <<: *benchmark_template
   name: benchmarks_bsoncolumn
-  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "run_on_single_variant", "benchmarks"]
+  tags: ["assigned_to_jira_team_server_cluster_scalability", "default", "benchmarks"]
   commands:
   - func: "do benchmark setup"
   - func: "run tests"
