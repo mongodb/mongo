@@ -142,7 +142,6 @@ SemiFuture<void> MultiUpdateCoordinatorInstance::run(
                     // untilStepdownOrMajorityCommit() will only stop retrying on a stepdown, which
                     // means we will directly run the instance cleanup executor chain with a non-ok
                     // status.
-                    invariant(cleanupStatus.isOK());
                     return operationStatus;
                 });
         })
