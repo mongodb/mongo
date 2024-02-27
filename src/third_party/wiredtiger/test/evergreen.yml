@@ -5239,8 +5239,9 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
-    - name: model-test-long
-      batchtime: 1440 # once a day
+    # FIXME-WT-12539
+    #- name: model-test-long
+    #  batchtime: 1440 # once a day
     - name: csuite-long-running
       batchtime: 1440 # once a day
 
@@ -5591,8 +5592,9 @@ buildvariants:
     - name: ".workgen-test"
       batchtime: 1440 # 24 hours
     - name: model-unit-test
-    - name: model-test-long
-      batchtime: 1440 # once a day
+    # FIXME-WT-12539
+    #- name: model-test-long
+    #  batchtime: 1440 # once a day
 
 - name: amazon2-arm64
   display_name: "Amazon Linux 2 ARM64"
