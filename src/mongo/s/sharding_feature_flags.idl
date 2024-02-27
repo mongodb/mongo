@@ -54,7 +54,7 @@ feature_flags:
     description: "Feature flag to enable shard to double as router"
     cpp_varname: feature_flags::gEmbeddedRouter
     default: false
-    shouldBeFCVGated: true
+    shouldBeFCVGated: false
   # TODO SERVER-79064: Remove once 8.0 becomes last LTS.
   featureFlagAuthoritativeRefineCollectionShardKey:
     description: "Feature flag for enabling the authoritative version of the refine collection shard key."
