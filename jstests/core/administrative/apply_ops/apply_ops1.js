@@ -520,3 +520,12 @@ assert.commandWorked(db.adminCommand({
                      "Nested apply ops was NOT successful");
 assert.eq(t.findOne({_id: 13}), {_id: 13, x: 'nested apply op update1'});
 assert.eq(t.findOne({_id: 14}), {_id: 14, x: 'nested apply op update2'});
+
+// Operations without collection UUIDs should not crash (SERVER-82349)
+
+assert.commandWorked(t.createIndex({a: 1}));
+assert.commandWorked(t.runCommand(
+    {applyOps: [{op: 'c', ns: t.getFullName(), o: {deleteIndexes: 'testColl', index: 'a_1'}}]}));
+assert.commandWorked(t.createIndex({a: 1}));
+assert.commandWorked(t.runCommand(
+    {applyOps: [{op: 'c', ns: t.getFullName(), o: {dropIndexes: 'testColl', index: 'a_1'}}]}));
