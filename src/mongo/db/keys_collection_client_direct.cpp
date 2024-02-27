@@ -196,7 +196,7 @@ Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
                         2,
                         "Batch write command to {nss_db}failed with retriable error and will be "
                         "retried{causedBy_writeStatus}",
-                        "nss_db"_attr = NamespaceString::kKeysCollectionNamespace.db(omitTenant),
+                        "nss_db"_attr = NamespaceString::kKeysCollectionNamespace.db(),
                         "causedBy_writeStatus"_attr = causedBy(redact(writeStatus)));
             continue;
         }

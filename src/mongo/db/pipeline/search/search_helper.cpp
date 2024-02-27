@@ -325,7 +325,7 @@ InternalSearchMongotRemoteSpec planShardedSearch(
     // * Create the merging pipeline.
     // * Get a sortSpec.
     const auto cmdObj = [&]() {
-        PlanShardedSearchSpec cmd(std::string(expCtx->ns.coll()) /* planShardedSearch */,
+        PlanShardedSearchSpec cmd(expCtx->ns.coll().rawData() /* planShardedSearch */,
                                   searchRequest /* query */);
 
         if (expCtx->explain) {

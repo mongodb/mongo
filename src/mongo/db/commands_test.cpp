@@ -212,10 +212,10 @@ TEST_F(ParseNsOrUUID, ParseValidColl) {
 TEST_F(ParseNsOrUUID, ParseValidCollLocalOpLogDollarMain) {
     auto cmd = BSON("query"
                     << "oplog.$main");
-    auto parsedNss = CommandHelpers::parseNsOrUUID(
-        DatabaseName::createDatabaseName_forTest(
-            boost::none, NamespaceString::kLocalOplogDollarMain.db(omitTenant)),
-        cmd);
+    auto parsedNss =
+        CommandHelpers::parseNsOrUUID(DatabaseName::createDatabaseName_forTest(
+                                          boost::none, NamespaceString::kLocalOplogDollarMain.db()),
+                                      cmd);
     ASSERT_EQ(parsedNss.nss(), NamespaceString::kLocalOplogDollarMain);
 }
 

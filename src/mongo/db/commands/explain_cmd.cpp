@@ -184,6 +184,7 @@ private:
 
     const OpMsgRequest* _outerRequest;
     const DatabaseName _dbName;
+    const NamespaceString _ns;
     ExplainOptions::Verbosity _verbosity;
     std::unique_ptr<OpMsgRequest> _innerRequest;  // Lifespan must enclose that of _innerInvocation.
     std::unique_ptr<CommandInvocation> _innerInvocation;

@@ -1676,7 +1676,7 @@ TEST_F(RollbackImplTest, RollbackRestoresTxnTableEntryToBeConsistentWithStableTi
     auto insertObj2 = BSON("_id" << 2);
     const auto txnNumOne = 1LL;
     // Create retryable write oplog entry before 'stableTimestamp'.
-    auto opBeforeStableTs = makeInsertOplogEntry(1, insertObj1, redactTenant(nss), collUuid);
+    auto opBeforeStableTs = makeInsertOplogEntry(1, insertObj1, nss.ns(), collUuid);
     const auto prevOpTime = OpTime(opBeforeStableTs["ts"].timestamp(), 1);
     BSONObjBuilder opBeforeStableTsBuilder(opBeforeStableTs);
     opBeforeStableTsBuilder.append("lsid", lsid.toBSON());
@@ -1703,7 +1703,7 @@ TEST_F(RollbackImplTest, RollbackRestoresTxnTableEntryToBeConsistentWithStableTi
     auto txnEntryBeforeStableTs = makeTransactionOplogEntry(txnOpTime, lsid3, 3, OpTime());
 
     // Create retryable write oplog entry after 'stableTimestamp'.
-    auto firstOpAfterStableTs = makeInsertOplogEntry(5, insertObj2, redactTenant(nss), collUuid);
+    auto firstOpAfterStableTs = makeInsertOplogEntry(5, insertObj2, nss.ns(), collUuid);
     BSONObjBuilder opAfterStableTsBuilder(firstOpAfterStableTs);
     opAfterStableTsBuilder.append("lsid", lsid.toBSON());
     opAfterStableTsBuilder.append("txnNumber", txnNumOne);
@@ -1792,7 +1792,7 @@ TEST_F(
 
     // Create oplog entry after 'stableTimestamp'.
     auto insertObj = BSON("_id" << 1);
-    auto firstOpAfterStableTs = makeInsertOplogEntry(3, insertObj, redactTenant(nss), collUuid);
+    auto firstOpAfterStableTs = makeInsertOplogEntry(3, insertObj, nss.ns(), collUuid);
     BSONObjBuilder builder(firstOpAfterStableTs);
     builder.append("lsid", lsid.toBSON());
     builder.append("txnNumber", 2LL);
@@ -1868,7 +1868,7 @@ TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEnt
     auto insertObj2 = BSON("_id" << 2);
     const auto txnNumOne = 1LL;
     // Create oplog entry before 'stableTimestamp'.
-    auto opBeforeStableTs = makeInsertOplogEntry(1, insertObj1, redactTenant(nss), collUuid);
+    auto opBeforeStableTs = makeInsertOplogEntry(1, insertObj1, nss.ns(), collUuid);
     BSONObjBuilder opBeforeStableTsBuilder(opBeforeStableTs);
     opBeforeStableTsBuilder.append("lsid", lsid.toBSON());
     opBeforeStableTsBuilder.append("txnNumber", txnNumOne);
@@ -1899,7 +1899,7 @@ TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEnt
                                                    false /* isRetryableWrite */);
 
     // Create regular non-retryable write oplog entry after 'stableTimestamp'.
-    auto insertEntry = makeInsertOplogEntry(7, BSON("_id" << 3), redactTenant(nss), collUuid);
+    auto insertEntry = makeInsertOplogEntry(7, BSON("_id" << 3), nss.ns(), collUuid);
 
     // Create migrated no-op transactions entry after 'stableTimestamp'.
     auto txnEntryAfterStableTs = makeMigratedNoop({{8, 8}, 8},
@@ -2449,7 +2449,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackDoesntRecordShardIdentityRollbackFo
     auto deleteOp = makeCRUDOp(OpTypeEnum::kDelete,
                                Timestamp(2, 2),
                                uuid,
-                               redactTenant(nss),
+                               nss.ns(),
                                BSON("_id"
                                     << "not_the_shard_id_document"),
                                boost::none,
