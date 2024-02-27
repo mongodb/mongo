@@ -78,7 +78,18 @@ function validateCollectionsImpl(db, obj) {
         filter = {$and: [filter, ...skippedCollections]};
     }
 
-    let collInfo = db.getCollectionInfos(filter);
+    // In a sharded cluster with in-progress validate command for the config database
+    // (i.e. on the config server), a listCommand command on a mongos or shardsvr mongod that
+    // has stale routing info may fail since a refresh would involve running read commands
+    // against the config database. The read commands are lock free so they are not blocked by
+    // the validate command and instead are subject to failing with a ObjectIsBusy error. Since
+    // this is a transient state, we shoud retry.
+    let collInfo;
+    assert.soonNoExcept(() => {
+        collInfo = db.getCollectionInfos(filter);
+        return true;
+    });
+
     for (let collDocument of collInfo) {
         const coll = db.getCollection(collDocument['name']);
         const res = coll.validate(obj);
