@@ -55,13 +55,6 @@ const testOptions = function(options) {
         });
     }
 
-    // `dataShard` will be added on unsplittable collections passthrough suites through overriding
-    // createCollection.
-    // TODO (SERVER-83349) dataShard deletion will no longer be necessary after SERVER-83349
-    if (options.hasOwnProperty('dataShard')) {
-        delete options.dataShard;
-    }
-
     const collections =
         assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
     jsTestLog('Checking listCollections result: ' + tojson(collections));
