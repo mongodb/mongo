@@ -17,6 +17,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
@@ -44,6 +45,15 @@ donorRst.initiate();
 if (isShardMergeEnabled(donorRst.getPrimary().getDB("admin"))) {
     donorRst.stopSet();
     jsTestLog("Skipping this shard merge incompatible test.");
+    quit();
+}
+
+// TODO(SERVER-86809): Re-enable this test.
+if (FeatureFlagUtil.isPresentAndEnabled(donorRst.getPrimary(),
+                                        "ReplicateVectoredInsertsTransactionally")) {
+    donorRst.stopSet();
+    jsTestLog(
+        "Retryable write migration test temporarily disabled with feature ReplicateVectoredInsertsTransactionally.");
     quit();
 }
 

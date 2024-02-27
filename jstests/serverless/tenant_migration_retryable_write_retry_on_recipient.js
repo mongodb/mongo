@@ -13,6 +13,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
@@ -210,10 +211,13 @@ modifyDataForErrorDetection(duringWrites);
 
 function testRecipientRetryableWrites(db, writes) {
     const kCollName = writes.collName;
-    jsTestLog("Testing retryable inserts");
-    assert.commandWorked(db.runCommand(writes.retryableInsertCommand));
-    // If retryable inserts don't work, we will see 6 here.
-    assert.eq(3, db[kCollName].find({tag: writes.sessionTag1}).itcount());
+    // TODO(SERVER-86809): Re-enable this test.
+    if (!FeatureFlagUtil.isPresentAndEnabled(db, "ReplicateVectoredInsertsTransactionally")) {
+        jsTestLog("Testing retryable inserts");
+        assert.commandWorked(db.runCommand(writes.retryableInsertCommand));
+        // If retryable inserts don't work, we will see 6 here.
+        assert.eq(3, db[kCollName].find({tag: writes.sessionTag1}).itcount());
+    }
 
     jsTestLog("Testing retryable update");
     assert.commandWorked(db.runCommand(writes.retryableUpdateCommand));
