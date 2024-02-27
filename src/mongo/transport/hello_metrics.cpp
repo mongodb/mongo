@@ -42,7 +42,6 @@
 namespace mongo {
 namespace {
 // TODO SERVER-84117: Tighten up Session object lifecycle
-// TransportlessHelloMetrics are used during unit tests and should not be expected at other times.
 const auto transportlessHelloMetrics = ServiceContext::declareDecoration<HelloMetrics>();
 const auto inExhaustHelloDecoration = transport::Session::declareDecoration<InExhaustHello>();
 
@@ -64,17 +63,24 @@ HelloMetrics* getHelloMetrics(const InExhaustHello* decoration) {
 }  // namespace
 
 HelloMetrics* HelloMetrics::get(OperationContext* opCtx) {
-    if (auto transportHelloMetrics = getHelloMetrics(opCtx->getClient()->session().get())) {
-        return transportHelloMetrics;
+    if (auto session = opCtx->getClient()->session()) {
+        if (auto transportHelloMetrics = getHelloMetrics(session.get())) {
+            return transportHelloMetrics;
+        }
+
+        // UnitTests are allowed to perform operations which read/write HelloMetrics
+        // even if no TransportLayer/SessionManager is setup.
+        // Conversely, a normal server process with a Session
+        // MUST have a SessionManager to record stats on.
+        massert(8076990,
+                "Accessing HelloMetrics on operation not attached to a transport",
+                TestingProctor::instance().isEnabled());
+
+        // Fallthrough...
     }
 
-    // UnitTests are allowed to perform operations which read/write HelloMetrics
-    // even if no TransportLayer is setup, or the session is not bound to a SessionManager.
-    // Conversely, a normal server process MUST have a SessionManager to record stats on.
-    massert(8076990,
-            "Accessing HelloMetrics on operation not attached to a transport",
-            TestingProctor::instance().isEnabled());
-
+    // Internal worker threads may spawn a Client without a Session to perform background tasks.
+    // We can ignore the usage of HelloMetrics on these threads.
     LOGV2_DEBUG(8076991, 3, "Using global HelloMetrics");
     return &transportlessHelloMetrics(opCtx->getServiceContext());
 }
