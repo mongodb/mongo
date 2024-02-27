@@ -77,7 +77,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
-#include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/remove_chunks_gen.h"
@@ -1933,8 +1932,6 @@ void CreateCollectionCoordinator::_translateRequestParameters() {
     getForwardableOpMetadata().setOn(opCtx);
 
     _doc.setTranslatedRequestParams(translateRequestParameters(opCtx, _request, originalNss()));
-    _doc.setNewEmptyCollectionCreated(sharding_ddl_util::getCollectionUUID(opCtx, nss()) ? false
-                                                                                         : true);
 }
 
 void CreateCollectionCoordinator::_createCollectionOnCoordinator() {
@@ -2210,38 +2207,26 @@ ExecutorFuture<void> CreateCollectionCoordinator::_cleanupOnAbort(
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                 opCtx, getNewSession(opCtx), **executor);
 
-            // TODO SERVER-86994: Remove kExitCriticalSection once all the create collections are
-            // serialized.
-            if (_doc.getPhase() != Phase::kExitCriticalSection) {
-                if (_doc.getPhase() >= Phase::kCommitOnShardingCatalog) {
-                    if (_uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss()); _uuid) {
-                        // Notify change streams to abort the shard collection.
-                        generateCommitEventForChangeStreams(opCtx,
-                                                            nss(),
-                                                            *_uuid,
-                                                            _request,
-                                                            *_doc.getTranslatedRequestParams(),
-                                                            CommitPhase::kAborted);
-                    }
-                }
+            if (_doc.getPhase() >= Phase::kCommitOnShardingCatalog) {
+                _uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
 
-                if (_doc.getPhase() >= Phase::kCreateCollectionOnParticipants && _uuid) {
-                    broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx), _uuid);
-                }
-
-                if (_doc.getPhase() >= Phase::kCreateCollectionOnCoordinator &&
-                    _doc.getNewEmptyCollectionCreated()) {
-                    DropCollectionCoordinator::dropCollectionLocally(
-                        opCtx, nss(), true /* fromMigrate */, false /* dropSystemCollections */);
-                }
-
-                // TODO SERVER-86994: Remove phase transition to kExitCriticalSection once all
-                // the create collections are serialized. Checkpoint to not drop the collection at
-                // retry after releasing critical sections.
-                _enterPhase(Phase::kExitCriticalSection);
+                // Notify change streams to abort the shard collection.
+                generateCommitEventForChangeStreams(opCtx,
+                                                    nss(),
+                                                    *_uuid,
+                                                    _request,
+                                                    *_doc.getTranslatedRequestParams(),
+                                                    CommitPhase::kAborted);
             }
 
-            if (_doc.getPhase() >= Phase::kEnterCriticalSection && _doc.getShardIds()) {
+            if (_doc.getPhase() >= Phase::kCreateCollectionOnParticipants) {
+                // TODO SERVER-83774: Remove the following invariant and skip the broadcast if the
+                // _uuid does not exist.
+                invariant(_uuid);
+                broadcastDropCollection(opCtx, nss(), **executor, getNewSession(opCtx), _uuid);
+            }
+
+            if (_doc.getPhase() >= Phase::kEnterCriticalSection) {
                 _exitCriticalSectionsOnParticipants(
                     opCtx, true /* throwIfReasonDiffers */, executor, token);
             }
