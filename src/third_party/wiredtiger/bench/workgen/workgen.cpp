@@ -1512,6 +1512,14 @@ pareto_calculation(uint32_t randint, uint64_t recno_max, ParetoOptions &pareto)
     return testutil_pareto((uint64_t)r, recno_max, pareto.param);
 }
 
+bool
+ThreadRunner::op_has_mirror(tint_t tint) const
+{
+    const std::shared_lock lock(*_icontext->_dyn_mutex);
+    return _icontext->_dyn_table_runtime.count(tint) > 0 &&
+      _icontext->_dyn_table_runtime.at(tint).has_mirror();
+}
+
 uint64_t
 ThreadRunner::op_get_key_recno(Operation *op, uint64_t range, tint_t tint)
 {
@@ -1855,6 +1863,9 @@ ThreadRunner::op_run(Operation *op)
             _in_transaction = true;
         }
         if (op->is_table_op()) {
+            bool has_mirror = op_has_mirror(tint);
+            // Ensure explicit transactions are used for mirrored operations.
+            ASSERT(!has_mirror || _in_transaction);
             switch (op->_optype) {
             case Operation::OP_INSERT:
                 ret = cursor->insert(cursor);
@@ -1888,13 +1899,10 @@ ThreadRunner::op_run(Operation *op)
                 cursor->reset(cursor);
             else {
                 /*
-                 * We don't retry on a WT_ROLLBACK error when:
-                 * - it is a mirrored operation as Workgen will create a new transaction and
-                 * - the mirror table is the one that faced the WT_ROLLBACK error as the operation
-                 * on the base table will be lost.
+                 * We don't retry on a WT_ROLLBACK error when it is a mirrored operation as Workgen
+                 * will create a new transaction.
                  */
-                if (op->_random_table && _icontext->_dyn_table_runtime[tint].has_mirror() &&
-                  !_icontext->_dyn_table_runtime[tint]._is_base) {
+                if (op->_random_table && has_mirror) {
                     VERBOSE(*this,
                       "The table "
                         << table_uri
@@ -1902,8 +1910,10 @@ ThreadRunner::op_run(Operation *op)
                 } else
                     retry_op = true;
                 track->rollbacks++;
-                _in_transaction = false;
-                WT_ERR(_session->rollback_transaction(_session, nullptr));
+                if (_in_transaction) {
+                    _in_transaction = false;
+                    WT_ERR(_session->rollback_transaction(_session, nullptr));
+                }
             }
         } else {
             // Never retry on an internal op.
@@ -1932,10 +1942,21 @@ ThreadRunner::op_run(Operation *op)
 
         do {
             // Wait for transactions to complete before stopping.
+            bool has_mirror;
             for (int count = 0; (!_stop || _in_transaction) && count < op->_repeatgroup; count++) {
                 for (std::vector<Operation>::iterator i = op->_group->begin();
                      i != op->_group->end(); i++) {
-                    WT_ERR(op_run_setup(&*i));
+                    auto [table_uri, tint] = op_get_table(&*i);
+                    has_mirror = op_has_mirror(tint);
+                    /*
+                     * If a mirrored operation has started and there is no active transaction, it
+                     * means it has been interrupted, quit.
+                     */
+                    if ((*i)._random_table && has_mirror && (i != op->_group->begin()) &&
+                      !_in_transaction)
+                        goto err;
+                    else
+                        WT_ERR(op_run_setup(&*i));
                 }
             }
             workgen_clock(&now);
