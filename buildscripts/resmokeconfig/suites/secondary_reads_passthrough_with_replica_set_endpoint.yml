@@ -59,8 +59,6 @@ selector:
     # TODO (SERVER-79353): Support role-aware serverStatus on mongod with router role.
     - jstests/core/write/find_and_modify/find_and_modify_metrics.js
     - jstests/core/write/update/update_metrics.js
-    # TODO (SERVER-86393): Support FLE2 with replica set endpoint.
-    - jstests/core/queryable_encryption/basic_crud.js
     # TODO (SERVER-75857): Unify behavior between mongod and mongos when running explain on a
     # nonexistent database.
     - jstests/core/query/explain/explain_missing_database.js

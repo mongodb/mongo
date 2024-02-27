@@ -1,6 +1,9 @@
 /**
  * Use prototype overrides to set read preference to "secondary" when running tests.
  */
+import {
+    EncryptedClient,
+} from "jstests/fle2/libs/encrypted_client_util.js";
 import {OverrideHelpers} from "jstests/libs/override_methods/override_helpers.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 
@@ -200,19 +203,29 @@ function runCommandWithReadPreferenceSecondary(
         }
         if (TestData.connectDirectlyToRandomSubsetOfSecondaries) {
             const randomSecondary = getRandomElement(kSecondariesToConnectDirectlyTo);
-            const currentClusterTime = conn.getClusterTime();
-            conn = new Mongo("mongodb://" + randomSecondary.host + "/?directConnection=true");
+
+            const newConn =
+                new Mongo("mongodb://" + randomSecondary.host + "/?directConnection=true");
+            if (conn.isAutoEncryptionEnabled()) {
+                const clientSideFLEOptions = conn.getAutoEncryptionOptions();
+                assert(newConn.setAutoEncryption(clientSideFLEOptions));
+                newConn.toggleAutoEncryption(true);
+            }
+
             // To guarantee causal consistency, wait for the operationTime on the original
             // connection.
+            const currentClusterTime = conn.getClusterTime();
             assert.soon(() => {
-                const res = assert.commandWorked(conn.adminCommand({"ping": 1}));
+                const res = assert.commandWorked(newConn.adminCommand({"ping": 1}));
                 return timestampCmp(res.operationTime, currentClusterTime.clusterTime) >= 0;
             });
+
             if (!commandObj.hasOwnProperty("comment")) {
                 // If this command already has the "comment" field, do not overwrite it since that
                 // could cause the test to fail.
                 commandObj.comment = randomSecondary.comment;
             }
+            conn = newConn;
         }
     }
 
