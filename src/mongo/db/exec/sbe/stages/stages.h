@@ -137,6 +137,24 @@ public:
         }
     }
 
+    /**
+     * Ensures that accessor owns the underlying BSON value, which can be potentially owned by
+     * storage.
+     */
+    void prepareForYielding(value::BSONObjValueAccessor& accessor, bool isAccessible) {
+        if (isAccessible) {
+            auto [tag, value] = accessor.getViewOfValue();
+            if (shouldCopyValue(tag)) {
+                accessor.makeOwned();
+            }
+        } else {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+            auto [tag, val] = value::getPoisonValue();
+            accessor.reset(false, tag, val);
+#endif
+        }
+    }
+
     void prepareForYielding(value::MaterializedRow& row, bool isAccessible) {
         if (isAccessible) {
             for (size_t idx = 0; idx < row.size(); idx++) {

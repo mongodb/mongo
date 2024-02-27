@@ -90,12 +90,6 @@ public:
             return copyValue(tag, val);
         }
 
-        std::pair<value::TypeTags, value::Value> copyOrMoveValue() const {
-            // Always make a copy.
-            auto [owned, tag, val] = _env->_state->values[_index];
-            return copyValue(tag, val);
-        }
-
         void reset(bool owned, value::TypeTags tag, value::Value val) {
             release();
 

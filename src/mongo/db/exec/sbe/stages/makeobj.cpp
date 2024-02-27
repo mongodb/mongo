@@ -47,7 +47,7 @@
 #include "mongo/util/shared_buffer.h"
 
 namespace mongo::sbe {
-template <MakeObjOutputType O>
+template <typename O>
 MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
                                       value::SlotId objSlot,
                                       boost::optional<value::SlotId> rootSlot,
@@ -59,9 +59,7 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
                                       bool returnOldObject,
                                       PlanNodeId planNodeId,
                                       bool participateInTrialRunTracking)
-    : PlanStage(O == MakeObjOutputType::object ? "mkobj"_sd : "mkbson"_sd,
-                planNodeId,
-                participateInTrialRunTracking),
+    : PlanStage(O::stageName, planNodeId, participateInTrialRunTracking),
       _objSlot(objSlot),
       _rootSlot(rootSlot),
       _fieldBehavior(fieldBehavior),
@@ -76,7 +74,7 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
     invariant(static_cast<bool>(rootSlot) == static_cast<bool>(fieldBehavior));
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
                                       value::SlotId objSlot,
                                       boost::optional<value::SlotId> rootSlot,
@@ -99,7 +97,7 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
           returnOldObject,
           planNodeId) {}
 
-template <MakeObjOutputType O>
+template <typename O>
 std::unique_ptr<PlanStage> MakeObjStageBase<O>::clone() const {
     return std::make_unique<MakeObjStageBase<O>>(_children[0]->clone(),
                                                  _objSlot,
@@ -114,7 +112,7 @@ std::unique_ptr<PlanStage> MakeObjStageBase<O>::clone() const {
                                                  _participateInTrialRunTracking);
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 void MakeObjStageBase<O>::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
 
@@ -132,7 +130,7 @@ void MakeObjStageBase<O>::prepare(CompileCtx& ctx) {
     _compiled = true;
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 value::SlotAccessor* MakeObjStageBase<O>::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     if (_compiled && slot == _objSlot) {
         return &_obj;
@@ -141,7 +139,7 @@ value::SlotAccessor* MakeObjStageBase<O>::getAccessor(CompileCtx& ctx, value::Sl
     }
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 void MakeObjStageBase<O>::projectField(value::Object* obj, size_t idx) {
     const auto& p = _projects[idx];
 
@@ -152,7 +150,7 @@ void MakeObjStageBase<O>::projectField(value::Object* obj, size_t idx) {
     }
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 void MakeObjStageBase<O>::projectField(UniqueBSONObjBuilder* bob, size_t idx) {
     const auto& p = _projects[idx];
 
@@ -160,7 +158,7 @@ void MakeObjStageBase<O>::projectField(UniqueBSONObjBuilder* bob, size_t idx) {
     bson::appendValueToBsonObj(*bob, p.first, tag, val);
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 void MakeObjStageBase<O>::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
@@ -169,7 +167,7 @@ void MakeObjStageBase<O>::open(bool reOpen) {
 }
 
 template <>
-void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
+void MakeObjStageBase<MakeObjOutputType::Object>::produceObject() {
     auto [tag, val] = value::makeNewObject();
     auto obj = value::getObjectView(val);
 
@@ -341,7 +339,7 @@ void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
 }
 
 template <>
-void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
+void MakeObjStageBase<MakeObjOutputType::BsonObject>::produceObject() {
     UniqueBSONObjBuilder bob;
 
     auto finish = [this, &bob]() {
@@ -495,7 +493,7 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
     finish();
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 PlanState MakeObjStageBase<O>::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
@@ -510,7 +508,7 @@ PlanState MakeObjStageBase<O>::getNext() {
     return trackPlanState(state);
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 void MakeObjStageBase<O>::close() {
     auto optTimer(getOptTimer(_opCtx));
 
@@ -518,7 +516,7 @@ void MakeObjStageBase<O>::close() {
     _children[0]->close();
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 std::unique_ptr<PlanStageStats> MakeObjStageBase<O>::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
 
@@ -543,12 +541,12 @@ std::unique_ptr<PlanStageStats> MakeObjStageBase<O>::getStats(bool includeDebugI
     return ret;
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 const SpecificStats* MakeObjStageBase<O>::getSpecificStats() const {
     return nullptr;
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
@@ -591,7 +589,7 @@ std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint() const {
     return ret;
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 size_t MakeObjStageBase<O>::estimateCompileTimeSize() const {
     size_t size = sizeof(*this);
     size += size_estimator::estimate(_children);
@@ -601,7 +599,7 @@ size_t MakeObjStageBase<O>::estimateCompileTimeSize() const {
     return size;
 }
 
-template <MakeObjOutputType O>
+template <typename O>
 void MakeObjStageBase<O>::doSaveState(bool relinquishCursor) {
     if (!relinquishCursor) {
         return;
@@ -611,6 +609,6 @@ void MakeObjStageBase<O>::doSaveState(bool relinquishCursor) {
 }
 
 // Explicit template instantiations.
-template class MakeObjStageBase<MakeObjOutputType::object>;
-template class MakeObjStageBase<MakeObjOutputType::bsonObject>;
+template class MakeObjStageBase<MakeObjOutputType::Object>;
+template class MakeObjStageBase<MakeObjOutputType::BsonObject>;
 }  // namespace mongo::sbe

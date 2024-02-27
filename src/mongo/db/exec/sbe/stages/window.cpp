@@ -215,7 +215,7 @@ bool WindowStage::fetchNextRow() {
         value::MaterializedRow row(rowSize);
         size_t idx = 0;
         for (auto accessor : _inCurrAccessors) {
-            auto [tag, val] = accessor->copyOrMoveValue();
+            auto [tag, val] = accessor->getCopyOfValue();
             row.reset(idx++, true, tag, val);
         }
         _rows.push_back(std::move(row));

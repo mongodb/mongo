@@ -286,8 +286,7 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeCloseAndReopen) {
     for (int i = 0; i < 4; ++i) {
         auto planState = rootStage->getNext();
         ASSERT(planState == PlanState::ADVANCED);
-        auto [tag, val] = accessor->copyOrMoveValue();
-        value::ValueGuard planOutputGuard{tag, val};
+        auto [tag, val] = accessor->getViewOfValue();
         char expectedChar = 'a' + i;
         auto [expectedTag, expectedValue] =
             value::makeNewString(StringData{std::string(1, expectedChar)});

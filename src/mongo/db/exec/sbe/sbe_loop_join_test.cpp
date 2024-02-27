@@ -80,10 +80,10 @@ TEST_F(LoopJoinStageTest, LoopJoinNoPredicate) {
     for (auto st = loopJoin->getNext(); st == PlanState::ADVANCED; st = loopJoin->getNext(), i++) {
         ASSERT_LT(i, expected.size());
 
-        auto [outerTag, outerVal] = outer->copyOrMoveValue();
+        auto [outerTag, outerVal] = outer->getViewOfValue();
         assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
 
-        auto [innerTag, innerVal] = inner->copyOrMoveValue();
+        auto [innerTag, innerVal] = inner->getViewOfValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());
@@ -115,10 +115,10 @@ TEST_F(LoopJoinStageTest, LoopJoinConstTruePredicate) {
     for (auto st = loopJoin->getNext(); st == PlanState::ADVANCED; st = loopJoin->getNext(), i++) {
         ASSERT_LT(i, expected.size());
 
-        auto [outerTag, outerVal] = outer->copyOrMoveValue();
+        auto [outerTag, outerVal] = outer->getViewOfValue();
         assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
 
-        auto [innerTag, innerVal] = inner->copyOrMoveValue();
+        auto [innerTag, innerVal] = inner->getViewOfValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());
@@ -173,7 +173,7 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
     for (auto st = loopJoin->getNext(); st == PlanState::ADVANCED; st = loopJoin->getNext(), i++) {
         ASSERT_LT(i, expected.size());
 
-        auto [innerTag, innerVal] = inner->copyOrMoveValue();
+        auto [innerTag, innerVal] = inner->getViewOfValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
     }
     ASSERT_EQ(i, expected.size());
@@ -209,10 +209,10 @@ TEST_F(LoopJoinStageTest, LoopJoinInnerBlockingStage) {
     for (auto st = loopJoin->getNext(); st == PlanState::ADVANCED; st = loopJoin->getNext(), i++) {
         ASSERT_LT(i, expected.size());
 
-        auto [outerTag, outerVal] = outer->copyOrMoveValue();
+        auto [outerTag, outerVal] = outer->getViewOfValue();
         assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
 
-        auto [innerTag, innerVal] = inner->copyOrMoveValue();
+        auto [innerTag, innerVal] = inner->getViewOfValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());

@@ -198,8 +198,7 @@ public:
         for (auto state = stage->getNext(); state == PlanState::ADVANCED;
              state = stage->getNext(), i++) {
             // Retrieve the result document from SBE plan.
-            auto [resultTag, resultValue] = tree.resultSlotAccessor->copyOrMoveValue();
-            ValueGuard resultGuard{resultTag, resultValue};
+            auto [resultTag, resultValue] = tree.resultSlotAccessor->getViewOfValue();
             if (enableDebugOutput) {
                 std::cout << "Actual document:   " << std::make_pair(resultTag, resultValue)
                           << std::endl;

@@ -99,7 +99,7 @@ void SpoolEagerProducerStage::open(bool reOpen) {
 
         size_t idx = 0;
         for (auto accessor : _inAccessors) {
-            auto [tag, val] = accessor->copyOrMoveValue();
+            auto [tag, val] = accessor->getCopyOfValue();
             vals.reset(idx++, true, tag, val);
         }
 

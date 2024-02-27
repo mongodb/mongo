@@ -84,7 +84,7 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> SBESamplingExecutor::execute(
         return {sbe::value::TypeTags::Nothing, 0};
     }
 
-    auto result = accessors.at(0)->copyOrMoveValue();
+    auto result = accessors.at(0)->getCopyOfValue();
     tassert(8375701,
             "Sampling query returned more than one row",
             sbePlan->getNext() == sbe::PlanState::IS_EOF);

@@ -184,7 +184,7 @@ void HashLookupStage::open(bool reOpen) {
         value::MaterializedRow value{1};
 
         // Copy the projected value.
-        auto [tag, val] = _inInnerProjectAccessor->copyOrMoveValue();
+        auto [tag, val] = _inInnerProjectAccessor->getCopyOfValue();
         value.reset(0, true, tag, val);
 
         // This where we put the value in here. This can grow need to spill.

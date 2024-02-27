@@ -31,6 +31,7 @@
 
 #include <type_traits>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot_util.h"
@@ -64,6 +65,14 @@ public:
     virtual std::pair<TypeTags, Value> getViewOfValue() const = 0;
 
     /**
+     * Returns an owned copy of the value currently stored in the slot.
+     */
+    inline std::pair<TypeTags, Value> getCopyOfValue() const {
+        auto [tag, val] = getViewOfValue();
+        return sbe::value::copyValue(tag, val);
+    }
+
+    /**
      * Sometimes it may be determined that a caller is the last one to access this slot. If that is
      * the case then the caller can use this optimized method to move out the value out of the slot
      * saving the extra copy operation. Not all slots own the values stored in them so they must
@@ -74,6 +83,16 @@ public:
     template <typename T>
     bool is() const {
         return dynamic_cast<const T*>(this) != nullptr;
+    }
+
+    template <typename T>
+    T* as() {
+        return dynamic_cast<T*>(this);
+    }
+
+    template <typename T>
+    const T* as() const {
+        return dynamic_cast<const T*>(this);
     }
 };
 
@@ -446,5 +465,137 @@ void orderedSlotMapTraverse(const SlotMap<T>& map, C callback) {
         callback(slot, map.at(slot));
     }
 }
+
+
+/**
+ * Accessor for a slot which can own the value held by that slot and provides optimized BSONObj
+ * access.
+ */
+class BSONObjValueAccessor final : public SlotAccessor {
+public:
+    BSONObjValueAccessor() = default;
+
+    BSONObjValueAccessor(const BSONObjValueAccessor& other) {
+        if (other._owned) {
+            auto [tag, val] = copyValue(other._tag, other._val);
+            _tag = tag;
+            _val = val;
+            _owned = true;
+        } else {
+            _tag = other._tag;
+            _val = other._val;
+            _owned = false;
+            _hasBsonObj = other._hasBsonObj;
+            _bsonObj = other._bsonObj;
+        }
+    }
+
+    BSONObjValueAccessor(BSONObjValueAccessor&& other) noexcept {
+        _hasBsonObj = other._hasBsonObj;
+        _tag = other._tag;
+        _val = other._val;
+        _owned = other._owned;
+        _bsonObj = other._bsonObj;
+
+        other._hasBsonObj = false;
+        other._owned = false;
+        other._bsonObj = BSONObj();
+    }
+
+    ~BSONObjValueAccessor() {
+        release();
+    }
+
+    // Copy and swap idiom for a single copy/move assignment operator.
+    BSONObjValueAccessor& operator=(BSONObjValueAccessor other) noexcept {
+        std::swap(_hasBsonObj, other._hasBsonObj);
+        std::swap(_tag, other._tag);
+        std::swap(_val, other._val);
+        std::swap(_owned, other._owned);
+        std::swap(_bsonObj, other._bsonObj);
+        return *this;
+    }
+
+    /**
+     * Returns a non-owning view of the value.
+     */
+    std::pair<TypeTags, Value> getViewOfValue() const override {
+        SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
+        return {_tag, _val};
+    }
+
+    /**
+     * If a the value is owned by this slot, then the slot relinquishes ownership of the returned
+     * value. Alternatively, if the value is unowned, then the caller receives a copy. Either way,
+     * the caller owns the resulting value.
+     */
+    std::pair<TypeTags, Value> copyOrMoveValue() override {
+        SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
+        if (_owned && !_hasBsonObj) {
+            _owned = false;
+            return {_tag, _val};
+        } else {
+            return copyValue(_tag, _val);
+        }
+    }
+
+    BSONObj getOwnedBSONObj() {
+        invariant(_tag == TypeTags::bsonObject);
+        if (!_hasBsonObj) {
+            if (!_owned) {
+                std::tie(_tag, _val) = copyValue(_tag, _val);
+            }
+
+            auto sharedBuf =
+                SharedBuffer(UniqueBuffer::reclaim(sbe::value::bitcastTo<char*>(_val)));
+            _hasBsonObj = true;
+            _owned = false;
+            _bsonObj = BSONObj{std::move(sharedBuf)};
+        }
+
+        return _bsonObj;
+    }
+
+    void reset() {
+        reset(TypeTags::Nothing, 0);
+    }
+
+    void reset(TypeTags tag, Value val) {
+        reset(true, tag, val);
+    }
+
+    void reset(bool owned, TypeTags tag, Value val) {
+        release();
+
+        _tag = tag;
+        _val = val;
+        _owned = owned;
+    }
+
+    void makeOwned() {
+        if (_owned || _hasBsonObj) {
+            return;
+        }
+
+        std::tie(_tag, _val) = copyValue(_tag, _val);
+        _owned = true;
+    }
+
+private:
+    void release() {
+        if (_owned) {
+            releaseValue(_tag, _val);
+            _owned = false;
+        }
+        _hasBsonObj = false;
+        _bsonObj = BSONObj();
+    }
+
+    bool _hasBsonObj{false};
+    bool _owned{false};
+    TypeTags _tag{TypeTags::Nothing};
+    Value _val{0};
+    BSONObj _bsonObj;
+};  // class BSONObjValueAccessor
 
 }  // namespace mongo::sbe::value

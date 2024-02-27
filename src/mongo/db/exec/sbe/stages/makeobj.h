@@ -53,7 +53,18 @@
 
 namespace mongo::sbe {
 enum class MakeObjFieldBehavior { drop, keep };
-enum class MakeObjOutputType { object, bsonObject };
+
+struct MakeObjOutputType {
+    struct Object {
+        static constexpr StringData stageName = "mkobj"_sd;
+        typedef value::OwnedValueAccessor OutputAccessorType;
+    };
+
+    struct BsonObject {
+        static constexpr StringData stageName = "mkbson"_sd;
+        typedef value::BSONObjValueAccessor OutputAccessorType;
+    };
+};
 
 /**
  * Base stage for creating a bsonObject or object.
@@ -70,7 +81,7 @@ enum class MakeObjOutputType { object, bsonObject };
  *       [projectedField_1 = slot_1, ..., projectedField_n = slot_n]
  *       forceNewObj returnOldObject childStage
  */
-template <MakeObjOutputType O>
+template <typename O>
 class MakeObjStageBase final : public PlanStage {
 public:
     using FieldBehavior = MakeObjFieldBehavior;
@@ -179,13 +190,13 @@ private:
     std::vector<std::pair<std::string, value::SlotAccessor*>> _projects;
     absl::InlinedVector<char, 64> _visited;
 
-    value::OwnedValueAccessor _obj;
+    typename O::OutputAccessorType _obj;
 
     value::SlotAccessor* _root{nullptr};
 
     bool _compiled{false};
 };
 
-using MakeObjStage = MakeObjStageBase<MakeObjOutputType::object>;
-using MakeBsonObjStage = MakeObjStageBase<MakeObjOutputType::bsonObject>;
+using MakeObjStage = MakeObjStageBase<MakeObjOutputType::Object>;
+using MakeBsonObjStage = MakeObjStageBase<MakeObjOutputType::BsonObject>;
 }  // namespace mongo::sbe

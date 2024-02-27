@@ -188,7 +188,7 @@ void LookupHashTable::addHashTableEntry(value::SlotAccessor* keyAccessor, size_t
         if (!hasSpilledHtToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
             // We have to insert an owned key, attempt a move, but force copy if necessary when we
             // haven't spilled to the '_recordStore' yet.
-            auto [tagKey, valKey] = keyAccessor->copyOrMoveValue();
+            auto [tagKey, valKey] = keyAccessor->getCopyOfValue();
             key.reset(0, true, tagKey, valKey);
 
             auto [it, inserted] = _memoryHt->try_emplace(std::move(key));

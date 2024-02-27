@@ -794,10 +794,14 @@ sbe::PlanState fetchNextImpl(sbe::PlanStage* root,
         } else if (tag == sbe::value::TypeTags::bsonObject) {
             BSONObj result;
             if (returnOwnedBson) {
-                auto [ownedTag, ownedVal] = resultSlot->copyOrMoveValue();
-                auto sharedBuf =
-                    SharedBuffer(UniqueBuffer::reclaim(sbe::value::bitcastTo<char*>(ownedVal)));
-                result = BSONObj{std::move(sharedBuf)};
+                if (auto bsonResultAccessor = resultSlot->as<sbe::value::BSONObjValueAccessor>()) {
+                    result = bsonResultAccessor->getOwnedBSONObj();
+                } else {
+                    auto [ownedTag, ownedVal] = sbe::value::copyValue(tag, val);
+                    auto sharedBuf =
+                        SharedBuffer(UniqueBuffer::reclaim(sbe::value::bitcastTo<char*>(ownedVal)));
+                    result = BSONObj{std::move(sharedBuf)};
+                }
             } else {
                 result = BSONObj{sbe::value::bitcastTo<const char*>(val)};
             }
