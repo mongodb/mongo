@@ -1432,6 +1432,14 @@ std::unique_ptr<BlockType> makeTestHomogeneousBlock() {
     return testHomogeneousBlock;
 }
 
+std::unique_ptr<value::ValueBlock> makeTestNothingBlock(size_t valsNum) {
+    std::unique_ptr<value::Int32Block> testHomogeneousBlock = std::make_unique<value::Int32Block>();
+    for (size_t i = 0; i < valsNum; ++i) {
+        testHomogeneousBlock->pushNothing();
+    }
+    return testHomogeneousBlock;
+}
+
 std::unique_ptr<value::ValueBlock> makeTestInt32Block() {
     return makeTestHomogeneousBlock<value::Int32Block, int32_t>();
 }
@@ -1543,6 +1551,7 @@ TEST_F(SBEBlockExpressionTest, ValueBlockCmpScalarHomogeneousTest) {
     testBlocks.push_back(makeTestInt64Block());
     testBlocks.push_back(makeTestDateBlock());
     testBlocks.push_back(makeTestDoubleBlock());
+    testBlocks.push_back(makeTestNothingBlock(2));
 
     for (auto& block : testBlocks) {
         testCmpScalar(EPrimBinary::greater, "valueBlockGtScalar", block.get());

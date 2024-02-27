@@ -239,19 +239,28 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::map(const ColumnOp& op
         return fastPathResult;
     }
 
-    size_t numElems = _vals.size();
-    if (numElems == 0) {
+    size_t blockSize = _presentBitset.size();
+    if (blockSize == 0) {
+        // The block is empty.
         return std::make_unique<HeterogeneousBlock>();
     }
 
-    std::vector<TypeTags> tags(numElems, TypeTags::Nothing);
-    std::vector<Value> vals(numElems, Value{0u});
+    size_t numVals = _vals.size();
+    if (numVals == 0) {
+        // The block has only Nothing values.
+        auto [resultTag, resultValue] = op.processSingle(value::TypeTags::Nothing, 0);
+        return std::make_unique<value::MonoBlock>(blockSize, resultTag, resultValue);
+    }
+
+    std::vector<TypeTags> tags(numVals, TypeTags::Nothing);
+    std::vector<Value> vals(numVals, Value{0u});
 
     ValueVectorGuard blockGuard(tags, vals);
     // Fast path for dense case, everything can be processed in one chunk.
-    op.processBatch(TypeTag, _vals.data(), tags.data(), vals.data(), numElems);
+    op.processBatch(TypeTag, _vals.data(), tags.data(), vals.data(), numVals);
 
-    if (_presentBitset.all()) {
+    if (numVals == blockSize) {
+        // The block is dense.
         blockGuard.reset();
         return buildBlockFromStorage(std::move(tags), std::move(vals));
     }
@@ -261,12 +270,11 @@ std::unique_ptr<ValueBlock> HomogeneousBlock<T, TypeTag>::map(const ColumnOp& op
     ValueGuard nullGuard(nullTag, nullVal);
 
     // Then, insert it in the proper places.
-    size_t blockSize = size();
     std::vector<TypeTags> mergedTags(blockSize, TypeTags::Nothing);
     std::vector<Value> mergedVals(blockSize, Value{0u});
 
     size_t valIdx = 0;
-    for (size_t i = 0; i < _presentBitset.size(); ++i) {
+    for (size_t i = 0; i < blockSize; ++i) {
         if (_presentBitset[i]) {
             mergedTags[i] = tags[valIdx];
             mergedVals[i] = vals[valIdx];
