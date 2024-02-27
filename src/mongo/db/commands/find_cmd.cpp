@@ -804,7 +804,8 @@ public:
                               "stats"_attr = redact(stats),
                               "cmd"_attr = cmdObj);
 
-                exception.addContext("Executor error during find command");
+                exception.addContext(str::stream() << "Executor error during find command: "
+                                                   << nss.toStringForErrorMsg());
                 throw;
             }
 
