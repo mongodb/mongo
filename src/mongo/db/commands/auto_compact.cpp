@@ -116,7 +116,15 @@ Status autoCompact(OperationContext* opCtx,
 
     auto* storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
-    Lock::GlobalLock lk(opCtx, MODE_IX);
+    // Holding the global lock to prevent racing with storage shutdown. However, no need to hold the
+    // RSTL nor acquire a flow control ticket. This doesn't care about the replica state of the node
+    // and the operation is not replicated.
+    Lock::GlobalLock lk{
+        opCtx,
+        MODE_IS,
+        Date_t::max(),
+        Lock::InterruptBehavior::kThrow,
+        Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
     std::shared_ptr<const CollectionCatalog> catalog = CollectionCatalog::get(opCtx);
     std::vector<StringData> excludedIdents;
 

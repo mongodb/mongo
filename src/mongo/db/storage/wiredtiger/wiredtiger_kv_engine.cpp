@@ -662,7 +662,15 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
                                               /*freeSpaceTargetMB=*/boost::none,
                                               /*excludedIdents*/ std::vector<StringData>()};
 
-    Lock::GlobalLock lk(opCtx, MODE_IX);
+    // Holding the global lock to prevent racing with storage shutdown. However, no need to hold the
+    // RSTL nor acquire a flow control ticket. This doesn't care about the replica state of the node
+    // and the operation is not replicated.
+    Lock::GlobalLock lk{
+        opCtx,
+        MODE_IS,
+        Date_t::max(),
+        Lock::InterruptBehavior::kThrow,
+        Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
     auto status = autoCompact(opCtx, options);
     uassert(8373401, "Failed to execute autoCompact.", status.isOK());
 }
@@ -2796,7 +2804,7 @@ void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
 
 Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
                                        const StorageEngine::AutoCompactOptions& options) {
-    dassert(shard_role_details::getLocker(opCtx)->isWriteLocked());
+    dassert(shard_role_details::getLocker(opCtx)->isLocked());
 
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     if (cache->isEphemeral()) {
