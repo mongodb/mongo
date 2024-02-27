@@ -36,7 +36,7 @@ coll.drop();
 // Create two indexes to ensure the multi-planner kicks in and the query plan gets cached when the
 // classic engine is in use.
 assert.commandWorked(coll.createIndex({a: 1, b: 1, c: 1}));
-assert.commandWorked(coll.createIndex({a: 1, b: 1, c: 1, d: 1}));
+assert.commandWorked(coll.createIndex({a: -1, b: 1, c: 1, d: 1}));
 
 const sortSpec = {
     c: 1

@@ -42,7 +42,7 @@ assert.commandWorked(coll.insert({a: 2, b: 2}));
 
 // We need two indices so that the MultiPlanRunner is executed.
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({a: -1, b: 1}));
 
 // Run a query.
 assert.eq(1, coll.find({a: 1, b: 1}, {_id: 1, a: 1}).sort({a: -1}).itcount());

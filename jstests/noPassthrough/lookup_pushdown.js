@@ -568,7 +568,7 @@ function setLookupPushdownDisabled(value) {
 (
     function testLookupPushdownWorksWithMultiplanning() {
         assert.commandWorked(coll.dropIndexes());
-        assert.commandWorked(coll.createIndexes([{a: 1, b: 1}, {a: 1, c: 1}]));
+        assert.commandWorked(coll.createIndexes([{a: 1, b: 1}, {a: -1}]));
 
         // Verify that $lookup still gets pushed down when the pipeline prefix is pushed down and
         // undergoes multi-planning.

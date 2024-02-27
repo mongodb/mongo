@@ -22,7 +22,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
 
 // Create two indexes to ensure that the best plan will be picked by the multi-planner.
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({a: -1, b: 1}));
 
 // Load the server parameter which instructs the planner to stop when a candidate plan returns that
 // many documents.

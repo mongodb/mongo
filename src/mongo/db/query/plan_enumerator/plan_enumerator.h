@@ -45,7 +45,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
-#include "mongo/db/query/plan_enumerator/memo.h"
+#include "mongo/db/query/plan_enumerator/enumerator_memo.h"
 #include "mongo/db/query/plan_enumerator/plan_enumerator_explain_info.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
@@ -54,6 +54,8 @@
 
 namespace mongo {
 namespace plan_enumerator {
+
+using namespace plan_enumerator;
 
 struct PlanEnumeratorParams {
     PlanEnumeratorParams()
@@ -89,6 +91,10 @@ struct PlanEnumeratorParams {
     // simplified: for example, that single-child $or nodes are unwrapped. To avoid this, when
     // the 'disableMatchExpressionOptimization' failpoint is set, we also disable OR-pushdown.
     bool disableOrPushdown;
+
+    const projection_ast::Projection* projection;
+    const boost::optional<SortPattern>* sort;
+    BSONObj shardKey;
 };
 
 /**
@@ -520,6 +526,11 @@ private:
 
     // Whether we should disable OR-pushdown optimization.
     const bool _disableOrPushdown;
+
+    // Additional information about the query used to prune the memo.
+    const projection_ast::Projection* _projection;
+    boost::optional<stdx::unordered_set<std::string>> _sortPatFields;
+    BSONObj _shardKey;
 };
 
 }  // namespace plan_enumerator

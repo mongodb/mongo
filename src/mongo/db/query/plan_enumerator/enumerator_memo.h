@@ -109,6 +109,15 @@ struct OneIndexAssignment {
     std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> orPushdowns;
 };
 
+template <typename H>
+H AbslHashValue(H h, const OneIndexAssignment& assignment) {
+    for (const auto& pred : assignment.preds) {
+        h = H::combine(std::move(h), reinterpret_cast<size_t>(pred));
+    }
+    return H::combine_contiguous(
+        std::move(h), assignment.positions.data(), assignment.positions.size());
+}
+
 struct AndEnumerableState {
     std::vector<OneIndexAssignment> assignments;
     std::vector<MemoID> subnodesToIndex;

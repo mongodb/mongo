@@ -23,7 +23,7 @@ function getPlanForCacheEntry(query, proj, sort) {
 // index is available, the solution will not be cached.
 assert.commandWorked(coll.insert({a: "foo"}));
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({a: -1}));
 
 // Repeat the test for query, query with projection, and query with projection and sort.
 for (let [proj, sort] of [[{}, {}], [{_id: 0, a: 1}, {}], [{_id: 0, a: 1}, {a: 1}]]) {

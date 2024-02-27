@@ -51,7 +51,8 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/db/query/plan_enumerator/memo.h"
+#include "mongo/db/query/plan_enumerator/enumerator_memo.h"
+#include "mongo/db/query/plan_enumerator/memo_prune.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -297,11 +298,28 @@ PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
       _enumerateOrChildrenLockstep(params.enumerateOrChildrenLockstep),
       _orLimit(params.maxSolutionsPerOr),
       _intersectLimit(params.maxIntersectPerAnd),
-      _disableOrPushdown(params.disableOrPushdown) {}
+      _disableOrPushdown(params.disableOrPushdown),
+      _projection(params.projection),
+      _shardKey(params.shardKey) {
+    if (params.sort && *params.sort) {
+        _sortPatFields = stdx::unordered_set<std::string>();
+        for (size_t i = 0; i < (*params.sort)->size(); i++) {
+            const auto& fieldPath = (**params.sort)[i].fieldPath;
+            if (fieldPath) {
+                _sortPatFields->insert(fieldPath->fullPath());
+            }
+        }
+    }
+}
 
 Status PlanEnumerator::init() {
     // Fill out our memo structure from the tagged _root.
     _done = !prepMemo(_root, PrepMemoContext());
+    if (internalQueryPlannerEnableIndexPruning.load()) {
+        bool prunedAnyIndexes = pruneMemoOfDupIndexes(
+            _memo, QueryPruningInfo{_projection, _sortPatFields, _shardKey, _indices});
+        _explainInfo.prunedAnyIndexes = prunedAnyIndexes;
+    }
 
     // Dump the tags.  We replace them with IndexTag instances.
     _root->resetTag();

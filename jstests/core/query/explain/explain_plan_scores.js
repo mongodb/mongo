@@ -49,7 +49,8 @@ function checkExplainOutput(explain, verbosity) {
 
 // Create indexes so that there are multiple plans.
 assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+// Create descending index to avoid index deduplication.
+assert.commandWorked(coll.createIndex({a: -1, b: 1}));
 
 ["queryPlanner", "executionStats", "allPlansExecution"].forEach(verbosity => {
     const explain = coll.find({a: {$gte: 0}}).explain(verbosity);

@@ -582,9 +582,9 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
-    addIndex(BSON("p1" << 1 << "opt2" << 1));
+    addIndex(BSON("p1" << -1 << "opt2" << 1));
     addIndex(BSON("p2" << 1 << "opt1" << 1));
-    addIndex(BSON("p2" << 1 << "opt2" << 1));
+    addIndex(BSON("p2" << -1 << "opt2" << 1));
     QueryPlannerParams plannerParams;
     auto coll = ctx.getCollection();
     MultipleCollectionAccessor collectionsAccessor(coll);
@@ -620,9 +620,9 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
 
     // Add 4 indices: 2 for each predicate to choose from.
     addIndex(BSON("p1" << 1 << "opt1" << 1));
-    addIndex(BSON("p1" << 1 << "opt2" << 1));
+    addIndex(BSON("p1" << -1 << "opt2" << 1));
     addIndex(BSON("p2" << 1 << "opt1" << 1));
-    addIndex(BSON("p2" << 1 << "opt2" << 1));
+    addIndex(BSON("p2" << -1 << "opt2" << 1));
     QueryPlannerParams plannerParams;
     auto coll = ctx.getCollection();
     MultipleCollectionAccessor collectionsAccessor(coll);

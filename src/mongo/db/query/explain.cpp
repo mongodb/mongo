@@ -197,11 +197,12 @@ void generatePlannerInfo(PlanExecutor* exec,
 
         plannerBob.append("queryFramework", "cqf");
     } else {
-        // Classic-only fields.
+        // Classic optimizer-only fields.
         auto&& enumeratorInfo = explainer.getEnumeratorInfo();
         plannerBob.append("maxIndexedOrSolutionsReached", enumeratorInfo.hitIndexedOrLimit);
         plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);
         plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
+        plannerBob.append("prunedSimilarIndexes", enumeratorInfo.prunedAnyIndexes);
     }
 
     auto&& [winningStats, _] =

@@ -1187,6 +1187,29 @@ TEST_F(QueryPlannerTest, ExplodeRootedOrForSortWorksWithShardingFilter) {
         "[['MinKey','MaxKey',true,true]]}}}]}}}}}}");
 }
 
+TEST_F(QueryPlannerTest, NoIndexDeduplicationWhenShardKeyExists) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    // If there's a shard key, we shouldn't deduplicate indexes in case one of them provides value
+    // for a shard filter.
+    params.shardKey = BSON("a" << 1);
+
+    // This is a scenario where we would usually deduplicate. The {a: 1, b: 1} index is removable.
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQuery(fromjson("{a: 1}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {pattern: {a: 1}, bounds: {a: [[1, 1, true, true]]}}}"
+        "}}");
+    assertSolutionExists(
+        "{fetch: {filter: null, node: "
+        "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[1, 1, true, true]], b: [['MinKey', "
+        "'MaxKey', true, true]]}}}"
+        "}}");
+}
+
 //
 // Multiple solutions
 //
@@ -1658,7 +1681,7 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldInIndex) {
     addIndex(BSON("a" << 1 << "c" << 1));
 
     runQuery(fromjson("{$and: [{a: 5}, {$or: [{b: 6}, {c: 7}]}]}"));
-    assertNumSolutions(4);
+    assertNumSolutions(3);
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
@@ -1669,11 +1692,6 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldInIndex) {
     assertSolutionExists(
         "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: "
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [['MinKey', "
-        "'MaxKey', true, true]]}}}"
-        "}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: "
-        "{ixscan: {pattern: {a: 1, c: 1}, bounds: {a: [[5, 5, true, true]], c: [['MinKey', "
         "'MaxKey', true, true]]}}}"
         "}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
@@ -1725,7 +1743,7 @@ TEST_F(QueryPlannerTest, ContainedOrPredicatesAreLeadingFields) {
     addIndex(BSON("a" << 1 << "c" << 1));
 
     runQuery(fromjson("{$and: [{a: {$gte: 0}}, {a: {$lte: 10}}, {$or: [{b: 6}, {c: 7}]}]}"));
-    assertNumSolutions(4);
+    assertNumSolutions(3);
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[0, 10, true, true]], b: [[6, 6, true, "
@@ -1738,11 +1756,6 @@ TEST_F(QueryPlannerTest, ContainedOrPredicatesAreLeadingFields) {
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[0, 10, true, true]], b: [['MinKey', "
         "'MaxKey', true, true]]}}}"
         "}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: "
-        "{ixscan: {pattern: {a: 1, c: 1}, bounds: {a: [[0, 10, true, true]], c: [['MinKey', "
-        "'MaxKey', true, true]]}}}"
-        "}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }
 
@@ -1751,7 +1764,7 @@ TEST_F(QueryPlannerTest, ContainedOrOnePredicateIsLeadingField) {
     addIndex(BSON("a" << 1 << "b" << 1 << "d" << 1));
 
     runQuery(fromjson("{$and: [{a: 5}, {b: 6}, {$or: [{c: 7}, {d: 8}]}]}"));
-    assertNumSolutions(4);
+    assertNumSolutions(3);
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
@@ -1763,11 +1776,6 @@ TEST_F(QueryPlannerTest, ContainedOrOnePredicateIsLeadingField) {
         "{fetch: {filter: {$or: [{c: 7}, {d: 8}]}, node: "
         "{ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
         "true]], c: [['MinKey', 'MaxKey', true, true]]}}}"
-        "}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{c: 7}, {d: 8}]}, node: "
-        "{ixscan: {pattern: {a: 1, b: 1, d: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
-        "true]], d: [['MinKey', 'MaxKey', true, true]]}}}"
         "}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }
@@ -1796,7 +1804,7 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldMoveToAnd) {
     addIndex(BSON("a" << 1 << "d" << 1));
 
     runQuery(fromjson("{$and: [{a: 5}, {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}]}"));
-    assertNumSolutions(4);
+    assertNumSolutions(3);
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
@@ -1804,11 +1812,6 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldMoveToAnd) {
         "{ixscan: {pattern: {a: 1, d: 1}, bounds: {a: [[5, 5, true, true]], d: [[8, 8, true, "
         "true]]}}}"
         "]}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}, node: "
-        "{ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[5, 5, true, true]], b: [['MinKey', "
-        "'MaxKey', true, true]], c: [['MinKey', 'MaxKey', true, true]]}}}"
-        "}}");
     assertSolutionExists(
         "{fetch: {filter: {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}, node: "
         "{ixscan: {pattern: {a: 1, d: 1}, bounds: {a: [[5, 5, true, true]], d: [['MinKey', "
@@ -1822,7 +1825,7 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldMoveToAndWithFilter) 
     addIndex(BSON("a" << 1 << "d" << 1));
 
     runQuery(fromjson("{$and: [{a: 5}, {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}]}"));
-    assertNumSolutions(4);
+    assertNumSolutions(3);
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{fetch: {filter: {c: 7}, node: {ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, "
@@ -1836,11 +1839,6 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldMoveToAndWithFilter) 
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [['MinKey', "
         "'MaxKey', true, true]]}}}"
         "}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}, node: "
-        "{ixscan: {pattern: {a: 1, d: 1}, bounds: {a: [[5, 5, true, true]], d: [['MinKey', "
-        "'MaxKey', true, true]]}}}"
-        "}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }
 
@@ -1850,7 +1848,7 @@ TEST_F(QueryPlannerTest, ContainedOrPredicatesAreLeadingFieldsMoveToAnd) {
 
     runQuery(fromjson(
         "{$and: [{a: {$gte: 0}}, {a: {$lte: 10}}, {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}]}"));
-    assertNumSolutions(4);
+    assertNumSolutions(3);
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[0, 10, true, true]], b: [[6, 6, "
@@ -1858,11 +1856,6 @@ TEST_F(QueryPlannerTest, ContainedOrPredicatesAreLeadingFieldsMoveToAnd) {
         "{ixscan: {pattern: {a: 1, d: 1}, bounds: {a: [[0, 10, true, true]], d: [[8, 8, true, "
         "true]]}}}"
         "]}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}, node: "
-        "{ixscan: {pattern: {a: 1, b: 1, c: 1}, bounds: {a: [[0, 10, true, true]], b: [['MinKey', "
-        "'MaxKey', true, true]], c: [['MinKey', 'MaxKey', true, true]]}}}"
-        "}}");
     assertSolutionExists(
         "{fetch: {filter: {$or: [{$and: [{b: 6}, {c: 7}]}, {d: 8}]}, node: "
         "{ixscan: {pattern: {a: 1, d: 1}, bounds: {a: [[0, 10, true, true]], d: [['MinKey', "
@@ -1876,7 +1869,7 @@ TEST_F(QueryPlannerTest, ContainedOrOnePredicateIsLeadingFieldMoveToAnd) {
     addIndex(BSON("a" << 1 << "b" << 1 << "e" << 1));
 
     runQuery(fromjson("{$and: [{a: 5}, {b: 6}, {$or: [{$and: [{c: 7}, {d: 8}]}, {e: 9}]}]}"));
-    assertNumSolutions(4);
+    assertNumSolutions(3);
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1, c: 1, d: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, "
@@ -1884,12 +1877,6 @@ TEST_F(QueryPlannerTest, ContainedOrOnePredicateIsLeadingFieldMoveToAnd) {
         "{ixscan: {pattern: {a: 1, b: 1, e: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
         "true]], e: [[9, 9, true, true]]}}}"
         "]}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{$and: [{c: 7}, {d: 8}]}, {e: 9}]}, node: "
-        "{ixscan: {pattern: {a: 1, b: 1, c: 1, d: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, "
-        "true, true]], c: [['MinKey', 'MaxKey', true, true]], d: [['MinKey', 'MaxKey', true, "
-        "true]]}}}"
-        "}}");
     assertSolutionExists(
         "{fetch: {filter: {$or: [{$and: [{c: 7}, {d: 8}]}, {e: 9}]}, node: "
         "{ixscan: {pattern: {a: 1, b: 1, e: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
@@ -1956,7 +1943,7 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldInBothBranchesIndexIn
     addIndex(BSON("a" << 1 << "c" << 1));
 
     runQuery(fromjson("{$and: [{a: 5}, {$or: [{b: 6}, {c: 7}]}]}"));
-    assertNumSolutions(6);
+    assertNumSolutions(5);
     assertSolutionExists(
         "{fetch: {node: {or: {nodes: ["
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
@@ -1967,11 +1954,6 @@ TEST_F(QueryPlannerTest, ContainedOrPredicateIsLeadingFieldInBothBranchesIndexIn
     assertSolutionExists(
         "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: "
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [['MinKey', "
-        "'MaxKey', true, true]]}}}"
-        "}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: "
-        "{ixscan: {pattern: {a: 1, c: 1}, bounds: {a: [[5, 5, true, true]], c: [['MinKey', "
         "'MaxKey', true, true]]}}}"
         "}}");
     // The AND_HASH stage is not really needed, since the predicate {a: 5} is covered by the indexed
@@ -2039,7 +2021,7 @@ TEST_F(QueryPlannerTest, ContainedOrNotPredicateIsLeadingFieldInBothBranchesInde
     addIndex(BSON("a" << 1 << "c" << 1));
 
     runQuery(fromjson("{$and: [{$nor: [{a: 5}]}, {$or: [{b: 6}, {c: 7}]}]}"));
-    assertNumSolutions(6);
+    assertNumSolutions(5);
     // The filter is {$not: {a: 5}}, but there is no way to write a BSON expression that will parse
     // to that MatchExpression.
     assertSolutionExists(
@@ -2054,11 +2036,6 @@ TEST_F(QueryPlannerTest, ContainedOrNotPredicateIsLeadingFieldInBothBranchesInde
         "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: "
         "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [['MinKey', 5, true, false], [5, 'MaxKey', "
         "false, true]], b: [['MinKey', 'MaxKey', true, true]]}}}"
-        "}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: "
-        "{ixscan: {pattern: {a: 1, c: 1}, bounds: {a: [['MinKey', 5, true, false], [5, 'MaxKey', "
-        "false, true]], c: [['MinKey', 'MaxKey', true, true]]}}}"
         "}}");
     // The AND_HASH stage is not really needed, since the predicate {a: 5} is covered by the indexed
     // OR.
@@ -2454,7 +2431,7 @@ TEST_F(QueryPlannerTest, SolutionSetStableWhenOrEnumerationLimitIsReached) {
     runQueryAsCommand(
         fromjson("{find: 'testns', filter: {$or: [{a: 1, b: 1, c: 1}, {d: 1, e: 1, f: 1}]}}"));
 
-    assertNumSolutions(10U);
+    assertNumSolutions(9U);
 
     assertSolutionExists(
         "{or: {nodes: [{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {a: "
@@ -2469,10 +2446,6 @@ TEST_F(QueryPlannerTest, SolutionSetStableWhenOrEnumerationLimitIsReached) {
         "1}}}}}, {fetch: {filter: {e: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {d: "
         "1}}}}}]}}");
     assertSolutionExists(
-        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
-        "1, x: 1}}}}}, {fetch: {filter: {e: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {d: "
-        "1}}}}}]}}");
-    assertSolutionExists(
         "{or: {nodes: [{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {a: "
         "1}}}}}, {fetch: {filter: {d: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {e: "
         "1}}}}}]}}");
@@ -2483,10 +2456,6 @@ TEST_F(QueryPlannerTest, SolutionSetStableWhenOrEnumerationLimitIsReached) {
     assertSolutionExists(
         "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
         "1}}}}}, {fetch: {filter: {d: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {e: "
-        "1}}}}}]}}");
-    assertSolutionExists(
-        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
-        "1, x: 1}}}}}, {fetch: {filter: {d: {$eq: 1}, f: {$eq: 1} }, node: {ixscan: {pattern: {e: "
         "1}}}}}]}}");
     assertSolutionExists(
         "{or: {nodes: [{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {a: "
@@ -2494,6 +2463,10 @@ TEST_F(QueryPlannerTest, SolutionSetStableWhenOrEnumerationLimitIsReached) {
         "1}}}}}]}}");
     assertSolutionExists(
         "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, c: {$eq: 1} }, node: {ixscan: {pattern: {b: "
+        "1}}}}}, {fetch: {filter: {d: {$eq: 1}, e: {$eq: 1} }, node: {ixscan: {pattern: {f: "
+        "1}}}}}]}}");
+    assertSolutionExists(
+        "{or: {nodes: [{fetch: {filter: {a: {$eq: 1}, b: {$eq: 1} }, node: {ixscan: {pattern: {c: "
         "1}}}}}, {fetch: {filter: {d: {$eq: 1}, e: {$eq: 1} }, node: {ixscan: {pattern: {f: "
         "1}}}}}]}}");
 }
@@ -2509,7 +2482,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenTwoIndexesEa
     runQueryAsCommand(
         fromjson("{find: 'testns', filter: {a: 1, $or: [{b: 1, c: 1}, {b: 2, c: 2}]}}"));
 
-    assertNumSolutions(6U);
+    assertNumSolutions(5U);
 
     assertSolutionExists(
         "{or: {nodes: [{fetch: {filter: {c: {$eq: 1} }, node: {ixscan: {pattern: {a: 1, b: 1}}}}}, "
@@ -2526,9 +2499,6 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenTwoIndexesEa
     assertSolutionExists(
         "{fetch: {filter: {$or: [{b: {$eq: 1}, c: {$eq: 1}}, {b: {$eq: 2}, c: {$eq: 2}}]}, node: "
         "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{b: {$eq: 1}, c: {$eq: 1}}, {b: {$eq: 2}, c: {$eq: 2}}]}, node: "
-        "{ixscan: {pattern: {a: 1, c: 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, TotalPossibleLockstepOrEnumerationReachesTheOrLimit) {
@@ -2554,7 +2524,7 @@ TEST_F(QueryPlannerTest, TotalPossibleLockstepOrEnumerationReachesTheOrLimit) {
     runQueryAsCommand(cmd);
 
     // internalQueryMaxOrSolutions.load() + 2.
-    assertNumSolutions(12U);
+    assertNumSolutions(11U);
 }
 
 // Test that we enumerate the expected plans with the special parameter set. In this test we have
@@ -2567,7 +2537,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenOneIndexEach
 
     runQueryAsCommand(fromjson("{find: 'testns', filter: {a: 1, $or: [{b: 1}, {c: 2}]}}"));
 
-    assertNumSolutions(3U);
+    assertNumSolutions(2U);
 
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: [{ixscan: {pattern: {a: 1, b: 1}}}, {ixscan: "
@@ -2575,9 +2545,6 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenOneIndexEach
     assertSolutionExists(
         "{fetch: {filter: {$or: [{b: {$eq: 1}}, {c: {$eq: 2}}]}, node: {ixscan: {pattern: {a: 1, "
         "b: 1}}}}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{b: {$eq: 1}}, {c: {$eq: 2}}]}, node: {ixscan: {pattern: {a: 1, "
-        "c: 1}}}}}}}");
 }
 
 // Test that we enumerate the expected plans with the special parameter set. In this test we have
@@ -2591,7 +2558,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenDifferentNum
 
     runQueryAsCommand(fromjson("{find: 'testns', filter: {a: 1, $or: [{b: 1}, {b: 2, c: 2}]}}"));
 
-    assertNumSolutions(4U);
+    assertNumSolutions(3);
 
     assertSolutionExists(
         "{fetch: {filter: null, node: {or: {nodes: [{ixscan: {pattern: {a: 1, b: 1}}}, {fetch: "
@@ -2602,9 +2569,6 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenDifferentNum
     assertSolutionExists(
         "{fetch: {filter: {$or: [{b: {$eq: 1}}, {b: {$eq: 2}, c: {$eq: 2}}]}, node: {ixscan: "
         "{pattern: {a: 1, b: 1}}}}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: [{b: {$eq: 1}}, {b: {$eq: 2}, c: {$eq: 2}}]}, node: {ixscan: "
-        "{pattern: {a: 1, c: 1}}}}}}}");
 }
 
 // Test that the special parameter does in fact impact the order of enumeration. Here we rely on the
@@ -2625,7 +2589,7 @@ TEST_F(QueryPlannerTest, NormalOrEnumerationDoesNotPrioritizeLockstepIteration) 
 
     // The $or enumeration is limited to 10, and then we have three plans where just the {a: 1}
     // predicate is indexed.
-    assertNumSolutions(13U);
+    assertNumSolutions(11U);
 
     assertSolutionExists(
         "{or: {nodes: ["
@@ -2672,7 +2636,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationDoesPrioritizeLockstepIteration) {
 
     // The $or enumeration is limited to 10, and then we have three plans where just the {a: 1}
     // predicate is indexed.
-    assertNumSolutions(13U);
+    assertNumSolutions(11U);
 
     assertSolutionExists(
         "{or: {nodes: ["
@@ -2724,7 +2688,7 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationDoesPrioritizeLockstepIterationMix
 
     // The $or enumeration is limited to 10, and then we have four plans where just the {a: 1}
     // predicate is indexed.
-    assertNumSolutions(14U);
+    assertNumSolutions(11U);
 
     // Lockstep enumerations. Definitely expected.
     assertSolutionExists(
@@ -2831,27 +2795,6 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationDoesPrioritizeLockstepIterationMix
         "{b: {$eq: 3}, c: {$eq: 3}, d: {$eq: 3}}, "
         "{b: {$eq: 4}, c: {$eq: 4}, d: {$eq: 4}, e: {$eq: 4}} "
         "]}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: ["
-        "{b: {$eq: 2.1}, c: {$eq: 2.1}}, "
-        "{b: {$eq: 2.2}, c: {$eq: 2.2}}, "
-        "{b: {$eq: 3}, c: {$eq: 3}, d: {$eq: 3}}, "
-        "{b: {$eq: 4}, c: {$eq: 4}, d: {$eq: 4}, e: {$eq: 4}} "
-        "]}, node: {ixscan: {pattern: {a: 1, c: 1}}}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: ["
-        "{b: {$eq: 2.1}, c: {$eq: 2.1}}, "
-        "{b: {$eq: 2.2}, c: {$eq: 2.2}}, "
-        "{b: {$eq: 3}, c: {$eq: 3}, d: {$eq: 3}}, "
-        "{b: {$eq: 4}, c: {$eq: 4}, d: {$eq: 4}, e: {$eq: 4}} "
-        "]}, node: {ixscan: {pattern: {a: 1, d: 1}}}}}}");
-    assertSolutionExists(
-        "{fetch: {filter: {$or: ["
-        "{b: {$eq: 2.1}, c: {$eq: 2.1}}, "
-        "{b: {$eq: 2.2}, c: {$eq: 2.2}}, "
-        "{b: {$eq: 3}, c: {$eq: 3}, d: {$eq: 3}}, "
-        "{b: {$eq: 4}, c: {$eq: 4}, d: {$eq: 4}, e: {$eq: 4}} "
-        "]}, node: {ixscan: {pattern: {a: 1, e: 1}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
@@ -2887,9 +2830,9 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
                  " ]}"
                  "]}}"));
 
-    // The $or enumeration is limited to 10, and then we have 4 plans where just the {a: 1}
-    // predicate is indexed.
-    assertNumSolutions(14U);
+    // The $or enumeration is limited to 10, plus one plan where just the {a: 1} predicate is
+    // indexed.
+    assertNumSolutions(11U);
 
     // Both lockstep enumerations should be present.
     assertSolutionExists(

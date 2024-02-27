@@ -19,8 +19,9 @@ db.getCollection("mrOutput").drop();
 
 coll.createIndex({a: 1, c: 1});
 coll.createIndex({b: 1, c: 1});
-coll.createIndex({a: 1});
-coll.createIndex({b: 1});
+// Use descending indexes to avoid index deduplication.
+coll.createIndex({a: -1});
+coll.createIndex({b: -1});
 
 assert.commandWorked(coll.insert({a: 2}));
 assert.commandWorked(coll.insert({b: 3}));

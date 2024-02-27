@@ -164,7 +164,8 @@ assert.commandWorked(coll.createIndex({f1: 1}));
 testOrToIn(positiveTestQueries);  // single index
 
 assert.commandWorked(coll.createIndex({f2: 1}));
-assert.commandWorked(coll.createIndex({f1: 1, f2: 1}));
+// Create descending index to avoid index deduplication.
+assert.commandWorked(coll.createIndex({f1: -1, f2: 1}));
 
 testOrToIn(positiveTestQueries);  // three indexes, requires multiplanning
 

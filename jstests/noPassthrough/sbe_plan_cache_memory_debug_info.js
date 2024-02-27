@@ -21,7 +21,7 @@ function createTestCollection(collectionName) {
     const coll = db[collectionName];
     coll.drop();
     // Create multiple indexes to ensure we go through the multi-planner.
-    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {a: 1, b: 1}, {b: 1, a: 1}]));
+    assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {a: -1, b: -1}, {b: -1, a: -1}]));
     return coll;
 }
 

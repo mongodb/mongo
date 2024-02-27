@@ -36,11 +36,13 @@ struct PlanEnumeratorExplainInfo {
     bool hitIndexedOrLimit = false;
     bool hitIndexedAndLimit = false;
     bool hitScanLimit = false;
+    bool prunedAnyIndexes = false;
 
     void merge(PlanEnumeratorExplainInfo other) {
         hitIndexedOrLimit = hitIndexedOrLimit || other.hitIndexedOrLimit;
         hitIndexedAndLimit = hitIndexedAndLimit || other.hitIndexedAndLimit;
         hitScanLimit = hitScanLimit || other.hitScanLimit;
+        prunedAnyIndexes = prunedAnyIndexes || other.prunedAnyIndexes;
     }
 };
 }  // namespace mongo

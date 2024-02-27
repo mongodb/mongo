@@ -69,6 +69,7 @@ selector:
   - jstests/core/query/explain/**/*.js
   - jstests/core/query/expr/expr_index_use.js
   - jstests/core/query/idhack.js
+  - jstests/core/query/index_deduplication.js
   - jstests/core/query/introspect_hidden_index_plan_cache_entries.js
   - jstests/core/query/or/or3.js
   - jstests/core/query/or/or_to_in.js

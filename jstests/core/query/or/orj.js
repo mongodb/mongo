@@ -100,7 +100,7 @@ t.dropIndexes();
 
 t.createIndex({a: 1});
 t.createIndex({b: 1});
-t.createIndex({a: 1, b: 1});
+t.createIndex({a: -1, b: 1});
 check();
 
 function checkHinted(hint) {
@@ -158,4 +158,4 @@ function checkHinted(hint) {
 checkHinted({$natural: 1});
 checkHinted({a: 1});
 checkHinted({b: 1});
-checkHinted({a: 1, b: 1});
+checkHinted({a: -1, b: 1});

@@ -8,7 +8,7 @@ const coll = db.ne_array_indexability;
 coll.drop();
 
 coll.createIndex({"obj": 1});
-coll.createIndex({"obj": 1, "abc": 1});
+coll.createIndex({"obj": -1});
 
 assert.commandWorked(coll.insert({obj: "hi there"}));
 

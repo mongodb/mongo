@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2024-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,30 +29,38 @@
 
 #pragma once
 
-#include <utility>
+#include <memory>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/plan_enumerator/enumerator_memo.h"
+#include "mongo/db/query/projection.h"
 
 namespace mongo {
+namespace plan_enumerator {
 
 /*
- * "moves" keys and values out of the map and passes them into the consumer function to own. This
- * can be used to avoid copies if the key and value in the map have heap allocations.
+ * Additional information about the query that is required for pruning the memo.
  */
-template <class MapType, class ConsumerType>
-static void extractFromMap(MapType map, const ConsumerType& consumer) {
-    while (!map.empty()) {
-        auto entry = map.extract(map.begin());
-        consumer(std::move(entry.key()), std::move(entry.mapped()));
-    }
-}
+struct QueryPruningInfo {
+    const projection_ast::Projection* projection;
+    const boost::optional<stdx::unordered_set<std::string>>& sortPatFields;
+    const BSONObj& shardKey;
+    const std::vector<IndexEntry>* indices;
+};
 
 /*
- * Similar to `extractFromMap` but for sets.
+ * Prunes index assignments from the memo if they are interchangeable with another existing
+ * assignment. Interchangeable means they provide no additional value or information over the other
+ * index. For example {a: 1} vs {a: 1, b: 1} if we have a query a=1 are interchangeable.
+ * This pruning is done as a step after memo preparation to make sure we output a set of plans that
+ * are sufficiently distinct from each other.
+ * Returns true if any indexes were pruned, otherwise false.
  */
-template <class SetType, class ConsumerType>
-static void extractFromSet(SetType set, const ConsumerType& consumer) {
-    while (!set.empty()) {
-        auto entry = set.extract(set.begin());
-        consumer(std::move(entry.value()));
-    }
-}
+bool pruneMemoOfDupIndexes(stdx::unordered_map<MemoID, std::unique_ptr<NodeAssignment>>& memo,
+                           const QueryPruningInfo& queryInfo);
+
+}  // namespace plan_enumerator
 }  // namespace mongo

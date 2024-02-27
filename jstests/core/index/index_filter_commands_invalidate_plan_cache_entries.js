@@ -36,7 +36,7 @@ function initCollection(collection) {
     // We need multiple indexes so that the multi-planner is executed.
     assert.commandWorked(collection.createIndex({a: 1}));
     assert.commandWorked(collection.createIndex({b: 1}));
-    assert.commandWorked(collection.createIndex({a: 1, b: 1}));
+    assert.commandWorked(collection.createIndex({a: -1, b: 1}));
     assert.commandWorked(collection.insert({a: 1, b: 1, c: 1}));
 }
 initCollection(coll);

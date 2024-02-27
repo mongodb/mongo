@@ -61,7 +61,7 @@ runWithParamsAllNodes(db, [{key: "internalCascadesOptimizerDisableFastPath", val
 
     // We need two indexes so that the multi-planner is executed.
     assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(coll.createIndex({a: 1, b: 1}));
+    assert.commandWorked(coll.createIndex({a: -1, b: 1}));
 
     if (!isBonsaiEnabled && !isBonsaiPlanCacheEnabled) {
         // TODO SERVER-85728: Re-enable index scans for Bonsai plan cache tests.

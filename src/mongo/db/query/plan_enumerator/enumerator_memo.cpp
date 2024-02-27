@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/plan_enumerator/memo.h"
+#include "mongo/db/query/plan_enumerator/enumerator_memo.h"
 
 namespace mongo {
 namespace plan_enumerator {

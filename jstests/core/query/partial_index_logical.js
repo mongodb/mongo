@@ -27,7 +27,7 @@ coll.drop();
     // queries are not cached).
     assert.commandWorked(coll.createIndex({num: 1}, {partialFilterExpression: {num: 5, foo: 6}}));
     assert.commandWorked(coll.createIndex({num: -1}));
-    assert.commandWorked(coll.createIndex({num: -1, not_num: 1}));
+    assert.commandWorked(coll.createIndex({num: 1, not_num: 1}));
 
     assert.commandWorked(coll.insert([
         {_id: 0, num: 5, foo: 6},
@@ -66,7 +66,7 @@ coll.drop();
         {num: 1},
         {partialFilterExpression: {$or: [{num: {$exists: true}}, {num: {$type: 'number'}}]}}));
     assert.commandWorked(coll.createIndex({num: -1}));
-    assert.commandWorked(coll.createIndex({num: -1, not_num: 1}));
+    assert.commandWorked(coll.createIndex({num: 1, not_num: 1}));
 
     assert.commandWorked(coll.insert([
         {_id: 0},
@@ -107,7 +107,7 @@ coll.drop();
         collation: caseInsensitive,
     }));
     assert.commandWorked(coll.createIndex({a: -1}));
-    assert.commandWorked(coll.createIndex({a: -1, b: 1}));
+    assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
     assert.commandWorked(coll.insert([
         {_id: 0, a: "some"},
@@ -148,7 +148,7 @@ coll.drop();
     assert.commandWorked(
         coll.createIndex({num: 1}, {partialFilterExpression: {num: {$gt: 0, $lt: 10}}}));
     assert.commandWorked(coll.createIndex({num: -1}));
-    assert.commandWorked(coll.createIndex({num: -1, not_num: 1}));
+    assert.commandWorked(coll.createIndex({num: 1, not_num: 1}));
 
     assert.commandWorked(coll.insert([
         {_id: 0},

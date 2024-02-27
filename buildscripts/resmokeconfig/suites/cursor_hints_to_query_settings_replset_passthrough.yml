@@ -22,6 +22,7 @@ selector:
     - jstests/core/index/index_multikey.js
     - jstests/core/query/covered_multikey.js
     - jstests/core/query/explain/explain_shell_helpers.js
+    - jstests/core/query/index_deduplication.js
     - jstests/core/query/internal_hash_eq/lookup_using_hash_key.js
     - jstests/core/return_key.js
 

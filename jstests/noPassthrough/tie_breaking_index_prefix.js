@@ -161,12 +161,17 @@ function preferShortestIndex() {
     }
 }
 
-function preferShortestIndexWithComparisonsInFilter() {
+function preferShortestIndexWithComparisonsInFilter(indexPruningActive) {
     const indexes = [{a: 1, b: 1, c: 1}, {a: 1, b: 1}];
     const filter = {a: {$gt: 1}, b: "hello"};
     assert.commandWorked(coll.createIndexes(indexes));
 
-    assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}]);
+    // Index pruning would have removed the a/b/c index for us already, so a/b would win.
+    if (indexPruningActive) {
+        assertIndexScan(false, filter, [{a: 1, b: 1}]);
+    } else {
+        assertIndexScan(false, filter, [{a: 1, b: 1, c: 1}]);
+    }
     assertIndexScan(true, filter, [{a: 1, b: 1}]);
 
     for (const index of indexes) {
@@ -256,27 +261,34 @@ function preferLongestPrefixWithIndexesOfSameLength() {
     }
 }
 
-// Running tests.
+// Running tests, with index pruning disabled and then enabled.
+function testWithPruningSetting(indexPruningActive) {
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQueryPlannerEnableIndexPruning: indexPruningActive}));
 
-preferLongestIndexPrefix();
-preferEquality();
-preferClosedIntervalsForType('long', NumberLong(0), NumberLong(1000));
-preferClosedIntervalsForType('double', 0.0, 1000.0);
-preferClosedIntervalsForType('decimal', NumberDecimal(0), NumberDecimal(1000));
-preferClosedIntervalsForType('date', new Date(0), new Date(1000));
-preferClosedIntervalsForType('timestamp', Timestamp(0, 0), Timestamp(1000, 0));
-preferClosedIntervalsForType('string', `abc${1e9}`, `abc${1e9 + 1000}`);
-preferClosedIntervalsForType('object', {'a': 0}, {'a': 1000});
-preferClosedIntervalsForType('objectid', smallObjectID, largeObjectID);
-preferClosedIntervalsForType('array', [], [1000]);
-preferShortestIndex();
-preferShortestIndexWithComparisonsInFilter();
-notBrokenTie();
-multiIntervalIndexBounds();
-nonBlockingSort();
-blockingSort();
-multiIndexScan();
-preferLongestPrefixWithIndexesOfSameLength();
+    preferLongestIndexPrefix();
+    preferEquality();
+    preferClosedIntervalsForType('long', NumberLong(0), NumberLong(1000));
+    preferClosedIntervalsForType('double', 0.0, 1000.0);
+    preferClosedIntervalsForType('decimal', NumberDecimal(0), NumberDecimal(1000));
+    preferClosedIntervalsForType('date', new Date(0), new Date(1000));
+    preferClosedIntervalsForType('timestamp', Timestamp(0, 0), Timestamp(1000, 0));
+    preferClosedIntervalsForType('string', `abc${1e9}`, `abc${1e9 + 1000}`);
+    preferClosedIntervalsForType('object', {'a': 0}, {'a': 1000});
+    preferClosedIntervalsForType('objectid', smallObjectID, largeObjectID);
+    preferClosedIntervalsForType('array', [], [1000]);
+    preferShortestIndex();
+    preferShortestIndexWithComparisonsInFilter(indexPruningActive);
+    notBrokenTie();
+    multiIntervalIndexBounds();
+    nonBlockingSort();
+    blockingSort();
+    multiIndexScan();
+    preferLongestPrefixWithIndexesOfSameLength();
+}
+
+testWithPruningSetting(false);
+testWithPruningSetting(true);
 
 // Test finalization.
 MongoRunner.stopMongod(conn);

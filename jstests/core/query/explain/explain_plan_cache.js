@@ -90,8 +90,8 @@ function predicateTest(explainMode) {
     // Create indexes so we have plan alternatives and need to cache.
     coll.createIndex({a: 1});
     coll.createIndex({b: 1});
-    coll.createIndex({a: 1, b: 1});
-    coll.createIndex({b: 1, a: 1});
+    coll.createIndex({a: -1, b: 1});
+    coll.createIndex({b: -1, a: 1});
 
     // Nothing should be cached at first.
     assertWinningPlanCacheStatus(coll.find({a: {$eq: 1}}).explain(explainMode), false);

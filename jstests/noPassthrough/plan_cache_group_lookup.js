@@ -26,7 +26,7 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "ClassicRuntimePlanningForSbe")) {
 
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1, a1: 1}));
-assert.commandWorked(coll.createIndex({a: 1, a2: 1}));
+assert.commandWorked(coll.createIndex({a: -1, a2: 1}));
 function setupForeignColl(index) {
     foreignColl.drop();
     assert.commandWorked(foreignColl.insert({b: 1}));

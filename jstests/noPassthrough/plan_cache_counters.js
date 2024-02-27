@@ -122,7 +122,7 @@ function runCommandAndCheckPlanCacheMetric({
     // third run when a plan cache entry gets activated.
     {
         command: {find: coll.getName(), filter: {a: 1}, comment: "query two indexes"},
-        indexes: [{a: 1}, {a: 1, b: 1}],
+        indexes: [{a: 1}, {a: -1}],
         expectedCacheBehaviors: [cacheBehavior.miss, cacheBehavior.miss, cacheBehavior.hit]
     },
     // Same query shape as above, should always recover from plan cache.
