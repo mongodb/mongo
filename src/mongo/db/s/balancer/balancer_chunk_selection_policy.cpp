@@ -173,9 +173,11 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
                     IDLParserContext("ShardsvrGetStatsForBalancingReply"), responseValue.data);
             const auto collStatsFromShard = reply.getStats();
 
-            invariant(collStatsFromShard.size() == collections.size());
+            tassert(8245200,
+                    "Collection count mismatch",
+                    collStatsFromShard.size() == collections.size());
             for (const auto& stats : collStatsFromShard) {
-                invariant(dataSizeInfoMap.contains(stats.getNs()));
+                tassert(8245201, "Namespace not found", dataSizeInfoMap.contains(stats.getNs()));
                 dataSizeInfoMap.at(stats.getNs()).shardToDataSizeMap[shardId] = stats.getCollSize();
             }
         } catch (const ExceptionFor<ErrorCodes::ShardNotFound>& ex) {
@@ -234,7 +236,9 @@ public:
             it->second.splitKeys.push_back(splitPoint);
         } else {
             // Split points must come in order
-            invariant(splitPoint.woCompare(it->second.splitKeys.back()) == 0);
+            tassert(8245202,
+                    "Split points are out of order",
+                    splitPoint.woCompare(it->second.splitKeys.back()) == 0);
         }
     }
 
@@ -274,7 +278,9 @@ void getSplitCandidatesToEnforceZoneRanges(const ChunkManager& cm,
         const auto& zoneRange = zoneRangeEntry.second;
 
         const auto chunkAtZoneMin = cm.findIntersectingChunkWithSimpleCollation(zoneRange.min);
-        invariant(chunkAtZoneMin.getMax().woCompare(zoneRange.min) > 0);
+        tassert(8245203,
+                "Chunk's max is smaller than zone's min",
+                chunkAtZoneMin.getMax().woCompare(zoneRange.min) > 0);
 
         if (chunkAtZoneMin.getMin().woCompare(zoneRange.min)) {
             splitCandidates->addSplitPoint(chunkAtZoneMin, zoneRange.min);
@@ -364,8 +370,6 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicy::selectChunksToMove(
     const std::vector<ClusterStatistics::ShardStatistics>& shardStats,
     stdx::unordered_set<ShardId>* availableShards,
     stdx::unordered_set<NamespaceString>* imbalancedCollectionsCachePtr) {
-    invariant(availableShards);
-    invariant(imbalancedCollectionsCachePtr);
 
     if (availableShards->size() < 2) {
         return MigrateInfoVector{};

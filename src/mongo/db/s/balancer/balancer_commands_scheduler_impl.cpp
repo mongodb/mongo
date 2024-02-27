@@ -356,7 +356,9 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
 void BalancerCommandsSchedulerImpl::_applySubmissionResult(
     WithLock, CommandSubmissionResult&& submissionResult) {
     auto submittedRequestIt = _requests.find(submissionResult.id);
-    invariant(submittedRequestIt != _requests.end());
+    tassert(8245206,
+            "Submission result ID not found in the requests",
+            submittedRequestIt != _requests.end());
     auto& submittedRequest = submittedRequestIt->second;
     auto submissionOutcome = submittedRequest.applySubmissionResult(std::move(submissionResult));
     if (!submissionOutcome.isOK()) {
@@ -373,9 +375,9 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
     UUID requestId, const executor::RemoteCommandResponse& response) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        invariant(_state != SchedulerState::Stopped);
+        tassert(8245207, "Scheduler is stopped", _state != SchedulerState::Stopped);
         auto requestIt = _requests.find(requestId);
-        invariant(requestIt != _requests.end());
+        tassert(8245208, "Request ID is already in use", requestIt != _requests.end());
         auto& request = requestIt->second;
         request.setOutcome(response);
         _recentlyCompletedRequestIds.emplace_back(request.getId());
@@ -413,7 +415,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         // 1. Check the internal state and plan for the actions to be taken ont this round.
         {
             stdx::unique_lock<Latch> ul(_mutex);
-            invariant(_state != SchedulerState::Stopped);
+            tassert(8245209, "Scheduler is stopped", _state != SchedulerState::Stopped);
             _stateUpdatedCV.wait(ul, [this] {
                 return ((!_unsubmittedRequestIds.empty() &&
                          !MONGO_likely(pauseSubmissionsFailPoint.shouldFail())) ||

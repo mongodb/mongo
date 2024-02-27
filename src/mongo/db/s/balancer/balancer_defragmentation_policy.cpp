@@ -272,7 +272,9 @@ public:
             auto it = _shardToProcess ? _pendingActionsByShards.find(*_shardToProcess)
                                       : _pendingActionsByShards.begin();
 
-            invariant(it != _pendingActionsByShards.end());
+            tassert(8245212,
+                    "Shard to process not found in pending actions",
+                    it != _pendingActionsByShards.end());
 
             auto& [shardId, pendingActions] = *it;
             auto shardVersion = getShardVersion(opCtx, shardId, _nss);
@@ -513,7 +515,7 @@ public:
             }
 
             // We have a chunk that can be moved&merged with at least one sibling. Choose one...
-            invariant(candidateSiblings.size() <= 2);
+            tassert(8245213, "Chunk has too many siblings", candidateSiblings.size() <= 2);
             auto targetSibling = candidateSiblings.front();
             if (auto challenger = candidateSiblings.back(); targetSibling != challenger) {
                 auto targetScore = _rankMergeableSibling(*nextSmallChunk, *targetSibling);
@@ -553,7 +555,9 @@ public:
                                            return (migrationAction.minKey.woCompare(
                                                        request.getMigrationMinKey()) == 0);
                                        });
-                      invariant(match != _outstandingMigrations.end());
+                      tassert(8245214,
+                              "MigrationAction not found",
+                              match != _outstandingMigrations.end());
                       MoveAndMergeRequest moveRequest(std::move(*match));
                       _outstandingMigrations.erase(match);
 
@@ -568,7 +572,9 @@ public:
                                   _nss, boost::none, moveRequest.getDestinationShard());
 
                           auto transferredAmount = moveRequest.getMovedDataSizeBytes();
-                          invariant(transferredAmount <= _smallChunkSizeThresholdBytes);
+                          tassert(8245215,
+                                  "Unexpected amount of transferred data during chunk migration",
+                                  transferredAmount <= _smallChunkSizeThresholdBytes);
                           _shardInfos.at(moveRequest.getSourceShard()).currentSizeBytes -=
                               transferredAmount;
                           _shardInfos.at(moveRequest.getDestinationShard()).currentSizeBytes +=
@@ -643,7 +649,7 @@ public:
                                                     return mergeAction.chunkRange.containsKey(
                                                         request.getMigrationMinKey());
                                                 });
-                      invariant(match != _outstandingMerges.end());
+                      tassert(8245216, "MergeAction not found", match != _outstandingMerges.end());
                       MoveAndMergeRequest mergeRequest(std::move(*match));
                       _outstandingMerges.erase(match);
 
@@ -1138,10 +1144,15 @@ public:
         auto it = _shardToProcess ? _unmergedRangesByShard.find(*_shardToProcess)
                                   : _unmergedRangesByShard.begin();
 
-        invariant(it != _unmergedRangesByShard.end());
+        tassert(8245217,
+                str::stream() << "Shard to process not found in unmerged ranges. ShardId: "
+                              << *_shardToProcess,
+                it != _unmergedRangesByShard.end());
 
         auto& [shardId, unmergedRanges] = *it;
-        invariant(!unmergedRanges.empty());
+        tassert(8245218,
+                str::stream() << "Unmerged ranges is empty. ShardId: " << *_shardToProcess,
+                !unmergedRanges.empty());
         auto shardVersion = getShardVersion(opCtx, shardId, _nss);
         const auto& rangeToMerge = unmergedRanges.back();
         boost::optional<BalancerStreamAction> nextAction = boost::optional<BalancerStreamAction>(

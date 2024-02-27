@@ -84,7 +84,7 @@ boost::optional<std::pair<CollectionType, ChunkType>> getRandomUnsplittableColle
         return {};
     }
     auto& chunks = swChunks.getValue();
-    invariant(chunks.size() == 1);
+    tassert(8245243, "Unsplittable collection has more than one chunk", chunks.size() == 1);
 
     return std::make_pair(*selectedCollection, chunks[0]);
 }
@@ -93,7 +93,9 @@ boost::optional<std::pair<CollectionType, ChunkType>> getRandomUnsplittableColle
 MoveUnshardedPolicy::MoveUnshardedPolicy()
     : fpBalancerShouldReturnRandomMigrations(
           globalFailPointRegistry().find("balancerShouldReturnRandomMigrations")) {
-    invariant(fpBalancerShouldReturnRandomMigrations != nullptr);
+    tassert(8245244,
+            "balancerShouldReturnRandomMigrations failpoint is not registered",
+            fpBalancerShouldReturnRandomMigrations != nullptr);
 }
 
 
@@ -152,9 +154,10 @@ MigrateInfoVector MoveUnshardedPolicy::selectCollectionsToMove(
                     return *availableShard;
                 }
             }
+            tasserted(8245245, "Destination does not exist");
+
             return {};
         }();
-        invariant(destinationShardId.has_value());
 
         result.emplace_back(MigrateInfo(*destinationShardId,
                                         collectionToMove.getNss(),

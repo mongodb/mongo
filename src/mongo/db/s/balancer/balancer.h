@@ -320,7 +320,7 @@ private:
 
     std::unique_ptr<MoveUnshardedPolicy> _moveUnshardedPolicy;
 
-    std::unique_ptr<stdx::unordered_set<NamespaceString>> _imbalancedCollectionsCache;
+    stdx::unordered_set<NamespaceString> _imbalancedCollectionsCache;
 };
 
 }  // namespace mongo

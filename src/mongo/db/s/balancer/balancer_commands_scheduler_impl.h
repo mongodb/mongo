@@ -384,7 +384,7 @@ public:
           _completedOrAborted(false),
           _commandInfo(std::move(commandInfo)),
           _responsePromise{NonNullPromiseTag{}} {
-        invariant(_commandInfo);
+        tassert(8245210, "CommandInfo is be empty", _commandInfo);
     }
 
     RequestData(RequestData&& rhs)
@@ -404,7 +404,7 @@ public:
     }
 
     Status applySubmissionResult(CommandSubmissionResult&& submissionResult) {
-        invariant(_id == submissionResult.id);
+        tassert(8245211, "Result ID does not match request ID", _id == submissionResult.id);
         if (_completedOrAborted) {
             // A remote response was already received by the time the submission gets processed.
             // Keep the original outcome and continue the workflow.
