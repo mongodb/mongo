@@ -234,14 +234,6 @@ tasks:
   - func: "verify build output present"
     vars:
       output: build/fast/mongo/db/commands/libfsync_locked.a
-  - func: "bazel compile (gcc)"
-    vars:
-      targets: src/mongo/db/commands:fsync_locked
-      compiler: gcc
-  - func: "bazel compile (clang)"
-    vars:
-      targets: src/mongo/db/commands:fsync_locked
-      compiler: clang
 
 - name: compile_bazel_dist_test_windows
   tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
@@ -268,38 +260,10 @@ tasks:
     vars:
       output: build/fast/mongo/db/commands/fsync_locked.lib
 
-- name: compile_bazel_dist_test_macos
-  tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-  - func: "fetch bazel"
-  - func: "scons compile"
-    vars:
-      targets: >-
-        build/fast/mongo/db/commands/libfsync_locked.a
-        build/fast/mongo/db/commands/libtest_commands_enabled.a
-      # MacOS needs the sandbox_writable_path set to tmpdir to allow the bazel sandbox to write to /data/mci/{id}/tmp
-      task_compile_flags: >-
-        BAZEL_BUILD_ENABLED=1
-        BAZEL_INTEGRATION_DEBUG=1
-        BAZEL_FLAGS="--subcommands --verbose_failures --sandbox_debug"
-        ICECC=
-        --build-profile=fast
-        --ninja=disabled
-        --link-model=static
-        --modules=
-  - func: "verify build output present"
-    vars:
-      output: build/fast/mongo/db/commands/libfsync_locked.a
-
-
 # Validates that the bazel mongo toolchain can be used to compile targets that
 # contain C and asssembly source code files.
 # TODO(SERVER-82195): simplify this to avoid duplication of parameters in other tests.
-- name: compile_bazel_c_and_asm_targets
+- name: compile_bazel_c_and_asm_targets_gcc
   tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
   depends_on:
   - name: version_expansions_gen
@@ -2356,7 +2320,7 @@ task_groups:
   tags: []
   tasks:
   - compile_bazel_dist_test
-  - compile_bazel_c_and_asm_targets
+  - compile_bazel_c_and_asm_targets_gcc
   - compile_bazel_libunwind
   - compile_bazel_program
   - run_bazel_scons_unittest
@@ -2380,7 +2344,7 @@ task_groups:
   name: compile_bazel_macos_TG
   tags: []
   tasks:
-  - compile_bazel_dist_test_macos
+  - compile_bazel_dist_test
 
 - <<: *compile_task_group_template
   name: compile_upload_benchmarks_TG

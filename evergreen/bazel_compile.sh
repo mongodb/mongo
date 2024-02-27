@@ -46,4 +46,4 @@ else
   BAZEL_BINARY=$TMPDIR/bazelisk
 fi
 
-$BAZEL_BINARY build --verbose_failures $LOCAL_ARG --//bazel/config:compiler_type=${compiler} ${args} ${targets}
+eval $BAZEL_BINARY build --verbose_failures $LOCAL_ARG --//bazel/config:compiler_type=${compiler} ${args} ${targets}

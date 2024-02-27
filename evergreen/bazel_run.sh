@@ -46,4 +46,4 @@ if [[ $ARCH == "ppc64le" ]]; then
   export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-11.0.4.11-2.el8.ppc64le"
 fi
 
-$BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target}
+eval $BAZEL_BINARY run --verbose_failures $LOCAL_ARG ${args} ${target}

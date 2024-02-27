@@ -283,7 +283,8 @@ def bazel_batch_build_thread(log_dir: str) -> None:
 
             if targets_to_build:
                 bazel_debug(
-                    f"BAZEL_COMMAND: {Globals.bazel_base_build_command + list(targets_to_build)}")
+                    f"BAZEL_COMMAND: {' '.join(Globals.bazel_base_build_command + list(targets_to_build))}"
+                )
                 start_time = time.time()
                 bazel_proc = subprocess.run(
                     Globals.bazel_base_build_command + list(targets_to_build),
