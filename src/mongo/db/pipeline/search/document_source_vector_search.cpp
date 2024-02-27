@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/db/pipeline/search/document_source_vector_search.h"
 
 #include "mongo/base/string_data.h"
@@ -34,6 +36,7 @@
 #include "mongo/db/pipeline/search/lite_parsed_search.h"
 #include "mongo/db/pipeline/search/vector_search_helper.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
+#include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/search/mongot_cursor.h"
 #include "mongo/db/query/search/search_task_executors.h"
 #include "mongo/db/query/vector_search/filter_validator.h"
@@ -95,10 +98,17 @@ Value DocumentSourceVectorSearch::serialize(const SerializationOptions& opts) co
     }
 
     if (_filterExpr) {
-        // We need to serialize the parsed match expression rather than the generic BSON object to
-        // correctly handle keywords.
-        baseObj = baseObj.addFields(
-            BSON(VectorSearchSpec::kFilterFieldName << _filterExpr->serialize(opts)));
+        // Send the unparsed filter to avoid performing transformations mongot doesn't have
+        // implemented. Specifically this refers to operators like $neq and $nin which in a sharded
+        // environment are desugared to {$not: {$and: [...]}}. We may want to change this to send
+        // the parsed version once mongot supports $not.
+        if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+            baseObj = baseObj.addFields(
+                BSON(VectorSearchSpec::kFilterFieldName << _request.getFilter().get()));
+        } else {
+            baseObj = baseObj.addFields(
+                BSON(VectorSearchSpec::kFilterFieldName << _filterExpr->serialize(opts)));
+        }
     }
 
     // We don't want mongos to make a remote call to mongot even though it can generate explain
