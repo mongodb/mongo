@@ -191,5 +191,49 @@ TEST(Schema, LookupMapMemoryUsage) {
     ASSERT_LTE(memUsageLargeStringInsert,
                memUsageSmallStringInsert + (3 * expectedAdditionalMemUsage));
 }
+
+TEST(Schema, UpdateValue) {
+    Schema schema;
+    ASSERT_EQ(schema.update(BSON("a" << 1), boost::none, nullptr), Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << 2), boost::none, nullptr), Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << 3 << "b" << 1), boost::none, nullptr),
+              Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("b" << 2), boost::none, nullptr), Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << BSONUndefined), boost::none, nullptr),
+              Schema::UpdateStatus::Failed);
+    ASSERT_EQ(schema.update(BSON("a" << BSON("b" << 1)), boost::none, nullptr),
+              Schema::UpdateStatus::Failed);
+    ASSERT_EQ(schema.update(BSON("a" << BSON_ARRAY(1)), boost::none, nullptr),
+              Schema::UpdateStatus::Failed);
+}
+
+TEST(Schema, UpdateArray) {
+    Schema schema;
+    ASSERT_EQ(schema.update(BSON("a" << BSON_ARRAY(1)), boost::none, nullptr),
+              Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << BSON_ARRAY(2)), boost::none, nullptr),
+              Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << BSON_ARRAY(1 << 2)), boost::none, nullptr),
+              Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << BSONUndefined), boost::none, nullptr),
+              Schema::UpdateStatus::Failed);
+    ASSERT_EQ(schema.update(BSON("a" << 1), boost::none, nullptr), Schema::UpdateStatus::Failed);
+    ASSERT_EQ(schema.update(BSON("a" << BSON("b" << 1)), boost::none, nullptr),
+              Schema::UpdateStatus::Failed);
+}
+
+TEST(Schema, UpdateObject) {
+    Schema schema;
+    ASSERT_EQ(schema.update(BSON("a" << BSON("b" << 1)), boost::none, nullptr),
+              Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << BSON("b" << 2)), boost::none, nullptr),
+              Schema::UpdateStatus::Updated);
+    ASSERT_EQ(schema.update(BSON("a" << 1), boost::none, nullptr), Schema::UpdateStatus::Failed);
+    ASSERT_EQ(schema.update(BSON("a" << BSONUndefined), boost::none, nullptr),
+              Schema::UpdateStatus::Failed);
+    ASSERT_EQ(schema.update(BSON("a" << BSON_ARRAY(1)), boost::none, nullptr),
+              Schema::UpdateStatus::Failed);
+}
+
 }  // namespace
 }  // namespace mongo::timeseries::bucket_catalog
