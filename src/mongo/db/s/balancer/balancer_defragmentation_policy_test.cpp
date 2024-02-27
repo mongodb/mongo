@@ -192,7 +192,7 @@ protected:
                                     uint64_t currentSizeBytes,
                                     bool draining = false,
                                     std::set<std::string>&& zones = {}) {
-        return ShardStatistics(id, currentSizeBytes, draining, zones, "");
+        return ShardStatistics(id, currentSizeBytes, draining, zones);
     }
 
     void setDefaultClusterStats(const std::vector<NamespaceString>& nssList = {kNss1}) {

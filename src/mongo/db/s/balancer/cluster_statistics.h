@@ -67,14 +67,12 @@ public:
                         uint64_t currSizeBytes,
                         bool isDraining,
                         std::set<std::string> shardZones,
-                        std::string mongoVersion,
                         use_bytes_t t);
 
         ShardStatistics(ShardId shardId,
                         uint64_t currSizeMB,
                         bool isDraining,
-                        std::set<std::string> shardZones,
-                        std::string mongoVersion);
+                        std::set<std::string> shardZones);
 
         // The id of the shard for which this statistic applies
         ShardId shardId;
@@ -87,9 +85,6 @@ public:
 
         // Set of zones for the shard
         std::set<std::string> shardZones;
-
-        // Version of mongod, which runs on this shard's primary
-        std::string mongoVersion;
     };
 
     virtual ~ClusterStatistics();

@@ -51,24 +51,20 @@ ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inCurrSizeBytes,
                                                     bool inIsDraining,
                                                     std::set<std::string> inShardZones,
-                                                    std::string inMongoVersion,
                                                     use_bytes_t t)
     : shardId(std::move(inShardId)),
       currSizeBytes(inCurrSizeBytes),
       isDraining(inIsDraining),
-      shardZones(std::move(inShardZones)),
-      mongoVersion(std::move(inMongoVersion)) {}
+      shardZones(std::move(inShardZones)) {}
 
 ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inCurrSizeMB,
                                                     bool inIsDraining,
-                                                    std::set<std::string> inShardZones,
-                                                    std::string inMongoVersion)
+                                                    std::set<std::string> inShardZones)
     : ShardStatistics(inShardId,
                       convertMBToBytes(inCurrSizeMB),
                       inIsDraining,
                       std::move(inShardZones),
-                      std::move(inMongoVersion),
                       use_bytes_t{}) {}
 
 }  // namespace mongo

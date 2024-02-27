@@ -67,52 +67,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
-namespace {
-
-const char kVersionField[] = "version";
-
-/**
- * Executes the serverStatus command against the specified shard and obtains the version of the
- * running MongoD service.
- *
- * Returns the MongoD version in strig format or an error. Known error codes are:
- *  ShardNotFound if shard by that id is not available on the registry
- *  NoSuchKey if the version could not be retrieved
- */
-StatusWith<std::string> retrieveShardMongoDVersion(OperationContext* opCtx, ShardId shardId) {
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    auto shardStatus = shardRegistry->getShard(opCtx, shardId);
-    if (!shardStatus.isOK()) {
-        return shardStatus.getStatus();
-    }
-    auto shard = shardStatus.getValue();
-
-    auto commandResponse =
-        shard->runCommandWithFixedRetryAttempts(opCtx,
-                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                                DatabaseName::kAdmin,
-                                                BSON("serverStatus" << 1),
-                                                Shard::RetryPolicy::kIdempotent);
-    if (!commandResponse.isOK()) {
-        return commandResponse.getStatus();
-    }
-    if (!commandResponse.getValue().commandStatus.isOK()) {
-        return commandResponse.getValue().commandStatus;
-    }
-
-    BSONObj serverStatus = std::move(commandResponse.getValue().response);
-
-    std::string version;
-    Status status = bsonExtractStringField(serverStatus, kVersionField, &version);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return version;
-}
-}  // namespace
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
 
@@ -165,22 +120,7 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
                                       << shard.getName());
         }
 
-        std::string mongoDVersion;
-
-        auto mongoDVersionStatus = retrieveShardMongoDVersion(opCtx, shard.getName());
-        if (mongoDVersionStatus.isOK()) {
-            mongoDVersion = std::move(mongoDVersionStatus.getValue());
-        } else {
-            // Since the mongod version is only used for reporting, there is no need to fail the
-            // entire round if it cannot be retrieved, so just leave it empty
-            LOGV2(21895,
-                  "Unable to obtain shard version",
-                  "shardId"_attr = shard.getName(),
-                  "error"_attr = mongoDVersionStatus.getStatus());
-        }
-
         std::set<std::string> shardZones;
-
         for (const auto& shardZone : shard.getTags()) {
             shardZones.insert(shardZone);
         }
@@ -189,7 +129,6 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
                            shardSizeStatus.getValue(),
                            shard.getDraining(),
                            std::move(shardZones),
-                           std::move(mongoDVersion),
                            ShardStatistics::use_bytes_t{});
     }
 

@@ -91,28 +91,12 @@ protected:
     }
 
     /**
-     * Sets up mock network to expect a serverStatus command and returns a BSON response with
-     * a dummy version.
-     */
-    void expectServerStatusCommand() {
-        BSONObjBuilder resultBuilder;
-        CommandHelpers::appendCommandStatusNoThrow(resultBuilder, Status::OK());
-
-        onCommand([&resultBuilder](const RemoteCommandRequest& request) {
-            ASSERT(request.cmdObj["serverStatus"]);
-            resultBuilder.append("version", "MONGO_VERSION");
-            return resultBuilder.obj();
-        });
-    }
-
-    /**
      * Sets up mock network for all the shards to expect the commands executed for computing cluster
      * stats, which include listDatabase and serverStatus.
      */
     void expectGetStatsCommands(int numShards) {
         for (int i = 0; i < numShards; i++) {
             expectListDatabasesCommand();
-            expectServerStatusCommand();
         }
     }
 

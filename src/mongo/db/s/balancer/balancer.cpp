@@ -251,34 +251,6 @@ protected:
     int _numCompleted;
 };
 
-/**
- * Occasionally prints a log message with shard versions if the versions are not the same
- * in the cluster.
- */
-void warnOnMultiVersion(const vector<ClusterStatistics::ShardStatistics>& clusterStats) {
-    static const auto& majorMinorRE = *new pcre::Regex(R"re(^(\d+)\.(\d+)\.)re");
-    auto&& vii = VersionInfoInterface::instance();
-    auto hasMyVersion = [&](auto&& stat) {
-        auto m = majorMinorRE.match(stat.mongoVersion);
-        return m && std::stoi(std::string{m[1]}) == vii.majorVersion() &&
-            std::stoi(std::string{m[2]}) == vii.minorVersion();
-    };
-
-    // If we're all the same version, don't message
-    if (std::all_of(clusterStats.begin(), clusterStats.end(), hasMyVersion))
-        return;
-
-    BSONObjBuilder shardVersions;
-    for (const auto& stat : clusterStats) {
-        shardVersions << stat.shardId << stat.mongoVersion;
-    }
-
-    LOGV2_WARNING(21875,
-                  "Multiversion cluster detected",
-                  "localVersion"_attr = vii.version(),
-                  "shardVersions"_attr = shardVersions.done());
-}
-
 Chunk getChunkForMaxBound(const ChunkManager& cm, const BSONObj& max) {
     boost::optional<Chunk> chunkWithMaxBound;
     cm.forEachChunk([&](const auto& chunk) {
@@ -1022,11 +994,6 @@ void Balancer::_mainThread() {
                         "Start balancing round",
                         "waitForDelete"_attr = balancerConfig->waitForDelete(),
                         "secondaryThrottle"_attr = balancerConfig->getSecondaryThrottle().toBSON());
-
-            static Occasionally sampler;
-            if (sampler.tick()) {
-                warnOnMultiVersion(uassertStatusOK(_clusterStats->getStats(opCtx.get())));
-            }
 
             // Collect and apply up-to-date configuration values on the cluster collections.
             _defragmentationPolicy->startCollectionDefragmentations(opCtx.get());
