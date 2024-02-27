@@ -168,8 +168,8 @@ public:
             return true;
         } else if (cmdObj.hasElement("getLastStableRecoveryTimestamp")) {
             try {
-                shard_role_details::getLocker(opCtx)->setAdmissionPriority(
-                    AdmissionContext::Priority::kImmediate);
+                ScopedAdmissionPriority admissionPriority(opCtx,
+                                                          AdmissionContext::Priority::kImmediate);
                 // We need to hold the lock so that we don't run when storage is being shutdown.
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,

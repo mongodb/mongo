@@ -1241,27 +1241,26 @@ TEST_F(LockerTest, SetTicketAcquisitionForLockRAIIType) {
     auto opCtx = makeOperationContext();
 
     // By default, ticket acquisition is required.
-    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
     {
-        ScopedAdmissionPriorityForLock setTicketAquisition(
-            shard_role_details::getLocker(opCtx.get()), AdmissionContext::Priority::kImmediate);
-        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
+        ScopedAdmissionPriority setTicketAquisition(opCtx.get(),
+                                                    AdmissionContext::Priority::kImmediate);
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
     }
 
-    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
+    ASSERT_TRUE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
-    shard_role_details::getLocker(opCtx.get())
-        ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
-    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
+    ScopedAdmissionPriority admissionPriority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 
     {
-        ScopedAdmissionPriorityForLock setTicketAquisition(
-            shard_role_details::getLocker(opCtx.get()), AdmissionContext::Priority::kImmediate);
-        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
+        ScopedAdmissionPriority setTicketAquisition(opCtx.get(),
+                                                    AdmissionContext::Priority::kImmediate);
+        ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
     }
 
-    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket());
+    ASSERT_FALSE(shard_role_details::getLocker(opCtx.get())->shouldWaitForTicket(opCtx.get()));
 }
 
 // This test exercises the lock dumping code in ~Locker in case locks are held on destruction.

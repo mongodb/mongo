@@ -238,7 +238,7 @@ private:
     bool _endKeyInclusive;
 
     bool _lowPriority;
-    boost::optional<ScopedAdmissionPriorityForLock> _priority;
+    boost::optional<ScopedAdmissionPriority> _priority;
 };
 
 }  // namespace mongo

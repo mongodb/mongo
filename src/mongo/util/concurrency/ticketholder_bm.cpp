@@ -31,7 +31,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <map>
 #include <memory>
-#include <ratio>
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
@@ -43,7 +42,6 @@
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/latency_distribution.h"
-#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -114,7 +112,11 @@ void BM_acquireAndRelease(benchmark::State& state) {
     }
     double acquired = 0;
 
-    AdmissionContext::Priority priority = [&] {
+    auto client = getGlobalServiceContext()->getService()->makeClient(
+        str::stream() << "test client for thread " << state.thread_index);
+    auto opCtx = client->makeOperationContext();
+
+    ScopedAdmissionPriority admissionPriority(opCtx.get(), [&] {
         switch (admissionsPriority) {
             case AdmissionsPriority::kNormal:
                 return AdmissionContext::Priority::kNormal;
@@ -127,7 +129,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
             default:
                 MONGO_UNREACHABLE;
         }
-    }();
+    }());
 
     TicketHolderFixture<TicketHolderImpl>* fixture = ticketHolder.get();
     // We build the latency distribution locally in order to avoid synchronizing with other threads.
@@ -138,9 +140,8 @@ void BM_acquireAndRelease(benchmark::State& state) {
         Timer timer;
         Microseconds timeForAcquire;
         Microseconds timeInQueue(0);
-        AdmissionContext admCtx;
-        admCtx.setPriority(priority);
         {
+            auto admCtx = AdmissionContext::get(opCtx.get());
             auto ticket = fixture->ticketHolder->waitForTicketUntil(
                 *Interruptible::notInterruptible(), &admCtx, Date_t::max(), timeInQueue);
             timeForAcquire = timer.elapsed();

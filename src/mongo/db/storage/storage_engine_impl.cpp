@@ -1304,8 +1304,8 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
 
                 // The TimestampMonitor is an important background cleanup task for the storage
                 // engine and needs to be able to make progress to free up resources.
-                ScopedAdmissionPriorityForLock immediatePriority(
-                    shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
+                ScopedAdmissionPriority immediatePriority(opCtx,
+                                                          AdmissionContext::Priority::kImmediate);
 
                 Timestamp checkpoint;
                 Timestamp oldest;

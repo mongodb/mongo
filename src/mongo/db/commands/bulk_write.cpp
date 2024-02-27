@@ -767,10 +767,10 @@ bool handleGroupedInserts(OperationContext* opCtx,
         }
     }
 
-    boost::optional<ScopedAdmissionPriorityForLock> priority;
+    boost::optional<ScopedAdmissionPriority> priority;
     if (nsString == NamespaceString::kConfigSampledQueriesNamespace ||
         nsString == NamespaceString::kConfigSampledQueriesDiffNamespace) {
-        priority.emplace(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
+        priority.emplace(opCtx, AdmissionContext::Priority::kLow);
     }
 
     auto txnParticipant = TransactionParticipant::get(opCtx);

@@ -299,8 +299,8 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
             // This code is used by the TransactionCoordinator. As a result, we need to skip ticket
             // acquisition in order to prevent possible deadlock when participants are in the
             // prepared state. See SERVER-82883 and SERVER-60682.
-            ScopedAdmissionPriorityForLock skipTicketAcquisition(
-                shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriority skipTicketAcquisition(opCtx,
+                                                          AdmissionContext::Priority::kImmediate);
 
             if (mustRecoverDurableTime) {
                 return recoverDirect(opCtx);

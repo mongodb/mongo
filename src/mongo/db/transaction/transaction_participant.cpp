@@ -1404,6 +1404,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
 
     _apiParameters = APIParameters::get(opCtx);
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    _admCtx = AdmissionContext::get(opCtx);
 }
 
 TransactionParticipant::TxnResources::~TxnResources() {
@@ -1603,7 +1604,10 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     }
 
     if (acquireTicket == AcquireTicket::kSkip) {
-        stashLocker->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+        tempTxnResourceStash->admissionContext().copyTo(opCtx,
+                                                        AdmissionContext::Priority::kImmediate);
+    } else {
+        tempTxnResourceStash->admissionContext().copyTo(opCtx);
     }
 
     tempTxnResourceStash->release(opCtx);

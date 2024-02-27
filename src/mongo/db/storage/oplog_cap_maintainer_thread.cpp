@@ -83,8 +83,7 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
     // Maintaining the Oplog cap is crucial to the stability of the server so that we don't let the
     // oplog grow unbounded. We mark the operation as having immediate priority to skip ticket
     // acquisition and flow control.
-    ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx.get()),
-                                            AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
 
     try {
         // A Global IX lock should be good enough to protect the oplog truncation from

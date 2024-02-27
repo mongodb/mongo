@@ -126,8 +126,7 @@ public:
         const auto runStart = clock->now();
         BSONObjBuilder timeBuilder(256);
 
-        shard_role_details::getLocker(opCtx)->setAdmissionPriority(
-            AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriority admissionPriority(opCtx, AdmissionContext::Priority::kImmediate);
 
         // --- basic fields that are global
 

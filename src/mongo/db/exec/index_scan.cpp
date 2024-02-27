@@ -107,8 +107,8 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     if (_lowPriority && gDeprioritizeUnboundedUserIndexScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
-        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket(opCtx())) {
+        _priority.emplace(opCtx(), AdmissionContext::Priority::kLow);
     }
 
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
@@ -311,8 +311,8 @@ void IndexScan::doDetachFromOperationContext() {
 void IndexScan::doReattachToOperationContext() {
     if (_lowPriority && gDeprioritizeUnboundedUserIndexScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
-        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket(opCtx())) {
+        _priority.emplace(opCtx(), AdmissionContext::Priority::kLow);
     }
     if (_indexCursor)
         _indexCursor->reattachToOperationContext(opCtx());

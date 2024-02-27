@@ -157,10 +157,9 @@ void TicketedWorkloadDriver::_read(int32_t i) {
     auto client = _svcCtx->getService()->makeClient("reader_" + std::to_string(i));
     auto opCtx = client->makeOperationContext();
     Microseconds timeInQueue;
-    AdmissionContext admCtx;
-    admCtx.setPriority(AdmissionContext::Priority::kNormal);
 
     while (_readRunning.load() >= i) {
+        auto admCtx = AdmissionContext::get(opCtx.get());
         Ticket ticket = _readTicketHolder->waitForTicket(*opCtx, &admCtx, timeInQueue);
         _doRead(opCtx.get(), &admCtx);
     }
@@ -170,10 +169,9 @@ void TicketedWorkloadDriver::_write(int32_t i) {
     auto client = _svcCtx->getService()->makeClient("writer_" + std::to_string(i));
     auto opCtx = client->makeOperationContext();
     Microseconds timeInQueue;
-    AdmissionContext admCtx;
-    admCtx.setPriority(AdmissionContext::Priority::kNormal);
 
     while (_writeRunning.load() >= i) {
+        auto admCtx = AdmissionContext::get(opCtx.get());
         Ticket ticket = _writeTicketHolder->waitForTicket(*opCtx, &admCtx, timeInQueue);
         _doWrite(opCtx.get(), &admCtx);
     }

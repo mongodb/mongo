@@ -104,18 +104,27 @@ void JournalFlusher::run() {
                                 [&] { return _flushJournalNow || _needToPause || _shuttingDown; });
     }
 
-    auto setUpOpCtx = [&] {
+    boost::optional<ScopedAdmissionPriority> admissionPriority;
+    auto setUpOpCtx = [&](WithLock lk) {
         // Initialize the thread's opCtx.
         _uniqueCtx.emplace(tc->makeOperationContext());
 
         // Updates to a non-replicated collection, oplogTruncateAfterPoint, are made by this thread.
         // As this operation is critical for data durability we mark it as having Immediate priority
         // to skip ticket and flow control.
-        shard_role_details::getLocker(_uniqueCtx->get())
-            ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+        admissionPriority.emplace(_uniqueCtx->get(), AdmissionContext::Priority::kImmediate);
     };
 
-    setUpOpCtx();
+    auto tearDownOpCtx = [&](WithLock lk) {
+        admissionPriority.reset();
+        _uniqueCtx.reset();
+    };
+
+    {
+        stdx::lock_guard<Latch> lk(_opCtxMutex);
+        setUpOpCtx(lk);
+    }
+
     while (true) {
         pauseJournalFlusherBeforeFlush.pauseWhileSet();
         try {
@@ -131,8 +140,8 @@ void JournalFlusher::run() {
             {
                 // Reset opCtx if we get an error.
                 stdx::lock_guard<Latch> lk(_opCtxMutex);
-                _uniqueCtx.reset();
-                setUpOpCtx();
+                tearDownOpCtx(lk);
+                setUpOpCtx(lk);
             }
 
             // Can be caused by killOp or stepdown.
@@ -200,7 +209,7 @@ void JournalFlusher::run() {
             _stateChangeCV.notify_all();
 
             stdx::lock_guard<Latch> lk(_opCtxMutex);
-            _uniqueCtx.reset();
+            tearDownOpCtx(lk);
             return;
         }
 

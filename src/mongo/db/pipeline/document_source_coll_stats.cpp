@@ -100,8 +100,8 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     const boost::optional<BSONObj>& filterObj) {
     // The $collStats stage is critical to observability and diagnosability, categorize as immediate
     // priority.
-    ScopedAdmissionPriorityForLock skipAdmissionControl(
-        shard_role_details::getLocker(expCtx->opCtx), AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority skipAdmissionControl(expCtx->opCtx,
+                                                 AdmissionContext::Priority::kImmediate);
 
     BSONObjBuilder builder;
 

@@ -1471,8 +1471,7 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
                                                                    bool primaryOnly) {
     // Waiting for oplog writes to be visible in the oplog does not use any storage engine resources
     // and must not wait for ticket acquisition to avoid deadlocks with updating oplog visibility.
-    ScopedAdmissionPriorityForLock setTicketAquisition(shard_role_details::getLocker(opCtx),
-                                                       AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     if (primaryOnly &&
@@ -1489,8 +1488,7 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
                                                 bool orderedCommit) {
     // Setting the oplog visibility does not use any storage engine resources and must skip ticket
     // acquisition to avoid deadlocks with updating oplog visibility.
-    ScopedAdmissionPriorityForLock setTicketAquisition(shard_role_details::getLocker(opCtx),
-                                                       AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriority setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     fassert(28557,
