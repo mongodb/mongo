@@ -105,23 +105,6 @@
 namespace mongo {
 namespace {
 
-query_settings::QuerySettings lookupQuerySettingsForDistinct(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const ParsedDistinctCommand& parsedRequest,
-    const NamespaceString& nss) {
-    auto serializationContext = parsedRequest.distinctCommandRequest->getSerializationContext();
-
-    auto queryShapeHashFn = [&]() {
-        query_shape::DistinctCmdShape shape(parsedRequest, expCtx);
-        return shape.sha256Hash(expCtx->opCtx, serializationContext);
-    };
-
-    auto settings =
-        query_settings::lookupQuerySettings(expCtx, nss, serializationContext, queryShapeHashFn);
-    query_settings::failIfRejectedBySettings(expCtx, settings);
-    return settings;
-}
-
 CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const BSONObj& cmdObj,
@@ -156,7 +139,8 @@ CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 
-    expCtx->setQuerySettings(lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
+    expCtx->setQuerySettings(
+        query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
 
     return CanonicalDistinct::parse(std::move(expCtx), std::move(parsedDistinct));
 }

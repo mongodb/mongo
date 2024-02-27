@@ -203,32 +203,6 @@ bool isInternalClient(const OperationContext* opCtx) {
     return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
 }
 
-// TODO: SERVER-73632 Remove feature flag for PM-635.
-// Remove query settings lookup as it is only done on mongos.
-query_settings::QuerySettings lookupQuerySettingsForFind(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const ParsedFindCommand& parsedFind,
-    const NamespaceString& nss) {
-    // No query settings lookup for IDHACK queries.
-    if (isIdHackEligibleQueryWithoutCollator(*parsedFind.findCommandRequest)) {
-        return query_settings::QuerySettings();
-    }
-
-    // If part of the sharded cluster, use the query settings passed as part of the command
-    // arguments.
-    if (isInternalClient(expCtx->opCtx)) {
-        return parsedFind.findCommandRequest->getQuerySettings().get_value_or({});
-    }
-
-    const auto& serializationContext = parsedFind.findCommandRequest->getSerializationContext();
-    auto settings = query_settings::lookupQuerySettings(expCtx, nss, serializationContext, [&]() {
-        query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
-        return findCmdShape.sha256Hash(expCtx->opCtx, serializationContext);
-    });
-    query_settings::failIfRejectedBySettings(expCtx, settings);
-    return settings;
-}
-
 /**
  * Parses the grammar elements like 'filter', 'sort', and 'projection' from the raw
  * 'FindCommandRequest', and tracks internal state like begining the operation's timer and recording
@@ -265,7 +239,11 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
         });
     }
 
-    expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
+    // TODO: SERVER-73632 Remove feature flag for PM-635.
+    // Query settings will only be looked up on mongos and therefore should be part of command body
+    // on mongod if present.
+    expCtx->setQuerySettings(
+        query_settings::lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
     return std::make_unique<CanonicalQuery>(CanonicalQueryParams{
         .expCtx = std::move(expCtx),
         .parsedFind = std::move(parsedRequest),
@@ -458,7 +436,8 @@ public:
                  .extensionsCallback = ExtensionsCallbackReal(opCtx, &nss),
                  .allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures}));
 
-            expCtx->setQuerySettings(lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
+            expCtx->setQuerySettings(
+                query_settings::lookupQuerySettingsForFind(expCtx, *parsedRequest, nss));
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedRequest)});
 
@@ -574,8 +553,7 @@ public:
                     }
                 }
 
-                auto isInternal =
-                    opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
+                auto isInternal = isInternalClient(opCtx);
                 if (MONGO_unlikely(allowExternalReadsForReverseOplogScanRule.shouldFail())) {
                     isInternal = true;
                 }

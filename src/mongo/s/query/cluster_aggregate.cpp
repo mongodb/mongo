@@ -346,15 +346,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     }
 
     // Perform the query settings lookup and attach it to the ExpressionContext.
-    auto serializationContext = request.getSerializationContext();
-    auto settings =
-        query_settings::lookupQuerySettings(expCtx, executionNss, serializationContext, [&]() {
-            query_shape::AggCmdShape shape(
-                request, executionNss, involvedNamespaces, *pipeline, expCtx);
-            return shape.sha256Hash(opCtx, serializationContext);
-        });
-    query_settings::failIfRejectedBySettings(expCtx, settings);
-    expCtx->setQuerySettings(std::move(settings));
+    expCtx->setQuerySettings(query_settings::lookupQuerySettingsForAgg(
+        expCtx, request, *pipeline, involvedNamespaces, executionNss));
 
     return pipeline;
 }

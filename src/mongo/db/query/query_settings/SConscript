@@ -46,12 +46,10 @@ env.Library(
         'query_settings_hash.cpp',
         'query_settings_utils.cpp',
     ],
-    LIBDEPS=[
-        'manager',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/canonical_query',
         '$BUILD_DIR/mongo/db/query/query_shape/query_shape',
+        'manager',
     ],
 )
 

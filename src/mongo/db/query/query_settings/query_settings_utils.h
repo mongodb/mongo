@@ -32,6 +32,9 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
 #include "mongo/db/query/query_settings/query_settings_manager.h"
+#include "mongo/db/query/query_shape/agg_cmd_shape.h"
+#include "mongo/db/query/query_shape/distinct_cmd_shape.h"
+#include "mongo/db/query/query_shape/find_cmd_shape.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/stdx/unordered_set.h"
 
@@ -54,44 +57,20 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
                                                  OperationContext* opCtx,
                                                  const boost::optional<TenantId>& tenantId);
 
-/**
- * Performs the lookup for the QuerySettings given the request present in OpDebug.
- */
-template <typename Fn>
-QuerySettings lookupQuerySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                  const NamespaceString& nss,
-                                  const mongo::SerializationContext& serializationContext,
-                                  const Fn& hashFn) {
-    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
-    // this could run during startup while the FCV is still uninitialized.
-    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return query_settings::QuerySettings();
-    }
+QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const ParsedFindCommand& parsedFind,
+                                         const NamespaceString& nss);
 
-    // No query settings lookup on internal dbs or system collections in user dbs.
-    if (nss.isOnInternalDb() || nss.isSystem()) {
-        return query_settings::QuerySettings();
-    }
+QuerySettings lookupQuerySettingsForAgg(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const AggregateCommandRequest& aggregateCommandRequest,
+    const Pipeline& pipeline,
+    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
+    const NamespaceString& nss);
 
-    auto* opCtx = expCtx->opCtx;
-    auto queryShapeHashFn = [&]() {
-        auto& opDebug = CurOp::get(opCtx)->debug();
-        if (opDebug.queryStatsInfo.key) {
-            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
-        }
-        return hashFn();
-    };
-
-    // Return the found query settings or an empty one.
-    auto& manager = QuerySettingsManager::get(opCtx);
-    return manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
-        .get_value_or({})
-        .first;
-}
-
-void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              const QuerySettings& settings);
+QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             const ParsedDistinctCommand& parsedDistinct,
+                                             const NamespaceString& nss);
 
 namespace utils {
 

@@ -157,7 +157,8 @@ public:
 
             // Update 'findCommand' by setting the looked up query settings, such that they can be
             // applied on the shards.
-            auto querySettings = lookupQuerySettings(expCtx, *parsedFind);
+            auto querySettings =
+                query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns());
             findCommand = std::move(parsedFind->findCommandRequest);
             if (!query_settings::utils::isEmpty(querySettings)) {
                 findCommand->setQuerySettings(std::move(querySettings));
@@ -242,7 +243,8 @@ public:
             registerRequestForQueryStats(expCtx, *parsedFind);
 
             // Perform the query settings lookup and attach it to 'expCtx'.
-            expCtx->setQuerySettings(lookupQuerySettings(expCtx, *parsedFind));
+            expCtx->setQuerySettings(
+                query_settings::lookupQuerySettingsForFind(expCtx, *parsedFind, ns()));
 
             auto cq = std::make_unique<CanonicalQuery>(CanonicalQueryParams{
                 .expCtx = std::move(expCtx), .parsedFind = std::move(parsedFind)});
@@ -337,28 +339,6 @@ public:
                     return std::make_unique<query_stats::FindKey>(expCtx, parsedFind);
                 });
             }
-        }
-
-        /**
-         * Perform query settings lookup for non IDHACK queries.
-         */
-        query_settings::QuerySettings lookupQuerySettings(
-            const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            const ParsedFindCommand& parsedFind) {
-            // No QuerySettings lookup for IDHACK queries.
-            if (isIdHackEligibleQueryWithoutCollator(*parsedFind.findCommandRequest)) {
-                return {};
-            }
-
-            auto opCtx = expCtx->opCtx;
-            auto serializationContext = parsedFind.findCommandRequest->getSerializationContext();
-            auto settings =
-                query_settings::lookupQuerySettings(expCtx, ns(), serializationContext, [&]() {
-                    query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
-                    return findCmdShape.sha256Hash(opCtx, serializationContext);
-                });
-            query_settings::failIfRejectedBySettings(expCtx, settings);
-            return settings;
         }
 
         void retryOnViewError(

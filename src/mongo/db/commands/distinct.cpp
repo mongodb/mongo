@@ -125,28 +125,6 @@ bool isInternalClient(OperationContext* opCtx) {
     return opCtx->getClient()->session() && opCtx->getClient()->isInternalClient();
 }
 
-query_settings::QuerySettings lookupQuerySettingsForDistinct(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const ParsedDistinctCommand& parsedRequest,
-    const NamespaceString& nss) {
-    auto serializationContext = parsedRequest.distinctCommandRequest->getSerializationContext();
-
-    if (auto querySettings = parsedRequest.distinctCommandRequest->getQuerySettings()) {
-        // Use the query settings passed as part of the command arguments.
-        return *querySettings;
-    }
-
-    auto queryShapeHashFn = [&]() {
-        query_shape::DistinctCmdShape shape(parsedRequest, expCtx);
-        return shape.sha256Hash(expCtx->opCtx, serializationContext);
-    };
-
-    auto settings =
-        query_settings::lookupQuerySettings(expCtx, nss, serializationContext, queryShapeHashFn);
-    query_settings::failIfRejectedBySettings(expCtx, settings);
-    return settings;
-}
-
 CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const BSONObj& cmdObj,
@@ -181,7 +159,11 @@ CanonicalDistinct parseDistinctCmd(OperationContext* opCtx,
                                        extensionsCallback,
                                        MatchExpressionParser::kAllowAllSpecialFeatures);
 
-    expCtx->setQuerySettings(lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
+    // TODO: SERVER-73632 Remove feature flag for PM-635.
+    // Query settings will only be looked up on mongos and therefore should be part of command body
+    // on mongod if present.
+    expCtx->setQuerySettings(
+        query_settings::lookupQuerySettingsForDistinct(expCtx, *parsedDistinct, nss));
     return CanonicalDistinct::parse(std::move(expCtx), std::move(parsedDistinct));
 }
 

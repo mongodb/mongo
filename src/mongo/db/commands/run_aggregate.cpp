@@ -1124,30 +1124,6 @@ query_shape::CollectionType determineCollectionType(
     return ctx ? ctx->getCollectionType() : query_shape::CollectionType::kUnknown;
 }
 
-// TODO: SERVER-73632 Remove feature flag for PM-635.
-// Remove query settings lookup as it is only done on mongos.
-query_settings::QuerySettings lookupQuerySettingsForAgg(
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const AggregateCommandRequest& aggregateCommandRequest,
-    const Pipeline& pipeline,
-    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
-    const NamespaceString& nss) {
-    auto opCtx = expCtx->opCtx;
-    const bool isInternalClient = opCtx->getClient()->session() &&
-        (opCtx->getClient()->isInternalClient() || opCtx->getClient()->isInDirectClient());
-    auto serializationContext = aggregateCommandRequest.getSerializationContext();
-    auto settings = isInternalClient
-        ? aggregateCommandRequest.getQuerySettings().get_value_or({})
-        : query_settings::lookupQuerySettings(expCtx, nss, serializationContext, [&]() {
-              query_shape::AggCmdShape shape(
-                  aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx);
-              return shape.sha256Hash(opCtx, serializationContext);
-          });
-
-    query_settings::failIfRejectedBySettings(expCtx, settings);
-    return settings;
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
     const NamespaceString& origNss,
@@ -1229,11 +1205,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     expCtx->setUserRoles();
 
     // Lookup the query settings and attach it to the 'expCtx'.
-    expCtx->setQuerySettings(lookupQuerySettingsForAgg(expCtx,
-                                                       request,
-                                                       *pipeline,
-                                                       liteParsedPipeline.getInvolvedNamespaces(),
-                                                       request.getNamespace()));
+    // TODO: SERVER-73632 Remove feature flag for PM-635.
+    // Query settings will only be looked up on mongos and therefore should be part of command body
+    // on mongod if present.
+    expCtx->setQuerySettings(
+        query_settings::lookupQuerySettingsForAgg(expCtx,
+                                                  request,
+                                                  *pipeline,
+                                                  liteParsedPipeline.getInvolvedNamespaces(),
+                                                  request.getNamespace()));
 
     return pipeline;
 }

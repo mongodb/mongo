@@ -52,6 +52,23 @@ auto const kSerializationContext = SerializationContext{SerializationContext::So
                                                         SerializationContext::CallerType::Request,
                                                         SerializationContext::Prefix::Default,
                                                         true /* nonPrefixedTenantId */};
+
+bool isInternalClient(OperationContext* opCtx) {
+    return opCtx->getClient()->session() &&
+        (opCtx->getClient()->isInternalClient() || opCtx->getClient()->isInDirectClient());
+}
+
+void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                              const QuerySettings& settings) {
+    if (expCtx->explain) {
+        // Explaining queries which _would_ be rejected if executed is still useful;
+        // do not fail here.
+        return;
+    }
+    uassert(ErrorCodes::QueryRejectedBySettings,
+            "Query rejected by admin query settings",
+            !settings.getReject());
+}
 }  // namespace
 
 /*
@@ -228,16 +245,158 @@ RepresentativeQueryInfo createRepresentativeInfo(const BSONObj& cmd,
     uasserted(7746402, str::stream() << "QueryShape can not be computed for command: " << cmd);
 }
 
-void failIfRejectedBySettings(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                              const QuerySettings& settings) {
-    if (expCtx->explain) {
-        // Explaining queries which _would_ be rejected if executed is still useful;
-        // do not fail here.
-        return;
+QuerySettings lookupQuerySettingsForFind(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         const ParsedFindCommand& parsedFind,
+                                         const NamespaceString& nss) {
+    // No query settings lookup for IDHACK queries.
+    if (isIdHackEligibleQueryWithoutCollator(*parsedFind.findCommandRequest)) {
+        return query_settings::QuerySettings();
     }
-    uassert(ErrorCodes::QueryRejectedBySettings,
-            "Query rejected by admin query settings",
-            !settings.getReject());
+
+    // No query settings lookup on internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
+
+    // If the client is internal the query settings are:
+    // - either looked up on the mongos and attached to the request
+    // - or a command is issued internally while processing the original request.
+    // Do not perform the query settings lookup and retrieve the settings from the request. In this
+    // case query settings rejection flag will not be checked.
+    if (isInternalClient(expCtx->opCtx)) {
+        return parsedFind.findCommandRequest->getQuerySettings().get_value_or({});
+    }
+
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return query_settings::QuerySettings();
+    }
+
+    auto* opCtx = expCtx->opCtx;
+    const auto& serializationContext = parsedFind.findCommandRequest->getSerializationContext();
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        if (opDebug.queryStatsInfo.key) {
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
+        }
+
+        query_shape::FindCmdShape findCmdShape(parsedFind, expCtx);
+        return findCmdShape.sha256Hash(expCtx->opCtx, serializationContext);
+    };
+
+    // Return the found query settings or an empty one.
+    auto& manager = QuerySettingsManager::get(opCtx);
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
+                        .get_value_or({})
+                        .first;
+
+    // Fail the current command, if 'reject: true' flag is present.
+    failIfRejectedBySettings(expCtx, settings);
+
+    return settings;
+}
+
+QuerySettings lookupQuerySettingsForAgg(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const AggregateCommandRequest& aggregateCommandRequest,
+    const Pipeline& pipeline,
+    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
+    const NamespaceString& nss) {
+    // No query settings lookup on internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
+
+    // If the client is internal the query settings are:
+    // - either looked up on the mongos and attached to the request
+    // - or a command is issued internally while processing the original request.
+    // Do not perform the query settings lookup and retrieve the settings from the request. In this
+    // case query settings rejection flag will not be checked.
+    if (isInternalClient(expCtx->opCtx)) {
+        return aggregateCommandRequest.getQuerySettings().get_value_or({});
+    }
+
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return query_settings::QuerySettings();
+    }
+
+    auto* opCtx = expCtx->opCtx;
+    const auto& serializationContext = aggregateCommandRequest.getSerializationContext();
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        if (opDebug.queryStatsInfo.key) {
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
+        }
+
+        query_shape::AggCmdShape shape(
+            aggregateCommandRequest, nss, involvedNamespaces, pipeline, expCtx);
+        return shape.sha256Hash(opCtx, serializationContext);
+    };
+
+    // Return the found query settings or an empty one.
+    auto& manager = QuerySettingsManager::get(opCtx);
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
+                        .get_value_or({})
+                        .first;
+
+    // Fail the current command, if 'reject: true' flag is present.
+    failIfRejectedBySettings(expCtx, settings);
+
+    return settings;
+}
+
+QuerySettings lookupQuerySettingsForDistinct(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                             const ParsedDistinctCommand& parsedDistinct,
+                                             const NamespaceString& nss) {
+    // No query settings lookup on internal dbs or system collections in user dbs.
+    if (nss.isOnInternalDb() || nss.isSystem()) {
+        return query_settings::QuerySettings();
+    }
+
+    // If the client is internal the query settings are:
+    // - either looked up on the mongos and attached to the request
+    // - or a command is issued internally while processing the original request.
+    // Do not perform the query settings lookup and retrieve the settings from the request. In this
+    // case query settings rejection flag will not be checked.
+    if (isInternalClient(expCtx->opCtx)) {
+        return parsedDistinct.distinctCommandRequest->getQuerySettings().get_value_or({});
+    }
+
+    // We need to use isEnabledUseLatestFCVWhenUninitialized instead of isEnabled because
+    // this could run during startup while the FCV is still uninitialized.
+    if (!feature_flags::gFeatureFlagQuerySettings.isEnabledUseLatestFCVWhenUninitialized(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return query_settings::QuerySettings();
+    }
+
+    auto* opCtx = expCtx->opCtx;
+    const auto& serializationContext =
+        parsedDistinct.distinctCommandRequest->getSerializationContext();
+    auto queryShapeHashFn = [&]() {
+        auto& opDebug = CurOp::get(opCtx)->debug();
+        if (opDebug.queryStatsInfo.key) {
+            return opDebug.queryStatsInfo.key->getQueryShapeHash(opCtx, serializationContext);
+        }
+
+        query_shape::DistinctCmdShape shape(parsedDistinct, expCtx);
+        return shape.sha256Hash(expCtx->opCtx, serializationContext);
+    };
+
+    // Return the found query settings or an empty one.
+    auto& manager = QuerySettingsManager::get(opCtx);
+    auto settings = manager.getQuerySettingsForQueryShapeHash(opCtx, queryShapeHashFn, nss)
+                        .get_value_or({})
+                        .first;
+
+    // Fail the current command, if 'reject: true' flag is present.
+    failIfRejectedBySettings(expCtx, settings);
+
+    return settings;
 }
 
 namespace utils {
