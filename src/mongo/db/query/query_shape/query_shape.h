@@ -40,11 +40,6 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/query_shape/shape_helpers.h"
 

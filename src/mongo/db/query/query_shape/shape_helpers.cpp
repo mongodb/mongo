@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/query_shape/shape_helpers.h"
 
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_shape/query_shape_gen.h"
 
 namespace mongo::shape_helpers {
