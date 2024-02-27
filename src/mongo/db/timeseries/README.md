@@ -6,31 +6,33 @@ measurements while organizing the actual data in buckets.
 
 A minimally configured time-series collection is defined by providing the [timeField](timeseries.idl)
 at creation. Optionally, a meta-data field may also be specified to help group
- measurements in the buckets. MongoDB also supports an expiration mechanism on measurements through
+measurements in the buckets. MongoDB also supports an expiration mechanism on measurements through
 the `expireAfterSeconds` option.
 
 A time-series collection `mytscoll` in the `mydb` database is represented in the [catalog](../catalog/README.md) by a
 combination of a view and a system collection:
-* The view `mydb.mytscoll` is defined with the bucket collection as the source collection with
-certain properties:
-    * Writes (inserts only) are allowed on the view. Every document inserted must contain a time field.
-    * Querying the view implicitly unwinds the data in the underlying bucket collection to return
-      documents in their original non-bucketed form.
-        * The aggregation stage [$_internalUnpackBucket](../pipeline/document_source_internal_unpack_bucket.h) is used to
-          unwind the bucket data for the view. For more information about this stage and query rewrites for
-          time-series collections see [query/timeseries/README](../query/timeseries/README.md).
-* The system collection has the namespace `mydb.system.buckets.mytscoll` and is where the actual
-  data is stored.
-    * Each document in the bucket collection represents a set of time-series data within a period of time.
-    * If a meta-data field is defined at creation time, this will be used to organize the buckets so that
-      all measurements within a bucket have a common meta-data value.
-    * Besides the time range, buckets are also constrained by the total number and size of measurements.
+
+-   The view `mydb.mytscoll` is defined with the bucket collection as the source collection with
+    certain properties:
+    _ Writes (inserts only) are allowed on the view. Every document inserted must contain a time field.
+    _ Querying the view implicitly unwinds the data in the underlying bucket collection to return
+    documents in their original non-bucketed form. \* The aggregation stage [$\_internalUnpackBucket](../pipeline/document_source_internal_unpack_bucket.h) is used to
+    unwind the bucket data for the view. For more information about this stage and query rewrites for
+    time-series collections see [query/timeseries/README](../query/timeseries/README.md).
+-   The system collection has the namespace `mydb.system.buckets.mytscoll` and is where the actual
+    data is stored.
+    -   Each document in the bucket collection represents a set of time-series data within a period of time.
+    -   If a meta-data field is defined at creation time, this will be used to organize the buckets so that
+        all measurements within a bucket have a common meta-data value.
+    -   Besides the time range, buckets are also constrained by the total number and size of measurements.
 
 Time-series collections can also be sharded. For more information about sharding-specific implementation
 details, see [db/s/README_timeseries.md](../s/README_timeseries.md).
+
 ## Bucket Collection Schema
 
 Uncompressed bucket (version 1):
+
 ```
 {
     _id: <Object ID with time component equal to control.min.<time field>>,
@@ -74,11 +76,13 @@ Uncompressed bucket (version 1):
     }
 }
 ```
+
 There are two types of compressed buckets, version 2 and version 3. They differ only in that the
 entries in the data field of version 2 buckets are sorted on the time field, whereas this is not
 enforced for version 3 buckets.
 
 Compressed bucket (version 2 and version 3):
+
 ```
 {
     _id: <Object ID with time component equal to control.min.<time field>>,
@@ -99,7 +103,7 @@ Compressed bucket (version 2 and version 3):
         },
         closed: <bool>, // Optional, signals the database that this document will not receive any
                         // additional measurements.
-        count: <int>    // The number of measurements contained in this bucket. Only present in 
+        count: <int>    // The number of measurements contained in this bucket. Only present in
                         // compressed buckets.
     },
     meta: <meta-data field (if specified at creation) value common to all measurements in this bucket>,
@@ -141,13 +145,14 @@ rather than collection scans, indexes may be created on the time, meta-data, and
 of a time-series collection. Starting in v6.0, indexes on time-series collection measurement fields
 are permitted. The index key specification provided by the user via `createIndex` will be converted
 to the underlying buckets collection's schema.
-* The details for mapping the index specification between the time-series collection and the
-  underlying buckets collection may be found in
-  [timeseries_index_schema_conversion_functions.h](timeseries_index_schema_conversion_functions.h).
-* Newly supported index types in v6.0 and up
-  [store the original user index definition](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/timeseries/timeseries_commands_conversion_helper.cpp#L140-L147)
-  on the transformed index definition. When mapping the bucket collection index to the time-series
-  collection index, the original user index definition is returned.
+
+-   The details for mapping the index specification between the time-series collection and the
+    underlying buckets collection may be found in
+    [timeseries_index_schema_conversion_functions.h](timeseries_index_schema_conversion_functions.h).
+-   Newly supported index types in v6.0 and up
+    [store the original user index definition](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/timeseries/timeseries_commands_conversion_helper.cpp#L140-L147)
+    on the transformed index definition. When mapping the bucket collection index to the time-series
+    collection index, the original user index definition is returned.
 
 Once the indexes have been created, they can be inspected through the `listIndexes` command or the
 `$indexStats` aggregation stage. `listIndexes` and `$indexStats` against a time-series collection
@@ -160,27 +165,30 @@ field.
 time-series collections.
 
 Supported index types on the time field:
-* [Single](https://docs.mongodb.com/manual/core/index-single/).
-* [Compound](https://docs.mongodb.com/manual/core/index-compound/).
-* [Hashed](https://docs.mongodb.com/manual/core/index-hashed/).
-* [Wildcard](https://docs.mongodb.com/manual/core/index-wildcard/).
-* [Sparse](https://docs.mongodb.com/manual/core/index-sparse/).
-* [Multikey](https://docs.mongodb.com/manual/core/index-multikey/).
-* [Indexes with collations](https://docs.mongodb.com/manual/indexes/#indexes-and-collation).
+
+-   [Single](https://docs.mongodb.com/manual/core/index-single/).
+-   [Compound](https://docs.mongodb.com/manual/core/index-compound/).
+-   [Hashed](https://docs.mongodb.com/manual/core/index-hashed/).
+-   [Wildcard](https://docs.mongodb.com/manual/core/index-wildcard/).
+-   [Sparse](https://docs.mongodb.com/manual/core/index-sparse/).
+-   [Multikey](https://docs.mongodb.com/manual/core/index-multikey/).
+-   [Indexes with collations](https://docs.mongodb.com/manual/indexes/#indexes-and-collation).
 
 Supported index types on the metaField or its subfields:
-* All of the supported index types on the time field.
-* [2d](https://docs.mongodb.com/manual/core/2d/) from v6.0.
-* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) from v6.0.
-* [Partial](https://docs.mongodb.com/manual/core/index-partial/) from v6.0.
+
+-   All of the supported index types on the time field.
+-   [2d](https://docs.mongodb.com/manual/core/2d/) from v6.0.
+-   [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) from v6.0.
+-   [Partial](https://docs.mongodb.com/manual/core/index-partial/) from v6.0.
 
 Supported index types on measurement fields in v6.0 and up only:
-* [Single](https://docs.mongodb.com/manual/core/index-single/) from v6.0.
-* [Compound](https://docs.mongodb.com/manual/core/index-compound/) from v6.0.
-* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) from v6.0.
-* [Partial](https://docs.mongodb.com/manual/core/index-partial/) from v6.0.
-* [TTL](https://docs.mongodb.com/manual/core/index-ttl/) from v6.3. Must be used in conjunction with
-  a `partialFilterExpression` based on the metaField or its subfields.
+
+-   [Single](https://docs.mongodb.com/manual/core/index-single/) from v6.0.
+-   [Compound](https://docs.mongodb.com/manual/core/index-compound/) from v6.0.
+-   [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) from v6.0.
+-   [Partial](https://docs.mongodb.com/manual/core/index-partial/) from v6.0.
+-   [TTL](https://docs.mongodb.com/manual/core/index-ttl/) from v6.3. Must be used in conjunction with
+    a `partialFilterExpression` based on the metaField or its subfields.
 
 Index types that are not supported on time-series collections include
 [unique](https://docs.mongodb.com/manual/core/index-unique/), and
@@ -210,7 +218,7 @@ full document (a so-called "classic" update), we create a DocDiff directly (a "d
 update).
 
 Any time a bucket document is updated without going through the `BucketCatalog`, the writer needs
-to notify the `BucketCatalog` by calling `timeseries::handleDirectWrite` or `BucketCatalog::clear` 
+to notify the `BucketCatalog` by calling `timeseries::handleDirectWrite` or `BucketCatalog::clear`
 so that it can update its internal state and avoid writing any data which may corrupt the bucket
 format.
 
@@ -223,7 +231,7 @@ the `_id` of an archived bucket (more details below). In other cases, this will 
 to use for a query.
 
 The filters will include an exact match on the `metaField`, a range match on the `timeField`, size
-filters on the `timeseriesBucketMaxCount` and `timeseriesBucketMaxSize` server parameters, and a 
+filters on the `timeseriesBucketMaxCount` and `timeseriesBucketMaxSize` server parameters, and a
 missing or `false` value for `control.closed`. At least for v6.3, the filters will also specify
 `control.version: 1` to disallow selecting compressed buckets. The last restriction is for
 performance, and may be removed in the future if we improve decompression speed or deem the benefits
@@ -264,7 +272,7 @@ The maximum span of time that a single bucket is allowed to cover is controlled 
 
 When a new bucket is opened by the `BucketCatalog`, the timestamp component of its `_id`, and
 equivalently the value of its `control.min.<time field>`, will be taken from the first measurement
-inserted to the bucket and rounded down based on the `bucketRoundingSeconds`. This rounding will 
+inserted to the bucket and rounded down based on the `bucketRoundingSeconds`. This rounding will
 generally be accomplished by basic modulus arithmetic operating on the number of seconds since the
 epoch i.e. for an input timestamp `t` and a rounding value `r`, the rounded timestamp will be
 taken as `t - (t % r)`.
@@ -339,10 +347,12 @@ Time-series deletes support retryable writes with the existing mechanisms. For t
 they are run through the Internal Transaction API to make sure the two writes to storage are atomic.
 
 # References
+
 See:
 [MongoDB Blog: Time Series Data and MongoDB: Part 2 - Schema Design Best Practices](https://www.mongodb.com/blog/post/time-series-data-and-mongodb-part-2-schema-design-best-practices)
 
 # Glossary
+
 **bucket**: A group of measurements with the same meta-data over a limited period of time.
 
 **bucket collection**: A system collection used for storing the buckets underlying a time-series

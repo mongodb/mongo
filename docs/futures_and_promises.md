@@ -10,21 +10,23 @@ continue performing other work instead of waiting synchronously for those result
 
 ## A Few Definitions
 
-- A `Future<T>` is a type that will eventually contain either a `T`, or an error indicating why the
-  `T` could not be produced (in MongoDB, the error will take the form of either an exception or a
-  `Status`).
-- A `Promise<T>` is a single-shot producer of a value (i.e., a `T`) for an associated `Future<T>`.
-  That is, to put a value or error in a `Future<T>` and make it ready for use by consumers, the
-  value is emplaced in the corresponding `Promise<T>`.
-- A continuation is a functor that can be chained on to `Future<T>` that will execute only once the
-  `T` (or error) is available and ready. A continuation in this way can "consume" the produced `T`,
-  and handle any errors.
+-   A `Future<T>` is a type that will eventually contain either a `T`, or an error indicating why the
+    `T` could not be produced (in MongoDB, the error will take the form of either an exception or a
+    `Status`).
+-   A `Promise<T>` is a single-shot producer of a value (i.e., a `T`) for an associated `Future<T>`.
+    That is, to put a value or error in a `Future<T>` and make it ready for use by consumers, the
+    value is emplaced in the corresponding `Promise<T>`.
+-   A continuation is a functor that can be chained on to `Future<T>` that will execute only once the
+    `T` (or error) is available and ready. A continuation in this way can "consume" the produced `T`,
+    and handle any errors.
 
 ## A First Example
+
 To build some intuition around futures and promises, let's see how they might be used. As an
 example, we'll look at how they help us rewrite some slow blocking code into fast, concurrent code.
 As a distributed system, MongoDB often needs to send RPCs from one machine to another. A sketch of a
 simple, synchronous way of doing so might look like this:
+
 ```c++
 Message call(Message& toSend) {
   ...
@@ -40,13 +42,15 @@ Message call(Message& toSend) {
   ...
 }
 ```
+
 This is fine, but some parts of networking are expensive! `TransportSession::sinkMessage` involves
 making expensive system calls to enqueue our message into the kernel's networking stack, and
 `TransportSession::sourceMessage` entails waiting for a network round-trip to occur! We don't want
 busy worker threads to be forced to wait around to hear back from the kernel for these sorts of
 expensive operations. Instead, we'd rather let these threads move on to perform other work, and
-handle the response from our expensive networking operations when they're available.  Futures and
+handle the response from our expensive networking operations when they're available. Futures and
 promises allow us to do this. We can rewrite our example as follows:
+
 ```c++
 Future<Message> call(Message& toSend) {
   ...
@@ -60,6 +64,7 @@ Future<Message> call(Message& toSend) {
      });
 }
 ```
+
 First, notice that our calls to `TransportSession::sourceMessage` and
 `TransportSession::sinkMessage` have been replaced with calls to asynchronous versions of those
 functions. These asynchronous versions are future-returning; they don't block, but also don't return
@@ -82,16 +87,18 @@ thread blocking and waiting. This is explained in more detail in the "How Are Re
 Down Continuation Chains?" section below.
 
 ## Filling In Some Details
+
 The example above hopefully showed us how futures can be used to structure asynchronous programs at
 a high level, but we've left out some important details about how they work.
 
 ### How Are Futures Fulfilled With Values?
+
 In our example, we looked at how some code that needs to wait for results can use `Future`s to be
 written in an asynchronous, performant way. But some thread running elsewhere needs to actually
 "fulfill" those futures with a value or error. Threads can fulfull the core "promise" of a
 `Future<T>` - that it will eventually contain a `T` or an error - by using the appropriately named
 `Promise<T>` type. Every pending `Future<T>` is associated with exactly one corresponding
-`Promise<T>` that can be used to ready the `Future<T>`, providing it with a value.  (Note that a
+`Promise<T>` that can be used to ready the `Future<T>`, providing it with a value. (Note that a
 `Future<T>` may also be "born ready"/already filled with a value when constructed). The `Future<T>`
 can be "made ready" by emplacing a value or error in the associated promise with
 `Promise<T>::emplaceValue`, `Promise<T>::setError`, or related helper member functions (see the
@@ -121,6 +128,7 @@ extract as many associated `SharedSemiFuture`s as you'd like from a `SharedPromi
 `getFuture()` member function.
 
 ### Where Do Continuations Run?
+
 In our example, we chained continuations onto futures using functions like `Future<T>::then()`, and
 explained that the continuations we chained will only be invoked once the future we've chained them
 onto is ready. But we haven't yet specified how this continuation is invoked: what thread will
@@ -143,10 +151,12 @@ Fortunately, the service can enforce these guarantees using two types closely re
 `Future<T>`: the types `SemiFuture<T>` and `ExecutorFuture<T>`.
 
 #### SemiFuture
+
 `SemiFuture`s are like regular futures, except that continuations cannot be chained to them.
 Instead, values and errors can only be extracted from them via blocking methods, which threads can
 call if they are willing to block. A `Future<T>` can always be transformed into a `SemiFuture<T>`
 using the member function `Future<T>::semi()`. Let's look at a quick example to make this clearer:
+
 ```c++
 // Code producing a `SemiFuture`
 SemiFuture<Work> SomeAsyncService::requestWork() {
@@ -168,6 +178,7 @@ SemiFuture<Work> sf = SomeAsyncService::requestWork();
 // sf.onError(...) won't compile for the same reason
 auto res = sf.get(); // OK; get blocks until sf is ready
 ```
+
 Our example begins when a thread makes a request for some asynchronous work to be performed by some
 service, using `SomeAsyncService::requestWork()`. As was the case in our initial example, this
 thread receives back a future that will be readied when its request has been completed and a value
@@ -181,6 +192,7 @@ run the continuations. By instead returning a `SemiFuture`, the `SomeAsyncServic
 that requests work from it from using its own internal `_privateExecutor` resource.
 
 #### ExecutorFuture
+
 `ExecutorFuture`s are another variation on the core `Future` type; they are like regular `Future`s,
 except for the fact that code constructing an `ExecutorFuture` is required to provide an
 [executor][executor] on which any continuations chained to the future will be run. (An executor is
@@ -193,20 +205,23 @@ clearer, so we'll reuse the one above. Let's imagine the thread that scheduled w
 `SomeAsyncService::requestWork()` can't afford to block until the result `SemiFuture` is readied.
 Instead, it consumes the asynchronous result by specifying a callback to run and an executor on
 which to run it like so:
+
 ```c++
 // Code consuming a `SemiFuture`
 SomeAsyncService::requestWork()              // <-- temporary `SemiFuture`
   .thenRunOn(_executor)                      // <-- Transformed into a `ExecutorFuture`
   .then([](Work w) { doMoreWork(w); }); // <-- Which supports chaining
 ```
+
 By calling `.thenRunOn(_executor)` on the `SemiFuture` returned by
 `SomeAsyncService::requestWork()`, we transform it from a `SemiFuture` to an `ExecutorFuture`. This
 allows us to again chain continuations to run when the future is ready, but instead of those
 continuations being run on whatever thread readied the future, they will be run on `_executor`. In
-this way,  the result of the future returned by `SomeAsyncService::requestWork()` is able to be
+this way, the result of the future returned by `SomeAsyncService::requestWork()` is able to be
 consumed by the `doMoreWork` function which will run on `_executor`.
 
 ### How Are Results Propagated Down Continuation Chains?
+
 In our example for an asyncified `call()` function above, we saw that we could attach continuations
 onto futures, like the one returned by `TransportSession::asyncSinkMessage`. We also saw that once
 we attached one continuation to a future, we could attach subsequent ones, forming a continuation
@@ -219,15 +234,15 @@ in the form of a `Status` or `DBException`. Because a `Future<T>` can resolve to
 this way, we can chain different continuations to a `Future<T>` to consume its result, depending on
 what the type of the result is (i.e. a `T` or `Status`). We mentioned above that `.then()` is used
 to chain continuations that run when the future to which the continuation is chained resolves
-successfully.  As a result, when a continuation is chained via `.then()` to a `Future<T>`, the
+successfully. As a result, when a continuation is chained via `.then()` to a `Future<T>`, the
 continuation must accept a `T`, the result of the `Future<T>`, as an argument to consume. In the
-case of a `Future<void>`, continuations chained via `.then()` accept no arguments.  Similarly, as
+case of a `Future<void>`, continuations chained via `.then()` accept no arguments. Similarly, as
 `.onError()` is used to chain continuations that run when the future is resolved with an error,
 these continuations must accept a `Status` as argument, which contains the error the future it is
-chained to resolves with.  Lastly, as `.onCompletion()` is used to chain continuations that run in
+chained to resolves with. Lastly, as `.onCompletion()` is used to chain continuations that run in
 case a `Future<T>` resolves with success or error, continuations chained via this function must
 accept an argument that can contain the results of successful resolution of the chained-to future or
-an error.  When `T` is non-void, continuations chained via `.onCompletion()` must therefore accept a
+an error. When `T` is non-void, continuations chained via `.onCompletion()` must therefore accept a
 `StatusWith<T>` as argument, which will contain a `T` if the chained-to future resolved successfully
 and an error status otherwise. If `T` is void, a continuation chained via `.onCompletion()` must
 accept a `Status` as argument, indicating whether or not the future the continuation is chained to
@@ -249,7 +264,7 @@ will be bypassed and will never run. Next, the successful result reaches the con
 via `.then()`, which must take no arguments as `TransportLayer::asyncSinkMessage` returns a
 `Future<void>`. Because the future returned by `TransportLayer::asyncSinkMessage` resolved
 successfully, the continuation chained via `.then()` does run. The result of this continuation is
-the future returned by `TransportLayer::asyncSourceMessage`.  When this future resolves, the result
+the future returned by `TransportLayer::asyncSourceMessage`. When this future resolves, the result
 will traverse the remaining continuation chain, and find the continuation chained via
 `.onCompletion()`, which always accepts the result of a future, however it resolves, and therefore
 is run.
@@ -281,7 +296,7 @@ extract the same error in the form of a `Status`. In the case of `.getAsync()`, 
 converted to `Status`, and crucially, callables chained as continuations via `.getAsync()` cannot
 throw any exceptions, as there is no appropriate context with which to handle an asynchronous
 exception. If an exception is thrown from a continuation chained via `.getAsync()`, the entire
-process will be terminated (i.e.  the program will crash).
+process will be terminated (i.e. the program will crash).
 
 ## Notes and Links
 
@@ -291,6 +306,7 @@ and all the related types, check out the [header file][future] and search for th
 function you're interested in.
 
 ### Future Utilities
+
 We have many utilities written to help make it easier for you to work with futures; check out
 [future_util.h][future_util.h] to see them. Their [unit tests][utilUnitTests] also help elucidate
 how they can be useful. Additionally, when making requests for asynchronous work through future-ful
@@ -300,12 +316,10 @@ the associated utilities. For more on them, see their architecture guide in [thi
 README][cancelationArch].
 
 ## General Promise/Future Docs
+
 For intro-documentation on programming with promises and futures, this blog post about future use at
 [Facebook][fb] and the documentation for the use of promises and futures at [Twitter][twtr] are also
 very helpful.
-
-
-
 
 [future]: ../src/mongo/util/future.h
 [future_util.h]: ../src/mongo/util/future_util.h

@@ -1,6 +1,6 @@
 # Query System Internals
 
-*Disclaimer*: This is a work in progress. It is not complete and we will
+_Disclaimer_: This is a work in progress. It is not complete and we will
 do our best to complete it in a timely manner.
 
 # Overview
@@ -13,29 +13,29 @@ distinct, and mapReduce.
 
 Here we will divide it into the following phases and topics:
 
- * **Command Parsing & Validation:** Which arguments to the command are
-   recognized and do they have the right types?
- * **Query Language Parsing & Validation:** More complex parsing of
-   elements like query predicates and aggregation pipelines, which are
-   skipped in the first section due to complexity of parsing rules.
- * **Query Optimization**
-     * **Normalization and Rewrites:** Before we try to look at data
-       access paths, we perform some simplification, normalization and
-       "canonicalization" of the query.
-     * **Index Tagging:** Figure out which indexes could potentially be
-       helpful for which query predicates.
-     * **Plan Enumeration:** Given the set of associated indexes and
-       predicates, enumerate all possible combinations of assignments
-       for the whole query tree and output a draft query plan for each.
-     * **Plan Compilation:** For each of the draft query plans, finalize
-       the details. Pick index bounds, add any necessary sorts, fetches,
-       or projections
-     * **Plan Selection:** Compete the candidate plans against each other
-       and select the winner.
-     * [**Plan Caching:**](#plan-caching) Attempt to skip the expensive steps above by
-       caching the previous winning solution.
- * **Query Execution:** Iterate the winning plan and return results to the
-   client.
+-   **Command Parsing & Validation:** Which arguments to the command are
+    recognized and do they have the right types?
+-   **Query Language Parsing & Validation:** More complex parsing of
+    elements like query predicates and aggregation pipelines, which are
+    skipped in the first section due to complexity of parsing rules.
+-   **Query Optimization**
+    -   **Normalization and Rewrites:** Before we try to look at data
+        access paths, we perform some simplification, normalization and
+        "canonicalization" of the query.
+    -   **Index Tagging:** Figure out which indexes could potentially be
+        helpful for which query predicates.
+    -   **Plan Enumeration:** Given the set of associated indexes and
+        predicates, enumerate all possible combinations of assignments
+        for the whole query tree and output a draft query plan for each.
+    -   **Plan Compilation:** For each of the draft query plans, finalize
+        the details. Pick index bounds, add any necessary sorts, fetches,
+        or projections
+    -   **Plan Selection:** Compete the candidate plans against each other
+        and select the winner.
+    -   [**Plan Caching:**](#plan-caching) Attempt to skip the expensive steps above by
+        caching the previous winning solution.
+-   **Query Execution:** Iterate the winning plan and return results to the
+    client.
 
 In this documentation we focus on the process for a single node or
 replica set where all the data is expected to be found locally. We plan
@@ -46,14 +46,15 @@ directory later.
 
 The following commands are generally maintained by the query team, with
 the majority of our focus given to the first two.
-* find
-* aggregate
-* count
-* distinct
-* mapReduce
-* update
-* delete
-* findAndModify
+
+-   find
+-   aggregate
+-   count
+-   distinct
+-   mapReduce
+-   update
+-   delete
+-   findAndModify
 
 The code path for each of these starts in a Command, named something
 like MapReduceCommand or FindCmd. You can generally find these in
@@ -105,7 +106,7 @@ This file (specified in a YAML format) is used to generate C++ code. Our
 build system will run a python tool to parse this YAML and spit out C++
 code which is then compiled and linked. This code is left in a file
 ending with '\_gen.h' or '\_gen.cpp', for example
-'count\_command\_gen.cpp'. You'll notice that things like whether it is
+'count_command_gen.cpp'. You'll notice that things like whether it is
 optional, the type of the field, and any defaults are included here, so
 we don't have to write any code to handle that.
 
@@ -173,12 +174,12 @@ further to a point where we understand which stages are involved. This
 is actually a special case, and we use a class called the
 `LiteParsedPipeline` for this and other similar purposes.
 
- The `LiteParsedPipeline` class is constructed via a semi-parse which
+The `LiteParsedPipeline` class is constructed via a semi-parse which
 only goes so far as to tease apart which stages are involved. It is a
 very simple model of an aggregation pipeline, and is supposed to be
 cheaper to construct than doing a full parse. As a general rule of
 thumb, we try to keep expensive things from happening until after we've
-verified the user has the required privileges to do those things. 
+verified the user has the required privileges to do those things.
 
 This simple model can be used for requests we want to inspect before
 proceeding and building a full model of the user's query or request. As
@@ -215,6 +216,7 @@ Once we have parsed the command and checked authorization, we move on to parsing
 parts of the query. Once again, we will focus on the find and aggregate commands.
 
 ## Find command parsing
+
 The find command is parsed entirely by the IDL. The IDL parser first creates a FindCommandRequest.
 As mentioned above, the IDL parser does all of the required type checking and stores all options for
 the query. The FindCommandRequest is then turned into a CanonicalQuery. The CanonicalQuery
@@ -231,12 +233,14 @@ both done here.
 ## Aggregate Command Parsing
 
 ### LiteParsedPipeline
+
 In the process of parsing an aggregation we create two versions of the pipeline: a
 LiteParsedPipeline (that contains LiteParsedDocumentSource objects) and the Pipeline (that contains
-DocumentSource objects) that is eventually used for execution.  See the above section on
+DocumentSource objects) that is eventually used for execution. See the above section on
 authorization checking for more details.
 
 ### DocumentSource
+
 Before talking about the aggregate command as a whole, we will first briefly discuss
 the concept of a DocumentSource. A DocumentSource represents one stage in the an aggregation
 pipeline. For each stage in the pipeline, we create another DocumentSource. A DocumentSource
@@ -248,6 +252,7 @@ validation of its internal fields and arguments and then generates the DocumentS
 added to the final pipeline.
 
 ### Pipeline
+
 The pipeline parser uses the individual document source parsers to parse the entire pipeline
 argument of the aggregate command. The parsing process is fairly simple -- for each object in the
 user specified pipeline lookup the document source parser for the stage name, and then parse the
@@ -255,6 +260,7 @@ object using that parser. The final pipeline is composed of the DocumentSources 
 individual parsers.
 
 ### Aggregation Command
+
 When an aggregation is run, the first thing that happens is the request is parsed into a
 LiteParsedPipeline. As mentioned above, the LiteParsedPipeline is used to check options and
 permissions on namespaces. More checks are done in addition to those performed by the
@@ -264,22 +270,23 @@ above. Note that we use the original BSON for parsing the pipeline and DocumentS
 to continuing from the LiteParsedPipeline. This could be improved in the future.
 
 ## Other command parsing
+
 As mentioned above, there are several other commands maintained by the query team. We will quickly
 give a summary of how each is parsed, but not get into the same level of detail.
 
-* count : Parsed by IDL and then turned into a CountStage which can be executed in a similar way to
-  a find command.
-* distinct : The distinct specific arguments are parsed by IDL into DistinctCommandRequest. Generic
-  command arguments and 'query' field are parsed by custom code into ParsedDistinctCommand, then
-  being used to construct CanonicalDistinct and eventually turned into executable stage.
-* mapReduce : Parsed by IDL and then turned into an equivalent aggregation command.
-* update : Parsed by IDL. An update command can contain both query (find) and pipeline syntax
-  (for updates) which each get delegated to their own parsers.
-* delete : Parsed by IDL. The filter portion of the of the delete command is delegated to the find
-  parser.
-* findAndModify : Parsed by IDL. The findAndModify command can contain find and update syntax. The
-  query portion is delegated to the query parser and if this is an update (rather than a delete) it
-  uses the same parser as the update command.
+-   count : Parsed by IDL and then turned into a CountStage which can be executed in a similar way to
+    a find command.
+-   distinct : The distinct specific arguments are parsed by IDL into DistinctCommandRequest. Generic
+    command arguments and 'query' field are parsed by custom code into ParsedDistinctCommand, then
+    being used to construct CanonicalDistinct and eventually turned into executable stage.
+-   mapReduce : Parsed by IDL and then turned into an equivalent aggregation command.
+-   update : Parsed by IDL. An update command can contain both query (find) and pipeline syntax
+    (for updates) which each get delegated to their own parsers.
+-   delete : Parsed by IDL. The filter portion of the of the delete command is delegated to the find
+    parser.
+-   findAndModify : Parsed by IDL. The findAndModify command can contain find and update syntax. The
+    query portion is delegated to the query parser and if this is an update (rather than a delete) it
+    uses the same parser as the update command.
 
 # Plan caching
 
@@ -428,7 +435,7 @@ queries that project a known limited subset of fields, run in SBE and aren't eli
 indexes. For other heuristics limiting use of CSI see
 [`querySatisfiesCsiPlanningHeuristics()`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/query/query_planner.cpp#L250).
 
-Scanning of CSI is implemented by the 
+Scanning of CSI is implemented by the
 [`columnscan`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/exec/sbe/stages/column_scan.h)
 SBE stage. Unlike `ixscan` the plans that use `columnscan` don't include a separate fetch stage as
 the columnstore indexes are optimistically assumed to be covering for the scenarios when they are
@@ -447,7 +454,7 @@ which filters can be pushed down see
 
 ### Tests
 
-*JS Tests:* Most CSI related tests can be found in `jstests/core/columnstore` folder or by searching
+_JS Tests:_ Most CSI related tests can be found in `jstests/core/columnstore` folder or by searching
 for tests that create an index with the "columnstore" tag. There are also
 [`core_column_store_indexes`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/buildscripts/resmokeconfig/suites/core_column_store_indexes.yml)
 and [`aggregation_column_store_index_passthrough`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/buildscripts/resmokeconfig/suites/aggregation_column_store_index_passthrough.yml)
@@ -470,6 +477,7 @@ does not sort by value but rather by path with `RecordId` postfix. A `ColumnStor
 entries per path in a collection document:
 
 Example input documents:
+
 ```
 {
   _id: new ObjectId("..."),
@@ -489,7 +497,9 @@ Example input documents:
   viewed: true
 }
 ```
+
 High-level view of the column store data format:
+
 ```
 (_id\01, {vals: [ ObjectId("...") ]})
 (_id\02, {vals: [ ObjectId("...") ]})
@@ -531,24 +541,24 @@ that the storage engine will receive.
 
 _Code spelunking entry points:_
 
-* The [IndexAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/index_access_method.h)
-is invoked by the [IndexCatalogImpl](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/catalog/index_catalog_impl.cpp#L1714-L1715).
+-   The [IndexAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/index_access_method.h)
+    is invoked by the [IndexCatalogImpl](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/catalog/index_catalog_impl.cpp#L1714-L1715).
 
-* The [ColumnStoreAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.h#L39),
-note the [write paths](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L269-L286)
-that use the ColumnKeyGenerator.
+-   The [ColumnStoreAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.h#L39),
+    note the [write paths](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L269-L286)
+    that use the ColumnKeyGenerator.
 
-* The [ColumnKeyGenerator](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L146)
-produces many [UnencodedCellView](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L111)
-via the [ColumnShredder](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.cpp#L163-L176)
-with the [ColumnProjectionTree & ColumnProjectionNode](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L46-L101)
-classes defining the desired path projections.
+-   The [ColumnKeyGenerator](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L146)
+    produces many [UnencodedCellView](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L111)
+    via the [ColumnShredder](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.cpp#L163-L176)
+    with the [ColumnProjectionTree & ColumnProjectionNode](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L46-L101)
+    classes defining the desired path projections.
 
-* The [column_cell.h/cpp](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_cell.h#L44-L50)
-helpers are leveraged throughout
-[ColumnStoreAccessMethod write methods](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L281)
-to encode ColumnKeyGenerator UnencodedCellView cells into final buffers for storage write.
+-   The [column_cell.h/cpp](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_cell.h#L44-L50)
+    helpers are leveraged throughout
+    [ColumnStoreAccessMethod write methods](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L281)
+    to encode ColumnKeyGenerator UnencodedCellView cells into final buffers for storage write.
 
-* The ColumnStoreAccessMethod
-[invokes the WiredTigerColumnStore](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L318)
-with the final encoded path-cell (key-value) entries for storage.
+-   The ColumnStoreAccessMethod
+    [invokes the WiredTigerColumnStore](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L318)
+    with the final encoded path-cell (key-value) entries for storage.

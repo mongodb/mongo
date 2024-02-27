@@ -1,25 +1,43 @@
 # MongoDB Build System Reference
 
 ## MongoDB Build System Requirements
+
 ### Recommended minimum requirements
+
 ### Python modules
+
 ### External libraries
+
 ### Enterprise module requirements
+
 ### Testing requirements
 
 ## MongoDB customizations
+
 ### SCons modules
+
 ### Development tools
+
 #### Compilation database generator
+
 ### Build tools
+
 #### IDL Compiler
+
 ### Auxiliary tools
+
 #### Ninja generator
+
 #### Icecream tool
+
 #### ccache tool
+
 ### LIBDEPS
+
 Libdeps is a subsystem within the build, which is centered around the LIBrary DEPendency graph. It tracks and maintains the dependency graph as well as lints, analyzes and provides useful metrics about the graph.
+
 #### Design
+
 The libdeps subsystem is divided into several stages, described in order of use as follows.
 
 ##### SConscript `LIBDEPS` definitions and built time linting
@@ -37,17 +55,18 @@ The libdeps analyzer module is a python library which provides and Application P
 ##### The CLI and Visualizer tools
 
 The libdeps analyzer module is used in the libdeps Graph Analysis Command Line Interface (gacli) tool and the libdeps Graph Visualizer web service. Both tools read in the graph file generated from the build and provide the Human Machine Interface (HMI) for analysis and linting.
+
 #### The `LIBDEPS` variables
+
 The variables include several types of lists to be added to libraries per a SCons builder instance:
 
-| Variable        | Use           |
-| ------------- |-------------|
-| `LIBDEPS`      | transitive dependencies  |
-| `LIBDEPS_PRIVATE`    |   local dependencies    |
-| `LIBDEPS_INTERFACE` | transitive dependencies excluding self      |
-| `LIBDEPS_DEPENDENTS` | reverse dependencies |
-| `PROGDEPS_DEPENDENTS` | reverse dependencies for Programs |
-
+| Variable              | Use                                    |
+| --------------------- | -------------------------------------- |
+| `LIBDEPS`             | transitive dependencies                |
+| `LIBDEPS_PRIVATE`     | local dependencies                     |
+| `LIBDEPS_INTERFACE`   | transitive dependencies excluding self |
+| `LIBDEPS_DEPENDENTS`  | reverse dependencies                   |
+| `PROGDEPS_DEPENDENTS` | reverse dependencies for Programs      |
 
 _`LIBDEPS`_ is the 'public' type, such that libraries that are added to this list become a dependency of the current library, and also become dependencies of libraries which may depend on the current library. This propagation also includes not just the libraries in the `LIBDEPS` list, but all `LIBDEPS` of those `LIBDEPS` recursively, meaning that all dependencies of the `LIBDEPS` libraries, also become dependencies of the current library and libraries which depend on it.
 
@@ -60,34 +79,40 @@ _`LIBDEPS_DEPENDENTS`_ are added to libraries which will force themselves as dep
 _`PROGDEPS_DEPENDENTS`_ are the same as `LIBDEPS_DEPENDENTS`, but intended for use only with Program builders.
 
 #### `LIBDEPS_TAGS`
+
 The `LIBDEPS_TAGS` variable is used to mark certain libdeps for various reasons. Some `LIBDEPS_TAGS` are used to mark certain libraries for `LIBDEPS_TAG_EXPANSIONS` variable which is used to create a function which can expand to a string on the command line. Below is a table of available `LIBDEPS` tags:
 
-| Tag | Description |
-|---|---|
-| `illegal_cyclic_or_unresolved_dependencies_allowlisted` | SCons subst expansion tag to handle dependency cycles |
-| `init-no-global-side-effects` | SCons subst expansion tag for causing linkers to avoid pulling in all symbols |
-| `lint-public-dep-allowed` | Linting exemption tag exempting the `lint-no-public-deps` tag |
-| `lint-no-public-deps` | Linting inclusion tag ensuring a libdep has no `LIBDEPS` declared |
-| `lint-allow-non-alphabetic` | Linting exemption tag allowing `LIBDEPS` variable lists to be non-alphabetic |
-| `lint-leaf-node-allowed-dep` | Linting exemption tag exempting the `lint-leaf-node-no-deps` tag |
-| `lint-leaf-node-no-deps` | Linting inclusion tag ensuring a libdep has no libdeps and is a leaf node |
-| `lint-allow-nonlist-libdeps` | Linting exemption tag allowing a `LIBDEPS` variable to not be a list | `lint-allow-bidirectional-edges` | Linting exemption tag allowing reverse dependencies to also be a forward dependencies |
-| `lint-allow-nonprivate-on-deps-dependents` | Linting exemption tag allowing reverse dependencies to be transitive |
-| `lint-allow-dup-libdeps` | Linting exemption tag allowing `LIBDEPS` variables to contain duplicate libdeps on a given library |
-| `lint-allow-program-links-private` | Linting exemption tag allowing `Program`s to have `PRIVATE_LIBDEPS` |
+| Tag                                                     | Description                                                                                        |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------- |
+| `illegal_cyclic_or_unresolved_dependencies_allowlisted` | SCons subst expansion tag to handle dependency cycles                                              |
+| `init-no-global-side-effects`                           | SCons subst expansion tag for causing linkers to avoid pulling in all symbols                      |
+| `lint-public-dep-allowed`                               | Linting exemption tag exempting the `lint-no-public-deps` tag                                      |
+| `lint-no-public-deps`                                   | Linting inclusion tag ensuring a libdep has no `LIBDEPS` declared                                  |
+| `lint-allow-non-alphabetic`                             | Linting exemption tag allowing `LIBDEPS` variable lists to be non-alphabetic                       |
+| `lint-leaf-node-allowed-dep`                            | Linting exemption tag exempting the `lint-leaf-node-no-deps` tag                                   |
+| `lint-leaf-node-no-deps`                                | Linting inclusion tag ensuring a libdep has no libdeps and is a leaf node                          |
+| `lint-allow-nonlist-libdeps`                            | Linting exemption tag allowing a `LIBDEPS` variable to not be a list                               | `lint-allow-bidirectional-edges` | Linting exemption tag allowing reverse dependencies to also be a forward dependencies |
+| `lint-allow-nonprivate-on-deps-dependents`              | Linting exemption tag allowing reverse dependencies to be transitive                               |
+| `lint-allow-dup-libdeps`                                | Linting exemption tag allowing `LIBDEPS` variables to contain duplicate libdeps on a given library |
+| `lint-allow-program-links-private`                      | Linting exemption tag allowing `Program`s to have `PRIVATE_LIBDEPS`                                |
 
 ##### The `illegal_cyclic_or_unresolved_dependencies_allowlisted` tag
+
 This tag should not be used anymore because the library dependency graph has been successfully converted to a Directed Acyclic Graph (DAG). Prior to this accomplishment, it was necessary to handle
 cycles specifically with platform specific options on the command line.
 
 ##### The `init-no-global-side-effects` tag
+
 Adding this flag to a library turns on platform specific compiler flags which will cause the linker to pull in just the symbols it needs. Note that by default, the build is configured to pull in all symbols from libraries because of the use of static initializers, however if a library is known to not have any of these initializers, then this flag can be added for some performance improvement.
 
 #### Linting and linter tags
 
 The libdeps linter features automatically detect certain classes of LIBDEPS usage errors. The libdeps linters are implemented as build-time linting and post-build linting procedures to maintain order in usage of the libdeps tool and the build’s library dependency graph. You will need to comply with the rules enforced by the libdeps linter, and fix issues that it raises when modifying the build scripts. There are exemption tags to prevent the linter from blocking things, however these exemption tags should only be used in extraordinary cases, and with good reason. A goal of the libdeps linter is to drive and maintain the number of exemption tags in use to zero.
+
 ##### Exemption Tags
+
 There are a number of existing issues that need to be addressed, but they will be addressed in future tickets. In the meantime, the use of specific strings in the LIBDEPS_TAGS variable can allow the libdeps linter to skip certain issues on given libraries. For example, to have the linter skip enforcement of the lint rule against bidirectional edges for "some_library":
+
 ```
 env.Library(
     target=’some_library’
@@ -97,11 +122,13 @@ env.Library(
 ```
 
 #### build-time Libdeps Linter
+
 If there is a build-time issue, the build will fail until it is addressed. This linting feature will be on by default and takes about half a second to complete in a full enterprise build (at the time of writing this), but can be turned off by using the --libdeps-linting=off option on your SCons invocation.
 
 The current rules and there exemptions are listed below:
 
 1. **A 'Program' can not link a non-public dependency, it can only have LIBDEPS links.**
+
     ###### Example
 
     ```
@@ -112,12 +139,15 @@ The current rules and there exemptions are listed below:
         LIBDEPS_PRIVATE=[‘lib2’], # This is a Program, BAD
     )
     ```
+
     ###### Rationale
 
     A Program can not be linked into anything else, and there for the transitiveness does not apply. A default value of LIBDEPS was selected for consistency since most Program's were already doing this at the time the rule was created.
 
     ###### Exemption
+
     'lint-allow-program-links-private' on the target node
+
     ######
 
 2. **A 'Node' can only directly link a given library once.**
@@ -133,15 +163,19 @@ The current rules and there exemptions are listed below:
         LIBDEPS_INTERFACE=[‘lib2’, 'lib2'], # Linked twice, BAD
     )
     ```
+
     ###### Rationale
 
     Libdeps will ignore duplicate links, so this rule is mostly for consistency and neatness in the build scripts.
 
     ###### Exemption
+
     'lint-allow-dup-libdeps' on the target node
 
     ######
+
 3. **A 'Node' which uses LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENTS can only have LIBDEPS_PRIVATE links.**
+
     ###### Example
 
     ```
@@ -153,14 +187,21 @@ The current rules and there exemptions are listed below:
         LIBDEPS_PRIVATE=[‘lib2’], # OK
     )
     ```
+
     ###### Rationale
 
     The node that the library is using LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENT to inject its dependency onto should be conditional, therefore there should not be transitiveness for that dependency since it cannot be the source of any resolved symbols.
+
     ###### Exemption
+
     'lint-allow-nonprivate-on-deps-dependents' on the target node
+
     ######
+
 4. **A 'Node' can not link directly to a library that uses LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENTS.**
+
     ###### Example
+
     ```
     env.Library(
         target='other_library',
@@ -173,16 +214,21 @@ The current rules and there exemptions are listed below:
         LIBDEPS_DEPENDENTS=['lib3'],
     )
     ```
+
     ###### Rationale
 
     A library that is using LIBDEPS_DEPENDENTS or PROGDEPS_DEPENDENT should only be used for reverse dependency edges. If a node does need to link directly to a library that does have reverse dependency edges, that indicates the library should be split into two separate libraries, containing its direct dependency content and its conditional reverse dependency content.
 
     ###### Exemption
+
     'lint-allow-bidirectional-edges' on the target node
+
     ######
 
 5. **All libdeps environment vars must be assigned as lists.**
+
     ###### Example
+
     ```
     env.Library(
         target='some_library',
@@ -191,13 +237,19 @@ The current rules and there exemptions are listed below:
         LIBDEPS_PRIVATE=['lib2'], # OK
     )
     ```
+
     ###### Rationale
 
     Libdeps will handle non-list environment variables, so this is more for consistency and neatness in the build scripts.
+
     ###### Exemption
+
     'lint-allow-nonlist-libdeps' on the target node
+
     ######
+
 6. **Libdeps with the tag 'lint-leaf-node-no-deps' shall not link any libdeps.**
+
     ###### Example
 
     ```
@@ -225,13 +277,19 @@ The current rules and there exemptions are listed below:
     The special tag allows certain nodes to be marked and programmatically checked that they remain lead nodes. An example use-case is when we want to make sure certain nodes never link mongodb code.
 
     ###### Exemption
+
     'lint-leaf-node-allowed-dep' on the exempted libdep
 
     ###### Inclusion
+
     'lint-leaf-node-no-deps' on the target node
+
     ######
+
 7. **Libdeps with the tag 'lint-no-public-deps' shall not link any libdeps.**
+
     ###### Example
+
     ```
     env.Library(
         target='lib2',
@@ -253,17 +311,25 @@ The current rules and there exemptions are listed below:
         ]
     )
     ```
+
     ###### Rationale
 
     The special tag allows certain nodes to be marked and programmatically checked that they do not link publicly. Some nodes such as mongod_main have special requirements that this programmatically checks.
 
     ###### Exemption
+
     'lint-public-dep-allowed' on the exempted libdep
+
     ###### Inclusion
+
     'lint-no-public-deps' on the target node
+
     ######
+
 8. **Libdeps shall be sorted alphabetically in LIBDEPS lists in the SCons files.**
+
     ###### Example
+
     ```
     env.Library(
         target='lib2',
@@ -276,17 +342,19 @@ The current rules and there exemptions are listed below:
         ]
     )
     ```
+
     ###### Rationale
 
     Keeping the SCons files neat and ordered allows for easier Code Review diffs and generally better maintainability.
+
     ###### Exemption
+
     'lint-allow-non-alphabetic' on the exempted libdep
+
     ######
 
-
-
-
 ##### The build-time print Option
+
 The libdeps linter also has the `--libdeps-linting=print` option which will perform linting, and instead of failing the build on an issue, just print and continue on. It will also ignore exemption tags, and still print the issue because it will not fail the build. This is a good way to see the entirety of existing issues that are exempted by tags, as well as printing other metrics such as time spent linting.
 
 #### post-build linting and analysis
@@ -400,12 +468,14 @@ The script will launch the backend and then build the optimized production front
 
 After the server has started up, it should notify you via the terminal that you can access it at http://localhost:3000 locally in your browser.
 
-
-
 ## Build system configuration
+
 ### SCons configuration
+
 #### Frequently used flags and variables
+
 ### MongoDB build configuration
+
 #### Frequently used flags and variables
 
 ##### `MONGO_GIT_HASH`
@@ -425,18 +495,31 @@ of `git describe`, which will use the local tags to derive a version.
 ### Targets and Aliases
 
 ## Build artifacts and installation
+
 ### Hygienic builds
+
 ### AutoInstall
+
 ### AutoArchive
 
 ## MongoDB SCons style guide
+
 ### Sconscript Formatting Guidelines
+
 #### Vertical list style
+
 #### Alphabetize everything
+
 ### `Environment` Isolation
+
 ### Declaring Targets (`Program`, `Library`, and `CppUnitTest`)
+
 ### Invoking external tools correctly with `Command`s
+
 ### Customizing an `Environment` for a target
+
 ### Invoking subordinate `SConscript`s
+
 #### `Import`s and `Export`s
+
 ### A Model `SConscript` with Comments

@@ -7,12 +7,12 @@ to assist the user in selecting a shard key given a collection's data
 and the user's query patterns.
 It returns two kinds of metrics called `keyCharacteristics` and `readWriteDistribution`:
 
-* `keyCharacteristics` consists of metrics about the cardinality, frequency and monotonicity
-of the shard key, calculated based on documents sampled from the collection.
-* `readWriteDistribution` consists of the metrics about query routing patterns
-and the hotness of shard key ranges, calculated based on sampled queries.
+-   `keyCharacteristics` consists of metrics about the cardinality, frequency and monotonicity
+    of the shard key, calculated based on documents sampled from the collection.
+-   `readWriteDistribution` consists of the metrics about query routing patterns
+    and the hotness of shard key ranges, calculated based on sampled queries.
 
-The remainder of this document describes how queries are sampled in order to report 
+The remainder of this document describes how queries are sampled in order to report
 `readWriteDistribution` metrics.
 
 ## How the Query Analyzer Works
@@ -58,7 +58,7 @@ This sampling rate is for the entire collection, not per mongos or mongod.
 
 In a sharded cluster,
 the overall `samplesPerSecond` configured via the `configureQueryAnalyzer` command
-is divided among mongoses 
+is divided among mongoses
 proportional to the number of queries that each mongos handles,
 so a mongos that handles proportionally more queries than other mongoses
 also samples proportionally more frequently.
@@ -75,7 +75,6 @@ For a standalone replica set, the primary mongod controls the sampling rate on e
 in a similar way: computing an exponential moving average of number of samples and updating
 its sample rate from the primary.
 
-
 ### Recording and Persisting a Sampled Query
 
 Recording and persisting of sampled queries is designed to minimize the performance impact of
@@ -87,7 +86,6 @@ periodically [inserting](https://github.com/10gen/mongo/blob/a1e2e227762163d8fc4
 Sampled queries can be fetched via the new aggregation stage called `$listSampledQueries`.
 Sampled queries have a TTL of seven days from the insertion time
 (configurable by server parameter `sampledQueriesExpirationSeconds`).
-
 
 ### Code references
 

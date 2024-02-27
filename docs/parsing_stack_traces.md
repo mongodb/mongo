@@ -8,11 +8,9 @@
 addr2line -e mongod -ifC <offset>
 ```
 
-
 ## `c++filt`
 
 Use [`c++filt`][2] to demangle function names by pasting the whole stack trace to stdin.
-
 
 ## Finding the Right Binary
 

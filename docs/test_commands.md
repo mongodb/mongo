@@ -17,10 +17,10 @@ parameter for testing.
 
 Some often-used commands that are test-only:
 
-- [configureFailPoint][fail_point_cmd]
-- [emptyCapped][empty_capped_cmd]
-- [replSetTest][repl_set_test_cmd]
-- [sleep][sleep_cmd]
+-   [configureFailPoint][fail_point_cmd]
+-   [emptyCapped][empty_capped_cmd]
+-   [replSetTest][repl_set_test_cmd]
+-   [sleep][sleep_cmd]
 
 As a very rough estimate, about 10% of all server commands are test-only. These additional commands
 will appear in `db.runCommand({listCommands: 1})` when the server has test commands enabled.
@@ -29,10 +29,9 @@ will appear in `db.runCommand({listCommands: 1})` when the server has test comma
 
 A few pointers to relevant code that sets this up:
 
-- [test_commands_enabled.h][test_commands_enabled]
+-   [test_commands_enabled.h][test_commands_enabled]
 
-- [MONGO_REGISTER_COMMAND][register_command]
-
+-   [MONGO_REGISTER_COMMAND][register_command]
 
 [empty_capped_cmd]: ../src/mongo/db/commands/test_commands.cpp
 [fail_point_cmd]: ../src/mongo/db/commands/fail_point_cmd.cpp

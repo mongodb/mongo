@@ -13,12 +13,13 @@ For more on what test-only means and how to enable the `configureFailPoint` comm
 A fail point must first be defined using `MONGO_FAIL_POINT_DEFINE(myFailPoint)`. This statement
 adds the fail point to a registry and allows it to be evaluated in code. There are three common
 patterns for evaluating a fail point:
-- Exercise a rarely used branch:
-  `if (whenPigsFly || myFailPoint.shouldFail()) { ... }`
-- Block until the fail point is unset:
-  `myFailPoint.pauseWhileSet();`
-- Use the fail point's payload to perform custom behavior:
-  `myFailPoint.execute([](const BSONObj& data) { useMyPayload(data); };`
+
+-   Exercise a rarely used branch:
+    `if (whenPigsFly || myFailPoint.shouldFail()) { ... }`
+-   Block until the fail point is unset:
+    `myFailPoint.pauseWhileSet();`
+-   Use the fail point's payload to perform custom behavior:
+    `myFailPoint.execute([](const BSONObj& data) { useMyPayload(data); };`
 
 For more complete usage, see the [fail point header][fail_point] or the [fail point
 tests][fail_point_test].
@@ -34,11 +35,11 @@ a `FailPointEnableBlock` to enable and configure the fail point for a given bloc
 a fail point can also be set via setParameter by its name prefixed with "failpoint." (e.g.,
 "failpoint.myFailPoint").
 
-Users can also wait until a fail point has been evaluated a certain number of times ***over its
-lifetime***. A `waitForFailPoint` command request will send a response back when the fail point has
+Users can also wait until a fail point has been evaluated a certain number of times **_over its
+lifetime_**. A `waitForFailPoint` command request will send a response back when the fail point has
 been evaluated the given number of times. For ease of use, the `configureFailPoint` JavaScript
-helper returns an object that can be used to wait a certain amount of times ***from when the fail
-point was enabled***. In C++ tests, users can invoke `FailPoint::waitForTimesEntered()` for similar
+helper returns an object that can be used to wait a certain amount of times **_from when the fail
+point was enabled_**. In C++ tests, users can invoke `FailPoint::waitForTimesEntered()` for similar
 behavior. `FailPointEnableBlock` records the amount of times the fail point had been evaluated when
 it was constructed, accessible via `FailPointEnableBlock::initialTimesEntered()`.
 

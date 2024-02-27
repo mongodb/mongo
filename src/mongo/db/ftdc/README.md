@@ -2,7 +2,7 @@
 
 ## Table of Contents
 
-- [High Level Overview](#high-level-overview)
+-   [High Level Overview](#high-level-overview)
 
 ## High Level Overview
 
@@ -23,9 +23,9 @@ process information for the controller. These sets of collector objects are stor
 object, allowing all the data to be collected through one call to collect on the
 `FTDCCollectorCollection`. There are two sets of `FTDCCollectorCollection` objects on the
 controller:
-[_periodicCollectors](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ftdc/controller.h#L200-L201)
+[\_periodicCollectors](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ftdc/controller.h#L200-L201)
 that collects data at a specified time interval, and
-[_rotateCollectors](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ftdc/controller.h#L207-L208)
+[\_rotateCollectors](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/ftdc/controller.h#L207-L208)
 that collects one set of data every time a file is created.
 
 At specified time intervals, the FTDC Controller calls collect on the `_periodicCollectors`

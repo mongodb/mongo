@@ -9,6 +9,7 @@ burden of starting and destroying a dedicated thead.
 ## Classes
 
 ### `ThreadPoolInterface`
+
 The [`ThreadPoolInterface`][thread_pool_interface.h] abstract interface is
 an extension of the `OutOfLineExecutor` (see [the executors architecture
 guide][executors]) abstract interface, adding `startup`, `shutdown`, and
@@ -58,4 +59,3 @@ resources it simulates a thread pool well enough to be used by a
 [network_interface_thread_pool.h]: ../src/mongo/executor/network_interface_thread_pool.h
 [network_interface.h]: ../src/mongo/executor/network_interface.h
 [thread_pool_mock.h]: ../src/mongo/executor/thread_pool_mock.h
-

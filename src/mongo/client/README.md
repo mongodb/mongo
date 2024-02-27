@@ -1,6 +1,7 @@
 # Internal Client
 
 ## Replica set monitoring and host targeting
+
 The internal client driver responsible for routing a command request to a replica set must determine
 which member to target. Host targeting involves finding which nodes in a topology satisfy the
 $readPreference. Node eligibility depends on the type of a node (i.e primary, secondary, etc.) and
@@ -33,16 +34,17 @@ through the hello response latency. Aside from the RTT, the remaining informatio
 read preferences is gathered through awaitable hello commands asynchronously sent to each node in
 the topology.
 
-
 #### Code references
-* [**Read Preference**](https://docs.mongodb.com/manual/core/read-preference/)
-* [**ReplicaSetMonitorInterface class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/replica_set_monitor_interface.h)
-* [**ReplicaSetMonitorManager class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/replica_set_monitor_manager.h)
-* [**RemoteCommandTargeter class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/remote_command_targeter.h)
-* [**ServerDiscoveryMonitor class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/server_discovery_monitor.cpp)
-* [**ServerPingMonitor class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/server_ping_monitor.h)
-* The specifications for
-[**Server Discovery and Monitoring (SDAM)**](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst)
-* [**TopologyDescription class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/sdam/topology_description.h)
-* [**Replication Architecture Guide**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#replication-and-topology-coordinators)
+
+-   [**Read Preference**](https://docs.mongodb.com/manual/core/read-preference/)
+-   [**ReplicaSetMonitorInterface class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/replica_set_monitor_interface.h)
+-   [**ReplicaSetMonitorManager class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/replica_set_monitor_manager.h)
+-   [**RemoteCommandTargeter class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/remote_command_targeter.h)
+-   [**ServerDiscoveryMonitor class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/server_discovery_monitor.cpp)
+-   [**ServerPingMonitor class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/server_ping_monitor.h)
+-   The specifications for
+    [**Server Discovery and Monitoring (SDAM)**](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst)
+-   [**TopologyDescription class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/sdam/topology_description.h)
+-   [**Replication Architecture Guide**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/README.md#replication-and-topology-coordinators)
+
 ---

@@ -18,11 +18,11 @@ an immutable container. Otherwise, a standard container may make more sense.
 The currently supported containers are all based on classes from the
 [`immer`](https://sinusoid.es/immer/) library.
 
- - [`immutable::map`](map.h): ordered map interface backed by `immer::flex_vector`
- - [`immutable::set`](set.h): ordered set interface backed by `immer::flex_vector`
- - [`immutable::unordered_map`](unordered_map.h): typedef for `immer:map`
- - [`immutable::unordered_set`](unordered_set.h): typedef for `immer:set`
- - [`immutable::vector`](vector.h): typedef for `immer::vector`
+-   [`immutable::map`](map.h): ordered map interface backed by `immer::flex_vector`
+-   [`immutable::set`](set.h): ordered set interface backed by `immer::flex_vector`
+-   [`immutable::unordered_map`](unordered_map.h): typedef for `immer:map`
+-   [`immutable::unordered_set`](unordered_set.h): typedef for `immer:set`
+-   [`immutable::vector`](vector.h): typedef for `immer::vector`
 
 Both ordered and unordered map and set variants support heterogeneous lookup.
 

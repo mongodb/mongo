@@ -1,4 +1,3 @@
-
 # Logical Sessions
 
 Some operations, such as retryable writes and transactions, require durably storing metadata in the
@@ -31,6 +30,7 @@ which the session's metadata expires.
 
 The logical session cache is an in-memory cache of sessions that are open and in use on a certain
 node. Each node (router, shard, config server) has its own in-memory cache. A cache entry contains:
+
 1. `_id` - The session’s logical session id
 1. `user` - The session’s logged-in username (if authentication is enabled)
 1. `lastUse` - The date and time that the session was last used
@@ -40,7 +40,7 @@ as the "sessions collection." The sessions collection has different placement be
 whether the user is running a standalone node, a replica set, or a sharded cluster.
 
 | Cluster Type    | Sessions Collection Durable Storage                                                                              |
-|-----------------|------------------------------------------------------------------------------------------------------------------|
+| --------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Standalone Node | Sessions collection exists on the same node as the in-memory cache.                                              |
 | Replica Set     | Sessions collection exists on the primary node and replicates to secondaries.                                    |
 | Sharded Cluster | Sessions collection is a regular sharded collection - can exist on multiple shards and can have multiple chunks. |
@@ -87,17 +87,17 @@ the following steps will be performed:
 #### Configurable parameters related to the logical session cache
 
 | Parameter                                                                                                                                                          | Value Type | Default Value        | Startup/Runtime | Description                                                                                                                            |
-|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------|----------------------|-----------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | -------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | [disableLogicalSessionCacheRefresh](https://github.com/mongodb/mongo/blob/9cbbb66d7536ab4f92baf99ef5332e96be0e4153/src/mongo/db/logical_session_cache.idl#L49-L54) | boolean    | false                | Startup         | Disables the logical session cache's periodic "refresh" and "reap" functions on this node. Recommended for testing only.               |
 | [logicalSessionRefreshMillis](https://github.com/mongodb/mongo/blob/9cbbb66d7536ab4f92baf99ef5332e96be0e4153/src/mongo/db/logical_session_cache.idl#L34-L40)       | integer    | 300000ms (5 minutes) | Startup         | Changes how often the logical session cache runs its periodic "refresh" and "reap" functions on this node.                             |
 | [localLogicalSessionTimeoutMinutes](https://github.com/mongodb/mongo/blob/9cbbb66d7536ab4f92baf99ef5332e96be0e4153/src/mongo/db/logical_session_id.idl#L191-L196)  | integer    | 30 minutes           | Startup         | Changes the TTL index timeout for the sessions collection. In sharded clusters, this parameter is supported only on the config server. |
 
 #### Code references
 
-* [Place where a session is placed (or replaced) in the logical session cache](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache.h#L71-L75)
-* [The logical session cache refresh function](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache_impl.cpp#L207-L355)
-* [The periodic job to clean up the session catalog and transactions table (the "reap" function)](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache_impl.cpp#L141-L205)
-* [Location of the session catalog and transactions table cleanup code on mongod](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/session/session_catalog_mongod.cpp#L331-L398)
+-   [Place where a session is placed (or replaced) in the logical session cache](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache.h#L71-L75)
+-   [The logical session cache refresh function](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache_impl.cpp#L207-L355)
+-   [The periodic job to clean up the session catalog and transactions table (the "reap" function)](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache_impl.cpp#L141-L205)
+-   [Location of the session catalog and transactions table cleanup code on mongod](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/session/session_catalog_mongod.cpp#L331-L398)
 
 ## The logical session catalog
 
@@ -127,7 +127,7 @@ the first kill request.
 
 The runtime state in a node's in-memory session catalog is made durable in the node's
 `config.transactions` collection, also called its transactions table. The in-memory session catalog
- is
+is
 [invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session/session_catalog_mongod.cpp#L324)
 if the `config.transactions` collection is dropped and whenever there is a rollback. When
 invalidation occurs, all active sessions are killed, and the in-memory transaction state is marked
@@ -135,10 +135,11 @@ as invalid to force it to be
 [reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog_mongod.cpp#L426).
 
 #### Code references
-* [**SessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog.h)
-* [**MongoDSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog_mongod.h)
-* [**RouterSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/session_catalog_router.h)
-* How [**mongod**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/service_entry_point_common.cpp#L537) and [**mongos**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/strategy.cpp#L412) check out a session prior to executing a command.
+
+-   [**SessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog.h)
+-   [**MongoDSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog_mongod.h)
+-   [**RouterSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/session_catalog_router.h)
+-   How [**mongod**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/service_entry_point_common.cpp#L537) and [**mongos**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/strategy.cpp#L412) check out a session prior to executing a command.
 
 ## Retryable writes
 
@@ -191,8 +192,8 @@ originally been returned. In version 5.0 and earlier, the default behavior is to
 [record the document image into the oplog](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer_impl.cpp#L191)
 as a no-op entry. The oplog entries generated would look something like:
 
-* `{ op: "d", o: {_id: 1}, ts: Timestamp(100, 2), preImageOpTime: Timestamp(100, 1), lsid: ..., txnNumber: ...}`
-* `{ op: "n", o: {_id: 1, imageBeforeDelete: "foobar"}, ts: Timestamp(100, 1)}`
+-   `{ op: "d", o: {_id: 1}, ts: Timestamp(100, 2), preImageOpTime: Timestamp(100, 1), lsid: ..., txnNumber: ...}`
+-   `{ op: "n", o: {_id: 1, imageBeforeDelete: "foobar"}, ts: Timestamp(100, 1)}`
 
 There's a cost in "explicitly" replicating these images via the oplog. We've addressed this cost
 with 5.1 where the default is to instead [save the image into a side collection](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer_impl.cpp#L646-L650)
@@ -215,7 +216,7 @@ For retry images saved in the image collection, the source will "downconvert" op
 `needsRetryImage: true` into two oplog entries, simulating the old format. As chunk migrations use
 internal commands, [this downconverting procedure](https://github.com/mongodb/mongo/blob/0beb0cacfcaf7b24259207862e1d0d489e1c16f1/src/mongo/db/s/session_catalog_migration_source.cpp#L58-L97)
 is installed under the hood. For resharding and tenant migrations, a new aggregation stage,
-[_internalFindAndModifyImageLookup](https://github.com/mongodb/mongo/blob/e27dfa10b994f6deff7c59a122b87771cdfa8aba/src/mongo/db/pipeline/document_source_find_and_modify_image_lookup.cpp#L61),
+[\_internalFindAndModifyImageLookup](https://github.com/mongodb/mongo/blob/e27dfa10b994f6deff7c59a122b87771cdfa8aba/src/mongo/db/pipeline/document_source_find_and_modify_image_lookup.cpp#L61),
 was introduced to perform the identical substitution. In order for this stage to have a valid timestamp
 to assign to the forged no-op oplog entry as result of the "downconvert", we must always assign an
 extra oplog slot when writing the original retryable findAndModify oplog entry with
@@ -233,11 +234,12 @@ those timestamps:
 |Delete, NeedsRetryImage=preImage |2|Reserved for forged no-op entry eventually used by tenant migrations/resharding|Delete oplog entry|NeedsRetryImage: preImage|
 
 #### Code references
-* [**TransactionParticipant class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.h)
-* How a write operation [checks if a statement has been executed](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L811-L816)
-* How mongos [assigns statement ids to writes in a batch write command](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/write_ops/batch_write_op.cpp#L483-L486)
-* How mongod [assigns statement ids to insert operations](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L573)
-* [Retryable writes specifications](https://github.com/mongodb/specifications/blob/49589d66d49517f10cc8e1e4b0badd61dbb1917e/source/retryable-writes/retryable-writes.rst)
+
+-   [**TransactionParticipant class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.h)
+-   How a write operation [checks if a statement has been executed](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L811-L816)
+-   How mongos [assigns statement ids to writes in a batch write command](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/write_ops/batch_write_op.cpp#L483-L486)
+-   How mongod [assigns statement ids to insert operations](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/ops/write_ops_exec.cpp#L573)
+-   [Retryable writes specifications](https://github.com/mongodb/specifications/blob/49589d66d49517f10cc8e1e4b0badd61dbb1917e/source/retryable-writes/retryable-writes.rst)
 
 ## Transactions
 
@@ -283,12 +285,12 @@ transaction runs on. The command is retryable as long as no new transaction has 
 and the session is still alive. The number of participant shards and the number of write shards determine
 the commit path for the transaction.
 
-* If the number of participant shards is zero, the mongos skips the commit and returns immediately.
-* If the number of participant shards is one, the mongos forwards `commitTransaction` directly to that shard.
-* If the number of participant shards is greater than one:
-   * If the number of write shards is zero, the mongos forwards `commitTransaction` to each shard individually.
-   * Otherwise, the mongos sends `coordinateCommitTransaction` with the participant list to the coordinator shard to
-   initiate two-phase commit.
+-   If the number of participant shards is zero, the mongos skips the commit and returns immediately.
+-   If the number of participant shards is one, the mongos forwards `commitTransaction` directly to that shard.
+-   If the number of participant shards is greater than one:
+    -   If the number of write shards is zero, the mongos forwards `commitTransaction` to each shard individually.
+    -   Otherwise, the mongos sends `coordinateCommitTransaction` with the participant list to the coordinator shard to
+        initiate two-phase commit.
 
 To recover the commit decision after the original mongos has become unreachable, the client can send `commitTransaction`
 along with the `recoveryToken` to a different mongos. This will not initiate committing the transaction, instead
@@ -303,22 +305,23 @@ information about the transaction it is trying commit. This document is deleted 
 
 Below are the steps in the two-phase commit protocol.
 
-* Prepare Phase
-  1. The coordinator writes the participant list to the `config.transaction_coordinators` document for the
-transaction, and waits for it to be majority committed.
-  1. The coordinator sends [`prepareTransaction`](https://github.com/mongodb/mongo/blob/r4.4.0-rc7/src/mongo/db/repl/README.md#lifetime-of-a-prepared-transaction) to the participants, and waits for vote reponses. Each participant
-shard responds with a vote, marks the transaction as prepared, and updates the `config.transactions`
-document for the transaction.
-  1. The coordinator writes the decision to the `config.transaction_coordinators` document and waits for it to
-be majority committed. If the `coordinateCommitTransactionReturnImmediatelyAfterPersistingDecision` server parameter is
-true  (default), the  `coordinateCommitTransaction` command returns immediately after waiting for client's write concern
-(i.e. let the remaining work continue in the background).
+-   Prepare Phase
 
-* Commit Phase
-  1. If the decision is 'commit', the coordinator sends `commitTransaction` to the participant shards, and waits
-for responses. If the decision is 'abort', it sends `abortTransaction` instead. Each participant shard marks
-the transaction as committed or aborted, and updates the `config.transactions` document.
-  1. The coordinator deletes the coordinator document with write concern `{w: 1}`.
+    1. The coordinator writes the participant list to the `config.transaction_coordinators` document for the
+       transaction, and waits for it to be majority committed.
+    1. The coordinator sends [`prepareTransaction`](https://github.com/mongodb/mongo/blob/r4.4.0-rc7/src/mongo/db/repl/README.md#lifetime-of-a-prepared-transaction) to the participants, and waits for vote reponses. Each participant
+       shard responds with a vote, marks the transaction as prepared, and updates the `config.transactions`
+       document for the transaction.
+    1. The coordinator writes the decision to the `config.transaction_coordinators` document and waits for it to
+       be majority committed. If the `coordinateCommitTransactionReturnImmediatelyAfterPersistingDecision` server parameter is
+       true (default), the `coordinateCommitTransaction` command returns immediately after waiting for client's write concern
+       (i.e. let the remaining work continue in the background).
+
+-   Commit Phase
+    1. If the decision is 'commit', the coordinator sends `commitTransaction` to the participant shards, and waits
+       for responses. If the decision is 'abort', it sends `abortTransaction` instead. Each participant shard marks
+       the transaction as committed or aborted, and updates the `config.transactions` document.
+    1. The coordinator deletes the coordinator document with write concern `{w: 1}`.
 
 The prepare phase is skipped if the coordinator already has the participant list and the commit decision persisted.
 This can be the case if the coordinator was created as part of step-up recovery.
@@ -332,9 +335,10 @@ been started on the session and the session is still alive. In both cases, the m
 to all participant shards.
 
 #### Code references
-* [**TransactionRouter class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/transaction_router.h)
-* [**TransactionCoordinatorService class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator_service.h)
-* [**TransactionCoordinator class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator.h)
+
+-   [**TransactionRouter class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/transaction_router.h)
+-   [**TransactionCoordinatorService class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator_service.h)
+-   [**TransactionCoordinator class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/transaction_coordinator.h)
 
 ## Internal Transactions
 
@@ -359,11 +363,11 @@ We expect that retryable write commands that start retryable internal transactio
 1. Write statements within the command are guaranteed to apply only once regardless of how many times a client retries.
 2. The response for the command is guaranteed to be reconstructable on retry.
 
-To do this, retryable write statements executed inside of a retryable internal transaction try to emulate the behavior of ordinary retryable writes. 
+To do this, retryable write statements executed inside of a retryable internal transaction try to emulate the behavior of ordinary retryable writes.
 
-Each statement inside of a retryable write command should have a corresponding entry within a retryable internal transaction with the same `stmtId` as the original write statement. When a transaction participant for a retryable internal transaction notices a write statement with a previously seen `stmtId`, it will not execute the statement and instead generate the original response for the already executed statement using the oplog entry generated by the initial execution. The check for previously executed statements is done using the `retriedStmtIds` array, which contains the `stmtIds` of already retried statements, inside of a write command's response. 
+Each statement inside of a retryable write command should have a corresponding entry within a retryable internal transaction with the same `stmtId` as the original write statement. When a transaction participant for a retryable internal transaction notices a write statement with a previously seen `stmtId`, it will not execute the statement and instead generate the original response for the already executed statement using the oplog entry generated by the initial execution. The check for previously executed statements is done using the `retriedStmtIds` array, which contains the `stmtIds` of already retried statements, inside of a write command's response.
 
-In cases where a client retryable write command implicitly expects an auxiliary operation to be executed atomically with its current request, a retryable internal transaction may contain additional write statements that are not explicitly requested by a client retryable write command. An example could be that the client expects to atomically update an index when executing a write. Since these auxiliary write statements do not have a corresponding entry within the original client command, the `stmtId` field for these statements will be set to `{stmtId: kUninitializedStmtId}`. These auxiliary write statements are non-retryable, thus it is crucial that we use the `retriedStmtIds` to determine which client write statements were already successfully retried to avoid re-applying the corresponding auxilary write statements. Additionally, these statements will be excluded from the history check involving `retriedStmtIds`. 
+In cases where a client retryable write command implicitly expects an auxiliary operation to be executed atomically with its current request, a retryable internal transaction may contain additional write statements that are not explicitly requested by a client retryable write command. An example could be that the client expects to atomically update an index when executing a write. Since these auxiliary write statements do not have a corresponding entry within the original client command, the `stmtId` field for these statements will be set to `{stmtId: kUninitializedStmtId}`. These auxiliary write statements are non-retryable, thus it is crucial that we use the `retriedStmtIds` to determine which client write statements were already successfully retried to avoid re-applying the corresponding auxilary write statements. Additionally, these statements will be excluded from the history check involving `retriedStmtIds`.
 
 To guarantee that we can reconstruct the response regardless of retries, we do a "cross sectional" write history check for retryable writes and retryable internal transactions prior to running a client retryable write/retryable internal transaction command. This ensures we do not double apply non-idempotent operations, and instead recover the response for a successful execution when appropriate. To support this, the [RetryableWriteTransactionParticipantCatalog](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.h#L1221-L1299) was added as a decoration on an external session and it stores the transaction participants for all active retryable writes on the session, which we use to do our [write history check](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L3205-L3208).
 
@@ -371,12 +375,11 @@ To guarantee that we can reconstruct the response regardless of retries, we do a
 
 To reconstruct responses for retryable internal transactions, we use the applyOps oplog entry, which contains an inner entry with the operation run under the `o` field that has a corresponding `stmtId`. We use the `stmtId` and `opTime` cached in the `TransactionParticipant` to lookup the operation in the applyOps oplog entry, which gives us the necessary details to reconstruct the original write response. The process for reconstructing retryable write responses works the same way.
 
-
 #### Special considerations for findAndModify
 
 `findAndModify` additionally, requires the storage of pre/post images. Upon committing or preparing an internal transaction, we insert a document into `config.image_collection` containing the pre/post image. The operation entry for the findAndModify statement inside the applyOps oplog entry will have a `needsRetryImage` field that is set to `true` to indicate that a pre/post image should be loaded from the side collection when reconstructing the write response. We can do the lookup using a transaction's `lsid` and `txnNumber`.
 
-Currently, a retryable internal transaction can only support a **single** `findAndModify` statement at a time, due to the limitation that `config.image_collection` can only support storing one pre/post image entry for a given `(lsid, txnNumber)`. 
+Currently, a retryable internal transaction can only support a **single** `findAndModify` statement at a time, due to the limitation that `config.image_collection` can only support storing one pre/post image entry for a given `(lsid, txnNumber)`.
 
 #### Retryability across failover and restart
 
@@ -390,27 +393,25 @@ Due to the use of `txnUUID` in the lsid for de-duplication purposes, retries of 
 
 2. If the client retries on a different mongos than the original write was run on, the new mongos will not have visibility over in-progress internal transactions run by another mongos, so this retry will not be blocked and legally begin execution. When the new mongos begins execution of the retried command, it will send commands with `startTransaction` to relevant transaction participants. The transaction participants will then [check if there is already an in-progress internal transaction that will conflict](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L2827-L2846) with the new internal transaction that is attempting to start. If so, then the transaction participant will throw `RetryableTransactionInProgress`, which will be caught and cause the new transaction to [block until the existing transaction is finished](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/service_entry_point_common.cpp#L1029-L1036).
 
-
 #### Supporting retryability across chunk migration and resharding
 
- The session history, oplog entries, and image collection entries involving the chunk being migrated are cloned from the donor shard to the recipient shard during chunk migration. Once the recipient receives the relevant oplog entries from the donor, it will [nest and apply the each of the received oplog entries in a no-op oplog entry](https://github.com/mongodb/mongo/blob/0d84f4bab0945559abcd5b00be5ec322c5214642/src/mongo/db/s/session_catalog_migration_destination.cpp#L204-L347). Depending on the type of operation run, the behavior will differ as such. 
+The session history, oplog entries, and image collection entries involving the chunk being migrated are cloned from the donor shard to the recipient shard during chunk migration. Once the recipient receives the relevant oplog entries from the donor, it will [nest and apply the each of the received oplog entries in a no-op oplog entry](https://github.com/mongodb/mongo/blob/0d84f4bab0945559abcd5b00be5ec322c5214642/src/mongo/db/s/session_catalog_migration_destination.cpp#L204-L347). Depending on the type of operation run, the behavior will differ as such.
 
-* If a non-retryable write/non-retryable internal transaction is run, then the donor shard will [send a sentinel no-op oplog entry](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/s/session_catalog_migration_destination.cpp#L204-L354), which when parsed by the TransactionParticipant upon getting a retry against the recipient shard will [throw IncompleteTransactionHistory](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L323-L331). 
+-   If a non-retryable write/non-retryable internal transaction is run, then the donor shard will [send a sentinel no-op oplog entry](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/s/session_catalog_migration_destination.cpp#L204-L354), which when parsed by the TransactionParticipant upon getting a retry against the recipient shard will [throw IncompleteTransactionHistory](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L323-L331).
 
-* If a retryable write/retryable internal transaction is run, then the donor shard will send a ["downconverted" oplog entry](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/s/session_catalog_migration_source.cpp#L669-L680), which when parsed by the TransactionParticipant upon getting a retry against the recipient shard will return the original write response.
+-   If a retryable write/retryable internal transaction is run, then the donor shard will send a ["downconverted" oplog entry](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/s/session_catalog_migration_source.cpp#L669-L680), which when parsed by the TransactionParticipant upon getting a retry against the recipient shard will return the original write response.
 
-`Note`: "Downconverting" in this context, is the process of extracting the operation information inside an applyOps entry for an internal transaction and constructing a new retryable write oplog entry with `lsid` and `txnNumber` set to the associated client's session id and txnNumber. 
+`Note`: "Downconverting" in this context, is the process of extracting the operation information inside an applyOps entry for an internal transaction and constructing a new retryable write oplog entry with `lsid` and `txnNumber` set to the associated client's session id and txnNumber.
 
 For resharding, the process is similar to how chunk migrations are handled. The session history, oplog entries, and image collection entries for operations run during resharding are cloned from the donor shard to the recipient shard. The only difference is that the recipient in this case will handle the "downconverting", nesting, and applying of the received oplog entries. The two cases discussed above apply to resharding as well.
 
-
 #### Code References
 
-* [**Session checkout logic**](https://github.com/mongodb/mongo/blob/0d84f4bab0945559abcd5b00be5ec322c5214642/src/mongo/db/session/session_catalog_mongod.cpp#L694)
-* [**Cross-section history check logic**](https://github.com/mongodb/mongo/blob/0d84f4bab0945559abcd5b00be5ec322c5214642/src/mongo/db/transaction/transaction_participant.cpp#L3206)
-* [**Conflicting internal transaction check logic**](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L2827-L2846)
-* [**Refreshing client and internal sessions logic**](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L2889-L2899)
-* [**RetryableWriteTransactionParticipantCatalog**](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.h#L1221-L1299)
+-   [**Session checkout logic**](https://github.com/mongodb/mongo/blob/0d84f4bab0945559abcd5b00be5ec322c5214642/src/mongo/db/session/session_catalog_mongod.cpp#L694)
+-   [**Cross-section history check logic**](https://github.com/mongodb/mongo/blob/0d84f4bab0945559abcd5b00be5ec322c5214642/src/mongo/db/transaction/transaction_participant.cpp#L3206)
+-   [**Conflicting internal transaction check logic**](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L2827-L2846)
+-   [**Refreshing client and internal sessions logic**](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.cpp#L2889-L2899)
+-   [**RetryableWriteTransactionParticipantCatalog**](https://github.com/mongodb/mongo/blob/d8ce3ee2e020d1ab2fa611a2a0f0a222b06b9779/src/mongo/db/transaction/transaction_participant.h#L1221-L1299)
 
 ### Transaction API
 
@@ -420,11 +421,11 @@ Additionally, the API can use router commands when running on a mongod. Each com
 
 Transactions for non-retryable operations or operations without a session initiated through the API use sessions from the [InternalSessionPool](https://github.com/mongodb/mongo/blob/master/src/mongo/db/internal_session_pool.h) to prevent the creation and maintenance of many single-use sessions.
 
-To use the transaction API, [instantiate a transaction client](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_find_and_modify_cmd.cpp#L250-L253) by providing the opCtx, an executor, and resource yielder. Then, run the commands to be grouped in the same transaction session on the transaction object. Some examples of this are listed below. 
+To use the transaction API, [instantiate a transaction client](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_find_and_modify_cmd.cpp#L250-L253) by providing the opCtx, an executor, and resource yielder. Then, run the commands to be grouped in the same transaction session on the transaction object. Some examples of this are listed below.
 
-* [Cluster Find and Modify Command](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_find_and_modify_cmd.cpp#L255-L265)
-* [Queryable Encryption](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/db/commands/fle2_compact.cpp#L636-L648)
-* [Cluster Write Command - WouldChangeOwningShard Error](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_write_cmd.cpp#L162-L190)
+-   [Cluster Find and Modify Command](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_find_and_modify_cmd.cpp#L255-L265)
+-   [Queryable Encryption](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/db/commands/fle2_compact.cpp#L636-L648)
+-   [Cluster Write Command - WouldChangeOwningShard Error](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_write_cmd.cpp#L162-L190)
 
 ## The historical routing table
 
@@ -448,8 +449,9 @@ currently own the target chunks. Otherwise, it will return the shards that owned
 at that clusterTime and will throw a `StaleChunkHistory` error if it cannot find them.
 
 #### Code references
-* [**ChunkManager class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/chunk_manager.h#L233-L451)
-* [**RoutingTableHistory class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/chunk_manager.h#L70-L231)
-* [**ChunkHistory class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/catalog/type_chunk.h#L131-L145)
+
+-   [**ChunkManager class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/chunk_manager.h#L233-L451)
+-   [**RoutingTableHistory class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/chunk_manager.h#L70-L231)
+-   [**ChunkHistory class**](https://github.com/mongodb/mongo/blob/r4.3.6/src/mongo/s/catalog/type_chunk.h#L131-L145)
 
 ---

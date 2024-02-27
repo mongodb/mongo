@@ -1,48 +1,43 @@
 # Multiversion Testing
 
-
 ## Table of contents
 
-- [Multiversion Testing](#multiversion-testing)
-  - [Table of contents](#table-of-contents)
-  - [Terminology and overview](#terminology-and-overview)
-    - [Introduction](#introduction)
-    - [Latest vs last-lts vs last-continuous](#latest-vs-last-lts-vs-last-continuous)
-    - [Old vs new](#old-vs-new)
-    - [Explicit and Implicit multiversion suites](#explicit-and-implicit-multiversion-suites)
-    - [Version combinations](#version-combinations)
-  - [Working with multiversion tasks in Evergreen](#working-with-multiversion-tasks-in-evergreen)
-    - [Exclude tests from multiversion testing](#exclude-tests-from-multiversion-testing)
-    - [Multiversion task generation](#multiversion-task-generation)
-
+-   [Multiversion Testing](#multiversion-testing)
+    -   [Table of contents](#table-of-contents)
+    -   [Terminology and overview](#terminology-and-overview)
+        -   [Introduction](#introduction)
+        -   [Latest vs last-lts vs last-continuous](#latest-vs-last-lts-vs-last-continuous)
+        -   [Old vs new](#old-vs-new)
+        -   [Explicit and Implicit multiversion suites](#explicit-and-implicit-multiversion-suites)
+        -   [Version combinations](#version-combinations)
+    -   [Working with multiversion tasks in Evergreen](#working-with-multiversion-tasks-in-evergreen)
+        -   [Exclude tests from multiversion testing](#exclude-tests-from-multiversion-testing)
+        -   [Multiversion task generation](#multiversion-task-generation)
 
 ## Terminology and overview
-
 
 ### Introduction
 
 Some tests test specific upgrade/downgrade behavior expected between different versions of MongoDB.
 Several versions of MongoDB are spun up during those test runs.
 
-* Multiversion suites - resmoke suites that are running tests with several versions of MongoDB.
+-   Multiversion suites - resmoke suites that are running tests with several versions of MongoDB.
 
-* Multiversion tasks - Evergreen tasks that are running multiversion suites. Multiversion tasks in
-most cases include `multiversion` or `downgrade` in their names.
-
+-   Multiversion tasks - Evergreen tasks that are running multiversion suites. Multiversion tasks in
+    most cases include `multiversion` or `downgrade` in their names.
 
 ### Latest vs last-lts vs last-continuous
 
 For some of the versions we are using such generic names as `latest`, `last-lts` and
 `last-continuous`.
 
-* `latest` - the current version. In Evergreen, the version that was compiled in the current build.
- 
-* `last-lts` - the latest LTS (Long Term Support) Major release version. In Evergreen, the version
-that was downloaded from the last LTS release branch project.
+-   `latest` - the current version. In Evergreen, the version that was compiled in the current build.
 
-* `last-continuous` - the latest Rapid release version. In Evergreen, the version that was
-downloaded from the Rapid release branch project.
+-   `last-lts` - the latest LTS (Long Term Support) Major release version. In Evergreen, the version
+    that was downloaded from the last LTS release branch project.
 
+-   `last-continuous` - the latest Rapid release version. In Evergreen, the version that was
+    downloaded from the Rapid release branch project.
 
 ### Old vs new
 
@@ -56,34 +51,53 @@ compiled binaries are downloaded from the old branch projects with
 `db-contrib-tool` searches for the latest available compiled binaries on the old branch projects in
 Evergreen.
 
-
 ### Explicit and Implicit multiversion suites
 
 Multiversion suites can be explicit and implicit.
 
-* Explicit - JS tests are aware of the binary versions they are running,
-e.g. [multiversion.yml](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be208481493fc96/buildscripts/resmokeconfig/suites/multiversion.yml).
-The version of binaries is explicitly set in JS tests,
-e.g. [jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js](https://github.com/mongodb/mongo/blob/397c8da541940b3fbe6257243f97a342fe7e0d3b/jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js#L33-L44):
+-   Explicit - JS tests are aware of the binary versions they are running,
+    e.g. [multiversion.yml](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be208481493fc96/buildscripts/resmokeconfig/suites/multiversion.yml).
+    The version of binaries is explicitly set in JS tests,
+    e.g. [jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js](https://github.com/mongodb/mongo/blob/397c8da541940b3fbe6257243f97a342fe7e0d3b/jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js#L33-L44):
 
 ```js
 const versions = [
-    {binVersion: '4.4', featureCompatibilityVersion: '4.4', testCollection: 'four_four'},
-    {binVersion: '5.0', featureCompatibilityVersion: '5.0', testCollection: 'five_zero'},
-    {binVersion: '6.0', featureCompatibilityVersion: '6.0', testCollection: 'six_zero'},
-    {binVersion: 'last-lts', featureCompatibilityVersion: lastLTSFCV, testCollection: 'last_lts'},
     {
-        binVersion: 'last-continuous',
-        featureCompatibilityVersion: lastContinuousFCV,
-        testCollection: 'last_continuous'
+        binVersion: "4.4",
+        featureCompatibilityVersion: "4.4",
+        testCollection: "four_four",
     },
-    {binVersion: 'latest', featureCompatibilityVersion: latestFCV, testCollection: 'latest'},
+    {
+        binVersion: "5.0",
+        featureCompatibilityVersion: "5.0",
+        testCollection: "five_zero",
+    },
+    {
+        binVersion: "6.0",
+        featureCompatibilityVersion: "6.0",
+        testCollection: "six_zero",
+    },
+    {
+        binVersion: "last-lts",
+        featureCompatibilityVersion: lastLTSFCV,
+        testCollection: "last_lts",
+    },
+    {
+        binVersion: "last-continuous",
+        featureCompatibilityVersion: lastContinuousFCV,
+        testCollection: "last_continuous",
+    },
+    {
+        binVersion: "latest",
+        featureCompatibilityVersion: latestFCV,
+        testCollection: "latest",
+    },
 ];
 ```
 
-* Implicit - JS tests know nothing about the binary versions they are running,
-e.g. [retryable_writes_downgrade.yml](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be208481493fc96/buildscripts/resmokeconfig/suites/retryable_writes_downgrade.yml).
-Most of the implicit multiversion suites are using matrix suites, e.g. `replica_sets_last_lts`:
+-   Implicit - JS tests know nothing about the binary versions they are running,
+    e.g. [retryable_writes_downgrade.yml](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be208481493fc96/buildscripts/resmokeconfig/suites/retryable_writes_downgrade.yml).
+    Most of the implicit multiversion suites are using matrix suites, e.g. `replica_sets_last_lts`:
 
 ```bash
 $ python buildscripts/resmoke.py suiteconfig --suite=replica_sets_last_lts
@@ -118,7 +132,7 @@ The [example](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be2
 of replica set fixture configuration override:
 
 ```yaml
-  fixture:
+fixture:
     num_nodes: 3
     old_bin_version: last_lts
     mixed_bin_versions: new_new_old
@@ -128,7 +142,7 @@ The [example](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be2
 of sharded cluster fixture configuration override:
 
 ```yaml
-  fixture:
+fixture:
     num_shards: 2
     num_rs_nodes_per_shard: 2
     old_bin_version: last_lts
@@ -139,15 +153,14 @@ The [example](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be2
 of shell fixture configuration override:
 
 ```yaml
-  value:
+value:
     executor:
-      config:
-        shell_options:
-          global_vars:
-            TestData:
-              useRandomBinVersionsWithinReplicaSet: 'last-lts'
+        config:
+            shell_options:
+                global_vars:
+                    TestData:
+                        useRandomBinVersionsWithinReplicaSet: "last-lts"
 ```
-
 
 ### Version combinations
 
@@ -155,54 +168,52 @@ In implicit multiversion suites the same set of tests may run in similar suites 
 various mixed version combinations. Those version combinations depend on the type of resmoke
 fixture the suite is running with. These are the recommended version combinations to test against based on the suite fixtures:
 
-* Replica set fixture combinations:
-  * `last-lts new-new-old` (i.e. suite runs the replica set fixture that spins up the `latest` and
-the `last-lts` versions in a 3-node replica set where the 1st node is the `latest`, 2nd - `latest`,
-3rd - `last-lts`, etc.)
-  * `last-lts new-old-new`
-  * `last-lts old-new-new`
-  * `last-continuous new-new-old`
-  * `last-continuous new-old-new`
-  * `last-continuous old-new-new`
-  * Ex: [change_streams](https://github.com/10gen/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml) uses a [`ReplicaSetFixture`](https://github.com/10gen/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml#L50) so the corresponding multiversion suites are
-    * [`change_streams_last_continuous_new_new_old`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_new_old.yml)
-    * [`change_streams_last_continuous_new_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_old_new.yml)
-    * [`change_streams_last_continuous_old_new_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_old_new_new.yml)
-    * [`change_streams_last_lts_new_new_old`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_new_old.yml)
-    * [`change_streams_last_lts_new_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_old_new.yml)
-    * [`change_streams_last_lts_old_new_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_old_new_new.yml)
+-   Replica set fixture combinations:
 
-* Sharded cluster fixture combinations:
-  * `last-lts new-old-old-new` (i.e. suite runs the sharded cluster fixture that spins up the
-`latest` and the `last-lts` versions in a sharded cluster that consists of 2 shards with 2-node
-replica sets per shard where the 1st node of the 1st shard is the `latest`, 2nd node of 1st
-shard - `last-lts`, 1st node of 2nd shard - `last-lts`, 2nd node of 2nd shard - `latest`, etc.)
-  * `last-continuous new-old-old-new`
-  * Ex: [change_streams_downgrade](https://github.com/10gen/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml) uses a [`ShardedClusterFixture`](https://github.com/10gen/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml#L408) so the corresponding multiversion suites are
-    * [`change_streams_downgrade_last_continuous_new_old_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_continuous_new_old_old_new.yml)
-    * [`change_streams_downgrade_last_lts_new_old_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_lts_new_old_old_new.yml)
+    -   `last-lts new-new-old` (i.e. suite runs the replica set fixture that spins up the `latest` and
+        the `last-lts` versions in a 3-node replica set where the 1st node is the `latest`, 2nd - `latest`,
+        3rd - `last-lts`, etc.)
+    -   `last-lts new-old-new`
+    -   `last-lts old-new-new`
+    -   `last-continuous new-new-old`
+    -   `last-continuous new-old-new`
+    -   `last-continuous old-new-new`
+    -   Ex: [change_streams](https://github.com/10gen/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml) uses a [`ReplicaSetFixture`](https://github.com/10gen/mongo/blob/88d59bfe9d5ee2c9938ae251f7a77a8bf1250a6b/buildscripts/resmokeconfig/suites/change_streams.yml#L50) so the corresponding multiversion suites are
+        -   [`change_streams_last_continuous_new_new_old`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_new_old.yml)
+        -   [`change_streams_last_continuous_new_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_new_old_new.yml)
+        -   [`change_streams_last_continuous_old_new_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_continuous_old_new_new.yml)
+        -   [`change_streams_last_lts_new_new_old`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_new_old.yml)
+        -   [`change_streams_last_lts_new_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_new_old_new.yml)
+        -   [`change_streams_last_lts_old_new_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_old_new_new.yml)
 
-* Shell fixture combinations:
-  * `last-lts` (i.e. suite runs the shell fixture that spins up `last-lts` as the `old` versions,
-etc.)
-  * `last-continuous`
-  * Ex: [initial_sync_fuzzer](https://github.com/10gen/mongo/blob/908625ffdec050a71aa2ce47c35788739f629c60/buildscripts/resmokeconfig/suites/initial_sync_fuzzer.yml) uses a Shell Fixture, so the corresponding multiversion suites are
-    * [`initial_sync_fuzzer_last_lts`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_lts.yml)
-    * [`initial_sync_fuzzer_last_continuous`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_continuous.yml)
+-   Sharded cluster fixture combinations:
 
+    -   `last-lts new-old-old-new` (i.e. suite runs the sharded cluster fixture that spins up the
+        `latest` and the `last-lts` versions in a sharded cluster that consists of 2 shards with 2-node
+        replica sets per shard where the 1st node of the 1st shard is the `latest`, 2nd node of 1st
+        shard - `last-lts`, 1st node of 2nd shard - `last-lts`, 2nd node of 2nd shard - `latest`, etc.)
+    -   `last-continuous new-old-old-new`
+    -   Ex: [change_streams_downgrade](https://github.com/10gen/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml) uses a [`ShardedClusterFixture`](https://github.com/10gen/mongo/blob/a96b83b2fa7010a5823fefac2469b4a06a697cf1/buildscripts/resmokeconfig/suites/change_streams_downgrade.yml#L408) so the corresponding multiversion suites are
+        -   [`change_streams_downgrade_last_continuous_new_old_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_continuous_new_old_old_new.yml)
+        -   [`change_streams_downgrade_last_lts_new_old_old_new`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_downgrade_last_lts_new_old_old_new.yml)
+
+-   Shell fixture combinations:
+    -   `last-lts` (i.e. suite runs the shell fixture that spins up `last-lts` as the `old` versions,
+        etc.)
+    -   `last-continuous`
+    -   Ex: [initial_sync_fuzzer](https://github.com/10gen/mongo/blob/908625ffdec050a71aa2ce47c35788739f629c60/buildscripts/resmokeconfig/suites/initial_sync_fuzzer.yml) uses a Shell Fixture, so the corresponding multiversion suites are
+        -   [`initial_sync_fuzzer_last_lts`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_lts.yml)
+        -   [`initial_sync_fuzzer_last_continuous`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_continuous.yml)
 
 If `last-lts` and `last-continuous` versions happen to be the same, or last-continuous is EOL, we skip `last-continuous`
 and run multiversion suites with only `last-lts` combinations in Evergreen.
 
-
 ## Working with multiversion tasks in Evergreen
-
 
 ### Multiversion task generation
 
 Please refer to mongo-task-generator [documentation](https://github.com/mongodb/mongo-task-generator/blob/master/docs/generating_tasks.md#multiversion-testing)
 for generating multiversion tasks in Evergreen.
-
 
 ### Exclude tests from multiversion testing
 

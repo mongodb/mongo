@@ -1,6 +1,7 @@
 # Exception Architecture
 
 MongoDB code uses the following types of assertions that are available for use:
+
 -   `uassert` and `iassert`
     -   Checks for per-operation user errors. Operation-fatal.
 -   `tassert`
@@ -15,7 +16,7 @@ MongoDB code uses the following types of assertions that are available for use:
     -   Checks process invariant. Process-fatal. Use to detect code logic errors ("pointer should
         never be null", "we should always be locked").
 
-__Note__: Calling C function `assert` is not allowed. Use one of the above instead.
+**Note**: Calling C function `assert` is not allowed. Use one of the above instead.
 
 The following types of assertions are deprecated:
 
@@ -89,13 +90,13 @@ when we expect a failure, a failure might be recoverable, or failure accounting 
 
 ### Choosing a unique location number
 
-The current convention for choosing a unique location number is to use the 5 digit SERVER ticket number 
-for the ticket being addressed when the assertion is added, followed by a two digit counter to distinguish 
-between codes added as part of the same ticket. For example, if you're working on SERVER-12345, the first 
-error code would be 1234500, the second would be 1234501, etc. This convention can also be used for LOGV2 
+The current convention for choosing a unique location number is to use the 5 digit SERVER ticket number
+for the ticket being addressed when the assertion is added, followed by a two digit counter to distinguish
+between codes added as part of the same ticket. For example, if you're working on SERVER-12345, the first
+error code would be 1234500, the second would be 1234501, etc. This convention can also be used for LOGV2
 logging id numbers.
 
-The only real constraint for unique location numbers is that they must be unique across the codebase. This is 
+The only real constraint for unique location numbers is that they must be unique across the codebase. This is
 verified at compile time with a [python script][errorcodes_py].
 
 ## Exception
@@ -120,7 +121,7 @@ upwards harmlessly. The code should also expect, and properly handle, `UserExcep
 
 MongoDB uses `ErrorCodes` both internally and externally: a subset of error codes (e.g.,
 `BadValue`) are used externally to pass errors over the wire and to clients. These error codes are
-the means for MongoDB processes (e.g., *mongod* and *mongo*) to communicate errors, and are visible
+the means for MongoDB processes (e.g., _mongod_ and _mongo_) to communicate errors, and are visible
 to client applications. Other error codes are used internally to indicate the underlying reason for
 a failed operation. For instance, `PeriodicJobIsStopped` is an internal error code that is passed
 to callback functions running inside a [`PeriodicRunner`][periodic_runner_h] once the runner is
@@ -162,9 +163,8 @@ Gotchas to watch out for:
     properly.
 -   Think about the location of your asserts in constructors, as the destructor would not be
     called. But at a minimum, use `wassert` a lot therein, we want to know if something is wrong.
--   Do __not__ throw in destructors or allow exceptions to leak out (if you call a function that
+-   Do **not** throw in destructors or allow exceptions to leak out (if you call a function that
     may throw).
-
 
 [raii]: https://en.wikipedia.org/wiki/Resource_acquisition_is_initialization
 [error_codes_yml]: ../src/mongo/base/error_codes.yml

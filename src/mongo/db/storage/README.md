@@ -1,11 +1,10 @@
-Storage Engine API
-==================
+# Storage Engine API
 
 The purpose of the Storage Engine API is to allow for pluggable storage engines in MongoDB (refer
 to the [Storage FAQ][]). This document gives a brief overview of the API, and provides pointers
 to places with more detailed documentation. Where referencing code, links are to the version that
 was current at the time when the reference was made. Always compare with the latest version for
-changes not yet reflected here.  For questions on the API that are not addressed by this material,
+changes not yet reflected here. For questions on the API that are not addressed by this material,
 use the [mongodb-dev][] Google group. Everybody involved in the Storage Engine API will read your
 post.
 
@@ -23,11 +22,10 @@ See <https://github.com/mongodb-partners/mongo-rocks> for a good example of the 
 For more context and information on how this API is used, see the
 [Execution Architecture Guide](https://github.com/mongodb/mongo/blob/master/src/mongo/db/catalog/README.md).
 
-
-Concepts
---------
+## Concepts
 
 ### Record Stores
+
 A database contains one or more collections, each with a number of indexes, and a catalog listing
 them. All MongoDB collections are implemented with record stores: one for the documents themselves,
 and one for each index. By using the KVEngine class, you only have to deal with the abstraction, as
@@ -35,6 +33,7 @@ the StorageEngineImpl implements the StorageEngine interface, using record store
 indexes.
 
 #### Record Identities
+
 A RecordId is a unique identifier, assigned by the storage engine, for a specific document or entry
 in a record store at a given time. For storage engines based in the KVEngine the record identity is
 fixed, but other storage engines may change it when updating a document. Note that changing record
@@ -42,10 +41,12 @@ ids can be very expensive, as indexes map to the RecordId. A single document wit
 have thousands of index entries, resulting in very expensive updates.
 
 #### Cloning and bulk operations
+
 Currently all cloning, [initial sync][] and other operations are done in terms of operating on
 individual documents, though there is a BulkBuilder class for more efficiently building indexes.
 
 ### Locking and Concurrency
+
 MongoDB uses multi-granular intent locking; see the [Concurrency FAQ][]. In all cases, this will
 ensure that operations to meta-data, such as creation and deletion of record stores, are serialized
 with respect to other accesses.
@@ -55,6 +56,7 @@ manages. MongoDB will only use intent locks for the most common operations, leav
 at the record store layer up to the storage engine.
 
 ### Transactions
+
 Each operation creates an OperationContext with a new RecoveryUnit, implemented by the storage
 engine, that lives until the operation finishes. Currently, query operations that return a cursor
 to the client live as long as that client cursor, with the operation context switching between its
@@ -63,22 +65,26 @@ an extra recovery unit as well. The recovery unit must implement transaction sem
 below.
 
 #### Atomicity
+
 Writes must only become visible when explicitly committed, and in that case all pending writes
 become visible atomically. Writes that are not committed before the unit of work ends must be
 rolled back. In addition to writes done directly through the Storage API, such as document updates
 and creation of record stores, other custom changes can be registered with the recovery unit.
 
 #### Consistency
+
 Storage engines must ensure that atomicity and isolation guarantees span all record stores, as
 otherwise the guarantee of atomic updates on a document and all its indexes would be violated.
 
 #### Isolation
+
 Storage engines must provide snapshot isolation, either through locking, through multi-version
 concurrency control (MVCC) or otherwise. The first read implicitly establishes the snapshot.
 Operations can always see all changes they make in the context of a recovery unit, but other
 operations cannot until a successful commit.
 
 #### Durability
+
 Once a transaction is committed, it is not necessarily durable: if, and only if the server fails,
 as result of power loss or otherwise, the database may recover to an earlier point in time.
 However, atomicity of transactions must remain preserved. Similarly, in a replica set, a primary
@@ -91,6 +97,7 @@ may use a group commit, bundling a number of transactions to achieve durability.
 storage engine may wait for durability at commit time.
 
 ### Write Conflicts
+
 Systems with optimistic concurrency control (OCC) or multi-version concurrency control (MVCC) may
 find that a transaction conflicts with other transactions, that executing an operation would result
 in deadlock or violate other resource constraints. In such cases the storage engine may throw a
@@ -98,29 +105,28 @@ WriteConflictException to signal the transient failure. MongoDB will handle the 
 and restart the transaction.
 
 ### Point-in-time snapshot reads
+
 Two functions on the RecoveryUnit help storage engines implement point-in-time reads: setTimestamp()
-and selectSnapshot().  setTimestamp() is used by write transactions to label any forthcoming writes
+and selectSnapshot(). setTimestamp() is used by write transactions to label any forthcoming writes
 with a timestamp; these timestamps are then used to produce a point-in-time read transaction via a
-call to selectSnapshot() at the start of the read.  The storage engine must produce the effect of
+call to selectSnapshot() at the start of the read. The storage engine must produce the effect of
 reading from a snapshot that includes only writes with timestamps at or earlier than the
-selectSnapshot timestamp.  This means that a point-in-time read may slice across prior write
+selectSnapshot timestamp. This means that a point-in-time read may slice across prior write
 transactions by hiding only some data from a given write transaction, if that transaction had a
 different timestamp set prior to each write it did.
 
-Classes to implement
---------------------
+## Classes to implement
 
 A storage engine should generally implement the following classes. See their definitions for more
 details.
 
-* [KVEngine](kv/kv_engine.h)
-* [RecordStore](record_store.h)
-* [RecoveryUnit](recovery_unit.h)
-* [SeekableRecordCursor](record_store.h)
-* [SortedDataInterface](sorted_data_interface.h)
-* [ServerStatusSection](../commands/server_status.h)
-* [ServerParameter](../server_parameters.h)
-
+-   [KVEngine](kv/kv_engine.h)
+-   [RecordStore](record_store.h)
+-   [RecoveryUnit](recovery_unit.h)
+-   [SeekableRecordCursor](record_store.h)
+-   [SortedDataInterface](sorted_data_interface.h)
+-   [ServerStatusSection](../commands/server_status.h)
+-   [ServerParameter](../server_parameters.h)
 
 [Concurrency FAQ]: http://docs.mongodb.org/manual/faq/concurrency/
 [initial sync]: http://docs.mongodb.org/manual/core/replica-set-sync/#replica-set-initial-sync

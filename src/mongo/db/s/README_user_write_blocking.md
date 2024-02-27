@@ -27,7 +27,7 @@ The `GlobalUserWriteBlockState` stores whether user write blocking is enabled in
 associated with the given `OperationContext` is
 enabled](https://github.com/mongodb/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.cpp#L59-L67).
 The `WriteBlockBypass` stores whether the user that initiated the write is able to perform writes
-when user write blocking is enabled.  On internal requests (i.e. from other `mongod` or `mongos`
+when user write blocking is enabled. On internal requests (i.e. from other `mongod` or `mongos`
 instances in the sharded cluster/replica set), the request originator propagates `WriteBlockBypass`
 [through the request
 metadata](https://github.com/mongodb/mongo/blob/182616b7b45a1e360839c612c9ee8acaa130fe17/src/mongo/rpc/metadata.cpp#L115).

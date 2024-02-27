@@ -19,6 +19,7 @@ new or changed javascript tests (note that a javascript test can be included in 
 those tests will be run 2 times minimum, and 1000 times maximum or for 10 minutes, whichever is reached first.
 
 ## ! Run All Affected JStests
+
 The `! Run All Affected JStests` variant has a single `burn_in_tags_gen` task. This task will create &
 activate [`burn_in_tests`](burn_in_tests.md) tasks for all required and suggested
 variants. The end result is that any jstests that have been modified in the patch will

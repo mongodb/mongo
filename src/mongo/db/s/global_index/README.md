@@ -13,7 +13,7 @@ global uniqueness enforcement.
 Unlike local indexes, global indexes are maintained in the sharding catalog, and are known to the
 entire cluster rather than individually by each shard. The sharding catalog is responsible for
 mapping a [base collection](#glossary) to its global indexes and vice-versa, for storing the index
-specifications, and for routing index key writes to the owning shards. 
+specifications, and for routing index key writes to the owning shards.
 
 The global index keys are stored locally in a shard in an internal system collection referred
 to as the [global index container](#glossary). Unlike local index tables, a global index container
@@ -56,12 +56,12 @@ Sample index entry:
 {_id: {shk1: 1 .. shkN: 1, _id: 1}, ik: BinData(KeyString({ik1: 1, .. ikN: 1})), tb: BinData(TypeBits({ik1: 1, .. ikN: 1}))}
 ```
 
-* Top-level `_id` is the [document key](#glossary).
-* `ik` is the index key. The key is stored in its [KeyString](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#keystring)
-  form without [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits), as BSON binary data with subtype 0 (Generic binary subtype).
-* `tb` are the [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits).
-  This field is only present when not empty, and is stored as BSON binary data with subtype 0
-  (Generic binary subtype).
+-   Top-level `_id` is the [document key](#glossary).
+-   `ik` is the index key. The key is stored in its [KeyString](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#keystring)
+    form without [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits), as BSON binary data with subtype 0 (Generic binary subtype).
+-   `tb` are the [TypeBits](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#typebits).
+    This field is only present when not empty, and is stored as BSON binary data with subtype 0
+    (Generic binary subtype).
 
 The global index collection is [clustered](https://github.com/mongodb/mongo/blob/dab0694cd327eb0f7e540de5dee97c69f84ea45d/src/mongo/db/catalog/README.md#clustered-collections)
 by `_id`, it has a local unique secondary index on `ik` and is planned to be sharded by `ik`.
@@ -82,20 +82,26 @@ DDL operations replicate as `createGlobalIndex` and `dropGlobalIndex` command ty
 Key insert and delete operations replicate as `xi` and `xd` CRUD types and do not generate
 change stream events. On a secondary, these entries are applied in parallel with other CRUD
 operations, and serialized based on the container's UUID and the entry's document key.
+
 # DDL operations
+
 TODO (SERVER-65567)
 
 # Index builds
+
 TODO (SERVER-65618)
+
 # Maintenance of a built index
+
 TODO (SERVER-65513)
 
 # Glossary
+
 **Global index container**: the internal system collection that stores the range of keys owned by
 the shard for a specific global index.
 
 **Base collection**: the user collection the global index belongs to.
 
 **Document key**: the key that uniquely identifies a document in the base collection. It is composed
-  of the _id value of the base collections's document followed by the shard key value(s) of the
-  base collection's document.
+of the \_id value of the base collections's document followed by the shard key value(s) of the
+base collection's document.

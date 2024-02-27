@@ -11,10 +11,10 @@ The Bazel equivalent of SConscript files are BUILD.bazel files.
 src/mongo/BUILD.bazel would contain:
 
     mongo_cc_binary(
-	    name = "hello_world",
-	    srcs = [
-		    "hello_world.cpp"
-		],
+        name = "hello_world",
+        srcs = [
+    	    "hello_world.cpp"
+    	],
     }
 
 Once you've obtained bazelisk by running **evergreen/get_bazelisk.sh**, you can then build this target via "bazelisk build":
@@ -25,7 +25,7 @@ Or run this target via "bazelisk run":
 
     ./bazelisk run //src/mongo:hello_world
 
-The full target name is a combination between the directory of the BUILD.bazel file and the target name: 
+The full target name is a combination between the directory of the BUILD.bazel file and the target name:
 
     //{BUILD.bazel dir}:{targetname}
 
@@ -36,32 +36,31 @@ Bazel makes use of static analysis wherever possible to improve execution and qu
 The divergence from SCons is that now source files have to be declared in addition to header files.
 
     mongo_cc_binary(
-	    name = "hello_world",
-	    srcs = [
-		    "hello_world.cpp",
-		    "new_source.cpp" # If adding a source file
-		],
-	    hdrs = [
-		    "new_header.h" # If adding a header file
-		],
+        name = "hello_world",
+        srcs = [
+    	    "hello_world.cpp",
+    	    "new_source.cpp" # If adding a source file
+    	],
+        hdrs = [
+    	    "new_header.h" # If adding a header file
+    	],
     }
 
 ## Adding a New Library
 
 The DevProd Build Team created MongoDB-specific macros for the different types of build targets you may want to specify. These include:
 
- - mongo_cc_binary
- - mongo_cc_library
- - idl_generator
- 
+-   mongo_cc_binary
+-   mongo_cc_library
+-   idl_generator
 
 Creating a new library is similar to the steps above for creating a new binary. A new **mongo_cc_library** definition would be created in the BUILD.bazel file.
 
     mongo_cc_library(
-	    name = "new_library",
-	    srcs = [
-		    "new_library_source_file.cpp"
-		]
+        name = "new_library",
+        srcs = [
+    	    "new_library_source_file.cpp"
+    	]
     }
 
 ## Declaring Dependencies
@@ -69,20 +68,20 @@ Creating a new library is similar to the steps above for creating a new binary. 
 If a library or binary depends on another library, this must be declared in the **deps** section of the target. The syntax for referring to the library is the same syntax used in the bazelisk build/run command.
 
     mongo_cc_library(
-	    name = "new_library",
-	    # ...
+        name = "new_library",
+        # ...
     }
-    
+
     mongo_cc_binary(
-	    name = "hello_world",
-	    srcs = [
-		    "hello_world.cpp",
-		],
-	    deps = [
-		    ":new_library", # if referring to the library declared in the same directory as this build file
-		    # "//src/mongo:new_library" # absolute path
-		    # "sub_directory:new_library" # relative path of a subdirectory
-		],
+        name = "hello_world",
+        srcs = [
+    	    "hello_world.cpp",
+    	],
+        deps = [
+    	    ":new_library", # if referring to the library declared in the same directory as this build file
+    	    # "//src/mongo:new_library" # absolute path
+    	    # "sub_directory:new_library" # relative path of a subdirectory
+    	],
     }
 
 ## Depending on a Bazel Library in a SCons Build Target
@@ -97,7 +96,6 @@ This allows SCons build targets to depend on Bazel build targets directly. The B
             'fsync_locked.cpp',
         ],
         LIBDEPS=[
-	        'new_library', # depend on the bazel "new_library" target defined above
-		],
+            'new_library', # depend on the bazel "new_library" target defined above
+    	],
     )
-

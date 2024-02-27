@@ -63,9 +63,9 @@ The `timeField` will be used in the `control` object in the buckets collection. 
 will be `control.min.t`, and `control.max.<time field>` will be `control.max.t`. The values for `t` in the
 user documents are stored in `data.t`.
 
-The meta-data field is always specified as `meta` in the buckets collection. We will return documents with the user-specified meta-data field (in this case `m`), but we will store the meta-data field values under 
-the field `meta` in the buckets collection. Therefore, when returning documents we will need to 
-rewrite the field `meta` to the field the user expects: `m`. When optimizing queries, we will need to 
+The meta-data field is always specified as `meta` in the buckets collection. We will return documents with the user-specified meta-data field (in this case `m`), but we will store the meta-data field values under
+the field `meta` in the buckets collection. Therefore, when returning documents we will need to
+rewrite the field `meta` to the field the user expects: `m`. When optimizing queries, we will need to
 rewrite the field the user inserted (`m`) to the field the buckets collection stores: `meta`.
 
 ## $match on metaField reorder

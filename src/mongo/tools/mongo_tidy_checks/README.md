@@ -8,7 +8,7 @@ The basics of implementing a check are in the [clang docs](https://releases.llvm
 
 #### Basic usage of the custom checks
 
-The current directory contains the individual check source files, the main `MongoTidyModule.cpp` source file which registers the checks, and the SConscript responsible for building the check library module. The module will be installed into the DESTDIR, by default `build/install/lib/libmongo_tidy_checks.so`. 
+The current directory contains the individual check source files, the main `MongoTidyModule.cpp` source file which registers the checks, and the SConscript responsible for building the check library module. The module will be installed into the DESTDIR, by default `build/install/lib/libmongo_tidy_checks.so`.
 
 Our internal `buildscripts/clang_tidy.py` will automatically check this location and attempt to load the module if it exists. If it is installed to a non-default location you will need to supply the `--check-module` argument with the location to the module.
 
@@ -28,7 +28,7 @@ Below is a checklist of all the steps to make sure to perform when writing a new
 
 1. Implement the check in the respectively named `.h` and `.cpp` files.
 2. Add the check's `#include` to the `MongoTidyModule.cpp`.
-3. Register the check class with a check name in the  `MongoTidyModule.cpp`.
+3. Register the check class with a check name in the `MongoTidyModule.cpp`.
 4. Add the `.cpp` file to the source list in the `SConscript` file.
 5. Write a unittest file named `tests/test_{CHECK_NAME}.cpp` which minimally reproduces the issue.
 6. Add the test file to the list of test sources in `tests/SConscript`.
@@ -38,6 +38,3 @@ Below is a checklist of all the steps to make sure to perform when writing a new
 #### Questions and Troubleshooting
 
 If you have any questions please reach out to the `#server-build-help` slack channel.
-
-
-

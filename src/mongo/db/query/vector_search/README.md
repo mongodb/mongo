@@ -18,14 +18,14 @@ Vector search is implemented as an aggregation stage that behaves similarly to [
 
 [`$vectorSearch`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.h) takes several [parameters](https://github.com/mongodb/mongo/blob/master/src/mongo/db/pipeline/search/document_source_vector_search.idl) that are passed on to `mongot`. These include:
 
-| Parameter | Description |
-| --------- | -------- |
-| queryVector | vector to query |
-| path | field to search over |
+| Parameter     | Description                                                 |
+| ------------- | ----------------------------------------------------------- |
+| queryVector   | vector to query                                             |
+| path          | field to search over                                        |
 | numCandidates | number of candidates to consider when performing the search |
-| limit | maximum number of documents to return |
-| index | index to use for the search |
-| filter | optional pre-filter to apply before searching |
+| limit         | maximum number of documents to return                       |
+| index         | index to use for the search                                 |
+| filter        | optional pre-filter to apply before searching               |
 
 Validation for most of these fields occurs on `mongot`, with the exception of `filter`. `mongot` does not yet support complex MQL semantics, so the `filter` is limited to simple comparisons (e.g. `$eq`, `$lt`, `$gte`) on basic field types. This is validated on `mongod` with a [custom `MatchExpressionVisitor`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/query/vector_search/filter_validator.cpp).
 

@@ -13,6 +13,7 @@ during the simulation by registering _observer_ requests that are maintained in 
 queue.
 
 More specifically:
+
 1. The event queue waits until it has received an _event_ request from each reported actor thread.
 2. When it is sufficiently full, the queue determines the minimum time of a queued _event_
    request, and advances the mock clock to that time.
@@ -38,6 +39,7 @@ name of the target _must_ end in `_simulator`.
 
 A `*_simulator` executable simply runs all selected workloads and outputs logs to stdout.
 These logs can be piped to `process_logs.py` to generate graphs. Ex.
+
 ```
 $ throughput_probing_simulator | process_logs.py -o ~/sim_output
 ```

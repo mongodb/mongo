@@ -1,5 +1,4 @@
-MongoDB TLA+/PlusCal Specifications
-===============================
+# MongoDB TLA+/PlusCal Specifications
 
 This folder contains formal specifications of various components in order to prove their
 correctness. Some are experiments, some reflect MongoDB's actual implementation. See the
