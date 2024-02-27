@@ -537,6 +537,10 @@ const PlanExplainer::ExplainVersion& PlanExplainerSBE::getVersion() const {
     return kExplainVersionForStageBuilders;
 }
 
+bool PlanExplainerSBE::matchesCachedPlan() const {
+    return _cachedPlanHash && (*_cachedPlanHash == _solution->hash());
+};
+
 std::string PlanExplainerSBE::getPlanSummary() const {
     if (_optimizerData) {
         return _optimizerData->getPlanSummary();
@@ -613,7 +617,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
                                  queryParams,
                                  buildRemotePlanInfo(),
                                  verbosity,
-                                 _matchesCachedPlan);
+                                 matchesCachedPlan());
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() const {
@@ -631,7 +635,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanTrialStats() con
             boost::none, /* queryParams */
             boost::none /* remotePlanInfo */,
             ExplainOptions::Verbosity::kExecAllPlans,
-            _matchesCachedPlan);
+            matchesCachedPlan());
     }
     return getWinningPlanStats(ExplainOptions::Verbosity::kExecAllPlans);
 }
@@ -659,6 +663,8 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         invariant(stats);
         auto execPlanDebugInfo =
             buildExecPlanDebugInfo(candidate.root.get(), &candidate.data.stageData);
+        bool candidateMatchesCachedPlan =
+            _cachedPlanHash && (*_cachedPlanHash == candidate.solution->hash());
         res.push_back(buildPlanStatsDetails(candidate.solution.get(),
                                             *stats,
                                             execPlanDebugInfo,
@@ -667,7 +673,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
                                             boost::none /* queryParams */,
                                             boost::none /* remotePlanInfo */,
                                             verbosity,
-                                            candidate.matchesCachedPlan));
+                                            candidateMatchesCachedPlan));
     }
     return res;
 }

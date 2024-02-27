@@ -62,7 +62,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
     tassert(8551900,
             "Solution must be present if cachedPlanHash is present",
             solution != nullptr || !cachedPlanHash.has_value());
-    bool matchesCachedPlan = cachedPlanHash && *cachedPlanHash == solution->hash();
     return uassertStatusOK(
         plan_executor_factory::make(_opCtx,
                                     extractCq(),
@@ -74,7 +73,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> PlannerBase::prepareSbePlan
                                     std::move(nss),
                                     extractSbeYieldPolicy(),
                                     isFromPlanCache,
-                                    matchesCachedPlan,
+                                    cachedPlanHash,
                                     false /* generatedByBonsai */,
                                     OptimizerCounterInfo{} /* used for Bonsai */,
                                     std::move(remoteCursors),

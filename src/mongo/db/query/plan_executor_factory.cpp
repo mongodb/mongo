@@ -150,7 +150,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool planIsFromCache,
-    bool matchesCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
     bool generatedByBonsai,
     OptimizerCounterInfo optCounterInfo,
     std::unique_ptr<RemoteCursorMap> remoteCursors,
@@ -173,14 +173,14 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                       sbe::plan_ranker::CandidatePlanData{std::move(data)},
                       false /*exitedEarly*/,
                       Status::OK(),
-                      planIsFromCache,
-                      matchesCachedPlan}),
+                      planIsFromCache}),
                   0},
                  plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                  std::move(nss),
                  false /*isOpen*/,
                  std::move(yieldPolicy),
                  generatedByBonsai,
+                 cachedPlanHash,
                  std::move(optCounterInfo),
                  std::move(remoteCursors),
                  std::move(remoteExplains)),
@@ -194,7 +194,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    boost::optional<size_t> cachedPlanHash) {
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",
@@ -211,7 +212,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                  true, /*isOpen*/
                                  std::move(yieldPolicy),
                                  false /*generatedByBonsai*/,
-                                 {} /* optCounterInfo */),
+                                 cachedPlanHash),
              PlanExecutor::Deleter{opCtx}}};
 }
 

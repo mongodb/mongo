@@ -1284,18 +1284,14 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                                          planStageData)) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = runTimePlanner->plan(std::move(solutions), std::move(roots));
-        for (auto& candidate : candidates.plans) {
-            candidate.matchesCachedPlan = planningResult->cachedPlanHash() &&
-                (*planningResult->cachedPlanHash() == candidate.solution->hash());
-        }
-
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
                                            std::move(candidates),
                                            collections,
                                            plannerParams.options,
                                            std::move(nss),
-                                           std::move(yieldPolicy));
+                                           std::move(yieldPolicy),
+                                           planningResult->cachedPlanHash());
     }
 
     // No need for runtime planning, just use the constructed plan stage tree.
@@ -1336,8 +1332,6 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                                   planningResult->isRecoveredFromPlanCache(),
                                                   remoteCursors.get());
 
-    bool matchesCachedPlan = planningResult->cachedPlanHash() &&
-        (*planningResult->cachedPlanHash() == solutions[0]->hash());
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
                                        nullptr /*pipeline*/,
@@ -1348,7 +1342,7 @@ getSlotBasedExecutorWithSbeRuntimePlanning(OperationContext* opCtx,
                                        std::move(nss),
                                        std::move(yieldPolicy),
                                        planningResult->isRecoveredFromPlanCache(),
-                                       matchesCachedPlan,
+                                       planningResult->cachedPlanHash(),
                                        false /* generatedByBonsai */,
                                        {} /* optCounterInfo */,
                                        std::move(remoteCursors),
@@ -1543,7 +1537,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSearchMetada
                                        cq.nss(),
                                        std::move(sbeYieldPolicy),
                                        false /* planIsFromCache */,
-                                       false /* matchesCachedPlan */,
+                                       boost::none /* cachedPlanHash */,
                                        false /* generatedByBonsai */,
                                        {} /* optCounterInfo */,
                                        std::move(remoteCursors));

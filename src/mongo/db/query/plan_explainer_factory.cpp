@@ -80,7 +80,7 @@ std::unique_ptr<PlanExplainer> make(
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
     bool isFromPlanCache,
-    bool matchesCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfoSBE,
     OptimizerCounterInfo optCounterInfo,
     RemoteExplainVector* remoteExplains) {
@@ -96,7 +96,7 @@ std::unique_ptr<PlanExplainer> make(
                                               std::move(rejectedCandidates),
                                               isMultiPlan,
                                               isFromPlanCache,
-                                              matchesCachedPlan,
+                                              cachedPlanHash,
                                               debugInfoSBE,
                                               std::move(optCounterInfo),
                                               remoteExplains);

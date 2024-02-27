@@ -90,6 +90,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  bool isOpen,
                                  std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                                  bool generatedByBonsai,
+                                 boost::optional<size_t> cachedPlanHash,
                                  OptimizerCounterInfo optCounterInfo,
                                  std::unique_ptr<RemoteCursorMap> remoteCursors,
                                  std::unique_ptr<RemoteExplainVector> remoteExplains)
@@ -154,7 +155,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     }
     const auto isMultiPlan = candidates.plans.size() > 1;
     const auto isCachedCandidate = candidates.winner().fromPlanCache;
-    const auto matchesCachedPlan = candidates.winner().matchesCachedPlan;
     if (!_cq || !_cq->getExpCtx()->explain) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
         candidates.plans.clear();
@@ -173,7 +173,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
                                                   isCachedCandidate,
-                                                  matchesCachedPlan,
+                                                  cachedPlanHash,
                                                   _rootData.debugInfo,
                                                   std::move(optCounterInfo),
                                                   _remoteExplains.get());

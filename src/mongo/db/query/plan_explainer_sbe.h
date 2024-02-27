@@ -68,7 +68,7 @@ public:
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan,
                      bool isCachedPlan,
-                     bool matchesCachedPlan,
+                     boost::optional<size_t> cachedPlanHash,
                      std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo,
                      OptimizerCounterInfo optCounterInfo = {},
                      RemoteExplainVector* remoteExplains = nullptr)
@@ -79,7 +79,7 @@ public:
           _rejectedCandidates{std::move(rejectedCandidates)},
           _isMultiPlan{isMultiPlan},
           _isFromPlanCache{isCachedPlan},
-          _matchesCachedPlan{matchesCachedPlan},
+          _cachedPlanHash{cachedPlanHash},
           _debugInfo{debugInfo},
           _remoteExplains{remoteExplains} {
         tassert(5968203, "_debugInfo should not be null", _debugInfo);
@@ -91,6 +91,7 @@ public:
     bool isFromCache() const {
         return _isFromPlanCache;
     }
+    bool matchesCachedPlan() const;
     const ExplainVersion& getVersion() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
@@ -124,7 +125,7 @@ private:
     const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
     const bool _isMultiPlan{false};
     const bool _isFromPlanCache{false};
-    const bool _matchesCachedPlan{false};
+    const boost::optional<size_t> _cachedPlanHash{boost::none};
     // Pre-computed debugging info so we don't necessarily have to collect them from QuerySolution.
     // All plans recovered from the same cached entry share the same debug info.
     const std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> _debugInfo;

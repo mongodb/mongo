@@ -136,7 +136,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
     bool isFromPlanCache,
-    bool matchesCachedPlan,
+    boost::optional<size_t> cachedPlanHash,
     bool generatedByBonsai,
     OptimizerCounterInfo optCounterInfo = {},
     std::unique_ptr<RemoteCursorMap> remoteCursors = nullptr,
@@ -154,7 +154,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const MultipleCollectionAccessor& collections,
     size_t plannerOptions,
     NamespaceString nss,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
+    boost::optional<size_t> cachedPlanHash = boost::none);
 
 /**
  * Constructs a plan executor for executing the given 'pipeline'.
