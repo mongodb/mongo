@@ -1287,6 +1287,22 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
         self.assertRegex(str(complex_checks_not_subset_two_error), "complexChecksNotSubsetTwo")
 
+        complex_check_privileges_superset_none_allowed_error = error_collection.get_error_by_command_name(
+            "complexCheckPrivilegesSupersetNoneAllowed")
+        self.assertTrue(complex_check_privileges_superset_none_allowed_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
+        self.assertRegex(
+            str(complex_check_privileges_superset_none_allowed_error),
+            "complexCheckPrivilegesSupersetNoneAllowed")
+
+        complex_check_privileges_superset_some_allowed_error = error_collection.get_error_by_command_name(
+            "complexCheckPrivilegesSupersetSomeAllowed")
+        self.assertTrue(complex_check_privileges_superset_some_allowed_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
+        self.assertRegex(
+            str(complex_check_privileges_superset_some_allowed_error),
+            "complexCheckPrivilegesSupersetSomeAllowed")
+
         complex_checks_superset_none_allowed_error = error_collection.get_error_by_command_name(
             "complexChecksSupersetNoneAllowed")
         self.assertTrue(complex_checks_superset_none_allowed_error.error_id ==
@@ -1510,7 +1526,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_command_type_field_added_as_stable_error), "newStableTypeFieldAdded")
 
-        self.assertEqual(error_collection.count(), 213)
+        self.assertEqual(error_collection.count(), 215)
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""
