@@ -140,22 +140,15 @@ ClusterAuthMode ClusterAuthMode::get(ServiceContext* svcCtx) {
 
 ClusterAuthMode ClusterAuthMode::set(ServiceContext* svcCtx, const ClusterAuthMode& newMode) {
     auto& authMode = getClusterAuthMode(svcCtx);
-    while (true) {
-        // We eventually return from this loop, either by throwing an exception if the transition is
-        // not allowed, or finally beating other writers. Since `ClusterAuthMode` is excepted to be
-        // a read-mostly-write-rarely value, the latter is expected to happen at most after 1 or 2
-        // iterations of the loop.
-        auto current = authMode.load();
-        if (!current.canTransitionTo(newMode)) {
-            uasserted(5579202,
-                      fmt::format("Illegal state transition for clusterAuthMode from '{}' to '{}'",
-                                  current.toString(),
-                                  newMode.toString()));
-        }
-        if (authMode.compareAndSwap(&current, newMode)) {
-            return current;
-        }
-    }
+    auto current = authMode.load();
+    do {
+        uassert(5579202,
+                fmt::format("Illegal state transition for clusterAuthMode from '{}' to '{}'",
+                            current.toString(),
+                            newMode.toString()),
+                current.canTransitionTo(newMode));
+    } while (!authMode.compareAndSwap(&current, newMode));
+    return current;
 }
 
 void disableX509Auth(Service* service) {
