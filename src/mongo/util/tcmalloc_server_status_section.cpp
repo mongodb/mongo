@@ -28,189 +28,210 @@
  */
 
 
-#include "mongo/base/string_data_comparator.h"
-#ifdef _WIN32
-#define NVALGRIND
-#endif
-
-#include <cstddef>
-#include <memory>
-#include <utility>
-
-#include <valgrind/valgrind.h>
-
 #include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <optional>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/tenant_id.h"
-#include "mongo/util/tcmalloc_parameters_gen.h"
 
 #ifdef MONGO_HAVE_GOOGLE_TCMALLOC
 #include <tcmalloc/malloc_extension.h>
-auto static tcmallocProperties = tcmalloc::MallocExtension::GetProperties();
 #elif defined(MONGO_HAVE_GPERF_TCMALLOC)
 #include <gperftools/malloc_extension.h>
-auto static mallocExtensionAPI = MallocExtension::instance();
 #endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
-
-// TODO: Remove these implementations and the associated IDL definition in 4.3.
-void TCMallocEnableMarkThreadTemporarilyIdle::append(OperationContext*,
-                                                     BSONObjBuilder*,
-                                                     StringData,
-                                                     const boost::optional<TenantId>&) {}
-
-Status TCMallocEnableMarkThreadTemporarilyIdle::setFromString(StringData,
-                                                              const boost::optional<TenantId>&) {
-    return Status(ErrorCodes::BadValue,
-                  "tcmallocEnableMarkThreadTemporarilyIdle has been removed. Setting this "
-                  "parameter has no effect and it will be removed in a future version of "
-                  "MongoDB.");
-}
-
 namespace {
 
-class TCMallocServerStatusSection : public ServerStatusSection {
-public:
-    TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
+template <typename E>
+auto getUnderlyingType(E e) {
+    return static_cast<std::underlying_type_t<E>>(e);
+}
 
-    bool includeByDefault() const override {
-        return true;
+/**
+ * For more information about tcmalloc stats, see:
+ * https://github.com/google/tcmalloc/blob/master/docs/stats.md and
+ * https://github.com/google/tcmalloc/blob/master/tcmalloc/malloc_extension.h
+ * for the tcmalloc-google, and
+ * https://github.com/gperftools/gperftools/blob/master/docs/tcmalloc.html and
+ * https://github.com/gperftools/gperftools/blob/master/src/gperftools/malloc_extension.h
+ * for tcmalloc-gperf
+ */
+class TCMallocMetrics {
+public:
+    virtual std::vector<StringData> getGenericStatNames() const {
+        return {};
     }
 
-    BSONObj generateSection(OperationContext* opCtx,
-                            const BSONElement& configElement) const override {
-        long long verbosity = 1;
-        if (configElement) {
-            // Relies on the fact that safeNumberLong turns non-numbers into 0.
-            long long configValue = configElement.safeNumberLong();
-            if (configValue) {
-                verbosity = configValue;
-            }
+    virtual std::vector<StringData> getTCMallocStatNames() const {
+        return {};
+    }
+
+    virtual boost::optional<size_t> getNumericProperty(StringData propertyName) const {
+        return boost::none;
+    }
+
+    virtual void appendPerCPUMetrics(BSONObjBuilder& bob) const {}
+
+    virtual long long getReleaseRate() const {
+        return 0;
+    }
+
+    virtual void appendHighVerbosityMetrics(BSONObjBuilder& bob) const {}
+
+    virtual void appendFormattedString(BSONObjBuilder& bob) const {}
+
+    virtual void appendCustomDerivedMetrics(BSONObjBuilder& bob) const {}
+};
+
+#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+class GoogleTCMallocMetrics : public TCMallocMetrics {
+public:
+    std::vector<StringData> getGenericStatNames() const override {
+        return {
+            "bytes_in_use_by_app"_sd,
+            "current_allocated_bytes"_sd,
+            "heap_size"_sd,
+            "peak_memory_usage"_sd,
+            "physical_memory_used"_sd,
+            "realized_fragmentation"_sd,
+            "virtual_memory_used"_sd,
+        };
+    }
+
+    std::vector<StringData> getTCMallocStatNames() const override {
+        return {
+            "central_cache_free"_sd,
+            "cpu_free"_sd,
+            "current_total_thread_cache_bytes"_sd,
+            "desired_usage_limit_bytes"_sd,
+            "external_fragmentation_bytes"_sd,
+            "hard_usage_limit_bytes"_sd,
+            "local_bytes"_sd,
+            "max_total_thread_cache_bytes"_sd,
+            "metadata_bytes"_sd,
+            "page_algorithm"_sd,
+            "pageheap_free_bytes"_sd,
+            "pageheap_unmapped_bytes"_sd,
+            "required_bytes"_sd,
+            "sampled_internal_fragmentation"_sd,
+            "sharded_transfer_cache_free"_sd,
+            "thread_cache_count"_sd,
+            "thread_cache_free"_sd,
+            "transfer_cache_free"_sd,
+        };
+    }
+
+    boost::optional<size_t> getNumericProperty(StringData propertyName) const override {
+        if (auto res = tcmalloc::MallocExtension::GetNumericProperty(std::string{propertyName});
+            res.has_value()) {
+            return res.value();
         }
 
-        BSONObjBuilder builder;
+        return boost::none;
+    }
 
-        auto getValueIfExists = [&](StringData property) -> boost::optional<size_t> {
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
-            if (auto value = tcmallocProperties.find(property.toString());
-                value != tcmallocProperties.end()) {
-                return {value->second.value};
+    void appendPerCPUMetrics(BSONObjBuilder& bob) const override {
+        _perCPUCachesActive =
+            _perCPUCachesActive || tcmalloc::MallocExtension::PerCpuCachesActive();
+        bob.appendBool("usingPerCPUCaches", _perCPUCachesActive);
+        bob.append("maxPerCPUCacheSize", tcmalloc::MallocExtension::GetMaxPerCpuCacheSize());
+    }
+
+    long long getReleaseRate() const override {
+        return getUnderlyingType(tcmalloc::MallocExtension::GetBackgroundReleaseRate());
+    }
+
+    void appendCustomDerivedMetrics(BSONObjBuilder& bob) const override {
+        if (auto physicalMemory = getNumericProperty("generic.physical_memory_used");
+            !!physicalMemory) {
+            if (auto virtualMemory = getNumericProperty("generic.virtual_memory_used");
+                !!virtualMemory) {
+                long long unmappedBytes = *virtualMemory - *physicalMemory;
+                bob.appendNumber("unmapped_bytes", unmappedBytes);
             }
+        }
+    }
+
+private:
+    // Once per-CPU caches are activated, they cannot be deactivated, and so we cache the true value
+    // in order to avoid the FTDC thread loading a contested atomic from tcmalloc when it does not
+    // need to.
+    static inline bool _perCPUCachesActive = false;
+};
 #elif defined(MONGO_HAVE_GPERF_TCMALLOC)
-            size_t value;
-            if (mallocExtensionAPI->GetNumericProperty(property.rawData(), &value)) {
-                return {value};
-            }
-#endif
-            return boost::none;
+class GperfTCMallocMetrics : public TCMallocMetrics {
+public:
+    std::vector<StringData> getGenericStatNames() const override {
+        return {
+            "current_allocated_bytes"_sd,
+            "heap_size"_sd,
         };
+    }
 
-        auto tryAppend = [&](BSONObjBuilder& builder, StringData bsonName, StringData property) {
-            if (auto value = getValueIfExists(property); !!value) {
-                builder.appendNumber(bsonName, static_cast<long long>(*value));
-            }
+    std::vector<StringData> getTCMallocStatNames() const override {
+        return {
+            "pageheap_free_bytes"_sd,
+            "pageheap_unmapped_bytes"_sd,
+            "max_total_thread_cache_bytes"_sd,
+            "current_total_thread_cache_bytes"_sd,
+            "central_cache_free_bytes"_sd,
+            "transfer_cache_free_bytes"_sd,
+            "thread_cache_free_bytes"_sd,
+            "aggressive_memory_decommit"_sd,
+            "pageheap_committed_bytes"_sd,
+            "pageheap_scavenge_count"_sd,
+            "pageheap_commit_count"_sd,
+            "pageheap_total_commit_bytes"_sd,
+            "pageheap_decommit_count"_sd,
+            "pageheap_total_decommit_bytes"_sd,
+            "pageheap_reserve_count"_sd,
+            "pageheap_total_reserve_bytes"_sd,
+            "spinlock_total_delay_ns"_sd,
         };
+    }
 
-        auto tryStat = [&](BSONObjBuilder& builder, StringData topic, StringData base) {
-            tryAppend(builder, base, fmt::format("{}.{}", topic, base));
-        };
-
-        // For a list of properties see the "Generic Tcmalloc Status" section of
-        // http://google-perftools.googlecode.com/svn/trunk/doc/tcmalloc.html and
-        // http://code.google.com/p/gperftools/source/browse/src/gperftools/malloc_extension.h
-        {
-            BSONObjBuilder sub(builder.subobjStart("generic"));
-            tryStat(sub, "generic", "current_allocated_bytes");
-            tryStat(sub, "generic", "heap_size");
+    boost::optional<size_t> getNumericProperty(StringData propertyName) const override {
+        size_t value;
+        if (MallocExtension::instance()->GetNumericProperty(propertyName.rawData(), &value)) {
+            return {value};
         }
-        {
-            BSONObjBuilder sub(builder.subobjStart("tcmalloc"));
-            auto tryTc = [&](StringData key) {
-                tryStat(sub, "tcmalloc", key);
-            };
 
-            tryTc("pageheap_free_bytes");
-            tryTc("pageheap_unmapped_bytes");
-            tryTc("max_total_thread_cache_bytes");
-            tryTc("current_total_thread_cache_bytes");
+        return boost::none;
+    }
 
-            {
-                long long total = 0;
-                if (auto central = getValueIfExists("tcmalloc.central_cache_free"); !!central) {
-                    sub.appendNumber("central_cache_free_bytes", static_cast<long long>(*central));
-                    total += *central;
-                }
-                if (auto transfer = getValueIfExists("tcmalloc.transfer_cache_free"); !!transfer) {
-                    sub.appendNumber("transfer_cache_free_bytes",
-                                     static_cast<long long>(*transfer));
-                    total += *transfer;
-                }
-                if (auto thread = getValueIfExists("tcmalloc.thread_cache_free"); !!thread) {
-                    sub.appendNumber("thread_cache_free_bytes", static_cast<long long>(*thread));
-                    total += *thread;
-                }
-                if (auto cpu = getValueIfExists("tcmalloc.cpu_free"); !!cpu) {
-                    sub.appendNumber("cpu_cache_free_bytes", static_cast<long long>(*cpu));
-                    total += *cpu;
-                }
-                sub.appendNumber("total_free_bytes", total);
-            }
+    long long getReleaseRate() const override {
+        return MallocExtension::instance()->GetMemoryReleaseRate();
+    }
 
-            tryTc("aggressive_memory_decommit");
-
-            tryTc("pageheap_committed_bytes");
-            tryTc("pageheap_scavenge_count");
-            tryTc("pageheap_commit_count");
-            tryTc("pageheap_total_commit_bytes");
-            tryTc("pageheap_decommit_count");
-            tryTc("pageheap_total_decommit_bytes");
-            tryTc("pageheap_reserve_count");
-            tryTc("pageheap_total_reserve_bytes");
-            tryTc("spinlock_total_delay_ns");
-
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
-            sub.appendNumber(
-                "release_rate",
-                static_cast<long long>(tcmalloc::MallocExtension::GetBackgroundReleaseRate()));
-#endif
-
+    void appendHighVerbosityMetrics(BSONObjBuilder& bob) const override {
 #if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
-            if (verbosity >= 2) {
-                // Size class information
-                std::pair<BSONArrayBuilder, BSONArrayBuilder> builders(
-                    builder.subarrayStart("size_classes"), BSONArrayBuilder());
+        // Size class information
+        std::pair<BSONArrayBuilder, BSONArrayBuilder> builders(bob.subarrayStart("size_classes"),
+                                                               BSONArrayBuilder());
 
-                // Size classes and page heap info is dumped in 1 call so that the performance
-                // sensitive tcmalloc page heap lock is only taken once
-                mallocExtensionAPI->SizeClasses(&builders, appendSizeClassInfo, appendPageHeapInfo);
+        // Size classes and page heap info is dumped in 1 call so that the performance
+        // sensitive tcmalloc page heap lock is only taken once
+        MallocExtension::instance()->SizeClasses(
+            &builders, appendSizeClassInfo, appendPageHeapInfo);
 
-                builders.first.done();
-                builder.append("page_heap", builders.second.arr());
-            }
-#endif
-#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
-            builder.append("formattedString", tcmalloc::MallocExtension::GetStats());
-#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
-            char buffer[4096];
-            mallocExtensionAPI->GetStats(buffer, sizeof buffer);
-            builder.append("formattedString", buffer);
-#endif
-        }
+        builders.first.done();
+        bob.append("page_heap", builders.second.arr());
+#endif  // MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+    }
 
-        return builder.obj();
+    void appendFormattedString(BSONObjBuilder& bob) const override {
+        char buffer[4096];
+        MallocExtension::instance()->GetStats(buffer, sizeof buffer);
+        bob.append("formattedString", buffer);
     }
 
 private:
@@ -247,7 +268,98 @@ private:
 
         builder.append(doc.obj());
     }
+#endif  // MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
+};
+#endif  // MONGO_HAVE_GPERF_TCMALLOC
+
+class TCMallocServerStatusSection : public ServerStatusSection {
+public:
+    TCMallocServerStatusSection() : ServerStatusSection("tcmalloc") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        long long verbosity = 1;
+        if (configElement) {
+            // Relies on the fact that safeNumberLong turns non-numbers into 0.
+            long long configValue = configElement.safeNumberLong();
+            if (configValue) {
+                verbosity = configValue;
+            }
+        }
+
+        BSONObjBuilder builder;
+
+        auto tryAppend = [&](BSONObjBuilder& builder, StringData bsonName, StringData property) {
+            if (auto value = _metrics.getNumericProperty(property); !!value) {
+                builder.appendNumber(bsonName, static_cast<long long>(*value));
+            }
+        };
+
+        auto tryStat = [&](BSONObjBuilder& builder, StringData topic, StringData base) {
+            tryAppend(builder, base, format(FMT_STRING("{}.{}"), topic, base));
+        };
+
+        _metrics.appendPerCPUMetrics(builder);
+        {
+            BSONObjBuilder sub(builder.subobjStart("generic"));
+            for (auto& stat : _metrics.getGenericStatNames()) {
+                tryStat(sub, "generic", stat);
+            }
+        }
+
+        {
+            BSONObjBuilder sub(builder.subobjStart("tcmalloc"));
+            for (auto& stat : _metrics.getTCMallocStatNames()) {
+                tryStat(sub, "tcmalloc", stat);
+            }
+
+            sub.appendNumber("release_rate", _metrics.getReleaseRate());
+
+            if (verbosity >= 2) {
+                _metrics.appendHighVerbosityMetrics(builder);
+            }
+
+            _metrics.appendFormattedString(builder);
+        }
+
+        {
+            BSONObjBuilder sub(builder.subobjStart("tcmalloc_derived"));
+            _metrics.appendCustomDerivedMetrics(builder);
+
+            static constexpr std::array totalFreeBytesParts{
+                "tcmalloc.pageheap_free_bytes"_sd,
+                "tcmalloc.central_cache_free"_sd,
+                "tcmalloc.transfer_cache_free"_sd,
+                "tcmalloc.thread_cache_free"_sd,
+                "tcmalloc.cpu_free"_sd,  // Will be 0 for gperf tcmalloc
+            };
+            long long total = 0;
+            for (auto& stat : totalFreeBytesParts) {
+                if (auto value = _metrics.getNumericProperty(stat); !!value) {
+                    total += *value;
+                }
+            }
+            sub.appendNumber("total_free_bytes", total);
+        }
+
+        return builder.obj();
+    }
+
+private:
+#ifdef MONGO_HAVE_GOOGLE_TCMALLOC
+    using MyMetrics = GoogleTCMallocMetrics;
+#elif defined(MONGO_HAVE_GPERF_TCMALLOC)
+    using MyMetrics = GperfTCMallocMetrics;
+#else
+    using MyMetrics = TCMallocMetrics;
 #endif
-} tcmallocServerStatusSection;
+
+    MyMetrics _metrics;
+};
+TCMallocServerStatusSection tcmallocServerStatusSection;
 }  // namespace
 }  // namespace mongo
