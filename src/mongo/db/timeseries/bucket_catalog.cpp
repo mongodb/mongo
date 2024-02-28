@@ -899,8 +899,9 @@ const BSONObj& BucketCatalog::BucketMetadata::toBSON() const {
     return _metadata;
 }
 
-StringData BucketCatalog::BucketMetadata::getMetaField() const {
-    return StringData(_metadataElement.fieldName());
+boost::optional<StringData> BucketCatalog::BucketMetadata::getMetaField() const {
+    return _metadataElement ? boost::make_optional(_metadataElement.fieldNameStringData())
+                            : boost::none;
 }
 
 const StringData::ComparatorInterface* BucketCatalog::BucketMetadata::getComparator() const {

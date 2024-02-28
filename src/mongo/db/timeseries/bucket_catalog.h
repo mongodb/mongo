@@ -343,7 +343,7 @@ private:
 
         const BSONObj& toBSON() const;
 
-        StringData getMetaField() const;
+        boost::optional<StringData> getMetaField() const;
 
         const StringData::ComparatorInterface* getComparator() const;
 
