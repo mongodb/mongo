@@ -34,7 +34,6 @@ selector:
   # The following tests use fsyncLock which will fail if FCBIS has a backup cursor open.
   - jstests/core/**/currentop.js
   - jstests/core/**/fsync.js
-  - jstests/core/**/killop_drop_collection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

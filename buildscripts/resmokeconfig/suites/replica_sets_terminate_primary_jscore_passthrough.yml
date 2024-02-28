@@ -26,7 +26,6 @@ selector:
   # Stepdown commands during fsync lock will fail.
   - jstests/core/**/currentop.js
   - jstests/core/**/fsync.js
-  - jstests/core/**/killop_drop_collection.js
 
   # Expect drops/creates to fail or have a certain response:
   - jstests/core/**/explain_upsert.js

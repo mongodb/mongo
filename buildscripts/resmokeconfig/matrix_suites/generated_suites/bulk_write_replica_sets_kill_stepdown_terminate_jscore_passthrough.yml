@@ -86,7 +86,6 @@ selector:
   - jstests/core/**/project_with_collation.js
   - jstests/core/**/currentop.js
   - jstests/core/**/fsync.js
-  - jstests/core/**/killop_drop_collection.js
   - jstests/core/**/explain_upsert.js
   - jstests/core/**/indexes_multiple_commands.js
   - jstests/core/**/create_indexes.js

@@ -74,9 +74,6 @@ selector:
     - jstests/core/views/invalid_system_views.js
     # TODO (SERVER-86364): Secondary reads assertion fails.
     - jstests/core/clustered/clustered_collection_creation.js
-    # TODO (SERVER-84243): Separate Shard-Role Catalog Cache and Loader. This test runs the fsync
-    # command so causes catalog cache refreshes which currently involve doing noop writes to hang.
-    - jstests/core/ddl/killop_drop_collection.js
 
     # The tests below are disabled because they assert that if there have not been any successful
     # writes the test database, it should remain empty or non-existent. This suite breaks this

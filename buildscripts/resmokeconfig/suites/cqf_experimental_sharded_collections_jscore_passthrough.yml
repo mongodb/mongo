@@ -50,7 +50,6 @@ selector:
   - jstests/core/**/dbcase.js
   - jstests/core/**/dbcase2.js
   - jstests/core/**/no_db_created.js
-  - jstests/core/**/killop_drop_collection.js # Uses fsyncLock.
   # These tests fail because sharded clusters do not clean up correctly after failed index builds.
   # See SERVER-33207 as an example.
   - jstests/core/**/geo_borders.js

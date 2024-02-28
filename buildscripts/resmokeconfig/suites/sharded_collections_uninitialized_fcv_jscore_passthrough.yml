@@ -98,8 +98,6 @@ selector:
 
   # Will fail all commands including those needed to forward command to initial sync node.
   - jstests/core/failcommand_failpoint.js
-  # Has asserts that depend on the use of fsyncLock which is skipped by this passthrough.
-  - jstests/core/ddl/killop_drop_collection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

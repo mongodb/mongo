@@ -194,7 +194,6 @@ selector:
   - jstests/core/**/distinct3.js
   - jstests/core/**/find_and_modify_concurrent_update.js
   - jstests/core/**/geo_update_btree.js
-  - jstests/core/**/killop_drop_collection.js
   - jstests/core/**/loadserverscripts.js
   - jstests/core/**/mr_killop.js
   - jstests/core/**/removeb.js
