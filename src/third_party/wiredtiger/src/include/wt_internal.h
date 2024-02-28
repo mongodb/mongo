@@ -452,6 +452,20 @@ typedef uint64_t wt_timestamp_t;
  * DO NOT EDIT: automatically built by dist/s_typedef.
  */
 
+/*
+ * Clang and gcc use different mechanisms to detect TSan, clang using __has_feature. Consolidate
+ * them into a single TSAN_BUILD pre-processor flag.
+ */
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define TSAN_BUILD 1
+#endif
+#endif
+
+#if defined(__SANITIZE_THREAD__)
+#define TSAN_BUILD 1
+#endif
+
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/

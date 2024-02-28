@@ -647,7 +647,8 @@ err:
     /* The URI is owned by the btree handle. */
     cursor->internal_uri = NULL;
 
-    WT_ASSERT(session, session->dhandle == NULL || session->dhandle->session_inuse > 0);
+    WT_ASSERT(session,
+      session->dhandle == NULL || __wt_atomic_loadi32(&session->dhandle->session_inuse) > 0);
 
     /* Free any private transaction set up for a checkpoint cursor. */
     if (cbt->checkpoint_txn != NULL)

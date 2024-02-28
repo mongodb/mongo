@@ -95,7 +95,7 @@
 int
 __wt_rwlock_init(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-    l->u.v = 0;
+    __wt_atomic_storev64(&l->u.v, 0);
     l->stat_read_count_off = l->stat_write_count_off = -1;
     l->stat_app_usecs_off = l->stat_int_usecs_off = -1;
 
@@ -111,7 +111,7 @@ __wt_rwlock_init(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 void
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-    l->u.v = 0;
+    __wt_atomic_storev64(&l->u.v, 0);
 
     __wt_cond_destroy(session, &l->cond_readers);
     __wt_cond_destroy(session, &l->cond_writers);
@@ -133,7 +133,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
         stats[session->stat_bucket][l->stat_read_count_off]++;
     }
 
-    old.u.v = l->u.v;
+    old.u.v = __wt_atomic_loadv64(&l->u.v);
 
     /* This read lock can only be granted if there are no active writers. */
     if (old.u.s.current != old.u.s.next)
@@ -183,7 +183,8 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
         /*
          * Fast path: if there is no active writer, join the current group.
          */
-        for (old.u.v = l->u.v; old.u.s.current == old.u.s.next; old.u.v = l->u.v) {
+        for (old.u.v = __wt_atomic_loadv64(&l->u.v); old.u.s.current == old.u.s.next;
+             old.u.v = __wt_atomic_loadv64(&l->u.v)) {
             new.u.v = old.u.v;
             /*
              * Check for overflow: if the maximum number of readers are already active, no new
@@ -283,7 +284,7 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     WT_RWLOCK new, old;
 
     do {
-        old.u.v = l->u.v;
+        old.u.v = __wt_atomic_loadv64(&l->u.v);
         WT_ASSERT(session, old.u.s.readers_active > 0);
 
         /*
@@ -319,7 +320,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
      * this thread's ticket would be the next ticket granted. Check if this can possibly succeed
      * (and confirm the lock is in the correct state to grant this write lock).
      */
-    old.u.v = l->u.v;
+    old.u.v = __wt_atomic_loadv64(&l->u.v);
     if (old.u.s.current != old.u.s.next || old.u.s.readers_active != 0)
         return (__wt_set_return(session, EBUSY));
 
@@ -368,7 +369,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     WT_STAT_CONN_INCR(session, rwlock_write);
 
     for (;;) {
-        old.u.v = l->u.v;
+        old.u.v = __wt_atomic_loadv64(&l->u.v);
 
         /* Allocate a ticket. */
         new.u.v = old.u.v;
@@ -395,8 +396,9 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
      */
     time_start =
       l->stat_write_count_off != -1 && WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
-    for (pause_cnt = 0, old.u.v = l->u.v; ticket != old.u.s.current || old.u.s.readers_active != 0;
-         pause_cnt++, old.u.v = l->u.v) {
+    for (pause_cnt = 0, old.u.v = __wt_atomic_loadv64(&l->u.v);
+         ticket != old.u.s.current || old.u.s.readers_active != 0;
+         pause_cnt++, old.u.v = __wt_atomic_loadv64(&l->u.v)) {
         if (pause_cnt < WT_THOUSAND)
             WT_PAUSE();
         else if (pause_cnt < 1200)
@@ -448,7 +450,7 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     WT_RWLOCK new, old;
 
     do {
-        old.u.v = l->u.v;
+        old.u.v = __wt_atomic_loadv64(&l->u.v);
 
         /*
          * We're holding the lock exclusive, there shouldn't be any active readers.
@@ -487,6 +489,6 @@ __wt_rwlock_islocked(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 
     WT_UNUSED(session);
 
-    old.u.v = l->u.v;
+    old.u.v = __wt_atomic_loadv64(&l->u.v);
     return (old.u.s.current != old.u.s.next || old.u.s.readers_active != 0);
 }

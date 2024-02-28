@@ -33,15 +33,15 @@ __sweep_mark(WT_SESSION_IMPL *session, uint64_t now)
          * handles alive because of those cases, but if we see multiple cursors open, clear the time
          * of death.
          */
-        if (dhandle->session_inuse > 1)
+        if (__wt_atomic_loadi32(&dhandle->session_inuse) > 1)
             dhandle->timeofdeath = 0;
 
         /*
          * If the handle is open exclusive or currently in use, or the time of death is already set,
          * move on.
          */
-        if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) || dhandle->session_inuse > 0 ||
-          dhandle->timeofdeath != 0)
+        if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE) ||
+          __wt_atomic_loadi32(&dhandle->session_inuse) > 0 || dhandle->timeofdeath != 0)
             continue;
 
         /*
@@ -133,7 +133,7 @@ __sweep_expire(WT_SESSION_IMPL *session, uint64_t now)
             break;
 
         if (WT_IS_METADATA(dhandle) || !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
-          dhandle->session_inuse != 0 || dhandle->timeofdeath == 0 ||
+          __wt_atomic_loadi32(&dhandle->session_inuse) != 0 || dhandle->timeofdeath == 0 ||
           now - dhandle->timeofdeath <= conn->sweep_idle_time)
             continue;
 

@@ -1,0 +1,6 @@
+# Suppress the listed TSan warnings. Load this file with 
+# export TSAN_OPTIONS="suppressions=path/to/wiredtiger/test/evergreen/tsan_warnings.supp"
+# before running tests with TSan
+
+# FIXME-WT-12512 TSan is raising warnings about mutexes that are non-intuitive. These will be investigated separately.
+mutex:src

@@ -142,6 +142,7 @@ FORALL
 FOREACH
 FS
 FULLFSYNC
+FUNC
 FUNCSIG
 Failpoint
 FindClose
@@ -374,7 +375,9 @@ TODO
 TORTIOUS
 TRET
 TRYLOCK
+TSAN
 TSO
+TSan
 TW
 TXN
 ThreadList
@@ -481,6 +484,7 @@ argv
 asdf
 assertfmt
 atomicity
+atomics
 atou
 auth
 autocommit
@@ -929,6 +933,7 @@ linux
 llll
 llu
 llvm
+loadbool
 loadtext
 loc
 localTime
@@ -1022,6 +1027,7 @@ newfile
 newuri
 newv
 nextprev
+nf
 nfilename
 nhex
 nlohmann
@@ -1235,6 +1241,7 @@ stderr
 stdin
 stdout
 stepp
+storebool
 str
 strace
 strcat

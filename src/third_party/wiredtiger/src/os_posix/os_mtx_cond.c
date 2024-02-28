@@ -37,7 +37,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, WT_CONDVAR **condp)
 #endif
 
     cond->name = name;
-    cond->waiters = 0;
+    __wt_atomic_storei32(&cond->waiters, 0);
 
     *condp = cond;
     return (0);
@@ -151,6 +151,7 @@ void
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
     WT_DECL_RET;
+    int cond_waiters;
 
     __wt_verbose_debug2(session, WT_VERB_MUTEX, "signal %s", cond->name);
 
@@ -165,7 +166,8 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
      * Fast path if we are in (or can enter), a state where the next waiter will return immediately
      * as already signaled.
      */
-    if (cond->waiters == -1 || (cond->waiters == 0 && __wt_atomic_casi32(&cond->waiters, 0, -1)))
+    cond_waiters = __wt_atomic_loadi32(&cond->waiters);
+    if (cond_waiters == -1 || (cond_waiters == 0 && __wt_atomic_casi32(&cond->waiters, 0, -1)))
         return;
 
     WT_ERR(pthread_mutex_lock(&cond->mtx));

@@ -262,7 +262,7 @@ __wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *o
     WT_CURSOR_BACKUP *cb, *other_cb;
     WT_DECL_ITEM(open_uri);
     WT_DECL_RET;
-    uint64_t session_cache_flags;
+    uint32_t session_cache_flags;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     other_cb = (WT_CURSOR_BACKUP *)other;

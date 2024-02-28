@@ -2058,7 +2058,7 @@ __wt_extra_diagnostics_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONFIG_ITEM cval, sval;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
-    uint16_t flags;
+    uint64_t flags;
 
     conn = S2C(session);
 
@@ -2262,7 +2262,7 @@ __wt_json_config(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
-    uint8_t flags;
+    uint64_t flags;
 
     conn = S2C(session);
 
@@ -2431,7 +2431,7 @@ __wt_verbose_dump_sessions(WT_SESSION_IMPL *session, bool show_cursors)
 
     WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
     WT_RET(__wt_msg(session, "Active sessions: %" PRIu32 " Max: %" PRIu32,
-      S2C(session)->session_array.cnt, S2C(session)->session_array.size));
+      __wt_atomic_load32(&S2C(session)->session_array.cnt), S2C(session)->session_array.size));
 
     /*
      * While the verbose dump doesn't dump internal sessions it returns a count of them so we don't
@@ -2465,7 +2465,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     const WT_NAME_FLAG *ft;
-    uint32_t flags;
+    uint64_t flags;
 
     conn = S2C(session);
 

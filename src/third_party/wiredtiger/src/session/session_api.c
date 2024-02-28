@@ -416,8 +416,8 @@ __wt_session_close_internal(WT_SESSION_IMPL *session)
      * not be at the end of the array, step toward the beginning of the array until we reach an
      * active session.
      */
-    while (WT_CONN_SESSIONS_GET(conn)[conn->session_array.cnt - 1].active == 0)
-        if (--conn->session_array.cnt == 0)
+    while (WT_CONN_SESSIONS_GET(conn)[__wt_atomic_load32(&conn->session_array.cnt) - 1].active == 0)
+        if (__wt_atomic_sub32(&conn->session_array.cnt, 1) == 0)
             break;
 
     __wt_spin_unlock(session, &conn->api_lock);
@@ -2564,8 +2564,8 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * session count on error, as long as we don't mark this session as active, we'll clean it up on
      * close.
      */
-    if (i >= conn->session_array.cnt) /* Defend against off-by-one errors. */
-        conn->session_array.cnt = i + 1;
+    if (i >= __wt_atomic_load32(&conn->session_array.cnt)) /* Defend against off-by-one errors. */
+        __wt_atomic_store32(&conn->session_array.cnt, i + 1);
 
     /* Find the set of methods appropriate to this session. */
     if (F_ISSET(conn, WT_CONN_MINIMAL) && !F_ISSET(session, WT_SESSION_INTERNAL))
