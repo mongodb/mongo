@@ -12,7 +12,6 @@ selector:
   - build/install/bin/profile_filter_bm*
   - build/install/bin/query_settings_lookup_bm*
   - build/install/bin/plan_cache_key_encoding_bm*
-  - build/install/bin/canonical_query_bm*
 
 executor:
   config: {}
