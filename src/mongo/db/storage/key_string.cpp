@@ -336,7 +336,7 @@ const double kInvPow256[] = {1.0,                                             //
 
 const uint8_t kEnd = 0x4;
 
-// These overlay with CType or kEnd bytes and therefor must be less/greater than all of
+// These overlay with CType or kEnd bytes and therefore must be less/greater than all of
 // them (and their inverses). They also can't equal 0 or 255 since that would collide with
 // the encoding of NUL bytes in strings as "\x00\xff".
 const uint8_t kLess = 1;

@@ -21,7 +21,7 @@ Knowing there was a lot this touched we expected to see some bugs and were quick
 
 [SERVER-81122](https://jira.mongodb.org/browse/SERVER-81122) found that poetry broke the spawnhost script. This was caught after merge.
 
-[SERVER-81061](https://jira.mongodb.org/browse/SERVER-81061) and [BF-29909](https://jira.mongodb.org/browse/BF-29909) were found by sys-perf since they run their own build and do not use the standard build process. Therefor it was very hard to test for this one. This was caught post merge.
+[SERVER-81061](https://jira.mongodb.org/browse/SERVER-81061) and [BF-29909](https://jira.mongodb.org/browse/BF-29909) were found by sys-perf since they run their own build and do not use the standard build process. Therefore it was very hard to test for this one. This was caught post merge.
 
 [SERVER-80799](https://jira.mongodb.org/browse/SERVER-80799) found that poetry broke mongo tooling metrics collection (not OTel). This was only found since an engineer on the team saw this bug in the code. This was caught post merge.
 

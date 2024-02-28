@@ -1,0 +1,61 @@
+# Test indexes with an override to create v:1 indexes by default.
+# Based on replica_sets_jscore_passthrough.yml.
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # v:1 index does not support NumberDecimal.
+  - jstests/core/index/index_decimal.js
+  - jstests/core/query/distinct/distinct_semantics.js
+  - jstests/core/query/double_decimal_compare.js
+  - jstests/core/query/nan.js
+  # v:1 index does not support wildcard.
+  - jstests/core/index/wildcard/**/*.js
+  # v:1 index does not support collation.
+  - jstests/core/collation.js
+  - jstests/core/query/expr/expr_index_use.js
+  # Timeseries collections are clustered, which use v:2 indexes.
+  - jstests/core/timeseries/**/*.js
+  # Excluded by replica_sets_jscore_passthrough
+  - jstests/core/txns/abort_expired_transaction.js
+  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+  - jstests/core/txns/kill_op_on_txn_expiry.js
+  - jstests/core/**/set_param1.js
+  - jstests/core/query/awaitdata_getmore_cmd.js
+  - jstests/core/administrative/current_op/currentop.js
+  - jstests/core/fsync.js
+  - jstests/core/txns/prepare_conflict.js
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  - requires_profiling
+executor:
+  archive:
+    hooks:
+      - RunDBCheckInBackground
+      - CheckReplDBHashInBackground
+      - ValidateCollectionsInBackground
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        globalThis.testingReplication = true;
+        await import("jstests/libs/override_methods/create_v1_index.js");
+  hooks:
+  - class: RunDBCheckInBackground
+  - class: CheckReplDBHashInBackground
+  - class: ValidateCollectionsInBackground
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 2

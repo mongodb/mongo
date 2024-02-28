@@ -97,7 +97,7 @@ function killCurrentOpTest() {
 
         createCollFP.off();
 
-        // the current op was killed therefor the thread will throw an exception and wil return
+        // the current op was killed therefore the thread will throw an exception and wil return
         // code 252.
         const exitCode = parallelShell({checkExitSuccess: false});
         assert.neq(0, exitCode, "Expected shell to exit with failure due to operation kill");

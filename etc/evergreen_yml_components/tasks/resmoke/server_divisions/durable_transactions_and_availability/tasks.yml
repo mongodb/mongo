@@ -1347,3 +1347,11 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: timeseries_crud_jscore_passthrough
+
+- <<: *gen_task_template
+  name: v1index_jscore_passthrough_gen
+  tags: ["assigned_to_jira_team_server_execution", "misc_js"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: v1index_jscore_passthrough

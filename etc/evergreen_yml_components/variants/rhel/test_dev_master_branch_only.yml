@@ -481,6 +481,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
+  - name: v1index_jscore_passthrough_gen
   - name: vector_search
   - name: vector_search_auth
   - name: vector_search_ssl
