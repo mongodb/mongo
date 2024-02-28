@@ -309,7 +309,7 @@ private:
 
         const BSONElement getMetaElement() const;
 
-        StringData getMetaField() const;
+        boost::optional<StringData> getMetaField() const;
 
         const StringData::ComparatorInterface* getComparator() const;
 
