@@ -1909,7 +1909,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     // Pop off the current op context so we can get a fresh set of read concern settings
     // Allow the thread to be killable. If interrupted, the call to runCommand will fail with the
     // interruption.
-    auto client = _opCtx->getServiceContext()->getService()->makeClient("FLETagNoTXNQuery");
+    auto client = _opCtx->getService()->makeClient("FLETagNoTXNQuery");
 
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();
