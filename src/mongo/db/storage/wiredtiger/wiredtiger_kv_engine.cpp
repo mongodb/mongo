@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection_options_gen.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
@@ -485,6 +486,11 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
     }
     if (gWiredTigerStressConfig) {
         ss << "timing_stress_for_test=[history_store_checkpoint_delay,checkpoint_slow],";
+    }
+
+    if (gFeatureFlagPrefetch.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        ss << "prefetch=(available=true,default=false),";
     }
 
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())

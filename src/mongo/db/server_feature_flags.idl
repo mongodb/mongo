@@ -168,3 +168,8 @@ feature_flags:
         cpp_varname: gFeatureFlagOIDCMultipurposeIDP
         default: false
         shouldBeFCVGated: false
+    featureFlagPrefetch:
+        description: "Feature flag to make pre-fetching available"
+        cpp_varname: gFeatureFlagPrefetch
+        default: false
+        shouldBeFCVGated: false
