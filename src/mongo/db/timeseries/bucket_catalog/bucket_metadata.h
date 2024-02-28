@@ -53,7 +53,7 @@ public:
     const BSONObj& toBSON() const;
     const BSONElement& element() const;
 
-    StringData getMetaField() const;
+    boost::optional<StringData> getMetaField() const;
 
     const StringDataComparator* getComparator() const;
 
