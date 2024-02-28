@@ -89,7 +89,8 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
             !op.isPreparedCommit() &&
                 (op.getCommandType() != OplogEntry::CommandType::kApplyOps || !op.shouldPrepare()));
     if (op.isTerminalApplyOps()) {
-        if (op.getOpTime() <= _beginApplyingAfterOpTime) {
+        if (op.getOpTime() <= _beginApplyingAfterOpTime &&
+            op.getMultiOpType() != MultiOplogEntryType::kApplyOpsAppliedSeparately) {
             // Fetched for the sake of retryable commitTransaction, don't need to apply.
             return;
         }
@@ -101,7 +102,8 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
         auto lastOpInTransactionBson = op.getEntry().toBSON();
         repl::ApplyOps::extractOperationsTo(op, lastOpInTransactionBson, &curExpansion);
         auto oplogPrevTsOption = op.getPrevWriteOpTimeInTransaction();
-        if (oplogPrevTsOption && !oplogPrevTsOption->isNull()) {
+        if (op.applyOpsIsLinkedTransactionally() && oplogPrevTsOption &&
+            !oplogPrevTsOption->isNull()) {
             // Since 'extractOperationsTo' adds the operations to 'curExpansion' in chronological
             // order, but we traverse the oplog chain in reverse chronological order, we need to
             // reverse each set of operations from each 'applyOps', including the one in 'op', then

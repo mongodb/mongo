@@ -257,7 +257,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> createRetryableWritesOplogFetchingPip
                         foreignField: 'ts',\
                         pipeline: [{\
                             $match: {\
-                                ns: {$regex: '^" + tenantId + "_'}\
+                                $or: [\
+                                    {ns: {$regex: '^" + tenantId + "_'}}, \
+                                    {applyOpsNs: {$regex: '^" + tenantId +
+                                                                      "_'}}\
+                                ]\
                             }\
                         }],\
                         as: 'lastOps'\

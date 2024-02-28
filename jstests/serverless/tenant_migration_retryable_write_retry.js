@@ -17,6 +17,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
@@ -45,6 +46,15 @@ if (isShardMergeEnabled(donorRst.getPrimary().getDB("admin"))) {
     donorRst.stopSet();
     jsTestLog("Skipping this shard merge incompatible test.");
     quit();
+}
+
+let insertsPerOplogEntry = 1;
+if (FeatureFlagUtil.isPresentAndEnabled(donorRst.getPrimary(),
+                                        "ReplicateVectoredInsertsTransactionally")) {
+    // Ensure retryable insert generates multiple oplog entries.
+    insertsPerOplogEntry = 2;
+    assert.commandWorked(donorRst.getPrimary().adminCommand(
+        {setParameter: 1, internalInsertMaxBatchSize: insertsPerOplogEntry}));
 }
 
 const recipientRst = new ReplSetTest(
@@ -79,6 +89,9 @@ function getTagFromOplog(oplogEntry) {
     if (oplogEntry.op == "u") {
         return oplogEntry.o.$v === 1 ? oplogEntry.o.$set.tag : oplogEntry.o.diff.u.tag;
     }
+    if (oplogEntry.op == "c") {
+        return oplogEntry.o.applyOps[0].o.tag;
+    }
     throw Error("Unknown op type " + oplogEntry.op);
 }
 
@@ -99,7 +112,7 @@ assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
 }));
 sessionsOnDonor.push({
     txnEntry: getTxnEntry(lsid1),
-    numOplogEntries: 3,
+    numOplogEntries: Math.ceil(3 / insertsPerOplogEntry),
     tag: sessionTag1,
 });
 
@@ -194,6 +207,25 @@ sessionsOnDonor.push({
     txnEntry: getTxnEntry(lsid6),
     containsPreImage: true,
     numOplogEntries: 2,  // one pre-image oplog entry.
+});
+
+// Test single batch insert. This generates a single applyOps oplog entry when
+// ReplicateVectoredInsertsTransactionally is enabled; otherwise it is redundant with the batch
+// insert test.
+const lsid8 = {
+    id: UUID()
+};
+const sessionTag8 = "single-batch retryable insert";
+assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
+    insert: kCollName,
+    documents: [{x: 8, tag: sessionTag8}, {x: 9, tag: sessionTag8}],
+    txnNumber: NumberLong(0),
+    lsid: lsid8
+}));
+sessionsOnDonor.push({
+    txnEntry: getTxnEntry(lsid8),
+    numOplogEntries: Math.ceil(2 / insertsPerOplogEntry),
+    tag: sessionTag8,
 });
 
 // Example oplog entries output for the retryable findAndModify in session 'lsid6' where the first

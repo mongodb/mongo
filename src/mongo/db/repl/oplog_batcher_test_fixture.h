@@ -136,6 +136,11 @@ std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(
     const DatabaseName& dbName,
     bool prepared,
     std::vector<std::vector<OplogEntry>> innerOps);
+std::vector<OplogEntry> makeRetryableApplyOpsOplogEntries(
+    int t,
+    const DatabaseName& dbName,
+    const OperationSessionInfo& sessionInfo,
+    std::vector<std::vector<OplogEntry>> innerOps);
 std::string toString(const std::vector<OplogEntry>& ops);
 }  // namespace repl
 }  // namespace mongo

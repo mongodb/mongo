@@ -482,6 +482,57 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
 }
 
 /**
+ * Creates oplog entries that are meant to be all parts of a batched retryable write. This function
+ * does the following:
+ *
+ * 1. We add multiOpType: 1 to all entries.
+ * 2. We add a statement ID to all entries.
+ * 3. If we intend to make the first oplog entry of the write, we add a Null prevOptime to
+ *    denote that there is no entry that comes before this one.
+ */
+OplogEntry makeLargeRetryableWriteOplogEntries(int t,
+                                               bool isFirst,
+                                               const OperationSessionInfo& sessionInfo,
+                                               StmtId startingStmtId,
+                                               const std::vector<OplogEntry> innerOps) {
+    auto nss = NamespaceString::createNamespaceString_forTest(DatabaseName::kAdmin).getCommandNS();
+    OpTime prevWriteOpTime = isFirst ? OpTime() : OpTime(Timestamp(t - 1, 1), 1);
+    BSONObj oField;
+    BSONObjBuilder oFieldBuilder;
+    BSONArrayBuilder applyOpsBuilder = oFieldBuilder.subarrayStart("applyOps");
+    for (const auto& op : innerOps) {
+        applyOpsBuilder.append(op.getDurableReplOperation().toBSON().addField(
+            BSON("stmtId" << startingStmtId).firstElement()));
+        startingStmtId++;
+    }
+    applyOpsBuilder.doneFast();
+    oField = oFieldBuilder.obj();
+    auto durableEntry =
+        DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                          OpTypeEnum::kCommand,        // op type
+                          nss,                         // namespace
+                          boost::none,                 // uuid
+                          boost::none,                 // fromMigrate
+                          boost::none,                 // checkExistenceForDiffInsert
+                          OplogEntry::kOplogVersion,   // version
+                          oField,                      // o
+                          boost::none,                 // o2
+                          sessionInfo,                 // sessionInfo
+                          boost::none,                 // upsert
+                          Date_t() + Seconds(t),       // wall clock time
+                          {},                          // statement ids
+                          prevWriteOpTime,  // optime of previous write within same transaction
+                          boost::none,      // pre-image optime
+                          boost::none,      // post-image optime
+                          boost::none,      // ShardId of resharding recipient
+                          boost::none,      // _id
+                          boost::none);     // needsRetryImage
+    return unittest::assertGet(OplogEntry::parse(durableEntry.toBSON().addField(
+        BSON(OplogEntry::kMultiOpTypeFieldName << MultiOplogEntryType::kApplyOpsAppliedSeparately)
+            .firstElement())));
+}
+
+/**
  * Generates a mock large-transaction which has more than one oplog entry.
  */
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
@@ -518,6 +569,24 @@ std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(
             i + 1,
             count,
             i < innerOps.size() ? innerOps[i] : std::vector<OplogEntry>()));
+    }
+    return vec;
+}
+
+/**
+ * Generates a mock applyOps retryable write which contains the operations in innerOps.
+ */
+std::vector<OplogEntry> makeRetryableApplyOpsOplogEntries(
+    int t,
+    const DatabaseName& dbName,
+    const OperationSessionInfo& sessionInfo,
+    std::vector<std::vector<OplogEntry>> innerOps) {
+    StmtId nextStmtId{0};
+    std::vector<OplogEntry> vec;
+    for (std::size_t i = 0; i < innerOps.size(); i++) {
+        vec.push_back(makeLargeRetryableWriteOplogEntries(
+            t + i, i == 0, sessionInfo, nextStmtId, innerOps[i]));
+        nextStmtId += innerOps[i].size();
     }
     return vec;
 }

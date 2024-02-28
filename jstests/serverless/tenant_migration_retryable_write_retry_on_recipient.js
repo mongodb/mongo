@@ -13,6 +13,7 @@
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {Thread} from "jstests/libs/parallelTester.js";
 import {extractUUIDFromObject} from "jstests/libs/uuid_util.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
@@ -141,6 +142,11 @@ function setupRetryableWritesForCollection(collName) {
 
 const beforeWrites = setupRetryableWritesForCollection(kCollNameBefore);
 const duringWrites = setupRetryableWritesForCollection(kCollNameDuring);
+
+// Ensure retryable insert generates multiple oplog entries.
+if (FeatureFlagUtil.isPresentAndEnabled(donorDb, "ReplicateVectoredInsertsTransactionally")) {
+    assert.commandWorked(donorDb.adminCommand({setParameter: 1, internalInsertMaxBatchSize: 2}));
+}
 
 jsTestLog("Run retryable writes before the migration");
 

@@ -215,6 +215,17 @@ public:
         ASSERT_EQ(_migrationUuid, noOp.getFromTenantMigration());
     }
 
+    void assertSessionApplyOpsNoOpMatches(const OplogEntry& op, const MutableOplogEntry& noOp) {
+        ASSERT_BSONOBJ_EQ(op.getEntry().toBSON(), *noOp.getObject2());
+        // TODO(SERVER-87214): The need to use the logging string here is a result of not
+        // running the tests with multitenancy support.
+        ASSERT_EQ(toStringForLogging(
+                      NamespaceString::createNamespaceString_forTest(_dbName.tenantId(), "")),
+                  toStringForLogging(noOp.getNss()));
+        ASSERT_EQ(op.getUuid(), noOp.getUuid());
+        ASSERT_EQ(_migrationUuid, noOp.getFromTenantMigration());
+    }
+
     void pushOps(const std::vector<OplogEntry>& ops) {
         std::vector<BSONObj> bsonOps;
         for (const auto& op : ops) {
@@ -431,6 +442,99 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
     applier->shutdown();
     _oplogBuffer.shutdown(_opCtx.get());
     applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, NoOpsForLargeRetryableApplyOps) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    {
+        DBDirectClient client(_opCtx.get());
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
+                             {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
+    }
+    std::vector<OplogEntry> innerOps1;
+    innerOps1.push_back(makeInsertOplogEntry(11,
+                                             NamespaceString::createNamespaceString_forTest(
+                                                 _dbName.toStringWithTenantId_forTest(), "bar"),
+                                             UUID::gen()));
+    innerOps1.push_back(makeInsertOplogEntry(12,
+                                             NamespaceString::createNamespaceString_forTest(
+                                                 _dbName.toStringWithTenantId_forTest(), "bar"),
+                                             UUID::gen()));
+    std::vector<OplogEntry> innerOps2;
+    innerOps2.push_back(makeInsertOplogEntry(21,
+                                             NamespaceString::createNamespaceString_forTest(
+                                                 _dbName.toStringWithTenantId_forTest(), "bar"),
+                                             UUID::gen()));
+    innerOps2.push_back(makeInsertOplogEntry(22,
+                                             NamespaceString::createNamespaceString_forTest(
+                                                 _dbName.toStringWithTenantId_forTest(), "bar"),
+                                             UUID::gen()));
+    std::vector<OplogEntry> innerOps3;
+    innerOps3.push_back(makeInsertOplogEntry(31,
+                                             NamespaceString::createNamespaceString_forTest(
+                                                 _dbName.toStringWithTenantId_forTest(), "bar"),
+                                             UUID::gen()));
+    innerOps3.push_back(makeInsertOplogEntry(32,
+                                             NamespaceString::createNamespaceString_forTest(
+                                                 _dbName.toStringWithTenantId_forTest(), "bar"),
+                                             UUID::gen()));
+
+    // Retryable writes need session information.
+    OperationSessionInfo sessionInfo;
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(5);
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNum);
+
+    // Makes entries with ts from range [2, 5).
+    std::vector<OplogEntry> srcOps = makeRetryableApplyOpsOplogEntries(
+        2, _dbName, sessionInfo, {innerOps1, innerOps2, innerOps3});
+    pushOps(srcOps);
+    for (auto&& op : srcOps) {
+        LOGV2(98789, "Test applyops", "op"_attr = op.toBSONForLogging());
+    }
+
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier =
+        std::make_shared<TenantOplogApplier>(_migrationUuid,
+                                             MigrationProtocolEnum::kMultitenantMigrations,
+                                             OpTime(),
+                                             kDefaultCloneFinishedRecipientOpTime,
+                                             _tenantId,
+                                             &_oplogBuffer,
+                                             _executor,
+                                             writerPool.get());
+    ASSERT_OK(applier->startup());
+    // All three ops should come in the same batch.
+    auto firstBatchFuture = applier->getNotificationForOpTime(srcOps[0].getOpTime());
+    ASSERT_EQ(srcOps[2].getOpTime(), firstBatchFuture.get().donorOpTime);
+    applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
+    applier->join();
+
+    // The session path in TenantOplogApplier bypasses the opObserver, so we can only read
+    // the entries from the oplog.
+    CollectionReader oplogReader(_opCtx.get(), NamespaceString::kRsOplogNamespace);
+    StatusWith<BSONObj> swOp = oplogReader.next();
+    // Oplog entries hold references to the original parsed object, so we must hold onto those
+    // objects.
+    std::vector<BSONObj> bsonEntries;
+    std::vector<MutableOplogEntry> entries;
+    while (swOp.isOK()) {
+        auto bsonEntry = swOp.getValue().getOwned();
+        auto entry = unittest::assertGet(MutableOplogEntry::parse(bsonEntry));
+        if (entry.getOpType() == OpTypeEnum::kNoop &&
+            entry.getFromTenantMigration() == _migrationUuid) {
+            bsonEntries.push_back(bsonEntry);
+            entries.push_back(entry);
+        }
+        swOp = oplogReader.next();
+    }
+    ASSERT_EQ(srcOps.size(), entries.size());
+    for (size_t i = 0; i < srcOps.size(); i++) {
+        assertSessionApplyOpsNoOpMatches(srcOps[i], entries[i]);
+    }
 }
 
 TEST_F(TenantOplogApplierTest, CommitUnpreparedTransaction_DataPartiallyApplied) {
