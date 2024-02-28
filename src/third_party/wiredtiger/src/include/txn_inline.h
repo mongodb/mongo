@@ -907,6 +907,8 @@ static WT_INLINE bool
 __wt_txn_snap_min_visible(
   WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t timestamp, wt_timestamp_t durable_timestamp)
 {
+    WT_ASSERT(session, F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
+
     /* Transaction snapshot minimum check. */
     if (!WT_TXNID_LT(id, session->txn->snapshot_data.snap_min))
         return (false);

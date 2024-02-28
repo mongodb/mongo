@@ -335,6 +335,8 @@ struct __wt_page_index;
 typedef struct __wt_page_index WT_PAGE_INDEX;
 struct __wt_page_modify;
 typedef struct __wt_page_modify WT_PAGE_MODIFY;
+struct __wt_page_walk_skip_stats;
+typedef struct __wt_page_walk_skip_stats WT_PAGE_WALK_SKIP_STATS;
 struct __wt_prefetch;
 typedef struct __wt_prefetch WT_PREFETCH;
 struct __wt_prefetch_queue_entry;

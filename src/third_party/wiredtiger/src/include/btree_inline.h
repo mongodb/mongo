@@ -1593,6 +1593,27 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
 }
 
 /*
+ * __wt_get_page_modify_ta --
+ *     Returns the page modify stop time aggregate information if exists.
+ */
+static inline bool
+__wt_get_page_modify_ta(WT_SESSION_IMPL *session, WT_PAGE *page, WT_TIME_AGGREGATE **ta)
+{
+    WT_ASSERT_ALWAYS(session, __wt_session_gen(session, WT_GEN_SPLIT) != 0,
+      "Any thread accessing ref address must hold a valid split generation");
+
+    /* If NULL, there is no information. */
+    if (page->modify == NULL)
+        return (false);
+
+    if (page->modify->stop_ta == NULL)
+        return (false);
+
+    WT_READ_ONCE(*ta, page->modify->stop_ta);
+    return (*ta != NULL);
+}
+
+/*
  * __wt_ref_block_free --
  *     Free the on-disk block for a reference and clear the address.
  */
@@ -2296,7 +2317,10 @@ __wt_btcur_skip_page(
 {
     WT_ADDR_COPY addr;
     WT_BTREE *btree;
+    WT_PAGE_WALK_SKIP_STATS *walk_skip_stats;
+    WT_TIME_AGGREGATE *ta;
     uint8_t previous_state;
+    bool clean_page;
 
     WT_UNUSED(context);
     WT_UNUSED(visible_all);
@@ -2304,6 +2328,9 @@ __wt_btcur_skip_page(
     *skipp = false; /* Default to reading */
 
     btree = S2BT(session);
+    walk_skip_stats = (WT_PAGE_WALK_SKIP_STATS *)context;
+    ta = NULL;
+    clean_page = false;
 
     /* Don't skip pages in FLCS trees; deleted records need to read back as 0. */
     if (btree->type == BTREE_COL_FIX)
@@ -2344,20 +2371,19 @@ __wt_btcur_skip_page(
      */
     if (previous_state == WT_REF_DELETED && __wt_page_del_visible(session, ref->page_del, true)) {
         *skipp = true;
+        walk_skip_stats->total_del_pages_skipped++;
         goto unlock;
     }
 
-    /*
-     * Look at the disk address, if it exists, and if the page is unmodified. We must skip this test
-     * if the page has been modified since it was reconciled, since neither the delete information
-     * nor the timestamp information is necessarily up to date.
-     */
-    if ((previous_state == WT_REF_DISK ||
-          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
-      __wt_ref_addr_copy(session, ref, &addr)) {
+    if (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))
+        clean_page = true;
+
+    /* Look at the disk address, if it exists. */
+    if ((previous_state == WT_REF_DISK || clean_page) && __wt_ref_addr_copy(session, ref, &addr)) {
         /* If there's delete information in the disk address, we can use it. */
         if (addr.del_set && __wt_page_del_visible(session, &addr.del, true)) {
             *skipp = true;
+            walk_skip_stats->total_del_pages_skipped++;
             goto unlock;
         }
 
@@ -2365,12 +2391,23 @@ __wt_btcur_skip_page(
          * Otherwise, check the timestamp information. We base this decision on the aggregate stop
          * point added to the page during the last reconciliation.
          */
-        if (addr.ta.newest_stop_txn != WT_TXN_MAX && addr.ta.newest_stop_ts != WT_TS_MAX &&
+        if (WT_TIME_AGGREGATE_HAS_STOP(&addr.ta) &&
           __wt_txn_snap_min_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts,
             addr.ta.newest_stop_durable_ts)) {
             *skipp = true;
-            goto unlock;
+            walk_skip_stats->total_del_pages_skipped++;
         }
+    } else if (clean_page && __wt_get_page_modify_ta(session, ref->page, &ta) &&
+      __wt_txn_snap_min_visible(
+        session, ta->newest_stop_txn, ta->newest_stop_ts, ta->newest_stop_durable_ts)) {
+        /*
+         * If the reader can see all of the deleted content, they can skip a deleted clean page.
+         * Before determining whether the deleted page is visible, copy the stop time aggregate
+         * information pointer because as part of the checkpoint operation, this pointer can be
+         * released in parallel.
+         */
+        *skipp = true;
+        walk_skip_stats->total_inmem_del_pages_skipped++;
     }
 
 unlock:

@@ -432,6 +432,13 @@ struct __wt_page_modify {
     WT_OVFL_TRACK *ovfl_track;
 
     /*
+     * Stop aggregated timestamp information when all the keys on the page are removed. This time
+     * aggregate information is used to skip these deleted pages as part of the tree walk if the
+     * delete operation is visible to the reader.
+     */
+    wt_shared WT_TIME_AGGREGATE *stop_ta;
+
+    /*
      * Page-delete information for newly instantiated deleted pages. The instantiated flag remains
      * set until the page is reconciled successfully; this indicates that the page_del information
      * in the ref remains valid. The update list remains set (if set at all) until the transaction
@@ -789,6 +796,15 @@ struct __wt_page {
  */
 #define WT_PAGE_DISK_OFFSET(page, p) WT_PTRDIFF32(p, (page)->dsk)
 #define WT_PAGE_REF_OFFSET(page, o) ((void *)((uint8_t *)((page)->dsk) + (o)))
+
+/*
+ * WT_PAGE_WALK_SKIP_STATS --
+ *	Statistics to track how many deleted pages are skipped as part of the tree walk.
+ */
+struct __wt_page_walk_skip_stats {
+    size_t total_del_pages_skipped;
+    size_t total_inmem_del_pages_skipped;
+};
 
 /*
  * Prepare states.
