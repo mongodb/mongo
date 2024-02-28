@@ -58,11 +58,14 @@ a notice will be included in
 | [TomCrypt]                 | Public Domain                                                  | 1.18.2                                             |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015                                               | 8.0.0                                              |          ✗           |                ✗                |
 | [libunwind]                | MIT                                                            | 1.6.2 + changes                                    |                      |                ✗                |
+| [lz4]                      | BSD-2-Clause                                                   | 1.9.3                                              |                      |                ✗                |
 | [Valgrind]                 | BSD-4-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.17.0                                             |                      |                ✗                |
 | [wiredtiger]               |                                                                | <sup>\[<a href="#note_wt" id="ref_wt">2</a>]</sup> |          ✗           |                ✗                |
+| [xxHash]                   | BSD-2-Clause                                                   | 0.8.0                                              |                      |                ✗                |
 | [yaml-cpp]                 | MIT                                                            | 0.6.3                                              |                      |                ✗                |
 | [Zlib]                     | Zlib                                                           | 1.3                                                |          ✗           |                ✗                |
 | [Zstandard]                | BSD-3-Clause                                                   | 1.5.5                                              |          ✗           |                ✗                |
+| [zydis]                    | MIT                                                            | 4d4fe4c293c5438f32688b14b29017ae3f48369e           |                      |                ✗                |
 
 [abseil-cpp]: https://github.com/abseil/abseil-cpp
 [ASIO]: https://github.com/chriskohlhoff/asio
@@ -81,6 +84,7 @@ a notice will be included in
 [librdkafka]: https://github.com/confluentinc/librdkafka
 [libmongocrypt]: https://github.com/mongodb/libmongocrypt
 [linenoise]: https://github.com/antirez/linenoise
+[lz4]: https://github.com/lz4/lz4
 [mongo-c-driver]: https://github.com/mongodb/mongo-c-driver
 [MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr
 [MurmurHash3]: https://github.com/aappleby/smhasher/blob/a6bd3ce/
@@ -100,9 +104,11 @@ a notice will be included in
 [libunwind]: http://www.nongnu.org/libunwind/
 [Valgrind]: http://valgrind.org/downloads/current.html
 [wiredtiger]: https://github.com/wiredtiger/wiredtiger
+[xxHash]: https://github.com/Cyan4973/xxHash
 [yaml-cpp]: https://github.com/jbeder/yaml-cpp/releases
 [Zlib]: https://zlib.net/
 [Zstandard]: https://github.com/facebook/zstd
+[zydis]: https://github.com/zyantific/zydis
 
 ## WiredTiger Vendored Test Libraries
 
