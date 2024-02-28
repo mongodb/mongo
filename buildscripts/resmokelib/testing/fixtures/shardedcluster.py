@@ -52,6 +52,9 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
             mongod_options.get("set_parameters", {})).copy()
         self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = \
                 self.mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
+        # Extend time for transactions by default to account for slow machines during testing.
+        self.mongod_options["set_parameters"]["maxTransactionLockRequestTimeoutMillis"] = \
+                self.mongod_options["set_parameters"].get("maxTransactionLockRequestTimeoutMillis", 10 * 1000)
 
         # Misc other options for the fixture.
         self.config_shard = config_shard
