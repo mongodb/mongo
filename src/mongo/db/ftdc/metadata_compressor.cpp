@@ -67,11 +67,24 @@ public:
     }
 
     void push(StringData sd) {
-        _stack.emplace_back(sd, nullptr);
+        _stack.emplace_back(sd);
     }
 
     void append(const BSONElement& elt) {
         activateBuilders().append(elt);
+    }
+
+    // If the builder at the current level is not yet created, this stashes the given element
+    // until the subobject builder at that level is created, during which stashed elements are
+    // appended to it in the order they were stashed.
+    void stashOrAppend(const BSONElement& elt) {
+        if (_stack.empty()) {
+            _root->append(elt);
+        } else if (_stack.back().builder) {
+            _stack.back().builder->append(elt);
+        } else {
+            _stack.back().stash.push_back(elt);
+        }
     }
 
     void pop() {
@@ -85,21 +98,32 @@ public:
 
 private:
     BSONObjBuilder& activateBuilders() {
-        if (!_stack.empty() && _stack.back().second) {
-            return *(_stack.back().second);
+        if (!_stack.empty() && _stack.back().builder) {
+            return *(_stack.back().builder);
         }
 
         BSONObjBuilder* prevBuilder = _root;
-        for (auto& [name, optBuilder] : _stack) {
-            if (!optBuilder) {
-                optBuilder = std::make_unique<BSONObjBuilder>(prevBuilder->subobjStart(name));
+        for (auto& frame : _stack) {
+            if (!frame.builder) {
+                frame.builder =
+                    std::make_unique<BSONObjBuilder>(prevBuilder->subobjStart(frame.name));
+                for (auto& element : frame.stash) {
+                    frame.builder->append(element);
+                }
+                frame.stash.clear();
             }
-            prevBuilder = optBuilder.get();
+            prevBuilder = frame.builder.get();
         }
         return *prevBuilder;
     }
 
-    std::vector<std::pair<StringData, std::unique_ptr<BSONObjBuilder>>> _stack;
+    struct JITBSONObjBuilderStackFrame {
+        JITBSONObjBuilderStackFrame(StringData subObjectName) : name(subObjectName){};
+        StringData name;
+        std::unique_ptr<BSONObjBuilder> builder{nullptr};
+        std::vector<BSONElement> stash;
+    };
+    std::vector<JITBSONObjBuilderStackFrame> _stack;
     BSONObjBuilder* _root;
 };
 
@@ -116,7 +140,6 @@ boost::optional<bool> compareAndBuildDeltaFinal(BSONObj reference,
     }
 
     // Holds any elements that don't need to appear if no substantial changes were found
-    std::vector<BSONElement> stash;
     bool hasChanges = false;
 
     BSONObjIterator sampleItr(sample);
@@ -130,22 +153,12 @@ boost::optional<bool> compareAndBuildDeltaFinal(BSONObj reference,
 
         if (fieldName == "start"_sd || fieldName == "end"_sd) {
             dassert(sampleElement.type() == BSONType::Date);
-            if (hasChanges) {
-                builder->append(sampleElement);
-            } else {
-                stash.push_back(sampleElement);
-            }
+            builder->stashOrAppend(sampleElement);
             continue;
         }
 
         if (sampleElement.woCompare(refElement) != 0) {
-            if (!hasChanges) {
-                for (auto& elt : stash) {
-                    builder->append(elt);
-                }
-                stash.clear();
-                hasChanges = true;
-            }
+            hasChanges = true;
             builder->append(sampleElement);
         }
     }
@@ -161,8 +174,7 @@ boost::optional<bool> compareAndBuildDeltaFinal(BSONObj reference,
 boost::optional<bool> compareAndBuildDelta(BSONObj reference,
                                            BSONObj sample,
                                            JITBSONObjBuilderStack* builder,
-                                           size_t maxDepth,
-                                           bool hasDates) {
+                                           size_t maxDepth) {
     dassert(maxDepth > 0);
 
     if (!haveSameFields(reference, sample)) {
@@ -179,9 +191,9 @@ boost::optional<bool> compareAndBuildDelta(BSONObj reference,
         auto sampleElement = sampleItr.next();
         auto fieldName = sampleElement.fieldNameStringData();
 
-        if (hasDates && (fieldName == "start"_sd || fieldName == "end"_sd)) {
+        if (fieldName == "start"_sd || fieldName == "end"_sd) {
             dassert(sampleElement.type() == BSONType::Date);
-            builder->append(sampleElement);
+            builder->stashOrAppend(sampleElement);
             continue;
         }
 
@@ -195,8 +207,7 @@ boost::optional<bool> compareAndBuildDelta(BSONObj reference,
         if (maxDepth == 1) {
             cleanCompare = compareAndBuildDeltaFinal(refSubObj, sampleSubObj, builder);
         } else {
-            cleanCompare =
-                compareAndBuildDelta(refSubObj, sampleSubObj, builder, maxDepth - 1, false);
+            cleanCompare = compareAndBuildDelta(refSubObj, sampleSubObj, builder, maxDepth - 1);
         }
         builder->pop();
 
@@ -248,11 +259,8 @@ boost::optional<BSONObj> FTDCMetadataCompressor::addSample(const BSONObj& sample
     BSONObjBuilder deltaDocBuilder;
     JITBSONObjBuilderStack jitBuilderStack(&deltaDocBuilder);
 
-    auto cleanCompare = compareAndBuildDelta(_referenceDoc,
-                                             sample,
-                                             &jitBuilderStack,
-                                             _multiServiceSchema ? 2 : 1 /*maxDepth*/,
-                                             true /*hasDates*/);
+    auto cleanCompare = compareAndBuildDelta(
+        _referenceDoc, sample, &jitBuilderStack, _multiServiceSchema ? 2 : 1 /*maxDepth*/);
     if (!cleanCompare.has_value()) {
         _reset(sample);
         return sample;

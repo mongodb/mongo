@@ -147,6 +147,24 @@ void registerShardCollectors(FTDCController* controller) {
                                     << BSON("waitForLock" << false << "numericOnly" << true)))))),
             ClusterRole::ShardServer);
     }
+    controller->addPeriodicMetadataCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "getParameter",
+            "getParameter",
+            DatabaseName::kEmpty,
+            BSON("getParameter" << BSON("allParameters" << true << "setAt"
+                                                        << "runtime"))),
+        ClusterRole::ShardServer);
+
+    controller->addPeriodicMetadataCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>("getClusterParameter",
+                                                             "getClusterParameter",
+                                                             DatabaseName::kEmpty,
+                                                             BSON("getClusterParameter"
+                                                                  << "*"
+                                                                  << "omitInFTDC" << true)),
+        ClusterRole::ShardServer);
+
 
     controller->addPeriodicCollector(std::make_unique<FTDCCollectionStatsCollector>(),
                                      ClusterRole::ShardServer);

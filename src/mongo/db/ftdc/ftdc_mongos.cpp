@@ -122,6 +122,24 @@ void registerRouterCollectors(FTDCController* controller) {
 
     controller->addPeriodicCollector(std::make_unique<NetworkInterfaceStatsCollector>(),
                                      ClusterRole::RouterServer);
+
+    controller->addPeriodicMetadataCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "getParameter",
+            "getParameter",
+            DatabaseName::kEmpty,
+            BSON("getParameter" << BSON("allParameters" << true << "setAt"
+                                                        << "runtime"))),
+        ClusterRole::RouterServer);
+
+    controller->addPeriodicMetadataCollector(
+        std::make_unique<FTDCSimpleInternalCommandCollector>("getClusterParameter",
+                                                             "getClusterParameter",
+                                                             DatabaseName::kEmpty,
+                                                             BSON("getClusterParameter"
+                                                                  << "*"
+                                                                  << "omitInFTDC" << true)),
+        ClusterRole::RouterServer);
 }
 
 void startMongoSFTDC(ServiceContext* serviceContext) {

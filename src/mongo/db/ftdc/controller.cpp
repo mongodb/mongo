@@ -73,6 +73,12 @@ Status FTDCController::setEnabled(bool enabled) {
     return Status::OK();
 }
 
+void FTDCController::setMetadataCaptureFrequency(std::uint64_t freq) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    _configTemp.metadataCaptureFrequency = freq;
+    _condvar.notify_one();
+}
+
 void FTDCController::setPeriod(Milliseconds millis) {
     stdx::lock_guard<Latch> lock(_mutex);
     _configTemp.period = millis;
@@ -119,6 +125,14 @@ Status FTDCController::setDirectory(const boost::filesystem::path& path) {
     return Status::OK();
 }
 
+
+void FTDCController::addPeriodicMetadataCollector(std::unique_ptr<FTDCCollectorInterface> collector,
+                                                  ClusterRole role) {
+    stdx::lock_guard<Latch> lock(_mutex);
+    invariant(_state == State::kNotStarted);
+
+    _periodicMetadataCollectors.add(std::move(collector), role);
+}
 
 void FTDCController::addPeriodicCollector(std::unique_ptr<FTDCCollectorInterface> collector,
                                           ClusterRole role) {
@@ -213,6 +227,11 @@ void FTDCController::doLoop(Service* service) noexcept {
         _config = _configTemp;
     }
 
+    // Periodic metadata is collected when metadataCaptureFrequencyCountdown hits 0 (which will
+    // always include the first iteration). Then, the value of metadataCaptureFrequencyCountdown is
+    // reset to _config.metadataCaptureFrequency and countdown starts again.
+    std::uint64_t metadataCaptureFrequencyCountdown = 1;
+
     while (true) {
         // Compute the next interval to run regardless of how we were woken up
         // Skipping an interval due to a race condition with a config signal is harmless.
@@ -271,6 +290,15 @@ void FTDCController::doLoop(Service* service) noexcept {
             {
                 stdx::lock_guard<Latch> lock(_mutex);
                 _mostRecentPeriodicDocument = std::get<0>(collectSample);
+            }
+
+            if (--metadataCaptureFrequencyCountdown == 0) {
+                metadataCaptureFrequencyCountdown = _config.metadataCaptureFrequency;
+                auto collectSample =
+                    _periodicMetadataCollectors.collect(client, _multiServiceSchema);
+                Status s = _mgr->writePeriodicMetadataSampleAndRotateIfNeeded(
+                    client, std::get<0>(collectSample), std::get<1>(collectSample));
+                iassert(s);
             }
         }
     }
