@@ -42,7 +42,6 @@ void InsertionOrderedColumnMap::initBuilders(BSONObj bucketDataDocWithCompressed
     for (auto&& [key, columnValue] : bucketDataDocWithCompressedBuilders) {
         int binLength = 0;
         const char* binData = columnValue.binData(binLength);
-        // TODO(SERVER-84234): Handle BSONColumnConstructor throwing.
         // TODO SERVER-79416: Use BSONColumnBuilder reopen constructor. It leaves the builder in a
         // diff-producing state so this needs to be integrated together with the intermediate()
         // call.
