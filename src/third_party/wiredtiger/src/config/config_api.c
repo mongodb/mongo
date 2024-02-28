@@ -160,17 +160,6 @@ wiredtiger_config_validate(
 }
 
 /*
- * wiredtiger_test_config_validate --
- *     Validate a test configuration string.
- */
-int
-wiredtiger_test_config_validate(
-  WT_SESSION *wt_session, WT_EVENT_HANDLER *event_handler, const char *name, const char *config)
-{
-    return (__config_validate(wt_session, event_handler, name, config, __wt_test_config_match));
-}
-
-/*
  * __conn_foc_add --
  *     Add a new entry into the connection's free-on-close list.
  */

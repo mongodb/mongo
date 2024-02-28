@@ -3847,12 +3847,6 @@ int wiredtiger_config_validate(WT_SESSION *session,
     WT_EVENT_HANDLER *event_handler, const char *name, const char *config)
     WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
-/*
- * Validate a configuration string for a WiredTiger test program.
- */
-int wiredtiger_test_config_validate(WT_SESSION *session,
-    WT_EVENT_HANDLER *event_handler, const char *name, const char *config)
-    WT_ATTRIBUTE_LIBRARY_VISIBLE;
 #endif
 
 /*!

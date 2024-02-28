@@ -15,7 +15,6 @@ wiredtiger_strerror
 wiredtiger_struct_pack
 wiredtiger_struct_size
 wiredtiger_struct_unpack
-wiredtiger_test_config_validate
 wiredtiger_unpack_int
 wiredtiger_unpack_item
 wiredtiger_unpack_start
