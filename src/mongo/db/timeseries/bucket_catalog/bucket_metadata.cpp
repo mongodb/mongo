@@ -107,8 +107,9 @@ BSONElement BucketMetadata::element() const {
     return _metadataElement;
 }
 
-StringData BucketMetadata::getMetaField() const {
-    return StringData(_metadataElement.fieldName());
+boost::optional<StringData> BucketMetadata::getMetaField() const {
+    return _metadataElement ? boost::make_optional(_metadataElement.fieldNameStringData())
+                            : boost::none;
 }
 
 const StringDataComparator* BucketMetadata::getComparator() const {
