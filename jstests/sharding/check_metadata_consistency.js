@@ -51,14 +51,17 @@ function assertNoInconsistencies() {
     });
 }
 
-function assertCollectionOptionsMismatch(inconsistencies, expectedOptions) {
+function assertCollectionOptionsMismatch(inconsistencies, expectedOptionsWithShards) {
     assert(inconsistencies.some(object => {
         return (object.type === "CollectionOptionsMismatch" &&
-                expectedOptions.every(expectedO => object.details.options.some(
-                                          o => tojson(o.options) === tojson(expectedO))));
+                expectedOptionsWithShards.every(expectedO => object.details.options.some(o => {
+                    return tojson(o.shards) == tojson(expectedO.shards) &&
+                        Object.keys(expectedO.options)
+                            .every(key => tojson(o.options[key]) == tojson(expectedO.options[key]));
+                })));
     }),
-           "Expected CollectionOptionsMismatch options: " + tojson(expectedOptions) + ", but got " +
-               tojson(inconsistencies));
+           "Expected CollectionOptionsMismatch options: " + tojson(expectedOptionsWithShards) +
+               ", but got " + tojson(inconsistencies));
 }
 
 // TODO SERVER-77915 We can get rid of isTrackedByConfigServer method once all unsharded collections
@@ -438,10 +441,10 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     // drop the collection on the primary and still catch the inconsistency
     primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
     let inconsistencies_key2 = db.checkMetadataConsistency().toArray();
-    assert.eq(1, inconsistencies_key2.length);
-    assert.eq("TrackedUnshardedCollectionHasInvalidKey",
-              inconsistencies_key2[0].type,
-              tojson(inconsistencies_key2[0]));
+    assert.neq(0, inconsistencies_key2.length);
+    assert(inconsistencies_key2.some(object =>
+                                         object.type === "TrackedUnshardedCollectionHasInvalidKey"),
+           tojson(inconsistencies_key2));
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
@@ -459,6 +462,11 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     const kSourceCollName = "tracked_collection";
     const kNss = db.getName() + "." + kSourceCollName;
     const kBucketNss = db.getName() + ".system.buckets." + kSourceCollName;
+    const primaryShard = st.shard0;
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
 
     // Create a timeseries sharded collection.
     assert.commandWorked(db.adminCommand({
@@ -473,14 +481,15 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     // Update the granularity on the sharding catalog only and catch the inconsistency.
     assert.commandWorked(configDB.collections.update(
         {_id: kBucketNss}, {$set: {'timeseriesFields.granularity': "seconds"}}));
-    let configTimeseries = localTimeseries;
+    let configTimeseries = Object.assign({}, localTimeseries);
     configTimeseries.granularity = "seconds";
 
     const inconsistencies = db.checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length);
-    assertCollectionOptionsMismatch(
-        inconsistencies,
-        [{timeseriesFields: localTimeseries}, {timeseriesFields: configTimeseries}]);
+    assertCollectionOptionsMismatch(inconsistencies, [
+        {shards: [primaryShard.shardName], options: {timeseriesFields: localTimeseries}},
+        {shards: ["config"], options: {timeseriesFields: configTimeseries}}
+    ]);
 
     // Clean up the database to pass the hooks that detect inconsistencies.
     db.dropDatabase();
@@ -498,6 +507,11 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     const db = getNewDb();
     const kSourceCollName = "tracked_collection";
     const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
 
     // Create a collection with a specific default collation.
     assert.commandWorked(db.runCommand({create: kSourceCollName, collation: {locale: "ca"}}));
@@ -522,8 +536,10 @@ function isFcvGraterOrEqualTo(fcvRequired) {
 
     const inconsistencies = db.checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length);
-    assertCollectionOptionsMismatch(inconsistencies,
-                                    [{defaultCollation: localCollation}, {defaultCollation: {}}]);
+    assertCollectionOptionsMismatch(inconsistencies, [
+        {shards: [primaryShard.shardName], options: {defaultCollation: localCollation}},
+        {shards: ["config"], options: {defaultCollation: {}}}
+    ]);
 
     // Clean up the database to pass the hooks that detect inconsistencies.
     db.dropDatabase();
@@ -541,6 +557,11 @@ function isFcvGraterOrEqualTo(fcvRequired) {
     const db = getNewDb();
     const kSourceCollName = "capped_collection";
     const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
 
     // Create a capped collection.
     assert.commandWorked(db.runCommand({create: kSourceCollName, capped: true, size: 1000}));
@@ -553,25 +574,296 @@ function isFcvGraterOrEqualTo(fcvRequired) {
         // Register another collection as sharded to be able to get a config.collections document as
         // a reference.
         const kNssSharded = db.getName() + ".sharded_collection";
-        assert.commandWorked(db.adminCommand({shardCollection: kNssSharded, key: {x: 1}}));
+        assert.commandWorked(db.adminCommand({shardCollection: kNssSharded, key: {_id: 1}}));
 
-        const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+        let collEntry = configDB.collections.findOne({_id: kNssSharded});
+        const shardedCollUuid = collEntry.uuid;
 
         // Insert a new collection into config.collections with the nss and uuid from the unsharded
         // capped collection previously created.
-        let collEntry = configDB.collections.findOne({_id: kNssSharded});
+        const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
         collEntry._id = kNss;
         collEntry.uuid = uuid;
         configDB.collections.insert(collEntry);
+
+        // Insert a chunk entry for the tracked unsharded collection.
+        const chunkEntry = {
+            "uuid": uuid,
+            "min": {"_id": MinKey},
+            "max": {"_id": MaxKey},
+            "shard": primaryShard.shardName,
+            "lastmod": Timestamp(0, 1),
+            "onCurrentShardSince": Timestamp(0, 1),
+            "history": [{"validAfter": Timestamp(0, 1), "shard": primaryShard.shardName}]
+        };
+        configDB.chunks.insert(chunkEntry);
     }
 
     // Catch the inconsistency.
     const inconsistencies = db.checkMetadataConsistency().toArray();
     assert.neq(0, inconsistencies.length);
-    assertCollectionOptionsMismatch(inconsistencies,
-                                    [{capped: true}, {capped: false, unsplittable: false}]);
+    assertCollectionOptionsMismatch(inconsistencies, [
+        {shards: [primaryShard.shardName], options: {capped: true}},
+        {shards: ["config"], options: {capped: false, unsplittable: false}}
+    ]);
 
     // Clean up the database to pass the hooks that detect inconsistencies.
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testCollectionNotFoundOnAnyShard() {
+    const db = getNewDb();
+    const kSourceCollName = "collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+    const anotherShard = st.shard1;
+
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testCappedCollectionCantBeSharded test because required FCV is less than 8.0.");
+        return;
+    }
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // Create a tracked collection.
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: kNss, middle: {x: 0}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}));
+    assertNoInconsistencies();
+
+    // Drop the collection on all the shards and catch the inconsistency
+    primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
+    anotherShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
+
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.gte(inconsistencies.length, 2);
+    assert(inconsistencies.some(object => object.type === "MissingLocalCollection" &&
+                                    object.details.shard === primaryShard.shardName),
+           tojson(inconsistencies));
+    assert(inconsistencies.some(object => object.type === "MissingLocalCollection" &&
+                                    object.details.shard === anotherShard.shardName),
+           tojson(inconsistencies));
+
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testUuidMismatchAcrossShards() {
+    const db = getNewDb();
+    const kSourceCollName = "collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+    const anotherShard = st.shard1;
+
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testUuidMismatchAcrossShards test because required FCV is less than 8.0. ");
+        return;
+    }
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // Create a tracked collection and place data in 2 shards.
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: kNss, middle: {x: 0}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}));
+    const uuidOnPrimaryShard = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+    assertNoInconsistencies();
+
+    // Create the same nss in a different shard, which means that both collections will differ on
+    // the uuid.
+    anotherShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
+    anotherShard.getDB(db.getName()).runCommand({create: kSourceCollName});
+    const uuidOnAnotherShard =
+        anotherShard.getDB(db.getName()).getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+
+    // Catch the inconsistency.
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.neq(0, inconsistencies.length);
+    assertCollectionOptionsMismatch(inconsistencies, [
+        {shards: [primaryShard.shardName], options: {uuid: uuidOnPrimaryShard}},
+        {shards: [anotherShard.shardName], options: {uuid: uuidOnAnotherShard}}
+    ]);
+
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testDbPrimaryWithoutData() {
+    const db = getNewDb();
+    const kSourceCollName = "collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+    const anotherShard = st.shard1;
+
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        return;
+    }
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // Create a tracked collection.
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assertNoInconsistencies();
+
+    const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+
+    // Move all chunks out of the primary shard.
+    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
+    assert(chunks.length > 0);
+    chunks.forEach(chunk => {
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
+    });
+
+    // There should not be any inconsistency.
+    assertNoInconsistencies();
+
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testDbPrimaryWithoutDataAndUuidMismatch() {
+    const db = getNewDb();
+    const kSourceCollName = "collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+    const anotherShard = st.shard1;
+
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        return;
+    }
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // Create a tracked collection.
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assertNoInconsistencies();
+
+    const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+
+    // Move all chunks out of the primary shard.
+    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
+    assert(chunks.length > 0);
+    chunks.forEach(chunk => {
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
+    });
+
+    // Drop the collection from the primary shard after moving all chunks out of the primary shard.
+    primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
+    primaryShard.getDB(db.getName()).runCommand({create: kSourceCollName});
+    const uuidOnPrimaryShard =
+        primaryShard.getDB(db.getName()).getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+
+    // Catch the inconsistency.
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.neq(0, inconsistencies.length);
+    assertCollectionOptionsMismatch(inconsistencies, [
+        {shards: [primaryShard.shardName], options: {uuid: uuidOnPrimaryShard}},
+        {shards: [anotherShard.shardName], options: {uuid: uuid}}
+    ]);
+
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testCollectionMissingOnDbPrimary() {
+    const db = getNewDb();
+    const kSourceCollName = "collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+    const anotherShard = st.shard1;
+
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        return;
+    }
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // Create a tracked collection and place data in 2 shards.
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assert.commandWorked(st.s.adminCommand({split: kNss, middle: {x: 0}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: kNss, find: {x: 0}, to: anotherShard.shardName}));
+    assertNoInconsistencies();
+
+    // Drop the collection from the primary shard after moving all chunks out of the primary shard.
+    primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
+
+    // Catch the inconsistency.
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length);
+    assert.eq("MissingLocalCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(primaryShard.shardName, inconsistencies[0].details.shard, tojson(inconsistencies[0]));
+
+    db.dropDatabase();
+    assertNoInconsistencies();
+})();
+
+(function testDbPrimaryWithoutDataAndCollectionMissing() {
+    const db = getNewDb();
+    const kSourceCollName = "collection";
+    const kNss = db.getName() + "." + kSourceCollName;
+    const primaryShard = st.shard0;
+    const anotherShard = st.shard1;
+
+    if (!isFcvGraterOrEqualTo('8.0')) {
+        jsTestLog(
+            "Skipping testCollectionOptionsMismatchAcrossShards test because required FCV is less than 8.0.");
+        return;
+    }
+
+    // Set a primary shard.
+    assert.commandWorked(
+        mongos.adminCommand({enableSharding: db.getName(), primaryShard: primaryShard.shardName}));
+
+    // Create a tracked collection.
+    assert.commandWorked(db.adminCommand({shardCollection: kNss, key: {x: 1}}));
+    assertNoInconsistencies();
+
+    const uuid = db.getCollectionInfos({name: kSourceCollName})[0].info.uuid;
+
+    // Move all chunks out of the primary shard.
+    const chunks = st.s.getDB("config").chunks.find({uuid: uuid}).toArray();
+    assert(chunks.length > 0);
+    chunks.forEach(chunk => {
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: kNss, find: {x: chunk.min}, to: anotherShard.shardName}));
+    });
+
+    // At this point there should not be any inconsistency.
+    assertNoInconsistencies();
+
+    // Drop the collection from the primary shard after moving all chunks out of the primary shard.
+    primaryShard.getDB(db.getName()).runCommand({drop: kSourceCollName});
+
+    // Catch the inconsistency.
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length);
+    assert.eq("MissingLocalCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(primaryShard.shardName, inconsistencies[0].details.shard, tojson(inconsistencies[0]));
+
     db.dropDatabase();
     assertNoInconsistencies();
 })();

@@ -14,10 +14,14 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
     IS_BACKGROUND = True
 
     # The 'CheckMetadataConsistency' hook relies on the 'isMaster' command to asses if the fixture cluster is sharded.
-    # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
     SKIP_TESTS = [
-        "build/install/bin/executor_integration_test", "build/install/bin/rpc_integration_test",
-        "build/install/bin/transport_integration_test"
+        # Skip tests that set a failPoint to make the 'isMaster' command unconditionally fail.
+        "build/install/bin/executor_integration_test",
+        "build/install/bin/rpc_integration_test",
+        "build/install/bin/transport_integration_test",
+        # Skip tests that update the internalDocumentSourceGroupMaxMemoryBytes parameter and make
+        # checkMetadataConsistency fail with QueryExceededMemoryLimitNoDiskUseAllowed error.
+        "jstests/aggregation/sources/unionWith/unionWith.js"
     ]
 
     def __init__(self, hook_logger, fixture, shell_options=None):
@@ -75,7 +79,8 @@ class CheckMetadataConsistencyInBackground(jsfile.PerClusterDataConsistencyHook)
         hook_test_case.configure(self.fixture)
 
         if test.test_name in self.SKIP_TESTS:
-            self.logger.info("Metadata consistency check explicitely disabled for {test.test_name}")
+            self.logger.info("Metadata consistency check explicitely disabled for %s",
+                             test.test_name)
             return
 
         self.logger.info("Resuming background metadata consistency checker thread")
