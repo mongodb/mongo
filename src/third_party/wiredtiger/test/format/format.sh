@@ -72,10 +72,6 @@ smoke_list=(
 	"$smoke_base_1 file_type=fix"
 	"$smoke_base_1 file_type=var"
 
-	# Huffman value encoding.
-	"$smoke_base_1 file_type=row huffman_value=1"
-	"$smoke_base_1 file_type=var huffman_value=1"
-
 	# LSM
     # Temporarily disabled: FIXME LSM
 	# "$smoke_base_1 file_type=row runs.source=lsm"

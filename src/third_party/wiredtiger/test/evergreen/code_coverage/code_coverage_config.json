@@ -229,7 +229,6 @@
     "python3 ../test/suite/run.py test_hazard",
     "python3 ../test/suite/run.py test_home",
     "python3 ../test/suite/run.py test_hs06",
-    "python3 ../test/suite/run.py test_huffman01",
     "python3 ../test/suite/run.py test_import08",
     "python3 ../test/suite/run.py test_index02",
     "python3 ../test/suite/run.py test_inmem02",

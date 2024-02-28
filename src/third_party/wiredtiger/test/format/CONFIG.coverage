@@ -1,5 +1,4 @@
 # A reasonable configuration for coverage testing.
-btree.huffman_value=0
 cache.minimum=20
 checkpoints=1
 leak_memory=0

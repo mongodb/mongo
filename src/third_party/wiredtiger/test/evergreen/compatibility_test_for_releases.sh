@@ -163,7 +163,6 @@ create_configs()
     echo "debug.cursor_reposition=0" >> $file_name  # WT-10594 - Not supported by older releases
     echo "debug.log_retention=0" >> $file_name      # WT-10434 - Not supported by older releases
     echo "debug.realloc_malloc=0" >> $file_name     # WT-10111 - Not supported by older releases
-    echo "huffman_key=0" >> $file_name              # WT-6893 - Not supported by newer releases
     echo "in_memory=0" >> $file_name                # Interested in the on-disk format
     echo "leak_memory=1" >> $file_name              # Faster runs
     echo "logging=1" >> $file_name                  # Test log compatibility

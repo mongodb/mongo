@@ -75,16 +75,11 @@ class test_base02(wttest.WiredTigerTestCase):
             ',,columns=(first=S,second="4u"),,',
             'columns=(/path/key,   /other/path/value,,,)',
             ]
-        conf_encoding = [
-            None,
-            'huffman_value=english',
-            ]
         for size in conf_confsize:
             for col in conf_col:
-                for enc in conf_encoding:
-                    conflist = [size, col, enc]
-                    confstr = ",".join([c for c in conflist if c != None])
-                    self.create_and_drop(confstr)
+                conflist = [size, col]
+                confstr = ",".join([c for c in conflist if c != None])
+                self.create_and_drop(confstr)
 
     def test_config_json(self):
         """

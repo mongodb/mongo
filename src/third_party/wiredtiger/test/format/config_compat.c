@@ -89,8 +89,6 @@ static const char *list[] = {
   "runs.type",
   "firstfit=",
   "disk.firstfit",
-  "huffman_value=",
-  "btree.huffman_value",
   "in_memory=",
   "runs.in_memory",
   "independent_thread_rng=",

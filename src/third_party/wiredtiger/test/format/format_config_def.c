@@ -38,9 +38,6 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"btree.dictionary", "configure dictionary compressed values",
     C_BOOL | C_TABLE | C_TYPE_ROW | C_TYPE_VAR, 20, 0, 0, V_TABLE_BTREE_DICTIONARY},
 
-  {"btree.huffman_value", "configure huffman encoded values",
-    C_BOOL | C_TABLE | C_TYPE_ROW | C_TYPE_VAR, 20, 0, 0, V_TABLE_BTREE_HUFFMAN_VALUE},
-
   {"btree.internal_key_truncation", "truncate internal keys", C_BOOL | C_TABLE, 95, 0, 0,
     V_TABLE_BTREE_INTERNAL_KEY_TRUNCATION},
 

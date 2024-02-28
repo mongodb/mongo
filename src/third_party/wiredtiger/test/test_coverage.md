@@ -31,7 +31,6 @@
 |Eviction|Prepare|[test_prepare12.py](../test/suite/test_prepare12.py)
 |History Store||[test_hs09.py](../test/suite/test_hs09.py)
 |History Store|Eviction Checkpoint Interaction|[test_hs15.py](../test/suite/test_hs15.py)
-|Huffman Encoding||[test_huffman02.py](../test/suite/test_huffman02.py)
 |Indexes||[test_schema03.py](../test/suite/test_schema03.py)
 |Indexes|Search Near|[test_index02.py](../test/suite/test_index02.py)
 |Prepare||[test_prepare09.py](../test/suite/test_prepare09.py)

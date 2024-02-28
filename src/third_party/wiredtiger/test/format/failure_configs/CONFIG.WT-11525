@@ -11,7 +11,6 @@ block_cache=0
 block_cache.cache_on_checkpoint=0
 block_cache.cache_on_writes=0
 block_cache.size=67
-btree.huffman_value=0
 buffer_alignment=0
 cache=288
 cache.evict_max=2

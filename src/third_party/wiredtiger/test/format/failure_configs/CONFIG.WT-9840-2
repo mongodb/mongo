@@ -9,7 +9,6 @@ block_cache=0
 block_cache.cache_on_checkpoint=0
 block_cache.cache_on_writes=1
 block_cache.size=44
-btree.huffman_value=0
 cache=594
 cache.evict_max=1
 cache.minimum=20

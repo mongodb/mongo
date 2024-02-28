@@ -97,8 +97,6 @@ CONFIG configuration_list[] = {
 
 {"btree.dictionary", "configure dictionary compressed values", C_BOOL | C_TABLE | C_TYPE_ROW | C_TYPE_VAR, 20, 0, 0}
 
-{"btree.huffman_value", "configure huffman encoded values", C_BOOL | C_TABLE | C_TYPE_ROW | C_TYPE_VAR, 20, 0, 0}
-
 {"btree.internal_key_truncation", "truncate internal keys", C_BOOL | C_TABLE, 95, 0, 0}
 
 {"btree.internal_page_max", "btree internal node maximum size", C_TABLE, 9, 17, 27}

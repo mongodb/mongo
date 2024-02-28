@@ -4,7 +4,6 @@
 # A configuration for predictable replay.
 # Some things are locked down at the moment.
 backup=0
-btree.huffman_value=0
 cache.minimum=20
 format.abort=0
 format.independent_thread_rng=1

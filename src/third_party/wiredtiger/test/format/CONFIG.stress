@@ -1,5 +1,4 @@
 # A reasonable configuration for stress testing.
-btree.huffman_value=0
 cache.minimum=20
 runs.rows=1000000:5000000
 runs.tables=3:10

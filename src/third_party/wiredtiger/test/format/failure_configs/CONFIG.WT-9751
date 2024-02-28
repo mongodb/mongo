@@ -75,7 +75,6 @@ wiredtiger.leak_memory=0
 #  TABLE PARAMETERS: table 1
 ############################################
 table1.btree.dictionary=1
-table1.btree.huffman_value=0
 table1.btree.internal_key_truncation=1
 table1.btree.internal_page_max=17
 table1.btree.leaf_page_max=9
@@ -96,7 +95,6 @@ table1.ops.truncate=1
 #  TABLE PARAMETERS: table 2
 ############################################
 table2.btree.dictionary=0
-table2.btree.huffman_value=0
 table2.btree.internal_key_truncation=1
 table2.btree.internal_page_max=14
 table2.btree.leaf_page_max=11
@@ -117,7 +115,6 @@ table2.ops.truncate=1
 #  TABLE PARAMETERS: table 3
 ############################################
 table3.btree.dictionary=0
-table3.btree.huffman_value=0
 table3.btree.internal_key_truncation=1
 table3.btree.internal_page_max=17
 table3.btree.leaf_page_max=12

@@ -529,8 +529,6 @@ create_object(TABLE *table, void *arg)
             CONFIG_APPEND(p, ",collator=reverse");
     /* FALLTHROUGH */
     case VAR:
-        if (TV(BTREE_HUFFMAN_VALUE))
-            CONFIG_APPEND(p, ",huffman_value=english");
         if (TV(BTREE_DICTIONARY))
             CONFIG_APPEND(p, ",dictionary=%" PRIu32, mmrand(&g.extra_rnd, 123, 517));
         break;

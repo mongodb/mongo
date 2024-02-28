@@ -9,7 +9,6 @@ backup.incr_granularity=16
 btree.bitcnt=7
 btree.compression=snappy
 btree.dictionary=0
-btree.huffman_value=0
 btree.internal_key_truncation=1
 btree.internal_page_max=12
 btree.key_gap=17
