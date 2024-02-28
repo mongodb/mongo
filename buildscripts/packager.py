@@ -352,6 +352,7 @@ class Distro(object):
                 "rhel70",
                 "rhel71",
                 "rhel72",
+                "rhel79",
                 "rhel62",
                 "rhel55",
                 "rhel67",

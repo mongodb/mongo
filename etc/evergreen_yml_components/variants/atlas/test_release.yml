@@ -30,7 +30,7 @@ buildvariants:
     has_packages: true
     packager_script: packager_enterprise.py
     packager_arch: x86_64
-    packager_distro: rhel7.9-small
+    packager_distro: rhel79
     repo_edition: enterprise
     scons_cache_scope: shared
     compile_variant: enterprise-rhel-79-64-bit
