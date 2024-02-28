@@ -88,6 +88,8 @@ int clang_optnone main(int argc, char** argv) {
         mongo::NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
     mongo::NamespaceString nssWithTenantId =
         mongo::NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
+    mongo::NamespaceString longNss = mongo::NamespaceString::createNamespaceString_forTest(
+        boost::none, "longdatabasenamewithoutsmallstring.longcollection");
 
     // Tests for various abseil containers.
     mongo::StringMap<int> emptyMap;
