@@ -237,23 +237,15 @@ PhysicalScan [{'<root>': scan_0, 'a': evalTemp_0, 'b': evalTemp_1}, cqf_disjunct
         () =>
             coll.explain("executionStats").find({$or: [{a: 1}, {a: 2}, {b: 3}, {b: 4}]}).finish());
 
-    // TODO SERVER-84351: Update this expectedStr to account for the fact that we should be able to
-    // simplify the predicates on b.
     expectedStr =
         `Root [{scan_0}]
 Filter []
 |   BinaryOp [Or]
-|   |   BinaryOp [Or]
-|   |   |   EvalFilter []
-|   |   |   |   Variable [evalTemp_1]
-|   |   |   PathTraverse [1]
-|   |   |   PathCompare [Eq]
-|   |   |   Const [4]
 |   |   EvalFilter []
 |   |   |   Variable [evalTemp_1]
 |   |   PathTraverse [1]
-|   |   PathCompare [Eq]
-|   |   Const [3]
+|   |   PathCompare [EqMember]
+|   |   Const [[3, 4]]
 |   EvalFilter []
 |   |   Variable [evalTemp_0]
 |   PathTraverse [1]

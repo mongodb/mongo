@@ -514,9 +514,12 @@ TEST(ExpressionOptimizeTest, PartialOrToInRewriteDoesNotGenerateDirectlyNestedOr
         RAIIServerParameterControllerForTest simplifierParamController(
             "internalQueryEnableBooleanExpressionsSimplifier", booleanSimplificationEnabled);
         BSONObj obj = fromjson("{$or: [{x: {$eq: 3}}, {x: {$eq: 4}}, {y: 5}, {z: 6}]}");
-        auto optimizedMatchExpression = MatchExpression::optimize(parseMatchExpression(obj));
-        ASSERT_BSONOBJ_EQ(optimizedMatchExpression->serialize(),
-                          fromjson("{$or: [{x: {$in: [3, 4]}}, {y: {$eq: 5}}, {z: {$eq: 6}}]}"));
+        // We call MatchExpression::normalize() here to ensure the stability of the predicate order
+        // after optimizations.
+        auto optimizedAndNormalizedMatchExpression =
+            MatchExpression::normalize(parseMatchExpression(obj));
+        ASSERT_BSONOBJ_EQ(optimizedAndNormalizedMatchExpression->serialize(),
+                          fromjson("{$or: [{y: {$eq: 5}}, {z: {$eq: 6}}, {x: {$in: [3, 4]}}]}"));
     }
 }
 
