@@ -30,6 +30,10 @@
 
 #include "wt_internal.h"
 
+#define BACKUP_BASE "backup."
+#define BACKUP_OLD "OLD." BACKUP_BASE
+#define CHECK_BASE "check."
+
 #ifdef _WIN32
 #define DIR_DELIM '\\'
 #define DIR_DELIM_STR "\\"
@@ -520,10 +524,9 @@ void op_cursor(void *);
 void op_drop(void *);
 bool testutil_is_flag_set(const char *);
 bool testutil_is_dir_store(TEST_OPTS *);
-void testutil_backup_create_full(
-  WT_CONNECTION *, const char *, const char *, const char *, bool, uint32_t, int *);
-void testutil_backup_create_incremental(WT_CONNECTION *, const char *, const char *, const char *,
-  const char *, const char *, bool, int *, int *, int *);
+void testutil_backup_create_full(WT_CONNECTION *, const char *, int, bool, uint32_t, int *);
+void testutil_backup_create_incremental(
+  WT_CONNECTION *, const char *, int, int, bool, int *, int *, int *);
 void testutil_backup_force_stop(WT_SESSION *);
 void testutil_backup_force_stop_conn(WT_CONNECTION *);
 void testutil_build_dir(TEST_OPTS *, char *, int);
@@ -537,6 +540,7 @@ void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *);
 void testutil_deduce_build_dir(TEST_OPTS *opts);
+void testutil_delete_old_backups(int);
 bool testutil_exists(const char *, const char *);
 int testutil_general_event_handler(
   WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE, void *);

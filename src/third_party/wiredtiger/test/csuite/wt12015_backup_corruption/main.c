@@ -195,7 +195,6 @@ static void
 do_work_before_failure(WT_CONNECTION *conn, WT_SESSION *session)
 {
     int i;
-    char backup_home[64], backup_id[32], src_backup_home[64], src_backup_id[32];
 
     for (i = 0; i < NUM_BACKUPS; i++) {
         populate_table(session, TABLE_URI, (uint32_t)i, 100 * WT_THOUSAND);
@@ -204,17 +203,13 @@ do_work_before_failure(WT_CONNECTION *conn, WT_SESSION *session)
         testutil_check(session->checkpoint(session, NULL));
         populate_table(session, TABLE_URI, (uint32_t)i + 2, 100 * WT_THOUSAND);
 
-        testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%d", i);
-        testutil_snprintf(backup_id, sizeof(backup_id), "ID%d", i);
         if (i == 0) {
             printf("Create full backup %d\n", i);
-            testutil_backup_create_full(conn, WT_HOME_DIR, backup_home, backup_id, true, 32, NULL);
+            testutil_backup_create_full(conn, WT_HOME_DIR, i, true, 32, NULL);
         } else {
             printf("Create incremental backup %d from %d\n", i, i - 1);
-            testutil_snprintf(src_backup_home, sizeof(src_backup_home), BACKUP_BASE "%d", i - 1);
-            testutil_snprintf(src_backup_id, sizeof(src_backup_id), "ID%d", i - 1);
-            testutil_backup_create_incremental(conn, WT_HOME_DIR, backup_home, backup_id,
-              src_backup_home, src_backup_id, false /* verbose */, NULL, NULL, NULL);
+            testutil_backup_create_incremental(
+              conn, WT_HOME_DIR, i, i - 1, false /* verbose */, NULL, NULL, NULL);
         }
     }
 }
@@ -232,7 +227,7 @@ do_work_after_failure(bool backup_from_min)
     WT_DECL_RET;
     WT_SESSION *session;
     int i, id;
-    char backup_home[64], backup_id[32], src_backup_home[64], src_backup_id[32], *str;
+    char backup_home[64], *str;
     bool do_incr;
 
     /* Reopen the database and find available backup IDs. */
@@ -272,16 +267,13 @@ do_work_after_failure(bool backup_from_min)
      * querying IDs after recovery and if IDs exist.
      */
     testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%d", NUM_BACKUPS);
-    testutil_snprintf(backup_id, sizeof(backup_id), "ID%d", NUM_BACKUPS);
     if (!do_incr) {
         printf("Create full backup into %s\n", backup_home);
-        testutil_backup_create_full(conn, WT_HOME_DIR, backup_home, backup_id, true, 32, NULL);
+        testutil_backup_create_full(conn, WT_HOME_DIR, NUM_BACKUPS, true, 32, NULL);
     } else {
-        testutil_snprintf(src_backup_home, sizeof(src_backup_home), BACKUP_BASE "%d", id);
-        testutil_snprintf(src_backup_id, sizeof(src_backup_id), "ID%d", id);
         printf("Create incremental backup %d from %d\n", NUM_BACKUPS, id);
-        testutil_backup_create_incremental(conn, WT_HOME_DIR, backup_home, backup_id,
-          src_backup_home, src_backup_id, false /* verbose */, NULL, NULL, NULL);
+        testutil_backup_create_incremental(
+          conn, WT_HOME_DIR, NUM_BACKUPS, id, false /* verbose */, NULL, NULL, NULL);
     }
 
     /* Cleanup. */

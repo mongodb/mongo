@@ -36,6 +36,9 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+#define BACKUP_RETAIN 4
+#define BACKUP_SRC "backup.src."
+
 #define ITERATIONS 10
 #define MAX_NTABLES 100
 
@@ -60,11 +63,6 @@ static int verbose_level = 0;
 static uint64_t seed = 0;
 
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
-
-/*
- * Note: set this to true to copy incremental files completely.
- */
-static bool slow_incremental = false;
 
 static bool do_drop = true;
 static bool do_rename = true;
@@ -98,15 +96,6 @@ typedef struct {
     uint32_t full_backup_number;
     uint32_t incr_backup_number;
 } TABLE_INFO;
-
-/*
- * The set of active files in a backup. This is our "memory" of files that are used in each backup,
- * so we can remove any that are not mentioned in the next backup.
- */
-typedef struct {
-    char **names;
-    uint32_t count;
-} ACTIVE_FILES;
 
 extern int __wt_optind;
 extern char *__wt_optarg;
@@ -223,136 +212,6 @@ key_value(uint64_t change_count, char *key, size_t key_size, WT_ITEM *item, OPER
             cp[pos] = 'M';
     }
     item->size = value_size;
-}
-
-/*
- * active_files_init --
- *     Initialize (clear) the active file struct.
- */
-static void
-active_files_init(ACTIVE_FILES *active)
-{
-    WT_CLEAR(*active);
-}
-
-/*
- * active_files_print --
- *     Print the set of active files for debugging.
- */
-static void
-active_files_print(ACTIVE_FILES *active, const char *msg)
-{
-    uint32_t i;
-
-    VERBOSE(6, "Active files: %s, %" PRIu32 " entries\n", msg, active->count);
-    for (i = 0; i < active->count; i++)
-        VERBOSE(6, "  %s\n", active->names[i]);
-}
-
-/*
- * active_files_add --
- *     Add a new name to the active file list.
- */
-static void
-active_files_add(ACTIVE_FILES *active, const char *name)
-{
-    uint32_t pos;
-
-    pos = active->count++;
-    active->names = drealloc(active->names, sizeof(char *) * active->count);
-    active->names[pos] = strdup(name);
-}
-
-/*
- * active_files_sort_function --
- *     Sort function for qsort.
- */
-static int
-active_files_sort_function(const void *left, const void *right)
-{
-    return (strcmp(*(const char **)left, *(const char **)right));
-}
-
-/*
- * active_files_sort --
- *     Sort the list of names in the active file list.
- */
-static void
-active_files_sort(ACTIVE_FILES *active)
-{
-    __wt_qsort(active->names, active->count, sizeof(char *), active_files_sort_function);
-}
-
-/*
- * active_files_remove_missing --
- *     Files in the previous list that are missing from the current list are removed.
- */
-static void
-active_files_remove_missing(ACTIVE_FILES *prev, ACTIVE_FILES *cur, const char *dirname)
-{
-    uint32_t curpos, prevpos;
-    int cmp;
-    char filename[1024];
-
-    active_files_print(prev, "computing removals: previous list of active files");
-    active_files_print(cur, "computing removals: current list of active files");
-    curpos = 0;
-    /*
-     * Walk through the two lists looking for non-matches.
-     */
-    for (prevpos = 0; prevpos < prev->count; prevpos++) {
-again:
-        if (curpos >= cur->count)
-            cmp = -1; /* There are extra entries at the end of the prev list */
-        else
-            cmp = strcmp(prev->names[prevpos], cur->names[curpos]);
-
-        if (cmp == 0)
-            curpos++;
-        else if (cmp < 0) {
-            /*
-             * There is something in the prev list not in the current list. Remove it, and continue
-             * - don't advance the current list.
-             */
-            testutil_snprintf(filename, sizeof(filename), "%s/%s", dirname, prev->names[prevpos]);
-            VERBOSE(3, "Removing file from backup: %s\n", filename);
-            testutil_check(remove(filename));
-        } else {
-            /*
-             * There is something in the current list not in the prev list. Walk past it in the
-             * current list and try again.
-             */
-            curpos++;
-            goto again;
-        }
-    }
-}
-
-/*
- * active_files_free --
- *     Free the list of active files.
- */
-static void
-active_files_free(ACTIVE_FILES *active)
-{
-    uint32_t i;
-
-    for (i = 0; i < active->count; i++)
-        free(active->names[i]);
-    free(active->names);
-    active_files_init(active);
-}
-
-/*
- * active_files_move --
- *     Move an active file list to the destination list.
- */
-static void
-active_files_move(ACTIVE_FILES *dest, ACTIVE_FILES *src)
-{
-    active_files_free(dest);
-    *dest = *src;
-    WT_CLEAR(*src);
 }
 
 /*
@@ -522,79 +381,31 @@ tables_free(TABLE_INFO *tinfo)
  *     TODO: Add a comment describing this function.
  */
 static void
-base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const char *backup_home,
-  TABLE_INFO *tinfo, ACTIVE_FILES *active)
+base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, TABLE_INFO *tinfo)
 {
-    WT_CURSOR *cursor;
-    WT_SESSION *session;
-    uint32_t granularity;
-    int nfiles, ret;
-    char buf[4096], copy_from[PATH_MAX], copy_to[PATH_MAX];
-    char *filename;
-    char granularity_unit;
-    const char *cons;
+    uint32_t granularity, granularity_kb;
+    int id, nfiles;
+    bool consolidate;
 
     nfiles = 0;
-
-    VERBOSE(2, "BASE BACKUP: %s\n", backup_home);
-    active_files_free(active);
-    active_files_init(active);
-    testutil_recreate_dir(backup_home);
-
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    tinfo->full_backup_number = tinfo->incr_backup_number++;
+    id = (int)tinfo->full_backup_number;
 
     /* Half of the runs with very low granularity to stress bitmaps */
     granularity = __wt_random(rand) % 20;
     if (__wt_random(rand) % 2 == 0) {
-        granularity_unit = 'K';
         granularity += 4;
+        granularity_kb = granularity;
     } else {
-        granularity_unit = 'M';
         granularity += 1;
+        granularity_kb = granularity * 1024;
     }
     if (__wt_random(rand) % 2 == 0)
-        cons = ",consolidate=true";
+        consolidate = true;
     else
-        cons = ",consolidate=false";
-    testutil_snprintf(buf, sizeof(buf),
-      "incremental=(granularity=%" PRIu32 "%c,enabled=true,%s,this_id=ID%" PRIu32 ")", granularity,
-      granularity_unit, cons, tinfo->full_backup_number);
-    VERBOSE(3, "open_cursor(session, \"backup:\", NULL, \"%s\", &cursor)\n", buf);
-    testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
-
-    while ((ret = cursor->next(cursor)) == 0) {
-        nfiles++;
-        testutil_check(cursor->get_key(cursor, &filename));
-        active_files_add(active, filename);
-        testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s", home, filename);
-        testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", backup_home, filename);
-        VERBOSE(3, " => copy %s %s\n", copy_from, copy_to);
-        testutil_copy(copy_from, copy_to);
-    }
-    testutil_assert(ret == WT_NOTFOUND);
-    testutil_check(cursor->close(cursor));
-    testutil_check(session->close(session, NULL));
-    active_files_sort(active);
+        consolidate = false;
+    /* Use the same ID for the directory name and configuration */
+    testutil_backup_create_full(conn, home, id, consolidate, granularity_kb, &nfiles);
     VERBOSE(2, " finished base backup: %d files\n", nfiles);
-}
-
-/*
- * reopen_file --
- *     Open a file if it isn't already open. The "memory" of the open file name is kept in the
- *     buffer passed in.
- */
-static void
-reopen_file(int *fdp, char *buf, size_t buflen, const char *filename, int oflag)
-{
-    /* Do we already have this file open? */
-    if (strcmp(buf, filename) == 0 && *fdp != -1)
-        return;
-    if (*fdp != -1)
-        testutil_check(close(*fdp));
-    *fdp = open(filename, oflag, 0666);
-    strncpy(buf, filename, buflen);
-    testutil_assert(*fdp >= 0);
 }
 
 /*
@@ -602,102 +413,19 @@ reopen_file(int *fdp, char *buf, size_t buflen, const char *filename, int oflag)
  *     Perform an incremental backup into an existing backup directory.
  */
 static void
-incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABLE_INFO *tinfo,
-  ACTIVE_FILES *current_active)
+incr_backup(WT_CONNECTION *conn, const char *home, TABLE_INFO *tinfo)
 {
-    ACTIVE_FILES active;
-    WT_CURSOR *cursor, *file_cursor;
-    WT_SESSION *session;
-    void *tmp;
-    ssize_t rdsize;
-    uint64_t offset, size, type;
-    int rfd, ret, wfd, nfiles, nrange, ncopy;
-    char buf[4096], copy_from[PATH_MAX], copy_to[PATH_MAX], rbuf[4096], wbuf[4096];
-    char *filename;
+    int nfiles, nranges, nunmodified;
 
-    VERBOSE(2, "INCREMENTAL BACKUP: %s\n", backup_home);
-    active_files_print(current_active, "current list before incremental backup");
-    WT_CLEAR(rbuf);
-    WT_CLEAR(wbuf);
-    rfd = wfd = -1;
-    nfiles = nrange = ncopy = 0;
+    VERBOSE(2, "INCREMENTAL BACKUP: START: %" PRIu32 " source=%" PRIu32 "\n",
+      tinfo->incr_backup_number, tinfo->full_backup_number);
 
-    active_files_init(&active);
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    testutil_snprintf(buf, sizeof(buf), "incremental=(src_id=ID%" PRIu32 ",this_id=ID%" PRIu32 ")",
-      tinfo->full_backup_number, tinfo->incr_backup_number++);
-    VERBOSE(3, "open_cursor(session, \"backup:\", NULL, \"%s\", &cursor)\n", buf);
-    testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
-
-    while ((ret = cursor->next(cursor)) == 0) {
-        nfiles++;
-        testutil_check(cursor->get_key(cursor, &filename));
-        active_files_add(&active, filename);
-        if (slow_incremental) {
-            /*
-             * The "slow" version of an incremental backup is to copy the entire file that was
-             * indicated to be changed. This may be useful for debugging problems that occur in
-             * backup. This path is typically disabled for the test program.
-             */
-            testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s", home, filename);
-            testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", backup_home, filename);
-            VERBOSE(3, " => copy %s %s\n", copy_from, copy_to);
-            testutil_copy(copy_from, copy_to);
-        } else {
-            /*
-             * Here is the normal incremental backup. Now that we know what file has changed, we get
-             * the specific changes
-             */
-            testutil_snprintf(buf, sizeof(buf), "incremental=(file=%s)", filename);
-            testutil_check(session->open_cursor(session, NULL, cursor, buf, &file_cursor));
-            VERBOSE(3, "open_cursor(session, NULL, cursor, \"%s\", &file_cursor)\n", buf);
-            while ((ret = file_cursor->next(file_cursor)) == 0) {
-                testutil_check(file_cursor->get_key(file_cursor, &offset, &size, &type));
-                testutil_assert(type == WT_BACKUP_FILE || type == WT_BACKUP_RANGE);
-                if (type == WT_BACKUP_RANGE) {
-                    VERBOSE(3, "RANGE: %s: offset %" PRIu64 " size %" PRIu64 "\n", filename, offset,
-                      size);
-                    nrange++;
-                    tmp = dcalloc(1, size);
-
-                    testutil_snprintf(buf, sizeof(buf), "%s/%s", home, filename);
-                    VERBOSE(5, "Reopen read file: %s\n", buf);
-                    reopen_file(&rfd, rbuf, sizeof(rbuf), buf, O_RDONLY);
-                    rdsize = pread(rfd, tmp, (size_t)size, (wt_off_t)offset);
-                    testutil_assert(rdsize >= 0);
-
-                    testutil_snprintf(buf, sizeof(buf), "%s/%s", backup_home, filename);
-                    VERBOSE(5, "Reopen write file: %s\n", buf);
-                    reopen_file(&wfd, wbuf, sizeof(wbuf), buf, O_WRONLY | O_CREAT);
-                    /* Use the read size since we may have read less than the granularity. */
-                    testutil_assert(pwrite(wfd, tmp, (size_t)rdsize, (wt_off_t)offset) == rdsize);
-                    free(tmp);
-                } else {
-                    ncopy++;
-                    testutil_snprintf(copy_from, sizeof(copy_from), "%s/%s", home, filename);
-                    testutil_snprintf(copy_to, sizeof(copy_to), "%s/%s", backup_home, filename);
-                    VERBOSE(3, " => copy %s %s\n", copy_from, copy_to);
-                    testutil_copy(copy_from, copy_to);
-                }
-            }
-            testutil_assert(ret == WT_NOTFOUND);
-            testutil_check(file_cursor->close(file_cursor));
-        }
-    }
-    testutil_assert(ret == WT_NOTFOUND);
-    if (rfd != -1)
-        testutil_check(close(rfd));
-    if (wfd != -1)
-        testutil_check(close(wfd));
-    testutil_check(cursor->close(cursor));
-    testutil_check(session->close(session, NULL));
-    VERBOSE(2, " finished incremental backup: %d files, %d range copy, %d file copy\n", nfiles,
-      nrange, ncopy);
-    active_files_sort(&active);
-    active_files_remove_missing(current_active, &active, backup_home);
-
-    /* Move the active list to the current list. */
-    active_files_move(current_active, &active);
+    testutil_backup_create_incremental(conn, home, (int)tinfo->incr_backup_number,
+      (int)tinfo->full_backup_number, true /* verbose */, &nfiles, &nranges, &nunmodified);
+    VERBOSE(2,
+      "INCREMENTAL BACKUP: COMPLETE: %" PRIu32 " files=%" PRId32 ", ranges=%" PRId32
+      ", unmodified=%" PRId32 "\n",
+      tinfo->incr_backup_number, nfiles, nranges, nunmodified);
 }
 
 /*
@@ -782,11 +510,19 @@ check_table(WT_SESSION *session, TABLE *table)
  *     Verify the backup to make sure the proper tables exist and have the correct content.
  */
 static void
-check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinfo)
+check_backup(uint32_t backup_iter, TABLE_INFO *tinfo)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
     uint32_t slot;
+    char backup_check[PATH_MAX], backup_home[PATH_MAX];
+
+    /*
+     * Generate the names for the backup home directory and the temporary backup directory for
+     * verification.
+     */
+    testutil_snprintf(backup_check, sizeof(backup_check), CHECK_BASE "%" PRIu32, backup_iter);
+    testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, backup_iter);
 
     VERBOSE(
       2, "CHECK BACKUP: copy %s to %s, then check %s\n", backup_home, backup_check, backup_check);
@@ -804,6 +540,7 @@ check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinf
 
     testutil_check(session->close(session, NULL));
     testutil_check(conn->close(conn, NULL));
+    testutil_remove(backup_check);
 }
 
 /*
@@ -813,7 +550,6 @@ check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinf
 int
 main(int argc, char *argv[])
 {
-    ACTIVE_FILES active;
     TABLE_INFO tinfo;
     WT_CONNECTION *conn;
     WT_FILE_COPY_OPTS copy_opts;
@@ -822,7 +558,7 @@ main(int argc, char *argv[])
     uint32_t file_max, iter, max_value_size, next_checkpoint, rough_size, slot;
     int ch, ncheckpoints, nreopens;
     const char *backup_verbose, *working_dir;
-    char backup_check[1024], backup_dir[1024], backup_src[1024], conf[1024], home[1024];
+    char backup_src[1024], conf[1024], home[1024];
     bool preserve;
 
     preserve = false;
@@ -830,7 +566,6 @@ main(int argc, char *argv[])
     (void)testutil_set_progname(argv);
     custom_die = die; /* Set our own abort handler */
     WT_CLEAR(tinfo);
-    active_files_init(&active);
 
     memset(&copy_opts, 0, sizeof(copy_opts));
     copy_opts.preserve = true;
@@ -865,14 +600,16 @@ main(int argc, char *argv[])
         rnd.v = seed;
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    /* Put the backup directories as the same level as the home directory. */
-    testutil_snprintf(backup_check, sizeof(backup_check), "./%s.CHECK", home);
-    testutil_snprintf(backup_dir, sizeof(backup_dir), "./%s.BACKUP", home);
-    testutil_snprintf(backup_src, sizeof(backup_src), "./%s.BACKUP.SRC", home);
     printf("Seed: %" PRIu64 "\n", seed);
 
     testutil_recreate_dir(home);
-    testutil_remove(backup_dir);
+    /*
+     * Go inside the home directory and create the database home. We also use the home directory as
+     * the top level for creating the backup directories and check directory.
+     */
+    if (chdir(home) != 0)
+        testutil_die(errno, "parent chdir: %s", home);
+    testutil_recreate_dir(WT_HOME_DIR);
 
     backup_verbose = (verbose_level >= 4) ? "verbose=(backup)" : "";
 
@@ -898,7 +635,7 @@ main(int argc, char *argv[])
     testutil_snprintf(conf, sizeof(conf), "%s,create,%s,log=(enabled=true,file_max=%" PRIu32 "K)",
       CONN_CONFIG_COMMON, backup_verbose, file_max);
     VERBOSE(2, "wiredtiger config: %s\n", conf);
-    testutil_check(wiredtiger_open(home, NULL, conf, &conn));
+    testutil_check(wiredtiger_open(WT_HOME_DIR, NULL, conf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     tinfo.table_count = __wt_random(&rnd) % MAX_NTABLES + 1;
@@ -950,42 +687,51 @@ main(int argc, char *argv[])
                 ncheckpoints++;
             }
         }
-
         /* Close and reopen the connection once in a while. */
         if (iter != 0 && __wt_random(&rnd) % 5 == 0) {
             VERBOSE(2, "Close and reopen the connection %d\n", nreopens);
             testutil_check(conn->close(conn, NULL));
+            testutil_snprintf(backup_src, sizeof(backup_src), BACKUP_SRC "%" PRIu32, iter);
             /* Check the source bitmap after restart. Copy while closed. */
-            testutil_remove(backup_src);
-            testutil_copy_ext(home, backup_src, &copy_opts);
+            testutil_copy_ext(WT_HOME_DIR, backup_src, &copy_opts);
 
-            testutil_check(wiredtiger_open(home, NULL, conf, &conn));
+            testutil_check(wiredtiger_open(WT_HOME_DIR, NULL, conf, &conn));
             testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
             /* Test against the copied directory. */
-            testutil_verify_src_backup(conn, backup_src, home, NULL);
+            testutil_verify_src_backup(conn, backup_src, WT_HOME_DIR, NULL);
+            testutil_remove(backup_src);
             nreopens++;
         }
 
         if (iter == 0) {
-            base_backup(conn, &rnd, home, backup_dir, &tinfo, &active);
-            check_backup(backup_dir, backup_check, &tinfo);
+            VERBOSE(2, "Iteration %" PRIu32 ": taking full backup\n", iter);
+            tinfo.full_backup_number = iter;
+            base_backup(conn, &rnd, WT_HOME_DIR, &tinfo);
+            check_backup(iter, &tinfo);
         } else {
-            incr_backup(conn, home, backup_dir, &tinfo, &active);
-            check_backup(backup_dir, backup_check, &tinfo);
+            /* Randomly restart with a full backup again. */
             if (__wt_random(&rnd) % 10 == 0) {
-                base_backup(conn, &rnd, home, backup_dir, &tinfo, &active);
-                check_backup(backup_dir, backup_check, &tinfo);
+                VERBOSE(2, "Iteration %" PRIu32 ": taking new full backup\n", iter);
+                tinfo.full_backup_number = iter;
+                base_backup(conn, &rnd, WT_HOME_DIR, &tinfo);
+                check_backup(iter, &tinfo);
+            } else {
+                VERBOSE(2, "Iteration %" PRIu32 ": taking incremental backup\n", iter);
+                tinfo.incr_backup_number = iter;
+                incr_backup(conn, WT_HOME_DIR, &tinfo);
+                check_backup(iter, &tinfo);
             }
         }
+        testutil_delete_old_backups(BACKUP_RETAIN);
     }
     testutil_check(session->close(session, NULL));
     testutil_check(conn->close(conn, NULL));
-    active_files_free(&active);
     tables_free(&tinfo);
 
     printf("Success.\n");
     if (!preserve) {
+        testutil_delete_old_backups(0);
         testutil_clean_test_artifacts(home);
         testutil_remove(home);
     }

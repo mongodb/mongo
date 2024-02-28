@@ -68,9 +68,6 @@ static char home[1024]; /* Program working dir */
  * snapshot.
  */
 
-#define BACKUP_BASE "backup."
-#define BACKUP_OLD "OLD." BACKUP_BASE
-#define CHECK_BASE "check."
 #define INVALID_KEY UINT64_MAX
 #define MAX_BACKUP_INVL 4 /* Maximum interval between backups */
 #define MAX_CKPT_INVL 5   /* Maximum interval between checkpoints */
@@ -201,16 +198,6 @@ static wt_thread_t stat_th;
 
 static WT_EVENT_HANDLER other_event = {handle_error, NULL, NULL, NULL, NULL};
 static WT_EVENT_HANDLER reopen_event = {handle_error, NULL, NULL, NULL, handle_general};
-
-/*
- * __int_comparator --
- *     "int" comparator.
- */
-static int
-__int_comparator(const void *a, const void *b)
-{
-    return (*(int *)a - *(int *)b);
-}
 
 /*
  * stat_func --
@@ -420,21 +407,11 @@ static void
 backup_create_full(WT_CONNECTION *conn, bool consolidate, uint32_t index)
 {
     int nfiles;
-    char backup_home[PATH_MAX], backup_id[32];
-
-    testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index);
-    testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
 
     printf("Create full backup %" PRIu32 " - start: consolidate=%d, granularity=%" PRIu32 "KB\n",
       index, consolidate, backup_granularity_kb);
     testutil_backup_create_full(
-      conn, WT_HOME_DIR, backup_home, backup_id, consolidate, backup_granularity_kb, &nfiles);
-
-    /* Remember that this was a full backup. */
-    testutil_sentinel(backup_home, "full");
-
-    /* Remember that the backup finished successfully. */
-    testutil_sentinel(backup_home, "done");
+      conn, WT_HOME_DIR, (int)index, consolidate, backup_granularity_kb, &nfiles);
 
     printf("Create full backup %" PRIu32 " - complete: files=%" PRId32 "\n", index, nfiles);
 }
@@ -447,16 +424,11 @@ static void
 backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t index)
 {
     int nfiles, nranges, nunmodified;
-    char backup_home[PATH_MAX], backup_id[32], src_backup_home[PATH_MAX], src_backup_id[32];
-
-    testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index);
-    testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
-    testutil_snprintf(src_backup_home, sizeof(src_backup_home), BACKUP_BASE "%" PRIu32, src_index);
-    testutil_snprintf(src_backup_id, sizeof(src_backup_id), "ID%" PRIu32, src_index);
+    char backup_home[PATH_MAX], backup_id[32];
 
     printf("Create incremental backup %" PRIu32 " - start: source=%" PRIu32 "\n", index, src_index);
-    testutil_backup_create_incremental(conn, WT_HOME_DIR, backup_home, backup_id, src_backup_home,
-      src_backup_id, true /* verbose */, &nfiles, &nranges, &nunmodified);
+    testutil_backup_create_incremental(conn, WT_HOME_DIR, (int)index, (int)src_index,
+      true /* verbose */, &nfiles, &nranges, &nunmodified);
 
     /* Remember that the backup finished successfully. */
     testutil_sentinel(backup_home, "done");
@@ -468,79 +440,14 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
     /* Immediately verify the backup. */
     if (backup_verify_immediately) {
         PRINT_BACKUP_VERIFY(index);
-        if (backup_verify_quick)
+        if (backup_verify_quick) {
+            testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index);
+            testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
             testutil_verify_src_backup(conn, backup_home, WT_HOME_DIR, backup_id);
-        else
+        } else
             testutil_check(recover_and_verify(index, 0));
         PRINT_BACKUP_VERIFY_DONE(index);
     }
-}
-
-/*
- * backup_delete_old_backups --
- *     Delete old backups, keeping just a few recent ones, so that we don't take too much space for
- *     no good reason.
- */
-static void
-backup_delete_old_backups(int retain)
-{
-    struct dirent *dir;
-    DIR *d;
-    size_t len;
-    int count, i, indexes[256], last_full, ndeleted;
-    char fromdir[256], todir[256];
-    bool done;
-
-    last_full = 0;
-    len = strlen(BACKUP_BASE);
-    ndeleted = 0;
-    do {
-        done = true;
-        testutil_assert_errno((d = opendir(".")) != NULL);
-        count = 0;
-        while ((dir = readdir(d)) != NULL) {
-            if (strncmp(dir->d_name, BACKUP_BASE, len) == 0) {
-                i = atoi(dir->d_name + len);
-                indexes[count++] = i;
-
-                /* If the backup failed to finish, delete it right away. */
-                if (!testutil_exists(dir->d_name, "done")) {
-                    testutil_remove(dir->d_name);
-                    ndeleted++;
-                }
-
-                /* Check if this is a full backup - we'd like to keep at least one. */
-                if (testutil_exists(dir->d_name, "full"))
-                    last_full = WT_MAX(last_full, i);
-
-                /* If we have too many backups, finish next time. */
-                if (count >= (int)(sizeof(indexes) / sizeof(*indexes))) {
-                    done = false;
-                    break;
-                }
-            }
-        }
-        testutil_check(closedir(d));
-        if (count <= retain)
-            break;
-
-        __wt_qsort(indexes, (size_t)count, sizeof(*indexes), __int_comparator);
-        for (i = 0; i < count - retain; i++) {
-            if (indexes[i] == last_full)
-                continue;
-            testutil_snprintf(fromdir, sizeof(fromdir), BACKUP_BASE "%d", indexes[i]);
-            testutil_snprintf(todir, sizeof(todir), BACKUP_OLD "%d", indexes[i]);
-            /*
-             * First rename the directory so that if the child process is killed during the remove
-             * the verify function doesn't attempt to open a partial database.
-             */
-            testutil_check(rename(fromdir, todir));
-            testutil_remove(todir);
-            ndeleted++;
-        }
-    } while (!done);
-
-    printf("Deleted %d old backup%s\n", ndeleted, ndeleted == 1 ? "" : "s");
 }
 
 /*
@@ -701,7 +608,7 @@ create:
 
         /* Periodically delete old backups. */
         if (i % 5 == 0 || (td->workload_iteration > 1 && i == 1))
-            backup_delete_old_backups(5);
+            testutil_delete_old_backups(5);
     }
 
     /* NOTREACHED */
