@@ -62,7 +62,7 @@ namespace mongo {
  */
 class DocumentSourceQueue : public DocumentSource {
 public:
-    using DeferredQueue = Deferred<std::deque<GetNextResult>>;
+    using DeferredQueue = DeferredFn<std::deque<GetNextResult>>;
 
     static constexpr StringData kStageName = "$queue"_sd;
 

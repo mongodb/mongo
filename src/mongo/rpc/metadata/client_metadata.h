@@ -359,15 +359,13 @@ private:
     std::string _appName;
 
     // See documentWithoutMongosInfo().
-    Deferred<BSONObj, const BSONObj&> _documentWithoutMongosInfo{[](const BSONObj& fullDocument) {
-        return fullDocument.removeField("mongos");
-    }};
+    Deferred<BSONObj (*)(const BSONObj&)> _documentWithoutMongosInfo{
+        [](const BSONObj& fullDocument) {
+            return fullDocument.removeField("mongos");
+        }};
 
     // See hashWithoutMongosInfo().
-    Deferred<unsigned long, const BSONObj&> _hashWithoutMongos{
-        [](const BSONObj& documentWithoutMongosInfo) {
-            return simpleHash(documentWithoutMongosInfo);
-        }};
+    Deferred<size_t (*)(const BSONObj&)> _hashWithoutMongos{simpleHash};
 };
 
 }  // namespace mongo

@@ -235,13 +235,14 @@ private:
     // This is logically const - any changes to _stageSpecs will invalidate cached copies of
     // "_hasChangeStream" and "_involvedNamespaces" below.
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
-    Deferred<bool, const decltype(_stageSpecs)&> _hasChangeStream{[](const auto& stageSpecs) {
+
+    Deferred<bool (*)(const decltype(_stageSpecs)&)> _hasChangeStream{[](const auto& stageSpecs) {
         return std::any_of(stageSpecs.begin(), stageSpecs.end(), [](auto&& spec) {
             return spec->isChangeStream();
         });
     }};
 
-    Deferred<stdx::unordered_set<NamespaceString>, const decltype(_stageSpecs)&>
+    Deferred<stdx::unordered_set<NamespaceString> (*)(const decltype(_stageSpecs)&)>
         _involvedNamespaces{[](const auto& stageSpecs) -> stdx::unordered_set<NamespaceString> {
             stdx::unordered_set<NamespaceString> involvedNamespaces;
             for (const auto& spec : stageSpecs) {

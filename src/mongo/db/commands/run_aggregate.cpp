@@ -314,7 +314,7 @@ void handleMultipleCursorsForExchange(OperationContext* opCtx,
  * batch). In some cases, serializing the command object can consume a significant amount of time
  * that we can optimize away if the results fit in a single batch.
  */
-using DeferredCmd = Deferred<BSONObj>;
+using DeferredCmd = DeferredFn<BSONObj>;
 
 /**
  * Gets the first batch of documents produced by this pipeline by calling 'getNext()' on the

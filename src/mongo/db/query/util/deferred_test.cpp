@@ -38,7 +38,9 @@ using namespace std::string_literals;
 
 
 TEST(DeferredTest, EagerInitialization) {
-    Deferred<string> eager{"someString"};
+    // Note that when initialised with a value eagerly, Deferred cannot
+    // deduce the initialiser type to store (as one has not been provided).
+    Deferred<string (*)()> eager{"someString"};
     ASSERT_TRUE(eager.isInitialized());
     ASSERT_EQ(eager.get(), "someString"s);
     ASSERT_EQ(*eager, "someString"s);
@@ -46,7 +48,7 @@ TEST(DeferredTest, EagerInitialization) {
 
 TEST(DeferredTest, DeferredInitialization) {
     size_t initializationCount = 0;
-    Deferred<string> deferred{[&]() {
+    Deferred deferred{[&]() {
         initializationCount++;
         return "someString"s;
     }};
@@ -69,7 +71,7 @@ TEST(DeferredTest, DeferredInitialization) {
 
 TEST(DeferredTest, DeferredInitializationWithOneArgument) {
     size_t initializationCount = 0;
-    Deferred<string, const string&> deferred{[&](const string& input) {
+    Deferred deferred{[&](const string& input) {
         initializationCount++;
         return "{" + input + "}";
     }};
@@ -88,10 +90,9 @@ TEST(DeferredTest, DeferredInitializationWithOneArgument) {
 }
 
 TEST(DeferredTest, DeferredInitializationWithTwoArgs) {
-    Deferred<string, const string&, const string&> deferred{
-        [&](const auto& input, const auto& prefix) {
-            return prefix + input;
-        }};
+    Deferred deferred{[&](const string& input, const string& prefix) {
+        return prefix + input;
+    }};
 
     ASSERT_EQ(deferred.get("cowbell", "more "), "more cowbell"s);
     ASSERT_EQ(deferred.get("cowbell", "more "), "more cowbell"s);

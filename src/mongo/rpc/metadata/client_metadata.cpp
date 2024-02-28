@@ -395,7 +395,7 @@ const BSONObj& ClientMetadata::getDocument() const {
 }
 
 unsigned long ClientMetadata::hashWithoutMongosInfo() const {
-    return _hashWithoutMongos.get(documentWithoutMongosInfo());
+    return static_cast<unsigned long>(_hashWithoutMongos.get(documentWithoutMongosInfo()));
 }
 
 const BSONObj& ClientMetadata::documentWithoutMongosInfo() const {
