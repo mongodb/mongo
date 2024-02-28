@@ -74,6 +74,7 @@
 			"eeyore.yapf",
 			"ms-python.pylint",
 			"ms-python.mypy-type-checker"
+			"ms-microsoft.java-type-maker"
 		]
 	}
 }
