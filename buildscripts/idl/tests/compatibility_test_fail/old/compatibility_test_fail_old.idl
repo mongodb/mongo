@@ -2823,6 +2823,36 @@ commands:
                 - check: checkOne
                 - check: checkTwo
 
+    complexCheckPrivilegesSupersetNoneAllowed:
+        description: "new command fails when privileges in the access check are a superset of the old
+                      privileges and none of the additional privileges are explicitly allowed."
+        command_name: complexCheckPrivilegesSupersetNoneAllowed
+        namespace: ignored
+        cpp_name: complexCheckPrivilegesSupersetNoneAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePatternOne
+                    action_type: [actionTypeOne]
+
+    complexCheckPrivilegesSupersetSomeAllowed:
+        description: "new command fails when privileges in the access check are a superset of the old
+                      privileges and not all of the additional privileges are explicitly allowed."
+        command_name: complexCheckPrivilegesSupersetSomeAllowed
+        namespace: ignored
+        cpp_name: complexCheckPrivilegesSupersetSomeAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePatternOne
+                    action_type: [actionTypeOne]
+
     complexChecksSupersetNoneAllowed:
         description: "new command fails when the the complex checks are a superset of the old
                       checks and none of the additional checks are explicitly allowed."

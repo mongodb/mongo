@@ -378,6 +378,39 @@ ALLOWED_NEW_COMPLEX_ACCESS_CHECKS = dict(
     complexChecksSupersetSomeAllowed={'checkTwo'})
 
 
+@dataclass
+class AllowedNewPrivilege:
+    """Represents a privilege check that should be ignored by the API compatibility checker."""
+
+    resource_pattern: str
+    action_type: List[str]
+    agg_stage: Optional[str] = None
+
+    @classmethod
+    def create_from(cls, privilege: syntax.Privilege):
+        return cls(privilege.resource_pattern, privilege.action_type, privilege.agg_stage)
+
+
+ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES = dict(
+    # Do not add any command other than the aggregate command or any privilege that is not required
+    # only by an aggregation stage not present in previously released versions.
+    aggregate=[
+        # TODO SERVER-87193: Check if we can remove the line below after the next 7.0 patch release (7.0.7) is out.
+        # The feature using 'queryStatsReadTransformed' has been backported to v7.0 but is not present
+        # in the latest patch release. It is guarded by a feature flag so we are allowing this conflict here.
+        AllowedNewPrivilege("cluster", ["queryStatsReadTransformed"], "queryStats"),
+    ],
+
+    # This list is only used in unit-tests.
+    complexChecksSupersetAllowed=[
+        AllowedNewPrivilege("resourcePatternTwo", ["actionTypeTwo"]),
+        AllowedNewPrivilege("resourcePatternThree", ["actionTypeThree"]),
+    ],
+    complexCheckPrivilegesSupersetSomeAllowed=[
+        AllowedNewPrivilege("resourcePatternTwo", ["actionTypeTwo"])
+    ])
+
+
 class FieldCompatibility:
     """Information about a Field to check compatibility."""
 
@@ -1398,6 +1431,12 @@ def check_complex_checks(ctxt: IDLCompatibilityContext,
         for check in ALLOWED_NEW_COMPLEX_ACCESS_CHECKS[cmd_name]:
             if check in new_checks_normalized:
                 new_checks_normalized.remove(check)
+
+    if cmd_name in ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES:
+        new_privileges = [
+            privilege for privilege in new_privileges if AllowedNewPrivilege.create_from(privilege)
+            not in ALLOWED_NEW_ACCESS_CHECK_PRIVILEGES[cmd_name]
+        ]
 
     if (len(new_checks_normalized) + len(new_privileges)) > (
             len(old_checks_normalized) + len(old_privileges)):

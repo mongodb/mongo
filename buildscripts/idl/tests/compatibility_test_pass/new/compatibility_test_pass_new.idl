@@ -2000,6 +2000,15 @@ commands:
                 - check: checkOne
                 - check: checkTwo
                 - check: checkThree
+                - privilege:
+                    resource_pattern: resourcePatternOne
+                    action_type: [actionTypeOne]
+                - privilege:
+                    resource_pattern: resourcePatternTwo
+                    action_type: [actionTypeTwo]
+                - privilege:
+                    resource_pattern: resourcePatternThree
+                    action_type: [actionTypeThree]
 
     addedAggStage:
         description: "new command passes when a agg stage is added"
