@@ -794,6 +794,11 @@ void AsyncResultsMerger::_processBatchResults(WithLock lk,
     // Update the cursorId; it is sent as '0' when the cursor has been exhausted on the shard.
     remote.cursorId = cursorResponse.getCursorId();
 
+    // Aggregate remote cursor metrics (if any) into the OpDebug metrics.
+    if (const auto& cursorMetrics = cursorResponse.getCursorMetrics(); _opCtx && cursorMetrics) {
+        CurOp::get(_opCtx)->debug().aggregateCursorMetrics(*cursorMetrics);
+    }
+
     // Save the batch in the remote's buffer.
     if (!_addBatchToBuffer(lk, remoteIndex, cursorResponse)) {
         return;
