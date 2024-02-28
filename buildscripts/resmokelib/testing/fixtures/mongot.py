@@ -32,12 +32,17 @@ class MongoTFixture(interface.Fixture, interface._DockerComposeInterface):
         # Default to command line options if the YAML configuration is not passed in.
         self.mongot_executable = self.fixturelib.default_if_none(self.config.MONGOT_EXECUTABLE)
         self.port = self.mongot_options["port"]
+        # Each mongot requires its own unique config journal to persist index definitions, replication status, etc to disk.
+        # If dir passed to --data-dir option doesn't exist, mongot will create it
+        self.data_dir = "data/config_journal_" + str(self.port)
+        self.mongot_options["data-dir"] = self.data_dir
         self.mongot = None
 
     def setup(self):
         """Set up and launch the mongot."""
         launcher = MongotLauncher(self.fixturelib)
-        # Second return val is the port, which we ignore because we explicitly generated the port number in MongoDFixture initialization and save to MongotFixture in above initialization function.
+        # Second return val is the port, which we ignore because we explicitly generated the port number in MongoDFixture
+        # initialization and save to MongotFixture in above initialization function.
         mongot, _ = launcher.launch_mongot_program(self.logger, self.job_num,
                                                    executable=self.mongot_executable,
                                                    mongot_options=self.mongot_options)
