@@ -394,6 +394,8 @@ tasks:
     vars:
       target: >-
         //src/mongo/platform:visibility_test1
+  teardown_task:
+  - func: "attach bazel invocation"
 
 - name: run_bazel_program_windows
   tags: ["assigned_to_jira_team_devprod_build", "bazel_check"]
@@ -413,6 +415,8 @@ tasks:
         --compilation_mode=dbg
         --//bazel/config:build_mode=dbg
         --copt /std:c++20
+  teardown_task:
+  - func: "attach bazel invocation"
 
 ## compile - build all scons targets except unittests ##
 - name: compile_dist_test_half

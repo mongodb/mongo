@@ -2386,6 +2386,19 @@ functions:
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
 
+  "attach bazel invocation":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/bazel-invocation.txt
+      remote_file: ${project}/${build_variant}/${revision}/bazel-invocation-${task_id}-${execution}.txt
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: Bazel invocation for local usage
+
   "attach multiversion download links":
     command: s3.put
     params:

@@ -33,3 +33,6 @@ a4f458fe4d7a44eba056f5c150753e73067c8e4d
 
 # SERVER-74787 Prepare jstest corpus for implicit strict mode
 43b87324302209cbfa240d6c6b520007669e4ea6
+
+# SERVER-87034 Initally formatted all markdown using prettier
+64e388007ec1ac3744537253540995af628bcc00

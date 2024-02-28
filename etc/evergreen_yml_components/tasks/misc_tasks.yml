@@ -560,6 +560,35 @@ tasks:
       jepsen_storage_engine: --storage-engine wiredTiger
       jepsen_test_name: set
 
+# TODO: rename if display_name appears on the evergreen UI
+- name: bazel_run_//:format
+  tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - command: timeout.update
+    params:
+      # 40 minutes
+      exec_timeout_secs: 2400
+  - func: "f_expansions_write"
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "get engflow creds"
+  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
+  - func: "fetch bazel"
+  - func: "bazel run"
+    vars:
+      target: >-
+        //:format -- --mode check
+  teardown_task:
+  - func: "attach bazel invocation"
+
 - name: lint_clang_format
   tags: ["assigned_to_jira_team_devprod_build", "development_critical_single_variant", "lint"]
   commands:

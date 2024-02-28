@@ -46,6 +46,7 @@
 			"mypy"
 		],
 		"mypy-type-checker.importStrategy": "fromEnvironment",
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
 		"[c]": {
 			"editor.defaultFormatter": "xaver.clang-format",
 			"editor.formatOnSave": true,
@@ -73,7 +74,8 @@
 			"cs128.cs128-clang-tidy",
 			"eeyore.yapf",
 			"ms-python.pylint",
-			"ms-python.mypy-type-checker"
+			"ms-python.mypy-type-checker",
+			"esbenp.prettier-vscode"
 		]
 	}
 }

@@ -1,6 +1,4 @@
-load("@aspect_rules_lint//format:defs.bzl", "multi_formatter_binary")
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("@npm//:prettier/package_json.bzl", prettier = "bin")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -12,18 +10,7 @@ exports_files([
 
 npm_link_all_packages(name = "node_modules")
 
-# TODO: SERVER-82329 eslint binary should almost exactly mirror prettier binary
-# To update prettier change the version in package.json
-# Run `pnpm install`
-# Commit changes
-prettier.prettier_binary(
-    name = "prettier",
-    # Allow the binary to be run outside bazel
-    # See more details about this by commenting this out and running `bazel run //:format`
-    env = {"BAZEL_BINDIR": "."},
-)
-
-multi_formatter_binary(
+alias(
     name = "format",
-    markdown = ":prettier",
+    actual = "//bazel/format",
 )

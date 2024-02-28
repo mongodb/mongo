@@ -1,5 +1,14 @@
-# Ignore all formatting in third_party/*
-src/third_party
+# Ignore everything
+# We are making prettier opt in for the moment while we work on the rollout
+# !*/ means do not ignore recursive directories
+# Together these work togather to make nothing opted-in by default
+*
+!*/
+
+# Do not ignore markdown
+# We are only going to do markdown file formatting for now
+# Hopefully we will use prettier for more file types in the future
+!*.md
 
 # Ignore all template files
 # When we eventually enable prettier on javascript these files are invalid and should be ignored
@@ -8,14 +17,5 @@ src/third_party
 # Ignore .yy files since prettier seems to think these are json files
 **/*.yy
 
-# Ignore everything
-# We are making prettier opt in for the moment while we work on the rollout
-*
-
-# Do not ignore markdown
-# TODO: DEVPROD-3079 enable markdown formatting
-# !*.md
-
-# Do not ignore recursive directories
-# TODO: DEVPROD-3079 enable markdown formatting
-# !*/
+# Ignore all formatting in third_party/*
+src/third_party
