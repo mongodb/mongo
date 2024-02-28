@@ -570,6 +570,7 @@ struct __wt_connection_impl {
 
 #define WT_MAX_PREFETCH_QUEUE 120
 #define WT_PREFETCH_QUEUE_PER_TRIGGER 30
+#define WT_PREFETCH_THREAD_COUNT 8
     WT_SPINLOCK prefetch_lock;
     WT_THREAD_GROUP prefetch_threads;
     uint64_t prefetch_queue_count;

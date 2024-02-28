@@ -918,8 +918,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
      * still present on the pre-fetch queue so that they are not accidentally accessed in an invalid
      * way later on.
      */
-    if (F_ISSET(session, WT_SESSION_PREFETCH_ENABLED))
-        WT_ERR(__wt_conn_prefetch_clear_tree(session, false));
+    WT_ERR(__wt_conn_prefetch_clear_tree(session, false));
 
     /*
      * Ensure no new pages from the file will be queued for eviction after this point, then clear

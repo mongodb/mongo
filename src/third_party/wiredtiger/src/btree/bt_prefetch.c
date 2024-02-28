@@ -26,10 +26,9 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
     block_preload = 0;
 
     /*
-     * Do not add refs from trees that have eviction disabled since they are probably being closed.
+     * Pre-fetch traverses the internal page, to do that safely it requires a split gen.
      */
-    if (!(F_ISSET(ref, WT_REF_FLAG_LEAF)) || S2BT(session)->evict_disabled > 0 ||
-      (__wt_session_gen(session, WT_GEN_SPLIT) == 0)) {
+    if (!(F_ISSET(ref, WT_REF_FLAG_LEAF) || __wt_session_gen(session, WT_GEN_SPLIT) == 0)) {
         WT_STAT_CONN_INCR(session, block_prefetch_failed_start);
         return (0);
     }
@@ -80,6 +79,10 @@ __wt_btree_prefetch(WT_SESSION_IMPL *session, WT_REF *ref)
         if (next_ref->state == WT_REF_DISK && F_ISSET(next_ref, WT_REF_FLAG_LEAF) &&
           next_ref->page_del == NULL && !F_ISSET(next_ref, WT_REF_FLAG_PREFETCH)) {
             ret = __wt_conn_prefetch_queue_push(session, next_ref);
+            if (ret == EBUSY) {
+                ret = 0;
+                break;
+            }
             if (ret != 0)
                 break;
             ++block_preload;
