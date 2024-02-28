@@ -791,7 +791,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
     repl::OpTime opTime,
     const CancellationToken& token) {
     return WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajorityForWrite(std::move(opTime), token)
+        .waitUntilMajorityForWrite(_serviceContext, std::move(opTime), token)
         .thenRunOn(**executor)
         .then([this, self = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);

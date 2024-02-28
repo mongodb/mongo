@@ -46,6 +46,7 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -92,7 +93,7 @@ WaitForMajorityService::~WaitForMajorityService() {
     shutDown();
 }
 
-WaitForMajorityServiceImplBase::~WaitForMajorityServiceImplBase() {
+WaitForMajorityServiceForReadImpl::~WaitForMajorityServiceForReadImpl() {
     shutDown();
 }
 
@@ -102,23 +103,21 @@ WaitForMajorityService& WaitForMajorityService::get(ServiceContext* service) {
 
 void WaitForMajorityService::startup(ServiceContext* ctx) {
     _readService.startup(ctx);
-    _writeService.startup(ctx);
 }
 
 void WaitForMajorityService::shutDown() {
-    _writeService.shutDown();
     _readService.shutDown();
 }
 
-void WaitForMajorityServiceImplBase::startup(ServiceContext* ctx) {
+void WaitForMajorityServiceForReadImpl::startup(ServiceContext* ctx) {
     stdx::lock_guard lk(_mutex);
     invariant(_state == State::kNotStarted);
-    _pool = makeThreadPool(_getReadOrWrite());
+    auto serviceType = "Read"_sd;
+    _pool = makeThreadPool(serviceType);
     _waitForMajorityClient = ClientStrand::make(
-        ctx->getService(ClusterRole::ShardServer)->makeClient(kWaitClientName + _getReadOrWrite()));
-    _waitForMajorityCancellationClient =
-        ClientStrand::make(ctx->getService(ClusterRole::ShardServer)
-                               ->makeClient(kCancelClientName + _getReadOrWrite()));
+        ctx->getService(ClusterRole::ShardServer)->makeClient(kWaitClientName + serviceType));
+    _waitForMajorityCancellationClient = ClientStrand::make(
+        ctx->getService(ClusterRole::ShardServer)->makeClient(kCancelClientName + serviceType));
     _backgroundWorkComplete = _periodicallyWaitForMajority();
     _pool->startup();
     _state = State::kRunning;
@@ -134,11 +133,11 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajorityForRead(
 }
 
 SemiFuture<void> WaitForMajorityService::waitUntilMajorityForWrite(
-    const repl::OpTime& opTime, const CancellationToken& cancelToken) {
-    return _writeService.waitUntilMajority(opTime, cancelToken);
+    ServiceContext* service, const repl::OpTime& opTime, const CancellationToken& cancelToken) {
+    return _writeService.waitUntilMajority(service, opTime, cancelToken);
 }
 
-void WaitForMajorityServiceImplBase::shutDown() {
+void WaitForMajorityServiceForReadImpl::shutDown() {
     {
         stdx::lock_guard lk(_mutex);
 
@@ -168,7 +167,7 @@ void WaitForMajorityServiceImplBase::shutDown() {
     _waitForMajorityCancellationClient.reset();
 }
 
-SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
+SemiFuture<void> WaitForMajorityServiceForReadImpl::waitUntilMajority(
     const repl::OpTime& opTime, const CancellationToken& cancelToken) {
 
     auto [promise, future] = makePromiseFuture<void>();
@@ -233,10 +232,20 @@ SemiFuture<void> WaitForMajorityServiceImplBase::waitUntilMajority(
     return std::move(future).semi();
 }
 
-Status WaitForMajorityServiceForWriteImpl::_waitForOpTime(OperationContext* opCtx,
-                                                          const repl::OpTime& opTime) {
-    WriteConcernResult ignoreResult;
-    return waitForWriteConcern(opCtx, opTime, kMajorityWriteConcern, &ignoreResult);
+SemiFuture<void> WaitForMajorityServiceForWriteImpl::waitUntilMajority(
+    ServiceContext* service, const repl::OpTime& opTime, const CancellationToken& cancelToken) {
+    auto const replCoord = repl::ReplicationCoordinator::get(service);
+
+    // Wait for replication
+    if (opTime.isNull()) {
+        // no write happened for this client yet
+        return SemiFuture<void>::makeReady();
+    }
+
+    auto writeConcernFuture =
+        replCoord->awaitReplicationAsyncNoWTimeout(opTime, kMajorityWriteConcern);
+
+    return future_util::withCancellation(std::move(writeConcernFuture), cancelToken);
 }
 
 Status WaitForMajorityServiceForReadImpl::_waitForOpTime(OperationContext* opCtx,
@@ -251,7 +260,7 @@ Status WaitForMajorityServiceForReadImpl::_waitForOpTime(OperationContext* opCtx
     return status;
 }
 
-SemiFuture<void> WaitForMajorityServiceImplBase::_periodicallyWaitForMajority() {
+SemiFuture<void> WaitForMajorityServiceForReadImpl::_periodicallyWaitForMajority() {
     /**
      * Enqueue a request to wait for the given opTime to be majority committed.
      */

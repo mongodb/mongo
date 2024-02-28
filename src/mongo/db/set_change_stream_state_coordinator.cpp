@@ -78,7 +78,8 @@ void waitUntilMajorityForWrite(OperationContext* opCtx) {
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
     WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajorityForWrite(lastLocalOpTime, opCtx->getCancellationToken())
+        .waitUntilMajorityForWrite(
+            opCtx->getServiceContext(), lastLocalOpTime, opCtx->getCancellationToken())
         .get(opCtx);
 }
 

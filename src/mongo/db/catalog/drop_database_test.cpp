@@ -295,7 +295,7 @@ TEST_F(DropDatabaseTest, DropDatabaseWaitsForDropPendingCollectionOpTimeIfNoColl
 
     // Update ReplicationCoordinatorMock so that we record the optime passed to awaitReplication().
     _replCoord->setAwaitReplicationReturnValueFunction(
-        [&clientLastOpTime, this](OperationContext*, const repl::OpTime& opTime) {
+        [&clientLastOpTime, this](const repl::OpTime& opTime) {
             clientLastOpTime = opTime;
             ASSERT_GREATER_THAN(clientLastOpTime, repl::OpTime());
             return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
@@ -310,12 +310,11 @@ TEST_F(DropDatabaseTest, DropDatabaseWaitsForDropPendingCollectionOpTimeIfNoColl
 
 TEST_F(DropDatabaseTest, DropDatabasePassedThroughAwaitReplicationErrorForDropPendingCollection) {
     // Update ReplicationCoordinatorMock so that we record the optime passed to awaitReplication().
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [this](OperationContext*, const repl::OpTime& opTime) {
-            ASSERT_GREATER_THAN(opTime, repl::OpTime());
-            return repl::ReplicationCoordinator::StatusAndDuration(
-                Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
-        });
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime& opTime) {
+        ASSERT_GREATER_THAN(opTime, repl::OpTime());
+        return repl::ReplicationCoordinator::StatusAndDuration(
+            Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
+    });
 
     repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
     auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
@@ -378,7 +377,7 @@ void _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(OperationCon
 TEST_F(DropDatabaseTest,
        DropDatabaseResetsDropPendingStateIfAwaitReplicationFailsAndDatabaseIsPresent) {
     // Update ReplicationCoordinatorMock so that awaitReplication() fails.
-    _replCoord->setAwaitReplicationReturnValueFunction([](OperationContext*, const repl::OpTime&) {
+    _replCoord->setAwaitReplicationReturnValueFunction([](const repl::OpTime&) {
         return repl::ReplicationCoordinator::StatusAndDuration(
             Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
     });
@@ -389,12 +388,11 @@ TEST_F(DropDatabaseTest,
 TEST_F(DropDatabaseTest,
        DropDatabaseResetsDropPendingStateIfAwaitReplicationFailsAndDatabaseIsMissing) {
     // Update ReplicationCoordinatorMock so that awaitReplication() fails.
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [this](OperationContext*, const repl::OpTime&) {
-            _removeDatabaseFromCatalog(_opCtx.get(), _nss.db_forTest());
-            return repl::ReplicationCoordinator::StatusAndDuration(
-                Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
-        });
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
+        _removeDatabaseFromCatalog(_opCtx.get(), _nss.db_forTest());
+        return repl::ReplicationCoordinator::StatusAndDuration(
+            Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
+    });
 
     _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(_opCtx.get(), _nss, false);
 }
@@ -402,11 +400,10 @@ TEST_F(DropDatabaseTest,
 TEST_F(DropDatabaseTest,
        DropDatabaseReturnsNamespaceNotFoundIfDatabaseIsRemovedAfterCollectionsDropsAreReplicated) {
     // Update ReplicationCoordinatorMock so that awaitReplication() fails.
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [this](OperationContext*, const repl::OpTime&) {
-            _removeDatabaseFromCatalog(_opCtx.get(), _nss.db_forTest());
-            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
-        });
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
+        _removeDatabaseFromCatalog(_opCtx.get(), _nss.db_forTest());
+        return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
+    });
 
     _createCollection(_opCtx.get(), _nss);
 
@@ -425,13 +422,12 @@ TEST_F(DropDatabaseTest,
 TEST_F(DropDatabaseTest,
        DropDatabaseReturnsNotMasterIfNotPrimaryAfterCollectionsDropsAreReplicated) {
     // Transition from PRIMARY to SECONDARY while awaiting replication of collection drops.
-    _replCoord->setAwaitReplicationReturnValueFunction(
-        [this](OperationContext*, const repl::OpTime&) {
-            ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
-            ASSERT_TRUE(_opCtx->writesAreReplicated());
-            ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.dbName()));
-            return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
-        });
+    _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
+        ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
+        ASSERT_TRUE(_opCtx->writesAreReplicated());
+        ASSERT_FALSE(_replCoord->canAcceptWritesForDatabase(_opCtx.get(), _nss.dbName()));
+        return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
+    });
 
     _createCollection(_opCtx.get(), _nss);
 

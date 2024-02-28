@@ -245,7 +245,9 @@ void RenameParticipantInstance::_enterPhase(Phase newPhase) {
             const auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
             const auto lastLocalOpTime = replCoord->getMyLastAppliedOpTime();
             WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajorityForWrite(lastLocalOpTime, opCtx.get()->getCancellationToken())
+                .waitUntilMajorityForWrite(opCtx->getServiceContext(),
+                                           lastLocalOpTime,
+                                           opCtx.get()->getCancellationToken())
                 .get(opCtx.get());
         }
     } else {

@@ -94,8 +94,7 @@ public:
         replCoord->setCanAcceptNonLocalWrites(true);
         std::ignore = replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY);
         // Make waitForWriteConcern return immediately.
-        replCoord->setAwaitReplicationReturnValueFunction([this](OperationContext* opCtx,
-                                                                 const repl::OpTime& opTime) {
+        replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime& opTime) {
             return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
         });
         repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));

@@ -394,8 +394,7 @@ public:
      * Sets the function to generate the return value for calls to awaitReplication().
      * 'OperationContext' and 'opTime' are the parameters passed to awaitReplication().
      */
-    using AwaitReplicationReturnValueFunction =
-        std::function<StatusAndDuration(OperationContext*, const OpTime&)>;
+    using AwaitReplicationReturnValueFunction = std::function<StatusAndDuration(const OpTime&)>;
     void setAwaitReplicationReturnValueFunction(
         AwaitReplicationReturnValueFunction returnValueFunction);
 
@@ -509,8 +508,7 @@ private:
     ServiceContext* const _service;
     ReplSettings _settings;
     StorageInterface* _storage = nullptr;
-    AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [](OperationContext*,
-                                                                                  const OpTime&) {
+    AwaitReplicationReturnValueFunction _awaitReplicationReturnValueFunction = [](const OpTime&) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     };
     RunCmdOnPrimaryAndAwaitResponseFunction _runCmdOnPrimaryAndAwaitResponseFn;

@@ -1571,7 +1571,8 @@ Status ShardingCatalogManager::_pullClusterTimeKeys(
 
     auto opTime = keys_collection_util::storeExternalClusterTimeKeyDocs(opCtx, std::move(keyDocs));
     auto waitStatus = WaitForMajorityService::get(opCtx->getServiceContext())
-                          .waitUntilMajorityForWrite(opTime, opCtx->getCancellationToken())
+                          .waitUntilMajorityForWrite(
+                              opCtx->getServiceContext(), opTime, opCtx->getCancellationToken())
                           .getNoThrow();
     if (!waitStatus.isOK()) {
         return waitStatus;

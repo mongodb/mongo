@@ -918,7 +918,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
             // doesn't rollback.
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajorityForWrite(writeOpTime, CancellationToken::uncancelable());
+                .waitUntilMajorityForWrite(
+                    opCtx->getServiceContext(), writeOpTime, CancellationToken::uncancelable());
         })
         .semi();
 }
@@ -1917,7 +1918,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
         })
         .then([this, self = shared_from_this()](repl::OpTime opTime) {
             return WaitForMajorityService::get(_serviceContext)
-                .waitUntilMajorityForWrite(opTime, CancellationToken::uncancelable());
+                .waitUntilMajorityForWrite(
+                    _serviceContext, opTime, CancellationToken::uncancelable());
         })
         .onError([](Status status) {
             // We assume that we only fail with shutDown/stepDown errors (i.e. for
@@ -2089,7 +2091,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMa
 
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajorityForWrite(writeOpTime, CancellationToken::uncancelable());
+                .waitUntilMajorityForWrite(
+                    opCtx->getServiceContext(), writeOpTime, CancellationToken::uncancelable());
         })
         .semi();
 }

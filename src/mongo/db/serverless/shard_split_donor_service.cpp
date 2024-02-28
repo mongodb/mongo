@@ -1093,7 +1093,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForMajorityWriteConcern(
     const ScopedTaskExecutorPtr& executor, repl::OpTime opTime, const CancellationToken& token) {
     return WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajorityForWrite(std::move(opTime), token)
+        .waitUntilMajorityForWrite(_serviceContext, std::move(opTime), token)
         .thenRunOn(**executor);
 }
 

@@ -296,9 +296,11 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_runUntilDo
                 .then([this, executor, cancelToken, cancelableFactory] {
                     return _transitionToReadyToCommit(executor, cancelToken);
                 })
-                .then([this, cancelToken](const repl::OpTime& readyToCommitOpTime) {
+                .then([this, cancelToken, cancelableFactory](
+                          const repl::OpTime& readyToCommitOpTime) {
                     return WaitForMajorityService::get(_serviceContext)
-                        .waitUntilMajorityForWrite(readyToCommitOpTime, cancelToken);
+                        .waitUntilMajorityForWrite(
+                            _serviceContext, readyToCommitOpTime, cancelToken);
                 });
         })
         .onTransientError([](const Status& status) {})
