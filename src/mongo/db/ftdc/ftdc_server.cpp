@@ -117,6 +117,15 @@ Status onUpdateFTDCEnabled(const bool value) {
     return Status::OK();
 }
 
+Status onUpdateFTDCMetadataCaptureFrequency(const std::int32_t potentialNewValue) {
+    if (FTDCController * controller;
+        hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
+        controller->setMetadataCaptureFrequency(potentialNewValue);
+    }
+
+    return Status::OK();
+}
+
 Status onUpdateFTDCPeriod(const std::int32_t potentialNewValue) {
     if (FTDCController * controller;
         hasGlobalServiceContext() && (controller = getFTDCController(getGlobalServiceContext()))) {
@@ -319,6 +328,7 @@ void startFTDC(ServiceContext* serviceContext,
                UseMultiServiceSchema multiServiceSchema) {
     FTDCConfig config;
     config.period = Milliseconds(ftdcStartupParams.periodMillis.load());
+    config.metadataCaptureFrequency = ftdcStartupParams.metadataCaptureFrequency.load();
     // Only enable FTDC if our caller says to enable FTDC, MongoS may not have a valid path to write
     // files to so update the diagnosticDataCollectionEnabled set parameter to reflect that.
     ftdcStartupParams.enabled.store(startupMode == FTDCStartMode::kStart &&

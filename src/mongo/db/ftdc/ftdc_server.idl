@@ -51,6 +51,15 @@ server_parameters:
         gte: 100
     redact: false
 
+  diagnosticDataCollectionMetadataCaptureFrequency:
+    description: "Specifies the interval, in instances of diagnostic data collection, at which to collect diagnostic config metadata."
+    set_at: [startup, runtime]
+    cpp_varname: "ftdcStartupParams.metadataCaptureFrequency"
+    on_update: "onUpdateFTDCMetadataCaptureFrequency"
+    validator:
+        gte: 1
+    redact: false
+
   diagnosticDataCollectionDirectorySizeMB:
     description: "Specifies the maximum size, in megabytes, of the diagnostic.data directory"
     set_at: [startup, runtime]

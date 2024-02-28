@@ -120,6 +120,7 @@ private:
 struct FTDCStartupParams {
     AtomicWord<bool> enabled;
     AtomicWord<int> periodMillis;
+    AtomicWord<int> metadataCaptureFrequency;
 
     AtomicWord<int> maxDirectorySizeMB;
     AtomicWord<int> maxFileSizeMB;
@@ -129,6 +130,7 @@ struct FTDCStartupParams {
     FTDCStartupParams()
         : enabled(FTDCConfig::kEnabledDefault),
           periodMillis(FTDCConfig::kPeriodMillisDefault),
+          metadataCaptureFrequency(FTDCConfig::kMetadataCaptureFrequencyDefault),
           // Scale the values down since are defaults are in bytes, but the user interface is MB
           maxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024)),
           maxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024)),
@@ -143,6 +145,7 @@ extern FTDCStartupParams ftdcStartupParams;
  */
 Status onUpdateFTDCEnabled(bool value);
 Status onUpdateFTDCPeriod(std::int32_t value);
+Status onUpdateFTDCMetadataCaptureFrequency(std::int32_t value);
 Status onUpdateFTDCDirectorySize(std::int32_t value);
 Status onUpdateFTDCFileSize(std::int32_t value);
 Status onUpdateFTDCSamplesPerChunk(std::int32_t value);

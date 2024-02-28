@@ -248,11 +248,8 @@ boost::optional<BSONObj> FTDCMetadataCompressor::addSample(const BSONObj& sample
     BSONObjBuilder deltaDocBuilder;
     JITBSONObjBuilderStack jitBuilderStack(&deltaDocBuilder);
 
-    auto cleanCompare = compareAndBuildDelta(_referenceDoc,
-                                             sample,
-                                             &jitBuilderStack,
-                                             _multiServiceSchema ? 2 : 1 /*maxDepth*/,
-                                             true /*hasDates*/);
+    auto cleanCompare = compareAndBuildDelta(
+        _referenceDoc, sample, &jitBuilderStack, 1 /*maxDepth*/, true /*hasDates*/);
     if (!cleanCompare.has_value()) {
         _reset(sample);
         return sample;

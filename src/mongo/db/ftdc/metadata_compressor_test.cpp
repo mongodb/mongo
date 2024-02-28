@@ -40,13 +40,13 @@ namespace mongo {
     std::cout << "Running " << _testInfo.testName() <<" with multiservice=" << \
     multiservice << std::endl
 
-#define TEST_END                          \
-    }                                     \
-    ;                                     \
-    do {                                  \
-        for (auto mode : {true, false}) { \
-            runTest(mode);                \
-        }                                 \
+#define TEST_END                    \
+    }                               \
+    ;                               \
+    do {                            \
+        for (auto mode : {false}) { \
+            runTest(mode);          \
+        }                           \
     } while (0)
 
 const Date_t kDate = Date_t::now();

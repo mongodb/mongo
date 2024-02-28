@@ -79,6 +79,12 @@ public:
     Status setEnabled(bool enabled);
 
     /**
+     * Set the frequency of metadata capture. Metadata will be captured once every `freq` times FTDC
+     * data is collected.
+     */
+    void setMetadataCaptureFrequency(std::uint64_t freq);
+
+    /**
      * Set the period for data collection.
      */
     void setPeriod(Milliseconds millis);
@@ -113,6 +119,16 @@ public:
      * Returns ErrorCodes::FTDCPathAlreadySet if the path has already been set.
      */
     Status setDirectory(const boost::filesystem::path& path);
+
+    /**
+     * Add a metadata collector to collect periodically (e.g., Configuration Settings). Does not
+     * lose info on compression. Collects as or less frequently than PeriodicCollector.
+     *
+     * `role` is used to disambiguate role-specific collectors with colliding names.
+     * It must be `ClusterRole::ShardServer`, `ClusterRole::RouterServer`, or `ClusterRole::None`.
+     */
+    void addPeriodicMetadataCollector(std::unique_ptr<FTDCCollectorInterface> collector,
+                                      ClusterRole role);
 
     /**
      * Add a metric collector to collect periodically (e.g., serverStatus).
@@ -210,6 +226,9 @@ private:
 
     // Config settings that are manipulated by setters via setParameter.
     FTDCConfig _configTemp;
+
+    // Set of periodic metadata collectors
+    FTDCCollectorCollection _periodicMetadataCollectors;
 
     // Set of periodic collectors
     FTDCCollectorCollection _periodicCollectors;
