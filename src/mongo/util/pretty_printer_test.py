@@ -40,8 +40,6 @@ def test_dbname_nss():
     search("foo.bar", nss_str)
     nss_tid_str = gdb.execute('print nssWithTenantId', to_string=True)
     search("6491a2112ef5c818703bf2a7_foo.bar", nss_tid_str)
-    long_nss_str = gdb.execute('print longNss', to_string=True)
-    search("longdatabasenamewithoutsmallstring.longcollection", long_nss_str)
 
 def test_string_map():
     search(r'absl::flat_hash_map.*0 elems', gdb.execute('print emptyMap', to_string=True))

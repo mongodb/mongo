@@ -60,21 +60,64 @@ struct OmitTenant {
 };
 constexpr inline OmitTenant omitTenant;
 
-constexpr unsigned char kSmallStringFlag = 2;
-constexpr unsigned char kStaticAllocFlag = 1;
-
 /**
  * A DatabaseName is a unique name for database.
  * It holds a database name and tenant id, if one exists. In a serverless environment, a tenant id
  * is expected to exist so that a database can be uniquely identified.
  */
 class DatabaseName {
-protected:
-    class Storage;
-
 public:
-#define DBNAME_CONSTANT(id, db) static const DatabaseName id;
+    /**
+     * Used to create `constexpr` reserved DatabaseName constants. See
+     * NamespaceString::ConstantProxy in namespace_string.h for more details.
+     */
+    class ConstantProxy {
+    public:
+        class SharedState {
+        public:
+            explicit constexpr SharedState(StringData db) : _db{db} {}
+
+            const DatabaseName& get() const {
+                std::call_once(_once, [this] {
+                    _dbName = new DatabaseName{TenantId::systemTenantId(), _db};
+                });
+                return *_dbName;
+            }
+
+        protected:
+            StringData _db;
+            mutable std::once_flag _once;
+            mutable const DatabaseName* _dbName = nullptr;
+        };
+
+        constexpr explicit ConstantProxy(const SharedState* sharedState)
+            : _sharedState{sharedState} {}
+
+        operator const DatabaseName&() const {
+            return _get();
+        }
+
+        StringData db(OmitTenant) const {
+            return _get().db(omitTenant);
+        }
+        decltype(auto) tenantId() const {
+            return _get().tenantId();
+        }
+        decltype(auto) toString() const {
+            return _get().toString();
+        }
+
+    protected:
+        const DatabaseName& _get() const {
+            return _sharedState->get();
+        }
+
+        const SharedState* _sharedState;
+    };
+
+#define DBNAME_CONSTANT(id, db) static const ConstantProxy id;
 #include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 
     static constexpr size_t kMaxDatabaseNameLength = 63;
@@ -84,14 +127,12 @@ public:
      */
     DatabaseName() = default;
 
-    constexpr DatabaseName(const char* data, size_t length) : _data(data, length) {}
-
     /**
      * Construct a new DatabaseName from a reference. This reference could be a NamespaceString so
      * only use the discriminator, tenant id and database name from its data.
      */
     DatabaseName(const DatabaseName& dbName)
-        : _data(dbName._data, dbName.sizeWithTenant() + kDataOffset) {}
+        : _data(dbName.view().substr(0, dbName.sizeWithTenant() + kDataOffset)) {}
 
     DatabaseName(DatabaseName&& dbName) = default;
 
@@ -102,15 +143,7 @@ public:
      * tenant id and database name from its data.
      */
     DatabaseName& operator=(const DatabaseName& dbName) {
-        if (dbName._data.isDynamicAlloc()) {
-            _data.deallocate();
-            _data = Storage(dbName._data, dbName.sizeWithTenant() + kDataOffset);
-        } else if (dbName._data.isSmallString()) {
-            _data = dbName._data;
-            _data.updateFooter(kSmallStringFlag, dbName.sizeWithTenant() + kDataOffset);
-        } else {
-            _data = dbName._data;
-        }
+        _data = dbName.view().substr(0, dbName.sizeWithTenant() + kDataOffset).toString();
         return *this;
     }
 
@@ -129,14 +162,14 @@ public:
             return boost::none;
         }
 
-        return TenantId{OID::from(_data.data() + kDataOffset)};
+        return TenantId{OID::from(&_data[kDataOffset])};
     }
 
     /**
      * Returns the size of the name of this Database.
      */
-    constexpr size_t size() const {
-        return static_cast<uint8_t>(*_data.data()) & kDatabaseNameOffsetEndMask;
+    size_t size() const {
+        return static_cast<uint8_t>(_data.front()) & kDatabaseNameOffsetEndMask;
     }
 
     bool isEmpty() const {
@@ -308,7 +341,7 @@ public:
      * DatabaseName that can never contain a tenant id (such as global database constants) otherwise
      * data isolation between tenant can break.
      */
-    constexpr StringData db(OmitTenant) const {
+    StringData db(OmitTenant) const {
         return view().substr(dbNameOffsetStart(), size());
     }
 
@@ -338,18 +371,15 @@ protected:
     /**
      * Returns the offset from the start of _data to the start of the database name.
      */
-    constexpr size_t dbNameOffsetStart() const {
-        if (std::is_constant_evaluated()) {
-            return kDataOffset;
-        }
+    size_t dbNameOffsetStart() const {
         return kDataOffset + tenantIdSize();
     }
 
     /**
      * Returns a view of the internal string.
      */
-    constexpr StringData view() const {
-        return StringData{_data.data(), _data.size()};
+    StringData view() const {
+        return _data;
     }
 
     /**
@@ -357,8 +387,7 @@ protected:
      * "dbString" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbString is a valid db name.
      */
-    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString)
-        : _data(Storage::make(std::move(tenantId), dbString)) {
+    DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
         uassert(ErrorCodes::InvalidNamespace,
                 "'.' is an invalid character in a db name: " + dbString,
                 dbString.find('.') == std::string::npos);
@@ -370,15 +399,23 @@ protected:
                             kMaxDatabaseNameLength,
                             dbString.size()),
                 dbString.size() <= kMaxDatabaseNameLength);
-    }
 
-    /**
-     * These constructor are invoked by NamespaceString. They are necessary to reduce copies
-     * or to ensure DatabaseName constructors do not remove the collection of the namespace string.
-     */
-    struct TrustedInitTag {};
-    DatabaseName(Storage&& data, TrustedInitTag) noexcept : _data(std::move(data)) {}
-    DatabaseName(const Storage& data, size_t size, TrustedInitTag) noexcept : _data(data, size) {}
+        uint8_t details = dbString.size() & kDatabaseNameOffsetEndMask;
+        size_t dbStartIndex = kDataOffset;
+        if (tenantId) {
+            dbStartIndex += OID::kOIDSize;
+            details |= kTenantIdMask;
+        }
+
+        _data.resize(dbStartIndex + dbString.size());
+        *reinterpret_cast<uint8_t*>(_data.data()) = details;
+        if (tenantId) {
+            std::memcpy(_data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
+        }
+        if (!dbString.empty()) {
+            std::memcpy(_data.data() + dbStartIndex, dbString.rawData(), dbString.size());
+        }
+    }
 
     StringData tenantIdView() const {
         if (!hasTenantId()) {
@@ -394,7 +431,7 @@ protected:
 
     std::string toStringWithTenantId() const {
         if (hasTenantId()) {
-            auto tenantId = TenantId{OID::from(_data.data() + kDataOffset)};
+            auto tenantId = TenantId{OID::from(&_data[kDataOffset])};
             return str::stream() << tenantId.toString() << "_" << db(omitTenant);
         }
 
@@ -406,13 +443,15 @@ protected:
     static constexpr uint8_t kDatabaseNameOffsetEndMask = 0x7F;
 
     bool hasTenantId() const {
-        return static_cast<uint8_t>(*_data.data()) & kTenantIdMask;
+        return static_cast<uint8_t>(_data.front()) & kTenantIdMask;
     }
 
+    // Private constructor for NamespaceString to construct DatabaseName from its own internal data
+    struct TrustedInitTag {};
+    DatabaseName(std::string data, TrustedInitTag) : _data(std::move(data)) {}
+
     /**
-     * Storage contains the underlying data for a DatabaseName or a NamespaceString. The data is
-     * accessible using the data() and size() accessors. It is packed into a  string consisting of
-     * these concatenated parts:
+     * We pack all possible namespaces data into a string consisting of these concatenated parts:
      *
      * Length      Name            Description
      * ---------------------------------------------------------------------------------------------
@@ -434,286 +473,8 @@ protected:
      *    ...      collection      Collection name.
      *                             Optional, only if `this` is a NamespaceString and there is space
      *                             left in the string.
-     *
      */
-    class Storage {
-    public:
-        constexpr Storage(const char* data, size_t length) noexcept
-            : _data(data), _length(length), _footer(createFooter(kStaticAllocFlag, 0)) {}
-
-        Storage() noexcept
-            : _data(nullptr), _length(0), _footer(createFooter(kSmallStringFlag, kDataOffset)) {}
-
-        constexpr ~Storage() {
-            if (!std::is_constant_evaluated()) {
-                if (isDynamicAlloc() && _data != nullptr) {
-                    delete[] _data;
-                }
-            }
-        }
-
-        /**
-         * Constructs a copy of other and, possibly, truncate the data.
-         *
-         * newSize must be smaller of equal than other.size(). It might be smaller if other contains
-         * a collection and we are only trying to copy the database part from it.
-         */
-        Storage(const Storage& other, const size_t newSize)
-            : _data(other._data), _length(other._length), _footer(other._footer) {
-            if (other.isStaticAlloc() && other.size() == newSize) {
-                return;
-            } else if (other.isSmallString()) {
-                updateFooter(kSmallStringFlag, newSize);
-            } else if (newSize < kSmallStringSize) {
-                setFooter(kSmallStringFlag, newSize);
-                memcpy(mutableDataptr(), other._data, newSize);
-            } else if (other.isDynamicAlloc()) {
-                char* dataptr = new char[newSize];
-                _data = dataptr;
-                _length = newSize;
-                memcpy(dataptr, other._data, newSize);
-            }
-        }
-
-        Storage(Storage&& other) noexcept
-            : _data(other._data), _length(other._length), _footer(other._footer) {
-            if (other.isDynamicAlloc()) {
-                other.reset();
-            }
-        }
-
-        Storage& operator=(Storage&& other) noexcept {
-            deallocate();
-            copy(other);
-            if (other.isDynamicAlloc()) {
-                other.reset();
-            }
-            return *this;
-        }
-
-        Storage& operator=(const Storage& other) {
-            deallocate();
-            copy(other);
-            if (other.isDynamicAlloc()) {
-                char* dataptr = new char[other.size()];
-                _data = dataptr;
-                memcpy(dataptr, other._data, other.size());
-            }
-            return *this;
-        }
-
-        void copy(const Storage& other) noexcept {
-            _data = other._data;
-            _length = other._length;
-            _footer = other._footer;
-        }
-
-        /**
-         * Resets the data to an empty Storage (small string optimisation without data).
-         */
-        void reset() {
-            _data = nullptr;
-            _length = 0;
-            setFooter(kSmallStringFlag, kDataOffset);
-        }
-
-        void deallocate() {
-            if (isDynamicAlloc() && _data != nullptr) {
-                delete[] _data;
-                reset();
-            }
-        }
-
-        /**
-         * Returns a word with a valid flag byte and the rest of the data cleared.
-         */
-        constexpr size_t createFooter(unsigned char flagsIn, unsigned char length) {
-            if (flagsIn & kSmallStringFlag) {
-                flagsIn |= (length << 2);
-            }
-
-            char byteflags[sizeof(size_t)] = {0};
-            byteflags[sizeof(size_t) - 1] = flagsIn;
-            return std::bit_cast<size_t>(byteflags);
-        }
-
-        /**
-         * Sets the footer field with the correct flags and length. Clear the first sizeof(_footer)
-         * - 1 bytes which might store data when using the small string optimisation.
-         */
-        void setFooter(unsigned char flagsIn, unsigned char length = 0) {
-            _footer = createFooter(flagsIn, length);
-        }
-
-        /**
-         * Sets the flag and length of the footer field without changing the first sizeof(_footer) -
-         * 1 bytes which might contain data.
-         */
-        void updateFooter(unsigned char flagsIn, unsigned char length) {
-            if (flagsIn & kSmallStringFlag) {
-                flagsIn |= (length << 2);
-            }
-            reinterpret_cast<unsigned char*>(&_footer)[sizeof(size_t) - 1] = flagsIn;
-        }
-
-        /**
-         * Returns a pointer to the data contained, abstract out the different modes (static
-         * allocation, dynamic allocation or small-string optimisation).
-         */
-        constexpr const char* data() const {
-            if (std::is_constant_evaluated()) {
-                return _data;
-            }
-            if (isSmallString())
-                return reinterpret_cast<const char*>(&_data);
-            return _data;
-        }
-
-        constexpr size_t size() const {
-            if (isSmallString()) {
-                return getFlags() >> 2;
-            }
-            return _length;
-        }
-
-        constexpr bool isSmallString() const {
-            return getFlags() & kSmallStringFlag;
-        }
-
-        constexpr bool isDynamicAlloc() const {
-            return getFlags() == 0;
-        }
-
-        constexpr bool isStaticAlloc() const {
-            return getFlags() & kStaticAllocFlag;
-        }
-
-        static Storage make(StringData db,
-                            StringData collectionName,
-                            bool hasTenant,
-                            const char* tenantData) {
-            uassert(ErrorCodes::InvalidNamespace,
-                    "Collection names cannot start with '.': " + collectionName,
-                    collectionName.empty() || collectionName[0] != '.');
-            uassert(ErrorCodes::InvalidNamespace,
-                    "namespaces cannot have embedded null characters",
-                    collectionName.find('\0') == std::string::npos);
-
-            uint8_t details = db.size() & kDatabaseNameOffsetEndMask;
-            size_t dbStartIndex = kDataOffset;
-            if (hasTenant) {
-                dbStartIndex += OID::kOIDSize;
-                details |= kTenantIdMask;
-            }
-
-            Storage data;
-            // Note there is no null terminator.
-            constexpr size_t dotSize = 1;
-            const size_t length = collectionName.empty()
-                ? dbStartIndex + db.size()
-                : dbStartIndex + db.size() + dotSize + collectionName.size();
-
-            char* dataptr;
-            if (length > kSmallStringSize) {
-                dataptr = new char[length];
-                data._data = dataptr;
-                data._length = length;
-                data._footer = 0;
-            } else {
-                data.setFooter(kSmallStringFlag, static_cast<unsigned char>(length));
-                dataptr = data.mutableDataptr();
-            }
-            invariant(dataptr == data.mutableDataptr());
-
-            *dataptr = details;
-            if (hasTenant) {
-                std::memcpy(dataptr + kDataOffset, tenantData, OID::kOIDSize);
-            }
-
-            if (!db.empty()) {
-                std::memcpy(dataptr + dbStartIndex, db.data(), db.size());
-            }
-
-            if (!collectionName.empty()) {
-                *(dataptr + dbStartIndex + db.size()) = '.';
-                std::memcpy(dataptr + dbStartIndex + db.size() + dotSize,
-                            collectionName.rawData(),
-                            collectionName.size());
-            }
-
-            return data;
-        }
-
-        static Storage make(const DatabaseName& dbName, StringData collectionName) {
-            return make(dbName.db(omitTenant),
-                        collectionName,
-                        dbName.hasTenantId(),
-                        dbName._data.data() + kDataOffset);
-        }
-
-        static Storage make(boost::optional<TenantId> tenantId,
-                            StringData db,
-                            StringData collectionName) {
-            uassert(ErrorCodes::InvalidNamespace,
-                    fmt::format("db name must be at most {} characters, found: {}",
-                                kMaxDatabaseNameLength,
-                                db.size()),
-                    db.size() <= kMaxDatabaseNameLength);
-            uassert(ErrorCodes::InvalidNamespace,
-                    "namespace cannot have embedded null characters",
-                    db.find('\0') == std::string::npos);
-
-            const char* tenantData = tenantId ? tenantId->_oid.view().view() : nullptr;
-
-            return make(db, collectionName, !!tenantId, tenantData);
-        }
-
-        static Storage make(boost::optional<TenantId> tenantId, StringData ns) {
-            auto dotIndex = ns.find('.');
-            if (dotIndex == std::string::npos) {
-                return make(tenantId, ns, StringData{});
-            }
-
-            return make(tenantId, ns.substr(0, dotIndex), ns.substr(dotIndex + 1));
-        }
-
-    private:
-        /**
-         * Extracts the flags's byte from the _footer field.
-         */
-        constexpr unsigned char getFlags() const {
-            return std::bit_cast<std::array<char, sizeof(size_t)>>(_footer)[sizeof(size_t) - 1];
-        }
-
-        char* mutableDataptr() {
-            if (isSmallString())
-                return reinterpret_cast<char*>(&_data);
-            return const_cast<char*>(_data);
-        }
-
-        /**
-         * Storage can work in three different mode (dynamic allocation, static allocation or
-         * small-string optimisation) depending on the flag bits (the last two bits of _footer) :
-         *     Flags value given by _footer[sizeof(_footer) - 1] & 0x00000011:
-         *         0: the data is dynamically allocated.
-         *         1: the data is statically allocated.
-         *         2: the data is packed using the small string optimisation
-         *
-         * When using static of dynamic allocation, _data is a pointer to the actual data and
-         * _length contains its size.
-         *
-         * When using the small string optimisation the data is packed in _data, _length and the
-         * first sizeof(_footer)-1 bytes of _footer. The size of the data is contained in the first
-         * 6 bits of the last byte of _footer :
-         */
-        const char* _data;
-        size_t _length;
-        size_t _footer;
-    };
-    Storage _data;
-
-    static constexpr const size_t kSmallStringSize =
-        std::min(sizeof(Storage) - sizeof(char), size_t(63));
+    std::string _data{'\0'};
 };
 
 inline std::string stringifyForAssert(const DatabaseName& dbName) {
@@ -755,28 +516,22 @@ inline bool DatabaseName::validDBName(StringData db,
     return true;
 }
 
-// The `constexpr` definitions for `DatabaseName` static data members are below.
-namespace dbname_detail::constexpr_data {
-template <size_t dbSize>
-constexpr auto makeDbData(const char* db) {
-    // The 1 is the length/no-tenant marker.
-    std::array<char, 1 + dbSize> result{};
-    auto p = result.begin();
-    *p++ = dbSize;
-    p = std::copy_n(db, dbSize, p);
-    return result;
-}
-#define DBNAME_CONSTANT(id, db) \
-    constexpr inline auto id##_data = makeDbData<db.size()>(db.rawData());
-#include "database_name_reserved.def.h"
-#undef DBNAME_CONSTANT
-}  // namespace dbname_detail::constexpr_data
 
-#define DBNAME_CONSTANT(id, db)                          \
-    constexpr inline DatabaseName DatabaseName::id(      \
-        dbname_detail::constexpr_data::id##_data.data(), \
-        dbname_detail::constexpr_data::id##_data.size());
-#include "database_name_reserved.def.h"
+// The `constexpr` definitions for `DatabaseName::ConstantProxy` static data members are below. See
+// `constexpr` definitions for the `NamespaceString::ConstantProxy` static data members of NSS in
+// namespace_string.h for more details.
+namespace dbname_detail::const_proxy_shared_states {
+#define DBNAME_CONSTANT(id, db) constexpr inline DatabaseName::ConstantProxy::SharedState id{db};
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
+
+#undef DBNAME_CONSTANT
+}  // namespace dbname_detail::const_proxy_shared_states
+
+#define DBNAME_CONSTANT(id, db)                                    \
+    constexpr inline DatabaseName::ConstantProxy DatabaseName::id{ \
+        &dbname_detail::const_proxy_shared_states::id};
+#include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 
 }  // namespace mongo

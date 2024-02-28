@@ -142,7 +142,7 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
     WiredTigerRecoveryUnit* ru =
         checked_cast<WiredTigerRecoveryUnit*>(shard_role_details::getRecoveryUnit(opCtx.get()));
-    std::string ident = redactTenant(NamespaceString::kRsOplogNamespace).toString();
+    std::string ident = NamespaceString::kRsOplogNamespace.ns().toString();
     std::string uri = WiredTigerKVEngine::kTableUriPrefix + ident;
 
     CollectionOptions options;

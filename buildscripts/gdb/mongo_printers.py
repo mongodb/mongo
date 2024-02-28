@@ -326,14 +326,6 @@ def extract_tenant_id(data):
     return "".join([hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes])
 
 
-def is_small_string(flags):
-    return bool(flags & 0b00000010)
-
-
-def small_string_size(flags):
-    return flags >> 2
-
-
 class DatabaseNamePrinter(object):
     """Pretty-printer for mongo::DatabaseName."""
 
@@ -346,28 +338,29 @@ class DatabaseNamePrinter(object):
         """Display hint."""
         return 'string'
 
-    def _get_storage_pointer(self):
-        """Return the data pointer from the _data Storage class."""
-        data = self.val['_data']
-        footer = data['_footer']
-        f_size = footer.type.sizeof
+    def to_string(self):
+        """Return string representation of DatabaseName."""
+        data = self.val['_data']['_M_dataplus']['_M_p']
+        if data[0] & TENANT_ID_MASK:
+            return f"{extract_tenant_id(data)}_{(data + OBJECT_ID_WIDTH + 1).string()}"
+        return (data + 1).string()
 
-        # The last byte of _footer contain the flags (and the size when using small string).
-        flags = footer.cast(gdb.lookup_type('char').array(f_size))[f_size - 1]
 
-        data_ptr = data['_data']
-        if is_small_string(flags):
-            size = small_string_size(flags)
-            # Casting to an array first allows conversion to a pointer
-            data_ptr = data_ptr.cast(gdb.lookup_type('char').array(size))\
-                .cast(gdb.lookup_type('char').pointer())
+class NamespaceStringPrinter(object):
+    """Pretty-printer for mongo::NamespaceString."""
 
-        return data_ptr
+    def __init__(self, val):
+        """Initialize NamespaceStringPrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'string'
 
     def to_string(self):
         """Return string representation of NamespaceString."""
-        data = self._get_storage_pointer()
-
+        data = self.val['_data']['_M_dataplus']['_M_p']
         if data[0] & TENANT_ID_MASK:
             return f"{extract_tenant_id(data)}_{(data + OBJECT_ID_WIDTH + 1).string()}"
         return (data + 1).string()
@@ -1011,7 +1004,7 @@ def build_pretty_printer():
     pp = MongoPrettyPrinterCollection()
     pp.add('BSONObj', 'mongo::BSONObj', False, BSONObjPrinter)
     pp.add('DatabaseName', 'mongo::DatabaseName', False, DatabaseNamePrinter)
-    pp.add('NamespaceString', 'mongo::NamespaceString', False, DatabaseNamePrinter)
+    pp.add('NamespaceString', 'mongo::NamespaceString', False, NamespaceStringPrinter)
     pp.add('Decorable', 'mongo::Decorable', True, DecorablePrinter)
     pp.add('Status', 'mongo::Status', False, StatusPrinter)
     pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)

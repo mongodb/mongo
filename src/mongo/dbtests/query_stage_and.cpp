@@ -181,19 +181,17 @@ public:
         return _nss;
     }
 
-private:
-    const NamespaceString _nss =
-        NamespaceString::createNamespaceString_forTest("unittests.QueryStageAnd");
-
 protected:
     const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_txnPtr;
 
     boost::intrusive_ptr<ExpressionContext> _expCtx =
-        make_intrusive<ExpressionContext>(&_opCtx, nullptr, _nss);
+        make_intrusive<ExpressionContext>(&_opCtx, nullptr, nss());
 
 private:
     DBDirectClient _client;
+    const NamespaceString _nss =
+        NamespaceString::createNamespaceString_forTest("unittests.QueryStageAnd");
 };
 
 //
