@@ -3,51 +3,33 @@
 # General style correction and cleanup.
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
+cd_top
 check_fast_mode_flag
 
-# Parallelize if possible.
-xp=""
-echo date | xargs -P 20 >/dev/null 2>&1
-if test $? -eq 0; then
-    xp="-P 20"
-fi
-
-# s_style is applied to every source file by default. It has a fast mode where it only runs against
-# modified files, according to git. Use -F for fast mode.
-single_file=0
-if [[ "$#" -eq 1 && "$1" != "-F" ]]; then
-    single_file=1
-else
-    if [[ -n "$NO_RECURSE" ]]; then
-        echo "INTERNAL ERROR: A possible infinite recursion detected!"
-        exit 1
-    fi
-fi
-
-# s_style is re-entrant, when run with no parameters it calls itself
-# again for each file that needs checking.
-if [ "$single_file" -ne 1 ]; then
-    cd_top
-    export NO_RECURSE=1
-    # Skip auto-generated and third party code, including SWIG generated workgen code.
+# Parallel execution: if it's the main onvocation of the script, collect the file names
+# to process and run them in subprocesses.
+is_main_run && {
     find bench examples ext src test -name '*.[ch]' -o -name '*.in' -o -name '*.dox' \
-            -o -name '*.cxx' -o -name '*.cpp' -o -name '*.py' -o -name '*.cmake' -o -name '*.i' |
-    filter_if_fast |
+            -o -name '*.cxx' -o -name '*.cpp' -o -name '*.py' -o -name '*.cmake' -o -name '*.i' | \
     sed -e '/Makefile.in/d' \
         -e '/test\/3rdparty/d' \
         -e '/test\/checksum\/power8/d' \
         -e '/bench\/workgen\/workgen_wrap.cxx/d' \
-        -e '/checksum\/zseries/d' |
-    xargs $xp -I{} bash ./dist/s_style {}
-else
+        -e '/checksum\/zseries/d' | \
+    do_in_parallel -n 5
+    exit $?
+}
+
+# A list of files provided: process them one by one.
+
+for f in "$@"; do
     # General style correction and cleanup for a single file
-    f=$1
     fname=`basename $f`
     rm -f "$t"
     t=__wt_s_style.$fname.$$
 
     if [ ! -e $f ]; then
-        echo "$0 error $1 does not exist"
+        echo "$0 error $f does not exist"
         exit 1;
     fi
 
@@ -259,6 +241,6 @@ else
             }
         fi
     fi
-fi
+done
 
 exit 0

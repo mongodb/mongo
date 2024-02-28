@@ -2,11 +2,11 @@
 
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 cd_top
+setup_trap 'rm -rf $t_out $t_out_filtered $t_build'
 
 t_out=__wt.$$.out
 t_out_filtered=__wt.$$.out_filtered
 t_build=__s_clang_scan_tmp_build
-trap 'rm -rf $t_out $t_out_filtered $t_build' 0 1 2 3 13 15
 
 echo "$0: running scan-build in $PWD"
 

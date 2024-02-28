@@ -190,7 +190,17 @@ func_ok()
 
 SUBDIRS="bench ext src test"
 
-for f in `find $SUBDIRS -name '*.c' -o -name '*_inline.h' | egrep -Ev '/windows_shim\.c$' | filter_if_fast`; do
+# Parallel execution: if it's the main onvocation of the script, collect the file names
+# to process and run them in subprocesses.
+is_main_run && {
+    find $SUBDIRS -name '*.c' -o -name '*_inline.h' | egrep -Ev '/windows_shim\.c$' |
+    do_in_parallel
+    exit $?
+}
+
+# A list of files provided: process them one by one.
+
+for f in "$@"; do
     # Complain about functions which return an "int" but which don't return
     # except at the end of the function.
     #

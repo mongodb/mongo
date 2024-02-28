@@ -19,108 +19,122 @@ file_parse()
         -e '{s/.*//;x;}'
 }
 
-files=`find bench examples ext src test -name '*.c' -o -name '*_inline.h' | filter_if_fast`
-
-[[ -z "$files" ]] && exit 0
-
-# Returns in functions after a jump to the error label, or an infinite loop
-# where there's a jump to the error label after the error label.
-for f in $files; do
-    file_parse $f |
-    egrep '(WT_ERR[_A-Z]*)\(.*(WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR)\(' |
-    sed 's/:.*//' > $t
-
-    test -s $t && {
-        echo "$f: return after a jump to the error label or a jump to the error label after the error label"
-        sed 's/^/function @ line:/' < $t
-    }
-done
-
-# Returns before jumps to an error label within the same loop.
-# Jumps before returns have already been detected above.
-for f in $files; do
-    file_parse $f | sed "s=^=$f:="
-done | python3 dist/s_function_loop.py |
-    egrep '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
-    sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
-
-# Early exits from WT_WITH_* macros.
-for f in $(grep -l 'WT_WITH_' $files); do
-    echo "===$f==="
-    cat $f
-done | python3 dist/s_function_with.py 2>&1 $t || exit 1
-test -s $t && {
-    echo "Misuse of WT_WITH_* macros:"
-    cat $t
+# Parallel execution: if it's the main onvocation of the script, collect the file names
+# to process and run them in subprocesses.
+is_main_run && {
+    find bench examples ext src test -name '*.c' -o -name '*_inline.h' |
+    do_in_parallel
+    exit $?
 }
 
-# Return of 0 in functions after a jump to the error label.
-for f in $files; do
-    file_parse $f |
-    egrep -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
-    egrep '[^a-z_]err:.*return \(0\);' |
-    sed 's/:.*//' > $t
+# A list of files provided: process them one by one.
 
-    test -s $t && {
-        echo "$f: error label followed by a return of 0"
-        sed 's/^/function @ line:/' < $t
+for f in "$@"; do
+    fp="$(file_parse $f)"
+
+    # Returns in functions after a jump to the error label, or an infinite loop
+    # where there's a jump to the error label after the error label.
+    {
+        echo "$fp" |
+        egrep '(WT_ERR[_A-Z]*)\(.*(WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR)\(' |
+        sed 's/:.*//' > $t-1
+
+        test -s $t-1 && {
+            echo "$f: return after a jump to the error label or a jump to the error label after the error label"
+            sed 's/^/function @ line:/' < $t-1
+        }
     }
-done
 
-# Early exits from critical loops.
-for f in $files; do
-    sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
-           -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
-           -e '/WT_TRACK_OP_INIT/,/WT_TRACK_OP_END/{=;p;}' \
-           -e '/va_start/,/va_end/{=;p;}' $f | \
-        sed 'N;s/\n/:/' | \
-        egrep -w 'return;|return \(|WT_RET' | \
-        sed -e "s,^,$f:," -e 's/$/ [return skips matching end call]/'
-
-done
-
-# API_END with a return
-for f in $files; do
-    file_parse $f |
-    egrep '[^A-Z_]API_END.*return' |
-    sed 's/:.*//' > $t
-    test -s $t && {
-        echo "$f: API_END followed by return."
-        sed 's/^/function @ line:/' < $t
+    # Returns before jumps to an error label within the same loop.
+    # Jumps before returns have already been detected above.
+    {
+        echo "$fp" |
+        sed "s=^=$f:=" |
+        python3 dist/s_function_loop.py |
+            egrep '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
+            sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
     }
-done
 
-# S2C with a local WT_CONNECTION_IMPL variable.
-for f in $files; do
-    file_parse $f |
-    egrep 'conn = S2C.*S2C' |
-    sed 's/:.*//' > $t
-    test -s $t && {
-        echo "$f: S2C with a local WT_CONNECTION_IMPL variable."
-        sed 's/^/function @ line:/' < $t
+    # Early exits from WT_WITH_* macros.
+    grep -q 'WT_WITH_' $f && {
+        {
+            echo "===$f==="
+            cat $f
+        } | python3 dist/s_function_with.py 2>&1 $t-2 || exit 1
+        test -s $t-2 && {
+            echo "Misuse of WT_WITH_* macros:"
+            cat $t-2
+        }
     }
-done
 
-# S2B with a local WT_BTREE variable.
-for f in $files; do
-    file_parse $f |
-    egrep 'btree = S2B.*S2B' |
-    sed 's/:.*//' > $t
-    test -s $t && {
-        echo "$f: S2B with a local WT_BTREE variable."
-        sed 's/^/function @ line:/' < $t
+    # Return of 0 in functions after a jump to the error label.
+    {
+        echo "$fp" |
+        egrep -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
+        egrep '[^a-z_]err:.*return \(0\);' |
+        sed 's/:.*//' > $t-3
+
+        test -s $t-3 && {
+            echo "$f: error label followed by a return of 0"
+            sed 's/^/function @ line:/' < $t-3
+        }
     }
-done
 
-files=`find src -name '*.c' -o -name '*._inline.h' | filter_if_fast`
-
-# __wt_verbose with a bitwise OR category parameter.
-for f in $files; do
-    file_parse $f | python3 dist/s_function_verbose.py > $t
-    test -s $t && {
-        echo "$f: Invalid use of verbose category parameter (bitwise OR)."
-        sed 's/^/function @ line:/' < $t
+    # Early exits from critical loops.
+    {
+        echo "$fp" 2>/dev/null |
+        sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
+            -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
+            -e '/WT_TRACK_OP_INIT/,/WT_TRACK_OP_END/{=;p;}' \
+            -e '/va_start/,/va_end/{=;p;}' $f | \
+            sed 'N;s/\n/:/' | \
+            egrep -w 'return;|return \(|WT_RET' | \
+            sed -e "s,^,$f:," -e 's/$/ [return skips matching end call]/'
     }
+
+    # API_END with a return
+    {
+        echo "$fp" |
+        egrep '[^A-Z_]API_END.*return' |
+        sed 's/:.*//' > $t-4
+        test -s $t-4 && {
+            echo "$f: API_END followed by return."
+            sed 's/^/function @ line:/' < $t-4
+        }
+    }
+
+    # S2C with a local WT_CONNECTION_IMPL variable.
+    {
+        echo "$fp" |
+        egrep 'conn = S2C.*S2C' |
+        sed 's/:.*//' > $t-5
+        test -s $t-5 && {
+            echo "$f: S2C with a local WT_CONNECTION_IMPL variable."
+            sed 's/^/function @ line:/' < $t-5
+        }
+    }
+
+    # S2B with a local WT_BTREE variable.
+    {
+        echo "$fp" |
+        egrep 'btree = S2B.*S2B' |
+        sed 's/:.*//' > $t-6
+        test -s $t-6 && {
+            echo "$f: S2B with a local WT_BTREE variable."
+            sed 's/^/function @ line:/' < $t-6
+        }
+    }
+
+    # __wt_verbose with a bitwise OR category parameter.
+    [[ "$f" =~ (\.c|\._inline\.h)$ ]] && {
+        echo "$fp" | python3 dist/s_function_verbose.py > $t-7
+        test -s $t-7 && {
+            echo "$f: Invalid use of verbose category parameter (bitwise OR)."
+            sed 's/^/function @ line:/' < $t-7
+        }
+    }
+
+    wait
 done
 
 exit 0

@@ -5,6 +5,8 @@
 cd_dist
 use_pygrep
 check_fast_mode_flag
+setup_trap
+check_xargs_P
 
 # List of files to search.
 l=$(
@@ -25,9 +27,14 @@ l=$(
     # Print the list of functions, followed by the occurrences: we're looking for
     # functions that only appear once
     echo "$search"
-    sed -n '/{/,/^}/p' $l | $FGREP -wo "$search"
 
-    sed -n '/^#define/,/[^\\]$/p' ../src/include/*.h ../src/include/*.in | $FGREP -wo "$search"
+    sed -n '/^#define/,/[^\\]$/p' ../src/include/*.h ../src/include/*.in | $FGREP -wo "$search" &
+
+    echo "$l" | xargs $XARGS_P -n 30 bash -c "sed -n '/{/,/^}/p' \"\$@\" | $FGREP -wo \"$search\" > $t-par-\$\$.out" -bash
+
+    wait
+    cat $t-par-*.out
+
 } | egrep -v '^__ut_' | sort | uniq -u
 
 exit 0

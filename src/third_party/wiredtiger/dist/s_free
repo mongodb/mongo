@@ -3,13 +3,13 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 setup_trap
 cd_dist
+check_fast_mode_flag
 
 # Complain if someone uses free in the library, other than the one call in
 # os_common/os_alloc.c:__wt_free_int. Strip out files in the 'utilities' directory.
-find ../src -name '*.c' -o -name '*_inline.h' | grep -v 'utilities' | xargs egrep ' free\(' > $t
+find ../src -name '*.c' -o -name '*_inline.h' | fgrep -v -e utilities -e os_alloc.c | filter_if_fast ../ | xargs egrep ' free\(' > $t
 
-len=`cat $t | wc -l`
-test "$len" -ne "1" && {
+test -s $t && {
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo 'Calls to the C library version of free. Only __wt_free_int allowed.'
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="

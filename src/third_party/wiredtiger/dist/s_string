@@ -5,7 +5,7 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 cd_dist
 check_fast_mode_flag
-trap 'rm -f $t; exit $exit_val' 0 1 2 3 13 15
+setup_trap 'rm -f $t; exit $exit_val'
 
 # Insulate against locale-specific sort order
 LC_ALL=C

@@ -3,7 +3,7 @@
 . `dirname -- ${BASH_SOURCE[0]}`/common_functions.sh
 cd_top
 t_pfx=__s_clang_tidy_tmp_
-trap 'rm -rf $t $t_pfx*' 0 1 2 3 13 15
+setup_trap 'rm -rf $t $t_pfx*'
 
 echo "$0: running clang-tidy in $PWD"
 

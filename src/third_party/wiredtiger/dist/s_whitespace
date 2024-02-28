@@ -26,27 +26,34 @@ whitespace()
     cmp $t $1 > /dev/null 2>&1 || (echo "$1" && cp $t $1)
 }
 
-SUBDIRS="bench examples ext src test"
-find $SUBDIRS \
-    -name '*.[ch]' -o \
-    -name '*.cpp' -o \
-    -name '*.dox' -o \
-    -name '*.in' -o \
-    -name '*.py' -o \
-    -name '*.sh' -o \
-    -name '*.yaml' -o \
-    -name '*.yml' -o \
-    -name 's_*' -o \
-    -name 'CONFIG.*' -o \
-    -name 'Makefile.am' | \
-    $FGREP -v \
-        -e 'Makefile.in' \
-        -e 'checksum/power8' \
-        -e '3rdparty' \
-        -e 'docs/tools' \
-        -e 'log/log_auto' \
-| filter_if_fast |
-while read f ; do
+# Parallel execution: if it's the main onvocation of the script, collect the file names
+# to process and run them in subprocesses.
+is_main_run && {
+    find bench examples ext src test \
+        -name '*.[ch]' -o \
+        -name '*.cpp' -o \
+        -name '*.dox' -o \
+        -name '*.in' -o \
+        -name '*.py' -o \
+        -name '*.sh' -o \
+        -name '*.yaml' -o \
+        -name '*.yml' -o \
+        -name 's_*' -o \
+        -name 'CONFIG.*' -o \
+        -name 'Makefile.am' | \
+        $FGREP -v \
+            -e 'Makefile.in' \
+            -e 'checksum/power8' \
+            -e '3rdparty' \
+            -e 'docs/tools' \
+            -e 'log/log_auto' \
+    | do_in_parallel
+    exit $?
+}
+
+# A list of files provided: process them one by one.
+
+for f in "$@"; do
     whitespace $f
 done
 
