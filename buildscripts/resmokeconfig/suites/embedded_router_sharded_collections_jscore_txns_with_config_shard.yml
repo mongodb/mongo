@@ -31,8 +31,7 @@ selector:
   - jstests/core/txns/create_indexes_parallel.js
   - jstests/core/txns/commands_in_txns_read_concern.js
 
-  # Currentop is not supported in embedded router mode yet.
-  # TODO SERVER-81359 Enable currentOp testing.
+  # TODO SERVER-86590 Reenable after moving SessionKiller to decorate Service
   - jstests/core/txns/kill_sessions_kills_transaction.js
 
   exclude_with_any_tags:
