@@ -546,6 +546,8 @@ Service::UniqueService Service::make(ServiceContext* sc, ClusterRole role) {
 }
 
 void ServiceContext::ServiceContextDeleter::operator()(ServiceContext* sc) const {
+    // First, delete the Services and fire their destructor actions.
+    sc->_serviceSet.reset();
     onDestroy(sc, ConstructorActionRegisterer::registeredConstructorActions());
     delete sc;
 }
