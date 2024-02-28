@@ -73,6 +73,11 @@ class test_bug028(wttest.WiredTigerTestCase, suite_subprocess):
         if os.name != 'posix':
             self.skipTest('skipping buffer alignment and direct I/O test on non-POSIX system')
 
+        # The PPC machines have known I/O bandwidth constraint and could take hours to complete
+        # this test.
+        if 'ppc' in os.uname().machine:
+            self.skipTest('skipping buffer alignment and direct I/O test on PPC machines')
+
         config = 'create'
         config += ",buffer_alignment=" + align
         config += ',direct_io=('
