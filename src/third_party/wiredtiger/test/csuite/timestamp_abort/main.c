@@ -431,6 +431,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
       true /* verbose */, &nfiles, &nranges, &nunmodified);
 
     /* Remember that the backup finished successfully. */
+    testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index);
     testutil_sentinel(backup_home, "done");
 
     printf("Create incremental backup %" PRIu32 " - complete: files=%" PRId32 ", ranges=%" PRId32
@@ -441,7 +442,6 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
     if (backup_verify_immediately) {
         PRINT_BACKUP_VERIFY(index);
         if (backup_verify_quick) {
-            testutil_snprintf(backup_home, sizeof(backup_home), BACKUP_BASE "%" PRIu32, index);
             testutil_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index);
             testutil_verify_src_backup(conn, backup_home, WT_HOME_DIR, backup_id);
         } else
