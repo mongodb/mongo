@@ -5493,7 +5493,7 @@ buildvariants:
 - name: little-endian
   display_name: "~ Little-endian (x86)"
   run_on:
-  - ubuntu1804-large
+  - ubuntu2204-large
   batchtime: 4320 # 3 days
   expansions:
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0

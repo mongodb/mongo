@@ -84,7 +84,7 @@ buildvariants:
   display_name: Compatibility tests (less frequent)
   batchtime: 10080 # 7 days
   run_on:
-  - ubuntu1804-test
+  - ubuntu2004-test
   expansions:
     ENABLE_TCMALLOC: -DENABLE_TCMALLOC=0
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
