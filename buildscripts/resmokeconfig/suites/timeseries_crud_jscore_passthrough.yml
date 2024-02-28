@@ -190,6 +190,7 @@ selector:
   - jstests/core/query/or/or2.js
   # Runs for too long for time-series collections.
   - jstests/core/write/update/batch_write_command_update.js
+  - jstests/core/write/delete/batch_write_command_delete.js
   # Multikey indexes and array measurement field.
   - jstests/core/match_numeric_components.js
   - jstests/core/query/array/array1.js
