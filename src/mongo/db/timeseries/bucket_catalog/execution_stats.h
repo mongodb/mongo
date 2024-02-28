@@ -65,10 +65,10 @@ struct ExecutionStats {
     AtomicWord<long long> numBucketQueriesFailed;
     AtomicWord<long long> numBucketReopeningsFailed;
     AtomicWord<long long> numDuplicateBucketsReopened;
-    AtomicWord<long long> numBytesUncompressed;
-    AtomicWord<long long> numBytesCompressed;
 
     // TODO SERVER-70605: Remove the metrics below.
+    AtomicWord<long long> numBytesUncompressed;
+    AtomicWord<long long> numBytesCompressed;
     AtomicWord<long long> numSubObjCompressionRestart;
     AtomicWord<long long> numCompressedBuckets;
     AtomicWord<long long> numUncompressedBuckets;

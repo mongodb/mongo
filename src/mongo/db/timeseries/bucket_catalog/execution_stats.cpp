@@ -247,14 +247,14 @@ void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& 
     builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
     builder.appendNumber("numDuplicateBucketsReopened", stats.numDuplicateBucketsReopened.load());
 
-    builder.appendNumber("numBytesUncompressed", stats.numBytesUncompressed.load());
-    builder.appendNumber("numBytesCompressed", stats.numBytesCompressed.load());
-
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         return;
     }
 
+    // TODO(SERVER-70605): Remove these.
+    builder.appendNumber("numBytesUncompressed", stats.numBytesUncompressed.load());
+    builder.appendNumber("numBytesCompressed", stats.numBytesCompressed.load());
     builder.appendNumber("numSubObjCompressionRestart", stats.numSubObjCompressionRestart.load());
     builder.appendNumber("numCompressedBuckets", stats.numCompressedBuckets.load());
     builder.appendNumber("numUncompressedBuckets", stats.numUncompressedBuckets.load());
@@ -294,6 +294,8 @@ void addCollectionExecutionStats(ExecutionStatsController& stats, const Executio
     stats.incNumBucketQueriesFailed(collStats.numBucketQueriesFailed.load());
     stats.incNumBucketReopeningsFailed(collStats.numBucketReopeningsFailed.load());
     stats.incNumDuplicateBucketsReopened(collStats.numDuplicateBucketsReopened.load());
+
+    // TODO(SERVER-70605): Remove these.
     stats.incNumBytesUncompressed(collStats.numBytesUncompressed.load());
     stats.incNumBytesCompressed(collStats.numBytesCompressed.load());
     stats.incNumSubObjCompressionRestart(collStats.numSubObjCompressionRestart.load());

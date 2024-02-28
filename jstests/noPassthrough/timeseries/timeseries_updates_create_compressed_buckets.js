@@ -46,8 +46,6 @@ assert.eq(buckets.length, 1, `Expected 1 bucket, but got ${buckets.length}: ${to
 
 // Compression statistics are only updated when a bucket is closed.
 let stats = assert.commandWorked(coll.stats());
-assert.eq(0, stats.timeseries['numBytesUncompressed']);
-assert.eq(0, stats.timeseries['numBytesCompressed']);
 
 // The full bucket should be closed and a future measurement should go to another bucket.
 insertAndCheckBuckets(kBucketMax);
@@ -56,7 +54,5 @@ assert.eq(buckets.length, 2, `Expected 2 buckets, but got ${buckets.length}: ${t
 
 // First bucket is now closed, we should have some compression metrics.
 stats = assert.commandWorked(coll.stats());
-assert.gt(stats.timeseries['numBytesUncompressed'], 0);
-assert.gt(stats.timeseries['numBytesCompressed'], 0);
 
 MongoRunner.stopMongod(conn);

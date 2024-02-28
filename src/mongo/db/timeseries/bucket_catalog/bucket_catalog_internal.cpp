@@ -118,13 +118,6 @@ void abortWriteBatch(WriteBatch& batch, const Status& status) {
     batch.promise.setError(status);
 }
 
-void updateCompressionStatistics(BucketCatalog& catalog, const Bucket& bucket) {
-    ExecutionStatsController stats =
-        getOrInitializeExecutionStats(catalog, bucket.key.collectionUUID);
-    stats.incNumBytesUncompressed(bucket.uncompressedBucketDoc.objsize());
-    stats.incNumBytesCompressed(bucket.compressedBucketDoc->objsize());
-}
-
 /**
  * Returns a prepared write batch matching the specified 'key' if one exists, by searching the set
  * of open buckets associated with 'key'.
@@ -1354,14 +1347,11 @@ void closeOpenBucket(OperationContext* opCtx,
                      WithLock stripeLock,
                      Bucket& bucket,
                      ClosedBuckets& closedBuckets) {
-    // Skip creating a ClosedBucket when the bucket is already compressed. Check that
-    // compressed is set because reopened uncompressed buckets can get closed without operations
-    // against them.
-    if (bucket.usingAlwaysCompressedBuckets && bucket.compressedBucketDoc) {
+    // Skip creating a ClosedBucket when the bucket is already compressed.
+    if (bucket.usingAlwaysCompressedBuckets) {
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
-        updateCompressionStatistics(catalog, bucket);
         removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
         return;
     }
@@ -1388,14 +1378,11 @@ void closeOpenBucket(OperationContext* opCtx,
                      WithLock stripeLock,
                      Bucket& bucket,
                      boost::optional<ClosedBucket>& closedBucket) {
-    // Skip creating a ClosedBucket when the bucket is already compressed. Check that
-    // compressed is set because reopened uncompressed buckets can get closed without operations
-    // against them.
-    if (bucket.usingAlwaysCompressedBuckets && bucket.compressedBucketDoc) {
+    // Skip creating a ClosedBucket when the bucket is already compressed.
+    if (bucket.usingAlwaysCompressedBuckets) {
         // Remove the bucket from the bucket state registry.
         stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
 
-        updateCompressionStatistics(catalog, bucket);
         removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
         return;
     }

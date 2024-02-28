@@ -2347,6 +2347,7 @@ void tryPerformTimeseriesBucketCompression(OperationContext* opCtx,
             opCtx, compressionOp, OperationSource::kTimeseriesBucketCompression),
         request);
 
+    // TODO(SERVER-70605): Remove deprecated metrics.
     closedBucket.stats.incNumBytesUncompressed(compressionStats.uncompressedSize);
     if (result.result.isOK() && compressionStats.compressedSize > 0) {
         closedBucket.stats.incNumBytesCompressed(compressionStats.compressedSize);
