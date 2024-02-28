@@ -82,10 +82,7 @@ configuration::configuration(const std::string &test_config_name, const std::str
     logger::log_msg(LOG_INFO, "Full config: " + _config);
 
     int ret =
-      wiredtiger_test_config_validate(nullptr, nullptr, test_config_name.c_str(), _config.c_str());
-    if (ret != 0)
-        testutil_die(EINVAL, "failed to validate given config, ensure test config exists");
-    ret = wiredtiger_config_parser_open(nullptr, _config.c_str(), _config.size(), &_config_parser);
+      wiredtiger_config_parser_open(nullptr, _config.c_str(), _config.size(), &_config_parser);
     if (ret != 0)
         testutil_die(EINVAL, "failed to create configuration parser for provided config");
 }
