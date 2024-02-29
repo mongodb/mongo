@@ -641,6 +641,14 @@ public:
     }
 
     /**
+     * Increment counter for how many times this command has been rejected
+     * due to query settings.
+     */
+    void incrementCommandsRejected() const {
+        _commandsRejected->increment();
+    }
+
+    /**
      * Generates a reply from the 'help' information associated with a command. The state of
      * the passed ReplyBuilder will be in kOutputDocs after calling this method.
      */
@@ -734,6 +742,7 @@ private:
     // Counters for how many times this command has been executed and failed
     Counter64* _commandsExecuted{};
     Counter64* _commandsFailed{};
+    Counter64* _commandsRejected{};
 };
 
 /**

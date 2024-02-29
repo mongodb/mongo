@@ -72,18 +72,21 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         stdx::lock_guard<Latch> lk(_mutex);
-        return BSON("count" << _count << "size" << _size);
+        return BSON("count" << _count << "size" << _size << "rejectCount"
+                            << _numSettingsWithReject);
     }
 
-    void record(int count, int size) {
+    void record(int count, int size, int numSettingsWithReject) {
         stdx::lock_guard<Latch> lk(_mutex);
         _count = count;
         _size = size;
+        _numSettingsWithReject = numSettingsWithReject;
     }
 
 private:
     int _count = 0;
     int _size = 0;
+    int _numSettingsWithReject = 0;
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QuerySettingsServerStatusSection::_mutex");
 } querySettingsServerStatusSection;
 
@@ -257,9 +260,16 @@ Status QuerySettingsClusterParameter::set(const BSONElement& newValueElement,
     auto& querySettingsManager = QuerySettingsManager::get(getGlobalServiceContext());
     auto newSettings = QuerySettingsClusterParameterValue::parse(
         IDLParserContext("querySettingsParameterValue"), newValueElement.Obj());
+    size_t rejectCount = 0;
+    for (const auto& config : newSettings.getSettingsArray()) {
+        if (config.getSettings().getReject()) {
+            ++rejectCount;
+        }
+    }
     querySettingsServerStatusSection.record(
         /* count */ static_cast<int>(newSettings.getSettingsArray().size()),
-        /* size */ static_cast<int>(newValueElement.valuesize()));
+        /* size */ static_cast<int>(newValueElement.valuesize()),
+        /* numSettingsWithReject */ static_cast<int>(rejectCount));
     querySettingsManager.setQueryShapeConfigurations(Client::getCurrent()->getOperationContext(),
                                                      std::move(newSettings.getSettingsArray()),
                                                      newSettings.getClusterParameterTime(),

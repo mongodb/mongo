@@ -1035,6 +1035,7 @@ void Command::initializeClusterRole(ClusterRole role) {
     for (auto&& [ptr, stat] : {
              std::pair{&_commandsExecuted, "total"},
              std::pair{&_commandsFailed, "failed"},
+             std::pair{&_commandsRejected, "rejected"},
          })
         *ptr = &*MetricBuilder<Counter64>{"commands.{}.{}"_format(_name, stat)}.setRole(role);
     doInitializeClusterRole(role);

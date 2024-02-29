@@ -700,7 +700,11 @@ public:
         // adding a non-okay field to the replyBuilder.
         if (MONGO_unlikely(!status.isOK() || !_ok)) {
             auto execContext = _ecd->getExecutionContext();
-            execContext->getCommand()->incrementCommandsFailed();
+            if (status.code() == ErrorCodes::QueryRejectedBySettings) {
+                execContext->getCommand()->incrementCommandsRejected();
+            } else {
+                execContext->getCommand()->incrementCommandsFailed();
+            }
             if (status.code() == ErrorCodes::Unauthorized) {
                 CommandHelpers::auditLogAuthEvent(execContext->getOpCtx(),
                                                   _ecd->getInvocation().get(),

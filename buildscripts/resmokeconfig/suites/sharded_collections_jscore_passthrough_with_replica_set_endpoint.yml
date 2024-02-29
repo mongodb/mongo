@@ -72,6 +72,8 @@ selector:
   # TODO (SERVER-75855): Support running the find command via mongos by specifying a UUID
   # (instead of a collection name).
   - jstests/core/commands_with_uuid.js
+  # This test cares about command metrics, and fails under this suite.
+  - jstests/core/query/query_settings/query_settings_reject_application.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

@@ -483,7 +483,12 @@ void ParseAndRunCommand::_updateStatsAndApplyErrorLabels(const Status& status) {
     if (!command)
         return;
 
-    command->incrementCommandsFailed();
+
+    if (status.code() == ErrorCodes::QueryRejectedBySettings) {
+        command->incrementCommandsRejected();
+    } else {
+        command->incrementCommandsFailed();
+    }
 
     // WriteConcern error (wcCode) is set to boost::none because:
     // 1. TransientTransaction error label handling for commitTransaction command in mongos is

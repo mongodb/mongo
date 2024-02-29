@@ -31,6 +31,16 @@ const biggerQuerySetting = {
     indexHints: {allowedIndexes: ["a_1", {$natural: 1}]}
 };
 
+function restartCluster() {
+    st.restartMongoses();
+    primaryQSU.db = st.s.getDB(db.getName());  // refresh the db reference so it's possible to later
+                                               // call 'clusterParamRefreshSecs.restore()'
+    st.stopAllConfigServers({startClean: false}, /* forRestart*/ true);
+    st.restartAllConfigServers();
+    st.stopAllShards({startClean: false}, /* forRestart */ true);
+    st.restartAllShards();
+}
+
 // Extends the `jstests/libs/fixture_helpers.js::mapOnEachShardNode()` function to also process
 // mongos instances from the current test instance. It runs the `func()` function over all the
 // mongod and mongos nodes in the cluster, returning an array according to the defined mapping.
@@ -67,7 +77,7 @@ function runTest({expectedQueryShapeConfiguration, assertionFunc}) {
 // Expect both the count and the size to be zero, as this is a newly created replica set.
 runTest({
     expectedQueryShapeConfiguration: [],
-    assertionFunc: ({count, size}) => {
+    assertionFunc: ({count, size, rejectCount}) => {
         assert.eq(
             count,
             0,
@@ -76,6 +86,10 @@ runTest({
             size,
             0,
             "`querySettings.size` server status should be 0 if no query settings are present");
+        assert.eq(
+            rejectCount,
+            0,
+            "`querySettings.rejectCount` should be zero before any reject settings are applied.");
     }
 });
 
@@ -114,13 +128,7 @@ runTest({
 });
 
 // Restart the cluster and ensure that the metrics remain unchanged.
-st.restartMongoses();
-primaryQSU.db = st.s.getDB(db.getName());  // refresh the db reference so it's possible to later
-                                           // call 'clusterParamRefreshSecs.restore()'
-st.stopAllConfigServers({startClean: false}, /* forRestart*/ true);
-st.restartAllConfigServers();
-st.stopAllShards({startClean: false}, /* forRestart */ true);
-st.restartAllShards();
+restartCluster();
 runTest({
     expectedQueryShapeConfiguration:
         [primaryQSU.makeQueryShapeConfiguration(smallerQuerySetting, query)],
@@ -145,6 +153,56 @@ runTest({
         assert.eq(count, 0, "`querySettings.count` server status failed to decrease on deletion.");
         assert.lt(
             size, lastSize, "`querySettings.size` server status failed to decrease on deletion.");
+    }
+});
+
+const rejectQuerySetting = {
+    "reject": true
+};
+const rejectQueryConfig = primaryQSU.makeQueryShapeConfiguration(rejectQuerySetting, query);
+// Set reject=true for the test query.
+st.adminCommand({setQuerySettings: query, settings: rejectQuerySetting});
+
+// Confirm rejectCount was updated.
+runTest({
+    expectedQueryShapeConfiguration: [rejectQueryConfig],
+    assertionFunc: ({rejectCount}) => {
+        assert.eq(
+            rejectCount,
+            1,
+            "`querySettings.rejectCount` should be one after reject has been set for test query.");
+    }
+});
+
+restartCluster();
+
+// Confirm rejectCount persists across restart.
+runTest({
+    expectedQueryShapeConfiguration: [rejectQueryConfig],
+    assertionFunc: ({rejectCount}) => {
+        assert.eq(rejectCount, 1, "`querySettings.rejectCount` should still be one after restart.");
+    }
+});
+
+// Remove settings.
+st.adminCommand({removeQuerySettings: query});
+
+runTest({
+    expectedQueryShapeConfiguration: [],
+    assertionFunc: ({rejectCount}) => {
+        assert.eq(rejectCount,
+                  0,
+                  "`querySettings.rejectCount` should be zero after settings are removed.");
+    }
+});
+
+restartCluster();
+
+// Confirm reject is not accidentally restored after restart.
+runTest({
+    expectedQueryShapeConfiguration: [],
+    assertionFunc: ({rejectCount}) => {
+        assert.eq(rejectCount, 0, "`querySettings.rejectCount` should be zero after restart.");
     }
 });
 
