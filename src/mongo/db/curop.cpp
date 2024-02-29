@@ -440,6 +440,8 @@ TickSource::Tick CurOp::startTime() {
         _cpuTimer->start();
     }
 
+    _blockedTimeAtStart = _sumBlockedTimeTotal();
+
     // The '_start' value is initialized to 0 and gets assigned on demand the first time it gets
     // accessed. The above thread ownership requirement ensures that there will never be
     // concurrent calls to this '_start' assignment, but we use compare-exchange anyway as an
@@ -546,8 +548,9 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         shard_role_details::getLocker(opCtx)->getTimeQueuedForTicketMicros() -
         _ticketWaitTimeAtStart);
 
-    auto totalBlockedTime = _sumBlockedTimeTotal();
-    // TODO SERVER-86572: Identify paused durations that are being double counted as blocked
+    auto totalBlockedTime = _sumBlockedTimeTotal() - _blockedTimeAtStart;
+    // TODO SERVER-86069: Uncomment the below invariant
+    // invariant(Milliseconds(executionTimeMillis) >= totalBlockedTime);
     _debug.workingTimeMillis = Milliseconds(executionTimeMillis) - totalBlockedTime;
 
     bool shouldLogSlowOp, shouldProfileAtLevel1;

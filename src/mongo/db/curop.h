@@ -1161,6 +1161,9 @@ private:
 
     // Flag to decide if diagnostic information should be omitted.
     bool _shouldOmitDiagnosticInformation{false};
+
+    // TODO SERVER-87201: Remove need to zero out blocked time prior to operation starting.
+    Milliseconds _blockedTimeAtStart{0};
 };
 
 }  // namespace mongo
