@@ -17,6 +17,9 @@
  *   directly_against_shardsvrs_incompatible,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # This test relies on specific bucketing behaviour, which isn't guaranteed in
+ *   # upgrade/downgrade.
+ *   cannot_run_during_upgrade_downgrade,
  * ]
  */
 import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
