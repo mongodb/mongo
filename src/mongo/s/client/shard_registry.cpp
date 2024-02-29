@@ -143,8 +143,22 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
         [&]() -> std::tuple<ShardRegistryData, Timestamp, Increment, ShardRegistryData::ShardMap> {
         if (timeInStore.topologyTime > cachedData.getTime().topologyTime ||
             timeInStore.forceReloadIncrement > cachedData.getTime().forceReloadIncrement) {
-            auto [reloadedData, maxTopologyTime] = ShardRegistryData::createFromCatalogClient(
-                opCtx, _shardFactory.get(), _useMajorityReadConcernForTest);
+            auto [reloadedData, maxTopologyTime] = [&] {
+                // The operation might return InvalidOptions if we end up targeting a config
+                // replicaset that's running 4.4 since we use snapshot reads. As a result, we have
+                // to rollback to majority reads in that case. We expect this to be a short-lived
+                // situation as it would only occur in the middle of an upgrade.
+                try {
+                    return ShardRegistryData::createFromCatalogClient(
+                        opCtx, _shardFactory.get(), _useMajorityReadConcernForTest);
+                } catch (const DBException& ex) {
+                    if (ex.code() == ErrorCodes::InvalidOptions) {
+                        return ShardRegistryData::createFromCatalogClient(
+                            opCtx, _shardFactory.get(), true);
+                    }
+                    throw;
+                }
+            }();
             if (!useActualTopologyTime()) {
                 // If not using the actual topology time, then just use the topologyTime currently
                 // in the cache, instead of the maximum topologyTime value from config.shards.  This
