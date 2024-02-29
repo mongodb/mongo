@@ -8,6 +8,7 @@
  *   assumes_read_preference_unchanged,
  *   assumes_superuser_permissions,
  *   uses_parallel_shell,
+ *   requires_fsync,
  * ]
  */
 

@@ -10,8 +10,9 @@
  *   does_not_support_stepdowns,
  *   # The SBE plan cache was enabled by default in 6.3.
  *   requires_fcv_63,
- *   # Plan cache state is node-local and will not get migrated alongside tenant data.
+ *   # Plan cache state is node-local and will not get migrated alongside user data.
  *   tenant_migration_incompatible,
+ *   assumes_balancer_off,
  *   # This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
  *   # when SBE is enabled.
  *   featureFlagSbeFull,

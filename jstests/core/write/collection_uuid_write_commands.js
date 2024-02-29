@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_fcv_62,
  *   tenant_migration_incompatible,
+ *   assumes_stable_collection_uuid,
  * ]
  */
 const validateErrorResponse = function(

@@ -7,6 +7,10 @@
  *   does_not_support_causal_consistency,
  *   uses_$out,
  *   references_foreign_collection,
+ *   # TODO SERVER-87186: aggregation can fail with QueryPlanKilled in suites with random
+ *   # migrations because moveCollection change the collection UUID
+ *   # by dropping and re-creating the collection
+ *   assumes_balancer_off,
  * ]
  */
 const coll = db.command_let_variables;

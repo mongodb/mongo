@@ -1,4 +1,11 @@
-// this tests all points
+/**
+ * this tests all points
+ *
+ * @tags: [
+ *  # GeoNearRandomTest::testPt() uses find().toArray() that makes use of a cursor
+ *  requires_getmore,
+ * ]
+ */
 import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 
 var test = new GeoNearRandomTest("geo_near_random1");

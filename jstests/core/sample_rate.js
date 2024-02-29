@@ -3,6 +3,10 @@
  * @tags: [
  *     # TODO(SERVER-60823): remove incompatible_with_gcov
  *     incompatible_with_gcov,
+ *     # TODO SERVER-87186: aggregation can fail with QueryPlanKilled in suites with random
+ *     # migrations because moveCollection change the collection UUID
+ *     # by dropping and re-creating the collection
+ *     assumes_balancer_off,
  * ]
  */
 const coll = db.expression_sample_rate;

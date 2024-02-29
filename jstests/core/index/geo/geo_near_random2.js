@@ -1,9 +1,13 @@
-// this tests 1% of all points
-//
-// @tags: [
-//     # TODO(SERVER-60823): remove incompatible_with_gcov
-//     incompatible_with_gcov,
-// ]
+/**
+ * this tests 1% of all points
+ *
+ * @tags: [
+ *  # TODO(SERVER-60823): remove incompatible_with_gcov
+ *  incompatible_with_gcov,
+ *  # GeoNearRandomTest::testPt() uses find().toArray() that makes use of a cursor
+ *  requires_getmore,
+ * ]
+ */
 
 import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 

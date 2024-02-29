@@ -4,8 +4,9 @@
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
- *   # Plan cache state is node-local and will not get migrated alongside tenant data.
+ *   # Plan cache state is node-local and will not get migrated alongside user data.
  *   tenant_migration_incompatible,
+ *   assumes_balancer_off,
  *   # $planCacheStats requires readConcern local and reading from the same node.
  *   assumes_read_concern_local,
  *   assumes_read_concern_unchanged,

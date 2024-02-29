@@ -1532,6 +1532,12 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: sharding_jscore_passthrough_with_balancer_gen
+  tags: ["assigned_to_jira_team_server_catalog_and_routing", "sharding", "jscore", "common"]
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: concurrency_sharded_with_balancer_and_auto_bootstrap_gen
   tags: ["assigned_to_jira_team_server_catalog_and_routing", "release_critical", "requires_large_host", "concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:

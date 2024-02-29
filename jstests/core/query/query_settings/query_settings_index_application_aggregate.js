@@ -14,6 +14,9 @@
 //   cqf_incompatible,
 //   # 'planCacheClear' command is not allowed with the security token.
 //   not_allowed_with_signed_security_token,
+//   # Explain for tracked unsharded collections return IXSCAN as inputStage
+//   # TODO SERVER-87164 re-enable the tests in suites with random migrations
+//   assumes_balancer_off,
 // ]
 //
 

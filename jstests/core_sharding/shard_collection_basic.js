@@ -1,3 +1,12 @@
+/**
+ * Test shardCollection command behavior
+ *
+ * @tags: [
+ *  # TODO SERVER-80135: re-enable this tests in suites with random migrations
+ *  assumes_balancer_off,
+ * ]
+ */
+
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
 
 var kDbName = db.getName()

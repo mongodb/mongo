@@ -17,6 +17,8 @@
  *   does_not_support_stepdowns,
  *   # In some scenarios this test asserts that a collection scan is the chosen plan.
  *   assumes_no_implicit_index_creation,
+ *   # Plan cache state is node-local and will not get migrated alongside user data
+ *   assumes_balancer_off,
  * ]
  */
 

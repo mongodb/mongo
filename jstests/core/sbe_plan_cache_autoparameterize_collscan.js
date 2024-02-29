@@ -10,8 +10,9 @@
  *   # Auto-parameterization behavior observed by this test changed in 7.0 as a result of enabling
  *   # additional scenarios in SBE.
  *   requires_fcv_70,
- *   # Plan cache state is node-local and will not get migrated alongside tenant data.
+ *   # Plan cache state is node-local and will not get migrated alongside user data.
  *   tenant_migration_incompatible,
+ *   assumes_balancer_off,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
  *   # Uses $where operation.

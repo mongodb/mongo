@@ -13,8 +13,9 @@
 //   assumes_standalone_mongod,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
-//   # Plan cache state is node-local and will not get migrated alongside tenant data.
+//   # Plan cache state is node-local and will not get migrated alongside user data.
 //   tenant_migration_incompatible,
+//   assumes_balancer_off,
 //   # This test checks a new field "solutionHash" in $planCacheStats, not available in previous
 //   # versions.
 //   requires_fcv_72,

@@ -11,6 +11,8 @@
  *  no_selinux,
  *  requires_fcv_61,
  *  requires_non_retryable_writes,
+ *  # TODO SERVER-87044: re-enable test in suites that perform random migrations
+ *  assumes_balancer_off,
  * ]
  */
 

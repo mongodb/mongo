@@ -11,6 +11,7 @@
  *  requires_replication,
  *  # Tenant migrations don't support applyOps.
  *  tenant_migration_incompatible,
+ *  assumes_stable_collection_uuid,
  * ]
  */
 

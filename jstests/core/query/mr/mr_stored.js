@@ -1,20 +1,25 @@
-// This test expects a function stored in the system.js collection to be available for a map/reduce,
-// which may not be the case if it is implicitly sharded in a passthrough.
-//
-// @tags: [
-//   # The test runs commands that are not allowed with security token: mapReduce.
-//   not_allowed_with_signed_security_token,
-//   assumes_unsharded_collection,
-//   # mapReduce does not support afterClusterTime.
-//   does_not_support_causal_consistency,
-//   does_not_support_stepdowns,
-//   requires_non_retryable_writes,
-//   uses_map_reduce_with_temp_collections,
-//   requires_scripting,
-// ]
 /**
  * Tests that map reduce works with stored javascript.
+ *
+ * @tags: [
+ *  # The test runs commands that are not allowed with security token: mapReduce.
+ *  not_allowed_with_signed_security_token,
+ *  # This test expects a function stored in the system.js collection to be available for a
+ *  # map/reduce, which may not be the case if it is implicitly sharded in a passthrough.
+ *  assumes_unsharded_collection,
+ *  # mapReduce does not support afterClusterTime.
+ *  does_not_support_causal_consistency,
+ *  does_not_support_stepdowns,
+ *  requires_non_retryable_writes,
+ *  uses_map_reduce_with_temp_collections,
+ *  requires_scripting,
+ *  # TODO SERVER-82802: re-enable this test in suites with random migrations
+ *  # "system.js" collection is not preserved when data is migrated
+ *  # to other shards (e.g. moveRange, moveCollection)
+ *  assumes_balancer_off,
+ * ]
  */
+
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
 
 // Use a unique database name to avoid conflicts with other tests that directly modify

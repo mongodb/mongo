@@ -2,6 +2,11 @@
  * This test ensures that geo indexes can be defined using very large and very small bounds.
  * Additionally, this test also randomizes the precision for the geo index specified in
  * 'bits' index option. See SERVER-2386.
+ *
+ * @tags: [
+ *  # GeoNearRandomTest::testPt() uses find().toArray() that makes use of a cursor
+ *  requires_getmore,
+ * ]
  */
 import {GeoNearRandomTest} from "jstests/libs/geo_near_random.js";
 

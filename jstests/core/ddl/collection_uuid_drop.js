@@ -5,6 +5,9 @@
  *   requires_fcv_60,
  *   tenant_migration_incompatible,
  *   requires_non_retryable_commands,
+ *   # Not prepared to handle changes to collections UUID
+ *   # due to background activity (e.g. *Resharding)
+ *   assumes_stable_collection_uuid,
  * ]
  */
 const testDB = db.getSiblingDB(jsTestName());

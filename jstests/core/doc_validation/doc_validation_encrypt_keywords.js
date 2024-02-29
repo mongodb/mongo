@@ -1,13 +1,18 @@
-// Verify encryption-related keywords are only allowed in document validators if the action is
-// 'error' and validation level is 'strict'.
-//
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// @tags: [
-//   assumes_no_implicit_collection_creation_after_drop,
-//   requires_non_retryable_commands,
-//   uses_full_validation,
-// ]
+/**
+ * Verify encryption-related keywords are only allowed in document validators if the action is
+ * 'error' and validation level is 'strict'.
+ *
+ * Cannot implicitly shard accessed collections because of collection existing when none
+ * expected.
+ * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   requires_non_retryable_commands,
+ *   uses_full_validation,
+ *   # TODO SERVER-87119: re-enable this tests in sharding suites with random migrations
+ *   assumes_balancer_off,
+ * ]
+ */
+
 const collName = "doc_validation_encrypt_keywords";
 const coll = db[collName];
 coll.drop();

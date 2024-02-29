@@ -9,6 +9,8 @@
  *   # commands that may return different values after a failover; in this case,
  *   # 'planCacheClearFilters'.
  *   does_not_support_stepdowns,
+ *   # Plan cache state is node-local and will not get migrated alongside user data
+ *   assumes_balancer_off,
  * ]
  */
 

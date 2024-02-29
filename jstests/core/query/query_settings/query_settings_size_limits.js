@@ -6,6 +6,8 @@
  *   featureFlagQuerySettings,
  *   requires_non_retryable_commands,
  *   simulate_atlas_proxy_incompatible,
+ *   # TODO SERVER-87047: re-enable test in suites with random migrations
+ *   assumes_balancer_off,
  * ]
  */
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";

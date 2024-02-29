@@ -12,6 +12,8 @@
  *   # primary.
  *   assumes_read_preference_unchanged,
  *   does_not_support_stepdowns,
+ *   # Plan cache state is node-local and will not get migrated alongside user data
+ *   assumes_balancer_off,
  * ]
  */
 import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";

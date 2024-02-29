@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_timeseries,
+ *   assumes_stable_collection_uuid,
  * ]
  */
 

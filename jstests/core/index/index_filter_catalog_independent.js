@@ -11,6 +11,7 @@
  *   assumes_read_preference_unchanged,
  *   does_not_support_stepdowns,
  *   tenant_migration_incompatible,
+ *   assumes_balancer_off,
  * ]
  */
 import {

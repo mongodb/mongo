@@ -3,6 +3,7 @@
  * cleanly.
  * @tags: [
  *   no_selinux,
+ *   assumes_stable_collection_uuid,
  * ]
  */
 // Use our own database so that we're guaranteed the only collection is this one.
