@@ -64,79 +64,6 @@ namespace mongo {
 
 class NamespaceString : private DatabaseName {
 public:
-    /**
-     * The NamespaceString reserved constants are actually this `ConstantProxy`
-     * type, which can be `constexpr` and can be used directly in place of
-     * `NamespaceString`, except in very rare cases. To work around those, use a
-     * `static_cast<const NamespaceString&>`. The first time it's used, a
-     * `ConstantProxy` produces a memoized `const NamespaceString*` and retains
-     * it for future uses.
-     */
-    class ConstantProxy {
-    public:
-        /**
-         * `ConstantProxy` objects can be copied, so that they behave more like
-         * `NamespaceString`. All copies will point to the same `SharedState`.
-         * The `SharedState` is meant to be defined constexpr, but has mutable
-         * data members to implement the on-demand memoization of the
-         * `NamespaceString`.
-         */
-        class SharedState {
-        public:
-            constexpr SharedState(DatabaseName::ConstantProxy dbName, StringData coll)
-                : _db{dbName}, _coll{coll} {}
-
-            const NamespaceString& get() const {
-                std::call_once(_once, [this] { _nss = new NamespaceString{_db, _coll}; });
-                return *_nss;
-            }
-
-        private:
-            DatabaseName::ConstantProxy _db;
-            StringData _coll;
-            mutable std::once_flag _once;
-            mutable const NamespaceString* _nss = nullptr;
-        };
-
-        constexpr explicit ConstantProxy(const SharedState* sharedState)
-            : _sharedState{sharedState} {}
-
-        operator const NamespaceString&() const {
-            return _get();
-        }
-
-        decltype(auto) ns() const {
-            return _get().ns();
-        }
-        /**
-         * This method should only be called on global DatabaseName constants. It shouldn't be used
-         * with a non-constant or non-global DatabaseName because it discards possible TenantId
-         * values which can break tenant isolation.
-         */
-        decltype(auto) db() const {
-            return _get().db_deprecated();
-        }
-        decltype(auto) coll() const {
-            return _get().coll();
-        }
-        decltype(auto) tenantId() const {
-            return _get().tenantId();
-        }
-        decltype(auto) dbName() const {
-            return _get().dbName();
-        }
-        decltype(auto) toStringForErrorMsg() const {
-            return _get().toStringForErrorMsg();
-        }
-
-    private:
-        const NamespaceString& _get() const {
-            return _sharedState->get();
-        }
-
-        const SharedState* _sharedState;
-    };
-
     constexpr static size_t MaxNSCollectionLenFCV42 = 120U;
     constexpr static size_t MaxNsCollectionLen = 255;
 
@@ -202,9 +129,8 @@ public:
     // definitions below. Because the `NamespaceString` class enclosing their
     // type is incomplete, they can't be _declared_ fully constexpr (a constexpr
     // limitation).
-#define NSS_CONSTANT(id, db, coll) static const ConstantProxy id;
+#define NSS_CONSTANT(id, db, coll) static const NamespaceString id;
 #include "namespace_string_reserved.def.h"  // IWYU pragma: keep
-
 #undef NSS_CONSTANT
 
     /**
@@ -215,32 +141,27 @@ public:
     /**
      * Constructs a NamespaceString for the given database.
      */
-    explicit NamespaceString(DatabaseName dbName)
-        : DatabaseName(std::move(dbName._data), DatabaseName::TrustedInitTag{}) {
-        // Given that NamespaceString is a DatabaseName, it is possible the `dbName` parameter is
-        // created from another `NamespaceString` and contains a collection. In this case we want to
-        // resize the underlying `data` to discard the previous collection.
-        const size_t expectedSize = DatabaseName::sizeWithTenant();
-        _data.resize(expectedSize + kDataOffset);
-    }
+    explicit NamespaceString(DatabaseName dbName) : DatabaseName(std::move(dbName)) {}
+
+    constexpr NamespaceString(const char* data, size_t length) : DatabaseName(data, length) {}
 
     /**
      * Construct a NamespaceString from a const reference. This constructor is required to avoid
      * invoking DatabaseName(const DatabaseName&..) which would discard the collection from the
      * underlying data.
      */
-    NamespaceString(NamespaceString&& ns) = default;
+    NamespaceString(NamespaceString&& other) = default;
 
-    NamespaceString(const NamespaceString& ns) : DatabaseName(ns._data, TrustedInitTag{}) {}
-
-    NamespaceString& operator=(NamespaceString&& ns) = default;
+    NamespaceString(const NamespaceString& other) noexcept
+        : DatabaseName(other._data, other.sizeWithTenant() + kDataOffset, TrustedInitTag{}) {}
+    NamespaceString& operator=(NamespaceString&& other) = default;
 
     /**
      * Copy assignment operator. This cannot be defaulted as we must avoid calling DatabaseName copy
      * assignment operator which would discard the collection from _data.
      */
-    NamespaceString& operator=(const NamespaceString& ns) {
-        _data = ns._data;
+    NamespaceString& operator=(const NamespaceString& other) noexcept {
+        _data = other._data;
         return *this;
     }
 
@@ -394,8 +315,10 @@ public:
             return boost::none;
         }
 
-        return TenantId{OID::from(&_data[kDataOffset])};
+        return TenantId{OID::from(_data.data() + kDataOffset)};
     }
+
+    using DatabaseName::db;
 
     /**
      * This function must only be used in sharding code (src/mongo/s and src/mongo/db/s).
@@ -492,6 +415,13 @@ public:
     size_t size() const {
         auto offset = kDataOffset + tenantIdSize();
         return _data.size() - offset;
+    }
+
+    /**
+     * Returns the size of the tenant id, database and collection (including the 'dot').
+     */
+    size_t sizeWithTenant() const {
+        return _data.size() - kDataOffset;
     }
 
     size_t dbSize() const {
@@ -823,7 +753,8 @@ public:
     }
 
     friend bool operator==(const NamespaceString& lhs, const NamespaceString& rhs) {
-        return lhs._data == rhs._data;
+        return StringData{lhs._data.data(), lhs._data.size()} ==
+            StringData{rhs._data.data(), rhs._data.size()};
     }
 
     friend bool operator<(const NamespaceString& lhs, const NamespaceString& rhs) {
@@ -844,11 +775,18 @@ public:
 
     template <typename H>
     friend H AbslHashValue(H h, const NamespaceString& nss) {
-        return H::combine(std::move(h), nss._data);
+        return H::combine(std::move(h), std::string_view{nss._data.data(), nss._data.size()});
     }
 
     friend auto logAttrs(const NamespaceString& nss) {
         return "namespace"_attr = nss;
+    }
+
+    /**
+     * This function removes the tenant id and returns the namespace part of NamespaceString.
+     */
+    friend StringData redactTenant(const NamespaceString& nss) {
+        return nss.ns();
     }
 
 private:
@@ -865,31 +803,14 @@ private:
      * tenantId. "ns" is NOT expected to contain the tenantId.
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData ns)
-        : DatabaseName(makeData(tenantId, ns), DatabaseName::TrustedInitTag{}) {}
+        : DatabaseName(Storage::make(tenantId, ns), TrustedInitTag{}) {}
 
     /**
      * Constructs a NamespaceString for the given database and collection names.
      * "dbName" must not contain a ".", and "collectionName" must not start with one.
      */
-    NamespaceString(DatabaseName dbName, StringData collectionName) {
-        uassert(ErrorCodes::InvalidNamespace,
-                "Collection names cannot start with '.': " + collectionName,
-                collectionName.empty() || collectionName[0] != '.');
-        uassert(ErrorCodes::InvalidNamespace,
-                "namespaces cannot have embedded null characters",
-                collectionName.find('\0') == std::string::npos);
-
-        const size_t dbAndDiscriminatorSize = dbName.sizeWithTenant() + kDataOffset;
-        _data.resize(collectionName.empty() ? dbAndDiscriminatorSize
-                                            : dbAndDiscriminatorSize + 1 + collectionName.size());
-        std::memcpy(_data.data(), dbName._data.data(), dbAndDiscriminatorSize);
-        if (!collectionName.empty()) {
-            *reinterpret_cast<uint8_t*>(_data.data() + dbAndDiscriminatorSize) = '.';
-            std::memcpy(_data.data() + dbAndDiscriminatorSize + 1,
-                        collectionName.rawData(),
-                        collectionName.size());
-        }
-    }
+    NamespaceString(DatabaseName dbName, StringData collectionName)
+        : DatabaseName(Storage::make(dbName, collectionName), TrustedInitTag{}) {}
 
     /**
      * Constructs a NamespaceString for the given db name, collection name, and tenantId.
@@ -897,19 +818,8 @@ private:
      * NOT expected to contain a tenantId.
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
-        : DatabaseName(makeData(tenantId, db, collectionName), DatabaseName::TrustedInitTag{}) {}
-
-    std::string toString() const {
-        return ns().toString();
-    }
-
-    std::string toStringWithTenantId() const {
-        if (hasTenantId()) {
-            return str::stream() << TenantId{OID::from(&_data[kDataOffset])} << "_" << ns();
-        }
-
-        return ns().toString();
-    }
+        : DatabaseName(Storage::make(tenantId, db, collectionName),
+                       DatabaseName::TrustedInitTag{}) {}
 
     /**
      * Please refer to NamespaceStringUtil::serialize method or use ns_forTest to satisfy any unit
@@ -918,6 +828,18 @@ private:
     StringData ns() const {
         auto offset = kDataOffset + tenantIdSize();
         return StringData{_data.data() + offset, _data.size() - offset};
+    }
+
+    std::string toString() const {
+        return ns().toString();
+    }
+
+    std::string toStringWithTenantId() const {
+        if (hasTenantId()) {
+            return str::stream() << TenantId{OID::from(_data.data() + kDataOffset)} << "_" << ns();
+        }
+
+        return ns().toString();
     }
 
     /**
@@ -933,60 +855,6 @@ private:
     static constexpr size_t kDataOffset = sizeof(uint8_t);
     static constexpr uint8_t kTenantIdMask = 0x80;
     static constexpr uint8_t kDatabaseNameOffsetEndMask = 0x7F;
-
-    std::string makeData(boost::optional<TenantId> tenantId,
-                         StringData db,
-                         StringData collectionName) {
-        uassert(ErrorCodes::InvalidNamespace,
-                "namespaces cannot have embedded null characters",
-                db.find('\0') == std::string::npos &&
-                    collectionName.find('\0') == std::string::npos);
-        uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("Collection names cannot start with '.': {}", collectionName),
-                collectionName.empty() || collectionName[0] != '.');
-        uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("db name must be at most {} characters, found: {}",
-                            DatabaseName::kMaxDatabaseNameLength,
-                            db.size()),
-                db.size() <= DatabaseName::kMaxDatabaseNameLength);
-
-        uint8_t details = db.size() & kDatabaseNameOffsetEndMask;
-        size_t dbStartIndex = kDataOffset;
-        if (tenantId) {
-            dbStartIndex += OID::kOIDSize;
-            details |= kTenantIdMask;
-        }
-
-        std::string data;
-        data.resize(collectionName.empty() ? dbStartIndex + db.size()
-                                           : dbStartIndex + db.size() + 1 + collectionName.size());
-        *reinterpret_cast<uint8_t*>(data.data()) = details;
-        if (tenantId) {
-            std::memcpy(data.data() + kDataOffset, tenantId->_oid.view().view(), OID::kOIDSize);
-        }
-
-        if (!db.empty()) {
-            std::memcpy(data.data() + dbStartIndex, db.rawData(), db.size());
-        }
-
-        if (!collectionName.empty()) {
-            *reinterpret_cast<uint8_t*>(data.data() + dbStartIndex + db.size()) = '.';
-            std::memcpy(data.data() + dbStartIndex + db.size() + 1,
-                        collectionName.rawData(),
-                        collectionName.size());
-        }
-
-        return data;
-    }
-
-    std::string makeData(boost::optional<TenantId> tenantId, StringData ns) {
-        auto dotIndex = ns.find('.');
-        if (dotIndex == std::string::npos) {
-            return makeData(tenantId, ns, {});
-        }
-
-        return makeData(tenantId, ns.substr(0, dotIndex), ns.substr(dotIndex + 1, ns.size()));
-    }
 };
 
 /**
@@ -997,8 +865,7 @@ class NamespaceStringOrUUID {
 public:
     NamespaceStringOrUUID() = delete;
     NamespaceStringOrUUID(NamespaceString nss) : _nssOrUUID(std::move(nss)) {}
-    NamespaceStringOrUUID(const NamespaceString::ConstantProxy& nss)
-        : NamespaceStringOrUUID{static_cast<const NamespaceString&>(nss)} {}
+    // NamespaceStringOrUUID(const NamespaceString& nss) : _nssOrUUID(nss) {}
     NamespaceStringOrUUID(DatabaseName dbname, UUID uuid)
         : _nssOrUUID(UUIDWithDbName{std::move(dbname), std::move(uuid)}) {}
 
@@ -1145,25 +1012,41 @@ inline std::string stringifyForAssert(const NamespaceString& nss) {
     return toStringForLogging(nss);
 }
 
-// Here are the `constexpr` definitions for the `NamespaceString::ConstantProxy`
+// Here are the `constexpr` definitions for the
 // constant static data members of `NamespaceString`. They cannot be defined
 // `constexpr` inside the class definition, but they can be upgraded to
 // `constexpr` here below it. Each one needs to be initialized with the address
-// of their associated shared state, so those are all defined first, as
+// of their associated data, so those are all defined first, as
 // variables named by the same `id`, but in separate nested namespace.
-namespace nss_detail::const_proxy_shared_states {
-#define NSS_CONSTANT(id, db, coll) \
-    constexpr inline NamespaceString::ConstantProxy::SharedState id{db, coll};
-#include "namespace_string_reserved.def.h"  // IWYU pragma: keep
 
+// cribbed from https://accu.org/journals/overload/30/172/wu/
+namespace namespace_string_data {
+
+template <size_t dbSize, size_t collSize>
+constexpr auto makeNsData(const char* db, const char* coll) {
+    // No dot if both db and coll are empty.
+    constexpr size_t dot = !!collSize;
+    std::array<char, 1 + dbSize + dot + collSize> result{};
+    auto p = result.begin();
+    *p++ = dbSize;
+    p = std::copy_n(db, dbSize, p);
+    if (dot)
+        *p++ = '.';
+    p = std::copy_n(coll, collSize, p);
+    return result;
+}
+
+#define NSS_CONSTANT(id, dbname, coll) \
+    constexpr inline auto id##_data =  \
+        makeNsData<dbname.size(), coll.size()>(dbname.db(OmitTenant{}).rawData(), coll.rawData());
+#include "namespace_string_reserved.def.h"
 #undef NSS_CONSTANT
-}  // namespace nss_detail::const_proxy_shared_states
+}  // namespace namespace_string_data
 
-#define NSS_CONSTANT(id, db, coll)                                       \
-    constexpr inline NamespaceString::ConstantProxy NamespaceString::id{ \
-        &nss_detail::const_proxy_shared_states::id};
-#include "namespace_string_reserved.def.h"  // IWYU pragma: keep
-
+#define NSS_CONSTANT(id, db, coll)                                                                \
+    constexpr inline NamespaceString NamespaceString::id(namespace_string_data::id##_data.data(), \
+                                                         namespace_string_data::id##_data.size());
+#include "namespace_string_reserved.def.h"
 #undef NSS_CONSTANT
 
 }  // namespace mongo

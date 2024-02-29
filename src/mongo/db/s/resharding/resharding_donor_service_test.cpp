@@ -340,7 +340,8 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
 
     DBDirectClient client(opCtx.get());
     FindCommandRequest findRequest{NamespaceString::kRsOplogNamespace};
-    findRequest.setFilter(BSON("ns" << NamespaceString::kForceOplogBatchBoundaryNamespace.ns()));
+    findRequest.setFilter(
+        BSON("ns" << redactTenant(NamespaceString::kForceOplogBatchBoundaryNamespace)));
     auto cursor = client.find(std::move(findRequest));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";

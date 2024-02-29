@@ -1830,7 +1830,8 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteBeforeEarlierRetryableUpd
         NamespaceString::kAdminCommandNamespace,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "d"
-                                           << "ns" << NamespaceString::kConfigImagesNamespace.ns()
+                                           << "ns"
+                                           << redactTenant(NamespaceString::kConfigImagesNamespace)
                                            << "ui" << configImagesUUID << "o"
                                            << BSON("_id" << sessionId.toBSON())))));
 
@@ -1898,7 +1899,8 @@ TEST_F(OplogApplierImplTest, ApplyApplyOpsSessionDeleteAfterLaterRetryableUpdate
         NamespaceString::kAdminCommandNamespace,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "d"
-                                           << "ns" << NamespaceString::kConfigImagesNamespace.ns()
+                                           << "ns"
+                                           << redactTenant(NamespaceString::kConfigImagesNamespace)
                                            << "ui" << configImagesUUID << "o"
                                            << BSON("_id" << sessionId.toBSON())))));
 
