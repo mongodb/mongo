@@ -1801,12 +1801,8 @@ void ExecCommandDatabase::_initiateCommand() {
         }
     }
 
-    if (startTransaction || startOrContinueTransaction) {
+    if (opCtx->isStartingMultiDocumentTransaction()) {
         _setLockStateForTransaction(opCtx);
-
-        // Remember whether or not this operation is starting a transaction, in case something later
-        // in the execution needs to adjust its behavior based on this.
-        opCtx->setIsStartingMultiDocumentTransaction(true);
     }
 
     // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.

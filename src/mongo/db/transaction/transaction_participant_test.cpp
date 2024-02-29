@@ -515,6 +515,66 @@ TEST_F(TxnParticipantTest, IsActiveTransactionParticipantSetCorrectly) {
     ASSERT(opCtx()->isActiveTransactionParticipant());
 }
 
+TEST_F(TxnParticipantTest, IsStartingMultiDocumentTransactionSetCorrectly) {
+    auto sessionCheckout = checkOutSession();
+    ASSERT(TransactionParticipant::get(opCtx()));
+    ASSERT(opCtx()->isStartingMultiDocumentTransaction());
+    sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
+
+    // Now swap out the opCtx to represent a new op coming in to continue the transaction
+    auto continueTxn = [&](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(*opCtx()->getLogicalSessionId());
+        newOpCtx->setTxnNumber(*opCtx()->getTxnNumber());
+        newOpCtx->setInMultiDocumentTransaction();
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto newOpCtxSession = mongoDSessionCatalog->checkOutSession(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+
+        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
+        txnParticipant.stashTransactionResources(newOpCtx);
+
+        txnParticipant.beginOrContinue(newOpCtx,
+                                       {*newOpCtx->getTxnNumber()},
+                                       false /* autocommit */,
+                                       TransactionParticipant::TransactionActions::kContinue);
+        ASSERT(!newOpCtx->isStartingMultiDocumentTransaction());
+    };
+
+    runFunctionFromDifferentOpCtx(continueTxn);
+}
+
+TEST_F(TxnParticipantTest, IsStartingMultiDocumentTransactionSetCorrectlyUsingStartOrContinue) {
+    auto sessionCheckout =
+        checkOutSession(TransactionParticipant::TransactionActions::kStartOrContinue);
+    ASSERT(TransactionParticipant::get(opCtx()));
+    ASSERT(opCtx()->isStartingMultiDocumentTransaction());
+    sessionCheckout->checkIn(opCtx(), OperationContextSession::CheckInReason::kDone);
+
+    // Now swap out the opCtx to represent a new op coming in to continue the transaction
+    auto continueTxn = [&](OperationContext* newOpCtx) {
+        newOpCtx->setLogicalSessionId(*opCtx()->getLogicalSessionId());
+        newOpCtx->setTxnNumber(*opCtx()->getTxnNumber());
+        newOpCtx->setInMultiDocumentTransaction();
+
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto newOpCtxSession = mongoDSessionCatalog->checkOutSession(newOpCtx);
+        auto txnParticipant = TransactionParticipant::get(newOpCtx);
+
+        txnParticipant.unstashTransactionResources(newOpCtx, "insert");
+        txnParticipant.stashTransactionResources(newOpCtx);
+
+        txnParticipant.beginOrContinue(
+            newOpCtx,
+            {*newOpCtx->getTxnNumber()},
+            false /* autocommit */,
+            TransactionParticipant::TransactionActions::kStartOrContinue);
+        ASSERT(!newOpCtx->isStartingMultiDocumentTransaction());
+    };
+
+    runFunctionFromDifferentOpCtx(continueTxn);
+}
+
 // Test that transaction lock acquisition times out in `maxTransactionLockRequestTimeoutMillis`
 // milliseconds.
 TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {

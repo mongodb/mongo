@@ -1183,6 +1183,10 @@ void TransactionParticipant::Participant::beginOrContinue(
     }
 
     _beginMultiDocumentTransaction(opCtx, txnNumberAndRetryCounter);
+
+    // Remember whether or not this operation is starting a transaction, in case something later
+    // in the execution needs to adjust its behavior based on this.
+    opCtx->setIsStartingMultiDocumentTransaction(true);
 }
 
 void TransactionParticipant::Participant::beginOrContinueTransactionUnconditionally(
