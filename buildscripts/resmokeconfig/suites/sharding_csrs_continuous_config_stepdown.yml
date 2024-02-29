@@ -103,6 +103,7 @@ selector:
   - jstests/sharding/move_chunk_insert_with_write_retryability.js
   - jstests/sharding/move_chunk_remove_with_write_retryability.js
   - jstests/sharding/move_chunk_update_with_write_retryability.js
+  - jstests/sharding/multi_collection_transaction_placement_conflict_workaround.js  # sets a failpoint on the config primary
   - jstests/sharding/refine_collection_shard_key_atomic.js  # sets a failpoint on the config primary
   - jstests/sharding/restart_transactions.js
   - jstests/sharding/txn_two_phase_commit_commands_basic_requirements.js

@@ -415,6 +415,11 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
         checkCollectionUUIDMismatch(opCtx, *catalog, _resolvedNss, _coll, options._expectedUUID);
 
+        if (receivedShardVersion) {
+            shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
+                opCtx, _resolvedNss, *receivedShardVersion, collDesc, _coll);
+        }
+
         return;
     }
 

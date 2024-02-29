@@ -3,6 +3,7 @@
  * TransientTransactionError label) if a collection or database placement changes have occurred
  * later than the transaction data snapshot timestamp.
  */
+import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
@@ -304,6 +305,81 @@ const st = new ShardingTest({mongos: 1, shards: 2});
                 }
             }, isWriteCommand ? ErrorCodes.WriteConflict : ErrorCodes.SnapshotUnavailable);
             assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+        }
+
+        readConcerns.forEach((readConcern) => commands.forEach((command) => {
+            runTest(readConcern, command);
+        }));
+    }
+
+    // Test transaction concurrent with reshardCollection.
+    {
+        function runTest(readConcernLevel, command) {
+            jsTest.log("Running transaction + resharding test with read concern " +
+                       readConcernLevel + " and command " + command);
+
+            // Setup initial state:
+            assert.commandWorked(st.s.getDB(dbName).dropDatabase());
+            st.adminCommand({enableSharding: dbName, primaryShard: st.shard0.shardName});
+
+            st.adminCommand({shardCollection: ns1, key: {x: 1}});
+            assert.commandWorked(st.splitAt(ns1, {x: 0}));
+            assert.commandWorked(st.moveChunk(ns1, {x: -1}, st.shard0.shardName));
+            assert.commandWorked(st.moveChunk(ns1, {x: 1}, st.shard1.shardName));
+
+            assert.commandWorked(coll1.insertMany([{x: -1, y: 0}, {x: 1, y: 0}]));
+
+            assert.commandWorked(coll2.insertOne({a: 1}));
+
+            // Set fp to block resharding after commit on configsvr but before commit on shards.
+            // We seek to test an interleaving where the transaction executes at a logical timestamp
+            // that falls between the timestamp at which resharding commits on the configsvr and the
+            // timestamp at which the temporary resharding collections are renamed to the original
+            // nss on the shards.
+            const fp = configureFailPoint(st.configRS.getPrimary(),
+                                          "reshardingPauseBeforeTellingParticipantsToCommit");
+
+            // On parallel shell, start resharding
+            const joinResharding = startParallelShell(() => {
+                assert.commandWorked(db.adminCommand({reshardCollection: 'test.foo', key: {y: 1}}));
+            }, st.s.port);
+
+            // Await configsvr to have done its part of the commit.
+            fp.wait();
+
+            const session = st.s.startSession();
+            const sessionDB = session.getDatabase(dbName);
+            const sessionColl1 = sessionDB.getCollection(collName1);
+            const sessionColl2 = sessionDB.getCollection(collName2);
+
+            // Make sure the session knows of a clusterTime inclusive of the resharding operation up
+            // to the commit on the configsvr.
+            assert.commandWorked(sessionColl2.insert({a: 2}));
+
+            // Start txn.
+            session.startTransaction({readConcern: {level: readConcernLevel}});
+            assert.eq(2, sessionColl2.find().itcount());
+
+            // Unset fp and wait for resharding to finish.
+            fp.off();
+            joinResharding();
+
+            // Make sure the router is aware of the new (post-resharding) routing table for test.foo
+            assert.eq(2, coll1.find({y: 0}).itcount());
+
+            // Now operate on coll1 within the transaction and expect to get a conflict.
+            let err = assert.throwsWithCode(() => {
+                if (command === 'find') {
+                    sessionColl1.find().itcount();
+                } else if (command === 'aggregate') {
+                    sessionColl1.aggregate().itcount();
+                } else if (command === 'update') {
+                    assert.commandWorked(sessionColl1.updateMany({}, {$set: {c: 1}}));
+                }
+            }, [ErrorCodes.WriteConflict, ErrorCodes.SnapshotUnavailable]);
+            assert.contains("TransientTransactionError", err.errorLabels, tojson(err));
+
+            session.abortTransaction();
         }
 
         readConcerns.forEach((readConcern) => commands.forEach((command) => {
