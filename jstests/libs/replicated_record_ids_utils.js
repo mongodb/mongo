@@ -1,3 +1,36 @@
+// Use an aggregate because showRecordId() will hide any existing user '$recordId' field in the
+// documents, otherwise.
+function getShowRecordIdsCursor(node, dbName, replicatedCollName) {
+    return node.getDB(dbName)[replicatedCollName].aggregate(
+        [{"$project": {"recordId": {"$meta": "recordId"}, "document": "$$ROOT"}}]);
+}
+
+// Confirms data returned from a full collection scan on 'replicatedCollName', with the '$recordId'
+// field included for each document, yields the same results across all nodes.
+export function validateShowRecordIdReplicatesAcrossNodes(nodes, dbName, replicatedCollName) {
+    assert(nodes.length !== 0, `Method only applies when there is more than 1 node to compare`);
+    const node0 = nodes[0];
+    const node0Cursor = getShowRecordIdsCursor(node0, dbName, replicatedCollName);
+    for (let i = 1; i < nodes.length; i++) {
+        const curNode = nodes[i];
+        const curNodeCursor = getShowRecordIdsCursor(curNode, dbName, replicatedCollName);
+        const actualDiff = DataConsistencyChecker.getDiff(node0Cursor, curNodeCursor);
+
+        assert.eq({docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []},
+                  actualDiff,
+                  `Expected RecordIds to match between node ${node0.host} and node ${
+                      curNode.host}. Got diff ${tojson(actualDiff)}`);
+    }
+}
+
+// Returns the '$recordId' associated with the 'doc' when a find() with 'showRecordId()' is
+// performed.
+export function getRidForDoc(db, collName, doc) {
+    const res = db[collName].find(doc).showRecordId().toArray()[0];
+    assert.neq(res["$recordId"], null);
+    return res["$recordId"];
+}
+
 // Tests that recordIds are preserved during initial sync for collections with
 // recordIdsReplicated:true. The method of initial sync used is determined by 'initSyncMethod',
 // which can be one of "logical" or "fileCopyBased". This test also pauses initial sync before
@@ -8,15 +41,6 @@
 // sync after collections have been cloned, but before oplog application.
 export function testPreservingRecordIdsDuringInitialSync(
     initSyncMethod, beforeCloningFP, afterCloningFP) {
-    /*
-     * Utility function to get documents with corresponding recordIds.
-     */
-    function getDocumentsWithRecordId(node, dbName, collName) {
-        return node.getDB(dbName)[collName]
-            .aggregate([{"$project": {"recordId": {"$meta": "recordId"}, "document": "$$ROOT"}}])
-            .toArray();
-    }
-
     const testName = jsTestName();
     const replTest = new ReplSetTest({name: testName, nodes: 1});
     replTest.startSet();
@@ -60,9 +84,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
         replTest.awaitReplication();
 
-        const primDocs = getDocumentsWithRecordId(primary, dbName, collName);
-        const initSyncDocs = getDocumentsWithRecordId(initialSyncNode, dbName, collName);
-        assert.sameMembers(primDocs, initSyncDocs);
+        validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
         assert.sameMembers(primary.getDB(dbName).getCollectionInfos(),
                            initialSyncNode.getDB(dbName).getCollectionInfos());
 
@@ -113,10 +135,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
         replTest.awaitReplication();
 
-        const primDocs = getDocumentsWithRecordId(primary, dbName, collName);
-        const initSyncDocs = getDocumentsWithRecordId(initialSyncNode, dbName, collName);
-
-        assert.sameMembers(primDocs, initSyncDocs);
+        validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
 
         replTest.remove(initialSyncNode);
         replTest.reInitiate();
@@ -167,10 +186,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
         replTest.awaitReplication();
 
-        const primDocs = getDocumentsWithRecordId(primary, dbName, collName);
-        const initSyncDocs = getDocumentsWithRecordId(initialSyncNode, dbName, collName);
-
-        assert.sameMembers(primDocs, initSyncDocs);
+        validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
 
         replTest.remove(initialSyncNode);
         replTest.reInitiate();
@@ -199,10 +215,7 @@ export function testPreservingRecordIdsDuringInitialSync(
         replTest.waitForState(initialSyncNode, ReplSetTest.State.SECONDARY);
         replTest.awaitReplication();
 
-        const primDocs = getDocumentsWithRecordId(primary, dbName, collName);
-        const initSyncDocs = getDocumentsWithRecordId(initialSyncNode, dbName, collName);
-
-        assert.sameMembers(primDocs, initSyncDocs);
+        validateShowRecordIdReplicatesAcrossNodes([primary, initialSyncNode], dbName, collName);
 
         replTest.remove(initialSyncNode);
         replTest.reInitiate();

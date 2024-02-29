@@ -1093,6 +1093,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
         operation.setDestinedRecipient(destinedRecipientDecoration(args));
         operation.setFromMigrateIfTrue(args.fromMigrate);
+
+        if (!args.replicatedRecordId.isNull()) {
+            operation.setRecordId(args.replicatedRecordId);
+        }
+
         batchedWriteContext.addBatchedOperation(opCtx, operation);
     } else if (inMultiDocumentTransaction) {
         const bool inRetryableInternalTransaction =
@@ -1106,6 +1111,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
+
+        if (!args.replicatedRecordId.isNull()) {
+            operation.setRecordId(args.replicatedRecordId);
+        }
 
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds({stmtId});
@@ -1144,6 +1153,10 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             if (!args.retryableFindAndModifyOplogSlots.empty()) {
                 oplogEntry.setOpTime(args.retryableFindAndModifyOplogSlots.back());
             }
+        }
+
+        if (!args.replicatedRecordId.isNull()) {
+            oplogEntry.setRecordId(args.replicatedRecordId);
         }
 
         opTime = replLogDelete(opCtx,

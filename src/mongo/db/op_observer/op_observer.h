@@ -141,6 +141,9 @@ struct OplogDeleteEntryArgs : Decorable<OplogDeleteEntryArgs> {
     RetryableFindAndModifyLocation retryableFindAndModifyLocation =
         RetryableFindAndModifyLocation::kNone;
 
+    // Non-null when the RecordId for the delete is / needs to be replicated.
+    RecordId replicatedRecordId;
+
     // Set if OpTimes were reserved for the delete ahead of time for this retryable
     // "findAndModify" operation.
     // Implies 'retryableFindAndModifyLocation' is set to kSideCollection but the

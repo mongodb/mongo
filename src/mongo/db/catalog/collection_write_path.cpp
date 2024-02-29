@@ -266,10 +266,10 @@ Status insertDocumentsImpl(OperationContext* opCtx,
                 record_id_helpers::keyForDoc(doc,
                                              collection->getClusteredInfo()->getIndexSpec(),
                                              collection->getDefaultCollator()));
-        } else if (!it->replRid.isNull()) {
-            // The 'replRid' being set indicates that this insert belongs to a replicated
+        } else if (!it->replicatedRecordId.isNull()) {
+            // The 'replicatedRecordId' being set indicates that this insert belongs to a replicated
             // recordId collection, and we need to use the given recordId while inserting.
-            recordId = it->replRid;
+            recordId = it->replicatedRecordId;
         } else if (!it->recordId.isNull()) {
             // This case would only normally be called in a testing circumstance to avoid
             // automatically generating record ids for capped collections.
@@ -389,7 +389,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
 Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                    const CollectionPtr& collection,
                                    const BSONObj& doc,
-                                   RecordId replRid,
+                                   RecordId replicatedRecordId,
                                    const OnRecordInsertedFn& onRecordInserted) {
     const auto& nss = collection->ns();
 
@@ -406,14 +406,14 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     dassert(shard_role_details::getLocker(opCtx)->isCollectionLockedForMode(nss, MODE_IX) ||
             (nss.isOplog() && shard_role_details::getLocker(opCtx)->isWriteLocked()));
 
-    // The replRid must be provided if the collection has recordIdsReplicated:true and it must
-    // not be provided if the collection has recordIdsReplicated:false
-    invariant(collection->areRecordIdsReplicated() != replRid.isNull(),
+    // The replicatedRecordId must be provided if the collection has recordIdsReplicated:true and it
+    // must not be provided if the collection has recordIdsReplicated:false
+    invariant(collection->areRecordIdsReplicated() != replicatedRecordId.isNull(),
               str::stream() << "Unexpected recordId value for collection with ns: '"
                             << collection->ns().toStringForErrorMsg() << "', uuid: '"
                             << collection->uuid());
 
-    RecordId recordId = replRid;
+    RecordId recordId = replicatedRecordId;
     if (collection->isClustered()) {
         invariant(collection->getRecordStore()->keyFormat() == KeyFormat::String);
         recordId = uassertStatusOK(record_id_helpers::keyForDoc(
@@ -843,6 +843,9 @@ void deleteDocument(OperationContext* opCtx,
     }
 
     OplogDeleteEntryArgs deleteArgs;
+    if (collection->areRecordIdsReplicated()) {
+        deleteArgs.replicatedRecordId = loc;
+    }
 
     // TODO(SERVER-80956): remove this call.
     opCtx->getServiceContext()->getOpObserver()->aboutToDelete(

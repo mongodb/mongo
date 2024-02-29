@@ -93,10 +93,16 @@ public:
 
     std::vector<StmtId> stmtIds = {kUninitializedStmtId};
     OplogSlot oplogSlot;
+
+    // TODO SERVER-86241: Clarify whether this is just used for testing and whether it is necessary
+    // at all. When a collection has replicated record ids enabled, defer to the
+    // 'replicatedRecordId' as the source of truth.
+    //
+    // Caution: this may be an artifact of code movement, and its current purpose is unclear.
     RecordId recordId;
 
     // Holds the replicated recordId during secondary oplog application.
-    RecordId replRid;
+    RecordId replicatedRecordId;
 
     BSONObj doc;
 };

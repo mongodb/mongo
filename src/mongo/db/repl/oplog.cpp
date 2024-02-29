@@ -1644,7 +1644,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // which is intentional.
                 for (size_t i = 0; i < insertObjs.size(); i++) {
                     if (insertOps[i]->getDurableReplOperation().getRecordId()) {
-                        insertObjs[i].replRid =
+                        insertObjs[i].replicatedRecordId =
                             *insertOps[i]->getDurableReplOperation().getRecordId();
                     }
                 }
@@ -1739,7 +1739,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // recordIdReplicated collection, and therefore we should use the recordId
                     // present.
                     if (op.getDurableReplOperation().getRecordId()) {
-                        insertStmt.replRid = *op.getDurableReplOperation().getRecordId();
+                        insertStmt.replicatedRecordId = *op.getDurableReplOperation().getRecordId();
                     }
 
                     OpDebug* const nullOpDebug = nullptr;
