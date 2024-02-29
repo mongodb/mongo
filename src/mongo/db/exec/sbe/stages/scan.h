@@ -359,7 +359,7 @@ private:
 
     // Whether the scan should have low storage admission priority.
     bool _lowPriority;
-    boost::optional<ScopedAdmissionPriority> _priority;
+    boost::optional<ScopedAdmissionPriorityForLock> _priority;
 
     ScanStats _specificStats;
 

@@ -120,12 +120,12 @@ struct TicketHolderTestFixture::MockAdmission {
     MockAdmission(ServiceContext* serviceContext, AdmissionContext::Priority priority) {
         client = serviceContext->getService()->makeClient("");
         opCtx = client->makeOperationContext();
-        admissionPriority.emplace(opCtx.get(), priority);
+        admCtx.setPriority(priority);
     }
 
+    AdmissionContext admCtx;
     ServiceContext::UniqueClient client;
     ServiceContext::UniqueOperationContext opCtx;
-    boost::optional<ScopedAdmissionPriority> admissionPriority;
     boost::optional<Ticket> ticket;
 };
 

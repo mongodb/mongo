@@ -227,8 +227,8 @@ void IndexScanStageBase::doDetachFromOperationContext() {
 void IndexScanStageBase::doAttachToOperationContext(OperationContext* opCtx) {
     if (_lowPriority && _open && gDeprioritizeUnboundedUserIndexScans.load() &&
         _opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket(_opCtx)) {
-        _priority.emplace(opCtx, AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
     }
     if (_cursor) {
         _cursor->reattachToOperationContext(opCtx);
@@ -292,8 +292,8 @@ PlanState IndexScanStageBase::getNext() {
 
     if (_lowPriority && !_priority && gDeprioritizeUnboundedUserIndexScans.load() &&
         _opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket(_opCtx)) {
-        _priority.emplace(_opCtx, AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(_opCtx), AdmissionContext::Priority::kLow);
     }
 
     // We are about to get next record from a storage cursor so do not bother saving our internal

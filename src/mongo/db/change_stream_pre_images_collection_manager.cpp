@@ -375,7 +375,8 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
     // Change stream collections can multiply the amount of user data inserted and deleted on each
     // node. It is imperative that removal is prioritized so it can keep up with inserts and prevent
     // users from running out of disk space.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
+                                                        AdmissionContext::Priority::kImmediate);
 
     // Acquire intent-exclusive lock on the change collection.
     const auto preImageColl = acquireCollection(
@@ -429,7 +430,8 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithCollSc
     // Change stream collections can multiply the amount of user data inserted and deleted on each
     // node. It is imperative that removal is prioritized so it can keep up with inserts and prevent
     // users from running out of disk space.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
+                                                        AdmissionContext::Priority::kImmediate);
 
     // Acquire intent-exclusive lock on the change collection.
     const auto preImageColl =

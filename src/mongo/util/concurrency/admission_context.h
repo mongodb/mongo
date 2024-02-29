@@ -31,35 +31,19 @@
 #include <cstdint>
 #include <type_traits>
 
-#include <boost/optional.hpp>
-
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/tick_source.h"
 
 namespace mongo {
 
-class OperationContext;
-
 /**
  * Stores state and statistics related to admission control for a given transactional context.
  */
 class AdmissionContext {
+
 public:
     AdmissionContext() {}
-
-    // TODO(SERVER-87157): Remove copy ctor/assignment operator when refactoring metrics to remove
-    // atomics.
-    AdmissionContext(const AdmissionContext& other)
-        : _startProcessingTime(other._startProcessingTime.loadRelaxed()),
-          _admissions(other._admissions.loadRelaxed()),
-          _priority(other._priority.loadRelaxed()) {}
-    AdmissionContext& operator=(const AdmissionContext& other) {
-        _startProcessingTime.swap(other._startProcessingTime.loadRelaxed());
-        _admissions.swap(other._admissions.loadRelaxed());
-        _priority.swap(other._priority.loadRelaxed());
-        return *this;
-    }
 
     /**
      * Classifies the priority that an operation acquires a ticket when the system is under high
@@ -85,20 +69,8 @@ public:
      */
     enum class Priority { kLow = 0, kNormal, kImmediate };
 
-    /**
-     * Retrieve the AdmissionContext decoration the provided OperationContext
-     */
-    static AdmissionContext& get(OperationContext* opCtx);
-
-    /**
-     * Copy this AdmissionContext to another OperationContext. Optionally, provide a new priority
-     * to upgrade the copied context's priority.
-     */
-    void copyTo(OperationContext* opCtx,
-                boost::optional<AdmissionContext::Priority> newPriority = boost::none);
-
     void start(TickSource* tickSource) {
-        _admissions.fetchAndAdd(1);
+        admissions.fetchAndAdd(1);
         if (tickSource) {
             _startProcessingTime.store(tickSource->getTicks());
         }
@@ -112,7 +84,11 @@ public:
      * Returns the number of times this context has taken a ticket.
      */
     int getAdmissions() const {
-        return _admissions.loadRelaxed();
+        return admissions.loadRelaxed();
+    }
+
+    void setPriority(Priority priority) {
+        _priority.store(priority);
     }
 
     Priority getPriority() const {
@@ -120,32 +96,14 @@ public:
     }
 
 private:
-    friend class ScopedAdmissionPriority;
-
     // We wrap these types in AtomicWord to avoid race conditions between reporting metrics and
     // setting the values.
     //
     // Only a single writer thread will modify these variables and the readers allow relaxed memory
     // semantics.
     AtomicWord<TickSource::Tick> _startProcessingTime{0};
-    AtomicWord<int32_t> _admissions{0};
+    AtomicWord<int32_t> admissions{0};
     AtomicWord<Priority> _priority{Priority::kNormal};
-};
-
-/**
- * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
- * lock.
- */
-class ScopedAdmissionPriority {
-public:
-    explicit ScopedAdmissionPriority(OperationContext* opCtx, AdmissionContext::Priority priority);
-    ScopedAdmissionPriority(const ScopedAdmissionPriority&) = delete;
-    ScopedAdmissionPriority& operator=(const ScopedAdmissionPriority&) = delete;
-    ~ScopedAdmissionPriority();
-
-private:
-    OperationContext* const _opCtx;
-    AdmissionContext::Priority _originalPriority;
 };
 
 StringData toString(AdmissionContext::Priority priority);

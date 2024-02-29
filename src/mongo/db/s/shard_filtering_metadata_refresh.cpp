@@ -563,8 +563,8 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
         {
             // The refresh threads do not perform any data reads themselves, therefore they don't
             // need to go through admission control.
-            ScopedAdmissionPriority skipAdmissionControl(opCtx,
-                                                         AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriorityForLock skipAdmissionControl(
+                shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kImmediate);
 
             boost::optional<Lock::DBLock> dbLock;
             boost::optional<Lock::CollectionLock> collLock;

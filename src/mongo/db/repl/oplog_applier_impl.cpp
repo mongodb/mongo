@@ -404,6 +404,12 @@ void _setOplogApplicationWorkerOpCtxStates(OperationContext* opCtx) {
     shard_role_details::getRecoveryUnit(opCtx)->setPrepareConflictBehavior(
         PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
+    // Applying an Oplog batch is crucial to the stability of the Replica Set. We
+    // mark it as having Immediate priority so that it skips waiting for ticket
+    // acquisition and flow control.
+    shard_role_details::getLocker(opCtx)->setAdmissionPriority(
+        AdmissionContext::Priority::kImmediate);
+
     // Ensure future transactions read without a timestamp.
     invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
               shard_role_details::getRecoveryUnit(opCtx)->getTimestampReadSource());
@@ -554,7 +560,8 @@ void OplogApplierImpl::_run(OplogBuffer* oplogBuffer) {
         // The oplog applier is crucial for stability of the replica set. As a result we mark it as
         // having Immediate priority. This makes the operation skip waiting for ticket acquisition
         // and flow control.
-        ScopedAdmissionPriority priority(&opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(&opCtx),
+                                                AdmissionContext::Priority::kImmediate);
 
         // For pausing replication in tests.
         if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
@@ -669,7 +676,8 @@ void OplogApplierImpl::scheduleWritesToOplogAndChangeCollection(OperationContext
             // Oplog writes are crucial to the stability of the replica set. We mark the operations
             // as having Immediate priority so that it skips waiting for ticket acquisition and flow
             // control.
-            ScopedAdmissionPriority priority(opCtx.get(), AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx.get()),
+                                                    AdmissionContext::Priority::kImmediate);
 
             UnreplicatedWritesBlock uwb(opCtx.get());
 
@@ -1094,11 +1102,6 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                        const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
                                        OplogApplication::Mode oplogApplicationMode,
                                        const bool isDataConsistent) {
-    // Applying an Oplog batch is crucial to the stability of the Replica Set. We
-    // mark it as having Immediate priority so that it skips waiting for ticket
-    // acquisition and flow control.
-    ScopedAdmissionPriority skipTicketAcquisition(opCtx, AdmissionContext::Priority::kImmediate);
-
     // Certain operations like prepareTransaction might reset the recovery unit or lock state
     // due to doing things like stashTransactionResources. So we restore the necessary states
     // here every time before applying a new entry or grouped inserts.
@@ -1152,11 +1155,6 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                                                   std::vector<ApplierOperation>* ops,
                                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo,
                                                   const bool isDataConsistent) {
-    // Applying an Oplog batch is crucial to the stability of the Replica Set. We
-    // mark it as having Immediate priority so that it skips waiting for ticket
-    // acquisition and flow control.
-    ScopedAdmissionPriority skipTicketAcquisition(opCtx, AdmissionContext::Priority::kImmediate);
-
     UnreplicatedWritesBlock uwb(opCtx);
     _setOplogApplicationWorkerOpCtxStates(opCtx);
 

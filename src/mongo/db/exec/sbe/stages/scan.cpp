@@ -333,8 +333,8 @@ void ScanStage::doDetachFromOperationContext() {
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
     if (_lowPriority && _open && gDeprioritizeUnboundedUserCollectionScans.load() &&
         opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx)->shouldWaitForTicket(opCtx)) {
-        _priority.emplace(opCtx, AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx), AdmissionContext::Priority::kLow);
     }
     if (auto cursor = getActiveCursor()) {
         cursor->reattachToOperationContext(opCtx);
@@ -455,8 +455,8 @@ PlanState ScanStage::getNext() {
 
     if (_lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
         _opCtx->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket(_opCtx)) {
-        _priority.emplace(_opCtx, AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(_opCtx)->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(_opCtx), AdmissionContext::Priority::kLow);
     }
 
     // We are about to call next() on a storage cursor so do not bother saving our internal state in

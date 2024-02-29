@@ -28,8 +28,6 @@
  */
 
 #include "mongo/util/concurrency/admission_context.h"
-
-#include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -38,40 +36,7 @@ namespace {
 static constexpr StringData kLowString = "low"_sd;
 static constexpr StringData kNormalString = "normal"_sd;
 static constexpr StringData kImmediateString = "immediate"_sd;
-
-const auto admissionContextDecoration = OperationContext::declareDecoration<AdmissionContext>();
 }  // namespace
-
-AdmissionContext& AdmissionContext::get(OperationContext* opCtx) {
-    return admissionContextDecoration(opCtx);
-}
-
-void AdmissionContext::copyTo(OperationContext* opCtx,
-                              boost::optional<AdmissionContext::Priority> newPriority) {
-    if (newPriority) {
-        AdmissionContext newContext(*this);
-        newContext._priority.swap(*newPriority);
-        admissionContextDecoration(opCtx) = newContext;
-        return;
-    }
-
-    admissionContextDecoration(opCtx) = *this;
-}
-
-ScopedAdmissionPriority::ScopedAdmissionPriority(OperationContext* opCtx,
-                                                 AdmissionContext::Priority priority)
-    : _opCtx(opCtx), _originalPriority(AdmissionContext::get(opCtx).getPriority()) {
-    uassert(ErrorCodes::IllegalOperation,
-            "It is illegal for an operation to demote a high priority to a lower priority "
-            "operation",
-            _originalPriority != AdmissionContext::Priority::kImmediate ||
-                priority == AdmissionContext::Priority::kImmediate);
-    admissionContextDecoration(opCtx)._priority.swap(priority);
-}
-
-ScopedAdmissionPriority::~ScopedAdmissionPriority() {
-    admissionContextDecoration(_opCtx)._priority.swap(_originalPriority);
-}
 
 StringData toString(AdmissionContext::Priority priority) {
     switch (priority) {

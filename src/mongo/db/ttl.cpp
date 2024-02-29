@@ -545,7 +545,8 @@ bool TTLMonitor::_doTTLSubPass(
             // 'AdmissionContext::Priority::kNormal' for one index means the priority will be
             // 'normal' for all indexes.
             AdmissionContext::Priority priority = getTTLPriority(uuid, ttlPriorityMap);
-            ScopedAdmissionPriority priorityGuard(opCtx, priority);
+            ScopedAdmissionPriorityForLock priorityGuard(shard_role_details::getLocker(opCtx),
+                                                         priority);
 
             for (const auto& info : infos) {
                 bool moreToDelete = _doTTLIndexDelete(opCtx, &ttlCollectionCache, uuid, info);

@@ -49,7 +49,8 @@ PreImagesTruncateStats PreImagesTruncateManager::truncateExpiredPreImages(
     // on each node. It is imperative that truncate marker generation and pre-image removal are
     // prioritized so they can keep up with inserts and prevent users from running out of disk
     // space.
-    ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
+                                                        AdmissionContext::Priority::kImmediate);
 
     auto tenantTruncateMarkers = _getInitializedMarkersForPreImagesCollection(opCtx, tenantId);
     if (!tenantTruncateMarkers) {

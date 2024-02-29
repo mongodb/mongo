@@ -501,7 +501,8 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // waiting for durability. SERVER-60682 is an example with more pending prepared transactions
     // than storage tickets; the transaction coordinator could not persist the decision and had to
     // unnecessarily wait for prepared transactions to expire to make forward progress.
-    ScopedAdmissionPriority setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock setTicketAquisition(shard_role_details::getLocker(opCtx),
+                                                       AdmissionContext::Priority::kImmediate);
 
     // The locks necessary to write to the oplog truncate after point's collection and read from the
     // oplog collection must be taken up front so that the mutex can also be taken around both

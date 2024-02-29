@@ -172,8 +172,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
     if (_params.lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx())->shouldWaitForTicket(opCtx())) {
-        _priority.emplace(opCtx(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
 
     boost::optional<Record> record;
@@ -550,8 +550,8 @@ void CollectionScan::doDetachFromOperationContext() {
 void CollectionScan::doReattachToOperationContext() {
     if (_params.lowPriority && gDeprioritizeUnboundedUserCollectionScans.load() &&
         opCtx()->getClient()->isFromUserConnection() &&
-        shard_role_details::getLocker(opCtx())->shouldWaitForTicket(opCtx())) {
-        _priority.emplace(opCtx(), AdmissionContext::Priority::kLow);
+        shard_role_details::getLocker(opCtx())->shouldWaitForTicket()) {
+        _priority.emplace(shard_role_details::getLocker(opCtx()), AdmissionContext::Priority::kLow);
     }
     if (_cursor)
         _cursor->reattachToOperationContext(opCtx());

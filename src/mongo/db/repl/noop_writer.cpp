@@ -167,7 +167,8 @@ Status NoopWriter::startWritingPeriodicNoops(OpTime lastKnownOpTime) {
             // Noop writes are critical for the cluster stability, so we mark it as having Immediate
             // priority. As a result it will skip both flow control and waiting for ticket
             // acquisition.
-            ScopedAdmissionPriority priority(opCtx, AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriorityForLock priority(shard_role_details::getLocker(opCtx),
+                                                    AdmissionContext::Priority::kImmediate);
             _writeNoop(opCtx);
         });
     return Status::OK();

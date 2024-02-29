@@ -63,7 +63,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         // Critical to monitoring and observability, categorize the command as immediate priority.
-        ScopedAdmissionPriority skipAdmissionControl(opCtx, AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriorityForLock skipAdmissionControl(shard_role_details::getLocker(opCtx),
+                                                            AdmissionContext::Priority::kImmediate);
 
         if (cmdObj["forShell"].trueValue())
             NotPrimaryErrorTracker::get(opCtx->getClient()).disable();

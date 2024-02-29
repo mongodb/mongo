@@ -30,15 +30,13 @@ env.Library(
         'ticket_pool.cpp' if env.TargetOSIs('linux') else [],
         'ticketholder.cpp',
     ],
-    LIBDEPS=[
-        'admission_context',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/concurrency_adjustment_parameters',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/third_party/shim_boost',
+        'admission_context',
     ],
 )
 

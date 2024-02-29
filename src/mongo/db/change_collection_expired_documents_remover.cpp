@@ -118,8 +118,8 @@ void removeExpiredDocuments(Client* client) {
             // Change stream collections can multiply the amount of user data inserted and deleted
             // on each node. It is imperative that removal is prioritized so it can keep up with
             // inserts and prevent users from running out of disk space.
-            ScopedAdmissionPriority skipAdmissionControl(opCtx.get(),
-                                                         AdmissionContext::Priority::kImmediate);
+            ScopedAdmissionPriorityForLock skipAdmissionControl(
+                shard_role_details::getLocker(opCtx.get()), AdmissionContext::Priority::kImmediate);
 
             auto expiredAfterSeconds =
                 change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);

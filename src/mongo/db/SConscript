@@ -879,7 +879,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/cursor_response_idl',
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
         'api_parameters',
     ],
     LIBDEPS_PRIVATE=[
@@ -888,6 +887,7 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/transport/service_executor',
+        '$BUILD_DIR/mongo/util/concurrency/admission_context',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
         '$BUILD_DIR/mongo/util/diagnostic_info'
         if get_option('use-diagnostic-latches') == 'on' else [],
@@ -976,7 +976,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/s/replica_set_endpoint_feature_flag',
         '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
         'concurrency/lock_manager',
         'shard_role_api_stor_ex',
         'storage/write_unit_of_work',

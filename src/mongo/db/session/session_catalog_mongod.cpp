@@ -591,8 +591,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             auto newOpCtx = cc().makeOperationContext();
 
             // Avoid ticket acquisition during step up.
-            ScopedAdmissionPriority admissionPriority(newOpCtx.get(),
-                                                      AdmissionContext::Priority::kImmediate);
+            shard_role_details::getLocker(newOpCtx.get())
+                ->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
             // Synchronize with killOps to make this unkillable.
             {
