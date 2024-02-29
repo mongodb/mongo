@@ -1,0 +1,8 @@
+# Image used by bazel remote execution hosts.
+
+FROM amazonlinux:2
+
+# glibc-devel is required for headers, libzstd is required by gcc.
+RUN yum -y install glibc-devel libzstd
+
+CMD ["/bin/bash"]

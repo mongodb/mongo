@@ -1,0 +1,5 @@
+# Image used by bazel remote execution hosts.
+
+FROM redhat/ubi8:8.9
+
+CMD ["/bin/bash"]
