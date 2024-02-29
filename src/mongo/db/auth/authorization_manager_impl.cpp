@@ -164,15 +164,12 @@ bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj&
     } else if (cmdName == "dropDatabase") {
         return true;
     } else if (cmdName == "renameCollection") {
-        auto context = SerializationContext::stateAuthPrevalidated();
-        // Mark the context as should expect tenant prefix for auth to signify that the NS string we
-        // are passing in may be prefixed with a tenantId.
-        context.setPrefixState(true);
+        auto context = SerializationContext::stateStorageRequest();
 
         const NamespaceString fromNamespace = NamespaceStringUtil::deserialize(
-            boost::none, cmdObj.firstElement().valueStringDataSafe(), context);
+            nss.tenantId(), cmdObj.firstElement().valueStringDataSafe(), context);
         const NamespaceString toNamespace =
-            NamespaceStringUtil::deserialize(boost::none, cmdObj.getStringField("to"), context);
+            NamespaceStringUtil::deserialize(nss.tenantId(), cmdObj.getStringField("to"), context);
 
         if (fromNamespace.isAdminDB() || toNamespace.isAdminDB()) {
             return isAuthzCollection(fromNamespace.coll()) || isAuthzCollection(toNamespace.coll());

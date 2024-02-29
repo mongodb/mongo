@@ -133,8 +133,7 @@ StatusWith<OpMsgRequest> createX509AuthCmd(const BSONObj& params, StringData cli
     }
 
     return OpMsgRequestBuilder::createWithValidatedTenancyScope(
-        DatabaseNameUtil::deserialize(
-            boost::none, db.getValue(), SerializationContext::stateAuthPrevalidated()),
+        AuthDatabaseNameUtil::deserialize(db.getValue()),
         auth::ValidatedTenancyScope::kNotRequired /* db is not tenanted */,
         BSON("authenticate" << 1 << "mechanism"
                             << "MONGODB-X509"

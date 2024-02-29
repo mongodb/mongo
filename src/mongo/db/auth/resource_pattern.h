@@ -99,13 +99,9 @@ public:
     static ResourcePattern forCollectionName(const boost::optional<TenantId>& tenantId,
                                              StringData collectionName) {
         // While the namespace we create for here is not valid for use in commands/storage layer
-        // since it has an empty DB, it is useful to represent this ResourcePattern. We use the
-        // AuthPrevalidated serialization source to denote that we are only using this namespace
-        // internally.
-        return ResourcePattern(
-            MatchTypeEnum::kMatchCollectionName,
-            NamespaceStringUtil::deserialize(
-                tenantId, "", collectionName, SerializationContext::stateAuthPrevalidated()));
+        // since it has an empty DB, it is valid for the ResourcePattern use-case.
+        return ResourcePattern(MatchTypeEnum::kMatchCollectionName,
+                               AuthNamespaceStringUtil::deserialize(tenantId, "", collectionName));
     }
 
     /**
@@ -138,10 +134,8 @@ public:
      */
     static ResourcePattern forAnySystemBucketsInAnyDatabase(
         const boost::optional<TenantId>& tenantId, StringData collectionName) {
-        return ResourcePattern(
-            MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
-            NamespaceStringUtil::deserialize(
-                tenantId, "", collectionName, SerializationContext::stateAuthPrevalidated()));
+        return ResourcePattern(MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
+                               AuthNamespaceStringUtil::deserialize(tenantId, "", collectionName));
     }
 
     /**

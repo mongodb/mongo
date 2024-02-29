@@ -41,6 +41,22 @@
 
 namespace mongo {
 
+/**
+ * This class is meant for specific authentication use cases, mainly to serialize or deserialize
+ * `authDB`. Engineers should default to use `DatabaseNameUtil` unless the use-case has been
+ * carefully vetted in multitenancy.
+ */
+class AuthDatabaseNameUtil {
+public:
+    /**
+     * This method should only be used in authentication code to deserialize `authDB` (which can be
+     * any value and doesn't have a tenant). All other cases should use `DatabaseNameUtil`.
+     */
+    static DatabaseName deserialize(StringData db) {
+        return DatabaseName(boost::none, db);
+    }
+};
+
 class DatabaseNameUtil {
 public:
     /**
@@ -118,10 +134,6 @@ private:
                                                const SerializationContext& context);
 
     static DatabaseName deserializeForCatalog(boost::optional<TenantId> tenantId, StringData db);
-
-    static DatabaseName deserializeForAuthPrevalidated(boost::optional<TenantId> tenantId,
-                                                       StringData db,
-                                                       const SerializationContext& context);
 };
 
 }  // namespace mongo

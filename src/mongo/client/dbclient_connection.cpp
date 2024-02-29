@@ -127,10 +127,8 @@ void DBClientConnection::_auth(const BSONObj& params) {
         /* note we remember the auth info before we attempt to auth -- if the connection is broken,
          * we will then have it for the next autoreconnect attempt.
          */
-        const DatabaseName dbName = DatabaseNameUtil::deserialize(
-            boost::none,
-            params[auth::getSaslCommandUserDBFieldName()].valueStringDataSafe(),
-            SerializationContext::stateAuthPrevalidated());
+        const DatabaseName dbName = AuthDatabaseNameUtil::deserialize(
+            params[auth::getSaslCommandUserDBFieldName()].valueStringDataSafe());
         authCache[dbName] = params.getOwned();
     }
 

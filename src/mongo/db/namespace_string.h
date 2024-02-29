@@ -792,6 +792,7 @@ public:
 private:
     friend class NamespaceStringUtil;
     friend class NamespaceStringTest;
+    friend class AuthNamespaceStringUtil;
 
     /**
      * In order to construct NamespaceString objects, use NamespaceStringUtil. The functions

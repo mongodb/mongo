@@ -60,7 +60,7 @@ struct SerializationContext {
      * where it is being called.  Use default if serialization and deserialization should only
      * depened on the state of the feature flags.
      */
-    enum class Source { Default, Command, Storage, Catalog, AuthPrevalidated };
+    enum class Source { Default, Command, Storage, Catalog };
 
     /**
      * The CallerType enum is currently only applicable to source = Command, and is used in
@@ -132,11 +132,6 @@ struct SerializationContext {
     static const SerializationContext& stateDefault() {
         static StaticImmortal<SerializationContext> stateDefault{};
         return *stateDefault;
-    }
-
-    static const SerializationContext& stateAuthPrevalidated() {
-        static StaticImmortal<SerializationContext> stateAuthPrevalidated{Source::AuthPrevalidated};
-        return *stateAuthPrevalidated;
     }
 
     /**

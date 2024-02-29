@@ -51,14 +51,21 @@
 
 namespace mongo {
 
+NamespaceString AuthNamespaceStringUtil::deserialize(const boost::optional<TenantId>& tenantId,
+                                                     StringData db,
+                                                     StringData coll) {
+    uassert(ErrorCodes::InternalError,
+            "A tenant ID is only accepted when multitenancySupport is on",
+            !tenantId || gMultitenancySupport);
+    return NamespaceString(tenantId, db, coll);
+}
+
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
                                            const SerializationContext& context) {
     if (!gMultitenancySupport)
         return ns.toString();
 
     switch (context.getSource()) {
-        case SerializationContext::Source::AuthPrevalidated:
-            return serializeForAuthPrevalidated(ns, context);
         case SerializationContext::Source::Command:
             if (context.getCallerType() == SerializationContext::CallerType::Reply) {
                 return serializeForCommands(ns, context);
@@ -78,13 +85,6 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
                                            const SerializationOptions& options,
                                            const SerializationContext& context) {
     return options.serializeIdentifier(serialize(ns, context));
-}
-
-std::string NamespaceStringUtil::serializeForAuthPrevalidated(const NamespaceString& ns,
-                                                              const SerializationContext& context) {
-    // We want everything in the NamespaceString (tenantId, db, coll) to be present in the
-    // serialized output to prevent loss of information in the prevalidated context.
-    return ns.toStringWithTenantId();
 }
 
 std::string NamespaceStringUtil::serializeForCatalog(const NamespaceString& ns) {
@@ -152,8 +152,6 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
     }
 
     switch (context.getSource()) {
-        case SerializationContext::Source::AuthPrevalidated:
-            return deserializeForAuthPrevalidated(std::move(tenantId), ns, context);
         case SerializationContext::Source::Command:
             if (context.getCallerType() == SerializationContext::CallerType::Request) {
                 return deserializeForCommands(std::move(tenantId), ns, context);
@@ -171,19 +169,6 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
 
 NamespaceString NamespaceStringUtil::deserialize(const DatabaseName& dbName, StringData coll) {
     return NamespaceString{dbName, coll};
-}
-
-NamespaceString NamespaceStringUtil::deserializeForAuthPrevalidated(
-    boost::optional<TenantId> tenantId, StringData ns, const SerializationContext& context) {
-    if (context.getPrefix() == SerializationContext::Prefix::IncludePrefix) {
-        // If there is a tenantId, expect that it's included in the ns string, and that the tenantId
-        // field passed will be empty.
-        uassert(7489601, "TenantId must not be set, but it is", tenantId == boost::none);
-        return parseFromStringExpectTenantIdInMultitenancyMode(ns);
-    }
-    // In the prevalidated context, we are passing in validated and correct values, so skip
-    // checks.
-    return NamespaceString(std::move(tenantId), ns);
 }
 
 NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<TenantId> tenantId,

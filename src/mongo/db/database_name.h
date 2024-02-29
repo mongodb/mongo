@@ -315,9 +315,10 @@ public:
     }
 
 protected:
+    friend class AuthDatabaseNameUtil;
+    friend class DatabaseNameUtil;
     friend class NamespaceString;
     friend class NamespaceStringOrUUID;
-    friend class DatabaseNameUtil;
     friend class NamespaceStringUtil;
 
     template <typename T>

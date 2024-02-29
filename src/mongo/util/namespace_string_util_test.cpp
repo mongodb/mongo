@@ -46,6 +46,34 @@
 
 namespace mongo {
 
+TEST(AuthNamespaceStringUtil, Deserialize) {
+    {
+        RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
+        ASSERT_THROWS_CODE(AuthNamespaceStringUtil::deserialize(TenantId{OID::gen()}, "foo", "bar"),
+                           DBException,
+                           ErrorCodes::InternalError);
+
+        auto nss = AuthNamespaceStringUtil::deserialize(boost::none, "", "bar");
+        ASSERT_EQ(nss.db_forTest(), "");
+        ASSERT_EQ(nss.coll(), "bar");
+        ASSERT_FALSE(nss.tenantId());
+    }
+
+    {
+        RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+        TenantId tenant{OID::gen()};
+        auto tenantNs = AuthNamespaceStringUtil::deserialize(tenant, "foo", "bar");
+        ASSERT_EQ(tenantNs.tenantId(), tenant);
+        ASSERT_EQ(tenantNs.db_forTest(), "foo");
+        ASSERT_EQ(tenantNs.coll(), "bar");
+
+        auto ns = AuthNamespaceStringUtil::deserialize(boost::none, "foo", "");
+        ASSERT_FALSE(ns.tenantId());
+        ASSERT_EQ(ns.db_forTest(), "foo");
+        ASSERT_EQ(ns.coll(), "");
+    }
+}
+
 // TenantID is not included in serialization when multitenancySupport and
 // featureFlagRequireTenantID are enabled.
 TEST(NamespaceStringUtilTest, SerializeMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
@@ -468,57 +496,6 @@ TEST(NamespaceStringUtilTest, ParseFailPointData) {
     }
 }
 
-TEST(NamespaceStringUtilTest, AuthPrevalidatedContext) {
-    const TenantId tid = TenantId(OID::gen());
-    auto ctxt = SerializationContext::stateAuthPrevalidated();
-    std::vector<std::pair<boost::optional<TenantId>, std::string>> casesToTest = {
-        {boost::none, ""},
-        {tid, ""},
-        {boost::none, "foo"},
-        {tid, "foo"},
-        {boost::none, "foo.bar"},
-        {tid, "foo.bar"},
-        {boost::none, ".bar"},
-        {tid, ".bar"},
-    };
-    for (bool multitenancy : {false, true}) {
-        for (bool ff : {false, true}) {
-            if (ff && !multitenancy)  // Feature flag on with multitenancy off is not handled
-                continue;
-            RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
-                                                                        multitenancy);
-            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                       ff);
-            for (auto [tenantId, nsStr] : casesToTest) {
-                auto expectedNss = NamespaceString::createNamespaceString_forTest(tenantId, nsStr);
-                std::string fullNsStr;
-                if (!tenantId) {
-                    fullNsStr = nsStr;
-                } else {
-                    fullNsStr = str::stream() << tenantId->toString() << "_" << nsStr;
-                }
-                if (tenantId && !multitenancy) {
-                    // Clang is stupid, so to use ASSERT_THROWS_CODE (which internally creates a
-                    // lambda function), we need to rebind the two structured bindings tenantId and
-                    // nsStr to real variables.
-                    auto t = tenantId;
-                    auto n = nsStr;
-                    // Expect deserialization to fail when we have a tenant ID and multitenancy
-                    // support is disabled
-                    ASSERT_THROWS_CODE(
-                        NamespaceStringUtil::deserialize(t, n, ctxt), AssertionException, 6972102);
-                    // Expect serialization to drop the tenant ID when multitenancy support is
-                    // disabled
-                    ASSERT_EQ(NamespaceStringUtil::serialize(expectedNss, ctxt), nsStr);
-                } else {
-                    ASSERT_EQ(NamespaceStringUtil::deserialize(tenantId, nsStr, ctxt), expectedNss);
-                    ASSERT_EQ(NamespaceStringUtil::serialize(expectedNss, ctxt), fullNsStr);
-                }
-            }
-        }
-    }
-}
-
 TEST(NamespaceStringUtilTest, SerializingEmptyNamespaceSting) {
     const auto emptyNss = NamespaceString();
     const auto kEmptyNss = NamespaceString::kEmpty;
@@ -550,15 +527,4 @@ TEST(NamespaceStringUtilTest, CheckEmptyCollectionSerialize) {
     ASSERT_EQ(nssEmptySerialized, "dbTest");
 }
 
-TEST(NamespaceStringUtilTest, CheckEmptyCollectionSerializeMultitenancy) {
-    const auto authSerializeCtx = SerializationContext::stateAuthPrevalidated();
-    const TenantId tenantId(OID::gen());
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-
-    const auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, "dbTestMulti");
-    const auto nssEmptyColl = NamespaceString::createNamespaceString_forTest(dbName, "");
-    const auto nssAuthEmptySerialized =
-        NamespaceStringUtil::serialize(nssEmptyColl, authSerializeCtx);
-    ASSERT_EQ(nssAuthEmptySerialized, (tenantId.toString() + "_dbTestMulti"));
-}
 }  // namespace mongo

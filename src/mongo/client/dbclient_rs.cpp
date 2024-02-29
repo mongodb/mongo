@@ -461,10 +461,8 @@ void DBClientReplicaSet::_auth(const BSONObj& params) {
     _runAuthLoop([&](DBClientConnection* conn) {
         conn->auth(params);
         // Cache the new auth information since we now validated it's good
-        const DatabaseName dbName =
-            DatabaseNameUtil::deserialize(boost::none,
-                                          params[saslCommandUserDBFieldName].valueStringDataSafe(),
-                                          SerializationContext::stateAuthPrevalidated());
+        const DatabaseName dbName = AuthDatabaseNameUtil::deserialize(
+            params[saslCommandUserDBFieldName].valueStringDataSafe());
         _auths[dbName] = params.getOwned();
     });
 }
