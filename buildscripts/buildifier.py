@@ -80,9 +80,10 @@ def fix(bin_path: str, files: list[str]):
 
 def main():
     parser = argparse.ArgumentParser(description='buildifier wrapper')
-    parser.add_argument("--binary-dir", "-b", type=str,
-                        help="Path to the buildifier binary, defaults to looking on the path.",
-                        default="")
+    parser.add_argument(
+        "--binary-dir", "-b", type=str,
+        help="Path to the buildifier binary, defaults to looking in the current directory.",
+        default="")
     parser.add_argument(
         "--generate-report", action="store_true",
         help="Whether or not a report of the lint errors should be generated for evergreen.",
@@ -112,7 +113,7 @@ def main():
     if args.binary_dir:
         binary_path = os.path.join(args.binary_dir, binary_name)
     else:
-        binary_path = binary_name
+        binary_path = os.path.join(os.curdir, binary_name)
 
     subcommand = args.subcommand
     if subcommand == "lint-all":
