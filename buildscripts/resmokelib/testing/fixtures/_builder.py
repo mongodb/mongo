@@ -385,23 +385,18 @@ class ShardedClusterBuilder(FixtureBuilder):
         config_shard = kwargs["config_shard"]
         config_svr = None
         # We install the configsvr before the shards, so that embedded-router shards can know the
-        # config-server connection string when they are created. Since config servers do not
-        # currently hold collection data, a mongot enabled shared cluster doesn't couple/launch
-        # the config server with an accompanying mongot
+        # config-server connection string when they are created.
         if config_shard is None:
             config_svr = self._new_configsvr(sharded_cluster, is_multiversion, old_bin_version)
         else:
             config_svr = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
-                                            config_shard, kwargs["num_rs_nodes_per_shard"],
-                                            launch_mongot=False)
+                                            config_shard, kwargs["num_rs_nodes_per_shard"])
         sharded_cluster.install_configsvr(config_svr)
 
-        launch_mongot = bool("launch_mongot" in kwargs)
         for rs_shard_index in range(kwargs["num_shards"]):
             if rs_shard_index != config_shard:
                 rs_shard = self._new_rs_shard(sharded_cluster, mixed_bin_versions, old_bin_version,
-                                              rs_shard_index, kwargs["num_rs_nodes_per_shard"],
-                                              launch_mongot)
+                                              rs_shard_index, kwargs["num_rs_nodes_per_shard"])
                 sharded_cluster.install_rs_shard(rs_shard)
             else:
                 sharded_cluster.install_rs_shard(config_svr)
@@ -547,8 +542,7 @@ class ShardedClusterBuilder(FixtureBuilder):
     @staticmethod
     def _new_rs_shard(sharded_cluster: ShardedClusterFixture,
                       mixed_bin_versions: Optional[List[str]], old_bin_version: Optional[str],
-                      rs_shard_index: int, num_rs_nodes_per_shard: int,
-                      launch_mongot: bool) -> ReplicaSetFixture:
+                      rs_shard_index: int, num_rs_nodes_per_shard: int) -> ReplicaSetFixture:
         """Return a replica set fixture configured as a shard in a sharded cluster.
 
         :param sharded_cluster: sharded cluster fixture we are configuring config server for
@@ -561,7 +555,6 @@ class ShardedClusterBuilder(FixtureBuilder):
 
         rs_shard_logger = sharded_cluster.get_rs_shard_logger(rs_shard_index)
         rs_shard_kwargs = sharded_cluster.get_rs_shard_kwargs(rs_shard_index)
-        rs_shard_kwargs["launch_mongot"] = launch_mongot
 
         if mixed_bin_versions is not None:
             start_index = rs_shard_index * num_rs_nodes_per_shard

@@ -119,8 +119,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
         self.initial_sync_node_idx = -1
         self.config_shard = config_shard
         self.use_auto_bootstrap_procedure = use_auto_bootstrap_procedure
-        # This will be set in setup() after the MongoTFixture has been launched.
-        self.mongot_port = None
 
     def setup(self):
         """Set up the replica set."""
@@ -271,9 +269,6 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
             # mongod node in a replica set.
             for node in self.nodes:
                 node.setup_mongot()
-            # Saving the mongot port to the ReplicaSetFixture allows the ShardedClusterFixture
-            # to spin up a mongos with a connection to the last launched mongot.
-            self.mongot_port = node.mongot_port
 
     def _all_mongo_d_s_t(self):
         """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""

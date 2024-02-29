@@ -25,7 +25,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                  num_rs_nodes_per_shard=1, num_mongos=1, enable_balancer=True, auth_options=None,
                  configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
                  config_shard=None, use_auto_bootstrap_procedure=None, embedded_router=False,
-                 replica_set_endpoint=False, random_migrations=False, launch_mongot=False):
+                 replica_set_endpoint=False, random_migrations=False):
         """Initialize ShardedClusterFixture with different options for the cluster processes.
 
         :param embedded_router - True if this ShardedCluster is running in "embedded router mode". Today, this means that:
@@ -35,6 +35,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
                 and all routing requests are directed to the routing ports of those nodes.
             TODO SERVER-86554: Support a mix of shard servers with the routerPort opened and not.
         """
+
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
 
         if "dbpath" in mongod_options:
@@ -42,9 +43,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
 
         self.mongos_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(mongos_options, {}))
-        # The mongotHost and searchIndexManagementHostAndPort options cannot be set on mongos_options yet because
-        # the port value is only assigned in MongoDFixture initialization, which happens later.
-        self.launch_mongot = launch_mongot
 
         # mongod options
         self.mongod_options = self.fixturelib.make_historic(
@@ -118,10 +116,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         self.configsvr = None
         self.mongos = []
         self.shards = []
-        # These mongot-related options will be set after each shard has been setup().
-        # They're used to connect a sharded cluster's mongos to last launched mongot.
-        self.mongotHost = None
-        self.searchIndexManagementHostAndPort = None
 
         self.is_ready = False
 
@@ -148,13 +142,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # Start up each of the shards
         for shard in self.shards:
             shard.setup()
-
-        if self.launch_mongot:
-            # These mongot parameters are popped from shard.mongod_options when mongod is launched in above
-            # setup() call. As such, the final values can't be cleanly copied over from mongod_options, but
-            # need to be recreated here.
-            self.mongotHost = "localhost:" + str(self.shards[-1].mongot_port)
-            self.searchIndexManagementHostAndPort = self.mongotHost
 
     def _all_mongo_d_s_t(self):
         """Return a list of all `mongo{d,s,t}` `Process` instances in this fixture."""
@@ -204,12 +191,6 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
         # We call mongos.setup() in self.await_ready() function instead of self.setup()
         # because mongos routers have to connect to a running cluster.
         for mongos in self.mongos:
-            if self.launch_mongot:
-                # In search enabled sharded cluster, mongos has to be spun up with a connection string to a
-                # mongot in order to issue PlanShardedSearch commands.
-                mongos.mongos_options["mongotHost"] = self.mongotHost
-                mongos.mongos_options[
-                    "searchIndexManagementHostAndPort"] = self.searchIndexManagementHostAndPort
             # Start up the mongos.
             mongos.setup()
 
@@ -373,6 +354,7 @@ class ShardedClusterFixture(interface.Fixture, interface._DockerComposeInterface
     def get_configsvr_kwargs(self):
         """Return args to create replicaset.ReplicaSetFixture configured as the config server."""
         configsvr_options = self.configsvr_options.copy()
+
         auth_options = configsvr_options.pop("auth_options", self.auth_options)
         preserve_dbpath = configsvr_options.pop("preserve_dbpath", self.preserve_dbpath)
         num_nodes = configsvr_options.pop("num_nodes", 1)
@@ -845,11 +827,6 @@ class MongosLauncher(object):
 
         if self.config.MONGOS_SET_PARAMETERS is not None:
             suite_set_parameters.update(yaml.safe_load(self.config.MONGOS_SET_PARAMETERS))
-
-        if "mongotHost" in mongos_options:
-            suite_set_parameters["mongotHost"] = mongos_options.pop("mongotHost")
-            suite_set_parameters["searchIndexManagementHostAndPort"] = mongos_options.pop(
-                "searchIndexManagementHostAndPort")
 
         # Set default log verbosity levels if none were specified.
         if "logComponentVerbosity" not in suite_set_parameters:
