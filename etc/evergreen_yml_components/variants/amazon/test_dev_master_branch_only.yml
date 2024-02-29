@@ -186,6 +186,7 @@ buildvariants:
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
   - name: .read_write_concern !.large
+  - name: .recordids_replicated
   - name: .replica_sets !.encrypt !.auth
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen

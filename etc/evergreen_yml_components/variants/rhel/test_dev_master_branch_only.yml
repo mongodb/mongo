@@ -363,6 +363,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .read_write_concern !.large
+  - name: .recordids_replicated
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-medium
@@ -1014,6 +1015,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .read_write_concern !.large
+  - name: .recordids_replicated
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-medium
@@ -1260,6 +1262,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .read_write_concern !.large
+  - name: .recordids_replicated
   - name: .replica_sets !.encrypt !.auth
     distros:
     - rhel80-medium

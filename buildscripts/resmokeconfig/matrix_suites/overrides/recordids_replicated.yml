@@ -1,0 +1,51 @@
+- name: enable
+  value:
+    eval: await import('jstests/libs/override_methods/set_recordids_replicated.js');
+
+- name: excluded_files
+  value:
+    exclude_files:
+      # TODO: SERVER-87011 Revisist all the tests excluded here.
+      # due to error: 'timeseries' is not allowed with 'recordIdsReplicated'
+      - jstests/core/timeseries/*.*
+      - jstests/core/txns/timeseries/*.*
+      - jstests/core/administrative/validate_db_metadata_command.js
+      - jstests/core/catalog/list_catalog.js
+      - jstests/core/write/bulk/bulk_write_timeseries_basic.js
+      # due to error: "BSON field 'create.recordIdsReplicated' is not allowed with apiStrict:true."
+      - jstests/core/version_api_v1_command_coverage.js
+      - jstests/core/api/*.js
+      # due to error: Error: [0] != [1] are not equal : encountered an error in the parallel shell
+      - jstests/core/query/distinct/*.*
+      - jstests/core/query/cursor/cursora.js
+      - jstests/core/write/delete/removeb.js
+      - jstests/core/write/delete/removec.js
+      - jstests/core/index/geo/geo_update_btree.js
+      - jstests/core/write/find_and_modify/find_and_modify_concurrent_update.js
+      - jstests/core/administrative/compact_keeps_indexes.js
+      - jstests/core/write/update/updatef.js
+      - jstests/core/loadserverscripts.js
+      - jstests/core/shell/shellstartparallel.js
+      # due to error: "Transaction with { txnNumber: 0 } has been aborted."
+      # TODO: Revisit them when working on SERVER-87012 Handle renameCollection / creating collections in txns
+      #       for recordIdsReplicated:true passthroughs
+      - jstests/core/txns/*.*
+      # due to error: "enableLatchAnalysis not found"
+      - jstests/core/latch_analyzer.js
+      # due to error: "currentOpSpawnsThreadWaitingForLatch not found"
+      - jstests/core/administrative/current_op/currentop_waiting_for_latch.js
+      # due to error: Error: assert.soon failed (timeout 90000ms)
+      - jstests/core/query/mr/mr_killop.js
+      - jstests/core/query/count/count_plan_summary.js
+      - jstests/core/write/crud_ops_do_not_throw_locktimeout.js
+      - jstests/core/administrative/current_op/currentop_shell.js
+      # due to error: Count op completed without being killed
+      - jstests/core/query/count/count10.js
+      # due to error: Error: [[ ]] != [[ "lists", "ordered_sets", "unordered_sets" ]] are not equal
+      - jstests/core/catalog/list_collections_filter.js
+      # due to error: "collection options of target collection irap_out_db.irap_out_coll changed during processing."
+      - jstests/core/query/internal_rename_if_options_and_indexes_match.js
+      # due to error: Error: [1] != [0] are not equal : failed to connect with `localhost:20000`
+      - jstests/core/shell/shell_connection_strings.js
+      # due to error: "operation exceeded time limit"
+      - jstests/core/query/query_settings/query_settings_lost_update.js

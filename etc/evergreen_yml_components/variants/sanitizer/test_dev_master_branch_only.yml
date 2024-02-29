@@ -575,6 +575,7 @@ buildvariants:
   - name: query_golden_classic
   - name: .query_fuzzer !.cqf_only
   - name: .read_write_concern
+  - name: .recordids_replicated
   - name: replica_sets_large_txns_format_jscore_passthrough
   - name: .replica_sets !.multi_oplog
   - name: .replica_sets .encrypt
