@@ -27,7 +27,7 @@ a notice will be included in
 | [benchmark]                | Apache-2.0                                                     | 1.5.2                                              |                      |                                 |
 | [Boost]                    | BSL-1.0                                                        | 1.79.0                                             |                      |                ✗                |
 | [c-ares]                   | MIT                                                            | 1.19.1                                             |                      |                ✗                |
-| [double-conversion]        | ???                                                            | ???                                                |                      |               ???               |
+| [double-conversion]        | BSD 3-Clause                                                   | bf4607277fa7133825cb7899015374917cd06b8f           |                      |                ✗                |
 | [fmt]                      | BSD-2-Clause                                                   | 7.1.3                                              |                      |                ✗                |
 | [GPerfTools]               | BSD-3-Clause                                                   | 2.9.1                                              |                      |                ✗                |
 | [gRPC]                     | Apache-2.0                                                     | 1.59.2                                             |                      |                ✗                |
