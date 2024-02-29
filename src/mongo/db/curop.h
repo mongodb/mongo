@@ -1141,6 +1141,9 @@ private:
     // CurOpStack.
     boost::optional<SingleThreadedLockStats> _lockStatsBase;
 
+    // The time accrued waiting for tickets when this CurOp instance is pushed to a CurOpStack.
+    Microseconds _ticketWaitTimeAtStart{0};
+
     SharedUserAcquisitionStats _userAcquisitionStats{std::make_shared<UserAcquisitionStats>()};
 
     TickSource* _tickSource = globalSystemTickSource();

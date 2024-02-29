@@ -189,10 +189,12 @@ private:
         curOp->_parent = _top;
 
         // If `curOp` is a sub-operation, we store the snapshot of lock stats as the base lock stats
-        // of the current operation.
+        // of the current operation. Also store the current ticket wait time as the base ticket
+        // wait time.
         if (_top) {
-            auto lockerInfo = shard_role_details::getLocker(opCtx())->getLockerInfo(boost::none);
-            curOp->_lockStatsBase = lockerInfo.stats;
+            auto locker = shard_role_details::getLocker(opCtx());
+            curOp->_lockStatsBase = locker->getLockerInfo(boost::none).stats;
+            curOp->_ticketWaitTimeAtStart = locker->getTimeQueuedForTicketMicros();
         }
 
         _top = curOp;
@@ -537,8 +539,12 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
         oplogGetMoreStats.recordMillis(executionTimeMillis);
     }
 
+    // The ticket wait time from the locker reports wait times from preceding operations in the
+    // CurOpStack. The precise time queued for tickets of a sub-operation is the ticket wait time
+    // from the locker minus the ticket wait time taken when this operation started.
     _debug.waitForTicketDurationMillis = duration_cast<Milliseconds>(
-        shard_role_details::getLocker(opCtx)->getTimeQueuedForTicketMicros());
+        shard_role_details::getLocker(opCtx)->getTimeQueuedForTicketMicros() -
+        _ticketWaitTimeAtStart);
 
     auto totalBlockedTime = _sumBlockedTimeTotal();
     // TODO SERVER-86572: Identify paused durations that are being double counted as blocked
