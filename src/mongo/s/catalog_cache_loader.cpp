@@ -27,20 +27,28 @@
  *    it in the license file.
  */
 
+#include "mongo/s/catalog_cache_loader.h"
+
 #include <utility>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {
 
-const auto catalogCacheLoaderDecoration =
+const auto getCatalogCacheLoader =
     ServiceContext::declareDecoration<std::unique_ptr<CatalogCacheLoader>>();
+
+const auto catalogCacheLoaderDecorationRegisterer =
+    ServiceContext::ConstructorActionRegisterer{"CatalogCacheLoader",
+                                                [](ServiceContext* ctx) { /* Noop */ },
+                                                [](ServiceContext* ctx) {
+                                                    getCatalogCacheLoader(ctx) = nullptr;
+                                                }};
 
 }  // namespace
 
@@ -70,23 +78,20 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
       allowMigrations(allowMigrations),
       changedChunks(std::move(chunks)) {}
 
+CatalogCacheLoader::CatalogCacheLoader() = default;
+
+CatalogCacheLoader::~CatalogCacheLoader() = default;
+
 void CatalogCacheLoader::set(ServiceContext* serviceContext,
                              std::unique_ptr<CatalogCacheLoader> loader) {
-    auto& catalogCacheLoader = catalogCacheLoaderDecoration(serviceContext);
+    auto& catalogCacheLoader = getCatalogCacheLoader(serviceContext);
     invariant(!catalogCacheLoader);
 
     catalogCacheLoader = std::move(loader);
 }
 
-void CatalogCacheLoader::clearForTests(ServiceContext* serviceContext) {
-    auto& catalogCacheLoader = catalogCacheLoaderDecoration(serviceContext);
-    invariant(catalogCacheLoader);
-
-    catalogCacheLoader.reset();
-}
-
 CatalogCacheLoader& CatalogCacheLoader::get(ServiceContext* serviceContext) {
-    auto& catalogCacheLoader = catalogCacheLoaderDecoration(serviceContext);
+    auto& catalogCacheLoader = getCatalogCacheLoader(serviceContext);
     invariant(catalogCacheLoader);
 
     return *catalogCacheLoader;

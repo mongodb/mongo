@@ -89,11 +89,6 @@ void ShardServerTestFixture::setCatalogCacheLoader(std::unique_ptr<CatalogCacheL
     _catalogCacheLoader = std::move(loader);
 }
 
-void ShardServerTestFixture::tearDown() {
-    ShardingMongoDTestFixture::tearDown();
-    CatalogCacheLoader::clearForTests(getServiceContext());
-}
-
 std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatalogClient() {
     return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
 }

@@ -150,8 +150,6 @@ void ConfigServerTestFixture::tearDown() {
 
     ShardingCatalogManager::clearForTests(getServiceContext());
 
-    CatalogCacheLoader::clearForTests(getServiceContext());
-
     ShardingMongoDTestFixture::tearDown();
 }
 

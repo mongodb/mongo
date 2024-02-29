@@ -211,8 +211,6 @@ ShardingTestFixture::ShardingTestFixture(bool withMockCatalogCache) {
 }
 
 ShardingTestFixture::~ShardingTestFixture() {
-    CatalogCacheLoader::clearForTests(getServiceContext());
-
     if (auto grid = Grid::get(getServiceContext())) {
         if (grid->getExecutorPool()) {
             grid->getExecutorPool()->shutdownAndJoin();

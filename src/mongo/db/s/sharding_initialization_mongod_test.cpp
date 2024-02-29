@@ -111,8 +111,6 @@ protected:
         storageGlobalParams.queryableBackupMode = false;
         serverGlobalParams.overrideShardIdentity = BSONObj();
 
-        CatalogCacheLoader::clearForTests(getServiceContext());
-
         ShardingMongoDTestFixture::tearDown();
     }
 

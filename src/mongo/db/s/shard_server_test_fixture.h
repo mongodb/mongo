@@ -54,7 +54,6 @@ protected:
     ~ShardServerTestFixture();
 
     void setUp() override;
-    void tearDown() override;
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override;
 

@@ -36,7 +36,6 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
-#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -45,12 +44,10 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
-#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 
@@ -62,7 +59,7 @@ namespace mongo {
  */
 class CatalogCacheLoader {
 public:
-    virtual ~CatalogCacheLoader() = default;
+    virtual ~CatalogCacheLoader();
 
     /**
      * Stores a loader on the specified service context. May only be called once for the lifetime of
@@ -174,28 +171,22 @@ public:
     virtual SemiFuture<DatabaseType> getDatabase(const DatabaseName& dbName) = 0;
 
     /**
-     * Waits for any pending changes for the specified collection to be persisted locally (not
-     * necessarily replicated). If newer changes come after this method has started running, they
-     * will not be waited for except if there is a drop.
+     * Waits for any pending changes for the specified database or collection to be persisted
+     * locally (not necessarily majority replicated). If newer changes come after this method has
+     * started running, they will not be waited for except if there is a drop.
      *
      * May throw if the node steps down from primary or if the operation time is exceeded or due to
      * any other error condition.
      *
-     * If the specific loader implementation does not support persistence, this method is undefined
-     * and must fassert.
+     * If the specific loader implementation does not support persistence, these methods are
+     * undefined and must fassert.
      */
     virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
     virtual void waitForDatabaseFlush(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
-    /**
-     * Only used for unit-tests, clears a previously-created catalog cache loader from the specified
-     * service context, so that 'create' can be called again.
-     */
-    static void clearForTests(ServiceContext* serviceContext);
-
 protected:
-    CatalogCacheLoader() = default;
+    CatalogCacheLoader();
 };
 
 }  // namespace mongo
