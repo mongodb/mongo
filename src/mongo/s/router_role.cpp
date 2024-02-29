@@ -114,10 +114,24 @@ void DBPrimaryRouter::_onException(RouteContext* context, Status s) {
     }
 }
 
-CollectionRouterCommon::CollectionRouterCommon(ServiceContext* service) : RouterBase(service) {}
+CollectionRouterCommon::CollectionRouterCommon(
+    ServiceContext* service, const std::vector<NamespaceString>& targetedNamespaces)
+    : RouterBase(service), _targetedNamespaces(targetedNamespaces) {}
 
 void CollectionRouterCommon::_onException(RouteContext* context, Status s) {
     auto catalogCache = Grid::get(_service)->catalogCache();
+
+    const auto isNssInvolvedInRouting = [&](const NamespaceString& nss) {
+        if (nss.isTimeseriesBucketsCollection() &&
+            std::find(_targetedNamespaces.begin(),
+                      _targetedNamespaces.end(),
+                      nss.getTimeseriesViewNamespace()) != _targetedNamespaces.end()) {
+            return true;
+        }
+
+        return std::find(_targetedNamespaces.begin(), _targetedNamespaces.end(), nss) !=
+            _targetedNamespaces.end();
+    };
 
     if (s == ErrorCodes::StaleDbVersion) {
         auto si = s.extraInfo<StaleDbRoutingVersion>();
@@ -126,10 +140,19 @@ void CollectionRouterCommon::_onException(RouteContext* context, Status s) {
     } else if (s == ErrorCodes::StaleConfig) {
         auto si = s.extraInfo<StaleConfigInfo>();
         tassert(6375904, "StaleConfig must have extraInfo", si);
+
+        if (!isNssInvolvedInRouting(si->getNss())) {
+            uassertStatusOK(s);
+        }
+
         catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
             si->getNss(), si->getVersionWanted(), si->getShardId());
     } else if (s == ErrorCodes::StaleEpoch) {
         if (auto si = s.extraInfo<StaleEpochInfo>()) {
+            if (!isNssInvolvedInRouting(si->getNss())) {
+                uassertStatusOK(s);
+            }
+
             catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
                 si->getNss(), si->getVersionWanted(), ShardId());
         }
@@ -162,12 +185,9 @@ CollectionRoutingInfo CollectionRouterCommon::_getRoutingInfo(OperationContext* 
     return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss, allowLocks));
 }
 
-CollectionRouter::CollectionRouter(ServiceContext* service, NamespaceString nss)
-    : CollectionRouterCommon(service), _nss(std::move(nss)) {}
-
-void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
-                                                       const CollectionRoutingInfo& cri,
-                                                       BSONObjBuilder* builder) {
+void CollectionRouterCommon::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
+                                                             const CollectionRoutingInfo& cri,
+                                                             BSONObjBuilder* builder) {
     if (cri.cm.getVersion(shardId) == ChunkVersion::UNSHARDED()) {
         // Need to add the database version as well.
         const auto& dbVersion = cri.cm.dbVersion();
@@ -179,9 +199,12 @@ void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
     cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, builder);
 }
 
+CollectionRouter::CollectionRouter(ServiceContext* service, NamespaceString nss)
+    : CollectionRouterCommon(service, {std::move(nss)}) {}
+
 MultiCollectionRouter::MultiCollectionRouter(ServiceContext* service,
                                              const std::vector<NamespaceString>& nssList)
-    : CollectionRouterCommon(service), _nssList(nssList) {}
+    : CollectionRouterCommon(service, nssList) {}
 
 bool MultiCollectionRouter::isAnyCollectionNotLocal(
     OperationContext* opCtx,
@@ -196,7 +219,7 @@ bool MultiCollectionRouter::isAnyCollectionNotLocal(
     bool anyCollectionNotLocal = false;
 
     // For each collection, figure out if it fully lives on this shard.
-    for (const auto& nss : _nssList) {
+    for (const auto& nss : _targetedNamespaces) {
         const auto nssCri = criMap.find(nss);
         tassert(8322001,
                 "Must be an entry in criMap for namespace " + nss.toStringForErrorMsg(),

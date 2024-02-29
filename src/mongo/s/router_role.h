@@ -102,10 +102,17 @@ private:
  */
 class CollectionRouterCommon : public RouterBase {
 protected:
-    CollectionRouterCommon(ServiceContext* service);
+    CollectionRouterCommon(ServiceContext* service,
+                           const std::vector<NamespaceString>& routingNamespaces);
+
+    static void appendCRUDRoutingTokenToCommand(const ShardId& shardId,
+                                                const CollectionRoutingInfo& cri,
+                                                BSONObjBuilder* builder);
 
     void _onException(RouteContext* context, Status s);
     CollectionRoutingInfo _getRoutingInfo(OperationContext* opCtx, const NamespaceString& nss);
+
+    const std::vector<NamespaceString> _targetedNamespaces;
 };
 
 /**
@@ -120,7 +127,7 @@ public:
     auto route(OperationContext* opCtx, StringData comment, F&& callbackFn) {
         RouteContext context{comment.toString()};
         while (true) {
-            auto cri = _getRoutingInfo(opCtx, _nss);
+            auto cri = _getRoutingInfo(opCtx, _targetedNamespaces.front());
             try {
                 return callbackFn(opCtx, cri);
             } catch (const DBException& ex) {
@@ -128,13 +135,6 @@ public:
             }
         }
     }
-
-    static void appendCRUDRoutingTokenToCommand(const ShardId& shardId,
-                                                const CollectionRoutingInfo& cri,
-                                                BSONObjBuilder* builder);
-
-private:
-    const NamespaceString _nss;
 };
 
 class MultiCollectionRouter : public CollectionRouterCommon {
@@ -142,7 +142,8 @@ public:
     MultiCollectionRouter(ServiceContext* service, const std::vector<NamespaceString>& nssList);
 
     /**
-     * Member function which discerns whether any of the namespaces in '_nssList' are not local.
+     * Member function which discerns whether any of the namespaces in 'routingNamespaces' are not
+     * local.
      */
     bool isAnyCollectionNotLocal(
         OperationContext* opCtx,
@@ -154,7 +155,7 @@ public:
         RouteContext context{comment.toString()};
         while (true) {
             stdx::unordered_map<NamespaceString, CollectionRoutingInfo> criMap;
-            for (const auto& nss : _nssList) {
+            for (const auto& nss : _targetedNamespaces) {
                 criMap.emplace(nss, _getRoutingInfo(opCtx, nss));
             }
 
@@ -165,9 +166,6 @@ public:
             }
         }
     }
-
-private:
-    const std::vector<NamespaceString> _nssList;
 };
 
 }  // namespace router
