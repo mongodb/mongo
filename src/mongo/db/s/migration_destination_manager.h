@@ -196,7 +196,7 @@ public:
         BSONObj idIndexSpec;
     };
     static IndexesAndIdIndex getCollectionIndexes(OperationContext* opCtx,
-                                                  const NamespaceStringOrUUID& nssOrUUID,
+                                                  const NamespaceString& nss,
                                                   const ShardId& fromShardId,
                                                   const boost::optional<CollectionRoutingInfo>& cri,
                                                   boost::optional<Timestamp> afterClusterTime);

@@ -144,7 +144,7 @@ protected:
             ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listIndexes"_sd);
             ASSERT_EQUALS(nss.dbName(), request.dbname);
             ASSERT_EQUALS(expectedHost, request.target);
-            ASSERT_EQ(unittest::assertGet(UUID::parse(request.cmdObj.firstElement())), uuid);
+            ASSERT_EQ(request.cmdObj.firstElement().checkAndGetStringData(), nss.coll());
             ASSERT(request.cmdObj.hasField("shardVersion"));
             ASSERT_BSONOBJ_EQ(request.cmdObj["readConcern"].Obj(),
                               BSON("level"

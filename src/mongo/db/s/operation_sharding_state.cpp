@@ -82,6 +82,17 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
     auto& oss = OperationShardingState::get(opCtx);
 
+    if (shardVersion && shardVersion != ShardVersion::UNSHARDED()) {
+        // TODO (SERVER-87196): remove the fcvSnapshot branch after 8.0 is released
+        const auto fcvSnapshot = serverGlobalParams.featureCompatibility.acquireFCVSnapshot();
+        if (fcvSnapshot.isVersionInitialized() &&
+            fcvSnapshot.isGreaterThan(multiversion::FeatureCompatibilityVersion::kVersion_7_3)) {
+            tassert(6300900,
+                    "Attaching a shard version requires a non db-only namespace",
+                    !nss.isDbOnly());
+        }
+    }
+
     bool shardVersionInserted = false;
     bool databaseVersionInserted = false;
     try {

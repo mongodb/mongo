@@ -849,7 +849,7 @@ Status MigrationDestinationManager::exitCriticalSection(OperationContext* opCtx,
 
 MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getCollectionIndexes(
     OperationContext* opCtx,
-    const NamespaceStringOrUUID& nssOrUUID,
+    const NamespaceString& nss,
     const ShardId& fromShardId,
     const boost::optional<CollectionRoutingInfo>& cri,
     boost::optional<Timestamp> afterClusterTime) {
@@ -864,8 +864,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     // Do not hold any locks while issuing remote calls.
     invariant(!shard_role_details::getLocker(opCtx)->isLocked());
 
-    auto cmd = nssOrUUID.isNamespaceString() ? BSON("listIndexes" << nssOrUUID.nss().coll())
-                                             : BSON("listIndexes" << nssOrUUID.uuid());
+    auto cmd = BSON("listIndexes" << nss.coll());
     if (cri) {
         cmd = appendShardVersion(cmd, cri->getShardVersion(fromShardId));
     }
@@ -877,7 +876,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     auto indexes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nssOrUUID.dbName(),
+                                              nss.dbName(),
                                               cmd,
                                               Milliseconds(-1)));
     for (auto&& spec : indexes.docs) {
