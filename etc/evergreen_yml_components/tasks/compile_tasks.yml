@@ -355,7 +355,6 @@ tasks:
       targets: >-
         +visibility_test1
       separate_debug: on
-      # TODO(SERVER-86893): Remove --config=local once asan+clang is working with remote execution
       task_compile_flags: >-
         BAZEL_BUILD_ENABLED=1
         BAZEL_INTEGRATION_DEBUG=1
@@ -364,7 +363,6 @@ tasks:
         --ninja=disabled
         --link-model=dynamic
         --modules=
-        BAZEL_FLAGS=--config=local
   - func: "verify build output present"
     vars:
       output: build/install/bin/visibility_test1
