@@ -84,9 +84,8 @@ void LimitSkipStage::open(bool reOpen) {
     _isEOF = false;
     _children[0]->open(reOpen);
 
-    vm::ByteCode bytecode;
-    _limit = _runLimitOrSkipCode(_limitCode.get(), bytecode);
-    _skip = _runLimitOrSkipCode(_skipCode.get(), bytecode);
+    _limit = _runLimitOrSkipCode(_limitCode.get());
+    _skip = _runLimitOrSkipCode(_skipCode.get());
     _specificStats.limit = _limit;
     _specificStats.skip = _skip;
 
@@ -164,13 +163,12 @@ size_t LimitSkipStage::estimateCompileTimeSize() const {
     return size;
 }
 
-boost::optional<int64_t> LimitSkipStage::_runLimitOrSkipCode(const vm::CodeFragment* code,
-                                                             vm::ByteCode& bytecode) {
+boost::optional<int64_t> LimitSkipStage::_runLimitOrSkipCode(const vm::CodeFragment* code) {
     if (code == nullptr) {
         return boost::none;
     }
 
-    auto [owned, tag, val] = bytecode.run(code);
+    auto [owned, tag, val] = _bytecode.run(code);
     value::ValueGuard guard{owned, tag, val};
     tassert(8349200,
             "Expect limit or skip code to return an int64",
