@@ -325,9 +325,9 @@ void RegexMatchExpression::appendSerializedRightHandSide(BSONObjBuilder* bob,
 
     if (!_flags.empty()) {
         // We need to make sure the $options value can be re-parsed as legal regex options, so
-        // we'll set the representative value in this case to be the empty string rather than
+        // we'll set the representative value in this case to be the string "i" rather than
         // "?", which is the standard representative for string values.
-        opts.appendLiteral(bob, "$options", _flags, Value(""_sd));
+        opts.appendLiteral(bob, "$options", _flags, Value("i"_sd));
     }
 }
 
