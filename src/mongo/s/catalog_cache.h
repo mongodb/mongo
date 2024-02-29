@@ -464,6 +464,12 @@ private:
     StatusWith<CollectionRoutingInfo> _getCollectionRoutingInfoWithoutOptimization(
         OperationContext* opCtx, const NamespaceString& nss);
 
+    StatusWith<CollectionRoutingInfo> _retryUntilConsistentRoutingInfo(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        ChunkManager&& cm,
+        boost::optional<ShardingIndexesCatalogCache>&& sii);
+
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;
 

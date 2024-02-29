@@ -183,33 +183,6 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
     return std::make_shared<RoutingTableHistory>(std::move(newRoutingHistory));
 }
 
-StatusWith<CollectionRoutingInfo> retryUntilConsistentRoutingInfo(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    ChunkManager&& cm,
-    boost::optional<ShardingIndexesCatalogCache>&& sii) {
-    const auto catalogCache = Grid::get(opCtx)->catalogCache();
-    try {
-        // A non-empty ShardingIndexesCatalogCache implies that the collection is sharded since
-        // global indexes cannot be created on unsharded collections.
-        while (sii && (!cm.isSharded() || !cm.uuidMatches(sii->getCollectionIndexes().uuid()))) {
-            auto nextSii =
-                uassertStatusOK(catalogCache->getCollectionRoutingInfoWithIndexRefresh(opCtx, nss))
-                    .sii;
-            if (sii.is_initialized() && nextSii.is_initialized() &&
-                sii->getCollectionIndexes() == nextSii->getCollectionIndexes()) {
-                cm = uassertStatusOK(
-                         catalogCache->getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss))
-                         .cm;
-            }
-            sii = std::move(nextSii);
-        }
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-    return CollectionRoutingInfo{std::move(cm), std::move(sii)};
-}
-
 }  // namespace
 
 ShardVersion CollectionRoutingInfo::getCollectionVersion() const {
@@ -488,7 +461,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
             return CollectionRoutingInfo{std::move(cm), boost::none};
         }
         auto sii = _getCollectionIndexInfoAt(opCtx, nss);
-        return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
+        return _retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -506,7 +479,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(Operati
             return CollectionRoutingInfo{std::move(cm), boost::none};
         }
         auto sii = _getCollectionIndexInfoAt(opCtx, nss, allowLocks);
-        return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
+        return _retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -517,7 +490,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoWithout
     try {
         auto cm = uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, boost::none));
         auto sii = _getCollectionIndexInfoAt(opCtx, nss);
-        return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
+        return _retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -635,6 +608,29 @@ void CatalogCache::_triggerIndexVersionRefresh(OperationContext* opCtx,
     _indexCache.advanceTimeInStore(
         nss, ComparableIndexVersion::makeComparableIndexVersionForForcedRefresh());
     setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
+}
+
+StatusWith<CollectionRoutingInfo> CatalogCache::_retryUntilConsistentRoutingInfo(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    ChunkManager&& cm,
+    boost::optional<ShardingIndexesCatalogCache>&& sii) {
+    try {
+        // A non-empty ShardingIndexesCatalogCache implies that the collection is sharded since
+        // global indexes cannot be created on unsharded collections.
+        while (sii && (!cm.isSharded() || !cm.uuidMatches(sii->getCollectionIndexes().uuid()))) {
+            auto nextSii =
+                uassertStatusOK(getCollectionRoutingInfoWithIndexRefresh(opCtx, nss)).sii;
+            if (sii.is_initialized() && nextSii.is_initialized() &&
+                sii->getCollectionIndexes() == nextSii->getCollectionIndexes()) {
+                cm = uassertStatusOK(getCollectionRoutingInfoWithPlacementRefresh(opCtx, nss)).cm;
+            }
+            sii = std::move(nextSii);
+        }
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+    return CollectionRoutingInfo{std::move(cm), std::move(sii)};
 }
 
 StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
