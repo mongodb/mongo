@@ -19,11 +19,6 @@ variables:
         variant: compile-amazon2
       - name: schedule_global_auto_tasks
         variant: task_generation
-  _real_compile_rhel70: &_compile_rhel70
-      - name: compile
-        variant: compile-rhel70
-      - name: schedule_global_auto_tasks
-        variant: task_generation
   _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
       - name: compile
         variant: compile-amazon-linux2-arm64
@@ -36,9 +31,6 @@ variables:
 ###
 # **Or**: Leave this section uncommented to bypass/skip compile.
 #  _skip_compile_amazon2: &_compile_amazon2
-#      - name: schedule_global_auto_tasks
-#        variant: task_generation
-#  _skip_compile_rhel70: &_compile_rhel70
 #      - name: schedule_global_auto_tasks
 #        variant: task_generation
 #  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
@@ -1417,24 +1409,6 @@ buildvariants:
     tasks:
       - name: compile
 
-  - name: compile-rhel70
-    display_name: Compile for Atlas-like
-    modules: *modules
-    expansions:
-      <<: *compile-expansions
-      compile_flags: >-
-        --ssl
-        --separate-debug
-        MONGO_DISTMOD=rhel70
-        -j$(grep -c ^processor /proc/cpuinfo)
-        --release
-        --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-      compile_variant: "-rhel70"
-    run_on:
-      - rhel70-large
-    tasks:
-      - name: compile
-
   - name: atlas-M60-real
     display_name: M60-Atlas ReplSet AWS
     modules: *modules
@@ -1544,7 +1518,6 @@ buildvariants:
       canaries: none
       atlas_setup: M60-repl-azure
       use_custom_build_azure: true
-      compile_variant: "-rhel70"
       infrastructure_provisioning: workload_client_intel.2023-11
       infrastructure_provisioning_release: 2023-09
       workload_setup: 2022-11
@@ -1553,15 +1526,7 @@ buildvariants:
       storageEngine: wiredTiger
     run_on:
       - "rhel70-perf-atlas-large"
-    depends_on:
-      - name: compile
-        variant: compile-amazon2
-      - name: schedule_global_auto_tasks
-        variant: task_generation
-      - name: compile
-        variant: compile-rhel70
-      - name: schedule_global_auto_tasks
-        variant: task_generation
+    depends_on: *_compile_amazon2
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
