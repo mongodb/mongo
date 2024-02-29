@@ -1356,7 +1356,7 @@ tasks:
 
 - <<: *gen_task_template
   name: v1index_jscore_passthrough_gen
-  tags: ["assigned_to_jira_team_server_execution", "misc_js"]
+  tags: ["assigned_to_jira_team_server_execution"]
   commands:
   - func: "generate resmoke tasks"
     vars:
