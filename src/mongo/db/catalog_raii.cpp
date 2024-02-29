@@ -379,6 +379,11 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                 opCtx, *catalog, _coll, _resolvedNss);
         }
 
+        if (receivedShardVersion) {
+            shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
+                opCtx, _resolvedNss, *receivedShardVersion, collDesc, _coll);
+        }
+
         return;
     }
 

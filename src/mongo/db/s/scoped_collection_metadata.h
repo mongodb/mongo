@@ -102,6 +102,10 @@ public:
         return _impl->get().uuidMatches(uuid);
     }
 
+    const UUID& getUUID() const {
+        return _impl->get().getUUID();
+    }
+
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
         return _impl->get().getReshardingFields();
     }

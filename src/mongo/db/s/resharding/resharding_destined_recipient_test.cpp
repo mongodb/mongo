@@ -279,7 +279,7 @@ protected:
                             env.version.placementVersion().epoch(),
                             env.version.placementVersion().getTimestamp(),
                             Date_t::now(),
-                            UUID::gen(),
+                            env.sourceUuid,
                             BSON(kShardKey << 1));
         coll.setAllowMigrations(false);
 

@@ -35,6 +35,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
+#include <fmt/format.h>
 #include <iterator>
 #include <list>
 #include <map>
@@ -85,6 +86,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 using TransactionResources = shard_role_details::TransactionResources;
 
@@ -356,21 +359,32 @@ CollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks
         const bool isCollection =
             holds_alternative<CollectionPtr>(snapshotedServices.collectionPtrOrView);
 
-        if (holds_alternative<PlacementConcern>(prerequisites.placementConcern)) {
-            const auto& placementConcern = get<PlacementConcern>(prerequisites.placementConcern);
+        const boost::optional<ShardVersion> placementConcernShardVersion =
+            holds_alternative<PlacementConcern>(prerequisites.placementConcern)
+            ? get<PlacementConcern>(prerequisites.placementConcern).shardVersion
+            : boost::none;
 
-            if (placementConcern.shardVersion == ShardVersion::UNSHARDED()) {
-                shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
-                    opCtx,
-                    catalog,
-                    isCollection ? get<CollectionPtr>(snapshotedServices.collectionPtrOrView)
-                                 : CollectionPtr::null,
-                    prerequisites.nss);
-            }
+        if (placementConcernShardVersion == ShardVersion::UNSHARDED()) {
+            shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
+                opCtx,
+                catalog,
+                isCollection ? get<CollectionPtr>(snapshotedServices.collectionPtrOrView)
+                             : CollectionPtr::null,
+                prerequisites.nss);
         }
 
         if (isCollection) {
             const auto& collectionPtr = get<CollectionPtr>(snapshotedServices.collectionPtrOrView);
+
+            if (placementConcernShardVersion && snapshotedServices.collectionDescription) {
+                shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
+                    opCtx,
+                    prerequisites.nss,
+                    *placementConcernShardVersion,
+                    *snapshotedServices.collectionDescription,
+                    collectionPtr);
+            }
+
             invariant(!prerequisites.uuid || prerequisites.uuid == collectionPtr->uuid());
             if (!prerequisites.uuid && collectionPtr) {
                 // If the uuid wasn't originally set on the AcquisitionRequest, set it now on the
@@ -1661,6 +1675,61 @@ void shard_role_details::checkLocalCatalogIsValidForUnshardedShardVersion(
                     makeErrorMessage(),
                     !latestCatalog->lookupCollectionByNamespace(opCtx, nss) &&
                         !latestCatalog->lookupView(opCtx, nss));
+        }
+    }
+}
+
+void shard_role_details::checkShardingAndLocalCatalogCollectionUUIDMatch(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardVersion& requestedShardVersion,
+    const ScopedCollectionDescription& shardingCollectionDescription,
+    const CollectionPtr& collectionPtr) {
+    // Skip the check if the requested shard version corresponds to an untracked collection or
+    // corresponds to this shard not own any chunk. Also skip the check if the router attached
+    // ShardVersion::IGNORED, since in this case the router broadcasts request to shards that may
+    // not even own the collection at all (so they won't have any uuid on their local catalog).
+    if (requestedShardVersion == ShardVersion::UNSHARDED() ||
+        !requestedShardVersion.placementVersion().isSet() ||
+        ShardVersion::isPlacementVersionIgnored(requestedShardVersion)) {
+        return;
+    }
+
+    // Skip checking resharding temporary collections. The reason is that resharding registers the
+    // temporary collections on the sharding catalog before creating them on the shards, without
+    // holding any critical section.
+    // TODO: SERVER-87235 Remove this when resharding creates the temporary collections under a
+    // critical section.
+    if (nss.isTemporaryReshardingCollection()) {
+        return;
+    }
+
+    // Check that the collection uuid in the sharding catalog and the one on the local catalog
+    // match.
+    if (shardingCollectionDescription.hasRoutingTable() &&
+        (!collectionPtr || !shardingCollectionDescription.uuidMatches(collectionPtr->uuid()))) {
+        if ((opCtx->inMultiDocumentTransaction() ||
+             repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime())) {
+            // If in multi-document transaction or snapshot read, throw SnapshotUnavailable so that
+            // the transaction can be retried. This situation is known to be possible when a
+            // collection undergoes resharding, due to the resharding commit protocol. See
+            // SERVER-87061.
+            // TODO: SERVER-87235: Remove this condition and leave only the tassert below also for
+            // transaction and snapshot reads.
+            uasserted(
+                ErrorCodes::SnapshotUnavailable,
+                "Sharding catalog and local catalog collection uuid do not match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'"_format(
+                    nss.toStringForErrorMsg(),
+                    shardingCollectionDescription.getUUID().toString(),
+                    collectionPtr ? collectionPtr->uuid().toString() : ""));
+
+        } else {
+            tasserted(
+                8706100,
+                "Sharding catalog and local catalog collection uuid do not match. Nss: '{}', sharding uuid: '{}', local uuid: '{}'"_format(
+                    nss.toStringForErrorMsg(),
+                    shardingCollectionDescription.getUUID().toString(),
+                    collectionPtr ? collectionPtr->uuid().toString() : ""));
         }
     }
 }

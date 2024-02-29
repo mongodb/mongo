@@ -607,5 +607,15 @@ void checkLocalCatalogIsValidForUnshardedShardVersion(OperationContext* opCtx,
                                                       const CollectionPtr& collectionPtr,
                                                       const NamespaceString& nss);
 
+/*
+ * Check that the collection uuid on the sharding catalog and the local catalog match.
+ */
+void checkShardingAndLocalCatalogCollectionUUIDMatch(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const ShardVersion& requestedShardVersion,
+    const ScopedCollectionDescription& shardingCollectionDescription,
+    const CollectionPtr& collectionPtr);
+
 }  // namespace shard_role_details
 }  // namespace mongo
