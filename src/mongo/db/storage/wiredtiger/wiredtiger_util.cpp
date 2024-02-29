@@ -1336,4 +1336,26 @@ BSONObj WiredTigerUtil::getSanitizedStorageOptionsForSecondaryReplication(const 
     return options;
 }
 
+Status WiredTigerUtil::canRunAutoCompact(OperationContext* opCtx) {
+    if (!gFeatureFlagAutoCompact.isEnabled(
+            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "autoCompact() requires its feature flag to be enabled");
+    }
+    if (WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "autoCompact() cannot be executed for in-memory configurations");
+    }
+    if (!opCtx->getServiceContext()->userWritesAllowed()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "autoCompact() can only be executed when writes are allowed");
+    }
+    if (storageGlobalParams.syncdelay == 0) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "autoCompact() can only be executed when checkpoints are enabled");
+    }
+    return Status::OK();
+}
+
+
 }  // namespace mongo

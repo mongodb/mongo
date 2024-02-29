@@ -380,6 +380,15 @@ public:
      */
     static BSONObj getSanitizedStorageOptionsForSecondaryReplication(const BSONObj& options);
 
+    /**
+     * Background compaction should not be executed if:
+     * - the feature flag is disabled or,
+     * - it is an in-memory configuration,
+     * - checkpoints are disabled or,
+     * - user writes are not allowed.
+     */
+    static Status canRunAutoCompact(OperationContext*);
+
 private:
     /**
      * Casts unsigned 64-bit statistics value to T.

@@ -655,14 +655,6 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
     if (!gEnableAutoCompaction)
         return;
 
-    // Notify the storage engine that it is safe to take stable checkpoints, as the data is now in a
-    // stable state. Background compaction should not be executed if:
-    // - checkpoints are disabled or,
-    // - user writes are not allowed.
-    uassert(8373400,
-            "The autoCompact command should not be executed",
-            opCtx->getServiceContext()->userWritesAllowed() && storageGlobalParams.syncdelay > 0);
-
     StorageEngine::AutoCompactOptions options{/*enable=*/true,
                                               /*runOnce=*/false,
                                               /*freeSpaceTargetMB=*/boost::none,
@@ -677,8 +669,20 @@ void WiredTigerKVEngine::notifyReplStartupRecoveryComplete(OperationContext* opC
         Date_t::max(),
         Lock::InterruptBehavior::kThrow,
         Lock::GlobalLockSkipOptions{.skipFlowControlTicket = true, .skipRSTLLock = true}};
+
     auto status = autoCompact(opCtx, options);
-    uassert(8373401, "Failed to execute autoCompact.", status.isOK());
+    if (status.isOK()) {
+        LOGV2(8704102, "AutoCompact enabled");
+        return;
+    }
+
+    // Proceed with startup if background compaction fails to start.
+    // In testing, crash if the command couldn't be executed and we get a non-EBUSY error.
+    if (TestingProctor::instance().isEnabled() && status != ErrorCodes::IllegalOperation &&
+        status != ErrorCodes::ObjectIsBusy) {
+        invariantStatusOK(
+            status.withContext("Background compaction failed to start due to an unexpected error"));
+    }
 }
 
 void WiredTigerKVEngine::appendGlobalStats(OperationContext* opCtx, BSONObjBuilder& b) {
@@ -2812,10 +2816,9 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
                                        const StorageEngine::AutoCompactOptions& options) {
     dassert(shard_role_details::getLocker(opCtx)->isLocked());
 
-    WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    if (cache->isEphemeral()) {
-        return Status::OK();
-    }
+    auto status = WiredTigerUtil::canRunAutoCompact(opCtx);
+    if (!status.isOK())
+        return status;
 
     WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     shard_role_details::getRecoveryUnit(opCtx)->abandonSnapshot();
@@ -2842,16 +2845,13 @@ Status WiredTigerKVEngine::autoCompact(OperationContext* opCtx,
     }
 
     int ret = s->compact(s, nullptr, config.str().c_str());
-
-    if (ret == EBUSY) {
-        StringBuilder msg;
-        msg << "Auto compact failed to " << (options.enable ? "start" : "stop")
-            << ", resource busy";
-        return Status(ErrorCodes::ObjectIsBusy, msg.str());
-    }
-    uassertStatusOK(wtRCToStatus(ret, s));
-
-    return Status::OK();
+    status = wtRCToStatus(ret, s, "WiredTigerKVEngine::autoCompact()");
+    if (!status.isOK())
+        LOGV2_ERROR(8704101,
+                    "WiredTigerKVEngine::autoCompact() failed",
+                    "config"_attr = config.str(),
+                    "error"_attr = status);
+    return status;
 }
 
 }  // namespace mongo

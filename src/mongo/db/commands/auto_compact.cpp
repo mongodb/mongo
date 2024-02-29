@@ -58,10 +58,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "AutoCompact command requires its feature flag to be enabled",
-                    gFeatureFlagAutoCompact.isEnabled(
-                        serverGlobalParams.featureCompatibility.acquireFCVSnapshot()));
             uassertStatusOK(autoCompact(opCtx,
                                         request().getCommandParameter(),
                                         request().getRunOnce(),
@@ -155,12 +151,7 @@ Status autoCompact(OperationContext* opCtx,
     Status status = storageEngine->autoCompact(opCtx, options);
     if (!status.isOK())
         return status;
-
-    if (enable)
-        LOGV2(8012100, "AutoCompact enabled");
-    else
-        LOGV2(8012101, "AutoCompact disabled");
-
+    LOGV2(8012100, "AutoCompact", "enabled"_attr = enable);
     return status;
 }
 
