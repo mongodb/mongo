@@ -196,15 +196,6 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
                                     << newConfig.getReplicaSetId());
     }
 
-    if (oldConfig.getConfigServer_deprecated() && !newConfig.getConfigServer_deprecated() &&
-        !gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
-            serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-        return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                      str::stream()
-                          << "Cannot remove \"" << ReplSetConfig::kConfigServer_deprecatedFieldName
-                          << "\" from replica set configuration on reconfig");
-    }
-
     //
     // For every member config mNew in newConfig, if there exists member config mOld
     // in oldConfig such that mNew.getHostAndPort() == mOld.getHostAndPort(), it is required

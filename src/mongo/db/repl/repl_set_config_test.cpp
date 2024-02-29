@@ -898,17 +898,6 @@ TEST(ReplSetConfig, ConfigServerField) {
     // When the field is false it should not be serialized.
     configBSON = config2.toBSON();
     ASSERT_FALSE(configBSON.hasField("configsvr"));
-
-    // Configs in which configsvr is not the same as the --configsvr flag are invalid.
-    serverGlobalParams.clusterRole = {ClusterRole::ShardServer, ClusterRole::ConfigServer};
-    ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
-
-    ASSERT_OK(config.validate());
-    ASSERT_EQUALS(ErrorCodes::BadValue, config2.validate());
-
-    serverGlobalParams.clusterRole = ClusterRole::None;
-    ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
-    ASSERT_OK(config2.validate());
 }
 
 TEST(ReplSetConfig, SetNewlyAddedFieldForMemberConfig) {

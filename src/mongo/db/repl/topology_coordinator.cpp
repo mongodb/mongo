@@ -2102,9 +2102,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
     }
 
     if (_rsConfig.getConfigServer_deprecated() ||
-        (gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
-             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
-         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         response->append("configsvr", true);
     }
 

@@ -1,6 +1,7 @@
 /**
- * Tests that a shard identity document cannot be inserted or updated with a shardName that is not
- * allowed for the server's cluster role.
+ * Tests that a shard identity document cannot be updated with a shardName that is not
+ * allowed for the server's cluster role. Invalid shard identity document inserts are covered by
+ * mixed_cluster_roles.js.
  *
  * @tags: [
  *   requires_fcv_70,
@@ -8,10 +9,6 @@
  * ]
  */
 const st = new ShardingTest({shards: 2, configShard: true});
-const rs = new ReplSetTest({name: "new-shard-rs", nodes: 1, nodeOptions: {shardsvr: ""}});
-
-rs.startSet();
-rs.initiate();
 
 var configConnStr = st.configRS.getURL();
 
@@ -22,20 +19,8 @@ var shardIdentityDoc = {
     clusterId: ObjectId()
 };
 
-// TODO: SERVER-67837 Change to test that the server crashed when auto-bootstrapping is enabled by
-// default.
-//
-// Insert with shard name "config" on shard server should fail
-var res =
-    assert.commandFailedWithCode(rs.getPrimary().getDB('admin').runCommand(
-                                     {insert: "system.version", documents: [shardIdentityDoc]}),
-                                 ErrorCodes.UnsupportedFormat);
-assert.eq(
-    res.writeErrors[0].errmsg,
-    "Invalid shard identity document: the shard name for a shard server cannot be \"config\"");
-
 // Update with shard name "config" on shard server should fail
-res = assert.commandFailedWithCode(
+let res = assert.commandFailedWithCode(
     st.shard1.getDB('admin').runCommand(
         {update: "system.version", updates: [{q: {"_id": "shardIdentity"}, u: shardIdentityDoc}]}),
     ErrorCodes.UnsupportedFormat);
@@ -55,4 +40,3 @@ assert.eq(
 
 // TODO SERVER-74570: Enable parallel shutdown
 st.stop({parallelSupported: false});
-rs.stopSet();

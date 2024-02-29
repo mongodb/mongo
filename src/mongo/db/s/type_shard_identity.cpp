@@ -83,12 +83,9 @@ Status ShardIdentityType::validate(bool fassert) const {
                               << ConnectionString::typeToString(configsvrConnStr.type())};
     }
 
-    // (Ignore FCV check): Auto-bootstrapping happens irrespective of the FCV when
-    // gFeatureFlagAllMongodsAreSharded is enabled.
-    if (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafe() && fassert) {
-        // With auto-bootstrapping, we rely on detecting a discrepancy between a server's cluster
-        // role and the shard identity document to prevent a replica set from running with mixed
-        // cluster roles. See SERVER-80249 for more information.
+    if (fassert) {
+        // We rely on detecting a discrepancy between a server's cluster role and the shard identity
+        // document to prevent a replica set from running with mixed cluster roles.
         const bool isShardIdConfigServer = getShardName() == ShardId::kConfigServerId;
         if (!isShardIdConfigServer &&
             serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {

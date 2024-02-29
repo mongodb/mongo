@@ -1,12 +1,13 @@
 /**
  * Test that servers with incorrect cluster roles (for the replica set they are in) eventually crash
- * during the upgrade process from 7.0 to 8.0 and that there are no issues with CRUD operations or
- * data inconsistencies.
+ * during the upgrade process from last-lts to latest (and continue to crash if restarted with an
+ * incorrect cluster role). Also test that there are no issues with CRUD operations or data
+ * inconsistencies from a replica set with mixed cluster roles.
  *
- * To provide context on this test: SERVER-80249 added code to allow a 7.0 replica set
- * to restart as an 8.0 auto-bootstrapped config shard; however, that code also necessarily allows a
- * replica set to be started with mixed cluster roles. To fix that, SERVER-80249 also added code to
- * shut down a server if its cluster role does not align with the shard identity document it
+ * To provide context on this test: SERVER-80249 added code to allow a last-lts replica set
+ * to restart as an latest auto-bootstrapped config shard; however, that code also necessarily
+ * allows a replica set to be started with mixed cluster roles. To fix that, SERVER-80249 also added
+ * code to shut down a server if its cluster role does not align with the shard identity document it
  * replicated (example: shard server has shard identity document for a config server). This ensures
  * that the replica set eventually all has nodes with the same cluster role.
  *
@@ -42,12 +43,12 @@ function ensureShardingCommandsFail(conn) {
 }
 
 /**
- * Upgrading 7.0 replica set to 8.0 one shard cluster (config shard).
+ * Upgrading last-lts replica set to latest one shard cluster (config shard).
  *
  * The test first verifies that CRUD operations behave correctly before the shard identity document
- * is inserted. It does this verification with various primaries (shard server primary, or 7.0
+ * is inserted. It does this verification with various primaries (shard server primary, or last-lts
  * replica set node primary) and secondaries (shard server secondary, config server secondary
- * and 7.0 replica set node secondary).
+ * and last-lts replica set node secondary).
  *
  * The test then verifies that shard servers crash when the config server shard identity
  * document is inserted.
@@ -99,7 +100,7 @@ function ensureShardingCommandsFail(conn) {
         }
     });
 
-    jsTestLog('Test with 7.0 node as primary before the shard identity document is inserted.');
+    jsTestLog('Test with last-lts node as primary before the shard identity document is inserted.');
     assert.eq(rst.getPrimary(), node0);
     testCRUD(node0);
     ensureShardingCommandsFail(node0);
@@ -133,7 +134,7 @@ function ensureShardingCommandsFail(conn) {
         }
     });
 
-    jsTestLog('Upgrading the 7.0 replica set node to a 8.0 config server.');
+    jsTestLog('Upgrading the last-lts replica set node to a latest config server.');
     MongoRunner.stopMongod(node3, null, {noCleanData: true});
     node3 = MongoRunner.runMongod({
         noCleanData: true,
@@ -204,13 +205,13 @@ function ensureShardingCommandsFail(conn) {
 }
 
 /**
- * Upgrading 7.0 sharded cluster to 8.0 sharded cluster.
+ * Upgrading last-lts sharded cluster to latest sharded cluster.
  *
- * This test verifies that mixed cluster roles are not possible when upgrading a 7.0 sharded cluster
- * to 8.0. More specifically it verifies a server will crash on startup in 8.0 if its cluster role
- * does not agree with the shard identity for the replica set. For example if a shard server sees
- * the shard identity document for a config server (i.e with _id: 'config') it should crash because
- * it knows the replica set it is a part of is for a config server.
+ * This test verifies that mixed cluster roles are not possible when upgrading a last-lts sharded
+ * cluster to latest. More specifically it verifies a server will crash on startup in latest if its
+ * cluster role does not agree with the shard identity for the replica set. For example if a shard
+ * server sees the shard identity document for a config server (i.e with _id: 'config') it should
+ * crash because it knows the replica set it is a part of is for a config server.
  */
 {
     const st = new ShardingTest({
@@ -222,7 +223,8 @@ function ensureShardingCommandsFail(conn) {
         nodeOptions: {binVersion: 'last-lts'}
     });
 
-    jsTestLog('Restarting a 7.0 config server secondary as a 8.0 shard server should fail.');
+    jsTestLog(
+        'Restarting a last-lts config server secondary as a latest shard server should fail.');
     let configSecondary = st.configRS.getSecondary();
     printjson(configSecondary);
     MongoRunner.stopMongod(configSecondary, null, {noCleanData: true});
@@ -239,7 +241,8 @@ function ensureShardingCommandsFail(conn) {
         });
     });
 
-    jsTestLog('Restarting a 7.0 config server secondary as a 8.0 config server should work.');
+    jsTestLog(
+        'Restarting a last-lts config server secondary as a latest config server should work.');
     configSecondary = MongoRunner.runMongod({
         noCleanData: true,
         configsvr: '',
@@ -252,7 +255,8 @@ function ensureShardingCommandsFail(conn) {
     });
     testCRUD(st.s0);
 
-    jsTestLog('Restarting a 7.0 shard server secondary as a 8.0 config server should fail.');
+    jsTestLog(
+        'Restarting a last-lts shard server secondary as a latest config server should fail.');
     let shardSecondary = st.rs0.getSecondary();
     MongoRunner.stopMongod(shardSecondary, null, {noCleanData: true});
     assert.throws(() => {
@@ -268,7 +272,7 @@ function ensureShardingCommandsFail(conn) {
         });
     });
 
-    jsTestLog('Restarting a 7.0 shard server secondary as a 8.0 shard server should work.');
+    jsTestLog('Restarting a last-lts shard server secondary as a latest shard server should work.');
     shardSecondary = MongoRunner.runMongod({
         noCleanData: true,
         shardsvr: '',

@@ -405,11 +405,8 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                       "one non-arbiter member with priority > 0");
     }
 
-    // (Ignore FCV check): If gFeatureFlagAllMongodsAreSharded is on, we want to allow reconfig-ing
-    // the replset even if it doesn't have configsvr: true in the config, regardless of the FCV.
     if (getConfigServer_deprecated() ||
-        (gFeatureFlagAllMongodsAreSharded.isEnabledAndIgnoreFCVUnsafe() &&
-         serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer))) {
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         if (arbiterCount > 0) {
             return Status(ErrorCodes::BadValue,
                           "Arbiters are not allowed in replica set configurations being used for "
@@ -438,24 +435,6 @@ Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
                           str::stream() << kWriteConcernMajorityShouldJournalFieldName
                                         << " must be true in replica set configurations being "
                                            "used for config servers");
-        }
-    } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // TODO: SERVER-82024 Remove this when master is 8.1.
-        //
-        // Skip this check to allow upgrading a 7.0 non auto-bootstrapped replica set node to a 8.0
-        // node with auto-bootstrapping enabled despite not having `configsvr:true` in the
-        // replication config. The `configsvr` field will get set during the upgrade process.
-        //
-        // By skipping this check there is the possibility of having a replica
-        // set where some nodes are shard servers and some are config servers. To ensure
-        // that all nodes in the replica set eventually have the same cluster role, the server
-        // fasserts (on startup or replication) if the shard identity document matches the server's
-        // cluster role. For why this is correct and for more context see: SERVER-80249
-        if (!gFeatureFlagAllMongodsAreSharded.isEnabledUseLatestFCVWhenUninitialized(
-                serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-            return Status(ErrorCodes::BadValue,
-                          "Nodes started with the --configsvr flag must have configsvr:true in "
-                          "their config");
         }
     }
 
