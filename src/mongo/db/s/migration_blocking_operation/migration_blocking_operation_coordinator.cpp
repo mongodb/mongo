@@ -79,6 +79,20 @@ MigrationBlockingOperationCoordinator::getOrCreate(OperationContext* opCtx,
         service->getOrCreateInstance(opCtx, std::move(coordinatorDoc)));
 }
 
+boost::optional<std::shared_ptr<MigrationBlockingOperationCoordinator>>
+MigrationBlockingOperationCoordinator::get(OperationContext* opCtx, const NamespaceString& nss) {
+    auto coordinatorId = [&] {
+        ShardingDDLCoordinatorId id{nss, DDLCoordinatorTypeEnum::kMigrationBlockingOperation};
+        return BSON("_id" << id.toBSON());
+    }();
+    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+    auto [maybeInstance, _] = ShardingDDLCoordinator::lookup(opCtx, service, coordinatorId);
+    if (!maybeInstance) {
+        return boost::none;
+    }
+    return checked_pointer_cast<MigrationBlockingOperationCoordinator>(*maybeInstance);
+}
+
 MigrationBlockingOperationCoordinator::MigrationBlockingOperationCoordinator(
     ShardingDDLCoordinatorService* service, const BSONObj& initialState)
     : RecoverableShardingDDLCoordinator(

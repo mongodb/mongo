@@ -67,8 +67,11 @@ public:
         void typedRun(OperationContext* opCtx) {
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             ShardingState::get(opCtx)->assertCanAcceptShardedCommands();
-            auto coordinator = MigrationBlockingOperationCoordinator::getOrCreate(opCtx, ns());
-            coordinator->endOperation(opCtx, request().getOperationId());
+            auto maybeCoordinator = MigrationBlockingOperationCoordinator::get(opCtx, ns());
+            if (!maybeCoordinator) {
+                return;
+            }
+            maybeCoordinator.get()->endOperation(opCtx, request().getOperationId());
         }
 
     private:

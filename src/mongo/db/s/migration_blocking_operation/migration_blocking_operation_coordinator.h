@@ -46,6 +46,9 @@ public:
 
     static std::shared_ptr<MigrationBlockingOperationCoordinator> getOrCreate(
         OperationContext* opCtx, const NamespaceString& nss);
+    static boost::optional<std::shared_ptr<MigrationBlockingOperationCoordinator>> get(
+        OperationContext* opCtx, const NamespaceString& nss);
+
     MigrationBlockingOperationCoordinator(ShardingDDLCoordinatorService* service,
                                           const BSONObj& initialState);
 
