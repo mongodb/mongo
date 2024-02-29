@@ -752,12 +752,13 @@ TEST_F(BucketStateRegistryTest, AbortingBatchRemovesBucketState) {
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
     TrackingContext trackingContext;
-    auto batch = std::make_shared<WriteBatch>(trackingContext,
-                                              BucketHandle{bucketId, info1.stripe},
-                                              info1.key.cloneAsUntracked(),
-                                              0,
-                                              stats,
-                                              bucket.timeField);
+    auto batch =
+        std::make_shared<WriteBatch>(trackingContext,
+                                     BucketHandle{bucketId, info1.stripe},
+                                     info1.key.cloneAsUntracked(),
+                                     0,
+                                     stats,
+                                     StringData{bucket.timeField.data(), bucket.timeField.size()});
 
     internal::abort(*this, *stripes[info1.stripe], WithLock::withoutLock(), batch, Status::OK());
     ASSERT(getBucketState(bucketStateRegistry, bucketId) == boost::none);
@@ -772,12 +773,13 @@ TEST_F(BucketStateRegistryTest, ClosingBucketGoesThroughPendingCompressionState)
 
     auto stats = internal::getOrInitializeExecutionStats(*this, info1.key.collectionUUID);
     TrackingContext trackingContext;
-    auto batch = std::make_shared<WriteBatch>(trackingContext,
-                                              BucketHandle{bucketId, info1.stripe},
-                                              info1.key.cloneAsUntracked(),
-                                              0,
-                                              stats,
-                                              bucket.timeField);
+    auto batch =
+        std::make_shared<WriteBatch>(trackingContext,
+                                     BucketHandle{bucketId, info1.stripe},
+                                     info1.key.cloneAsUntracked(),
+                                     0,
+                                     stats,
+                                     StringData{bucket.timeField.data(), bucket.timeField.size()});
     ASSERT(claimWriteBatchCommitRights(*batch));
     ASSERT_OK(prepareCommit(*this, ns, batch));
     ASSERT_TRUE(doesBucketStateMatch(bucketId, BucketState::kPrepared));

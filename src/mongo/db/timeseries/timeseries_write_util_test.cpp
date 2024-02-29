@@ -384,7 +384,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOp) {
                                    /*validateCompression=*/true);
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
-    batch->uncompressedBucketDoc = uncompressedPreImage;
+    setUncompressedBucketDoc(*batch, uncompressedPreImage);
     batch->compressedBucketDoc = *preImageCompressionResult.compressedBucket;
 
     batch->numPreviouslyCommittedMeasurements = 3;
@@ -458,7 +458,7 @@ TEST_F(TimeseriesWriteUtilTest, MakeTimeseriesCompressedDiffUpdateOpWithMeta) {
                                    /*validateCompression=*/true);
     ASSERT_TRUE(preImageCompressionResult.compressedBucket);
 
-    batch->uncompressedBucketDoc = uncompressedPreImage;
+    setUncompressedBucketDoc(*batch, uncompressedPreImage);
     batch->compressedBucketDoc = *preImageCompressionResult.compressedBucket;
 
     batch->numPreviouslyCommittedMeasurements = 3;

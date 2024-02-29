@@ -81,6 +81,8 @@ struct WriteBatch {
 
     BSONObj toBSON() const;
 
+    TrackingContext& trackingContext;
+
     const BucketHandle bucketHandle;
     const BucketKey bucketKey;
     const OperationId opId;
@@ -97,7 +99,7 @@ struct WriteBatch {
     BSONObj max;  // Batch-local max; full if first batch, updates otherwise.
     uint32_t numPreviouslyCommittedMeasurements = 0;
     StringMap<std::size_t> newFieldNamesToBeInserted;  // Value is hash of string key
-    BSONObj uncompressedBucketDoc;
+    TrackedBSONObj uncompressedBucketDoc;
     boost::optional<BSONObj> compressedBucketDoc;  // If set, bucket is compressed on-disk.
 
     /**
@@ -122,6 +124,9 @@ struct WriteBatch {
     AtomicWord<bool> commitRights{false};
     SharedPromise<CommitInfo> promise;
 };
+
+const BSONObj& getUncompressedBucketDoc(const WriteBatch& batch);
+void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc);
 
 /**
  * Returns whether the batch has already been committed or aborted.

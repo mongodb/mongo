@@ -744,7 +744,7 @@ write_ops::InsertCommandRequest makeTimeseriesInsertOp(
     if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
             serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
         invariant(bucketDoc.compressedBucket);
-        batch->uncompressedBucketDoc = bucketDoc.uncompressedBucket.getOwned();
+        setUncompressedBucketDoc(*batch, bucketDoc.uncompressedBucket.getOwned());
 
         // Initialize BSONColumnBuilders which will later get transferred into the Bucket class.
         BSONObj bucketDataDoc = bucketDoc.compressedBucket->getObjectField(kBucketDataFieldName);
@@ -777,13 +777,13 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
     }
 
     auto updateMod = makeTimeseriesUpdateOpEntry(opCtx, batch, metadata).getU();
-    auto updated = doc_diff::applyDiff(batch->uncompressedBucketDoc,
+    auto updated = doc_diff::applyDiff(getUncompressedBucketDoc(*batch),
                                        updateMod.getDiff(),
                                        updateMod.mustCheckExistenceForInsertOperations());
 
     // Hold the uncompressed bucket document that's currently on-disk prior to this write batch
     // running.
-    auto before = std::move(batch->uncompressedBucketDoc);
+    auto before = getUncompressedBucketDoc(*batch);
 
     auto compressionResult = timeseries::compressBucket(
         updated, batch->timeField, bucketsNs, gValidateTimeseriesCompression.load());
@@ -792,7 +792,7 @@ write_ops::UpdateCommandRequest makeTimeseriesUpdateOp(
             "Failed to compress time-series bucket",
             compressionResult.compressedBucket);
 
-    batch->uncompressedBucketDoc = updated;
+    setUncompressedBucketDoc(*batch, updated);
     batch->compressedBucketDoc = *compressionResult.compressedBucket;
 
     auto after = compressionResult.compressedBucket ? *compressionResult.compressedBucket : updated;
@@ -915,7 +915,7 @@ write_ops::UpdateCommandRequest makeTimeseriesCompressedDiffUpdateOp(
     BSONObj compressedBucketDataFieldDocAfter =
         buildCompressedBucketDataFieldDocEfficiently(batch, unused);
     batch->compressedBucketDoc = compressedBucketDataFieldDocAfter;
-    batch->uncompressedBucketDoc = {};
+    setUncompressedBucketDoc(*batch, {});
 
     // Generates a delta update request using the before and after compressed bucket documents' data
     // fields. The only other items that will be different are the min, max, and count fields in the

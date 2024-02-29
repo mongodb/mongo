@@ -31,6 +31,11 @@
 
 namespace mongo::timeseries {
 
+TrackedStringSet makeTrackedStringSet(TrackingContext& trackingContext) {
+    return TrackedStringSet(
+        trackingContext.makeAllocator<typename TrackedStringSet::allocator_type::value_type>());
+}
+
 TrackedBSONObj makeTrackedBson(TrackingContext& trackingContext, BSONObj obj) {
     return trackingContext.makeTracked(TrackableBSONObj{std::move(obj)});
 }

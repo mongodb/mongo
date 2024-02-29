@@ -2434,7 +2434,7 @@ TEST_F(BucketCatalogTest, ArchivingAndClosingUnderSideBucketCatalogMemoryPressur
     // used by the idle bucket.
     sideBucketCatalog->memoryUsage.store(getTimeseriesSideBucketCatalogMemoryUsageThresholdBytes() -
                                          sideBucketCatalog->trackingContext.allocated() +
-                                         (dummyBucket->memoryUsage) / 2);
+                                         trackingContext.allocated());
 
     // When we exceed the memory usage threshold we will first try to archive idle buckets to try
     // to get below the threshold. If this does not get us beneath the threshold, we will then try

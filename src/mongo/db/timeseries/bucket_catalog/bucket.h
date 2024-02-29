@@ -94,7 +94,7 @@ public:
     const BucketKey key;
 
     // Time field for the measurements that have been inserted into the bucket.
-    const std::string timeField;
+    const tracked_string timeField;
 
     // Minimum timestamp over contained measurements.
     const Date_t minTime;
@@ -113,10 +113,10 @@ public:
     // Top-level hashed field names of the measurements that have been inserted into the bucket.
     // TODO(SERVER-70605): Remove to avoid extra overhead. These are stored as keys in
     // intermediateBuilders.
-    StringSet fieldNames;
+    TrackedStringSet fieldNames;
 
     // Top-level hashed new field names that have not yet been committed into the bucket.
-    StringSet uncommittedFieldNames;
+    TrackedStringSet uncommittedFieldNames;
 
     // The minimum and maximum values for each field in the bucket.
     MinMax minmax;
@@ -150,14 +150,11 @@ public:
     std::shared_ptr<WriteBatch> preparedBatch;
 
     // Batches, per operation, that haven't been committed or aborted yet.
-    stdx::unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
+    tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>> batches;
 
     // If the bucket is in idleBuckets, then its position is recorded here.
-    using IdleList = std::list<Bucket*>;
+    using IdleList = tracked_list<Bucket*>;
     boost::optional<IdleList::iterator> idleListEntry = boost::none;
-
-    // Approximate memory usage of this bucket.
-    uint64_t memoryUsage = sizeof(*this);
 
     /**
      * The uncompressed bucket.
@@ -166,7 +163,7 @@ public:
      * enabled. Used to convert an uncompressed bucket to a compressed bucket on the next insert,
      * and will be cleared when finished.
      */
-    BSONObj uncompressedBucketDoc;
+    TrackedBSONObj uncompressedBucketDoc;
 
     // If set, bucket is compressed on disk, and first prepared batch will need to decompress it
     // before updating.
@@ -206,7 +203,8 @@ bool schemaIncompatible(Bucket& bucket,
  * to overflow, we will create a new bucket and recalculate the change to the bucket size
  * and data fields.
  */
-void calculateBucketFieldsAndSizeChange(const Bucket& bucket,
+void calculateBucketFieldsAndSizeChange(TrackingContext&,
+                                        const Bucket& bucket,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
                                         Bucket::NewFieldNames& newFieldNamesToBeInserted,

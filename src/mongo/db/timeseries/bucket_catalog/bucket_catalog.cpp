@@ -80,7 +80,9 @@ const std::size_t kDefaultNumberOfStripes = 32;
  * documents that have previously been committed to the bucket, and renders the batch
  * inactive. Must have commit rights.
  */
-void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
+void prepareWriteBatchForCommit(TrackingContext& trackingContext,
+                                WriteBatch& batch,
+                                Bucket& bucket) {
     invariant(batch.commitRights.load());
     batch.numPreviouslyCommittedMeasurements = bucket.numCommittedMeasurements;
 
@@ -88,7 +90,7 @@ void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
     // by someone else.
     for (auto it = batch.newFieldNamesToBeInserted.begin();
          it != batch.newFieldNamesToBeInserted.end();) {
-        StringMapHashedKey fieldName(it->first, it->second);
+        TrackedStringMapHashedKey fieldName(trackingContext, it->first, it->second);
         bucket.uncommittedFieldNames.erase(fieldName);
         if (bucket.fieldNames.contains(fieldName)) {
             batch.newFieldNamesToBeInserted.erase(it++);
@@ -118,13 +120,10 @@ void prepareWriteBatchForCommit(WriteBatch& batch, Bucket& bucket) {
     batch.intermediateBuilders = std::move(bucket.intermediateBuilders);
     batch.uncompressedBucketDoc = std::move(bucket.uncompressedBucketDoc);
     batch.bucketIsSortedByTime = bucket.bucketIsSortedByTime;
-    bucket.uncompressedBucketDoc = {};
-    bucket.memoryUsage -= batch.uncompressedBucketDoc.objsize();
 
     if (bucket.compressedBucketDoc) {
         batch.compressedBucketDoc = std::move(bucket.compressedBucketDoc);
         bucket.compressedBucketDoc.reset();
-        bucket.memoryUsage -= batch.compressedBucketDoc->objsize();
     }
 }
 
@@ -542,9 +541,7 @@ Status prepareCommit(BucketCatalog& catalog,
         return getBatchStatus();
     }
 
-    auto prevMemoryUsage = bucket->memoryUsage;
-    prepareWriteBatchForCommit(*batch, *bucket);
-    catalog.memoryUsage.fetchAndAdd(bucket->memoryUsage - prevMemoryUsage);
+    prepareWriteBatchForCommit(catalog.trackingContext, *batch, *bucket);
 
     return Status::OK();
 }
@@ -587,21 +584,15 @@ boost::optional<ClosedBucket> finish(OperationContext* opCtx,
         bucket->intermediateBuilders = std::move(batch->intermediateBuilders);
         bucket->preparedBatch.reset();
 
-        auto prevMemoryUsage = bucket->memoryUsage;
-
         // The uncompressed and compressed images should have already been moved to the batch by
         // this point.
         invariant(!bucket->compressedBucketDoc);
 
         // Take ownership of the committed batch's uncompressed and compressed images.
         bucket->uncompressedBucketDoc = std::move(batch->uncompressedBucketDoc);
-        bucket->memoryUsage += bucket->uncompressedBucketDoc.objsize();
         if (batch->compressedBucketDoc) {
             bucket->compressedBucketDoc = std::move(batch->compressedBucketDoc);
-            bucket->memoryUsage += bucket->compressedBucketDoc->objsize();
         }
-
-        catalog.memoryUsage.fetchAndAdd(bucket->memoryUsage - prevMemoryUsage);
     }
 
     auto& stats = batch->stats;

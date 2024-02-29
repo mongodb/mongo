@@ -139,6 +139,29 @@ tracked_string make_tracked_string(TrackingContext& trackingContext, Args... arg
     return tracked_string(args..., trackingContext.makeAllocator<char>());
 }
 
+struct TrackedStringMapHashedKey {
+public:
+    TrackedStringMapHashedKey(TrackingContext& trackingContext, StringData sd, size_t hash)
+        : _trackingContext(trackingContext), _sd(sd), _hash(hash) {}
+
+    operator tracked_string() const {
+        return make_tracked_string(_trackingContext, _sd.data(), _sd.size());
+    }
+
+    StringData key() const {
+        return _sd;
+    }
+
+    size_t hash() const {
+        return _hash;
+    }
+
+private:
+    std::reference_wrapper<TrackingContext> _trackingContext;
+    StringData _sd;
+    size_t _hash;
+};
+
 struct TrackedStringMapHasher {
     using is_transparent = void;
 
@@ -148,6 +171,14 @@ struct TrackedStringMapHasher {
 
     size_t operator()(const tracked_string& s) const {
         return operator()(StringData{s.data(), s.size()});
+    }
+
+    size_t operator()(TrackedStringMapHashedKey key) const {
+        return key.hash();
+    }
+
+    TrackedStringMapHashedKey hashed_key(TrackingContext& trackingContext, StringData sd) {
+        return {trackingContext, sd, operator()(sd)};
     }
 };
 
@@ -164,6 +195,18 @@ struct TrackedStringMapEq {
 
     bool operator()(StringData lhs, const tracked_string& rhs) const {
         return lhs == StringData{rhs.data(), rhs.size()};
+    }
+
+    bool operator()(TrackedStringMapHashedKey lhs, TrackedStringMapHashedKey rhs) const {
+        return lhs.key() == rhs.key();
+    }
+
+    bool operator()(const tracked_string& lhs, TrackedStringMapHashedKey rhs) const {
+        return StringData{lhs.data(), lhs.size()} == rhs.key();
+    }
+
+    bool operator()(TrackedStringMapHashedKey lhs, const tracked_string& rhs) const {
+        return lhs.key() == StringData{rhs.data(), rhs.size()};
     }
 
     bool operator()(const tracked_string& lhs, const tracked_string& rhs) const {
@@ -186,6 +229,14 @@ TrackedStringMap<Value> makeTrackedStringMap(TrackingContext& trackingContext) {
         trackingContext
             .makeAllocator<typename TrackedStringMap<Value>::allocator_type::value_type>());
 }
+
+using TrackedStringSet = absl::flat_hash_set<
+    tracked_string,
+    TrackedStringMapHasher,
+    TrackedStringMapEq,
+    std::scoped_allocator_adaptor<timeseries::TrackingAllocator<tracked_string>>>;
+
+TrackedStringSet makeTrackedStringSet(TrackingContext&);
 
 template <class T>
 using tracked_vector =

@@ -64,12 +64,17 @@ Bucket::Bucket(TrackingContext& trackingContext,
                BucketStateRegistry& bsr)
     : bucketId(bId),
       key(std::move(k)),
-      timeField(tf.toString()),
+      timeField(make_tracked_string(trackingContext, tf.data(), tf.size())),
       minTime(mt),
       bucketStateRegistry(bsr),
       lastChecked(getCurrentEraAndIncrementBucketCount(bucketStateRegistry)),
+      fieldNames(makeTrackedStringSet(trackingContext)),
+      uncommittedFieldNames(makeTrackedStringSet(trackingContext)),
       minmax(trackingContext),
       schema(trackingContext),
+      batches(
+          make_tracked_unordered_map<OperationId, std::shared_ptr<WriteBatch>>(trackingContext)),
+      uncompressedBucketDoc(makeTrackedBson(trackingContext, {})),
       usingAlwaysCompressedBuckets(feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
           serverGlobalParams.featureCompatibility.acquireFCVSnapshot())),
       intermediateBuilders(trackingContext) {}
@@ -90,7 +95,8 @@ bool schemaIncompatible(Bucket& bucket,
     return (result == Schema::UpdateStatus::Failed);
 }
 
-void calculateBucketFieldsAndSizeChange(const Bucket& bucket,
+void calculateBucketFieldsAndSizeChange(TrackingContext& trackingContext,
+                                        const Bucket& bucket,
                                         const BSONObj& doc,
                                         boost::optional<StringData> metaField,
                                         Bucket::NewFieldNames& newFieldNamesToBeInserted,
@@ -111,12 +117,13 @@ void calculateBucketFieldsAndSizeChange(const Bucket& bucket,
             continue;
         }
 
-        auto hashedKey = StringSet::hasher().hashed_key(fieldName);
+        auto hashedKey = TrackedStringSet::hasher().hashed_key(trackingContext, fieldName);
         if (!bucket.fieldNames.contains(hashedKey)) {
             // Record the new field name only if it hasn't been committed yet. There could
             // be concurrent batches writing to this bucket with the same new field name,
             // but they're not guaranteed to commit successfully.
-            newFieldNamesToBeInserted.push_back(hashedKey);
+            newFieldNamesToBeInserted.push_back(
+                StringMapHashedKey{hashedKey.key(), hashedKey.hash()});
 
             // Only update the bucket size once to account for the new field name if it
             // isn't already pending a commit from another batch.
@@ -147,12 +154,13 @@ std::shared_ptr<WriteBatch> activeBatch(TrackingContext& trackingContext,
     if (it == bucket.batches.end()) {
         it = bucket.batches
                  .try_emplace(opId,
-                              std::make_shared<WriteBatch>(trackingContext,
-                                                           BucketHandle{bucket.bucketId, stripe},
-                                                           bucket.key.cloneAsUntracked(),
-                                                           opId,
-                                                           stats,
-                                                           bucket.timeField))
+                              std::make_shared<WriteBatch>(
+                                  trackingContext,
+                                  BucketHandle{bucket.bucketId, stripe},
+                                  bucket.key.cloneAsUntracked(),
+                                  opId,
+                                  stats,
+                                  StringData{bucket.timeField.data(), bucket.timeField.size()}))
                  .first;
     }
     return it->second;

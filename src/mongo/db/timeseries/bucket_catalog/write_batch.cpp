@@ -45,17 +45,19 @@
 
 namespace mongo::timeseries::bucket_catalog {
 
-WriteBatch::WriteBatch(TrackingContext& trackingContext,
+WriteBatch::WriteBatch(TrackingContext& tc,
                        const BucketHandle& b,
                        BucketKey k,
                        OperationId o,
                        ExecutionStatsController& s,
                        StringData timeField)
-    : bucketHandle(b),
+    : trackingContext(tc),
+      bucketHandle(b),
       bucketKey(std::move(k)),
       opId(o),
       stats(s),
       timeField(timeField),
+      uncompressedBucketDoc(makeTrackedBson(tc, {})),
       intermediateBuilders(trackingContext) {}
 
 BSONObj WriteBatch::toBSON() const {
@@ -69,6 +71,15 @@ BSONObj WriteBatch::toBSON() const {
                                                     newFieldNamesToBeInserted.begin(), toFieldName),
                                                 boost::make_transform_iterator(
                                                     newFieldNamesToBeInserted.end(), toFieldName)));
+}
+
+const BSONObj& getUncompressedBucketDoc(const WriteBatch& batch) {
+    return batch.uncompressedBucketDoc.get().get();
+}
+
+void setUncompressedBucketDoc(WriteBatch& batch, BSONObj uncompressedBucketDoc) {
+    batch.uncompressedBucketDoc =
+        makeTrackedBson(batch.trackingContext, std::move(uncompressedBucketDoc));
 }
 
 bool claimWriteBatchCommitRights(WriteBatch& batch) {
