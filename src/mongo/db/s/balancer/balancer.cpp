@@ -720,9 +720,15 @@ void Balancer::_consumeActionStreamLoop() {
     executor::ScopedTaskExecutor executor(
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
 
-    ScopeGuard onExitCleanup([this, &executor] {
+    ScopeGuard onExitCleanup([this, &opCtx, &executor] {
         _defragmentationPolicy->interruptAllDefragmentations();
-        _autoMergerPolicy->disable();
+        try {
+            _autoMergerPolicy->disable(opCtx.get());
+        } catch (const DBException& e) {
+            LOGV2_WARNING(8145100,
+                          "Failed to log in config.changelog when disabling the auto merger",
+                          "error"_attr = redact(e));
+        }
         // Explicitly cancel and drain any outstanding streaming action already dispatched to the
         // task executor.
         executor->shutdown();
@@ -978,7 +984,7 @@ void Balancer::_mainThread() {
                     lastDrainingShardsCheckTime = Date_t::now();
                 }
 
-                _autoMergerPolicy->disable();
+                _autoMergerPolicy->disable(opCtx.get());
 
                 LOGV2_DEBUG(21859, 1, "Skipping balancing round because balancing is disabled");
                 _endRound(opCtx.get(), kBalanceRoundDefaultInterval);
@@ -986,7 +992,7 @@ void Balancer::_mainThread() {
             }
 
             if (balancerConfig->shouldBalanceForAutoMerge()) {
-                _autoMergerPolicy->enable();
+                _autoMergerPolicy->enable(opCtx.get());
             }
 
             LOGV2_DEBUG(21860,
@@ -999,7 +1005,7 @@ void Balancer::_mainThread() {
             _defragmentationPolicy->startCollectionDefragmentations(opCtx.get());
 
             // Reactivate the Automerger if needed.
-            _autoMergerPolicy->checkInternalUpdates();
+            _autoMergerPolicy->checkInternalUpdates(opCtx.get());
 
             // The current configuration is allowing the balancer to perform operations.
             // Unblock the secondary thread if needed.
@@ -1339,7 +1345,7 @@ void Balancer::_onActionsStreamPolicyStateUpdate() {
 
 void Balancer::notifyPersistedBalancerSettingsChanged(OperationContext* opCtx) {
     if (!Grid::get(opCtx)->getBalancerConfiguration()->shouldBalanceForAutoMerge()) {
-        _autoMergerPolicy->disable();
+        _autoMergerPolicy->disable(opCtx);
     }
 
     // Try to awake the main balancer thread

@@ -63,21 +63,24 @@ class AutoMergerPolicy : public ActionsStreamPolicy {
 
 public:
     AutoMergerPolicy(const std::function<void()>& onStateUpdated)
-        : _onStateUpdated(onStateUpdated), _enabled(false), _firstAction(true) {}
+        : _onStateUpdated(onStateUpdated),
+          _enabled(false),
+          _firstAction(true),
+          _withinRound(true) {}
 
     ~AutoMergerPolicy() {}
 
     /*
      * Enables/disables the AutoMerger.
      */
-    void enable();
-    void disable();
+    void enable(OperationContext* opCtx);
+    void disable(OperationContext* opCtx);
     bool isEnabled();
 
     /*
      * Check if the AutoMerger should be reactivated after a period of inactivity.
      */
-    void checkInternalUpdates();
+    void checkInternalUpdates(OperationContext* opCtx);
 
     /*
      * ActionsStreamPolicy overridden methods.
@@ -94,8 +97,8 @@ public:
     inline static constexpr int MAX_NUMBER_OF_CHUNKS_TO_MERGE = 1000;
 
 private:
-    void _init(WithLock lk);
-    void _checkInternalUpdatesWithLock(WithLock lk);
+    void _init(OperationContext* opCtx, WithLock lk);
+    void _checkInternalUpdatesWithLock(OperationContext* opCtx, WithLock lk);
     std::map<ShardId, std::vector<NamespaceString>> _getNamespacesWithMergeableChunksPerShard(
         OperationContext* opCtx);
 
@@ -109,6 +112,8 @@ private:
     bool _enabled;
 
     bool _firstAction;
+    // Set if there could be more mergeable chunks to process.
+    bool _withinRound;
     Timer _intervalTimer;
     Timestamp _maxHistoryTimeCurrentRound{0, 0};
     Timestamp _maxHistoryTimePreviousRound{0, 0};

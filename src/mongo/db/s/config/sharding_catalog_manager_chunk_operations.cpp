@@ -480,16 +480,18 @@ void logMergeToChangelog(OperationContext* opCtx,
                          const ChunkRange& chunkRange,
                          const size_t numChunks,
                          std::shared_ptr<Shard> configShard,
-                         ShardingCatalogClient* catalogClient) {
+                         ShardingCatalogClient* catalogClient,
+                         const bool isAutoMerge = false) {
     BSONObjBuilder logDetail;
     prevPlacementVersion.serialize("prevPlacementVersion", &logDetail);
     mergedVersion.serialize("mergedVersion", &logDetail);
     logDetail.append("owningShard", owningShard);
     chunkRange.append(&logDetail);
     logDetail.append("numChunks", static_cast<int>(numChunks));
+    auto what = isAutoMerge ? "autoMerge" : "merge";
 
     ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "merge",
+                                           what,
                                            nss,
                                            logDetail.obj(),
                                            WriteConcernOptions(),
@@ -1393,7 +1395,8 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 newChunk.getRange(),
                                 numMergedChunks.second.at(i),
                                 _localConfigShard,
-                                _localCatalogClient.get());
+                                _localCatalogClient.get(),
+                                true /*isAutoMerge*/);
 
             // we can know the prevVersion since newChunks vector is sorted by version
             prevVersion = newChunk.getVersion();

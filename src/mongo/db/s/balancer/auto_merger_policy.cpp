@@ -61,6 +61,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -80,23 +81,38 @@ namespace mongo {
 
 namespace {
 const std::string kPolicyName{"AutoMergerPolicy"};
+
+void logAutoMergeChange(OperationContext* opCtx, const std::string& what) {
+    auto catalogManager = ShardingCatalogManager::get(opCtx);
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           what,
+                                           NamespaceString::kEmpty,
+                                           BSONObj(),
+                                           WriteConcernOptions(),
+                                           std::move(catalogManager->localConfigShard()),
+                                           catalogManager->localCatalogClient());
+}
 }  // namespace
 
 
-void AutoMergerPolicy::enable() {
+void AutoMergerPolicy::enable(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_enabled) {
         _enabled = true;
-        _init(lk);
+        logAutoMergeChange(opCtx, "autoMerge.enable");
+        _init(opCtx, lk);
     }
 }
 
-void AutoMergerPolicy::disable() {
+void AutoMergerPolicy::disable(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
-    _enabled = false;
-    _collectionsToMergePerShard.clear();
-    _maxHistoryTimeCurrentRound = Timestamp(0, 0);
-    _maxHistoryTimePreviousRound = Timestamp(0, 0);
+    if (_enabled) {
+        _enabled = false;
+        _collectionsToMergePerShard.clear();
+        _maxHistoryTimeCurrentRound = Timestamp(0, 0);
+        _maxHistoryTimePreviousRound = Timestamp(0, 0);
+        logAutoMergeChange(opCtx, "autoMerge.disable");
+    }
 }
 
 bool AutoMergerPolicy::isEnabled() {
@@ -104,12 +120,12 @@ bool AutoMergerPolicy::isEnabled() {
     return _enabled;
 }
 
-void AutoMergerPolicy::checkInternalUpdates() {
+void AutoMergerPolicy::checkInternalUpdates(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_enabled) {
         return;
     }
-    _checkInternalUpdatesWithLock(lk);
+    _checkInternalUpdatesWithLock(opCtx, lk);
 }
 
 StringData AutoMergerPolicy::getName() const {
@@ -124,7 +140,7 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
         return boost::none;
     }
 
-    _checkInternalUpdatesWithLock(lk);
+    _checkInternalUpdatesWithLock(opCtx, lk);
 
     bool applyThrottling = false;
 
@@ -171,6 +187,11 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
         }
     }
 
+    if (_withinRound) {
+        // All mergeable chunks have been processed for the current round.
+        _withinRound = false;
+        logAutoMergeChange(opCtx, "autoMerge.end");
+    }
     return boost::none;
 }
 
@@ -220,23 +241,25 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
     }
 }
 
-void AutoMergerPolicy::_init(WithLock lk) {
+void AutoMergerPolicy::_init(OperationContext* opCtx, WithLock lk) {
     _maxHistoryTimePreviousRound = _maxHistoryTimeCurrentRound;
     _intervalTimer.reset();
     _collectionsToMergePerShard.clear();
     _firstAction = true;
+    _withinRound = true;
     _outstandingActions = 0;
     _onStateUpdated();
+    logAutoMergeChange(opCtx, "autoMerge.start");
 }
 
-void AutoMergerPolicy::_checkInternalUpdatesWithLock(WithLock lk) {
+void AutoMergerPolicy::_checkInternalUpdatesWithLock(OperationContext* opCtx, WithLock lk) {
     if (!_enabled || !_collectionsToMergePerShard.empty() || _outstandingActions) {
         return;
     }
 
     // Trigger Automerger every `autoMergerIntervalSecs` seconds
     if (_intervalTimer.seconds() > autoMergerIntervalSecs) {
-        _init(lk);
+        _init(opCtx, lk);
     }
 }
 
