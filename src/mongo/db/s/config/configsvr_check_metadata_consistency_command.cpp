@@ -179,7 +179,7 @@ public:
             OperationContext* opCtx,
             const CollectionType& coll,
             std::vector<MetadataInconsistencyItem>& inconsistenciesMerged) {
-            auto chunksInconsistencies = metadata_consistency_util::checkChunksConsistency(
+            auto chunksInconsistencies = metadata_consistency_util::checkChunksInconsistencies(
                 opCtx, coll, _getCollectionChunks(opCtx, coll));
 
             inconsistenciesMerged.insert(inconsistenciesMerged.end(),
@@ -194,7 +194,7 @@ public:
                 std::make_move_iterator(collectionsInconsistencies.begin()),
                 std::make_move_iterator(collectionsInconsistencies.end()));
 
-            auto zonesInconsistencies = metadata_consistency_util::checkZonesConsistency(
+            auto zonesInconsistencies = metadata_consistency_util::checkZonesInconsistencies(
                 opCtx, coll, _getCollectionZones(opCtx, coll.getNss()));
 
             inconsistenciesMerged.insert(inconsistenciesMerged.end(),

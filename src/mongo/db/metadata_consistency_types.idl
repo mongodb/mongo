@@ -45,7 +45,6 @@ enums:
             kHiddenShardedCollection: "HiddenShardedCollection"
             kInconsistentIndex: "InconsistentIndex"
             kMisplacedCollection: "MisplacedCollection"
-            kMissingLocalCollection: "MissingLocalCollection"
             kMissingRoutingTable: "MissingRoutingTable"
             kMissingShardKeyIndex: "MissingShardKeyIndex"
             kRoutingTableMissingMaxKey: "RoutingTableMissingMaxKey"
@@ -62,8 +61,7 @@ enums:
         description: "Description of each metadata inconsistency."
         type: string
         values:
-            kMissingLocalCollection: "Collection registered on the sharding catalog not found on the given shards"
-            kCollectionOptionsMismatch: "Found collection with mismatching options across shards and/or config server"
+            kCollectionOptionsMismatch: "Found collection with mismatching options between the shard and the config server"
             kCollectionUUIDMismatch: "Found collection on non primary shard with mismatching UUID"
             kCorruptedChunkShardKey: "Found chunk with a shard key pattern violation"
             kCorruptedZoneShardKey: "Found zone with a shard key pattern violation"
@@ -105,21 +103,6 @@ structs:
                 type: uuid
                 description: "The UUID of the collection that is misplaced."
 
-    MissingLocalCollectionDetails:
-        description: "Details about a local collection not found inconsistency."
-        strict: false
-        fields:
-            namespace:
-                cpp_name: nss
-                type: namespacestring
-                description: "The namespace of the collection that has not been found on any shard."
-            uuid:
-                type: uuid
-                description: "The UUID of the collection registered on the sharding catalog."
-            shard:
-                type: shard_id
-                description: "The shard where the collection is missing."
-
     CollectionOptionsMismatchDetails:
         description: "Details about a collection options mismatch inconsistency."
         strict: false
@@ -127,10 +110,10 @@ structs:
             namespace:
                 cpp_name: nss
                 type: namespacestring
-                description: "The namespace of the collection that has a collection options mismatch."
+                description: "The namespace of the collection that has an options mismatch."
             options:
                 type: array<object>
-                description: "A list of the different options found per shard and/or config server."
+                description: "A list of the different options found per shard or config server."
 
     CollectionUUIDMismatchDetails:
         description: "Details about a UUID mismatch inconsistency."
