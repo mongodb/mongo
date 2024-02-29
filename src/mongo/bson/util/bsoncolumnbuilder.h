@@ -36,6 +36,7 @@
 #include <functional>
 #include <memory>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "mongo/bson/bsonelement.h"
@@ -73,22 +74,156 @@ struct Element {
  * object to compress.
  */
 struct EncodingState {
+    struct Encoder64;
+    struct Encoder128;
+
     template <class F>
-    class Simple8bBlockWriter {
+    class Simple8bBlockWriter128 {
     public:
-        Simple8bBlockWriter(EncodingState& encoder, BufBuilder& buffer, F controlBlockWriter)
-            : _encoder(encoder), _buffer(buffer), _controlBlockWriter(controlBlockWriter) {}
+        Simple8bBlockWriter128(BufBuilder& buffer,
+                               ptrdiff_t& controlByteOffset,
+                               F controlBlockWriter)
+            : _buffer(buffer),
+              _controlByteOffset(controlByteOffset),
+              _controlBlockWriter(std::move(controlBlockWriter)) {}
 
         void operator()(uint64_t block);
 
     private:
-        EncodingState& _encoder;
         BufBuilder& _buffer;
+        ptrdiff_t& _controlByteOffset;
+        F _controlBlockWriter;
+    };
+
+    template <class F>
+    class Simple8bBlockWriter64 {
+    public:
+        Simple8bBlockWriter64(Encoder64& encoder,
+                              BufBuilder& buffer,
+                              ptrdiff_t& controlByteOffset,
+                              BSONType type,
+                              F controlBlockWriter)
+            : _encoder(encoder),
+              _buffer(buffer),
+              _controlByteOffset(controlByteOffset),
+              _type(type),
+              _controlBlockWriter(std::move(controlBlockWriter)) {}
+
+        void operator()(uint64_t block);
+
+    private:
+        Encoder64& _encoder;
+        BufBuilder& _buffer;
+        ptrdiff_t& _controlByteOffset;
+        BSONType _type;
         F _controlBlockWriter;
     };
 
     struct NoopControlBlockWriter {
         void operator()(ptrdiff_t, size_t) const {}
+    };
+
+    // Encoder state for 64bit types
+    struct Encoder64 {
+        Encoder64();
+
+        // Initializes this encoder to uncompressed element to allow for future delta calculations.
+        void initialize(Element elem);
+
+        // Calculates and appends delta for this element compared to last.
+        template <class F>
+        bool appendDelta(Element elem,
+                         Element previous,
+                         BufBuilder& buffer,
+                         ptrdiff_t& controlByteOffset,
+                         F controlBlockWriter);
+
+        // Appends encoded value to simple8b builder
+        template <class F>
+        bool append(BSONType type,
+                    uint64_t value,
+                    BufBuilder& buffer,
+                    ptrdiff_t& controlByteOffset,
+                    F controlBlockWriter);
+
+        // Appends skip to simple8b builder
+        template <class F>
+        void skip(BSONType type,
+                  BufBuilder& buffer,
+                  ptrdiff_t& controlByteOffset,
+                  F controlBlockWriter);
+
+        // Flushes simple8b builder, causes all pending values to be written as blocks
+        template <class F>
+        void flush(BSONType type,
+                   BufBuilder& buffer,
+                   ptrdiff_t& controlByteOffset,
+                   F controlBlockWriter);
+
+        // Simple-8b builder for storing compressed deltas
+        Simple8bBuilder<uint64_t> simple8bBuilder;
+        // Additional variables needed for tracking previous state
+        int64_t prevDelta = 0;
+        int64_t prevEncoded64 = 0;
+        double lastValueInPrevBlock = 0;
+        uint8_t scaleIndex;
+
+    private:
+        // Helper to append doubles to this Column builder. Returns true if append was successful
+        // and false if the value needs to be stored uncompressed.
+        template <class F>
+        bool _appendDouble(double value,
+                           double previous,
+                           BufBuilder& buffer,
+                           ptrdiff_t& controlByteOffset,
+                           F controlBlockWriter);
+
+        // Tries to rescale current pending values + one additional value into a new
+        // Simple8bBuilder. Returns the new Simple8bBuilder if rescaling was possible and none
+        // otherwise.
+        boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
+                                                                      uint8_t newScaleIndex) const;
+    };
+
+    // Encoder state for 128bit types
+    struct Encoder128 {
+        // Initializes this encoder to uncompressed element to allow for future delta calculations.
+        void initialize(Element elem);
+
+        // Calculates and appends delta for this element compared to last.
+        template <class F>
+        bool appendDelta(Element elem,
+                         Element previous,
+                         BufBuilder& buffer,
+                         ptrdiff_t& controlByteOffset,
+                         F controlBlockWriter);
+
+        // Appends encoded value to simple8b builder
+        template <class F>
+        bool append(BSONType type,
+                    uint128_t value,
+                    BufBuilder& buffer,
+                    ptrdiff_t& controlByteOffset,
+                    F controlBlockWriter);
+
+        // Appends skip to simple8b builder
+        template <class F>
+        void skip(BSONType type,
+                  BufBuilder& buffer,
+                  ptrdiff_t& controlByteOffset,
+                  F controlBlockWriter);
+
+        // Flushes simple8b builder, causes all pending values to be written as blocks
+        template <class F>
+        void flush(BSONType type,
+                   BufBuilder& buffer,
+                   ptrdiff_t& controlByteOffset,
+                   F controlBlockWriter);
+
+        // Simple-8b builder for storing compressed deltas
+        Simple8bBuilder<uint128_t> simple8bBuilder;
+        // Additional variables needed for previous state
+        boost::optional<int128_t> prevEncoded128;
     };
 
     EncodingState();
@@ -100,6 +235,9 @@ struct EncodingState {
     template <class F>
     void flush(BufBuilder& buffer, F controlBlockWriter);
 
+    template <class Encoder, class F>
+    void appendDelta(
+        Encoder& encoder, Element elem, Element previous, BufBuilder& buffer, F controlBlockWriter);
     Element _previous() const;
     void _storePrevious(Element elem);
     template <class F>
@@ -107,17 +245,6 @@ struct EncodingState {
     void _initializeFromPrevious();
     template <class F>
     ptrdiff_t _incrementSimple8bCount(BufBuilder& buffer, F controlBlockWriter);
-
-    // Helper to append doubles to this Column builder. Returns true if append was successful
-    // and false if the value needs to be stored uncompressed.
-    template <class F>
-    bool _appendDouble(double value, double previous, BufBuilder& buffer, F controlBlockWriter);
-
-    // Tries to rescale current pending values + one additional value into a new
-    // Simple8bBuilder. Returns the new Simple8bBuilder if rescaling was possible and none
-    // otherwise.
-    boost::optional<Simple8bBuilder<uint64_t>> _tryRescalePending(int64_t encoded,
-                                                                  uint8_t newScaleIndex);
 
     /**
      * Copyable memory buffer
@@ -136,27 +263,14 @@ struct EncodingState {
         int capacity = 0;
     };
 
+    // Encoders for 64bit and 128bit types.
+    std::variant<Encoder64, Encoder128> _encoder;
+
     // Storage for the previously appended BSONElement
     CloneableBuffer _prev;
 
-    // This is only used for types that use delta of delta.
-    int64_t _prevDelta = 0;
-
-    // Simple-8b builder for storing compressed deltas
-    Simple8bBuilder<uint64_t> _simple8bBuilder64;
-    Simple8bBuilder<uint128_t> _simple8bBuilder128;
-
-    // Chose whether to use 128 or 64 Simple-8b builder
-    bool _storeWith128 = false;
-
     // Offset to last Simple-8b control byte
     std::ptrdiff_t _controlByteOffset;
-
-    // Additional variables needed for previous state
-    int64_t _prevEncoded64 = 0;
-    boost::optional<int128_t> _prevEncoded128;
-    double _lastValueInPrevBlock = 0;
-    uint8_t _scaleIndex;
 };
 }  // namespace bsoncolumn
 
