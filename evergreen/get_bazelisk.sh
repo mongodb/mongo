@@ -33,8 +33,7 @@ if [[ $ARCH == "ppc64le" ]]; then
   REMOTE_PATH=https://mdb-build-public.s3.amazonaws.com/bazel-binaries/bazel-6.4.0-${ARCH}
   LOCAL_PATH=$TMPDIR/bazel
 else
-  # TODO(SERVER-81038): remove once bazel/bazelisk is self-hosted.
-  REMOTE_PATH=https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-${OS}-${ARCH}${EXT}
+  REMOTE_PATH=https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-${OS}-${ARCH}${EXT}
   LOCAL_PATH=$TMPDIR/bazelisk
 fi
 

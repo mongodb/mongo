@@ -216,8 +216,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-  - func: "fetch bazel"
   - func: "scons compile"
     vars:
       targets: >-
@@ -241,8 +239,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-  - func: "fetch bazel"
   - func: "scons compile"
     vars:
       targets: >-
@@ -269,7 +265,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
   - func: "fetch bazel"
   - func: "bazel compile (gcc)"
     vars:
@@ -285,8 +280,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-  - func: "fetch bazel"
   - func: "scons compile"
     vars:
       targets: >-
@@ -310,8 +303,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-  - func: "fetch bazel"
   - func: "scons compile"
     vars:
       targets: >-
@@ -336,8 +327,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-  - func: "fetch bazel"
   - func: "scons compile"
     vars:
       targets: >-
@@ -361,8 +350,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
-  - func: "fetch bazel"
   - func: "scons compile"
     vars:
       targets: >-
@@ -388,7 +375,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
   - func: "fetch bazel"
   - func: "bazel run"
     vars:
@@ -403,7 +389,6 @@ tasks:
   - name: version_expansions_gen
     variant: generate-tasks-for-version
   commands:
-  # TODO SERVER-81038: Remove "fetch bazel" once bazelisk is self-hosted.
   - func: "fetch bazel"
   - func: "bazel run"
     vars:

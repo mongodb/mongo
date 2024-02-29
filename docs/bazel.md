@@ -16,7 +16,7 @@ To generate and install the engflow credentials:
 
 To perform a Bazel build and _bypass_ SCons:
 
--   Install Bazelisk: `curl -L https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 --output /tmp/bazelisk && chmod +x /tmp/bazelisk`
+-   Install Bazelisk: `curl -L https://mdb-build-public.s3.amazonaws.com/bazelisk-binaries/v1.19.0/bazelisk-linux-arm64 --output /tmp/bazelisk && chmod +x /tmp/bazelisk`
 -   Build the Bazel-compatible target: `/tmp/bazelisk build --verbose_failures  src/mongo/db/commands:fsync_locked`
 
 To perform a Bazel build using a local Buildfarm (to test remote execution capability):

@@ -540,7 +540,6 @@ class BazelConversionCandidates(Analyzer):
 
         # Note: //... is the bazel catch-all for referencing all targets in that directory. For
         # example, //src/... will expand to include all targets under //src/.
-        # TODO(SERVER-81038): remove /tmp/ prefix once bazel/bazelisk is self-hosted.
         proc = subprocess.run(["/tmp/bazelisk", "query", "//..."], capture_output=True, text=True,
                               check=True)
 

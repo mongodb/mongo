@@ -14,7 +14,6 @@ RUN git clone -b 2.3.1 https://github.com/bazelbuild/bazel-buildfarm.git
 # Switch into the cloned Buildfarm repository
 WORKDIR /bazel-buildfarm
 
-# TODO(SERVER-81038): remove once bazel/bazelisk is self-hosted.
 # Obtain Bazelisk and make it executable
 RUN wget https://github.com/bazelbuild/bazelisk/releases/download/v1.17.0/bazelisk-linux-arm64 -O bazelisk && chmod +x bazelisk
 
